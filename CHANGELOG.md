@@ -140,7 +140,17 @@ format.
   `mrhiScalarType`, `mrhiInterpolation` and `mrhiSampling`,
   `mrhiShaderBuiltins`, workgroup storage, required constants),
   identified by a SHA-256 digest; `mrhiCreateShader` checks every byte
-  as hostile input and the container against the device's limits, `mrhiDestroyShader` and `mrhiGetShaderInfo`; the
-  device's `shaders` limit. `tools/mrhi_container.py` writes them from
+  as hostile input and the container against the device's limits;
+  `mrhiDestroyShader` and `mrhiGetShaderInfo`; the device's `shaders`
+  limit. `tools/mrhi_container.py` writes them from
   the two modules and a JSON reflection, refusing code that disagrees
   with it.
+- Compute pipelines (mrhi-0010, `pipeline.h`): `mrhiCreateComputePipeline`
+  returns the pipeline and a request answered by
+  `mrhi_devicePipelineReady` in the device's queue, whose room it
+  reserves; `mrhiDestroyComputePipeline` answers a pending one stale;
+  specialization constants as doubles checked against their types,
+  with every constant without a default required; pipelines keep working
+  after their shader is destroyed; frames and pipelines share one
+  request space; the device's `pipelines` limit and the test adapter's
+  `pipelineOutcome`.

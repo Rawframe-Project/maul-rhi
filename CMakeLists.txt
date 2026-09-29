@@ -59,8 +59,10 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/memory.c
     src/notify.c
     src/pass.c
+    src/pipeline.c
     src/plan.c
     src/pool.c
+    src/reflection.c
     src/resources.c
     src/sha256.c
     src/shader.c
@@ -100,6 +102,7 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(plan)
         maul_add_test(memory)
         maul_add_test(shader WHITEBOX)
+        maul_add_test(pipeline WHITEBOX)
         # The container writer against the reader, where Python runs.
         find_package(Python3 COMPONENTS Interpreter)
         if(TARGET test_shader AND Python3_Interpreter_FOUND AND NOT CMAKE_CROSSCOMPILING)

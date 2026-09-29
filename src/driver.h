@@ -8,9 +8,9 @@
 #ifndef MAUL_RHI_SRC_DRIVER_H
 #define MAUL_RHI_SRC_DRIVER_H
 
-#include "container.h"
+#include "reflection.h"
 
-#include "maul-rhi/frame.h"
+#include "maul-rhi/pipeline.h"
 
 // The SPI version a driver's vtable must carry.
 #define MRHI_SPI_VERSION 1
@@ -31,6 +31,21 @@ typedef struct mrhiDriverEvent
     uint64_t tag;
     mrhiResult outcome;
 } mrhiDriverEvent;
+
+// A compute pipeline the core has checked, as its driver makes it: its
+// label, its shader's driver handle and reflection, the entry point
+// there, and the program's constant values, each id known and at most
+// once, with every required one given.
+typedef struct mrhiDriverComputePipeline
+{
+    const char* label;
+    size_t labelLength;
+    uint64_t shader;
+    const mrhiReflection* reflection;
+    uint32_t entry;
+    const mrhiConstantValue* constants;
+    uint32_t constantCount;
+} mrhiDriverComputePipeline;
 
 // The driver side of a device: its vtable and pointer. A device driver
 // is made at once and opens in the background; its instance driver
@@ -69,6 +84,14 @@ typedef struct mrhiDeviceDriverVtable
     mrhiResult (*createShader)(void* self, const mrhiShaderDef* def, const mrhiContainer* container,
                                uint64_t* handleOut);
     void (*destroyShader)(void* self, uint64_t handle);
+    // Starts a compute pipeline, answered by a poll event with the tag; its
+    // handle, never zero, at once. An immediate failure is returned
+    // instead. Everything it is given is only read during the call.
+    mrhiResult (*createComputePipeline)(void* self, const mrhiDriverComputePipeline* pipeline,
+                                        uint64_t tag, uint64_t* handleOut);
+    // Destroys a pipeline, pending or not; a pending one is never
+    // reported.
+    void (*destroyPipeline)(void* self, uint64_t handle);
     // The bytes a declared texture with its derived usages takes, and
     // their alignment, a power of two; 0 bytes when the GPU keeps it on
     // chip.
@@ -81,8 +104,8 @@ typedef struct mrhiDeviceDriverVtable
     // Runs a frame on the GPU; finished, it is reported by poll with the
     // tag.
     mrhiResult (*submitFrame)(void* self, uint64_t tag);
-    // Moves up to capacity finished frames into events and returns how
-    // many it moved.
+    // Moves up to capacity finished frames and pipelines into events and
+    // returns how many it moved.
     size_t (*poll)(void* self, mrhiDriverEvent* events, size_t capacity);
     // Waits up to timeoutNs for a frame and returns whether it finished;
     // a finished frame is still reported by poll.

@@ -4890,6 +4890,11 @@
               "name": "shaders",
               "type": "uint32",
               "doc": "Shader containers the device holds at once; 256 by default."
+            },
+            {
+              "name": "pipelines",
+              "type": "uint32",
+              "doc": "Graphics and compute pipelines the device holds at once; 1024 by default."
             }
           ]
         },
@@ -8236,6 +8241,11 @@
               "name": "device_frame_done",
               "value": 0,
               "doc": "A submitted frame finished on the GPU: its outcome is mrhi_success, or the error that ended it."
+            },
+            {
+              "name": "device_pipeline_ready",
+              "value": 1,
+              "doc": "A pipeline's creation finished: its outcome is mrhi_success, the error that ended it, or mrhi_errorStale when it was destroyed first."
             }
           ]
         },
@@ -8251,7 +8261,7 @@
             {
               "name": "request_id",
               "type": "id.request_id",
-              "doc": "The request the record answers: a frame's token."
+              "doc": "The request the record answers: a frame's token or a pipeline's request, unique on the device."
             },
             {
               "name": "outcome",
@@ -11940,10 +11950,165 @@
       ]
     },
     {
+      "name": "pipeline",
+      "doc": "Pipelines: a shader container's entry points with everything fixed for them, made asynchronously and answered in the device's queue. A pipeline's binding layout is its container's reflection, and it keeps working after its shader is destroyed.",
+      "includes": [
+        "shader"
+      ],
+      "items": [
+        {
+          "kind": "struct",
+          "name": "constant_value",
+          "doc": "A value for a specialization constant, converted to the constant's type: a boolean 0 or 1, an integer within its type's range, or a finite float within 32-bit range.",
+          "members": [
+            {
+              "name": "id",
+              "type": "uint32",
+              "doc": "The constant's id in the container."
+            },
+            {
+              "name": "value",
+              "type": "float64",
+              "doc": "Its value."
+            }
+          ]
+        },
+        {
+          "kind": "id",
+          "name": "compute_pipeline_id",
+          "doc": "A compute pipeline of a device."
+        },
+        {
+          "kind": "struct",
+          "name": "compute_pipeline_def",
+          "def": true,
+          "doc": "How a compute pipeline is made: a shader's compute entry point and its constants. Build it with mrhiDefaultComputePipelineDef.",
+          "members": [
+            {
+              "name": "label",
+              "type": "char",
+              "pointer": "const",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
+            },
+            {
+              "name": "label_length",
+              "type": "size",
+              "doc": "The label's bytes."
+            },
+            {
+              "name": "shader",
+              "type": "id.shader_id",
+              "doc": "The shader container."
+            },
+            {
+              "name": "entry",
+              "type": "char",
+              "pointer": "const",
+              "doc": "The compute entry point's name, entryLength bytes. Only read during the call."
+            },
+            {
+              "name": "entry_length",
+              "type": "size",
+              "doc": "The name's bytes."
+            },
+            {
+              "name": "constants",
+              "type": "struct.constant_value",
+              "pointer": "const",
+              "doc": "Values for the container's constants, each id at most once; every constant without a default needs one. NULL when constantCount is 0. Only read during the call."
+            },
+            {
+              "name": "constant_count",
+              "type": "uint32",
+              "doc": "The values."
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_compute_pipeline_def",
+          "doc": "Returns the default compute pipeline def, with no shader or entry, which must be set.",
+          "returns": {
+            "type": "struct.compute_pipeline_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "create_compute_pipeline",
+          "doc": "Makes a compute pipeline on a ready device. It returns at once with the pipeline pending, and the device's queue answers the request with mrhi_devicePipelineReady; a pipeline is usable once that answer is mrhi_success.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` with the pipeline pending; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an entry the shader has not as a compute entry, a constant the shader has not, twice, or with a value its type cannot hold, or a constant without a default left unset; `mrhi_errorStale` for a shader the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's pipeline limit is reached or its queue has no room for the answer; `mrhi_errorPlatform` when the driver refuses at once."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "def",
+              "type": "struct.compute_pipeline_def",
+              "pointer": "const",
+              "doc": "The pipeline to make."
+            },
+            {
+              "name": "pipeline_out",
+              "type": "id.compute_pipeline_id",
+              "pointer": "mutable",
+              "doc": "Receives the pipeline."
+            },
+            {
+              "name": "request_out",
+              "type": "id.request_id",
+              "pointer": "mutable",
+              "doc": "Receives the id its ready record answers."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "destroy_compute_pipeline",
+          "doc": "Destroys a compute pipeline. A pending one's request is answered with mrhi_errorStale.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device; `mrhi_errorStale` for a pipeline the device no longer has."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pipeline",
+              "type": "id.compute_pipeline_id",
+              "doc": "The pipeline."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        }
+      ]
+    },
+    {
       "name": "test",
       "doc": "The test driver (MAUL_RHI_TEST_DRIVER): a driver without a GPU whose adapters a test describes, for the library's tests and a program's own.",
       "includes": [
-        "shader"
+        "pipeline"
       ],
       "items": [
         {
@@ -11991,6 +12156,11 @@
               "name": "frame_outcome",
               "type": "result",
               "doc": "The outcome its devices' frames finish with; mrhi_success by default."
+            },
+            {
+              "name": "pipeline_outcome",
+              "type": "result",
+              "doc": "What pipelines made on the adapter's devices are answered with at the next poll: mrhi_success, or the error their creation fails with."
             }
           ]
         },

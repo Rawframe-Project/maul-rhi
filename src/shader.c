@@ -2,14 +2,11 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Shader containers on a device (mrhi-0009): the container checked as
-// hostile input, its reflection kept in one block from the device's
-// allocator, and its code handed to the driver.
+// hostile input and against the device, its reflection kept for the
+// shader and its pipelines, and its code handed to the driver.
 
-#include "allocator.h"
 #include "device_core.h"
 
-#include <stdalign.h>
-#include <stddef.h>
 #include <string.h>
 
 #define SHADER_DEF_COOKIE 0x6D727368u
@@ -19,113 +16,6 @@ mrhiShaderDef mrhiDefaultShaderDef(void)
     mrhiShaderDef def = {0};
     def.cookie = SHADER_DEF_COOKIE;
     return def;
-}
-
-// Where each part of a shader's reflection block starts.
-typedef struct ReflectionParts
-{
-    size_t entries;
-    size_t bindings;
-    size_t inputs;
-    size_t outputs;
-    size_t variables;
-    size_t constants;
-    size_t names;
-} ReflectionParts;
-
-// The bytes of a container's entries' names.
-static size_t NameBytes(const mrhiContainer* container)
-{
-    size_t bytes = 0;
-    for (uint32_t i = 0; i < container->entryCount; ++i)
-    {
-        bytes += mrhiContainerEntry(container, i).nameLength;
-    }
-    return bytes;
-}
-
-// Copies a container's reflection into a new block for the slot: true,
-// or false when the allocator fails.
-static bool KeepReflection(const mrhiAllocator* allocator, const mrhiContainer* container,
-                           mrhiShaderSlot* slot)
-{
-    mrhiLayout layout = {0};
-    ReflectionParts parts = {
-        .entries = mrhiLayoutAdd(&layout, container->entryCount, sizeof(mrhiShaderEntry),
-                                 alignof(mrhiShaderEntry)),
-        .bindings = mrhiLayoutAdd(&layout, container->bindingCount, sizeof(mrhiShaderBinding),
-                                  alignof(mrhiShaderBinding)),
-        .inputs = mrhiLayoutAdd(&layout, container->inputCount, sizeof(mrhiShaderVariable),
-                                alignof(mrhiShaderVariable)),
-        .outputs = mrhiLayoutAdd(&layout, container->outputCount, sizeof(mrhiShaderVariable),
-                                 alignof(mrhiShaderVariable)),
-        .variables = mrhiLayoutAdd(&layout, container->variableCount, sizeof(mrhiShaderVariable),
-                                   alignof(mrhiShaderVariable)),
-        .constants = mrhiLayoutAdd(&layout, container->constantCount, sizeof(mrhiShaderConstant),
-                                   alignof(mrhiShaderConstant)),
-        .names = mrhiLayoutAdd(&layout, NameBytes(container), 1, 1),
-    };
-    unsigned char* block =
-        layout.overflow ? nullptr : mrhiAllocate(allocator, layout.size, alignof(max_align_t));
-    if (block == nullptr)
-    {
-        return false;
-    }
-    slot->reflection = block;
-    slot->reflectionBytes = layout.size;
-    slot->entries = (mrhiShaderEntry*)(block + parts.entries);
-    slot->bindings = (mrhiShaderBinding*)(block + parts.bindings);
-    slot->inputs = (mrhiShaderVariable*)(block + parts.inputs);
-    slot->outputs = (mrhiShaderVariable*)(block + parts.outputs);
-    slot->variables = (mrhiShaderVariable*)(block + parts.variables);
-    slot->constants = (mrhiShaderConstant*)(block + parts.constants);
-    char* names = (char*)(block + parts.names);
-    slot->names = names;
-    uint32_t packed = 0;
-    for (uint32_t i = 0; i < container->entryCount; ++i)
-    {
-        mrhiShaderEntry entry = mrhiContainerEntry(container, i);
-        memcpy(names + packed, container->strings + entry.nameOffset, entry.nameLength);
-        entry.nameOffset = packed;
-        packed += entry.nameLength;
-        slot->entries[i] = entry;
-    }
-    for (uint32_t i = 0; i < container->bindingCount; ++i)
-    {
-        slot->bindings[i] = mrhiContainerBinding(container, i);
-    }
-    for (uint32_t i = 0; i < container->inputCount; ++i)
-    {
-        slot->inputs[i] = mrhiContainerInput(container, i);
-    }
-    for (uint32_t i = 0; i < container->outputCount; ++i)
-    {
-        slot->outputs[i] = mrhiContainerOutput(container, i);
-    }
-    for (uint32_t i = 0; i < container->variableCount; ++i)
-    {
-        slot->variables[i] = mrhiContainerVariable(container, i);
-    }
-    for (uint32_t i = 0; i < container->constantCount; ++i)
-    {
-        slot->constants[i] = mrhiContainerConstant(container, i);
-    }
-    memcpy(slot->digest, container->digest, MRHI_DIGEST_BYTES);
-    slot->rootBlockBytes = container->rootBlockBytes;
-    slot->entryCount = container->entryCount;
-    slot->bindingCount = container->bindingCount;
-    slot->inputCount = container->inputCount;
-    slot->outputCount = container->outputCount;
-    slot->variableCount = container->variableCount;
-    slot->constantCount = container->constantCount;
-    return true;
-}
-
-// Frees a slot's reflection and marks the slot free.
-static void ReleaseReflection(const mrhiAllocator* allocator, mrhiShaderSlot* slot)
-{
-    mrhiRelease(allocator, slot->reflection, slot->reflectionBytes, alignof(max_align_t));
-    *slot = (mrhiShaderSlot){0};
 }
 
 // Whether a container's bindings fit the device's limits: slots, binding
@@ -290,7 +180,8 @@ mrhiResult mrhiCreateShader(mrhiDevice* device, const mrhiShaderDef* def, mrhiSh
         return mrhi_errorCapacity;
     }
     mrhiShaderSlot* slot = &device->shaderSlots[index1 - 1];
-    if (!KeepReflection(&device->allocator, &container, slot))
+    slot->reflection = mrhiKeepReflection(&device->allocator, &container);
+    if (slot->reflection == nullptr)
     {
         mrhiPoolRelease(&device->shaders, index1);
         return mrhi_errorCapacity;
@@ -299,7 +190,8 @@ mrhiResult mrhiCreateShader(mrhiDevice* device, const mrhiShaderDef* def, mrhiSh
         device->driver.vtable->createShader(device->driver.self, def, &container, &slot->handle);
     if (status != mrhi_success)
     {
-        ReleaseReflection(&device->allocator, slot);
+        mrhiReleaseReflection(&device->allocator, slot->reflection);
+        *slot = (mrhiShaderSlot){0};
         mrhiPoolRelease(&device->shaders, index1);
         return status;
     }
@@ -319,7 +211,8 @@ mrhiResult mrhiDestroyShader(mrhiDevice* device, mrhiShaderId shader)
     }
     mrhiShaderSlot* slot = &device->shaderSlots[shader.index1 - 1];
     device->driver.vtable->destroyShader(device->driver.self, slot->handle);
-    ReleaseReflection(&device->allocator, slot);
+    mrhiReleaseReflection(&device->allocator, slot->reflection);
+    *slot = (mrhiShaderSlot){0};
     mrhiPoolRelease(&device->shaders, shader.index1);
     return mrhi_success;
 }
@@ -338,13 +231,13 @@ mrhiResult mrhiGetShaderInfo(mrhiDevice* device, mrhiShaderId shader, mrhiShader
     {
         return mrhi_errorStale;
     }
-    const mrhiShaderSlot* slot = &device->shaderSlots[shader.index1 - 1];
+    const mrhiReflection* reflection = device->shaderSlots[shader.index1 - 1].reflection;
     *infoOut = (mrhiShaderInfo){
-        .entryCount = slot->entryCount,
-        .bindingCount = slot->bindingCount,
-        .rootBlockBytes = slot->rootBlockBytes,
+        .entryCount = reflection->entryCount,
+        .bindingCount = reflection->bindingCount,
+        .rootBlockBytes = reflection->rootBlockBytes,
     };
-    memcpy(infoOut->digest, slot->digest, MRHI_DIGEST_BYTES);
+    memcpy(infoOut->digest, reflection->digest, MRHI_DIGEST_BYTES);
     return mrhi_success;
 }
 
@@ -356,7 +249,8 @@ void mrhiDestroyShaders(mrhiDevice* device)
         if (slot->reflection != nullptr)
         {
             device->driver.vtable->destroyShader(device->driver.self, slot->handle);
-            ReleaseReflection(&device->allocator, slot);
+            mrhiReleaseReflection(&device->allocator, slot->reflection);
+            *slot = (mrhiShaderSlot){0};
         }
     }
 }

@@ -65,6 +65,9 @@ extern "C"
         uint32_t frameBarriers;
         // Shader containers the device holds at once; 256 by default.
         uint32_t shaders;
+        // Graphics and compute pipelines the device holds at once; 1024 by
+        // default.
+        uint32_t pipelines;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the

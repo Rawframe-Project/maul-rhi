@@ -153,12 +153,22 @@ static size_t GetAdapters(const void* self, mrhiDriverAdapter* adapters, size_t 
 // The frames a test device runs at once.
 #define TEST_FRAMES 16
 
+// The pipeline creations a test device holds unanswered.
+#define TEST_PIPELINES 64
+
 // A frame the test device runs, and whether a wait finished it.
 typedef struct TestFrame
 {
     uint64_t tag;
     bool done;
 } TestFrame;
+
+// A pipeline creation the next poll answers.
+typedef struct TestPipeline
+{
+    uint64_t tag;
+    uint64_t handle;
+} TestPipeline;
 
 typedef struct TestView
 {
@@ -178,8 +188,13 @@ typedef struct TestDevice
     uint32_t buffers;
     uint64_t bufferBytes;
     uint32_t textures;
-    // Live shaders; the core destroys each before the device.
+    // Live shaders and pipelines; the core destroys each before the device.
     uint32_t shaders;
+    uint32_t pipelines;
+    // Pipeline creations not answered yet, and what they are answered with.
+    TestPipeline pending[TEST_PIPELINES];
+    uint32_t pendingCount;
+    mrhiResult pipelineOutcome;
     // The last label an object was given, copied as a real driver would.
     char label[MRHI_LABEL_BYTES + 1];
     // Configured surfaces; the core ends each before the device.
@@ -327,6 +342,43 @@ static void DestroyShader(void* self, uint64_t handle)
     --device->shaders;
 }
 
+static mrhiResult CreateComputePipeline(void* self, const mrhiDriverComputePipeline* pipeline,
+                                        uint64_t tag, uint64_t* handleOut)
+{
+    TestDevice* device = self;
+    Name(device, pipeline->label, pipeline->labelLength);
+    MRHI_ASSERT(pipeline->shader != 0 && tag > UINT32_MAX &&
+                pipeline->entry < pipeline->reflection->entryCount &&
+                pipeline->reflection->entries[pipeline->entry].stage == mrhi_stageCompute);
+    if (device->pendingCount == TEST_PIPELINES)
+    {
+        return mrhi_errorPlatform;
+    }
+    mrhiResult status = MakeObject(device, handleOut);
+    if (status == mrhi_success)
+    {
+        device->pending[device->pendingCount++] = (TestPipeline){tag, *handleOut};
+        ++device->pipelines;
+    }
+    return status;
+}
+
+// Destroys a pipeline, dropping its answer if it is still pending.
+static void DestroyPipeline(void* self, uint64_t handle)
+{
+    TestDevice* device = self;
+    MRHI_ASSERT(handle != 0 && handle <= device->nextHandle && device->pipelines > 0);
+    for (uint32_t i = 0; i < device->pendingCount; ++i)
+    {
+        if (device->pending[i].handle == handle)
+        {
+            device->pending[i] = device->pending[--device->pendingCount];
+            break;
+        }
+    }
+    --device->pipelines;
+}
+
 static mrhiResult ConfigureSurface(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
                                    uint64_t oldSwapchain, uint64_t* swapchainOut)
 {
@@ -384,12 +436,17 @@ static mrhiResult SubmitFrame(void* self, uint64_t tag)
     return status;
 }
 
-// Reports the frames that finished: all of them, or only those a wait
-// finished when frames are held.
-static size_t PollFrames(void* self, mrhiDriverEvent* events, size_t capacity)
+// Reports every pending pipeline, then the frames that finished: all of
+// them, or only those a wait finished when frames are held.
+static size_t PollDevice(void* self, mrhiDriverEvent* events, size_t capacity)
 {
     TestDevice* device = self;
     size_t moved = 0;
+    while (device->pendingCount > 0 && moved < capacity)
+    {
+        events[moved++] = (mrhiDriverEvent){.tag = device->pending[--device->pendingCount].tag,
+                                            .outcome = device->pipelineOutcome};
+    }
     uint32_t i = 0;
     while (i < device->frameCount && moved < capacity)
     {
@@ -426,7 +483,7 @@ static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
 static void DestroyDevice(void* self)
 {
     TestDevice* device = self;
-    MRHI_ASSERT(device->swapchains == 0 && device->shaders == 0);
+    MRHI_ASSERT(device->swapchains == 0 && device->shaders == 0 && device->pipelines == 0);
     mrhiAllocator allocator = device->allocator;
     mrhiRelease(&allocator, device, sizeof(TestDevice), alignof(TestDevice));
 }
@@ -447,10 +504,12 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .unconfigureSurface = UnconfigureSurface,
     .createShader = CreateShader,
     .destroyShader = DestroyShader,
+    .createComputePipeline = CreateComputePipeline,
+    .destroyPipeline = DestroyPipeline,
     .textureMemory = TextureMemory,
     .bufferMemory = BufferMemory,
     .submitFrame = SubmitFrame,
-    .poll = PollFrames,
+    .poll = PollDevice,
     .waitFrame = WaitFrame,
 };
 
@@ -472,6 +531,7 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
         .madeBeforeFailure = driver->adapters[adapter - 1].objectsBeforeFailure,
         .holdFrames = driver->adapters[adapter - 1].holdFrames,
         .frameOutcome = driver->adapters[adapter - 1].frameOutcome,
+        .pipelineOutcome = driver->adapters[adapter - 1].pipelineOutcome,
     };
     Name(device, def->label, def->labelLength);
     driver->pending[driver->pendingCount++] = (mrhiDriverEvent){

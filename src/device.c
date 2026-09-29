@@ -33,6 +33,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.frameAccesses = 4096;
     def.deviceLimits.frameBarriers = 4096;
     def.deviceLimits.shaders = 256;
+    def.deviceLimits.pipelines = 1024;
     return def;
 }
 
@@ -49,8 +50,9 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
         def->deviceLimits.surfaces == 0 || def->deviceLimits.frameResources == 0 ||
         def->deviceLimits.framePasses == 0 || def->deviceLimits.frameAccesses == 0 ||
         def->deviceLimits.frameBarriers == 0 || def->deviceLimits.shaders == 0 ||
-        !mrhiIsLabelValid(def->label, def->labelLength) || !mrhiIsAllocatorValid(&def->allocator) ||
-        !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
+        def->deviceLimits.pipelines == 0 || !mrhiIsLabelValid(def->label, def->labelLength) ||
+        !mrhiIsAllocatorValid(&def->allocator) || !mrhiLimitsWithin(&floor, &def->limits) ||
+        chain == mrhi_errorInvalid)
     {
         *statusOut = mrhiMisuse(instance);
         return nullptr;
@@ -123,6 +125,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
         AddTable(&layout, limits->surfaces, sizeof(mrhiSwapchainSlot), alignof(mrhiSwapchainSlot));
     TableParts shaders =
         AddTable(&layout, limits->shaders, sizeof(mrhiShaderSlot), alignof(mrhiShaderSlot));
+    TableParts pipelines =
+        AddTable(&layout, limits->pipelines, sizeof(mrhiPipelineSlot), alignof(mrhiPipelineSlot));
     size_t runningAt =
         mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
     size_t resourcesAt = mrhiLayoutAdd(&layout, limits->frameResources, sizeof(mrhiFrameResource),
@@ -160,6 +164,11 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     for (uint32_t i = 0; i < limits->shaders; ++i)
     {
         device->shaderSlots[i] = (mrhiShaderSlot){0};
+    }
+    device->pipelineSlots = InitTable(block, pipelines, &device->pipelines, limits->pipelines);
+    for (uint32_t i = 0; i < limits->pipelines; ++i)
+    {
+        device->pipelineSlots[i] = (mrhiPipelineSlot){0};
     }
     device->running = (uint32_t*)(block + runningAt);
     device->queue = (mrhiDeviceNotification*)(block + queueAt);
@@ -257,6 +266,7 @@ void mrhiDestroyDevice(mrhiDevice* device)
     if (device->driver.vtable != nullptr)
     {
         mrhiEndConfigurations(device);
+        mrhiDestroyPipelines(device);
         mrhiDestroyShaders(device);
         device->driver.vtable->destroy(device->driver.self);
     }

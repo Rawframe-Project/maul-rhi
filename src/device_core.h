@@ -8,9 +8,9 @@
 #define MAUL_RHI_SRC_DEVICE_CORE_H
 
 #include "capabilities_core.h"
-#include "container.h"
 #include "driver.h"
 #include "pool.h"
+#include "reflection.h"
 
 #include "maul-rhi/device.h"
 
@@ -158,31 +158,42 @@ typedef struct mrhiSwapchainSlot
     mrhiSurfaceConfig config;
 } mrhiSwapchainSlot;
 
-// A shader container as its device keeps it: its driver handle, digest
-// and root block, and its reflection in one block from the device's
-// allocator, NULL for a free slot. The entries' names are packed after
-// the records, and each entry's nameOffset points into them.
+// A shader container as its device keeps it: its driver handle and its
+// reflection, NULL for a free slot.
 typedef struct mrhiShaderSlot
 {
     uint64_t handle;
-    uint8_t digest[MRHI_DIGEST_BYTES];
-    uint32_t rootBlockBytes;
-    uint32_t entryCount;
-    uint32_t bindingCount;
-    uint32_t inputCount;
-    uint32_t outputCount;
-    uint32_t variableCount;
-    uint32_t constantCount;
-    mrhiShaderEntry* entries;
-    mrhiShaderBinding* bindings;
-    mrhiShaderVariable* inputs;
-    mrhiShaderVariable* outputs;
-    mrhiShaderVariable* variables;
-    mrhiShaderConstant* constants;
-    const char* names;
-    void* reflection;
-    size_t reflectionBytes;
+    mrhiReflection* reflection;
 } mrhiShaderSlot;
+
+// What a pipeline is; none for a free slot.
+typedef enum mrhiPipelineKind
+{
+    mrhiPipelineNone,
+    mrhiPipelineCompute,
+    mrhiPipelineGraphics,
+} mrhiPipelineKind;
+
+// Where a pipeline's creation stands.
+typedef enum mrhiPipelineState
+{
+    mrhiPipelinePending,
+    mrhiPipelineReady,
+    mrhiPipelineFailed,
+} mrhiPipelineState;
+
+// A pipeline as its device keeps it: its kind and state, the request
+// its creation answers, its driver handle, its shader's reflection
+// (NULL for a free slot) and its entry points there.
+typedef struct mrhiPipelineSlot
+{
+    mrhiPipelineKind kind;
+    mrhiPipelineState state;
+    uint32_t request;
+    uint64_t handle;
+    mrhiReflection* reflection;
+    uint32_t entries[2];
+} mrhiPipelineSlot;
 
 struct mrhiDevice
 {
@@ -216,6 +227,11 @@ struct mrhiDevice
     mrhiSwapchainSlot* swapchainSlots;
     mrhiPool shaders;
     mrhiShaderSlot* shaderSlots;
+    mrhiPool pipelines;
+    mrhiPipelineSlot* pipelineSlots;
+    // Pipelines whose creation the driver has not answered; each has room
+    // for its answer in the queue.
+    uint32_t pendingCount;
     // Frames: whether one is open and its serial, never 0, its resources,
     // the last token given, and the tokens of the frames the GPU has not
     // finished, at most framesInFlight.
@@ -240,7 +256,9 @@ struct mrhiDevice
     // the placed resources a new one meets.
     uint64_t frameMemory;
     uint32_t* frameOrder;
-    uint32_t lastToken;
+    // The last request given, frames' tokens and pipelines' requests
+    // alike.
+    uint32_t lastRequest;
     uint32_t* running;
     uint32_t runningCount;
     // A ring of deviceLimits.notifications records.
@@ -343,5 +361,20 @@ void mrhiEndConfigurations(mrhiDevice* device);
 
 // Destroys every shader the device holds, in its driver and its tables.
 void mrhiDestroyShaders(mrhiDevice* device);
+
+// Destroys every pipeline the device holds, answering none.
+void mrhiDestroyPipelines(mrhiDevice* device);
+
+// Whether the queue has room for one more answer beside those it holds
+// and those running frames and pending pipelines will give.
+bool mrhiHasAnswerRoom(const mrhiDevice* device);
+
+// Queues an answer the device made room for.
+void mrhiQueueAnswer(mrhiDevice* device, mrhiDeviceNotificationKind kind, uint32_t request,
+                     mrhiResult outcome);
+
+// Answers a pending pipeline the driver finished, by its tag: its slot
+// above its request.
+void mrhiFinishPipeline(mrhiDevice* device, uint64_t tag, mrhiResult outcome);
 
 #endif // MAUL_RHI_SRC_DEVICE_CORE_H

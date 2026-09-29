@@ -39,13 +39,17 @@ extern "C"
         // A submitted frame finished on the GPU: its outcome is mrhi_success,
         // or the error that ended it.
         mrhi_deviceFrameDone = 0,
+        // A pipeline's creation finished: its outcome is mrhi_success, the
+        // error that ended it, or mrhi_errorStale when it was destroyed first.
+        mrhi_devicePipelineReady = 1,
     };
 
     // A record from a device's notification queue.
     typedef struct mrhiDeviceNotification
     {
         mrhiDeviceNotificationKind kind;
-        // The request the record answers: a frame's token.
+        // The request the record answers: a frame's token or a pipeline's
+        // request, unique on the device.
         mrhiRequestId requestId;
         // How the request ended.
         mrhiResult outcome;

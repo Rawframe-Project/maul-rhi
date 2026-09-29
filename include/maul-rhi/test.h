@@ -10,7 +10,7 @@
 #ifndef MAUL_RHI_TEST_H
 #define MAUL_RHI_TEST_H
 
-#include "maul-rhi/shader.h"
+#include "maul-rhi/pipeline.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -45,6 +45,9 @@ extern "C"
         bool holdFrames;
         // The outcome its devices' frames finish with; mrhi_success by default.
         mrhiResult frameOutcome;
+        // What pipelines made on the adapter's devices are answered with at the
+        // next poll: mrhi_success, or the error their creation fails with.
+        mrhiResult pipelineOutcome;
     } mrhiTestAdapter;
 
     // Turns the test driver on for an instance, chained on its def with the

@@ -20,8 +20,26 @@ mrhiFrameDef mrhiDefaultFrameDef(void)
     return def;
 }
 
+bool mrhiHasAnswerRoom(const mrhiDevice* device)
+{
+    return device->queueCount + device->runningCount + device->pendingCount <
+           device->deviceLimits.notifications;
+}
+
+void mrhiQueueAnswer(mrhiDevice* device, mrhiDeviceNotificationKind kind, uint32_t request,
+                     mrhiResult outcome)
+{
+    uint32_t tail = (device->queueHead + device->queueCount) % device->deviceLimits.notifications;
+    device->queue[tail] = (mrhiDeviceNotification){
+        .kind = kind,
+        .requestId = {request, 1},
+        .outcome = outcome,
+    };
+    ++device->queueCount;
+}
+
 // Takes a finished frame off the running list and queues its answer;
-// submission made sure there is room.
+// submission made room for it.
 static void Finish(mrhiDevice* device, uint64_t tag, mrhiResult outcome)
 {
     for (uint32_t i = 0; i < device->runningCount; ++i)
@@ -29,20 +47,14 @@ static void Finish(mrhiDevice* device, uint64_t tag, mrhiResult outcome)
         if (device->running[i] == tag)
         {
             device->running[i] = device->running[--device->runningCount];
-            uint32_t tail =
-                (device->queueHead + device->queueCount) % device->deviceLimits.notifications;
-            device->queue[tail] = (mrhiDeviceNotification){
-                .kind = mrhi_deviceFrameDone,
-                .requestId = {(uint32_t)tag, 1},
-                .outcome = outcome,
-            };
-            ++device->queueCount;
+            mrhiQueueAnswer(device, mrhi_deviceFrameDone, (uint32_t)tag, outcome);
             return;
         }
     }
 }
 
-// Takes in the frames the driver has finished.
+// Takes in the work the driver has finished: frames, whose tags are
+// their tokens, and pipelines, whose tags carry their slot above.
 static void TakeFinished(mrhiDevice* device)
 {
     mrhiDriverEvent events[POLL_BATCH];
@@ -51,7 +63,14 @@ static void TakeFinished(mrhiDevice* device)
     {
         for (size_t i = 0; i < moved; ++i)
         {
-            Finish(device, events[i].tag, events[i].outcome);
+            if (events[i].tag > UINT32_MAX)
+            {
+                mrhiFinishPipeline(device, events[i].tag, events[i].outcome);
+            }
+            else
+            {
+                Finish(device, events[i].tag, events[i].outcome);
+            }
         }
     }
 }
@@ -128,19 +147,19 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     {
         return compiled;
     }
-    if (device->queueCount + device->runningCount >= device->deviceLimits.notifications)
+    if (!mrhiHasAnswerRoom(device))
     {
         return mrhi_errorCapacity;
     }
     device->frameOpen = false;
-    uint32_t token = device->lastToken + 1;
+    uint32_t token = device->lastRequest + 1;
     mrhiResult status = device->driver.vtable->submitFrame(device->driver.self, token);
     if (status != mrhi_success)
     {
         return status;
     }
     mrhiApplyFinalStates(device);
-    device->lastToken = token;
+    device->lastRequest = token;
     device->running[device->runningCount++] = token;
     *tokenOut = (mrhiRequestId){token, 1};
     return mrhi_success;
@@ -152,7 +171,7 @@ mrhiResult mrhiWaitFrame(mrhiDevice* device, mrhiRequestId token, uint64_t timeo
     {
         return mrhi_errorInvalid;
     }
-    if (token.index1 == 0 || token.index1 > device->lastToken || token.generation != 1)
+    if (token.index1 == 0 || token.index1 > device->lastRequest || token.generation != 1)
     {
         return mrhiDeviceMisuse(device);
     }
