@@ -404,9 +404,9 @@ static void Finish(mrhiDevice* device, uint32_t readbacks)
 // bytes, so only its answers are checked.
 static bool s_runs;
 
-// Whether the driver only opens devices: the D3D12 driver, whose
-// objects, pipelines and frames are not made yet (mrhi-0003).
-static bool s_opensOnly;
+// Whether the driver makes objects only: the D3D12 driver, whose
+// shaders, pipelines and frames are not made yet (mrhi-0003).
+static bool s_objectsOnly;
 
 static bool Taken(mrhiDevice* device, mrhiRequestId request, const uint8_t* expected, size_t size)
 {
@@ -1578,12 +1578,12 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CHECK(asked->timestampQuery ? status == mrhi_success && period > 0.0
                                 : status == mrhi_errorUnsupported,
           "a timestamp period with timestamps");
-    if (s_opensOnly)
+    CheckObjects(device, asked->timestampQuery);
+    if (s_objectsOnly)
     {
         mrhiDestroyDevice(device);
         return;
     }
-    CheckObjects(device, asked->timestampQuery);
     CheckFrameMemory(device);
     CheckPipelines(device);
     CheckRoundTrip(device);
@@ -1598,7 +1598,7 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
     mrhiAdapterId ids[16];
     size_t count = Search(instance, ids, 16);
     s_runs = driver != mrhi_driverTest;
-    s_opensOnly = driver == mrhi_driverD3d12;
+    s_objectsOnly = driver == mrhi_driverD3d12;
     for (size_t i = 0; i < count; ++i)
     {
         mrhiAdapterInfo info;
@@ -1613,7 +1613,7 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         mrhiFeatures all;
         CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
         CheckDevice(instance, ids[i], &all);
-        if (!s_opensOnly)
+        if (!s_objectsOnly)
         {
             CheckCacheImport(instance, ids[i]);
             CheckRetirement(instance, ids[i]);

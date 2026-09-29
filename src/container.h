@@ -83,12 +83,12 @@ typedef struct mrhiD3d12Place
 } mrhiD3d12Place;
 
 // The constant buffers a D3D12 map places besides the bindings.
-typedef enum mrhiD3d12Buffer
+typedef enum mrhiD3d12MapBuffer
 {
     mrhiD3d12RootBlock,
     mrhiD3d12Constants,
     mrhiD3d12VertexInfo,
-} mrhiD3d12Buffer;
+} mrhiD3d12MapBuffer;
 
 // An entry's D3D12 code: its DXIL's range in the DXIL section, and
 // whether it reads the vertex information.
@@ -164,7 +164,7 @@ uint8_t mrhiContainerMetalIndex(const mrhiContainer* container, uint32_t binding
 // The D3D12 map of a checked container with DXIL: where a constant
 // buffer lies ({0, 0} when the container has none of it), an entry's
 // code, where a binding lies, and whether a constant is fixed.
-mrhiD3d12Place mrhiContainerD3d12Buffer(const mrhiContainer* container, mrhiD3d12Buffer buffer);
+mrhiD3d12Place mrhiContainerD3d12Buffer(const mrhiContainer* container, mrhiD3d12MapBuffer buffer);
 mrhiD3d12Entry mrhiContainerD3d12Entry(const mrhiContainer* container, uint32_t index);
 mrhiD3d12Place mrhiContainerD3d12Binding(const mrhiContainer* container, uint32_t binding);
 bool mrhiContainerD3d12Fixed(const mrhiContainer* container, uint32_t constant);

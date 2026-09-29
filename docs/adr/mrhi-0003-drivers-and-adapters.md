@@ -198,6 +198,21 @@ ids, requests, the frame graph) can be tested without a GPU.
   suite on the hosted Windows runner's WARP under the Agility SDK's
   debug layer and GPU-based validation, which the suite's exe selects
   and whose errors fail it.
+- **D3D12 objects:** buffers, textures, views, samplers and query sets
+  sit in tables in the device's block, a handle being a slot plus one.
+  Buffers and textures are committed resources in the default heap,
+  starting in the common state; a buffer's size rounds up to 256 bytes,
+  so that a uniform binding's constant buffer view stays inside it, and
+  a texture whose views change its format, or a depth texture, is made
+  in its typeless family. A view's slot holds, in a CPU-only descriptor
+  heap, a shader resource view where it is sampled and an unordered
+  access view of its first mip where it is stored to; a sampler's slot
+  holds its sampler. Bindings copy them to the GPU's heaps. A 2D or cube
+  view of a later layer is a one-layer or one-cube array, since only
+  arrays name their first layer, and a stencil view reads the second
+  plane. An occlusion query set is a query heap. A resource's memory is
+  what `GetResourceAllocationInfo` says. A destroyed object waits until
+  no frame can name it.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`

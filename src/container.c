@@ -274,7 +274,7 @@ static mrhiD3d12Place ReadPlace(const uint8_t* at)
     return (mrhiD3d12Place){.reg = mrhiRead32(at), .space = mrhiRead32(at + 4)};
 }
 
-mrhiD3d12Place mrhiContainerD3d12Buffer(const mrhiContainer* container, mrhiD3d12Buffer buffer)
+mrhiD3d12Place mrhiContainerD3d12Buffer(const mrhiContainer* container, mrhiD3d12MapBuffer buffer)
 {
     return ReadPlace(container->d3d12Map + (size_t)buffer * 8);
 }
@@ -671,7 +671,7 @@ static bool AreD3d12BuffersValid(const mrhiContainer* container, bool vertexInfo
     present[mrhiD3d12VertexInfo] = vertexInfo;
     for (int i = mrhiD3d12RootBlock; i <= mrhiD3d12VertexInfo; ++i)
     {
-        mrhiD3d12Place place = mrhiContainerD3d12Buffer(container, (mrhiD3d12Buffer)i);
+        mrhiD3d12Place place = mrhiContainerD3d12Buffer(container, (mrhiD3d12MapBuffer)i);
         if (!present[i])
         {
             if (place.reg != 0 || place.space != 0)
@@ -687,7 +687,7 @@ static bool AreD3d12BuffersValid(const mrhiContainer* container, bool vertexInfo
         for (int j = mrhiD3d12RootBlock; j < i; ++j)
         {
             if (present[j] &&
-                IsSamePlace(place, mrhiContainerD3d12Buffer(container, (mrhiD3d12Buffer)j)))
+                IsSamePlace(place, mrhiContainerD3d12Buffer(container, (mrhiD3d12MapBuffer)j)))
             {
                 return false;
             }
@@ -711,7 +711,7 @@ static bool AreD3d12BindingsValid(const mrhiContainer* container, const bool* pr
         for (int b = mrhiD3d12RootBlock; kind == D3D12_CBV && b <= mrhiD3d12VertexInfo; ++b)
         {
             if (present[b] &&
-                IsSamePlace(place, mrhiContainerD3d12Buffer(container, (mrhiD3d12Buffer)b)))
+                IsSamePlace(place, mrhiContainerD3d12Buffer(container, (mrhiD3d12MapBuffer)b)))
             {
                 return false;
             }

@@ -30,7 +30,10 @@ vulkan_label: invariant vulkan_api
 vulkan_api:
 instance: allocator chain driver driver_d3d12 driver_metal driver_test driver_vulkan driver_webgpu instance_core invariant
 driver_d3d12: allocator d3d12_api d3d12_device driver format_caps invariant
-d3d12_device: allocator d3d12_api driver invariant
+d3d12_device: allocator d3d12_api d3d12_names d3d12_resource driver invariant
+d3d12_resource: allocator d3d12_api d3d12_names driver invariant
+d3d12_view: d3d12_names d3d12_resource driver invariant
+d3d12_names: capabilities_core d3d12_api driver invariant
 d3d12_api:
 driver_metal: allocator driver format_caps invariant metal_device metal_frame metal_surface
 metal_device: allocator driver invariant metal_frame metal_pipeline metal_resource metal_surface

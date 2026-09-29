@@ -1,70 +1,120 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The D3D12 driver's devices (mrhi-0003): a D3D12 device and its direct
-// command queue, released when the device is destroyed. Objects,
-// pipelines and frames land in the driver's later slices; until then
-// every call that makes one answers mrhi_errorUnsupported, and the
-// conformance suite only opens and closes D3D12 devices.
+// The D3D12 driver's devices (mrhi-0003): a D3D12 device, its direct
+// command queue and its objects (d3d12_resource.c), released when the
+// device is destroyed. A destroyed object waits until no frame can name
+// it; until frames run, that is the device's end. Pipelines and frames
+// land in the driver's later slices; until then every call that makes
+// one answers mrhi_errorUnsupported.
 
 #include "d3d12_device.h"
 
 #include "allocator.h"
+#include "d3d12_names.h"
+#include "d3d12_resource.h"
 #include "invariant.h"
 
 #include <stdalign.h>
 
+// A destroyed object waiting until no frame can name it.
+typedef struct Retiree
+{
+    uint64_t handle;
+    mrhiD3d12Kind kind;
+} Retiree;
+
 typedef struct D3d12Device
 {
     mrhiAllocator allocator;
+    size_t bytes;
     ID3D12Device* device;
     ID3D12CommandQueue* queue;
+    mrhiD3d12Objects objects;
+    Retiree* retirees;
+    uint32_t retireeCount;
+    uint32_t retireeLimit;
 } D3d12Device;
+
+static void Retire(D3d12Device* device, uint64_t handle, mrhiD3d12Kind kind)
+{
+    // One entry per object the device holds at most.
+    MRHI_ASSERT(device->retireeCount < device->retireeLimit);
+    device->retirees[device->retireeCount++] = (Retiree){.handle = handle, .kind = kind};
+}
+
+static void ReleaseRetirees(D3d12Device* device)
+{
+    for (uint32_t i = 0; i < device->retireeCount; ++i)
+    {
+        mrhiD3d12ReleaseObject(&device->objects, device->retirees[i].kind,
+                               device->retirees[i].handle);
+    }
+    device->retireeCount = 0;
+}
 
 static void Destroy(void* self)
 {
     D3d12Device* device = self;
+    ReleaseRetirees(device);
+    mrhiD3d12CloseObjects(&device->objects);
     ID3D12CommandQueue_Release(device->queue);
     ID3D12Device_Release(device->device);
     mrhiAllocator allocator = device->allocator;
-    mrhiRelease(&allocator, device, sizeof(D3d12Device), alignof(D3d12Device));
+    mrhiRelease(&allocator, device, device->bytes, alignof(D3d12Device));
 }
 
 static mrhiResult CreateSampler(void* self, const mrhiSamplerDef* def, uint64_t* handleOut)
 {
-    (void)self;
-    (void)def;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    D3d12Device* device = self;
+    return mrhiD3d12CreateSampler(&device->objects, def, handleOut);
 }
 
 static mrhiResult CreateBuffer(void* self, const mrhiBufferDef* def, uint64_t* handleOut)
 {
-    (void)self;
-    (void)def;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    D3d12Device* device = self;
+    return mrhiD3d12CreateBuffer(&device->objects, def, handleOut);
 }
 
 static mrhiResult CreateTexture(void* self, const mrhiTextureDef* def, uint64_t* handleOut)
 {
-    (void)self;
-    (void)def;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    D3d12Device* device = self;
+    return mrhiD3d12CreateTexture(&device->objects, def, handleOut);
 }
 
 static mrhiResult CreateView(void* self, uint64_t texture, const mrhiViewDef* def,
                              uint64_t* handleOut)
 {
-    (void)self;
-    (void)texture;
-    (void)def;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    D3d12Device* device = self;
+    return mrhiD3d12CreateView(&device->objects, texture, def, handleOut);
 }
 
-// Nothing is made yet, so nothing is destroyed.
+static void DestroySampler(void* self, uint64_t handle)
+{
+    Retire(self, handle, mrhiD3d12KindSampler);
+}
+
+static void DestroyBuffer(void* self, uint64_t handle)
+{
+    Retire(self, handle, mrhiD3d12KindBuffer);
+}
+
+static void DestroyTexture(void* self, uint64_t handle)
+{
+    Retire(self, handle, mrhiD3d12KindTexture);
+}
+
+static void DestroyView(void* self, uint64_t handle)
+{
+    Retire(self, handle, mrhiD3d12KindView);
+}
+
+static void DestroyQuerySet(void* self, uint64_t handle)
+{
+    Retire(self, handle, mrhiD3d12KindQuerySet);
+}
+
+// What is not made yet is never destroyed.
 static void Never(void* self, uint64_t handle)
 {
     (void)self;
@@ -137,10 +187,8 @@ static void ReleaseImage(void* self, uint64_t swapchain, uint64_t image)
 
 static mrhiResult CreateQuerySet(void* self, const mrhiQuerySetDef* def, uint64_t* handleOut)
 {
-    (void)self;
-    (void)def;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    D3d12Device* device = self;
+    return mrhiD3d12CreateQuerySet(&device->objects, def, handleOut);
 }
 
 // Timestamps are not granted yet, so the core never asks.
@@ -170,18 +218,15 @@ static size_t ExportPipelineCache(void* self, void* bytes, size_t capacity)
 static void TextureMemory(const void* self, const mrhiTextureDef* def, uint64_t* bytesOut,
                           uint64_t* alignmentOut)
 {
-    (void)self;
-    (void)def;
-    *bytesOut = 0;
-    *alignmentOut = 256;
+    const D3d12Device* device = self;
+    mrhiD3d12TextureMemory(&device->objects, def, bytesOut, alignmentOut);
 }
 
 static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* bytesOut,
                          uint64_t* alignmentOut)
 {
-    (void)self;
-    *bytesOut = (def->size + 255) & ~(uint64_t)255;
-    *alignmentOut = 256;
+    const D3d12Device* device = self;
+    mrhiD3d12BufferMemory(&device->objects, def, bytesOut, alignmentOut);
 }
 
 static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag)
@@ -240,13 +285,13 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .size = sizeof(mrhiDeviceDriverVtable),
     .destroy = Destroy,
     .createSampler = CreateSampler,
-    .destroySampler = Never,
+    .destroySampler = DestroySampler,
     .createBuffer = CreateBuffer,
-    .destroyBuffer = Never,
+    .destroyBuffer = DestroyBuffer,
     .createTexture = CreateTexture,
-    .destroyTexture = Never,
+    .destroyTexture = DestroyTexture,
     .createView = CreateView,
-    .destroyView = Never,
+    .destroyView = DestroyView,
     .configureSurface = ConfigureSurface,
     .unconfigureSurface = Never,
     .createShader = CreateShader,
@@ -258,7 +303,7 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .acquireImage = AcquireImage,
     .releaseImage = ReleaseImage,
     .createQuerySet = CreateQuerySet,
-    .destroyQuerySet = Never,
+    .destroyQuerySet = DestroyQuerySet,
     .timestampPeriod = TimestampPeriod,
     .importPipelineCache = ImportPipelineCache,
     .exportPipelineCache = ExportPipelineCache,
@@ -273,26 +318,45 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .writeHeapSampler = WriteHeapSampler,
 };
 
-// Labels a queue with the device def's label, as UTF-16; an unlabeled
-// queue works the same.
-static void Label(ID3D12CommandQueue* queue, const mrhiDeviceDef* def)
+// The room a device takes: itself, its object tables and its retirees.
+typedef struct Room
 {
-    WCHAR name[MRHI_LABEL_BYTES + 1];
-    int length = def->labelLength == 0
-                     ? 0
-                     : MultiByteToWideChar(CP_UTF8, 0, def->label, (int)def->labelLength, name,
-                                           MRHI_LABEL_BYTES);
-    if (length > 0)
-    {
-        name[length] = 0;
-        (void)ID3D12CommandQueue_SetName(queue, name);
-    }
+    mrhiLayout layout;
+    mrhiD3d12ObjectRoom objects;
+    size_t retirees;
+    uint32_t retireeLimit;
+} Room;
+
+static Room RoomOf(const mrhiDeviceLimits* limits)
+{
+    Room room = {.layout = {.size = sizeof(D3d12Device)}};
+    room.objects = mrhiD3d12PlanObjects(&room.layout, limits);
+    uint64_t retirees = (uint64_t)limits->buffers + limits->textures + limits->views +
+                        limits->samplers + limits->querySets;
+    room.retireeLimit = retirees < UINT32_MAX ? (uint32_t)retirees : UINT32_MAX;
+    room.retirees =
+        mrhiLayoutAdd(&room.layout, room.retireeLimit, sizeof(Retiree), alignof(Retiree));
+    return room;
+}
+
+// Lays out a device's parts in its block, around its D3D12 device and
+// queue.
+static void Lay(D3d12Device* made, const Room* room, const mrhiDeviceLimits* limits)
+{
+    unsigned char* block = (unsigned char*)made;
+    made->objects = (mrhiD3d12Objects){.device = made->device};
+    mrhiD3d12LayObjects(&made->objects, block, &room->objects, limits);
+    made->retirees = (Retiree*)(block + room->retirees);
+    made->retireeLimit = room->retireeLimit;
 }
 
 mrhiResult mrhiCreateD3d12Device(const mrhiAllocator* allocator, ID3D12Device* device,
                                  const mrhiDeviceDef* def, mrhiDeviceDriver* deviceOut)
 {
-    D3d12Device* made = mrhiAllocate(allocator, sizeof(D3d12Device), alignof(D3d12Device));
+    Room room = RoomOf(&def->deviceLimits);
+    D3d12Device* made = room.layout.overflow
+                            ? nullptr
+                            : mrhiAllocate(allocator, room.layout.size, alignof(D3d12Device));
     if (made == nullptr)
     {
         ID3D12Device_Release(device);
@@ -303,12 +367,23 @@ mrhiResult mrhiCreateD3d12Device(const mrhiAllocator* allocator, ID3D12Device* d
     if (FAILED(ID3D12Device_CreateCommandQueue(device, &desc, &IID_ID3D12CommandQueue,
                                                (void**)&queue)))
     {
-        mrhiRelease(allocator, made, sizeof(D3d12Device), alignof(D3d12Device));
+        mrhiRelease(allocator, made, room.layout.size, alignof(D3d12Device));
         ID3D12Device_Release(device);
         return mrhi_errorPlatform;
     }
-    Label(queue, def);
-    *made = (D3d12Device){.allocator = *allocator, .device = device, .queue = queue};
+    mrhiD3d12Label((ID3D12Object*)queue, def->label, def->labelLength);
+    *made = (D3d12Device){
+        .allocator = *allocator,
+        .bytes = room.layout.size,
+        .device = device,
+        .queue = queue,
+    };
+    Lay(made, &room, &def->deviceLimits);
+    if (mrhiD3d12OpenObjects(&made->objects) != mrhi_success)
+    {
+        Destroy(made);
+        return mrhi_errorCapacity;
+    }
     *deviceOut = (mrhiDeviceDriver){.vtable = &s_vtable, .self = made};
     return mrhi_success;
 }

@@ -1,0 +1,140 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// The D3D12 driver's objects (mrhi-0003): buffers, textures and query
+// sets, each a D3D12 object in its table's slot, and views and
+// samplers, whose slots are also their descriptors' in CPU-only
+// descriptor heaps, copied to the GPU's heaps when bound. Included by the driver's files only.
+
+#ifndef MAUL_RHI_SRC_D3D12_RESOURCE_H
+#define MAUL_RHI_SRC_D3D12_RESOURCE_H
+
+#include "allocator.h"
+#include "d3d12_api.h"
+#include "driver.h"
+
+typedef struct mrhiD3d12Buffer
+{
+    ID3D12Resource* resource;
+    uint64_t size;
+} mrhiD3d12Buffer;
+
+// A texture and its def, without its label.
+typedef struct mrhiD3d12Texture
+{
+    ID3D12Resource* resource;
+    mrhiTextureDef def;
+} mrhiD3d12Texture;
+
+// A view: its texture's handle, its resolved def without its label,
+// and whether its slot holds a shader resource view and an unordered
+// access view.
+typedef struct mrhiD3d12View
+{
+    uint64_t texture;
+    mrhiViewDef def;
+    bool read;
+    bool write;
+} mrhiD3d12View;
+
+typedef struct mrhiD3d12QuerySet
+{
+    ID3D12QueryHeap* heap;
+    uint32_t count;
+} mrhiD3d12QuerySet;
+
+// What a handle names, for its release.
+typedef enum mrhiD3d12Kind
+{
+    mrhiD3d12KindBuffer,
+    mrhiD3d12KindTexture,
+    mrhiD3d12KindView,
+    mrhiD3d12KindSampler,
+    mrhiD3d12KindQuerySet,
+} mrhiD3d12Kind;
+
+// Free slots of a table, linked by index plus one; a handle is its
+// slot's index plus one.
+typedef struct mrhiD3d12Slots
+{
+    uint32_t* next;
+    uint32_t head;
+    uint32_t capacity;
+} mrhiD3d12Slots;
+
+// A device's objects: tables of each kind in the device's block, and
+// the descriptor heaps of views and samplers, two descriptors a view
+// slot (its shader resource view, then its unordered access view) and
+// one a sampler slot. A sampler is only its descriptor.
+typedef struct mrhiD3d12Objects
+{
+    ID3D12Device* device;
+    ID3D12DescriptorHeap* viewHeap;
+    ID3D12DescriptorHeap* samplerHeap;
+    D3D12_CPU_DESCRIPTOR_HANDLE viewStart;
+    D3D12_CPU_DESCRIPTOR_HANDLE samplerStart;
+    UINT viewStep;
+    UINT samplerStep;
+    mrhiD3d12Buffer* buffers;
+    mrhiD3d12Texture* textures;
+    mrhiD3d12View* views;
+    mrhiD3d12QuerySet* querySets;
+    mrhiD3d12Slots bufferSlots;
+    mrhiD3d12Slots textureSlots;
+    mrhiD3d12Slots viewSlots;
+    mrhiD3d12Slots samplerSlots;
+    mrhiD3d12Slots querySetSlots;
+} mrhiD3d12Objects;
+
+// Where the tables lie in a device's block.
+typedef struct mrhiD3d12ObjectRoom
+{
+    size_t buffers;
+    size_t textures;
+    size_t views;
+    size_t querySets;
+    size_t slots;
+} mrhiD3d12ObjectRoom;
+
+// Adds the tables a device's limits need to its layout, and sets them
+// up in its block, every slot free.
+mrhiD3d12ObjectRoom mrhiD3d12PlanObjects(mrhiLayout* layout, const mrhiDeviceLimits* limits);
+void mrhiD3d12LayObjects(mrhiD3d12Objects* objects, unsigned char* block,
+                         const mrhiD3d12ObjectRoom* room, const mrhiDeviceLimits* limits);
+
+// Makes the descriptor heaps of the laid out tables: success, or
+// mrhi_errorCapacity when D3D12 makes none.
+mrhiResult mrhiD3d12OpenObjects(mrhiD3d12Objects* objects);
+void mrhiD3d12CloseObjects(mrhiD3d12Objects* objects);
+
+// A free slot's handle, taken: 0 when the table is full.
+uint32_t mrhiD3d12TakeSlot(mrhiD3d12Slots* slots);
+
+// Each maker answers success with the handle, never zero, or
+// mrhi_errorCapacity when D3D12 or the table makes nothing.
+mrhiResult mrhiD3d12CreateBuffer(mrhiD3d12Objects* objects, const mrhiBufferDef* def,
+                                 uint64_t* handleOut);
+mrhiResult mrhiD3d12CreateTexture(mrhiD3d12Objects* objects, const mrhiTextureDef* def,
+                                  uint64_t* handleOut);
+mrhiResult mrhiD3d12CreateView(mrhiD3d12Objects* objects, uint64_t texture, const mrhiViewDef* def,
+                               uint64_t* handleOut);
+mrhiResult mrhiD3d12CreateSampler(mrhiD3d12Objects* objects, const mrhiSamplerDef* def,
+                                  uint64_t* handleOut);
+mrhiResult mrhiD3d12CreateQuerySet(mrhiD3d12Objects* objects, const mrhiQuerySetDef* def,
+                                   uint64_t* handleOut);
+void mrhiD3d12ReleaseObject(mrhiD3d12Objects* objects, mrhiD3d12Kind kind, uint64_t handle);
+
+// The CPU descriptors of a view (its shader resource view, or its
+// unordered access view) and of a sampler.
+D3D12_CPU_DESCRIPTOR_HANDLE mrhiD3d12ViewDescriptor(const mrhiD3d12Objects* objects, uint64_t view,
+                                                    bool write);
+D3D12_CPU_DESCRIPTOR_HANDLE mrhiD3d12SamplerDescriptor(const mrhiD3d12Objects* objects,
+                                                       uint64_t sampler);
+
+// The bytes and alignment a texture or buffer takes in a D3D12 heap.
+void mrhiD3d12TextureMemory(const mrhiD3d12Objects* objects, const mrhiTextureDef* def,
+                            uint64_t* bytesOut, uint64_t* alignmentOut);
+void mrhiD3d12BufferMemory(const mrhiD3d12Objects* objects, const mrhiBufferDef* def,
+                           uint64_t* bytesOut, uint64_t* alignmentOut);
+
+#endif // MAUL_RHI_SRC_D3D12_RESOURCE_H

@@ -152,7 +152,8 @@ if(MAUL_RHI_METAL_DRIVER)
                                            "-framework Metal" "-framework QuartzCore")
 endif()
 if(MAUL_RHI_D3D12_DRIVER)
-    target_sources(maul-rhi PRIVATE src/driver_d3d12.c src/d3d12_api.c src/d3d12_device.c)
+    target_sources(maul-rhi PRIVATE src/driver_d3d12.c src/d3d12_api.c src/d3d12_device.c
+                                   src/d3d12_names.c src/d3d12_resource.c src/d3d12_view.c)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_D3D12_DRIVER)
     # The DirectX headers, kept as published (directx/README.md).
     target_include_directories(maul-rhi SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
