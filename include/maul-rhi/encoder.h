@@ -132,6 +132,20 @@ extern "C"
         mrhiTextureAspect aspect;
     } mrhiTextureCopy;
 
+    // How texels lie in the program's memory: where they start and how rows and
+    // layers follow.
+    typedef struct mrhiTexelLayout
+    {
+        // The first texel block's byte.
+        uint64_t offset;
+        // The bytes from one row of blocks to the next, at least a row's bytes;
+        // 0 when the copy has one row and one layer.
+        uint32_t bytesPerRow;
+        // The rows of blocks from one layer to the next, at least the copy's
+        // rows; 0 when the copy has one layer.
+        uint32_t rowsPerImage;
+    } mrhiTexelLayout;
+
     /// Begins recording a kept pass of the compiled open frame. It records
     /// until mrhiEndPass; a kept pass never begun records nothing.
     ///
@@ -421,6 +435,58 @@ extern "C"
                                                        const mrhiTextureCopy* source,
                                                        const mrhiTextureCopy* destination,
                                                        const mrhiExtent3d* size);
+
+    /// Uploads bytes into a buffer of the frame, copying them at the call.
+    ///
+    /// @param device    The device.
+    /// @param pass      The pass, recording, without targets.
+    /// @param resource  The buffer written.
+    /// @param offset    Its first byte written, a multiple of 4.
+    /// @param bytes     The bytes; NULL when size is 0. Only read during the
+    ///                  call.
+    /// @param size      How many, a multiple of 4.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or bytes
+    /// with a size, a pass with targets, a resource that is not a buffer the
+    /// pass declares with the copy destination access, or an offset or size not
+    /// a multiple of 4 or past the buffer; `mrhi_errorStale` for a pass of
+    /// another frame or a resource that is not live; `mrhi_errorState` for a
+    /// pass that is not recording; `mrhi_errorCapacity` when the frame's
+    /// commands or uploads are full, which the frame's submission then refuses
+    /// too.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiWriteBuffer(mrhiDevice* device, mrhiPassId pass,
+                                                       mrhiResourceId resource, uint64_t offset,
+                                                       const void* bytes, uint64_t size);
+
+    /// Uploads texels into a texture's mip, copying them at the call.
+    ///
+    /// @param device       The device.
+    /// @param pass         The pass, recording, without targets.
+    /// @param destination  The texture, mip, origin and aspect. Only read
+    ///                     during the call.
+    /// @param bytes        The texels; NULL when byte_count is 0. Only read
+    ///                     during the call.
+    /// @param byteCount    The bytes there.
+    /// @param layout       How the texels lie in the bytes. Only read during
+    ///                     the call.
+    /// @param size         The texels. Only read during the call.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass
+    /// with targets, a layout that is not given where needed or does not fit
+    /// the bytes, a region off the texture's blocks or past its mip, a
+    /// multisampled texture, an aspect that cannot be copied to, or a texture
+    /// the pass declares no covering copy destination access of;
+    /// `mrhi_errorStale` for a pass of another frame or a resource that is not
+    /// live; `mrhi_errorState` for a pass that is not recording;
+    /// `mrhi_errorCapacity` when the frame's commands or uploads are full,
+    /// which the frame's submission then refuses too.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiWriteTexture(mrhiDevice* device, mrhiPassId pass,
+                                                        const mrhiTextureCopy* destination,
+                                                        const void* bytes, size_t byteCount,
+                                                        const mrhiTexelLayout* layout,
+                                                        const mrhiExtent3d* size);
 
     /// Writes bytes of the root block later draws or dispatches read.
     ///

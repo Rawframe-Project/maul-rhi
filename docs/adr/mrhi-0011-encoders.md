@@ -72,6 +72,15 @@ them at submission.
   carry their copy facts in the contract. The pass must declare a copy
   source access covering what is read and a copy destination access
   covering what is written, so one part is never both.
+- **Uploads** (`mrhiWriteBuffer`, `mrhiWriteTexture`) copy the
+  program's bytes at the call into the frame's staging, the device's
+  `frameUploadBytes` for each frame in flight: every upload at a 512-byte
+  boundary and a texture's rows at a 256-byte pitch, so that every API
+  copies from staging without repacking. They are checked as WebGPU
+  checks its queue writes and recorded as copies from the staging. A
+  full staging marks the pass as a full arena does. Each running frame
+  keeps its own region, chosen free when a frame begins, whatever order
+  frames finish in.
 - **Debug groups** balance by the pass's end. A push or pop refused for
   capacity still counts, so a pass that found the arena full still
   ends.

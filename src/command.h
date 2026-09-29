@@ -52,6 +52,11 @@ typedef enum mrhiCommandType
     mrhiCommandCopyBufferToTexture,
     mrhiCommandCopyTextureToBuffer,
     mrhiCommandCopyTexture,
+    // As a copy from a buffer, the source's side naming the frame's
+    // staging (object 0), its bytes placed at 512-byte boundaries and a
+    // texture's rows at a 256-byte pitch.
+    mrhiCommandWriteBuffer,
+    mrhiCommandWriteTexture,
 } mrhiCommandType;
 
 typedef struct mrhiCommand

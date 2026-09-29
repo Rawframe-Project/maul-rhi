@@ -5486,6 +5486,11 @@
               "name": "frame_command_bytes",
               "type": "uint32",
               "doc": "The bytes one frame's commands take in all, in 4 KiB chunks; 1 MiB by default."
+            },
+            {
+              "name": "frame_upload_bytes",
+              "type": "uint32",
+              "doc": "The bytes one frame's uploads take in all, each at a 512-byte boundary with a texture's rows at a 256-byte pitch; as many again for each frame in flight; 4 MiB by default, 0 for no uploads."
             }
           ]
         },
@@ -14904,6 +14909,28 @@
           ]
         },
         {
+          "kind": "struct",
+          "name": "texel_layout",
+          "doc": "How texels lie in the program's memory: where they start and how rows and layers follow.",
+          "members": [
+            {
+              "name": "offset",
+              "type": "uint64",
+              "doc": "The first texel block's byte."
+            },
+            {
+              "name": "bytes_per_row",
+              "type": "uint32",
+              "doc": "The bytes from one row of blocks to the next, at least a row's bytes; 0 when the copy has one row and one layer."
+            },
+            {
+              "name": "rows_per_image",
+              "type": "uint32",
+              "doc": "The rows of blocks from one layer to the next, at least the copy's rows; 0 when the copy has one layer."
+            }
+          ]
+        },
+        {
           "kind": "function",
           "name": "begin_pass",
           "doc": "Begins recording a kept pass of the compiled open frame. It records until mrhiEndPass; a kept pass never begun records nothing.",
@@ -15459,6 +15486,108 @@
               "type": "struct.texture_copy",
               "pointer": "const",
               "doc": "The texture copied to. Only read during the call."
+            },
+            {
+              "name": "size",
+              "type": "struct.extent3d",
+              "pointer": "const",
+              "doc": "The texels. Only read during the call."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "write_buffer",
+          "doc": "Uploads bytes into a buffer of the frame, copying them at the call.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or bytes with a size, a pass with targets, a resource that is not a buffer the pass declares with the copy destination access, or an offset or size not a multiple of 4 or past the buffer; `mrhi_errorStale` for a pass of another frame or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands or uploads are full, which the frame's submission then refuses too."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, without targets."
+            },
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "The buffer written."
+            },
+            {
+              "name": "offset",
+              "type": "uint64",
+              "doc": "Its first byte written, a multiple of 4."
+            },
+            {
+              "name": "bytes",
+              "type": "void",
+              "pointer": "const",
+              "doc": "The bytes; NULL when size is 0. Only read during the call."
+            },
+            {
+              "name": "size",
+              "type": "uint64",
+              "doc": "How many, a multiple of 4."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "write_texture",
+          "doc": "Uploads texels into a texture's mip, copying them at the call.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass with targets, a layout that is not given where needed or does not fit the bytes, a region off the texture's blocks or past its mip, a multisampled texture, an aspect that cannot be copied to, or a texture the pass declares no covering copy destination access of; `mrhi_errorStale` for a pass of another frame or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands or uploads are full, which the frame's submission then refuses too."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, without targets."
+            },
+            {
+              "name": "destination",
+              "type": "struct.texture_copy",
+              "pointer": "const",
+              "doc": "The texture, mip, origin and aspect. Only read during the call."
+            },
+            {
+              "name": "bytes",
+              "type": "void",
+              "pointer": "const",
+              "doc": "The texels; NULL when byte_count is 0. Only read during the call."
+            },
+            {
+              "name": "byte_count",
+              "type": "size",
+              "doc": "The bytes there."
+            },
+            {
+              "name": "layout",
+              "type": "struct.texel_layout",
+              "pointer": "const",
+              "doc": "How the texels lie in the bytes. Only read during the call."
             },
             {
               "name": "size",

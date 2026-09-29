@@ -40,6 +40,25 @@ void mrhiQueueAnswer(mrhiDevice* device, mrhiDeviceNotificationKind kind, uint32
     ++device->queueCount;
 }
 
+// A staging region no running frame uses. Running frames hold distinct
+// regions, so one of the first runningCount + 1 is free, whatever order
+// frames finish in.
+static uint32_t FreeRegion(const mrhiDevice* device)
+{
+    for (uint32_t region = 0;; ++region)
+    {
+        bool used = false;
+        for (uint32_t i = 0; i < device->runningCount; ++i)
+        {
+            used = used || device->runningRegions[i] == region;
+        }
+        if (!used)
+        {
+            return region;
+        }
+    }
+}
+
 // Takes a finished frame off the running list and queues its answer;
 // submission made room for it.
 static void Finish(mrhiDevice* device, uint64_t tag, mrhiResult outcome)
@@ -48,7 +67,9 @@ static void Finish(mrhiDevice* device, uint64_t tag, mrhiResult outcome)
     {
         if (device->running[i] == tag)
         {
-            device->running[i] = device->running[--device->runningCount];
+            --device->runningCount;
+            device->running[i] = device->running[device->runningCount];
+            device->runningRegions[i] = device->runningRegions[device->runningCount];
             mrhiQueueAnswer(device, mrhi_deviceFrameDone, (uint32_t)tag, outcome);
             return;
         }
@@ -108,6 +129,8 @@ mrhiResult mrhiBeginFrame(mrhiDevice* device, const mrhiFrameDef* def)
         return mrhi_errorCapacity;
     }
     device->frameOpen = true;
+    device->stagingRegion = FreeRegion(device);
+    atomic_store_explicit(&device->stagingTaken, 0, memory_order_relaxed);
     device->frameSerial = device->frameSerial == UINT32_MAX ? 1 : device->frameSerial + 1;
     device->frameCompiled = false;
     device->frameResourceCount = 0;
@@ -175,6 +198,7 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     }
     mrhiApplyFinalStates(device);
     device->lastRequest = token;
+    device->runningRegions[device->runningCount] = device->stagingRegion;
     device->running[device->runningCount++] = token;
     *tokenOut = (mrhiRequestId){token, 1};
     return mrhi_success;

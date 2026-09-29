@@ -15,6 +15,7 @@
 
 #include <stdalign.h>
 #include <stdatomic.h>
+#include <stddef.h>
 
 #define DEVICE_DEF_COOKIE 0x6D726476u
 
@@ -36,6 +37,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.shaders = 256;
     def.deviceLimits.pipelines = 1024;
     def.deviceLimits.frameCommandBytes = 1u << 20;
+    def.deviceLimits.frameUploadBytes = 1u << 22;
     return def;
 }
 
@@ -201,6 +203,11 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
                                     sizeof(mrhiVertexFacts), alignof(mrhiVertexFacts));
     size_t runningAt =
         mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
+    size_t regionsAt =
+        mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
+    size_t stagingAt =
+        mrhiLayoutAdd(&layout, (size_t)def->limits.framesInFlight * limits->frameUploadBytes, 1,
+                      alignof(max_align_t));
     FrameParts frame = AddFrameParts(&layout, def);
     size_t queueAt = mrhiLayoutAdd(&layout, limits->notifications, sizeof(mrhiDeviceNotification),
                                    alignof(mrhiDeviceNotification));
@@ -229,6 +236,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     }
     device->pipelineVertex = (mrhiVertexFacts*)(block + vertexAt);
     device->running = (uint32_t*)(block + runningAt);
+    device->runningRegions = (uint32_t*)(block + regionsAt);
+    device->frameStaging = block + stagingAt;
     device->queue = (mrhiDeviceNotification*)(block + queueAt);
     PlaceFrameParts(device, block, &frame);
     return device;

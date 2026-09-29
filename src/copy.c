@@ -5,26 +5,12 @@
 // textures, in a pass without targets, each checked as WebGPU checks it
 // and against the copy accesses the pass declares.
 
-#include "capabilities_core.h"
-#include "encoder_core.h"
+#include "copy_core.h"
 
 #include <stdckdint.h>
 #include <string.h>
 
-// A texture side of a copy, checked: its frame resource's slot, its
-// def, the aspect copied as the format's copy facts name it, and the
-// part of the texture it covers.
-typedef struct TextureSide
-{
-    uint32_t object;
-    const mrhiTextureDef* def;
-    mrhiTextureAspect aspect;
-    mrhiFrameUse part;
-} TextureSide;
-
-// The pass a copy records in: recording and without targets, or NULL
-// with the refusal.
-static mrhiFramePass* CopyPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
+mrhiFramePass* mrhiCopyPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
 {
     mrhiFramePass* pass = mrhiRecordingPass(device, id, statusOut);
     if (pass != nullptr && mrhiWorkOf(pass) == mrhiWorkRender)
@@ -35,10 +21,8 @@ static mrhiFramePass* CopyPass(mrhiDevice* device, mrhiPassId id, mrhiResult* st
     return pass;
 }
 
-// Finds a resource of the open frame that is a buffer, or not: its
-// slot, or 0 with the refusal.
-static uint32_t FindKind(const mrhiDevice* device, mrhiResourceId id, bool buffer,
-                         mrhiResult* statusOut)
+uint32_t mrhiFindKind(const mrhiDevice* device, mrhiResourceId id, bool buffer,
+                      mrhiResult* statusOut)
 {
     uint32_t object = mrhiFindFrameResource(device, id);
     if (object == 0)
@@ -55,16 +39,13 @@ static uint32_t FindKind(const mrhiDevice* device, mrhiResourceId id, bool buffe
     return object;
 }
 
-// Refuses a status, counting invalid input as misuse.
-static mrhiResult Refuse(mrhiDevice* device, mrhiResult status)
+mrhiResult mrhiRefuse(mrhiDevice* device, mrhiResult status)
 {
     return status == mrhi_errorInvalid ? mrhiDeviceMisuse(device) : status;
 }
 
-// Takes a copy's records, the command's and its two sides', filling the
-// command: the sides, or NULL when the arena is full.
-static mrhiCommand* TakeCopy(mrhiDevice* device, mrhiFramePass* pass, mrhiCommandType type,
-                             uint64_t width, uint64_t height, uint64_t depth)
+mrhiCommand* mrhiTakeCopy(mrhiDevice* device, mrhiFramePass* pass, mrhiCommandType type,
+                          uint64_t width, uint64_t height, uint64_t depth)
 {
     mrhiCommand* records = mrhiTakeCommands(device, pass, 3);
     if (records != nullptr)
@@ -89,16 +70,16 @@ mrhiResult mrhiCopyBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId sour
         return mrhi_errorInvalid;
     }
     mrhiResult status = mrhi_success;
-    mrhiFramePass* pass = CopyPass(device, id, &status);
+    mrhiFramePass* pass = mrhiCopyPass(device, id, &status);
     if (pass == nullptr)
     {
         return status;
     }
-    uint32_t from = FindKind(device, source, true, &status);
-    uint32_t to = from == 0 ? 0 : FindKind(device, destination, true, &status);
+    uint32_t from = mrhiFindKind(device, source, true, &status);
+    uint32_t to = from == 0 ? 0 : mrhiFindKind(device, destination, true, &status);
     if (to == 0)
     {
-        return Refuse(device, status);
+        return mrhiRefuse(device, status);
     }
     uint64_t fromBytes = mrhiBufferBytesOf(device, &device->frameResources[from - 1]);
     uint64_t toBytes = mrhiBufferBytesOf(device, &device->frameResources[to - 1]);
@@ -112,7 +93,7 @@ mrhiResult mrhiCopyBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId sour
     {
         return mrhiDeviceMisuse(device);
     }
-    mrhiCommand* records = TakeCopy(device, pass, mrhiCommandCopyBuffer, size, 1, 1);
+    mrhiCommand* records = mrhiTakeCopy(device, pass, mrhiCommandCopyBuffer, size, 1, 1);
     if (records == nullptr)
     {
         return mrhi_errorCapacity;
@@ -143,15 +124,11 @@ static uint32_t Physical(uint32_t size, uint32_t mip, uint32_t block)
     return (uint32_t)(((uint64_t)texels + block - 1) / block * block);
 }
 
-// Checks a texture side of a copy of a size and resolves it: success,
-// or the refusal. The region is in whole blocks within the mip's
-// physical size, and a depth format or multisampled texture is copied
-// whole.
-static mrhiResult CheckTexture(const mrhiDevice* device, const mrhiTextureCopy* copy,
-                               const mrhiExtent3d* size, TextureSide* sideOut)
+mrhiResult mrhiCheckTextureSide(const mrhiDevice* device, const mrhiTextureCopy* copy,
+                                const mrhiExtent3d* size, mrhiTextureSide* sideOut)
 {
     mrhiResult status = mrhi_success;
-    uint32_t object = FindKind(device, copy->resource, false, &status);
+    uint32_t object = mrhiFindKind(device, copy->resource, false, &status);
     if (object == 0)
     {
         return status;
@@ -178,7 +155,7 @@ static mrhiResult CheckTexture(const mrhiDevice* device, const mrhiTextureCopy* 
         return mrhi_errorInvalid;
     }
     bool flat = def->kind != mrhi_texture3d;
-    *sideOut = (TextureSide){
+    *sideOut = (mrhiTextureSide){
         .object = object,
         .def = def,
         .aspect = copy->aspect,
@@ -196,10 +173,7 @@ static mrhiResult CheckTexture(const mrhiDevice* device, const mrhiTextureCopy* 
     return mrhi_success;
 }
 
-// The copy facts of a texture side copied with a buffer: of its color,
-// or of the one aspect of a depth format it names. All zero for both
-// aspects of a format that has two.
-static mrhiFormatCopy CopyFacts(const TextureSide* side)
+mrhiFormatCopy mrhiSideCopyFacts(const mrhiTextureSide* side)
 {
     mrhiFormat format = side->def->format;
     if (!mrhiFormatHasDepth(format))
@@ -214,20 +188,19 @@ static mrhiFormatCopy CopyFacts(const TextureSide* side)
     return mrhiGetFormatCopy(format, aspect);
 }
 
-// Checks a buffer layout for a copy of a size with a texture as WebGPU
-// validates linear texture data: success, or mrhi_errorInvalid.
-static mrhiResult CheckLayout(const mrhiBufferCopy* copy, uint64_t total, mrhiFormatBlock block,
-                              uint32_t bytes, uint32_t alignment, const mrhiExtent3d* size)
+bool mrhiIsLayoutValid(uint64_t offset, uint32_t bytesPerRow, uint32_t rowsPerImage, uint64_t total,
+                       mrhiFormatBlock block, uint32_t bytes, const mrhiExtent3d* size,
+                       bool aligned)
 {
     uint64_t rows = size->height / block.height;
     uint64_t lastRow = (uint64_t)(size->width / block.width) * bytes;
-    uint64_t perRow = copy->bytesPerRow;
-    uint64_t perImage = copy->rowsPerImage;
-    if (copy->offset % alignment != 0 || perRow % 256 != 0 || (rows > 1 && perRow == 0) ||
+    uint64_t perRow = bytesPerRow;
+    uint64_t perImage = rowsPerImage;
+    if ((aligned && perRow % 256 != 0) || (rows > 1 && perRow == 0) ||
         (size->depthOrLayers > 1 && (perRow == 0 || perImage == 0)) ||
         (perRow != 0 && perRow < lastRow) || (perImage != 0 && perImage < rows))
     {
-        return mrhi_errorInvalid;
+        return false;
     }
     // Rows and images of 32-bit counts multiply within 64 bits; their
     // sums may not.
@@ -242,8 +215,21 @@ static mrhiResult CheckLayout(const mrhiBufferCopy* copy, uint64_t total, mrhiFo
                        ckd_add(&required, required, lastRow);
         }
     }
-    bool fits = !overflow && copy->offset <= total && required <= total - copy->offset;
-    return fits ? mrhi_success : mrhi_errorInvalid;
+    return !overflow && offset <= total && required <= total - offset;
+}
+
+mrhiResult mrhiCheckTextureTransfer(const mrhiDevice* device, const mrhiTextureCopy* texture,
+                                    const mrhiExtent3d* size, bool fromTexture,
+                                    mrhiTextureSide* sideOut, mrhiFormatCopy* factsOut)
+{
+    mrhiResult status = mrhiCheckTextureSide(device, texture, size, sideOut);
+    if (status != mrhi_success)
+    {
+        return status;
+    }
+    *factsOut = mrhiSideCopyFacts(sideOut);
+    bool direction = fromTexture ? factsOut->source : factsOut->destination;
+    return sideOut->def->sampleCount == 1 && direction ? mrhi_success : mrhi_errorInvalid;
 }
 
 // Checks a copy between a buffer and a texture, the texture being the
@@ -251,34 +237,29 @@ static mrhiResult CheckLayout(const mrhiBufferCopy* copy, uint64_t total, mrhiFo
 static mrhiResult CheckBufferTexture(const mrhiDevice* device, const mrhiFramePass* pass,
                                      const mrhiBufferCopy* buffer, const mrhiTextureCopy* texture,
                                      const mrhiExtent3d* size, bool fromTexture,
-                                     uint32_t* bufferOut, TextureSide* textureOut)
+                                     uint32_t* bufferOut, mrhiTextureSide* textureOut)
 {
     mrhiResult status = mrhi_success;
-    uint32_t object = FindKind(device, buffer->resource, true, &status);
+    uint32_t object = mrhiFindKind(device, buffer->resource, true, &status);
     if (object == 0)
     {
         return status;
     }
-    status = CheckTexture(device, texture, size, textureOut);
+    mrhiFormatCopy facts;
+    status = mrhiCheckTextureTransfer(device, texture, size, fromTexture, textureOut, &facts);
     if (status != mrhi_success)
     {
         return status;
     }
     const mrhiTextureDef* def = textureOut->def;
-    mrhiFormatCopy facts = CopyFacts(textureOut);
-    bool direction = fromTexture ? facts.source : facts.destination;
-    if (def->sampleCount != 1 || !direction)
-    {
-        return mrhi_errorInvalid;
-    }
     uint32_t alignment = mrhiFormatHasDepth(def->format) ? 4 : facts.bytes;
     uint64_t total = mrhiBufferBytesOf(device, &device->frameResources[object - 1]);
-    status =
-        CheckLayout(buffer, total, mrhiGetFormatBlock(def->format), facts.bytes, alignment, size);
+    bool valid = buffer->offset % alignment == 0 &&
+                 mrhiIsLayoutValid(buffer->offset, buffer->bytesPerRow, buffer->rowsPerImage, total,
+                                   mrhiGetFormatBlock(def->format), facts.bytes, size, true);
     mrhiAccessKind bufferKind = fromTexture ? mrhi_accessCopyDestination : mrhi_accessCopySource;
     mrhiAccessKind textureKind = fromTexture ? mrhi_accessCopySource : mrhi_accessCopyDestination;
-    if (status != mrhi_success ||
-        !mrhiPassDeclares(device, pass, object, MRHI_KIND(bufferKind), nullptr) ||
+    if (!valid || !mrhiPassDeclares(device, pass, object, MRHI_KIND(bufferKind), nullptr) ||
         !mrhiPassDeclares(device, pass, textureOut->object, MRHI_KIND(textureKind),
                           &textureOut->part))
     {
@@ -303,22 +284,22 @@ static mrhiResult CopyBufferTexture(mrhiDevice* device, mrhiPassId id, const mrh
         return mrhiDeviceMisuse(device);
     }
     mrhiResult status = mrhi_success;
-    mrhiFramePass* pass = CopyPass(device, id, &status);
+    mrhiFramePass* pass = mrhiCopyPass(device, id, &status);
     if (pass == nullptr)
     {
         return status;
     }
     uint32_t object = 0;
-    TextureSide side;
+    mrhiTextureSide side;
     status = CheckBufferTexture(device, pass, buffer, texture, size, fromTexture, &object, &side);
     if (status != mrhi_success)
     {
-        return Refuse(device, status);
+        return mrhiRefuse(device, status);
     }
     mrhiCommandType type =
         fromTexture ? mrhiCommandCopyTextureToBuffer : mrhiCommandCopyBufferToTexture;
     mrhiCommand* records =
-        TakeCopy(device, pass, type, size->width, size->height, size->depthOrLayers);
+        mrhiTakeCopy(device, pass, type, size->width, size->height, size->depthOrLayers);
     if (records == nullptr)
     {
         return mrhi_errorCapacity;
@@ -358,7 +339,7 @@ mrhiResult mrhiCopyTextureToBuffer(mrhiDevice* device, mrhiPassId pass,
 
 // Whether a texture side names every aspect of its format: all of them,
 // or the only one.
-static bool IsEveryAspect(const TextureSide* side)
+static bool IsEveryAspect(const mrhiTextureSide* side)
 {
     mrhiFormat format = side->def->format;
     bool single = !(mrhiFormatHasDepth(format) && mrhiFormatHasStencil(format));
@@ -377,18 +358,18 @@ mrhiResult mrhiCopyTexture(mrhiDevice* device, mrhiPassId id, const mrhiTextureC
         return mrhiDeviceMisuse(device);
     }
     mrhiResult status = mrhi_success;
-    mrhiFramePass* pass = CopyPass(device, id, &status);
+    mrhiFramePass* pass = mrhiCopyPass(device, id, &status);
     if (pass == nullptr)
     {
         return status;
     }
-    TextureSide from;
-    TextureSide to;
-    status = CheckTexture(device, source, size, &from);
-    status = status == mrhi_success ? CheckTexture(device, destination, size, &to) : status;
+    mrhiTextureSide from;
+    mrhiTextureSide to;
+    status = mrhiCheckTextureSide(device, source, size, &from);
+    status = status == mrhi_success ? mrhiCheckTextureSide(device, destination, size, &to) : status;
     if (status != mrhi_success)
     {
-        return Refuse(device, status);
+        return mrhiRefuse(device, status);
     }
     // Overlapping parts of one texture are refused by the pass's
     // declarations, which never name a part as both a copy source and
@@ -404,8 +385,8 @@ mrhiResult mrhiCopyTexture(mrhiDevice* device, mrhiPassId id, const mrhiTextureC
     {
         return mrhiDeviceMisuse(device);
     }
-    mrhiCommand* records = TakeCopy(device, pass, mrhiCommandCopyTexture, size->width, size->height,
-                                    size->depthOrLayers);
+    mrhiCommand* records = mrhiTakeCopy(device, pass, mrhiCommandCopyTexture, size->width,
+                                        size->height, size->depthOrLayers);
     if (records == nullptr)
     {
         return mrhi_errorCapacity;

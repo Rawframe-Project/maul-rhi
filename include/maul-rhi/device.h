@@ -71,6 +71,10 @@ extern "C"
         // The bytes one frame's commands take in all, in 4 KiB chunks; 1 MiB by
         // default.
         uint32_t frameCommandBytes;
+        // The bytes one frame's uploads take in all, each at a 512-byte
+        // boundary with a texture's rows at a 256-byte pitch; as many again for
+        // each frame in flight; 4 MiB by default, 0 for no uploads.
+        uint32_t frameUploadBytes;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the

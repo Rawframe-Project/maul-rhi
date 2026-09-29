@@ -334,6 +334,13 @@ struct mrhiDevice
     uint64_t frameMemory;
     uint32_t* frameOrder;
     // The frame's command arena: its chunks, and those taken so far.
+    // The frames' staging: framesInFlight regions of frameUploadBytes,
+    // the open frame's region, the bytes taken of it, and the region of
+    // each running frame, beside its token in running.
+    uint8_t* frameStaging;
+    uint32_t stagingRegion;
+    _Atomic uint64_t stagingTaken;
+    uint32_t* runningRegions;
     // Each pass's vertex buffers' bytes plus one (0 for unset),
     // vertexBuffers per pass.
     uint64_t* frameVertexBytes;

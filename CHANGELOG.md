@@ -191,3 +191,7 @@ format.
   `mrhiTextureCopy`, `mrhiExtent3d`), checked as WebGPU checks them and
   against the pass's copy accesses; formats carry their texel copy
   footprint and copy directions per aspect in the contract.
+- Uploads: `mrhiWriteBuffer` and `mrhiWriteTexture` (`mrhiTexelLayout`)
+  copy the program's bytes at the call into the frame's staging, the
+  device's `frameUploadBytes` limit per frame in flight, checked as
+  WebGPU checks its queue writes; a full staging refuses the frame.
