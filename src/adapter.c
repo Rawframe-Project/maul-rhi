@@ -71,10 +71,8 @@ static uint32_t SlotFor(mrhiInstance* instance, uint64_t handle)
 // masked to what its API can grant. The driver's order is kept for
 // equal ranks; more adapters than the limit is a capacity outcome, with
 // the first ones kept.
-// What a format can do on an adapter: the driver's answer, nothing for
-// a compressed family whose feature the adapter lacks.
-static mrhiFormatCaps FormatCaps(const mrhiInstance* instance, const mrhiDriverAdapter* adapter,
-                                 mrhiFormat format)
+mrhiFormatCaps mrhiAdapterFormatCaps(const mrhiInstance* instance, const mrhiDriverAdapter* adapter,
+                                     mrhiFormat format)
 {
     mrhiFormatCaps caps = {0};
     if (instance->driver.vtable != nullptr && mrhiFormatFamilyGranted(format, &adapter->features))
@@ -97,7 +95,7 @@ static bool MeetsFloor(const mrhiInstance* instance, const mrhiDriverAdapter* ad
     for (size_t i = 0; i < MRHI_KNOWN_FORMATS; ++i)
     {
         mrhiFormatCaps least = mrhiFloorFormatCaps(mrhiKnownFormats[i]);
-        mrhiFormatCaps caps = FormatCaps(instance, adapter, mrhiKnownFormats[i]);
+        mrhiFormatCaps caps = mrhiAdapterFormatCaps(instance, adapter, mrhiKnownFormats[i]);
         if (!mrhiFormatCapsWithin(&least, &caps))
         {
             return false;
@@ -279,6 +277,6 @@ mrhiResult mrhiGetFormatCaps(mrhiInstance* instance, mrhiAdapterId adapter, mrhi
     {
         return mrhi_errorStale;
     }
-    *capsOut = FormatCaps(instance, found, format);
+    *capsOut = mrhiAdapterFormatCaps(instance, found, format);
     return mrhi_success;
 }

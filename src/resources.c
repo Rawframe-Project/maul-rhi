@@ -6,9 +6,7 @@
 // destruction that ends the id at once.
 
 #include "capabilities_core.h"
-#include "chain.h"
 #include "device_core.h"
-#include "instance_core.h"
 
 #define SAMPLER_DEF_COOKIE 0x6D727361u
 #define BUFFER_DEF_COOKIE  0x6D726275u
@@ -48,19 +46,6 @@ static bool IsSamplerDefValid(const mrhiSamplerDef* def)
     return filters && address && lod && anisotropy && def->compare <= mrhi_compareAlways;
 }
 
-// Checks a def's cookie and extension chain on a live device: success,
-// or the refusal (invalid input counted as misuse).
-static mrhiResult CheckDef(mrhiDevice* device, uint32_t cookie, uint32_t expected,
-                           const mrhiChain* next)
-{
-    mrhiResult chain = mrhiCheckChain(next, nullptr, 0, device->instance->limits.chainDepth);
-    if (cookie != expected || chain == mrhi_errorInvalid)
-    {
-        return mrhiDeviceMisuse(device);
-    }
-    return chain;
-}
-
 mrhiResult mrhiCreateSampler(mrhiDevice* device, const mrhiSamplerDef* def,
                              mrhiSamplerId* samplerOut)
 {
@@ -72,7 +57,7 @@ mrhiResult mrhiCreateSampler(mrhiDevice* device, const mrhiSamplerDef* def,
     {
         return mrhiDeviceMisuse(device);
     }
-    mrhiResult status = CheckDef(device, def->cookie, SAMPLER_DEF_COOKIE, def->next);
+    mrhiResult status = mrhiCheckObjectDef(device, def->cookie, SAMPLER_DEF_COOKIE, def->next);
     if (status != mrhi_success)
     {
         return status;
@@ -137,7 +122,7 @@ mrhiResult mrhiCreateBuffer(mrhiDevice* device, const mrhiBufferDef* def, mrhiBu
     {
         return mrhiDeviceMisuse(device);
     }
-    mrhiResult status = CheckDef(device, def->cookie, BUFFER_DEF_COOKIE, def->next);
+    mrhiResult status = mrhiCheckObjectDef(device, def->cookie, BUFFER_DEF_COOKIE, def->next);
     if (status != mrhi_success)
     {
         return status;

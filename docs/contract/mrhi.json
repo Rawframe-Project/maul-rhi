@@ -1940,7 +1940,12 @@
                 "blending": true,
                 "storage": true,
                 "sample_counts": 5
-              }
+              },
+              "block": [
+                1,
+                1
+              ],
+              "srgb_pair": "format_rgba8_unorm_srgb"
             },
             {
               "name": "format_rgba8_unorm_srgb",
@@ -1971,7 +1976,12 @@
                 "blending": true,
                 "storage": false,
                 "sample_counts": 5
-              }
+              },
+              "block": [
+                1,
+                1
+              ],
+              "srgb_pair": "format_rgba8_unorm"
             },
             {
               "name": "format_bgra8_unorm",
@@ -2002,7 +2012,12 @@
                 "blending": true,
                 "storage": false,
                 "sample_counts": 5
-              }
+              },
+              "block": [
+                1,
+                1
+              ],
+              "srgb_pair": "format_bgra8_unorm_srgb"
             },
             {
               "name": "format_bgra8_unorm_srgb",
@@ -2033,7 +2048,12 @@
                 "blending": true,
                 "storage": false,
                 "sample_counts": 5
-              }
+              },
+              "block": [
+                1,
+                1
+              ],
+              "srgb_pair": "format_bgra8_unorm"
             },
             {
               "name": "format_r8_unorm",
@@ -2064,7 +2084,11 @@
                 "blending": true,
                 "storage": false,
                 "sample_counts": 5
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_rg8_unorm",
@@ -2095,7 +2119,11 @@
                 "blending": true,
                 "storage": false,
                 "sample_counts": 5
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_r16_float",
@@ -2126,7 +2154,11 @@
                 "blending": true,
                 "storage": false,
                 "sample_counts": 5
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_rg16_float",
@@ -2157,7 +2189,11 @@
                 "blending": true,
                 "storage": false,
                 "sample_counts": 5
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_rgba16_float",
@@ -2188,7 +2224,11 @@
                 "blending": true,
                 "storage": true,
                 "sample_counts": 5
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_r32_float",
@@ -2219,7 +2259,11 @@
                 "blending": false,
                 "storage": true,
                 "sample_counts": 1
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_rg32_float",
@@ -2250,7 +2294,11 @@
                 "blending": false,
                 "storage": true,
                 "sample_counts": 1
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_rgba32_float",
@@ -2281,7 +2329,11 @@
                 "blending": false,
                 "storage": true,
                 "sample_counts": 1
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_r32_uint",
@@ -2312,7 +2364,11 @@
                 "blending": false,
                 "storage": true,
                 "sample_counts": 1
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_r32_sint",
@@ -2343,7 +2399,11 @@
                 "blending": false,
                 "storage": true,
                 "sample_counts": 1
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_rgb10a2_unorm",
@@ -2374,7 +2434,11 @@
                 "blending": true,
                 "storage": false,
                 "sample_counts": 5
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_rg11b10_ufloat",
@@ -2405,7 +2469,11 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 1
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_depth32_float",
@@ -2436,7 +2504,11 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 5
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_depth_stencil",
@@ -2467,7 +2539,11 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 5
-              }
+              },
+              "block": [
+                1,
+                1
+              ]
             },
             {
               "name": "format_bc1_rgba_unorm",
@@ -2499,7 +2575,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_bc1_rgba_unorm_srgb"
             },
             {
               "name": "format_bc1_rgba_unorm_srgb",
@@ -2531,7 +2612,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_bc1_rgba_unorm"
             },
             {
               "name": "format_bc2_rgba_unorm",
@@ -2563,7 +2649,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_bc2_rgba_unorm_srgb"
             },
             {
               "name": "format_bc2_rgba_unorm_srgb",
@@ -2595,7 +2686,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_bc2_rgba_unorm"
             },
             {
               "name": "format_bc3_rgba_unorm",
@@ -2627,7 +2723,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_bc3_rgba_unorm_srgb"
             },
             {
               "name": "format_bc3_rgba_unorm_srgb",
@@ -2659,7 +2760,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_bc3_rgba_unorm"
             },
             {
               "name": "format_bc4_r_unorm",
@@ -2691,7 +2797,11 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ]
             },
             {
               "name": "format_bc4_r_snorm",
@@ -2723,7 +2833,11 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ]
             },
             {
               "name": "format_bc5_rg_unorm",
@@ -2755,7 +2869,11 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ]
             },
             {
               "name": "format_bc5_rg_snorm",
@@ -2787,7 +2905,11 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ]
             },
             {
               "name": "format_bc6h_rgb_ufloat",
@@ -2819,7 +2941,11 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ]
             },
             {
               "name": "format_bc6h_rgb_float",
@@ -2851,7 +2977,11 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ]
             },
             {
               "name": "format_bc7_rgba_unorm",
@@ -2883,7 +3013,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_bc7_rgba_unorm_srgb"
             },
             {
               "name": "format_bc7_rgba_unorm_srgb",
@@ -2915,7 +3050,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_bc7_rgba_unorm"
             },
             {
               "name": "format_etc2_rgb8_unorm",
@@ -2947,7 +3087,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_etc2_rgb8_unorm_srgb"
             },
             {
               "name": "format_etc2_rgb8_unorm_srgb",
@@ -2979,7 +3124,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_etc2_rgb8_unorm"
             },
             {
               "name": "format_etc2_rgb8a1_unorm",
@@ -3011,7 +3161,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_etc2_rgb8a1_unorm_srgb"
             },
             {
               "name": "format_etc2_rgb8a1_unorm_srgb",
@@ -3043,7 +3198,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_etc2_rgb8a1_unorm"
             },
             {
               "name": "format_etc2_rgba8_unorm",
@@ -3075,7 +3235,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_etc2_rgba8_unorm_srgb"
             },
             {
               "name": "format_etc2_rgba8_unorm_srgb",
@@ -3107,7 +3272,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_etc2_rgba8_unorm"
             },
             {
               "name": "format_eac_r11_unorm",
@@ -3139,7 +3309,11 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ]
             },
             {
               "name": "format_eac_r11_snorm",
@@ -3171,7 +3345,11 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ]
             },
             {
               "name": "format_eac_rg11_unorm",
@@ -3203,7 +3381,11 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ]
             },
             {
               "name": "format_eac_rg11_snorm",
@@ -3235,7 +3417,11 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ]
             },
             {
               "name": "format_astc_4x4_unorm",
@@ -3267,7 +3453,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_astc_4x4_unorm_srgb"
             },
             {
               "name": "format_astc_4x4_unorm_srgb",
@@ -3299,7 +3490,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                4,
+                4
+              ],
+              "srgb_pair": "format_astc_4x4_unorm"
             },
             {
               "name": "format_astc_5x4_unorm",
@@ -3331,7 +3527,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                5,
+                4
+              ],
+              "srgb_pair": "format_astc_5x4_unorm_srgb"
             },
             {
               "name": "format_astc_5x4_unorm_srgb",
@@ -3363,7 +3564,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                5,
+                4
+              ],
+              "srgb_pair": "format_astc_5x4_unorm"
             },
             {
               "name": "format_astc_5x5_unorm",
@@ -3395,7 +3601,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                5,
+                5
+              ],
+              "srgb_pair": "format_astc_5x5_unorm_srgb"
             },
             {
               "name": "format_astc_5x5_unorm_srgb",
@@ -3427,7 +3638,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                5,
+                5
+              ],
+              "srgb_pair": "format_astc_5x5_unorm"
             },
             {
               "name": "format_astc_6x5_unorm",
@@ -3459,7 +3675,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                6,
+                5
+              ],
+              "srgb_pair": "format_astc_6x5_unorm_srgb"
             },
             {
               "name": "format_astc_6x5_unorm_srgb",
@@ -3491,7 +3712,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                6,
+                5
+              ],
+              "srgb_pair": "format_astc_6x5_unorm"
             },
             {
               "name": "format_astc_6x6_unorm",
@@ -3523,7 +3749,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                6,
+                6
+              ],
+              "srgb_pair": "format_astc_6x6_unorm_srgb"
             },
             {
               "name": "format_astc_6x6_unorm_srgb",
@@ -3555,7 +3786,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                6,
+                6
+              ],
+              "srgb_pair": "format_astc_6x6_unorm"
             },
             {
               "name": "format_astc_8x5_unorm",
@@ -3587,7 +3823,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                8,
+                5
+              ],
+              "srgb_pair": "format_astc_8x5_unorm_srgb"
             },
             {
               "name": "format_astc_8x5_unorm_srgb",
@@ -3619,7 +3860,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                8,
+                5
+              ],
+              "srgb_pair": "format_astc_8x5_unorm"
             },
             {
               "name": "format_astc_8x6_unorm",
@@ -3651,7 +3897,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                8,
+                6
+              ],
+              "srgb_pair": "format_astc_8x6_unorm_srgb"
             },
             {
               "name": "format_astc_8x6_unorm_srgb",
@@ -3683,7 +3934,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                8,
+                6
+              ],
+              "srgb_pair": "format_astc_8x6_unorm"
             },
             {
               "name": "format_astc_8x8_unorm",
@@ -3715,7 +3971,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                8,
+                8
+              ],
+              "srgb_pair": "format_astc_8x8_unorm_srgb"
             },
             {
               "name": "format_astc_8x8_unorm_srgb",
@@ -3747,7 +4008,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                8,
+                8
+              ],
+              "srgb_pair": "format_astc_8x8_unorm"
             },
             {
               "name": "format_astc_10x5_unorm",
@@ -3779,7 +4045,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                10,
+                5
+              ],
+              "srgb_pair": "format_astc_10x5_unorm_srgb"
             },
             {
               "name": "format_astc_10x5_unorm_srgb",
@@ -3811,7 +4082,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                10,
+                5
+              ],
+              "srgb_pair": "format_astc_10x5_unorm"
             },
             {
               "name": "format_astc_10x6_unorm",
@@ -3843,7 +4119,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                10,
+                6
+              ],
+              "srgb_pair": "format_astc_10x6_unorm_srgb"
             },
             {
               "name": "format_astc_10x6_unorm_srgb",
@@ -3875,7 +4156,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                10,
+                6
+              ],
+              "srgb_pair": "format_astc_10x6_unorm"
             },
             {
               "name": "format_astc_10x8_unorm",
@@ -3907,7 +4193,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                10,
+                8
+              ],
+              "srgb_pair": "format_astc_10x8_unorm_srgb"
             },
             {
               "name": "format_astc_10x8_unorm_srgb",
@@ -3939,7 +4230,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                10,
+                8
+              ],
+              "srgb_pair": "format_astc_10x8_unorm"
             },
             {
               "name": "format_astc_10x10_unorm",
@@ -3971,7 +4267,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                10,
+                10
+              ],
+              "srgb_pair": "format_astc_10x10_unorm_srgb"
             },
             {
               "name": "format_astc_10x10_unorm_srgb",
@@ -4003,7 +4304,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                10,
+                10
+              ],
+              "srgb_pair": "format_astc_10x10_unorm"
             },
             {
               "name": "format_astc_12x10_unorm",
@@ -4035,7 +4341,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                12,
+                10
+              ],
+              "srgb_pair": "format_astc_12x10_unorm_srgb"
             },
             {
               "name": "format_astc_12x10_unorm_srgb",
@@ -4067,7 +4378,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                12,
+                10
+              ],
+              "srgb_pair": "format_astc_12x10_unorm"
             },
             {
               "name": "format_astc_12x12_unorm",
@@ -4099,7 +4415,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                12,
+                12
+              ],
+              "srgb_pair": "format_astc_12x12_unorm_srgb"
             },
             {
               "name": "format_astc_12x12_unorm_srgb",
@@ -4131,7 +4452,12 @@
                 "blending": false,
                 "storage": false,
                 "sample_counts": 0
-              }
+              },
+              "block": [
+                12,
+                12
+              ],
+              "srgb_pair": "format_astc_12x12_unorm"
             }
           ]
         },
@@ -4456,6 +4782,11 @@
               "name": "buffers",
               "type": "uint32",
               "doc": "Buffers the device holds at once; 4096 by default."
+            },
+            {
+              "name": "textures",
+              "type": "uint32",
+              "doc": "Textures the device holds at once; 4096 by default."
             }
           ]
         },
@@ -4493,7 +4824,7 @@
         {
           "kind": "function",
           "name": "default_device_def",
-          "doc": "Returns the default device def: no adapter, no optional features, the floor limits, 256 notifications, 256 samplers, 4096 buffers and the C library's allocator.",
+          "doc": "Returns the default device def: no adapter, no optional features, the floor limits, 256 notifications, 256 samplers, 4096 buffers, 4096 textures and the C library's allocator.",
           "returns": {
             "type": "struct.device_def",
             "doc": "The def, with a valid cookie."
@@ -5628,6 +5959,577 @@
               "name": "buffer",
               "type": "id.buffer_id",
               "doc": "The buffer."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "enum",
+          "name": "texture_kind",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "The shape of a texture, or of a view of one.",
+          "values": [
+            {
+              "name": "texture_2d",
+              "value": 0,
+              "doc": "A 2D image.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "IMAGE_TYPE_2D, a 2D view"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "TEXTURE2D"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLTextureType2D"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "2d"
+                }
+              }
+            },
+            {
+              "name": "texture_2d_array",
+              "value": 1,
+              "doc": "An array of 2D images.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "IMAGE_TYPE_2D with layers, a 2D array view"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "TEXTURE2D with an ArraySize"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLTextureType2DArray"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "2d with layers, a 2d-array view"
+                }
+              }
+            },
+            {
+              "name": "texture_cube",
+              "value": 2,
+              "doc": "Six square 2D images, one per cube face.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "CUBE_COMPATIBLE with 6 layers, a cube view"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "TEXTURE2D with 6 array slices, a TextureCube view"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLTextureTypeCube"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "2d with 6 layers, a cube view"
+                }
+              }
+            },
+            {
+              "name": "texture_cube_array",
+              "value": 3,
+              "doc": "An array of cubes, six layers each.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "CUBE_COMPATIBLE with 6n layers, a cube array view"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "TEXTURE2D with 6n array slices, a TextureCubeArray view"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLTextureTypeCubeArray"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "2d with 6n layers, a cube-array view"
+                }
+              }
+            },
+            {
+              "name": "texture_3d",
+              "value": 4,
+              "doc": "A volume.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "IMAGE_TYPE_3D"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "TEXTURE3D"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLTextureType3D"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "3d"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "bitflags",
+          "name": "texture_usage",
+          "width": "uint32",
+          "mapped": true,
+          "doc": "What a texture is used for, declared when it is made; each needs the format's capability.",
+          "values": [
+            {
+              "name": "texture_sampled",
+              "value": 1,
+              "doc": "Sampled in shaders.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SAMPLED_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "a shader resource view"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "ShaderRead"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "TEXTURE_BINDING"
+                }
+              }
+            },
+            {
+              "name": "texture_storage",
+              "value": 2,
+              "doc": "Read and written by shaders as storage.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "STORAGE_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "ALLOW_UNORDERED_ACCESS"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "ShaderWrite"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "STORAGE_BINDING"
+                }
+              }
+            },
+            {
+              "name": "texture_render_target",
+              "value": 4,
+              "doc": "A color or depth target of render passes.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "COLOR_ATTACHMENT_BIT or DEPTH_STENCIL_ATTACHMENT_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "ALLOW_RENDER_TARGET or ALLOW_DEPTH_STENCIL"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "RenderTarget"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "RENDER_ATTACHMENT"
+                }
+              }
+            },
+            {
+              "name": "texture_transient",
+              "value": 8,
+              "doc": "A render target whose contents live only inside a render pass; only with render target.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRANSIENT_ATTACHMENT_BIT in lazily allocated memory"
+                },
+                "d3d12": {
+                  "class": "emulated",
+                  "note": "an ordinary render target"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLStorageModeMemoryless"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "TRANSIENT_ATTACHMENT"
+                }
+              }
+            },
+            {
+              "name": "texture_copy_source",
+              "value": 16,
+              "doc": "The source of copies and readbacks.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRANSFER_SRC_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "a copy source"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a blit source"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "COPY_SRC"
+                }
+              }
+            },
+            {
+              "name": "texture_copy_destination",
+              "value": 32,
+              "doc": "The destination of copies and uploads.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRANSFER_DST_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "a copy destination"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a blit destination"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "COPY_DST"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "constant",
+          "name": "view_formats",
+          "value": 4,
+          "doc": "The other formats one texture may be viewed as."
+        },
+        {
+          "kind": "id",
+          "name": "texture_id",
+          "doc": "A texture of a device."
+        },
+        {
+          "kind": "struct",
+          "name": "texture_def",
+          "def": true,
+          "mapped": true,
+          "doc": "How a texture is made. Build it with mrhiDefaultTextureDef and set its format, size and usage. Its contents are undefined until the frame graph writes them.",
+          "members": [
+            {
+              "name": "kind",
+              "type": "enum.texture_kind",
+              "doc": "Its shape.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "imageType and CUBE_COMPATIBLE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "Dimension"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "textureType"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "dimension"
+                }
+              }
+            },
+            {
+              "name": "format",
+              "type": "enum.format",
+              "doc": "Its format; a compressed one needs its family's feature on the device.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "format"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "Format"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "pixelFormat"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "format"
+                }
+              }
+            },
+            {
+              "name": "width",
+              "type": "uint32",
+              "doc": "Texels across; a multiple of the format's block width.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "extent.width"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "Width"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "width"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "size.width"
+                }
+              }
+            },
+            {
+              "name": "height",
+              "type": "uint32",
+              "doc": "Texels down; a multiple of the format's block height; equal to the width for cubes.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "extent.height"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "Height"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "height"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "size.height"
+                }
+              }
+            },
+            {
+              "name": "depth_or_layers",
+              "type": "uint32",
+              "doc": "The depth of a 3D texture, else its layers: 1 for 2D, 6 for a cube, a multiple of 6 for a cube array.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "extent.depth or arrayLayers"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DepthOrArraySize"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "depth or arrayLength"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "size.depthOrArrayLayers"
+                }
+              }
+            },
+            {
+              "name": "mip_levels",
+              "type": "uint32",
+              "doc": "At least 1, at most a full chain.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "mipLevels"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "MipLevels"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "mipmapLevelCount"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "mipLevelCount"
+                }
+              }
+            },
+            {
+              "name": "sample_count",
+              "type": "uint32",
+              "doc": "1, or a count the format's sampleCounts allows for a 2D render target with one mip.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "samples"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SampleDesc.Count"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "sampleCount"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "sampleCount, 1 or 4"
+                }
+              }
+            },
+            {
+              "name": "usage",
+              "type": "bitflags.texture_usage",
+              "doc": "Its uses, at least one.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "usage"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "Flags"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "usage and storageMode"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "usage"
+                }
+              }
+            },
+            {
+              "name": "view_formats",
+              "type": "enum.format",
+              "array": "view_formats",
+              "doc": "The formats its views may take besides its own: the format's sRGB or linear twin. Unused entries are mrhi_formatNone.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "MUTABLE_FORMAT and a format list"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "castable formats"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "pixelFormatView"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "viewFormats"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_texture_def",
+          "doc": "Returns the default texture def: a 2D texture of one mip, one sample and one layer, with no format, size or usage, which must be set.",
+          "returns": {
+            "type": "struct.texture_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "create_texture",
+          "doc": "Makes a texture on a ready device.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, an unknown kind, format, usage or view format, a zero size, a size or layer count that does not fit the kind or the format's block, too many mips, an unusable sample count, or a transient texture that is not only a render target; `mrhi_errorUnsupported` for a size past the device's limits, a usage or sample count the format cannot take on the device, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's texture limit is reached; `mrhi_errorPlatform` when the driver fails."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "def",
+              "type": "struct.texture_def",
+              "pointer": "const",
+              "doc": "The texture to make."
+            },
+            {
+              "name": "texture_out",
+              "type": "id.texture_id",
+              "pointer": "mutable",
+              "doc": "Receives the texture."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "destroy_texture",
+          "doc": "Destroys a texture and its views. Their ids end at once; the device retires them after the frames that used them.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device; `mrhi_errorStale` for a texture the device no longer has."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "texture",
+              "type": "id.texture_id",
+              "doc": "The texture."
             }
           ],
           "thread_safety": {

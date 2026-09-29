@@ -91,6 +91,11 @@ void mrhiAnswerNow(mrhiInstance* instance, uint32_t request, mrhiResult outcome)
 // The adapter an id names, or NULL for a stale or null id.
 const mrhiDriverAdapter* mrhiFindAdapter(const mrhiInstance* instance, mrhiAdapterId adapter);
 
+// What a format can do on an adapter: the driver's answer, nothing for
+// a compressed family whose feature the adapter lacks.
+mrhiFormatCaps mrhiAdapterFormatCaps(const mrhiInstance* instance, const mrhiDriverAdapter* adapter,
+                                     mrhiFormat format);
+
 // Rebuilds the adapter table for an answered search and returns the
 // search's outcome.
 mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search);

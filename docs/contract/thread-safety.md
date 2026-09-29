@@ -33,3 +33,6 @@ edit the contract, not this file.
 | `mrhiDefaultBufferDef` | Safe from any thread. |
 | `mrhiCreateBuffer` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDestroyBuffer` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDefaultTextureDef` | Safe from any thread. |
+| `mrhiCreateTexture` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDestroyTexture` | Safe from any thread; the device is used by one thread at a time. |

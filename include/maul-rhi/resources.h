@@ -221,6 +221,128 @@ extern "C"
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyBuffer(mrhiDevice* device, mrhiBufferId buffer);
 
+    // The shape of a texture, or of a view of one.
+    typedef uint8_t mrhiTextureKind;
+
+    enum
+    {
+        // A 2D image.
+        mrhi_texture2d = 0,
+        // An array of 2D images.
+        mrhi_texture2dArray = 1,
+        // Six square 2D images, one per cube face.
+        mrhi_textureCube = 2,
+        // An array of cubes, six layers each.
+        mrhi_textureCubeArray = 3,
+        // A volume.
+        mrhi_texture3d = 4,
+    };
+
+    // What a texture is used for, declared when it is made; each needs the
+    // format's capability.
+    typedef uint32_t mrhiTextureUsage;
+
+    enum
+    {
+        // Sampled in shaders.
+        mrhi_textureSampled = 0x1u,
+        // Read and written by shaders as storage.
+        mrhi_textureStorage = 0x2u,
+        // A color or depth target of render passes.
+        mrhi_textureRenderTarget = 0x4u,
+        // A render target whose contents live only inside a render pass; only
+        // with render target.
+        mrhi_textureTransient = 0x8u,
+        // The source of copies and readbacks.
+        mrhi_textureCopySource = 0x10u,
+        // The destination of copies and uploads.
+        mrhi_textureCopyDestination = 0x20u,
+    };
+
+// The other formats one texture may be viewed as.
+#define MRHI_VIEW_FORMATS 4
+
+    // A texture of a device.
+    typedef struct mrhiTextureId
+    {
+        uint32_t index1;
+        uint32_t generation;
+    } mrhiTextureId;
+
+    // How a texture is made. Build it with mrhiDefaultTextureDef and set its
+    // format, size and usage. Its contents are undefined until the frame graph
+    // writes them.
+    typedef struct mrhiTextureDef
+    {
+        uint32_t cookie;
+        // Extensions, or NULL.
+        const mrhiChain* next;
+        // Its shape.
+        mrhiTextureKind kind;
+        // Its format; a compressed one needs its family's feature on the
+        // device.
+        mrhiFormat format;
+        // Texels across; a multiple of the format's block width.
+        uint32_t width;
+        // Texels down; a multiple of the format's block height; equal to the
+        // width for cubes.
+        uint32_t height;
+        // The depth of a 3D texture, else its layers: 1 for 2D, 6 for a cube, a
+        // multiple of 6 for a cube array.
+        uint32_t depthOrLayers;
+        // At least 1, at most a full chain.
+        uint32_t mipLevels;
+        // 1, or a count the format's sampleCounts allows for a 2D render target
+        // with one mip.
+        uint32_t sampleCount;
+        // Its uses, at least one.
+        mrhiTextureUsage usage;
+        // The formats its views may take besides its own: the format's sRGB or
+        // linear twin. Unused entries are mrhi_formatNone.
+        mrhiFormat viewFormats[MRHI_VIEW_FORMATS];
+    } mrhiTextureDef;
+
+    /// Returns the default texture def: a 2D texture of one mip, one sample and
+    /// one layer, with no format, size or usage, which must be set.
+    ///
+    /// @return The def, with a valid cookie.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MRHI_API mrhiTextureDef mrhiDefaultTextureDef(void);
+
+    /// Makes a texture on a ready device.
+    ///
+    /// @param device      The device.
+    /// @param def         The texture to make.
+    /// @param textureOut  Receives the texture.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
+    /// without its cookie, an unknown kind, format, usage or view format, a
+    /// zero size, a size or layer count that does not fit the kind or the
+    /// format's block, too many mips, an unusable sample count, or a transient
+    /// texture that is not only a render target; `mrhi_errorUnsupported` for a
+    /// size past the device's limits, a usage or sample count the format cannot
+    /// take on the device, a compressed format without its feature, or a
+    /// critical extension the library does not know; `mrhi_errorState` for a
+    /// device that is not ready; `mrhi_errorCapacity` when the device's texture
+    /// limit is reached; `mrhi_errorPlatform` when the driver fails.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateTexture(mrhiDevice* device,
+                                                         const mrhiTextureDef* def,
+                                                         mrhiTextureId* textureOut);
+
+    /// Destroys a texture and its views. Their ids end at once; the device
+    /// retires them after the frames that used them.
+    ///
+    /// @param device   The device.
+    /// @param texture  The texture.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
+    /// `mrhi_errorStale` for a texture the device no longer has.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyTexture(mrhiDevice* device,
+                                                          mrhiTextureId texture);
+
 #ifdef __cplusplus
 }
 #endif

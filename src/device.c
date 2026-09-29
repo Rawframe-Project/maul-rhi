@@ -24,6 +24,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.notifications = 256;
     def.deviceLimits.samplers = 256;
     def.deviceLimits.buffers = 4096;
+    def.deviceLimits.textures = 4096;
     return def;
 }
 
@@ -36,8 +37,8 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
     mrhiResult chain = mrhiCheckChain(def->next, nullptr, 0, instance->limits.chainDepth);
     if (def->cookie != DEVICE_DEF_COOKIE || def->deviceLimits.notifications == 0 ||
         def->deviceLimits.samplers == 0 || def->deviceLimits.buffers == 0 ||
-        !mrhiIsAllocatorValid(&def->allocator) || !mrhiLimitsWithin(&floor, &def->limits) ||
-        chain == mrhi_errorInvalid)
+        def->deviceLimits.textures == 0 || !mrhiIsAllocatorValid(&def->allocator) ||
+        !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
     {
         *statusOut = mrhiMisuse(instance);
         return nullptr;
@@ -102,6 +103,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     TableParts samplers = AddTable(&layout, limits->samplers, sizeof(uint64_t), alignof(uint64_t));
     TableParts buffers =
         AddTable(&layout, limits->buffers, sizeof(mrhiBufferSlot), alignof(mrhiBufferSlot));
+    TableParts textures =
+        AddTable(&layout, limits->textures, sizeof(mrhiTextureSlot), alignof(mrhiTextureSlot));
     unsigned char* block =
         layout.overflow ? nullptr : mrhiAllocate(&def->allocator, layout.size, alignof(mrhiDevice));
     if (block == nullptr)
@@ -112,6 +115,7 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     *device = (mrhiDevice){.bytes = layout.size};
     device->samplerHandles = InitTable(block, samplers, &device->samplers, limits->samplers);
     device->bufferSlots = InitTable(block, buffers, &device->buffers, limits->buffers);
+    device->textureSlots = InitTable(block, textures, &device->textures, limits->textures);
     return device;
 }
 
@@ -149,6 +153,13 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     device->deviceLimits = def->deviceLimits;
     device->state = mrhi_deviceOpening;
     device->request = mrhiNextRequest(instance);
+    for (uint32_t i = 0; i < MRHI_KNOWN_FORMATS; ++i)
+    {
+        mrhiFormat format = mrhiKnownFormats[i];
+        device->formatCaps[i] = mrhiFormatFamilyGranted(format, &def->features)
+                                    ? mrhiAdapterFormatCaps(instance, adapter, format)
+                                    : (mrhiFormatCaps){0};
+    }
     // An adapter was found, so the instance has a driver.
     MRHI_ASSERT(instance->driver.vtable != nullptr);
     status = instance->driver.vtable->createDevice(instance->driver.self, adapter->handle,
@@ -235,4 +246,15 @@ mrhiResult mrhiGetDeviceLimits(mrhiDevice* device, mrhiLimits* limitsOut)
 uint64_t mrhiGetDeviceMisuse(mrhiDevice* device)
 {
     return device == nullptr ? 0 : device->misuse;
+}
+
+mrhiResult mrhiCheckObjectDef(mrhiDevice* device, uint32_t cookie, uint32_t expected,
+                              const mrhiChain* next)
+{
+    mrhiResult chain = mrhiCheckChain(next, nullptr, 0, device->instance->limits.chainDepth);
+    if (cookie != expected || chain == mrhi_errorInvalid)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    return chain;
 }

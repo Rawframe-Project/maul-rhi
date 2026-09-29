@@ -6,7 +6,7 @@ base:
 capabilities_core:
 chain:
 device: allocator capabilities_core chain device_core driver instance_core invariant pool
-device_core: driver pool
+device_core: capabilities_core driver pool
 driver:
 driver_test: allocator capabilities_core driver invariant
 instance: allocator chain driver driver_test instance_core invariant
@@ -14,4 +14,5 @@ instance_core: driver
 invariant:
 notify: instance_core
 pool:
-resources: capabilities_core chain device_core instance_core
+resources: capabilities_core device_core
+texture: capabilities_core device_core

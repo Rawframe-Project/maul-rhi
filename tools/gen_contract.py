@@ -162,6 +162,12 @@ def check_values(errors, where, item):
     for value in item.get("values", []):
         if "floor" in value and not isinstance(value["floor"], dict):
             errors.append(f"{where}: '{value.get('name')}' has a floor that is not an object")
+        if "floor" in value and not (isinstance(value.get("block"), list) and
+                                     len(value["block"]) == 2):
+            errors.append(f"{where}: '{value.get('name')}' needs a block of two sizes")
+        pair = value.get("srgb_pair")
+        if pair is not None and pair not in {other["name"] for other in item["values"]}:
+            errors.append(f"{where}: '{value.get('name')}' pairs with an unknown format")
 
 
 def check_constant(errors, where, item):
@@ -605,6 +611,24 @@ def format_checks(contract):
             lines += [f"    case {names.value(value['name'])}:",
                       f"        return features->{camel(value['family'])};"]
     lines += ["    default:", "        return true;", "    }", "}"]
+    lines += ["", "mrhiFormatBlock mrhiGetFormatBlock(mrhiFormat format)", "{", "    switch (format)",
+              "    {"]
+    for value in listed:
+        if value["block"] != [1, 1]:
+            lines += [f"    case {names.value(value['name'])}:",
+                      f"        return (mrhiFormatBlock){{{value['block'][0]}, {value['block'][1]}}};"]
+    lines += ["    default:", "        return (mrhiFormatBlock){1, 1};", "    }", "}"]
+    lines += ["", "mrhiFormat mrhiFormatSrgbPair(mrhiFormat format)", "{", "    switch (format)",
+              "    {"]
+    for value in listed:
+        if value.get("srgb_pair"):
+            lines += [f"    case {names.value(value['name'])}:",
+                      f"        return {names.value(value['srgb_pair'])};"]
+    lines += ["    default:", f"        return {names.value('format_none')};", "    }", "}"]
+    lines += ["", "uint32_t mrhiFormatIndex(mrhiFormat format)", "{", "    switch (format)", "    {"]
+    for position, value in enumerate(listed):
+        lines += [f"    case {names.value(value['name'])}:", f"        return {position};"]
+    lines += ["    default:", f"        return {len(listed)};", "    }", "}"]
     lines += ["", "bool mrhiFormatCapsWithin(const mrhiFormatCaps* asked, "
               "const mrhiFormatCaps* granted)", "{", "    return true"]
     for member in caps["members"]:

@@ -7,6 +7,7 @@
 #ifndef MAUL_RHI_SRC_DEVICE_CORE_H
 #define MAUL_RHI_SRC_DEVICE_CORE_H
 
+#include "capabilities_core.h"
 #include "driver.h"
 #include "pool.h"
 
@@ -19,6 +20,15 @@ typedef struct mrhiBufferSlot
     uint64_t size;
     mrhiBufferUsage usage;
 } mrhiBufferSlot;
+
+// A texture as its device keeps it: its def (without its chain), its
+// driver handle, and how many of its views exist.
+typedef struct mrhiTextureSlot
+{
+    uint64_t handle;
+    mrhiTextureDef def;
+    uint32_t views;
+} mrhiTextureSlot;
 
 struct mrhiDevice
 {
@@ -41,6 +51,12 @@ struct mrhiDevice
     // Buffers: ids, and each slot's driver handle and def.
     mrhiPool buffers;
     mrhiBufferSlot* bufferSlots;
+    mrhiPool textures;
+    mrhiTextureSlot* textureSlots;
+    // What each known format can do on this device: the adapter's
+    // capabilities, with the compressed families the device was not
+    // granted cleared.
+    mrhiFormatCaps formatCaps[MRHI_KNOWN_FORMATS];
 };
 
 // mrhi_success for a ready device, mrhi_errorState for one that is not.
@@ -48,5 +64,10 @@ mrhiResult mrhiDeviceUsable(const mrhiDevice* device);
 
 // Counts one misuse on the device and returns mrhi_errorInvalid.
 mrhiResult mrhiDeviceMisuse(mrhiDevice* device);
+
+// Checks an object def's cookie and extension chain on a live device:
+// success, or the refusal (invalid input counted as misuse).
+mrhiResult mrhiCheckObjectDef(mrhiDevice* device, uint32_t cookie, uint32_t expected,
+                              const mrhiChain* next);
 
 #endif // MAUL_RHI_SRC_DEVICE_CORE_H

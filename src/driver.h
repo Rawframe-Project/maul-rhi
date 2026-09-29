@@ -44,6 +44,9 @@ typedef struct mrhiDeviceDriverVtable
     // Makes a buffer the core has checked; its handle, never zero.
     mrhiResult (*createBuffer)(void* self, const mrhiBufferDef* def, uint64_t* handleOut);
     void (*destroyBuffer)(void* self, uint64_t handle);
+    // Makes a texture the core has checked; its handle, never zero.
+    mrhiResult (*createTexture)(void* self, const mrhiTextureDef* def, uint64_t* handleOut);
+    void (*destroyTexture)(void* self, uint64_t handle);
 } mrhiDeviceDriverVtable;
 
 typedef struct mrhiDeviceDriver

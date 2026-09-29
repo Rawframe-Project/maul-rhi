@@ -212,3 +212,38 @@ restricted or absent-rejected, with how.
 | --- | --- | --- | --- | --- |
 | `size` | direct: size | direct: the resource's Width | direct: length | direct: size |
 | `usage` | direct: usage | direct: the resource's flags and the views made of it | direct: the storage mode | direct: usage |
+
+## mrhiTextureKind
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_texture2d` | direct: IMAGE_TYPE_2D, a 2D view | direct: TEXTURE2D | direct: MTLTextureType2D | direct: 2d |
+| `mrhi_texture2dArray` | direct: IMAGE_TYPE_2D with layers, a 2D array view | direct: TEXTURE2D with an ArraySize | direct: MTLTextureType2DArray | direct: 2d with layers, a 2d-array view |
+| `mrhi_textureCube` | direct: CUBE_COMPATIBLE with 6 layers, a cube view | direct: TEXTURE2D with 6 array slices, a TextureCube view | direct: MTLTextureTypeCube | direct: 2d with 6 layers, a cube view |
+| `mrhi_textureCubeArray` | direct: CUBE_COMPATIBLE with 6n layers, a cube array view | direct: TEXTURE2D with 6n array slices, a TextureCubeArray view | direct: MTLTextureTypeCubeArray | direct: 2d with 6n layers, a cube-array view |
+| `mrhi_texture3d` | direct: IMAGE_TYPE_3D | direct: TEXTURE3D | direct: MTLTextureType3D | direct: 3d |
+
+## mrhiTextureUsage
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_textureSampled` | direct: SAMPLED_BIT | direct: a shader resource view | direct: ShaderRead | direct: TEXTURE_BINDING |
+| `mrhi_textureStorage` | direct: STORAGE_BIT | direct: ALLOW_UNORDERED_ACCESS | direct: ShaderWrite | direct: STORAGE_BINDING |
+| `mrhi_textureRenderTarget` | direct: COLOR_ATTACHMENT_BIT or DEPTH_STENCIL_ATTACHMENT_BIT | direct: ALLOW_RENDER_TARGET or ALLOW_DEPTH_STENCIL | direct: RenderTarget | direct: RENDER_ATTACHMENT |
+| `mrhi_textureTransient` | direct: TRANSIENT_ATTACHMENT_BIT in lazily allocated memory | emulated: an ordinary render target | direct: MTLStorageModeMemoryless | direct: TRANSIENT_ATTACHMENT |
+| `mrhi_textureCopySource` | direct: TRANSFER_SRC_BIT | direct: a copy source | direct: a blit source | direct: COPY_SRC |
+| `mrhi_textureCopyDestination` | direct: TRANSFER_DST_BIT | direct: a copy destination | direct: a blit destination | direct: COPY_DST |
+
+## mrhiTextureDef
+
+| Member | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `kind` | direct: imageType and CUBE_COMPATIBLE | direct: Dimension | direct: textureType | direct: dimension |
+| `format` | direct: format | direct: Format | direct: pixelFormat | direct: format |
+| `width` | direct: extent.width | direct: Width | direct: width | direct: size.width |
+| `height` | direct: extent.height | direct: Height | direct: height | direct: size.height |
+| `depthOrLayers` | direct: extent.depth or arrayLayers | direct: DepthOrArraySize | direct: depth or arrayLength | direct: size.depthOrArrayLayers |
+| `mipLevels` | direct: mipLevels | direct: MipLevels | direct: mipmapLevelCount | direct: mipLevelCount |
+| `sampleCount` | direct: samples | direct: SampleDesc.Count | direct: sampleCount | restricted: sampleCount, 1 or 4 |
+| `usage` | direct: usage | direct: Flags | direct: usage and storageMode | direct: usage |
+| `viewFormats` | direct: MUTABLE_FORMAT and a format list | direct: castable formats | direct: pixelFormatView | direct: viewFormats |

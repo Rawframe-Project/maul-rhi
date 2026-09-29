@@ -63,3 +63,11 @@ format.
   usages (`mrhiBufferUsage`, mapped onto the four APIs), sizes that are
   multiples of 4 up to the device's `bufferBytes`, never mapped; the
   device's `buffers` limit.
+- Textures: `mrhiCreateTexture` and `mrhiDestroyTexture` with a kind
+  (`mrhiTextureKind`: 2D, 2D array, cube, cube array, 3D), mips up to a
+  full chain, sample counts the format allows, declared usages
+  (`mrhiTextureUsage`, transient render targets included) checked
+  against the format's capabilities on the device, and the sRGB or
+  linear twin its views may take (`viewFormats`); sizes checked against
+  the kind, the format's block and the device's limits; the device's
+  `textures` limit.

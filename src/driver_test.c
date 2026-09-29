@@ -74,6 +74,7 @@ typedef struct TestDevice
     uint32_t samplers;
     uint32_t buffers;
     uint64_t bufferBytes;
+    uint32_t textures;
 } TestDevice;
 
 // A new object's handle, or mrhi_errorPlatform once the adapter's
@@ -117,6 +118,22 @@ static void DestroyBuffer(void* self, uint64_t handle)
     --device->buffers;
 }
 
+static mrhiResult CreateTexture(void* self, const mrhiTextureDef* def, uint64_t* handleOut)
+{
+    (void)def;
+    TestDevice* device = self;
+    mrhiResult status = MakeObject(device, handleOut);
+    device->textures += status == mrhi_success ? 1 : 0;
+    return status;
+}
+
+static void DestroyTexture(void* self, uint64_t handle)
+{
+    TestDevice* device = self;
+    MRHI_ASSERT(handle != 0 && handle <= device->nextHandle && device->textures > 0);
+    --device->textures;
+}
+
 static void DestroySampler(void* self, uint64_t handle)
 {
     TestDevice* device = self;
@@ -139,6 +156,8 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .destroySampler = DestroySampler,
     .createBuffer = CreateBuffer,
     .destroyBuffer = DestroyBuffer,
+    .createTexture = CreateTexture,
+    .destroyTexture = DestroyTexture,
 };
 
 static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiFeatures* features,

@@ -509,6 +509,369 @@ bool mrhiFormatFamilyGranted(mrhiFormat format, const mrhiFeatures* features)
     }
 }
 
+mrhiFormatBlock mrhiGetFormatBlock(mrhiFormat format)
+{
+    switch (format)
+    {
+    case mrhi_formatBc1RgbaUnorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatBc1RgbaUnormSrgb:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatBc2RgbaUnorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatBc2RgbaUnormSrgb:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatBc3RgbaUnorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatBc3RgbaUnormSrgb:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatBc4RUnorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatBc4RSnorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatBc5RgUnorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatBc5RgSnorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatBc6hRgbUfloat:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatBc6hRgbFloat:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatBc7RgbaUnorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatBc7RgbaUnormSrgb:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatEtc2Rgb8Unorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatEtc2Rgb8UnormSrgb:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatEtc2Rgb8a1Unorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatEtc2Rgb8a1UnormSrgb:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatEtc2Rgba8Unorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatEtc2Rgba8UnormSrgb:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatEacR11Unorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatEacR11Snorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatEacRg11Unorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatEacRg11Snorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatAstc4x4Unorm:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatAstc4x4UnormSrgb:
+        return (mrhiFormatBlock){4, 4};
+    case mrhi_formatAstc5x4Unorm:
+        return (mrhiFormatBlock){5, 4};
+    case mrhi_formatAstc5x4UnormSrgb:
+        return (mrhiFormatBlock){5, 4};
+    case mrhi_formatAstc5x5Unorm:
+        return (mrhiFormatBlock){5, 5};
+    case mrhi_formatAstc5x5UnormSrgb:
+        return (mrhiFormatBlock){5, 5};
+    case mrhi_formatAstc6x5Unorm:
+        return (mrhiFormatBlock){6, 5};
+    case mrhi_formatAstc6x5UnormSrgb:
+        return (mrhiFormatBlock){6, 5};
+    case mrhi_formatAstc6x6Unorm:
+        return (mrhiFormatBlock){6, 6};
+    case mrhi_formatAstc6x6UnormSrgb:
+        return (mrhiFormatBlock){6, 6};
+    case mrhi_formatAstc8x5Unorm:
+        return (mrhiFormatBlock){8, 5};
+    case mrhi_formatAstc8x5UnormSrgb:
+        return (mrhiFormatBlock){8, 5};
+    case mrhi_formatAstc8x6Unorm:
+        return (mrhiFormatBlock){8, 6};
+    case mrhi_formatAstc8x6UnormSrgb:
+        return (mrhiFormatBlock){8, 6};
+    case mrhi_formatAstc8x8Unorm:
+        return (mrhiFormatBlock){8, 8};
+    case mrhi_formatAstc8x8UnormSrgb:
+        return (mrhiFormatBlock){8, 8};
+    case mrhi_formatAstc10x5Unorm:
+        return (mrhiFormatBlock){10, 5};
+    case mrhi_formatAstc10x5UnormSrgb:
+        return (mrhiFormatBlock){10, 5};
+    case mrhi_formatAstc10x6Unorm:
+        return (mrhiFormatBlock){10, 6};
+    case mrhi_formatAstc10x6UnormSrgb:
+        return (mrhiFormatBlock){10, 6};
+    case mrhi_formatAstc10x8Unorm:
+        return (mrhiFormatBlock){10, 8};
+    case mrhi_formatAstc10x8UnormSrgb:
+        return (mrhiFormatBlock){10, 8};
+    case mrhi_formatAstc10x10Unorm:
+        return (mrhiFormatBlock){10, 10};
+    case mrhi_formatAstc10x10UnormSrgb:
+        return (mrhiFormatBlock){10, 10};
+    case mrhi_formatAstc12x10Unorm:
+        return (mrhiFormatBlock){12, 10};
+    case mrhi_formatAstc12x10UnormSrgb:
+        return (mrhiFormatBlock){12, 10};
+    case mrhi_formatAstc12x12Unorm:
+        return (mrhiFormatBlock){12, 12};
+    case mrhi_formatAstc12x12UnormSrgb:
+        return (mrhiFormatBlock){12, 12};
+    default:
+        return (mrhiFormatBlock){1, 1};
+    }
+}
+
+mrhiFormat mrhiFormatSrgbPair(mrhiFormat format)
+{
+    switch (format)
+    {
+    case mrhi_formatRgba8Unorm:
+        return mrhi_formatRgba8UnormSrgb;
+    case mrhi_formatRgba8UnormSrgb:
+        return mrhi_formatRgba8Unorm;
+    case mrhi_formatBgra8Unorm:
+        return mrhi_formatBgra8UnormSrgb;
+    case mrhi_formatBgra8UnormSrgb:
+        return mrhi_formatBgra8Unorm;
+    case mrhi_formatBc1RgbaUnorm:
+        return mrhi_formatBc1RgbaUnormSrgb;
+    case mrhi_formatBc1RgbaUnormSrgb:
+        return mrhi_formatBc1RgbaUnorm;
+    case mrhi_formatBc2RgbaUnorm:
+        return mrhi_formatBc2RgbaUnormSrgb;
+    case mrhi_formatBc2RgbaUnormSrgb:
+        return mrhi_formatBc2RgbaUnorm;
+    case mrhi_formatBc3RgbaUnorm:
+        return mrhi_formatBc3RgbaUnormSrgb;
+    case mrhi_formatBc3RgbaUnormSrgb:
+        return mrhi_formatBc3RgbaUnorm;
+    case mrhi_formatBc7RgbaUnorm:
+        return mrhi_formatBc7RgbaUnormSrgb;
+    case mrhi_formatBc7RgbaUnormSrgb:
+        return mrhi_formatBc7RgbaUnorm;
+    case mrhi_formatEtc2Rgb8Unorm:
+        return mrhi_formatEtc2Rgb8UnormSrgb;
+    case mrhi_formatEtc2Rgb8UnormSrgb:
+        return mrhi_formatEtc2Rgb8Unorm;
+    case mrhi_formatEtc2Rgb8a1Unorm:
+        return mrhi_formatEtc2Rgb8a1UnormSrgb;
+    case mrhi_formatEtc2Rgb8a1UnormSrgb:
+        return mrhi_formatEtc2Rgb8a1Unorm;
+    case mrhi_formatEtc2Rgba8Unorm:
+        return mrhi_formatEtc2Rgba8UnormSrgb;
+    case mrhi_formatEtc2Rgba8UnormSrgb:
+        return mrhi_formatEtc2Rgba8Unorm;
+    case mrhi_formatAstc4x4Unorm:
+        return mrhi_formatAstc4x4UnormSrgb;
+    case mrhi_formatAstc4x4UnormSrgb:
+        return mrhi_formatAstc4x4Unorm;
+    case mrhi_formatAstc5x4Unorm:
+        return mrhi_formatAstc5x4UnormSrgb;
+    case mrhi_formatAstc5x4UnormSrgb:
+        return mrhi_formatAstc5x4Unorm;
+    case mrhi_formatAstc5x5Unorm:
+        return mrhi_formatAstc5x5UnormSrgb;
+    case mrhi_formatAstc5x5UnormSrgb:
+        return mrhi_formatAstc5x5Unorm;
+    case mrhi_formatAstc6x5Unorm:
+        return mrhi_formatAstc6x5UnormSrgb;
+    case mrhi_formatAstc6x5UnormSrgb:
+        return mrhi_formatAstc6x5Unorm;
+    case mrhi_formatAstc6x6Unorm:
+        return mrhi_formatAstc6x6UnormSrgb;
+    case mrhi_formatAstc6x6UnormSrgb:
+        return mrhi_formatAstc6x6Unorm;
+    case mrhi_formatAstc8x5Unorm:
+        return mrhi_formatAstc8x5UnormSrgb;
+    case mrhi_formatAstc8x5UnormSrgb:
+        return mrhi_formatAstc8x5Unorm;
+    case mrhi_formatAstc8x6Unorm:
+        return mrhi_formatAstc8x6UnormSrgb;
+    case mrhi_formatAstc8x6UnormSrgb:
+        return mrhi_formatAstc8x6Unorm;
+    case mrhi_formatAstc8x8Unorm:
+        return mrhi_formatAstc8x8UnormSrgb;
+    case mrhi_formatAstc8x8UnormSrgb:
+        return mrhi_formatAstc8x8Unorm;
+    case mrhi_formatAstc10x5Unorm:
+        return mrhi_formatAstc10x5UnormSrgb;
+    case mrhi_formatAstc10x5UnormSrgb:
+        return mrhi_formatAstc10x5Unorm;
+    case mrhi_formatAstc10x6Unorm:
+        return mrhi_formatAstc10x6UnormSrgb;
+    case mrhi_formatAstc10x6UnormSrgb:
+        return mrhi_formatAstc10x6Unorm;
+    case mrhi_formatAstc10x8Unorm:
+        return mrhi_formatAstc10x8UnormSrgb;
+    case mrhi_formatAstc10x8UnormSrgb:
+        return mrhi_formatAstc10x8Unorm;
+    case mrhi_formatAstc10x10Unorm:
+        return mrhi_formatAstc10x10UnormSrgb;
+    case mrhi_formatAstc10x10UnormSrgb:
+        return mrhi_formatAstc10x10Unorm;
+    case mrhi_formatAstc12x10Unorm:
+        return mrhi_formatAstc12x10UnormSrgb;
+    case mrhi_formatAstc12x10UnormSrgb:
+        return mrhi_formatAstc12x10Unorm;
+    case mrhi_formatAstc12x12Unorm:
+        return mrhi_formatAstc12x12UnormSrgb;
+    case mrhi_formatAstc12x12UnormSrgb:
+        return mrhi_formatAstc12x12Unorm;
+    default:
+        return mrhi_formatNone;
+    }
+}
+
+uint32_t mrhiFormatIndex(mrhiFormat format)
+{
+    switch (format)
+    {
+    case mrhi_formatRgba8Unorm:
+        return 0;
+    case mrhi_formatRgba8UnormSrgb:
+        return 1;
+    case mrhi_formatBgra8Unorm:
+        return 2;
+    case mrhi_formatBgra8UnormSrgb:
+        return 3;
+    case mrhi_formatR8Unorm:
+        return 4;
+    case mrhi_formatRg8Unorm:
+        return 5;
+    case mrhi_formatR16Float:
+        return 6;
+    case mrhi_formatRg16Float:
+        return 7;
+    case mrhi_formatRgba16Float:
+        return 8;
+    case mrhi_formatR32Float:
+        return 9;
+    case mrhi_formatRg32Float:
+        return 10;
+    case mrhi_formatRgba32Float:
+        return 11;
+    case mrhi_formatR32Uint:
+        return 12;
+    case mrhi_formatR32Sint:
+        return 13;
+    case mrhi_formatRgb10a2Unorm:
+        return 14;
+    case mrhi_formatRg11b10Ufloat:
+        return 15;
+    case mrhi_formatDepth32Float:
+        return 16;
+    case mrhi_formatDepthStencil:
+        return 17;
+    case mrhi_formatBc1RgbaUnorm:
+        return 18;
+    case mrhi_formatBc1RgbaUnormSrgb:
+        return 19;
+    case mrhi_formatBc2RgbaUnorm:
+        return 20;
+    case mrhi_formatBc2RgbaUnormSrgb:
+        return 21;
+    case mrhi_formatBc3RgbaUnorm:
+        return 22;
+    case mrhi_formatBc3RgbaUnormSrgb:
+        return 23;
+    case mrhi_formatBc4RUnorm:
+        return 24;
+    case mrhi_formatBc4RSnorm:
+        return 25;
+    case mrhi_formatBc5RgUnorm:
+        return 26;
+    case mrhi_formatBc5RgSnorm:
+        return 27;
+    case mrhi_formatBc6hRgbUfloat:
+        return 28;
+    case mrhi_formatBc6hRgbFloat:
+        return 29;
+    case mrhi_formatBc7RgbaUnorm:
+        return 30;
+    case mrhi_formatBc7RgbaUnormSrgb:
+        return 31;
+    case mrhi_formatEtc2Rgb8Unorm:
+        return 32;
+    case mrhi_formatEtc2Rgb8UnormSrgb:
+        return 33;
+    case mrhi_formatEtc2Rgb8a1Unorm:
+        return 34;
+    case mrhi_formatEtc2Rgb8a1UnormSrgb:
+        return 35;
+    case mrhi_formatEtc2Rgba8Unorm:
+        return 36;
+    case mrhi_formatEtc2Rgba8UnormSrgb:
+        return 37;
+    case mrhi_formatEacR11Unorm:
+        return 38;
+    case mrhi_formatEacR11Snorm:
+        return 39;
+    case mrhi_formatEacRg11Unorm:
+        return 40;
+    case mrhi_formatEacRg11Snorm:
+        return 41;
+    case mrhi_formatAstc4x4Unorm:
+        return 42;
+    case mrhi_formatAstc4x4UnormSrgb:
+        return 43;
+    case mrhi_formatAstc5x4Unorm:
+        return 44;
+    case mrhi_formatAstc5x4UnormSrgb:
+        return 45;
+    case mrhi_formatAstc5x5Unorm:
+        return 46;
+    case mrhi_formatAstc5x5UnormSrgb:
+        return 47;
+    case mrhi_formatAstc6x5Unorm:
+        return 48;
+    case mrhi_formatAstc6x5UnormSrgb:
+        return 49;
+    case mrhi_formatAstc6x6Unorm:
+        return 50;
+    case mrhi_formatAstc6x6UnormSrgb:
+        return 51;
+    case mrhi_formatAstc8x5Unorm:
+        return 52;
+    case mrhi_formatAstc8x5UnormSrgb:
+        return 53;
+    case mrhi_formatAstc8x6Unorm:
+        return 54;
+    case mrhi_formatAstc8x6UnormSrgb:
+        return 55;
+    case mrhi_formatAstc8x8Unorm:
+        return 56;
+    case mrhi_formatAstc8x8UnormSrgb:
+        return 57;
+    case mrhi_formatAstc10x5Unorm:
+        return 58;
+    case mrhi_formatAstc10x5UnormSrgb:
+        return 59;
+    case mrhi_formatAstc10x6Unorm:
+        return 60;
+    case mrhi_formatAstc10x6UnormSrgb:
+        return 61;
+    case mrhi_formatAstc10x8Unorm:
+        return 62;
+    case mrhi_formatAstc10x8UnormSrgb:
+        return 63;
+    case mrhi_formatAstc10x10Unorm:
+        return 64;
+    case mrhi_formatAstc10x10UnormSrgb:
+        return 65;
+    case mrhi_formatAstc12x10Unorm:
+        return 66;
+    case mrhi_formatAstc12x10UnormSrgb:
+        return 67;
+    case mrhi_formatAstc12x12Unorm:
+        return 68;
+    case mrhi_formatAstc12x12UnormSrgb:
+        return 69;
+    default:
+        return 70;
+    }
+}
+
 bool mrhiFormatCapsWithin(const mrhiFormatCaps* asked, const mrhiFormatCaps* granted)
 {
     return true
@@ -521,3 +884,5 @@ bool mrhiFormatCapsWithin(const mrhiFormatCaps* asked, const mrhiFormatCaps* gra
 }
 
 const mrhiBufferUsage mrhiBufferUsageKnown = 0xFFu;
+
+const mrhiTextureUsage mrhiTextureUsageKnown = 0x3Fu;
