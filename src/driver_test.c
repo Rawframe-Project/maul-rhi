@@ -342,14 +342,10 @@ static void DestroyShader(void* self, uint64_t handle)
     --device->shaders;
 }
 
-static mrhiResult CreateComputePipeline(void* self, const mrhiDriverComputePipeline* pipeline,
-                                        uint64_t tag, uint64_t* handleOut)
+// Holds a pipeline's creation for the next poll: its handle, or
+// mrhi_errorPlatform once the device holds 64 or its budget is spent.
+static mrhiResult HoldPipeline(TestDevice* device, uint64_t tag, uint64_t* handleOut)
 {
-    TestDevice* device = self;
-    Name(device, pipeline->label, pipeline->labelLength);
-    MRHI_ASSERT(pipeline->shader != 0 && tag > UINT32_MAX &&
-                pipeline->entry < pipeline->reflection->entryCount &&
-                pipeline->reflection->entries[pipeline->entry].stage == mrhi_stageCompute);
     if (device->pendingCount == TEST_PIPELINES)
     {
         return mrhi_errorPlatform;
@@ -361,6 +357,31 @@ static mrhiResult CreateComputePipeline(void* self, const mrhiDriverComputePipel
         ++device->pipelines;
     }
     return status;
+}
+
+static mrhiResult CreateComputePipeline(void* self, const mrhiDriverComputePipeline* pipeline,
+                                        uint64_t tag, uint64_t* handleOut)
+{
+    TestDevice* device = self;
+    Name(device, pipeline->label, pipeline->labelLength);
+    MRHI_ASSERT(pipeline->shader != 0 && tag > UINT32_MAX &&
+                pipeline->entry < pipeline->reflection->entryCount &&
+                pipeline->reflection->entries[pipeline->entry].stage == mrhi_stageCompute);
+    return HoldPipeline(device, tag, handleOut);
+}
+
+static mrhiResult CreateGraphicsPipeline(void* self, const mrhiDriverGraphicsPipeline* pipeline,
+                                         uint64_t tag, uint64_t* handleOut)
+{
+    TestDevice* device = self;
+    Name(device, pipeline->def->label, pipeline->def->labelLength);
+    MRHI_ASSERT(
+        pipeline->shader != 0 && tag > UINT32_MAX &&
+        pipeline->vertexEntry < pipeline->reflection->entryCount &&
+        pipeline->reflection->entries[pipeline->vertexEntry].stage == mrhi_stageVertex &&
+        (pipeline->fragmentEntry == pipeline->reflection->entryCount ||
+         pipeline->reflection->entries[pipeline->fragmentEntry].stage == mrhi_stageFragment));
+    return HoldPipeline(device, tag, handleOut);
 }
 
 // Destroys a pipeline, dropping its answer if it is still pending.
@@ -505,6 +526,7 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .createShader = CreateShader,
     .destroyShader = DestroyShader,
     .createComputePipeline = CreateComputePipeline,
+    .createGraphicsPipeline = CreateGraphicsPipeline,
     .destroyPipeline = DestroyPipeline,
     .textureMemory = TextureMemory,
     .bufferMemory = BufferMemory,

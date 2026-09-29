@@ -746,6 +746,138 @@ bool mrhiFormatHasStencil(mrhiFormat format)
     }
 }
 
+mrhiFormatTarget mrhiGetFormatTarget(mrhiFormat format)
+{
+    switch (format)
+    {
+    case mrhi_formatRgba8Unorm:
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 1};
+    case mrhi_formatRgba8UnormSrgb:
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 1};
+    case mrhi_formatBgra8Unorm:
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 1};
+    case mrhi_formatBgra8UnormSrgb:
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 1};
+    case mrhi_formatR8Unorm:
+        return (mrhiFormatTarget){1, mrhi_scalarFloat32, 1, 1};
+    case mrhi_formatRg8Unorm:
+        return (mrhiFormatTarget){2, mrhi_scalarFloat32, 2, 1};
+    case mrhi_formatR16Float:
+        return (mrhiFormatTarget){1, mrhi_scalarFloat32, 2, 2};
+    case mrhi_formatRg16Float:
+        return (mrhiFormatTarget){2, mrhi_scalarFloat32, 4, 2};
+    case mrhi_formatRgba16Float:
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 2};
+    case mrhi_formatR32Float:
+        return (mrhiFormatTarget){1, mrhi_scalarFloat32, 4, 4};
+    case mrhi_formatRg32Float:
+        return (mrhiFormatTarget){2, mrhi_scalarFloat32, 8, 4};
+    case mrhi_formatRgba32Float:
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 16, 4};
+    case mrhi_formatR32Uint:
+        return (mrhiFormatTarget){1, mrhi_scalarUint32, 4, 4};
+    case mrhi_formatR32Sint:
+        return (mrhiFormatTarget){1, mrhi_scalarSint32, 4, 4};
+    case mrhi_formatRgb10a2Unorm:
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 4};
+    case mrhi_formatRg11b10Ufloat:
+        return (mrhiFormatTarget){3, mrhi_scalarFloat32, 8, 4};
+    default:
+        return (mrhiFormatTarget){0};
+    }
+}
+
+mrhiVertexLayout mrhiGetVertexLayout(mrhiVertexFormat format)
+{
+    switch (format)
+    {
+    case mrhi_vertexUint8:
+        return (mrhiVertexLayout){mrhi_scalarUint32, 1, 1};
+    case mrhi_vertexUint8x2:
+        return (mrhiVertexLayout){mrhi_scalarUint32, 2, 2};
+    case mrhi_vertexUint8x4:
+        return (mrhiVertexLayout){mrhi_scalarUint32, 4, 4};
+    case mrhi_vertexSint8:
+        return (mrhiVertexLayout){mrhi_scalarSint32, 1, 1};
+    case mrhi_vertexSint8x2:
+        return (mrhiVertexLayout){mrhi_scalarSint32, 2, 2};
+    case mrhi_vertexSint8x4:
+        return (mrhiVertexLayout){mrhi_scalarSint32, 4, 4};
+    case mrhi_vertexUnorm8:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 1, 1};
+    case mrhi_vertexUnorm8x2:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 2, 2};
+    case mrhi_vertexUnorm8x4:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 4, 4};
+    case mrhi_vertexSnorm8:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 1, 1};
+    case mrhi_vertexSnorm8x2:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 2, 2};
+    case mrhi_vertexSnorm8x4:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 4, 4};
+    case mrhi_vertexUint16:
+        return (mrhiVertexLayout){mrhi_scalarUint32, 1, 2};
+    case mrhi_vertexUint16x2:
+        return (mrhiVertexLayout){mrhi_scalarUint32, 2, 4};
+    case mrhi_vertexUint16x4:
+        return (mrhiVertexLayout){mrhi_scalarUint32, 4, 8};
+    case mrhi_vertexSint16:
+        return (mrhiVertexLayout){mrhi_scalarSint32, 1, 2};
+    case mrhi_vertexSint16x2:
+        return (mrhiVertexLayout){mrhi_scalarSint32, 2, 4};
+    case mrhi_vertexSint16x4:
+        return (mrhiVertexLayout){mrhi_scalarSint32, 4, 8};
+    case mrhi_vertexUnorm16:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 1, 2};
+    case mrhi_vertexUnorm16x2:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 2, 4};
+    case mrhi_vertexUnorm16x4:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 4, 8};
+    case mrhi_vertexSnorm16:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 1, 2};
+    case mrhi_vertexSnorm16x2:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 2, 4};
+    case mrhi_vertexSnorm16x4:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 4, 8};
+    case mrhi_vertexFloat16:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 1, 2};
+    case mrhi_vertexFloat16x2:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 2, 4};
+    case mrhi_vertexFloat16x4:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 4, 8};
+    case mrhi_vertexFloat32:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 1, 4};
+    case mrhi_vertexFloat32x2:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 2, 8};
+    case mrhi_vertexFloat32x3:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 3, 12};
+    case mrhi_vertexFloat32x4:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 4, 16};
+    case mrhi_vertexUint32:
+        return (mrhiVertexLayout){mrhi_scalarUint32, 1, 4};
+    case mrhi_vertexUint32x2:
+        return (mrhiVertexLayout){mrhi_scalarUint32, 2, 8};
+    case mrhi_vertexUint32x3:
+        return (mrhiVertexLayout){mrhi_scalarUint32, 3, 12};
+    case mrhi_vertexUint32x4:
+        return (mrhiVertexLayout){mrhi_scalarUint32, 4, 16};
+    case mrhi_vertexSint32:
+        return (mrhiVertexLayout){mrhi_scalarSint32, 1, 4};
+    case mrhi_vertexSint32x2:
+        return (mrhiVertexLayout){mrhi_scalarSint32, 2, 8};
+    case mrhi_vertexSint32x3:
+        return (mrhiVertexLayout){mrhi_scalarSint32, 3, 12};
+    case mrhi_vertexSint32x4:
+        return (mrhiVertexLayout){mrhi_scalarSint32, 4, 16};
+    case mrhi_vertexUnorm1010102:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 4, 4};
+    case mrhi_vertexUnorm8x4Bgra:
+        return (mrhiVertexLayout){mrhi_scalarFloat32, 4, 4};
+    default:
+        return (mrhiVertexLayout){0};
+    }
+}
+
 uint32_t mrhiFormatIndex(mrhiFormat format)
 {
     switch (format)
@@ -917,3 +1049,5 @@ const mrhiAlphaModes mrhiAlphaModesKnown = 0x3u;
 const mrhiShaderStages mrhiShaderStagesKnown = 0x7u;
 
 const mrhiShaderBuiltins mrhiShaderBuiltinsKnown = 0x3Fu;
+
+const mrhiColorWrites mrhiColorWritesKnown = 0xFu;

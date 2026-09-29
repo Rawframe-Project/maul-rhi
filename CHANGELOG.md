@@ -154,3 +154,13 @@ format.
   after their shader is destroyed; frames and pipelines share one
   request space; the device's `pipelines` limit and the test adapter's
   `pipelineOutcome`.
+- Graphics pipelines: `mrhiCreateGraphicsPipeline` and
+  `mrhiDestroyGraphicsPipeline` with every state of WebGPU's render
+  pipeline descriptor (vertex buffers and attributes, WebGPU's vertex
+  formats but for `snorm10-10-10-2`, primitive, depth and stencil,
+  multisample, up to eight color targets with blending and write masks,
+  constants), each mapped onto the four APIs and checked against the
+  shader's reflection and the device as WebGPU checks it: invalid input
+  for contradictions, unsupported for what the device cannot do. Color
+  formats and vertex formats carry their render target and layout facts
+  in the contract.

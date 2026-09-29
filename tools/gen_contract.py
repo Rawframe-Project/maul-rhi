@@ -47,6 +47,9 @@ PRIMITIVES = {
     "static_cstring": "const char*",
     "char": "char",
 }
+# The scalar classes of render targets and vertex formats, as the
+# library's scalar types.
+SCALARS = {"float": "mrhi_scalarFloat32", "sint": "mrhi_scalarSint32", "uint": "mrhi_scalarUint32"}
 # The four APIs every concept maps onto (the requirements' four-API
 # rule), and the classes a mapping row may have.
 APIS = (("vulkan", "Vulkan"), ("d3d12", "D3D12"), ("metal", "Metal"), ("web_gpu", "WebGPU"))
@@ -167,6 +170,19 @@ def check_values(errors, where, item):
             errors.append(f"{where}: '{value.get('name')}' needs a block of two sizes")
         if not set(value.get("aspects", [])) <= {"depth", "stencil"}:
             errors.append(f"{where}: '{value.get('name')}' has aspects other than depth and stencil")
+        target = value.get("target")
+        if target is not None and not (
+                isinstance(target, dict) and set(target) == {"channels", "scalar", "bytes", "alignment"}
+                and target["channels"] in (1, 2, 3, 4) and target["scalar"] in SCALARS
+                and target["alignment"] in (1, 2, 4) and isinstance(target["bytes"], int)
+                and target["bytes"] > 0):
+            errors.append(f"{where}: '{value.get('name')}' has a malformed target")
+        layout = value.get("layout")
+        if layout is not None and not (
+                isinstance(layout, dict) and set(layout) == {"scalar", "components", "bytes"}
+                and layout["scalar"] in SCALARS and layout["components"] in (1, 2, 3, 4)
+                and isinstance(layout["bytes"], int) and layout["bytes"] > 0):
+            errors.append(f"{where}: '{value.get('name')}' has a malformed layout")
         pair = value.get("srgb_pair")
         if pair is not None and pair not in {other["name"] for other in item["values"]}:
             errors.append(f"{where}: '{value.get('name')}' pairs with an unknown format")
@@ -633,6 +649,25 @@ def format_checks(contract):
         lines += [f"    case {names.value(value['name'])}:" for value in listed
                   if aspect in value.get("aspects", [])]
         lines += ["        return true;", "    default:", "        return false;", "    }", "}"]
+    lines += ["", "mrhiFormatTarget mrhiGetFormatTarget(mrhiFormat format)", "{",
+              "    switch (format)", "    {"]
+    for value in listed:
+        target = value.get("target")
+        if target:
+            lines += [f"    case {names.value(value['name'])}:",
+                      f"        return (mrhiFormatTarget){{{target['channels']}, "
+                      f"{SCALARS[target['scalar']]}, {target['bytes']}, {target['alignment']}}};"]
+    lines += ["    default:", "        return (mrhiFormatTarget){0};", "    }", "}"]
+    vertex = find_item(contract, "vertex_format")
+    lines += ["", "mrhiVertexLayout mrhiGetVertexLayout(mrhiVertexFormat format)", "{",
+              "    switch (format)", "    {"]
+    for value in vertex["values"]:
+        layout = value.get("layout")
+        if layout:
+            lines += [f"    case {names.value(value['name'])}:",
+                      f"        return (mrhiVertexLayout){{{SCALARS[layout['scalar']]}, "
+                      f"{layout['components']}, {layout['bytes']}}};"]
+    lines += ["    default:", "        return (mrhiVertexLayout){0};", "    }", "}"]
     lines += ["", "uint32_t mrhiFormatIndex(mrhiFormat format)", "{", "    switch (format)", "    {"]
     for position, value in enumerate(listed):
         lines += [f"    case {names.value(value['name'])}:", f"        return {position};"]

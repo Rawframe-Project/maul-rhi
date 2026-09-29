@@ -2006,7 +2006,13 @@
                 1,
                 1
               ],
-              "srgb_pair": "format_rgba8_unorm_srgb"
+              "srgb_pair": "format_rgba8_unorm_srgb",
+              "target": {
+                "channels": 4,
+                "scalar": "float",
+                "bytes": 8,
+                "alignment": 1
+              }
             },
             {
               "name": "format_rgba8_unorm_srgb",
@@ -2042,7 +2048,13 @@
                 1,
                 1
               ],
-              "srgb_pair": "format_rgba8_unorm"
+              "srgb_pair": "format_rgba8_unorm",
+              "target": {
+                "channels": 4,
+                "scalar": "float",
+                "bytes": 8,
+                "alignment": 1
+              }
             },
             {
               "name": "format_bgra8_unorm",
@@ -2078,7 +2090,13 @@
                 1,
                 1
               ],
-              "srgb_pair": "format_bgra8_unorm_srgb"
+              "srgb_pair": "format_bgra8_unorm_srgb",
+              "target": {
+                "channels": 4,
+                "scalar": "float",
+                "bytes": 8,
+                "alignment": 1
+              }
             },
             {
               "name": "format_bgra8_unorm_srgb",
@@ -2114,7 +2132,13 @@
                 1,
                 1
               ],
-              "srgb_pair": "format_bgra8_unorm"
+              "srgb_pair": "format_bgra8_unorm",
+              "target": {
+                "channels": 4,
+                "scalar": "float",
+                "bytes": 8,
+                "alignment": 1
+              }
             },
             {
               "name": "format_r8_unorm",
@@ -2149,7 +2173,13 @@
               "block": [
                 1,
                 1
-              ]
+              ],
+              "target": {
+                "channels": 1,
+                "scalar": "float",
+                "bytes": 1,
+                "alignment": 1
+              }
             },
             {
               "name": "format_rg8_unorm",
@@ -2184,7 +2214,13 @@
               "block": [
                 1,
                 1
-              ]
+              ],
+              "target": {
+                "channels": 2,
+                "scalar": "float",
+                "bytes": 2,
+                "alignment": 1
+              }
             },
             {
               "name": "format_r16_float",
@@ -2219,7 +2255,13 @@
               "block": [
                 1,
                 1
-              ]
+              ],
+              "target": {
+                "channels": 1,
+                "scalar": "float",
+                "bytes": 2,
+                "alignment": 2
+              }
             },
             {
               "name": "format_rg16_float",
@@ -2254,7 +2296,13 @@
               "block": [
                 1,
                 1
-              ]
+              ],
+              "target": {
+                "channels": 2,
+                "scalar": "float",
+                "bytes": 4,
+                "alignment": 2
+              }
             },
             {
               "name": "format_rgba16_float",
@@ -2289,7 +2337,13 @@
               "block": [
                 1,
                 1
-              ]
+              ],
+              "target": {
+                "channels": 4,
+                "scalar": "float",
+                "bytes": 8,
+                "alignment": 2
+              }
             },
             {
               "name": "format_r32_float",
@@ -2324,7 +2378,13 @@
               "block": [
                 1,
                 1
-              ]
+              ],
+              "target": {
+                "channels": 1,
+                "scalar": "float",
+                "bytes": 4,
+                "alignment": 4
+              }
             },
             {
               "name": "format_rg32_float",
@@ -2359,7 +2419,13 @@
               "block": [
                 1,
                 1
-              ]
+              ],
+              "target": {
+                "channels": 2,
+                "scalar": "float",
+                "bytes": 8,
+                "alignment": 4
+              }
             },
             {
               "name": "format_rgba32_float",
@@ -2394,7 +2460,13 @@
               "block": [
                 1,
                 1
-              ]
+              ],
+              "target": {
+                "channels": 4,
+                "scalar": "float",
+                "bytes": 16,
+                "alignment": 4
+              }
             },
             {
               "name": "format_r32_uint",
@@ -2429,7 +2501,13 @@
               "block": [
                 1,
                 1
-              ]
+              ],
+              "target": {
+                "channels": 1,
+                "scalar": "uint",
+                "bytes": 4,
+                "alignment": 4
+              }
             },
             {
               "name": "format_r32_sint",
@@ -2464,7 +2542,13 @@
               "block": [
                 1,
                 1
-              ]
+              ],
+              "target": {
+                "channels": 1,
+                "scalar": "sint",
+                "bytes": 4,
+                "alignment": 4
+              }
             },
             {
               "name": "format_rgb10a2_unorm",
@@ -2499,7 +2583,13 @@
               "block": [
                 1,
                 1
-              ]
+              ],
+              "target": {
+                "channels": 4,
+                "scalar": "float",
+                "bytes": 8,
+                "alignment": 4
+              }
             },
             {
               "name": "format_rg11b10_ufloat",
@@ -2534,7 +2624,13 @@
               "block": [
                 1,
                 1
-              ]
+              ],
+              "target": {
+                "channels": 3,
+                "scalar": "float",
+                "bytes": 8,
+                "alignment": 4
+              }
             },
             {
               "name": "format_depth32_float",
@@ -10473,734 +10569,6 @@
         },
         {
           "kind": "enum",
-          "name": "vertex_format",
-          "width": "uint8",
-          "mapped": true,
-          "doc": "The format of a vertex attribute.",
-          "values": [
-            {
-              "name": "vertex_none",
-              "value": 0,
-              "doc": "No attribute: never valid.",
-              "unmapped": true
-            },
-            {
-              "name": "vertex_uint8x2",
-              "value": 1,
-              "doc": "uint8x2 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R8G8_UINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R8G8_UINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatUChar2"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "uint8x2"
-                }
-              }
-            },
-            {
-              "name": "vertex_uint8x4",
-              "value": 2,
-              "doc": "uint8x4 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R8G8B8A8_UINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R8G8B8A8_UINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatUChar4"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "uint8x4"
-                }
-              }
-            },
-            {
-              "name": "vertex_sint8x2",
-              "value": 3,
-              "doc": "sint8x2 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R8G8_SINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R8G8_SINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatChar2"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "sint8x2"
-                }
-              }
-            },
-            {
-              "name": "vertex_sint8x4",
-              "value": 4,
-              "doc": "sint8x4 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R8G8B8A8_SINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R8G8B8A8_SINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatChar4"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "sint8x4"
-                }
-              }
-            },
-            {
-              "name": "vertex_unorm8x2",
-              "value": 5,
-              "doc": "unorm8x2 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R8G8_UNORM"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R8G8_UNORM"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatUChar2Normalized"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "unorm8x2"
-                }
-              }
-            },
-            {
-              "name": "vertex_unorm8x4",
-              "value": 6,
-              "doc": "unorm8x4 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R8G8B8A8_UNORM"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R8G8B8A8_UNORM"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatUChar4Normalized"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "unorm8x4"
-                }
-              }
-            },
-            {
-              "name": "vertex_snorm8x2",
-              "value": 7,
-              "doc": "snorm8x2 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R8G8_SNORM"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R8G8_SNORM"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatChar2Normalized"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "snorm8x2"
-                }
-              }
-            },
-            {
-              "name": "vertex_snorm8x4",
-              "value": 8,
-              "doc": "snorm8x4 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R8G8B8A8_SNORM"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R8G8B8A8_SNORM"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatChar4Normalized"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "snorm8x4"
-                }
-              }
-            },
-            {
-              "name": "vertex_uint16x2",
-              "value": 9,
-              "doc": "uint16x2 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R16G16_UINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R16G16_UINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatUShort2"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "uint16x2"
-                }
-              }
-            },
-            {
-              "name": "vertex_uint16x4",
-              "value": 10,
-              "doc": "uint16x4 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R16G16B16A16_UINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R16G16B16A16_UINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatUShort4"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "uint16x4"
-                }
-              }
-            },
-            {
-              "name": "vertex_sint16x2",
-              "value": 11,
-              "doc": "sint16x2 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R16G16_SINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R16G16_SINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatShort2"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "sint16x2"
-                }
-              }
-            },
-            {
-              "name": "vertex_sint16x4",
-              "value": 12,
-              "doc": "sint16x4 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R16G16B16A16_SINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R16G16B16A16_SINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatShort4"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "sint16x4"
-                }
-              }
-            },
-            {
-              "name": "vertex_unorm16x2",
-              "value": 13,
-              "doc": "unorm16x2 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R16G16_UNORM"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R16G16_UNORM"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatUShort2Normalized"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "unorm16x2"
-                }
-              }
-            },
-            {
-              "name": "vertex_unorm16x4",
-              "value": 14,
-              "doc": "unorm16x4 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R16G16B16A16_UNORM"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R16G16B16A16_UNORM"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatUShort4Normalized"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "unorm16x4"
-                }
-              }
-            },
-            {
-              "name": "vertex_snorm16x2",
-              "value": 15,
-              "doc": "snorm16x2 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R16G16_SNORM"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R16G16_SNORM"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatShort2Normalized"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "snorm16x2"
-                }
-              }
-            },
-            {
-              "name": "vertex_snorm16x4",
-              "value": 16,
-              "doc": "snorm16x4 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R16G16B16A16_SNORM"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R16G16B16A16_SNORM"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatShort4Normalized"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "snorm16x4"
-                }
-              }
-            },
-            {
-              "name": "vertex_float16x2",
-              "value": 17,
-              "doc": "float16x2 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R16G16_SFLOAT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R16G16_FLOAT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatHalf2"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "float16x2"
-                }
-              }
-            },
-            {
-              "name": "vertex_float16x4",
-              "value": 18,
-              "doc": "float16x4 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R16G16B16A16_SFLOAT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R16G16B16A16_FLOAT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatHalf4"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "float16x4"
-                }
-              }
-            },
-            {
-              "name": "vertex_float32",
-              "value": 19,
-              "doc": "float32 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R32_SFLOAT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R32_FLOAT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatFloat"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "float32"
-                }
-              }
-            },
-            {
-              "name": "vertex_float32x2",
-              "value": 20,
-              "doc": "float32x2 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R32G32_SFLOAT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R32G32_FLOAT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatFloat2"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "float32x2"
-                }
-              }
-            },
-            {
-              "name": "vertex_float32x3",
-              "value": 21,
-              "doc": "float32x3 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R32G32B32_SFLOAT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R32G32B32_FLOAT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatFloat3"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "float32x3"
-                }
-              }
-            },
-            {
-              "name": "vertex_float32x4",
-              "value": 22,
-              "doc": "float32x4 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R32G32B32A32_SFLOAT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R32G32B32A32_FLOAT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatFloat4"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "float32x4"
-                }
-              }
-            },
-            {
-              "name": "vertex_uint32",
-              "value": 23,
-              "doc": "uint32 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R32_UINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R32_UINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatUInt"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "uint32"
-                }
-              }
-            },
-            {
-              "name": "vertex_uint32x2",
-              "value": 24,
-              "doc": "uint32x2 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R32G32_UINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R32G32_UINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatUInt2"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "uint32x2"
-                }
-              }
-            },
-            {
-              "name": "vertex_uint32x3",
-              "value": 25,
-              "doc": "uint32x3 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R32G32B32_UINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R32G32B32_UINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatUInt3"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "uint32x3"
-                }
-              }
-            },
-            {
-              "name": "vertex_uint32x4",
-              "value": 26,
-              "doc": "uint32x4 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R32G32B32A32_UINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R32G32B32A32_UINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatUInt4"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "uint32x4"
-                }
-              }
-            },
-            {
-              "name": "vertex_sint32",
-              "value": 27,
-              "doc": "sint32 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R32_SINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R32_SINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatInt"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "sint32"
-                }
-              }
-            },
-            {
-              "name": "vertex_sint32x2",
-              "value": 28,
-              "doc": "sint32x2 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R32G32_SINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R32G32_SINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatInt2"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "sint32x2"
-                }
-              }
-            },
-            {
-              "name": "vertex_sint32x3",
-              "value": 29,
-              "doc": "sint32x3 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R32G32B32_SINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R32G32B32_SINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatInt3"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "sint32x3"
-                }
-              }
-            },
-            {
-              "name": "vertex_sint32x4",
-              "value": 30,
-              "doc": "sint32x4 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_R32G32B32A32_SINT"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R32G32B32A32_SINT"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatInt4"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "sint32x4"
-                }
-              }
-            },
-            {
-              "name": "vertex_unorm10_10_10_2",
-              "value": 31,
-              "doc": "unorm10_10_10_2 per vertex.",
-              "mapping": {
-                "vulkan": {
-                  "class": "direct",
-                  "note": "VK_FORMAT_A2B10G10R10_UNORM_PACK32"
-                },
-                "d3d12": {
-                  "class": "direct",
-                  "note": "DXGI_FORMAT_R10G10B10A2_UNORM"
-                },
-                "metal": {
-                  "class": "direct",
-                  "note": "MTLVertexFormatUInt1010102Normalized"
-                },
-                "web_gpu": {
-                  "class": "direct",
-                  "note": "unorm10-10-10-2"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "kind": "enum",
           "name": "scalar_type",
           "width": "uint8",
           "mapped": true,
@@ -11957,6 +11325,1169 @@
       ],
       "items": [
         {
+          "kind": "enum",
+          "name": "vertex_format",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "The format of a vertex attribute in its buffer. Floats, unorm and snorm formats feed f32 inputs, uint formats u32 inputs and sint formats i32 inputs, of any component count.",
+          "values": [
+            {
+              "name": "vertex_none",
+              "value": 0,
+              "doc": "Not a vertex format.",
+              "unmapped": true
+            },
+            {
+              "name": "vertex_uint8",
+              "value": 1,
+              "doc": "One unsigned integer of 8 bits.",
+              "layout": {
+                "scalar": "uint",
+                "components": 1,
+                "bytes": 1
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8_UINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R8_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUChar"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "uint8"
+                }
+              }
+            },
+            {
+              "name": "vertex_uint8x2",
+              "value": 2,
+              "doc": "2 unsigned integers of 8 bits.",
+              "layout": {
+                "scalar": "uint",
+                "components": 2,
+                "bytes": 2
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8G8_UINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R8G8_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUChar2"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "uint8x2"
+                }
+              }
+            },
+            {
+              "name": "vertex_uint8x4",
+              "value": 3,
+              "doc": "4 unsigned integers of 8 bits.",
+              "layout": {
+                "scalar": "uint",
+                "components": 4,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8G8B8A8_UINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R8G8B8A8_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUChar4"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "uint8x4"
+                }
+              }
+            },
+            {
+              "name": "vertex_sint8",
+              "value": 4,
+              "doc": "One signed integer of 8 bits.",
+              "layout": {
+                "scalar": "sint",
+                "components": 1,
+                "bytes": 1
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8_SINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R8_SINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatChar"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sint8"
+                }
+              }
+            },
+            {
+              "name": "vertex_sint8x2",
+              "value": 5,
+              "doc": "2 signed integers of 8 bits.",
+              "layout": {
+                "scalar": "sint",
+                "components": 2,
+                "bytes": 2
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8G8_SINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R8G8_SINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatChar2"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sint8x2"
+                }
+              }
+            },
+            {
+              "name": "vertex_sint8x4",
+              "value": 6,
+              "doc": "4 signed integers of 8 bits.",
+              "layout": {
+                "scalar": "sint",
+                "components": 4,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8G8B8A8_SINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R8G8B8A8_SINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatChar4"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sint8x4"
+                }
+              }
+            },
+            {
+              "name": "vertex_unorm8",
+              "value": 7,
+              "doc": "One unsigned normalize of 8 bits.",
+              "layout": {
+                "scalar": "float",
+                "components": 1,
+                "bytes": 1
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8_UNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R8_UNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUCharNormalized"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "unorm8"
+                }
+              }
+            },
+            {
+              "name": "vertex_unorm8x2",
+              "value": 8,
+              "doc": "2 unsigned normalized of 8 bits.",
+              "layout": {
+                "scalar": "float",
+                "components": 2,
+                "bytes": 2
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8G8_UNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R8G8_UNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUChar2Normalized"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "unorm8x2"
+                }
+              }
+            },
+            {
+              "name": "vertex_unorm8x4",
+              "value": 9,
+              "doc": "4 unsigned normalized of 8 bits.",
+              "layout": {
+                "scalar": "float",
+                "components": 4,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8G8B8A8_UNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R8G8B8A8_UNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUChar4Normalized"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "unorm8x4"
+                }
+              }
+            },
+            {
+              "name": "vertex_snorm8",
+              "value": 10,
+              "doc": "One signed normalize of 8 bits.",
+              "layout": {
+                "scalar": "float",
+                "components": 1,
+                "bytes": 1
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8_SNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R8_SNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatCharNormalized"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "snorm8"
+                }
+              }
+            },
+            {
+              "name": "vertex_snorm8x2",
+              "value": 11,
+              "doc": "2 signed normalized of 8 bits.",
+              "layout": {
+                "scalar": "float",
+                "components": 2,
+                "bytes": 2
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8G8_SNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R8G8_SNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatChar2Normalized"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "snorm8x2"
+                }
+              }
+            },
+            {
+              "name": "vertex_snorm8x4",
+              "value": 12,
+              "doc": "4 signed normalized of 8 bits.",
+              "layout": {
+                "scalar": "float",
+                "components": 4,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8G8B8A8_SNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R8G8B8A8_SNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatChar4Normalized"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "snorm8x4"
+                }
+              }
+            },
+            {
+              "name": "vertex_uint16",
+              "value": 13,
+              "doc": "One unsigned integer of 16 bits.",
+              "layout": {
+                "scalar": "uint",
+                "components": 1,
+                "bytes": 2
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16_UINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUShort"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "uint16"
+                }
+              }
+            },
+            {
+              "name": "vertex_uint16x2",
+              "value": 14,
+              "doc": "2 unsigned integers of 16 bits.",
+              "layout": {
+                "scalar": "uint",
+                "components": 2,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16G16_UINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16G16_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUShort2"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "uint16x2"
+                }
+              }
+            },
+            {
+              "name": "vertex_uint16x4",
+              "value": 15,
+              "doc": "4 unsigned integers of 16 bits.",
+              "layout": {
+                "scalar": "uint",
+                "components": 4,
+                "bytes": 8
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16G16B16A16_UINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16G16B16A16_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUShort4"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "uint16x4"
+                }
+              }
+            },
+            {
+              "name": "vertex_sint16",
+              "value": 16,
+              "doc": "One signed integer of 16 bits.",
+              "layout": {
+                "scalar": "sint",
+                "components": 1,
+                "bytes": 2
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16_SINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16_SINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatShort"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sint16"
+                }
+              }
+            },
+            {
+              "name": "vertex_sint16x2",
+              "value": 17,
+              "doc": "2 signed integers of 16 bits.",
+              "layout": {
+                "scalar": "sint",
+                "components": 2,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16G16_SINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16G16_SINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatShort2"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sint16x2"
+                }
+              }
+            },
+            {
+              "name": "vertex_sint16x4",
+              "value": 18,
+              "doc": "4 signed integers of 16 bits.",
+              "layout": {
+                "scalar": "sint",
+                "components": 4,
+                "bytes": 8
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16G16B16A16_SINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16G16B16A16_SINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatShort4"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sint16x4"
+                }
+              }
+            },
+            {
+              "name": "vertex_unorm16",
+              "value": 19,
+              "doc": "One unsigned normalize of 16 bits.",
+              "layout": {
+                "scalar": "float",
+                "components": 1,
+                "bytes": 2
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16_UNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16_UNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUShortNormalized"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "unorm16"
+                }
+              }
+            },
+            {
+              "name": "vertex_unorm16x2",
+              "value": 20,
+              "doc": "2 unsigned normalized of 16 bits.",
+              "layout": {
+                "scalar": "float",
+                "components": 2,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16G16_UNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16G16_UNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUShort2Normalized"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "unorm16x2"
+                }
+              }
+            },
+            {
+              "name": "vertex_unorm16x4",
+              "value": 21,
+              "doc": "4 unsigned normalized of 16 bits.",
+              "layout": {
+                "scalar": "float",
+                "components": 4,
+                "bytes": 8
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16G16B16A16_UNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16G16B16A16_UNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUShort4Normalized"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "unorm16x4"
+                }
+              }
+            },
+            {
+              "name": "vertex_snorm16",
+              "value": 22,
+              "doc": "One signed normalize of 16 bits.",
+              "layout": {
+                "scalar": "float",
+                "components": 1,
+                "bytes": 2
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16_SNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16_SNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatShortNormalized"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "snorm16"
+                }
+              }
+            },
+            {
+              "name": "vertex_snorm16x2",
+              "value": 23,
+              "doc": "2 signed normalized of 16 bits.",
+              "layout": {
+                "scalar": "float",
+                "components": 2,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16G16_SNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16G16_SNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatShort2Normalized"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "snorm16x2"
+                }
+              }
+            },
+            {
+              "name": "vertex_snorm16x4",
+              "value": 24,
+              "doc": "4 signed normalized of 16 bits.",
+              "layout": {
+                "scalar": "float",
+                "components": 4,
+                "bytes": 8
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16G16B16A16_SNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16G16B16A16_SNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatShort4Normalized"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "snorm16x4"
+                }
+              }
+            },
+            {
+              "name": "vertex_float16",
+              "value": 25,
+              "doc": "One 16-bit float.",
+              "layout": {
+                "scalar": "float",
+                "components": 1,
+                "bytes": 2
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatHalf"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "float16"
+                }
+              }
+            },
+            {
+              "name": "vertex_float16x2",
+              "value": 26,
+              "doc": "2 16-bit floats.",
+              "layout": {
+                "scalar": "float",
+                "components": 2,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16G16_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16G16_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatHalf2"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "float16x2"
+                }
+              }
+            },
+            {
+              "name": "vertex_float16x4",
+              "value": 27,
+              "doc": "4 16-bit floats.",
+              "layout": {
+                "scalar": "float",
+                "components": 4,
+                "bytes": 8
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16G16B16A16_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16G16B16A16_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatHalf4"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "float16x4"
+                }
+              }
+            },
+            {
+              "name": "vertex_float32",
+              "value": 28,
+              "doc": "One 32-bit float.",
+              "layout": {
+                "scalar": "float",
+                "components": 1,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R32_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatFloat"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "float32"
+                }
+              }
+            },
+            {
+              "name": "vertex_float32x2",
+              "value": 29,
+              "doc": "2 32-bit floats.",
+              "layout": {
+                "scalar": "float",
+                "components": 2,
+                "bytes": 8
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32G32_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R32G32_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatFloat2"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "float32x2"
+                }
+              }
+            },
+            {
+              "name": "vertex_float32x3",
+              "value": 30,
+              "doc": "3 32-bit floats.",
+              "layout": {
+                "scalar": "float",
+                "components": 3,
+                "bytes": 12
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32G32B32_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R32G32B32_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatFloat3"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "float32x3"
+                }
+              }
+            },
+            {
+              "name": "vertex_float32x4",
+              "value": 31,
+              "doc": "4 32-bit floats.",
+              "layout": {
+                "scalar": "float",
+                "components": 4,
+                "bytes": 16
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32G32B32A32_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R32G32B32A32_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatFloat4"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "float32x4"
+                }
+              }
+            },
+            {
+              "name": "vertex_uint32",
+              "value": 32,
+              "doc": "One unsigned 32-bit integer.",
+              "layout": {
+                "scalar": "uint",
+                "components": 1,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32_UINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R32_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUInt"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "uint32"
+                }
+              }
+            },
+            {
+              "name": "vertex_uint32x2",
+              "value": 33,
+              "doc": "2 unsigned 32-bit integers.",
+              "layout": {
+                "scalar": "uint",
+                "components": 2,
+                "bytes": 8
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32G32_UINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R32G32_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUInt2"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "uint32x2"
+                }
+              }
+            },
+            {
+              "name": "vertex_uint32x3",
+              "value": 34,
+              "doc": "3 unsigned 32-bit integers.",
+              "layout": {
+                "scalar": "uint",
+                "components": 3,
+                "bytes": 12
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32G32B32_UINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R32G32B32_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUInt3"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "uint32x3"
+                }
+              }
+            },
+            {
+              "name": "vertex_uint32x4",
+              "value": 35,
+              "doc": "4 unsigned 32-bit integers.",
+              "layout": {
+                "scalar": "uint",
+                "components": 4,
+                "bytes": 16
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32G32B32A32_UINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R32G32B32A32_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUInt4"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "uint32x4"
+                }
+              }
+            },
+            {
+              "name": "vertex_sint32",
+              "value": 36,
+              "doc": "One signed 32-bit integer.",
+              "layout": {
+                "scalar": "sint",
+                "components": 1,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32_SINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R32_SINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatInt"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sint32"
+                }
+              }
+            },
+            {
+              "name": "vertex_sint32x2",
+              "value": 37,
+              "doc": "2 signed 32-bit integers.",
+              "layout": {
+                "scalar": "sint",
+                "components": 2,
+                "bytes": 8
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32G32_SINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R32G32_SINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatInt2"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sint32x2"
+                }
+              }
+            },
+            {
+              "name": "vertex_sint32x3",
+              "value": 38,
+              "doc": "3 signed 32-bit integers.",
+              "layout": {
+                "scalar": "sint",
+                "components": 3,
+                "bytes": 12
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32G32B32_SINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R32G32B32_SINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatInt3"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sint32x3"
+                }
+              }
+            },
+            {
+              "name": "vertex_sint32x4",
+              "value": 39,
+              "doc": "4 signed 32-bit integers.",
+              "layout": {
+                "scalar": "sint",
+                "components": 4,
+                "bytes": 16
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32G32B32A32_SINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R32G32B32A32_SINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatInt4"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sint32x4"
+                }
+              }
+            },
+            {
+              "name": "vertex_unorm10_10_10_2",
+              "value": 40,
+              "doc": "RGB of 10 bits and alpha of 2, unsigned normalized.",
+              "layout": {
+                "scalar": "float",
+                "components": 4,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "A2B10G10R10_UNORM_PACK32"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R10G10B10A2_UNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUInt1010102Normalized"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "unorm10-10-10-2"
+                }
+              }
+            },
+            {
+              "name": "vertex_unorm8x4_bgra",
+              "value": 41,
+              "doc": "4 unsigned normalized of 8 bits in BGRA order, read as RGBA.",
+              "layout": {
+                "scalar": "float",
+                "components": 4,
+                "bytes": 4
+              },
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "B8G8R8A8_UNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_B8G8R8A8_UNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexFormatUChar4Normalized_BGRA"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "unorm8x4-bgra"
+                }
+              }
+            }
+          ]
+        },
+        {
           "kind": "struct",
           "name": "constant_value",
           "doc": "A value for a specialization constant, converted to the constant's type: a boolean 0 or 1, an integer within its type's range, or a finite float within 32-bit range.",
@@ -11972,6 +12503,1493 @@
               "doc": "Its value."
             }
           ]
+        },
+        {
+          "kind": "enum",
+          "name": "vertex_step_mode",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "How a vertex buffer advances.",
+          "values": [
+            {
+              "name": "step_vertex",
+              "value": 0,
+              "doc": "Per vertex.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_VERTEX_INPUT_RATE_VERTEX"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexStepFunctionPerVertex"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "vertex"
+                }
+              }
+            },
+            {
+              "name": "step_instance",
+              "value": 1,
+              "doc": "Per instance.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_VERTEX_INPUT_RATE_INSTANCE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA with a step rate of 1"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLVertexStepFunctionPerInstance"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "instance"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "primitive_topology",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "How vertices form primitives.",
+          "values": [
+            {
+              "name": "topology_point_list",
+              "value": 0,
+              "doc": "Each vertex a point.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "POINT_LIST"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D_PRIMITIVE_TOPOLOGY_POINTLIST"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLPrimitiveTypePoint"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "point-list"
+                }
+              }
+            },
+            {
+              "name": "topology_line_list",
+              "value": 1,
+              "doc": "Each two vertices a line.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "LINE_LIST"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D_PRIMITIVE_TOPOLOGY_LINELIST"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLPrimitiveTypeLine"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "line-list"
+                }
+              }
+            },
+            {
+              "name": "topology_line_strip",
+              "value": 2,
+              "doc": "A line through the vertices in order.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "LINE_STRIP"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D_PRIMITIVE_TOPOLOGY_LINESTRIP"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLPrimitiveTypeLineStrip"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "line-strip"
+                }
+              }
+            },
+            {
+              "name": "topology_triangle_list",
+              "value": 3,
+              "doc": "Each three vertices a triangle.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRIANGLE_LIST"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLPrimitiveTypeTriangle"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "triangle-list"
+                }
+              }
+            },
+            {
+              "name": "topology_triangle_strip",
+              "value": 4,
+              "doc": "Each vertex after the second a triangle with the two before it.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRIANGLE_STRIP"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLPrimitiveTypeTriangleStrip"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "triangle-strip"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "index_format",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "The width of an index.",
+          "values": [
+            {
+              "name": "index_none",
+              "value": 0,
+              "doc": "No index format: a strip pipeline drawn without indices.",
+              "unmapped": true
+            },
+            {
+              "name": "index_uint16",
+              "value": 1,
+              "doc": "16-bit indices.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_INDEX_TYPE_UINT16"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R16_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLIndexTypeUInt16"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "uint16"
+                }
+              }
+            },
+            {
+              "name": "index_uint32",
+              "value": 2,
+              "doc": "32-bit indices.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_INDEX_TYPE_UINT32"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_FORMAT_R32_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLIndexTypeUInt32"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "uint32"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "front_face",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "Which winding faces front.",
+          "values": [
+            {
+              "name": "front_counter_clockwise",
+              "value": 0,
+              "doc": "Counter-clockwise.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_FRONT_FACE_COUNTER_CLOCKWISE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "FrontCounterClockwise TRUE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLWindingCounterClockwise"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "ccw"
+                }
+              }
+            },
+            {
+              "name": "front_clockwise",
+              "value": 1,
+              "doc": "Clockwise.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_FRONT_FACE_CLOCKWISE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "FrontCounterClockwise FALSE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLWindingClockwise"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "cw"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "cull_mode",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "Which faces are culled.",
+          "values": [
+            {
+              "name": "cull_none",
+              "value": 0,
+              "doc": "None.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_CULL_MODE_NONE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_CULL_MODE_NONE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLCullModeNone"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "none"
+                }
+              }
+            },
+            {
+              "name": "cull_front",
+              "value": 1,
+              "doc": "Front faces.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_CULL_MODE_FRONT_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_CULL_MODE_FRONT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLCullModeFront"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "front"
+                }
+              }
+            },
+            {
+              "name": "cull_back",
+              "value": 2,
+              "doc": "Back faces.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_CULL_MODE_BACK_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_CULL_MODE_BACK"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLCullModeBack"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "back"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "stencil_operation",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "What a stencil test does to the stencil value.",
+          "values": [
+            {
+              "name": "stencil_keep",
+              "value": 0,
+              "doc": "Keeps it.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "KEEP"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_STENCIL_OP_KEEP"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLStencilOperationKeep"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "keep"
+                }
+              }
+            },
+            {
+              "name": "stencil_zero",
+              "value": 1,
+              "doc": "Sets it to 0.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "ZERO"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_STENCIL_OP_ZERO"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLStencilOperationZero"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "zero"
+                }
+              }
+            },
+            {
+              "name": "stencil_replace",
+              "value": 2,
+              "doc": "Sets it to the reference.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "REPLACE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_STENCIL_OP_REPLACE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLStencilOperationReplace"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "replace"
+                }
+              }
+            },
+            {
+              "name": "stencil_invert",
+              "value": 3,
+              "doc": "Inverts its bits.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "INVERT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_STENCIL_OP_INVERT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLStencilOperationInvert"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "invert"
+                }
+              }
+            },
+            {
+              "name": "stencil_increment_clamp",
+              "value": 4,
+              "doc": "Adds 1, clamped.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "INCREMENT_AND_CLAMP"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_STENCIL_OP_INCR_SAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLStencilOperationIncrementClamp"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "increment-clamp"
+                }
+              }
+            },
+            {
+              "name": "stencil_decrement_clamp",
+              "value": 5,
+              "doc": "Subtracts 1, clamped.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "DECREMENT_AND_CLAMP"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_STENCIL_OP_DECR_SAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLStencilOperationDecrementClamp"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "decrement-clamp"
+                }
+              }
+            },
+            {
+              "name": "stencil_increment_wrap",
+              "value": 6,
+              "doc": "Adds 1, wrapping.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "INCREMENT_AND_WRAP"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_STENCIL_OP_INCR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLStencilOperationIncrementWrap"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "increment-wrap"
+                }
+              }
+            },
+            {
+              "name": "stencil_decrement_wrap",
+              "value": 7,
+              "doc": "Subtracts 1, wrapping.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "DECREMENT_AND_WRAP"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_STENCIL_OP_DECR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLStencilOperationDecrementWrap"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "decrement-wrap"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "blend_factor",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "A factor of blending's source or destination.",
+          "values": [
+            {
+              "name": "blend_zero",
+              "value": 0,
+              "doc": "0.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "ZERO"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_ZERO"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorZero"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "zero"
+                }
+              }
+            },
+            {
+              "name": "blend_one",
+              "value": 1,
+              "doc": "1.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "ONE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_ONE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorOne"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "one"
+                }
+              }
+            },
+            {
+              "name": "blend_src",
+              "value": 2,
+              "doc": "The source color.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SRC_COLOR"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_SRC_COLOR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorSourceColor"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "src"
+                }
+              }
+            },
+            {
+              "name": "blend_one_minus_src",
+              "value": 3,
+              "doc": "1 minus the source color.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "ONE_MINUS_SRC_COLOR"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_INV_SRC_COLOR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorOneMinusSourceColor"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "one-minus-src"
+                }
+              }
+            },
+            {
+              "name": "blend_src_alpha",
+              "value": 4,
+              "doc": "The source alpha.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SRC_ALPHA"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_SRC_ALPHA"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorSourceAlpha"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "src-alpha"
+                }
+              }
+            },
+            {
+              "name": "blend_one_minus_src_alpha",
+              "value": 5,
+              "doc": "1 minus the source alpha.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "ONE_MINUS_SRC_ALPHA"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_INV_SRC_ALPHA"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorOneMinusSourceAlpha"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "one-minus-src-alpha"
+                }
+              }
+            },
+            {
+              "name": "blend_dst",
+              "value": 6,
+              "doc": "The destination color.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "DST_COLOR"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_DEST_COLOR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorDestinationColor"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "dst"
+                }
+              }
+            },
+            {
+              "name": "blend_one_minus_dst",
+              "value": 7,
+              "doc": "1 minus the destination color.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "ONE_MINUS_DST_COLOR"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_INV_DEST_COLOR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorOneMinusDestinationColor"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "one-minus-dst"
+                }
+              }
+            },
+            {
+              "name": "blend_dst_alpha",
+              "value": 8,
+              "doc": "The destination alpha.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "DST_ALPHA"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_DEST_ALPHA"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorDestinationAlpha"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "dst-alpha"
+                }
+              }
+            },
+            {
+              "name": "blend_one_minus_dst_alpha",
+              "value": 9,
+              "doc": "1 minus the destination alpha.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "ONE_MINUS_DST_ALPHA"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_INV_DEST_ALPHA"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorOneMinusDestinationAlpha"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "one-minus-dst-alpha"
+                }
+              }
+            },
+            {
+              "name": "blend_src_alpha_saturated",
+              "value": 10,
+              "doc": "The lesser of the source alpha and 1 minus the destination alpha.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SRC_ALPHA_SATURATE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_SRC_ALPHA_SAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorSourceAlphaSaturated"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "src-alpha-saturated"
+                }
+              }
+            },
+            {
+              "name": "blend_constant",
+              "value": 11,
+              "doc": "The blend constant.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "CONSTANT_COLOR"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_BLEND_FACTOR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorBlendColor"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "constant"
+                }
+              }
+            },
+            {
+              "name": "blend_one_minus_constant",
+              "value": 12,
+              "doc": "1 minus the blend constant.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "ONE_MINUS_CONSTANT_COLOR"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_INV_BLEND_FACTOR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorOneMinusBlendColor"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "one-minus-constant"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "blend_operation",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "How blending combines its weighted source and destination.",
+          "values": [
+            {
+              "name": "blend_add",
+              "value": 0,
+              "doc": "Source plus destination.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_BLEND_OP_ADD"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_OP_ADD"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendOperationAdd"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "add"
+                }
+              }
+            },
+            {
+              "name": "blend_subtract",
+              "value": 1,
+              "doc": "Source minus destination.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_BLEND_OP_SUBTRACT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_OP_SUBTRACT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendOperationSubtract"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "subtract"
+                }
+              }
+            },
+            {
+              "name": "blend_reverse_subtract",
+              "value": 2,
+              "doc": "Destination minus source.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_BLEND_OP_REVERSE_SUBTRACT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_OP_REV_SUBTRACT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendOperationReverseSubtract"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "reverse-subtract"
+                }
+              }
+            },
+            {
+              "name": "blend_min",
+              "value": 3,
+              "doc": "The lesser, with both factors one.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_BLEND_OP_MIN"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_OP_MIN"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendOperationMin"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "min"
+                }
+              }
+            },
+            {
+              "name": "blend_max",
+              "value": 4,
+              "doc": "The greater, with both factors one.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_BLEND_OP_MAX"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_OP_MAX"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendOperationMax"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "max"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "bitflags",
+          "name": "color_writes",
+          "width": "uint32",
+          "mapped": true,
+          "doc": "The channels a color target writes.",
+          "values": [
+            {
+              "name": "write_red",
+              "value": 1,
+              "doc": "Red.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_COLOR_COMPONENT_R_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_COLOR_WRITE_ENABLE_RED"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLColorWriteMaskRed"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "RED"
+                }
+              }
+            },
+            {
+              "name": "write_green",
+              "value": 2,
+              "doc": "Green.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_COLOR_COMPONENT_G_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_COLOR_WRITE_ENABLE_GREEN"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLColorWriteMaskGreen"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "GREEN"
+                }
+              }
+            },
+            {
+              "name": "write_blue",
+              "value": 4,
+              "doc": "Blue.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_COLOR_COMPONENT_B_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_COLOR_WRITE_ENABLE_BLUE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLColorWriteMaskBlue"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "BLUE"
+                }
+              }
+            },
+            {
+              "name": "write_alpha",
+              "value": 8,
+              "doc": "Alpha.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_COLOR_COMPONENT_A_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_COLOR_WRITE_ENABLE_ALPHA"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLColorWriteMaskAlpha"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "ALPHA"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "vertex_buffer_layout",
+          "doc": "A vertex buffer a graphics pipeline reads.",
+          "members": [
+            {
+              "name": "stride",
+              "type": "uint32",
+              "doc": "The bytes from one element to the next, a multiple of 4 within the stride limit; 0 for one element all vertices share."
+            },
+            {
+              "name": "step_mode",
+              "type": "enum.vertex_step_mode",
+              "doc": "Whether it advances per vertex or per instance."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "vertex_attribute",
+          "doc": "A vertex input fed from a vertex buffer.",
+          "members": [
+            {
+              "name": "buffer",
+              "type": "uint32",
+              "doc": "The index of its buffer among the pipeline's."
+            },
+            {
+              "name": "location",
+              "type": "uint32",
+              "doc": "The vertex input's location."
+            },
+            {
+              "name": "format",
+              "type": "enum.vertex_format",
+              "doc": "Its format in the buffer."
+            },
+            {
+              "name": "offset",
+              "type": "uint32",
+              "doc": "Its bytes from the element's start, a multiple of the lesser of 4 and its size."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "stencil_face",
+          "doc": "The stencil test of one face.",
+          "members": [
+            {
+              "name": "compare",
+              "type": "enum.compare_function",
+              "doc": "The test against the reference."
+            },
+            {
+              "name": "fail_op",
+              "type": "enum.stencil_operation",
+              "doc": "What a failed stencil test does."
+            },
+            {
+              "name": "depth_fail_op",
+              "type": "enum.stencil_operation",
+              "doc": "What a passed stencil test with a failed depth test does."
+            },
+            {
+              "name": "pass_op",
+              "type": "enum.stencil_operation",
+              "doc": "What passing both tests does."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "blend_component",
+          "doc": "How one part of a color, its RGB or its alpha, blends.",
+          "members": [
+            {
+              "name": "src_factor",
+              "type": "enum.blend_factor",
+              "doc": "The source's factor."
+            },
+            {
+              "name": "dst_factor",
+              "type": "enum.blend_factor",
+              "doc": "The destination's factor."
+            },
+            {
+              "name": "operation",
+              "type": "enum.blend_operation",
+              "doc": "How the weighted two combine."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "color_target_state",
+          "doc": "How a graphics pipeline writes one color target.",
+          "members": [
+            {
+              "name": "format",
+              "type": "enum.format",
+              "doc": "The target's format; mrhi_formatNone for no target at this location."
+            },
+            {
+              "name": "blend",
+              "type": "bool",
+              "doc": "Whether it blends; its format must be blendable."
+            },
+            {
+              "name": "color",
+              "type": "struct.blend_component",
+              "doc": "How RGB blends."
+            },
+            {
+              "name": "alpha",
+              "type": "struct.blend_component",
+              "doc": "How alpha blends."
+            },
+            {
+              "name": "write_mask",
+              "type": "bitflags.color_writes",
+              "doc": "The channels it writes; a nonzero mask needs the fragment entry to write the location."
+            }
+          ]
+        },
+        {
+          "kind": "id",
+          "name": "graphics_pipeline_id",
+          "doc": "A graphics pipeline of a device."
+        },
+        {
+          "kind": "struct",
+          "name": "graphics_pipeline_def",
+          "def": true,
+          "doc": "How a graphics pipeline is made: a shader's vertex and fragment entry points with every state fixed for them. Build it with mrhiDefaultGraphicsPipelineDef.",
+          "members": [
+            {
+              "name": "label",
+              "type": "char",
+              "pointer": "const",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
+            },
+            {
+              "name": "label_length",
+              "type": "size",
+              "doc": "The label's bytes."
+            },
+            {
+              "name": "shader",
+              "type": "id.shader_id",
+              "doc": "The shader container."
+            },
+            {
+              "name": "vertex_entry",
+              "type": "char",
+              "pointer": "const",
+              "doc": "The vertex entry point's name, vertexEntryLength bytes. Only read during the call."
+            },
+            {
+              "name": "vertex_entry_length",
+              "type": "size",
+              "doc": "The name's bytes."
+            },
+            {
+              "name": "fragment_entry",
+              "type": "char",
+              "pointer": "const",
+              "doc": "The fragment entry point's name, fragmentEntryLength bytes; NULL for a pipeline that only writes depth. Only read during the call."
+            },
+            {
+              "name": "fragment_entry_length",
+              "type": "size",
+              "doc": "The name's bytes."
+            },
+            {
+              "name": "vertex_buffers",
+              "type": "struct.vertex_buffer_layout",
+              "pointer": "const",
+              "doc": "The vertex buffers, in binding order; NULL when vertexBufferCount is 0. Only read during the call."
+            },
+            {
+              "name": "vertex_buffer_count",
+              "type": "uint32",
+              "doc": "The vertex buffers, within the vertex buffer limit."
+            },
+            {
+              "name": "vertex_attributes",
+              "type": "struct.vertex_attribute",
+              "pointer": "const",
+              "doc": "The vertex attributes, one per vertex input of the vertex entry and at most one per location; NULL when vertexAttributeCount is 0. Only read during the call."
+            },
+            {
+              "name": "vertex_attribute_count",
+              "type": "uint32",
+              "doc": "The attributes, within the vertex attribute limit."
+            },
+            {
+              "name": "topology",
+              "type": "enum.primitive_topology",
+              "doc": "How vertices form primitives."
+            },
+            {
+              "name": "strip_index_format",
+              "type": "enum.index_format",
+              "doc": "For strip topologies drawn with indices, their format, whose largest value restarts the strip; mrhi_indexNone otherwise."
+            },
+            {
+              "name": "front_face",
+              "type": "enum.front_face",
+              "doc": "Which winding faces front."
+            },
+            {
+              "name": "cull_mode",
+              "type": "enum.cull_mode",
+              "doc": "Which faces are culled."
+            },
+            {
+              "name": "unclipped_depth",
+              "type": "bool",
+              "doc": "Whether depth is clamped instead of clipped; needs unclippedDepth."
+            },
+            {
+              "name": "depth_stencil_format",
+              "type": "enum.format",
+              "doc": "The depth or stencil target's format; mrhi_formatNone for none."
+            },
+            {
+              "name": "depth_write",
+              "type": "bool",
+              "doc": "Whether depth is written; needs a depth format."
+            },
+            {
+              "name": "depth_compare",
+              "type": "enum.compare_function",
+              "doc": "The depth test; other than mrhi_compareAlways needs a depth format."
+            },
+            {
+              "name": "stencil_front",
+              "type": "struct.stencil_face",
+              "doc": "Front faces' stencil test; other than the default needs a stencil format."
+            },
+            {
+              "name": "stencil_back",
+              "type": "struct.stencil_face",
+              "doc": "Back faces' stencil test; other than the default needs a stencil format."
+            },
+            {
+              "name": "stencil_read_mask",
+              "type": "uint32",
+              "doc": "The stencil bits the test reads."
+            },
+            {
+              "name": "stencil_write_mask",
+              "type": "uint32",
+              "doc": "The stencil bits it writes."
+            },
+            {
+              "name": "depth_bias",
+              "type": "int32",
+              "doc": "A constant depth bias; 0 for points and lines, and without a depth format."
+            },
+            {
+              "name": "depth_bias_slope_scale",
+              "type": "float32",
+              "doc": "A depth bias by slope, finite; 0 for points and lines, and without a depth format."
+            },
+            {
+              "name": "depth_bias_clamp",
+              "type": "float32",
+              "doc": "The greatest depth bias, finite; 0 for points and lines, and without a depth format."
+            },
+            {
+              "name": "sample_count",
+              "type": "uint32",
+              "doc": "Samples per pixel: 1, or a count every target format takes on the device."
+            },
+            {
+              "name": "sample_mask",
+              "type": "uint32",
+              "doc": "The samples written."
+            },
+            {
+              "name": "alpha_to_coverage",
+              "type": "bool",
+              "doc": "Whether the first target's alpha decides coverage: multisampled, with a blendable first target that has alpha, and a fragment entry that does not write the sample mask."
+            },
+            {
+              "name": "color_targets",
+              "type": "struct.color_target_state",
+              "array": "color_targets",
+              "doc": "The color targets by location, colorTargetCount of them."
+            },
+            {
+              "name": "color_target_count",
+              "type": "uint32",
+              "doc": "How many, at most MRHI_COLOR_TARGETS; 0 without a fragment entry."
+            },
+            {
+              "name": "constants",
+              "type": "struct.constant_value",
+              "pointer": "const",
+              "doc": "Values for the container's constants, each id at most once; every constant without a default needs one. NULL when constantCount is 0. Only read during the call."
+            },
+            {
+              "name": "constant_count",
+              "type": "uint32",
+              "doc": "The values."
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_graphics_pipeline_def",
+          "doc": "Returns the default graphics pipeline def: triangle lists, no culling, no depth or stencil target, one sample, and color targets that write every channel without blending; its shader and entries must be set.",
+          "returns": {
+            "type": "struct.graphics_pipeline_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "create_graphics_pipeline",
+          "doc": "Makes a graphics pipeline on a ready device, checked against its shader's reflection and the device as WebGPU checks it. It returns at once with the pipeline pending, and the device's queue answers the request with mrhi_devicePipelineReady; a pipeline is usable once that answer is mrhi_success.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` with the pipeline pending; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, entries the shader has not as vertex and fragment entries, constants as for compute pipelines, or state that contradicts itself, the reflection or WebGPU's rules; `mrhi_errorStale` for a shader the device no longer has; `mrhi_errorUnsupported` for vertex buffers, attributes, strides, inter-stage variables or color bytes past the device's limits, target formats the device cannot render, blend or multisample as asked, unclipped depth without its feature, a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's pipeline limit is reached or its queue has no room for the answer; `mrhi_errorPlatform` when the driver refuses at once."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "def",
+              "type": "struct.graphics_pipeline_def",
+              "pointer": "const",
+              "doc": "The pipeline to make."
+            },
+            {
+              "name": "pipeline_out",
+              "type": "id.graphics_pipeline_id",
+              "pointer": "mutable",
+              "doc": "Receives the pipeline."
+            },
+            {
+              "name": "request_out",
+              "type": "id.request_id",
+              "pointer": "mutable",
+              "doc": "Receives the id its ready record answers."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "destroy_graphics_pipeline",
+          "doc": "Destroys a graphics pipeline. A pending one's request is answered with mrhi_errorStale.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device; `mrhi_errorStale` for a pipeline the device no longer has."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pipeline",
+              "type": "id.graphics_pipeline_id",
+              "doc": "The pipeline."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
         },
         {
           "kind": "id",

@@ -47,6 +47,18 @@ typedef struct mrhiDriverComputePipeline
     uint32_t constantCount;
 } mrhiDriverComputePipeline;
 
+// A graphics pipeline the core has checked, as its driver makes it: its
+// shader's driver handle and reflection, its entry points there (the
+// fragment entry entryCount for none), and its def.
+typedef struct mrhiDriverGraphicsPipeline
+{
+    uint64_t shader;
+    const mrhiReflection* reflection;
+    uint32_t vertexEntry;
+    uint32_t fragmentEntry;
+    const mrhiGraphicsPipelineDef* def;
+} mrhiDriverGraphicsPipeline;
+
 // The driver side of a device: its vtable and pointer. A device driver
 // is made at once and opens in the background; its instance driver
 // answers the opening through a poll event. A def's label is valid
@@ -89,6 +101,10 @@ typedef struct mrhiDeviceDriverVtable
     // instead. Everything it is given is only read during the call.
     mrhiResult (*createComputePipeline)(void* self, const mrhiDriverComputePipeline* pipeline,
                                         uint64_t tag, uint64_t* handleOut);
+    // Starts a graphics pipeline as createComputePipeline starts a compute
+    // one.
+    mrhiResult (*createGraphicsPipeline)(void* self, const mrhiDriverGraphicsPipeline* pipeline,
+                                         uint64_t tag, uint64_t* handleOut);
     // Destroys a pipeline, pending or not; a pending one is never
     // reported.
     void (*destroyPipeline)(void* self, uint64_t handle);

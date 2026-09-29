@@ -30,4 +30,6 @@ sha256:
 container: capabilities_core label sha256
 shader: container device_core
 reflection: allocator container
-pipeline: device_core invariant
+pipeline: device_core invariant pipeline_core
+pipeline_core: device_core
+graphics: capabilities_core pipeline_core

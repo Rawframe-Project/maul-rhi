@@ -441,42 +441,6 @@ restricted or absent-rejected, with how.
 | `mrhi_storageWriteOnly` | direct: NonReadable | direct: a UAV write | direct: access::write | direct: write-only |
 | `mrhi_storageReadWrite` | direct: a storage image | direct: a UAV | direct: access::read_write | direct: read-write |
 
-## mrhiVertexFormat
-
-| Value | Vulkan | D3D12 | Metal | WebGPU |
-| --- | --- | --- | --- | --- |
-| `mrhi_vertexUint8x2` | direct: VK_FORMAT_R8G8_UINT | direct: DXGI_FORMAT_R8G8_UINT | direct: MTLVertexFormatUChar2 | direct: uint8x2 |
-| `mrhi_vertexUint8x4` | direct: VK_FORMAT_R8G8B8A8_UINT | direct: DXGI_FORMAT_R8G8B8A8_UINT | direct: MTLVertexFormatUChar4 | direct: uint8x4 |
-| `mrhi_vertexSint8x2` | direct: VK_FORMAT_R8G8_SINT | direct: DXGI_FORMAT_R8G8_SINT | direct: MTLVertexFormatChar2 | direct: sint8x2 |
-| `mrhi_vertexSint8x4` | direct: VK_FORMAT_R8G8B8A8_SINT | direct: DXGI_FORMAT_R8G8B8A8_SINT | direct: MTLVertexFormatChar4 | direct: sint8x4 |
-| `mrhi_vertexUnorm8x2` | direct: VK_FORMAT_R8G8_UNORM | direct: DXGI_FORMAT_R8G8_UNORM | direct: MTLVertexFormatUChar2Normalized | direct: unorm8x2 |
-| `mrhi_vertexUnorm8x4` | direct: VK_FORMAT_R8G8B8A8_UNORM | direct: DXGI_FORMAT_R8G8B8A8_UNORM | direct: MTLVertexFormatUChar4Normalized | direct: unorm8x4 |
-| `mrhi_vertexSnorm8x2` | direct: VK_FORMAT_R8G8_SNORM | direct: DXGI_FORMAT_R8G8_SNORM | direct: MTLVertexFormatChar2Normalized | direct: snorm8x2 |
-| `mrhi_vertexSnorm8x4` | direct: VK_FORMAT_R8G8B8A8_SNORM | direct: DXGI_FORMAT_R8G8B8A8_SNORM | direct: MTLVertexFormatChar4Normalized | direct: snorm8x4 |
-| `mrhi_vertexUint16x2` | direct: VK_FORMAT_R16G16_UINT | direct: DXGI_FORMAT_R16G16_UINT | direct: MTLVertexFormatUShort2 | direct: uint16x2 |
-| `mrhi_vertexUint16x4` | direct: VK_FORMAT_R16G16B16A16_UINT | direct: DXGI_FORMAT_R16G16B16A16_UINT | direct: MTLVertexFormatUShort4 | direct: uint16x4 |
-| `mrhi_vertexSint16x2` | direct: VK_FORMAT_R16G16_SINT | direct: DXGI_FORMAT_R16G16_SINT | direct: MTLVertexFormatShort2 | direct: sint16x2 |
-| `mrhi_vertexSint16x4` | direct: VK_FORMAT_R16G16B16A16_SINT | direct: DXGI_FORMAT_R16G16B16A16_SINT | direct: MTLVertexFormatShort4 | direct: sint16x4 |
-| `mrhi_vertexUnorm16x2` | direct: VK_FORMAT_R16G16_UNORM | direct: DXGI_FORMAT_R16G16_UNORM | direct: MTLVertexFormatUShort2Normalized | direct: unorm16x2 |
-| `mrhi_vertexUnorm16x4` | direct: VK_FORMAT_R16G16B16A16_UNORM | direct: DXGI_FORMAT_R16G16B16A16_UNORM | direct: MTLVertexFormatUShort4Normalized | direct: unorm16x4 |
-| `mrhi_vertexSnorm16x2` | direct: VK_FORMAT_R16G16_SNORM | direct: DXGI_FORMAT_R16G16_SNORM | direct: MTLVertexFormatShort2Normalized | direct: snorm16x2 |
-| `mrhi_vertexSnorm16x4` | direct: VK_FORMAT_R16G16B16A16_SNORM | direct: DXGI_FORMAT_R16G16B16A16_SNORM | direct: MTLVertexFormatShort4Normalized | direct: snorm16x4 |
-| `mrhi_vertexFloat16x2` | direct: VK_FORMAT_R16G16_SFLOAT | direct: DXGI_FORMAT_R16G16_FLOAT | direct: MTLVertexFormatHalf2 | direct: float16x2 |
-| `mrhi_vertexFloat16x4` | direct: VK_FORMAT_R16G16B16A16_SFLOAT | direct: DXGI_FORMAT_R16G16B16A16_FLOAT | direct: MTLVertexFormatHalf4 | direct: float16x4 |
-| `mrhi_vertexFloat32` | direct: VK_FORMAT_R32_SFLOAT | direct: DXGI_FORMAT_R32_FLOAT | direct: MTLVertexFormatFloat | direct: float32 |
-| `mrhi_vertexFloat32x2` | direct: VK_FORMAT_R32G32_SFLOAT | direct: DXGI_FORMAT_R32G32_FLOAT | direct: MTLVertexFormatFloat2 | direct: float32x2 |
-| `mrhi_vertexFloat32x3` | direct: VK_FORMAT_R32G32B32_SFLOAT | direct: DXGI_FORMAT_R32G32B32_FLOAT | direct: MTLVertexFormatFloat3 | direct: float32x3 |
-| `mrhi_vertexFloat32x4` | direct: VK_FORMAT_R32G32B32A32_SFLOAT | direct: DXGI_FORMAT_R32G32B32A32_FLOAT | direct: MTLVertexFormatFloat4 | direct: float32x4 |
-| `mrhi_vertexUint32` | direct: VK_FORMAT_R32_UINT | direct: DXGI_FORMAT_R32_UINT | direct: MTLVertexFormatUInt | direct: uint32 |
-| `mrhi_vertexUint32x2` | direct: VK_FORMAT_R32G32_UINT | direct: DXGI_FORMAT_R32G32_UINT | direct: MTLVertexFormatUInt2 | direct: uint32x2 |
-| `mrhi_vertexUint32x3` | direct: VK_FORMAT_R32G32B32_UINT | direct: DXGI_FORMAT_R32G32B32_UINT | direct: MTLVertexFormatUInt3 | direct: uint32x3 |
-| `mrhi_vertexUint32x4` | direct: VK_FORMAT_R32G32B32A32_UINT | direct: DXGI_FORMAT_R32G32B32A32_UINT | direct: MTLVertexFormatUInt4 | direct: uint32x4 |
-| `mrhi_vertexSint32` | direct: VK_FORMAT_R32_SINT | direct: DXGI_FORMAT_R32_SINT | direct: MTLVertexFormatInt | direct: sint32 |
-| `mrhi_vertexSint32x2` | direct: VK_FORMAT_R32G32_SINT | direct: DXGI_FORMAT_R32G32_SINT | direct: MTLVertexFormatInt2 | direct: sint32x2 |
-| `mrhi_vertexSint32x3` | direct: VK_FORMAT_R32G32B32_SINT | direct: DXGI_FORMAT_R32G32B32_SINT | direct: MTLVertexFormatInt3 | direct: sint32x3 |
-| `mrhi_vertexSint32x4` | direct: VK_FORMAT_R32G32B32A32_SINT | direct: DXGI_FORMAT_R32G32B32A32_SINT | direct: MTLVertexFormatInt4 | direct: sint32x4 |
-| `mrhi_vertexUnorm1010102` | direct: VK_FORMAT_A2B10G10R10_UNORM_PACK32 | direct: DXGI_FORMAT_R10G10B10A2_UNORM | direct: MTLVertexFormatUInt1010102Normalized | direct: unorm10-10-10-2 |
-
 ## mrhiScalarType
 
 | Value | Vulkan | D3D12 | Metal | WebGPU |
@@ -523,3 +487,138 @@ restricted or absent-rejected, with how.
 | `mrhi_constantInt32` | direct: OpSpecConstant | emulated: a variant or root constant | direct: a function constant | direct: override i32 |
 | `mrhi_constantUint32` | direct: OpSpecConstant | emulated: a variant or root constant | direct: a function constant | direct: override u32 |
 | `mrhi_constantFloat32` | direct: OpSpecConstant | emulated: a variant or root constant | direct: a function constant | direct: override f32 |
+
+## mrhiVertexFormat
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_vertexUint8` | direct: R8_UINT | direct: DXGI_FORMAT_R8_UINT | direct: MTLVertexFormatUChar | direct: uint8 |
+| `mrhi_vertexUint8x2` | direct: R8G8_UINT | direct: DXGI_FORMAT_R8G8_UINT | direct: MTLVertexFormatUChar2 | direct: uint8x2 |
+| `mrhi_vertexUint8x4` | direct: R8G8B8A8_UINT | direct: DXGI_FORMAT_R8G8B8A8_UINT | direct: MTLVertexFormatUChar4 | direct: uint8x4 |
+| `mrhi_vertexSint8` | direct: R8_SINT | direct: DXGI_FORMAT_R8_SINT | direct: MTLVertexFormatChar | direct: sint8 |
+| `mrhi_vertexSint8x2` | direct: R8G8_SINT | direct: DXGI_FORMAT_R8G8_SINT | direct: MTLVertexFormatChar2 | direct: sint8x2 |
+| `mrhi_vertexSint8x4` | direct: R8G8B8A8_SINT | direct: DXGI_FORMAT_R8G8B8A8_SINT | direct: MTLVertexFormatChar4 | direct: sint8x4 |
+| `mrhi_vertexUnorm8` | direct: R8_UNORM | direct: DXGI_FORMAT_R8_UNORM | direct: MTLVertexFormatUCharNormalized | direct: unorm8 |
+| `mrhi_vertexUnorm8x2` | direct: R8G8_UNORM | direct: DXGI_FORMAT_R8G8_UNORM | direct: MTLVertexFormatUChar2Normalized | direct: unorm8x2 |
+| `mrhi_vertexUnorm8x4` | direct: R8G8B8A8_UNORM | direct: DXGI_FORMAT_R8G8B8A8_UNORM | direct: MTLVertexFormatUChar4Normalized | direct: unorm8x4 |
+| `mrhi_vertexSnorm8` | direct: R8_SNORM | direct: DXGI_FORMAT_R8_SNORM | direct: MTLVertexFormatCharNormalized | direct: snorm8 |
+| `mrhi_vertexSnorm8x2` | direct: R8G8_SNORM | direct: DXGI_FORMAT_R8G8_SNORM | direct: MTLVertexFormatChar2Normalized | direct: snorm8x2 |
+| `mrhi_vertexSnorm8x4` | direct: R8G8B8A8_SNORM | direct: DXGI_FORMAT_R8G8B8A8_SNORM | direct: MTLVertexFormatChar4Normalized | direct: snorm8x4 |
+| `mrhi_vertexUint16` | direct: R16_UINT | direct: DXGI_FORMAT_R16_UINT | direct: MTLVertexFormatUShort | direct: uint16 |
+| `mrhi_vertexUint16x2` | direct: R16G16_UINT | direct: DXGI_FORMAT_R16G16_UINT | direct: MTLVertexFormatUShort2 | direct: uint16x2 |
+| `mrhi_vertexUint16x4` | direct: R16G16B16A16_UINT | direct: DXGI_FORMAT_R16G16B16A16_UINT | direct: MTLVertexFormatUShort4 | direct: uint16x4 |
+| `mrhi_vertexSint16` | direct: R16_SINT | direct: DXGI_FORMAT_R16_SINT | direct: MTLVertexFormatShort | direct: sint16 |
+| `mrhi_vertexSint16x2` | direct: R16G16_SINT | direct: DXGI_FORMAT_R16G16_SINT | direct: MTLVertexFormatShort2 | direct: sint16x2 |
+| `mrhi_vertexSint16x4` | direct: R16G16B16A16_SINT | direct: DXGI_FORMAT_R16G16B16A16_SINT | direct: MTLVertexFormatShort4 | direct: sint16x4 |
+| `mrhi_vertexUnorm16` | direct: R16_UNORM | direct: DXGI_FORMAT_R16_UNORM | direct: MTLVertexFormatUShortNormalized | direct: unorm16 |
+| `mrhi_vertexUnorm16x2` | direct: R16G16_UNORM | direct: DXGI_FORMAT_R16G16_UNORM | direct: MTLVertexFormatUShort2Normalized | direct: unorm16x2 |
+| `mrhi_vertexUnorm16x4` | direct: R16G16B16A16_UNORM | direct: DXGI_FORMAT_R16G16B16A16_UNORM | direct: MTLVertexFormatUShort4Normalized | direct: unorm16x4 |
+| `mrhi_vertexSnorm16` | direct: R16_SNORM | direct: DXGI_FORMAT_R16_SNORM | direct: MTLVertexFormatShortNormalized | direct: snorm16 |
+| `mrhi_vertexSnorm16x2` | direct: R16G16_SNORM | direct: DXGI_FORMAT_R16G16_SNORM | direct: MTLVertexFormatShort2Normalized | direct: snorm16x2 |
+| `mrhi_vertexSnorm16x4` | direct: R16G16B16A16_SNORM | direct: DXGI_FORMAT_R16G16B16A16_SNORM | direct: MTLVertexFormatShort4Normalized | direct: snorm16x4 |
+| `mrhi_vertexFloat16` | direct: R16_SFLOAT | direct: DXGI_FORMAT_R16_FLOAT | direct: MTLVertexFormatHalf | direct: float16 |
+| `mrhi_vertexFloat16x2` | direct: R16G16_SFLOAT | direct: DXGI_FORMAT_R16G16_FLOAT | direct: MTLVertexFormatHalf2 | direct: float16x2 |
+| `mrhi_vertexFloat16x4` | direct: R16G16B16A16_SFLOAT | direct: DXGI_FORMAT_R16G16B16A16_FLOAT | direct: MTLVertexFormatHalf4 | direct: float16x4 |
+| `mrhi_vertexFloat32` | direct: R32_SFLOAT | direct: DXGI_FORMAT_R32_FLOAT | direct: MTLVertexFormatFloat | direct: float32 |
+| `mrhi_vertexFloat32x2` | direct: R32G32_SFLOAT | direct: DXGI_FORMAT_R32G32_FLOAT | direct: MTLVertexFormatFloat2 | direct: float32x2 |
+| `mrhi_vertexFloat32x3` | direct: R32G32B32_SFLOAT | direct: DXGI_FORMAT_R32G32B32_FLOAT | direct: MTLVertexFormatFloat3 | direct: float32x3 |
+| `mrhi_vertexFloat32x4` | direct: R32G32B32A32_SFLOAT | direct: DXGI_FORMAT_R32G32B32A32_FLOAT | direct: MTLVertexFormatFloat4 | direct: float32x4 |
+| `mrhi_vertexUint32` | direct: R32_UINT | direct: DXGI_FORMAT_R32_UINT | direct: MTLVertexFormatUInt | direct: uint32 |
+| `mrhi_vertexUint32x2` | direct: R32G32_UINT | direct: DXGI_FORMAT_R32G32_UINT | direct: MTLVertexFormatUInt2 | direct: uint32x2 |
+| `mrhi_vertexUint32x3` | direct: R32G32B32_UINT | direct: DXGI_FORMAT_R32G32B32_UINT | direct: MTLVertexFormatUInt3 | direct: uint32x3 |
+| `mrhi_vertexUint32x4` | direct: R32G32B32A32_UINT | direct: DXGI_FORMAT_R32G32B32A32_UINT | direct: MTLVertexFormatUInt4 | direct: uint32x4 |
+| `mrhi_vertexSint32` | direct: R32_SINT | direct: DXGI_FORMAT_R32_SINT | direct: MTLVertexFormatInt | direct: sint32 |
+| `mrhi_vertexSint32x2` | direct: R32G32_SINT | direct: DXGI_FORMAT_R32G32_SINT | direct: MTLVertexFormatInt2 | direct: sint32x2 |
+| `mrhi_vertexSint32x3` | direct: R32G32B32_SINT | direct: DXGI_FORMAT_R32G32B32_SINT | direct: MTLVertexFormatInt3 | direct: sint32x3 |
+| `mrhi_vertexSint32x4` | direct: R32G32B32A32_SINT | direct: DXGI_FORMAT_R32G32B32A32_SINT | direct: MTLVertexFormatInt4 | direct: sint32x4 |
+| `mrhi_vertexUnorm1010102` | direct: A2B10G10R10_UNORM_PACK32 | direct: DXGI_FORMAT_R10G10B10A2_UNORM | direct: MTLVertexFormatUInt1010102Normalized | direct: unorm10-10-10-2 |
+| `mrhi_vertexUnorm8x4Bgra` | direct: B8G8R8A8_UNORM | direct: DXGI_FORMAT_B8G8R8A8_UNORM | direct: MTLVertexFormatUChar4Normalized_BGRA | direct: unorm8x4-bgra |
+
+## mrhiVertexStepMode
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_stepVertex` | direct: VK_VERTEX_INPUT_RATE_VERTEX | direct: D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA | direct: MTLVertexStepFunctionPerVertex | direct: vertex |
+| `mrhi_stepInstance` | direct: VK_VERTEX_INPUT_RATE_INSTANCE | direct: D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA with a step rate of 1 | direct: MTLVertexStepFunctionPerInstance | direct: instance |
+
+## mrhiPrimitiveTopology
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_topologyPointList` | direct: POINT_LIST | direct: D3D_PRIMITIVE_TOPOLOGY_POINTLIST | direct: MTLPrimitiveTypePoint | direct: point-list |
+| `mrhi_topologyLineList` | direct: LINE_LIST | direct: D3D_PRIMITIVE_TOPOLOGY_LINELIST | direct: MTLPrimitiveTypeLine | direct: line-list |
+| `mrhi_topologyLineStrip` | direct: LINE_STRIP | direct: D3D_PRIMITIVE_TOPOLOGY_LINESTRIP | direct: MTLPrimitiveTypeLineStrip | direct: line-strip |
+| `mrhi_topologyTriangleList` | direct: TRIANGLE_LIST | direct: D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST | direct: MTLPrimitiveTypeTriangle | direct: triangle-list |
+| `mrhi_topologyTriangleStrip` | direct: TRIANGLE_STRIP | direct: D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP | direct: MTLPrimitiveTypeTriangleStrip | direct: triangle-strip |
+
+## mrhiIndexFormat
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_indexUint16` | direct: VK_INDEX_TYPE_UINT16 | direct: DXGI_FORMAT_R16_UINT | direct: MTLIndexTypeUInt16 | direct: uint16 |
+| `mrhi_indexUint32` | direct: VK_INDEX_TYPE_UINT32 | direct: DXGI_FORMAT_R32_UINT | direct: MTLIndexTypeUInt32 | direct: uint32 |
+
+## mrhiFrontFace
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_frontCounterClockwise` | direct: VK_FRONT_FACE_COUNTER_CLOCKWISE | direct: FrontCounterClockwise TRUE | direct: MTLWindingCounterClockwise | direct: ccw |
+| `mrhi_frontClockwise` | direct: VK_FRONT_FACE_CLOCKWISE | direct: FrontCounterClockwise FALSE | direct: MTLWindingClockwise | direct: cw |
+
+## mrhiCullMode
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_cullNone` | direct: VK_CULL_MODE_NONE | direct: D3D12_CULL_MODE_NONE | direct: MTLCullModeNone | direct: none |
+| `mrhi_cullFront` | direct: VK_CULL_MODE_FRONT_BIT | direct: D3D12_CULL_MODE_FRONT | direct: MTLCullModeFront | direct: front |
+| `mrhi_cullBack` | direct: VK_CULL_MODE_BACK_BIT | direct: D3D12_CULL_MODE_BACK | direct: MTLCullModeBack | direct: back |
+
+## mrhiStencilOperation
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_stencilKeep` | direct: KEEP | direct: D3D12_STENCIL_OP_KEEP | direct: MTLStencilOperationKeep | direct: keep |
+| `mrhi_stencilZero` | direct: ZERO | direct: D3D12_STENCIL_OP_ZERO | direct: MTLStencilOperationZero | direct: zero |
+| `mrhi_stencilReplace` | direct: REPLACE | direct: D3D12_STENCIL_OP_REPLACE | direct: MTLStencilOperationReplace | direct: replace |
+| `mrhi_stencilInvert` | direct: INVERT | direct: D3D12_STENCIL_OP_INVERT | direct: MTLStencilOperationInvert | direct: invert |
+| `mrhi_stencilIncrementClamp` | direct: INCREMENT_AND_CLAMP | direct: D3D12_STENCIL_OP_INCR_SAT | direct: MTLStencilOperationIncrementClamp | direct: increment-clamp |
+| `mrhi_stencilDecrementClamp` | direct: DECREMENT_AND_CLAMP | direct: D3D12_STENCIL_OP_DECR_SAT | direct: MTLStencilOperationDecrementClamp | direct: decrement-clamp |
+| `mrhi_stencilIncrementWrap` | direct: INCREMENT_AND_WRAP | direct: D3D12_STENCIL_OP_INCR | direct: MTLStencilOperationIncrementWrap | direct: increment-wrap |
+| `mrhi_stencilDecrementWrap` | direct: DECREMENT_AND_WRAP | direct: D3D12_STENCIL_OP_DECR | direct: MTLStencilOperationDecrementWrap | direct: decrement-wrap |
+
+## mrhiBlendFactor
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_blendZero` | direct: ZERO | direct: D3D12_BLEND_ZERO | direct: MTLBlendFactorZero | direct: zero |
+| `mrhi_blendOne` | direct: ONE | direct: D3D12_BLEND_ONE | direct: MTLBlendFactorOne | direct: one |
+| `mrhi_blendSrc` | direct: SRC_COLOR | direct: D3D12_BLEND_SRC_COLOR | direct: MTLBlendFactorSourceColor | direct: src |
+| `mrhi_blendOneMinusSrc` | direct: ONE_MINUS_SRC_COLOR | direct: D3D12_BLEND_INV_SRC_COLOR | direct: MTLBlendFactorOneMinusSourceColor | direct: one-minus-src |
+| `mrhi_blendSrcAlpha` | direct: SRC_ALPHA | direct: D3D12_BLEND_SRC_ALPHA | direct: MTLBlendFactorSourceAlpha | direct: src-alpha |
+| `mrhi_blendOneMinusSrcAlpha` | direct: ONE_MINUS_SRC_ALPHA | direct: D3D12_BLEND_INV_SRC_ALPHA | direct: MTLBlendFactorOneMinusSourceAlpha | direct: one-minus-src-alpha |
+| `mrhi_blendDst` | direct: DST_COLOR | direct: D3D12_BLEND_DEST_COLOR | direct: MTLBlendFactorDestinationColor | direct: dst |
+| `mrhi_blendOneMinusDst` | direct: ONE_MINUS_DST_COLOR | direct: D3D12_BLEND_INV_DEST_COLOR | direct: MTLBlendFactorOneMinusDestinationColor | direct: one-minus-dst |
+| `mrhi_blendDstAlpha` | direct: DST_ALPHA | direct: D3D12_BLEND_DEST_ALPHA | direct: MTLBlendFactorDestinationAlpha | direct: dst-alpha |
+| `mrhi_blendOneMinusDstAlpha` | direct: ONE_MINUS_DST_ALPHA | direct: D3D12_BLEND_INV_DEST_ALPHA | direct: MTLBlendFactorOneMinusDestinationAlpha | direct: one-minus-dst-alpha |
+| `mrhi_blendSrcAlphaSaturated` | direct: SRC_ALPHA_SATURATE | direct: D3D12_BLEND_SRC_ALPHA_SAT | direct: MTLBlendFactorSourceAlphaSaturated | direct: src-alpha-saturated |
+| `mrhi_blendConstant` | direct: CONSTANT_COLOR | direct: D3D12_BLEND_BLEND_FACTOR | direct: MTLBlendFactorBlendColor | direct: constant |
+| `mrhi_blendOneMinusConstant` | direct: ONE_MINUS_CONSTANT_COLOR | direct: D3D12_BLEND_INV_BLEND_FACTOR | direct: MTLBlendFactorOneMinusBlendColor | direct: one-minus-constant |
+
+## mrhiBlendOperation
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_blendAdd` | direct: VK_BLEND_OP_ADD | direct: D3D12_BLEND_OP_ADD | direct: MTLBlendOperationAdd | direct: add |
+| `mrhi_blendSubtract` | direct: VK_BLEND_OP_SUBTRACT | direct: D3D12_BLEND_OP_SUBTRACT | direct: MTLBlendOperationSubtract | direct: subtract |
+| `mrhi_blendReverseSubtract` | direct: VK_BLEND_OP_REVERSE_SUBTRACT | direct: D3D12_BLEND_OP_REV_SUBTRACT | direct: MTLBlendOperationReverseSubtract | direct: reverse-subtract |
+| `mrhi_blendMin` | direct: VK_BLEND_OP_MIN | direct: D3D12_BLEND_OP_MIN | direct: MTLBlendOperationMin | direct: min |
+| `mrhi_blendMax` | direct: VK_BLEND_OP_MAX | direct: D3D12_BLEND_OP_MAX | direct: MTLBlendOperationMax | direct: max |
+
+## mrhiColorWrites
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_writeRed` | direct: VK_COLOR_COMPONENT_R_BIT | direct: D3D12_COLOR_WRITE_ENABLE_RED | direct: MTLColorWriteMaskRed | direct: RED |
+| `mrhi_writeGreen` | direct: VK_COLOR_COMPONENT_G_BIT | direct: D3D12_COLOR_WRITE_ENABLE_GREEN | direct: MTLColorWriteMaskGreen | direct: GREEN |
+| `mrhi_writeBlue` | direct: VK_COLOR_COMPONENT_B_BIT | direct: D3D12_COLOR_WRITE_ENABLE_BLUE | direct: MTLColorWriteMaskBlue | direct: BLUE |
+| `mrhi_writeAlpha` | direct: VK_COLOR_COMPONENT_A_BIT | direct: D3D12_COLOR_WRITE_ENABLE_ALPHA | direct: MTLColorWriteMaskAlpha | direct: ALPHA |

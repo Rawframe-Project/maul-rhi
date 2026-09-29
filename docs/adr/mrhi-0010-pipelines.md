@@ -36,8 +36,16 @@ made.
   range, or a finite float within 32-bit range. Every constant without
   a default is set, each at most once.
 - **Checks:** everything the reflection allows to be checked is checked
-  before the driver sees the pipeline; a def naming anything the shader
-  lacks is invalid.
+  before the driver sees the pipeline, by WebGPU's rules for compute and
+  render pipelines; a def that contradicts itself, the shader or those
+  rules is invalid, and one the device cannot do is unsupported.
+- **Graphics defs** carry every state of WebGPU's render pipeline
+  descriptor. Vertex buffers and attributes are arrays with counts, so
+  no fixed array caps an adapter's limits; depth and stencil state sits
+  in the def with `mrhi_formatNone` for none, and a field for an aspect
+  the format lacks must keep its default, so a forgotten format is
+  refused rather than ignored. Sample counts are 1 or a power of two
+  every target format takes on the device.
 
 ## Consequences
 

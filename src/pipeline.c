@@ -5,8 +5,8 @@
 // started in the driver with a tag that carries their slot, and answered
 // in the device's queue, whose room each creation reserves.
 
-#include "device_core.h"
 #include "invariant.h"
+#include "pipeline_core.h"
 
 #include <float.h>
 
@@ -48,11 +48,8 @@ static uint32_t FindConstant(const mrhiReflection* reflection, uint32_t id)
     return i;
 }
 
-// Whether a pipeline's constant values suit its reflection: each id
-// known, given once, with a value its type holds, and every constant
-// without a default given.
-static bool AreConstantsValid(const mrhiReflection* reflection, const mrhiConstantValue* values,
-                              uint32_t count)
+bool mrhiAreConstantsValid(const mrhiReflection* reflection, const mrhiConstantValue* values,
+                           uint32_t count)
 {
     if (count > reflection->constantCount || (values == nullptr && count > 0))
     {
@@ -89,10 +86,9 @@ static bool AreConstantsValid(const mrhiReflection* reflection, const mrhiConsta
     return true;
 }
 
-// Takes a pipeline slot for a checked def, holding the reflection:
-// success with the slot, or mrhi_errorCapacity.
-static mrhiResult TakeSlot(mrhiDevice* device, mrhiPipelineKind kind, mrhiReflection* reflection,
-                           uint32_t* index1Out, uint32_t* generationOut)
+mrhiResult mrhiTakePipelineSlot(mrhiDevice* device, mrhiPipelineKind kind,
+                                mrhiReflection* reflection, uint32_t* index1Out,
+                                uint32_t* generationOut)
 {
     if (!mrhiHasAnswerRoom(device) ||
         !mrhiPoolAcquire(&device->pipelines, index1Out, generationOut))
@@ -109,8 +105,7 @@ static mrhiResult TakeSlot(mrhiDevice* device, mrhiPipelineKind kind, mrhiReflec
     return mrhi_success;
 }
 
-// Frees a pipeline slot and its hold on the reflection.
-static void FreeSlot(mrhiDevice* device, uint32_t index1)
+void mrhiFreePipelineSlot(mrhiDevice* device, uint32_t index1)
 {
     mrhiPipelineSlot* slot = &device->pipelineSlots[index1 - 1];
     mrhiReleaseReflection(&device->allocator, slot->reflection);
@@ -118,26 +113,22 @@ static void FreeSlot(mrhiDevice* device, uint32_t index1)
     mrhiPoolRelease(&device->pipelines, index1);
 }
 
-// Gives a started pipeline its request: counted pending, its room kept.
-static mrhiRequestId Start(mrhiDevice* device, uint32_t index1)
+mrhiRequestId mrhiStartPipeline(mrhiDevice* device, uint32_t index1)
 {
     ++device->pendingCount;
     device->lastRequest = device->pipelineSlots[index1 - 1].request;
     return (mrhiRequestId){device->lastRequest, 1};
 }
 
-// The driver tag of a pipeline slot's creation.
-static uint64_t TagOf(const mrhiDevice* device, uint32_t index1)
+uint64_t mrhiPipelineTag(const mrhiDevice* device, uint32_t index1)
 {
     return (uint64_t)index1 << 32 | device->pipelineSlots[index1 - 1].request;
 }
 
-// Checks a compute pipeline def: the shader, with the entry's index, or
-// NULL with the refusal, invalid input counted as misuse.
-static mrhiShaderSlot* CheckComputeDef(mrhiDevice* device, const mrhiComputePipelineDef* def,
-                                       uint32_t* entryOut, mrhiResult* statusOut)
+mrhiShaderSlot* mrhiCheckPipelineHead(mrhiDevice* device, mrhiDefHead head, uint32_t cookie,
+                                      mrhiShaderId shader, mrhiResult* statusOut)
 {
-    *statusOut = mrhiCheckObjectDef(device, MRHI_DEF_HEAD(def), COMPUTE_PIPELINE_DEF_COOKIE);
+    *statusOut = mrhiCheckObjectDef(device, head, cookie);
     if (*statusOut == mrhi_success)
     {
         *statusOut = mrhiDeviceUsable(device);
@@ -146,18 +137,31 @@ static mrhiShaderSlot* CheckComputeDef(mrhiDevice* device, const mrhiComputePipe
     {
         return nullptr;
     }
-    if (!mrhiPoolIsLive(&device->shaders, def->shader.index1, def->shader.generation))
+    if (!mrhiPoolIsLive(&device->shaders, shader.index1, shader.generation))
     {
         *statusOut = mrhi_errorStale;
         return nullptr;
     }
-    mrhiShaderSlot* shader = &device->shaderSlots[def->shader.index1 - 1];
+    return &device->shaderSlots[shader.index1 - 1];
+}
+
+// Checks a compute pipeline def: the shader, with the entry's index, or
+// NULL with the refusal, invalid input counted as misuse.
+static mrhiShaderSlot* CheckComputeDef(mrhiDevice* device, const mrhiComputePipelineDef* def,
+                                       uint32_t* entryOut, mrhiResult* statusOut)
+{
+    mrhiShaderSlot* shader = mrhiCheckPipelineHead(
+        device, MRHI_DEF_HEAD(def), COMPUTE_PIPELINE_DEF_COOKIE, def->shader, statusOut);
+    if (shader == nullptr)
+    {
+        return nullptr;
+    }
     const mrhiReflection* reflection = shader->reflection;
     *entryOut = def->entry == nullptr
                     ? reflection->entryCount
                     : mrhiFindEntry(reflection, def->entry, def->entryLength, mrhi_stageCompute);
     if (*entryOut == reflection->entryCount ||
-        !AreConstantsValid(reflection, def->constants, def->constantCount))
+        !mrhiAreConstantsValid(reflection, def->constants, def->constantCount))
     {
         *statusOut = mrhiDeviceMisuse(device);
         return nullptr;
@@ -185,7 +189,8 @@ mrhiResult mrhiCreateComputePipeline(mrhiDevice* device, const mrhiComputePipeli
     }
     uint32_t index1 = 0;
     uint32_t generation = 0;
-    status = TakeSlot(device, mrhiPipelineCompute, shader->reflection, &index1, &generation);
+    status =
+        mrhiTakePipelineSlot(device, mrhiPipelineCompute, shader->reflection, &index1, &generation);
     if (status != mrhi_success)
     {
         return status;
@@ -201,22 +206,20 @@ mrhiResult mrhiCreateComputePipeline(mrhiDevice* device, const mrhiComputePipeli
         .constants = def->constants,
         .constantCount = def->constantCount,
     };
-    status = device->driver.vtable->createComputePipeline(device->driver.self, &pipeline,
-                                                          TagOf(device, index1), &slot->handle);
+    status = device->driver.vtable->createComputePipeline(
+        device->driver.self, &pipeline, mrhiPipelineTag(device, index1), &slot->handle);
     if (status != mrhi_success)
     {
-        FreeSlot(device, index1);
+        mrhiFreePipelineSlot(device, index1);
         return status;
     }
     *pipelineOut = (mrhiComputePipelineId){index1, generation};
-    *requestOut = Start(device, index1);
+    *requestOut = mrhiStartPipeline(device, index1);
     return mrhi_success;
 }
 
-// Destroys a live pipeline of a kind: its pending request answered
-// stale, its driver object and its slot.
-static mrhiResult Destroy(mrhiDevice* device, mrhiPipelineKind kind, uint32_t index1,
-                          uint32_t generation)
+mrhiResult mrhiDestroyPipeline(mrhiDevice* device, mrhiPipelineKind kind, uint32_t index1,
+                               uint32_t generation)
 {
     if (!mrhiPoolIsLive(&device->pipelines, index1, generation) ||
         device->pipelineSlots[index1 - 1].kind != kind)
@@ -230,7 +233,7 @@ static mrhiResult Destroy(mrhiDevice* device, mrhiPipelineKind kind, uint32_t in
         mrhiQueueAnswer(device, mrhi_devicePipelineReady, slot->request, mrhi_errorStale);
     }
     device->driver.vtable->destroyPipeline(device->driver.self, slot->handle);
-    FreeSlot(device, index1);
+    mrhiFreePipelineSlot(device, index1);
     return mrhi_success;
 }
 
@@ -240,7 +243,7 @@ mrhiResult mrhiDestroyComputePipeline(mrhiDevice* device, mrhiComputePipelineId 
     {
         return mrhi_errorInvalid;
     }
-    return Destroy(device, mrhiPipelineCompute, pipeline.index1, pipeline.generation);
+    return mrhiDestroyPipeline(device, mrhiPipelineCompute, pipeline.index1, pipeline.generation);
 }
 
 void mrhiFinishPipeline(mrhiDevice* device, uint64_t tag, mrhiResult outcome)

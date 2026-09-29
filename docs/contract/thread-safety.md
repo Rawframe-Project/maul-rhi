@@ -68,6 +68,9 @@ edit the contract, not this file.
 | `mrhiCreateShader` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDestroyShader` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiGetShaderInfo` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDefaultGraphicsPipelineDef` | Safe from any thread. |
+| `mrhiCreateGraphicsPipeline` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDestroyGraphicsPipeline` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDefaultComputePipelineDef` | Safe from any thread. |
 | `mrhiCreateComputePipeline` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDestroyComputePipeline` | Safe from any thread; the device is used by one thread at a time. |

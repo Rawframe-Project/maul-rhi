@@ -7,7 +7,7 @@
 #ifndef MAUL_RHI_SRC_CAPABILITIES_CORE_H
 #define MAUL_RHI_SRC_CAPABILITIES_CORE_H
 
-#include "maul-rhi/shader.h"
+#include "maul-rhi/pipeline.h"
 
 // Whether every feature asked for is granted.
 bool mrhiFeaturesWithin(const mrhiFeatures* asked, const mrhiFeatures* granted);
@@ -34,6 +34,30 @@ mrhiFormatCaps mrhiFloorFormatCaps(mrhiFormat format);
 // Whether the feature a format's family needs is granted; true for a
 // format without a family.
 bool mrhiFormatFamilyGranted(mrhiFormat format, const mrhiFeatures* features);
+
+// What a color format is as a render target: its channels, the scalar
+// type of the outputs that write it, and its bytes per sample and their
+// alignment toward the color bytes limit. All zero for other formats.
+typedef struct mrhiFormatTarget
+{
+    uint8_t channels;
+    mrhiScalarType scalar;
+    uint8_t bytes;
+    uint8_t alignment;
+} mrhiFormatTarget;
+
+mrhiFormatTarget mrhiGetFormatTarget(mrhiFormat format);
+
+// What a vertex format feeds: the scalar type of the inputs it suits,
+// its components, and its bytes. All zero for no format.
+typedef struct mrhiVertexLayout
+{
+    mrhiScalarType scalar;
+    uint8_t components;
+    uint8_t bytes;
+} mrhiVertexLayout;
+
+mrhiVertexLayout mrhiGetVertexLayout(mrhiVertexFormat format);
 
 // A format's block in texels: 1 by 1 but for the compressed families.
 typedef struct mrhiFormatBlock
@@ -65,5 +89,6 @@ extern const mrhiPresentModes mrhiPresentModesKnown;
 extern const mrhiAlphaModes mrhiAlphaModesKnown;
 extern const mrhiShaderStages mrhiShaderStagesKnown;
 extern const mrhiShaderBuiltins mrhiShaderBuiltinsKnown;
+extern const mrhiColorWrites mrhiColorWritesKnown;
 
 #endif // MAUL_RHI_SRC_CAPABILITIES_CORE_H
