@@ -95,6 +95,14 @@ extern "C"
         uint32_t nameLength;
     } mrhiAdapterInfo;
 
+    // A surface of an instance: a window's drawable area, for one generation of
+    // the window's surface.
+    typedef struct mrhiSurfaceId
+    {
+        uint32_t index1;
+        uint32_t generation;
+    } mrhiSurfaceId;
+
     // Which adapters a request looks for. Build it with
     // mrhiDefaultAdapterRequestDef.
     typedef struct mrhiAdapterRequestDef
@@ -105,6 +113,8 @@ extern "C"
         mrhiPowerPreference preference;
         // Whether software rasterizers may answer.
         bool allowSoftware;
+        // A surface every adapter found must present to, or a null id for none.
+        mrhiSurfaceId compatibleSurface;
     } mrhiAdapterRequestDef;
 
     // What an instance notification reports.
@@ -113,7 +123,8 @@ extern "C"
     enum
     {
         // An adapter request is answered: its outcome is mrhi_success, and
-        // mrhiGetAdapters lists the adapters, or an error.
+        // mrhiGetAdapters lists the adapters, mrhi_errorStale when its
+        // compatible surface ended before the answer, or another error.
         mrhi_instanceAdaptersFound = 0,
         // A device finished opening: its outcome is mrhi_success and the device
         // is ready, or an error and the device failed. A device destroyed while
@@ -140,6 +151,8 @@ extern "C"
         uint32_t notifications;
         // Adapters the instance keeps; 16 by default.
         uint32_t adapters;
+        // Surfaces the instance holds at once; 16 by default.
+        uint32_t surfaces;
     } mrhiInstanceLimits;
 
     // How an instance is made. Build it with mrhiDefaultInstanceDef.
@@ -213,7 +226,8 @@ extern "C"
     /// @param def         The adapters to look for.
     /// @param requestOut  Receives the request's id.
     /// @return `mrhi_success` with the request accepted; `mrhi_errorInvalid`
-    /// for a NULL argument or a def without its cookie; `mrhi_errorUnsupported`
+    /// for a NULL argument or a def without its cookie; `mrhi_errorStale` for a
+    /// compatible surface the instance no longer has; `mrhi_errorUnsupported`
     /// for a critical extension the library does not know; `mrhi_errorCapacity`
     /// when the notification queue has no room for the answer.
     /// @par Thread safety

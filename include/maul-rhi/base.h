@@ -114,6 +114,21 @@ extern "C"
         mrhi_structNone = 0,
         // mrhiTestDriverDef, on an instance def: turns the test driver on.
         mrhi_structTestDriver = 1,
+        // mrhiSurfaceSourceWin32, on a surface def.
+        mrhi_structSurfaceSourceWin32 = 2,
+        // mrhiSurfaceSourceWayland, on a surface def.
+        mrhi_structSurfaceSourceWayland = 3,
+        // mrhiSurfaceSourceXcb, on a surface def.
+        mrhi_structSurfaceSourceXcb = 4,
+        // mrhiSurfaceSourceAndroid, on a surface def.
+        mrhi_structSurfaceSourceAndroid = 5,
+        // mrhiSurfaceSourceMetalLayer, on a surface def.
+        mrhi_structSurfaceSourceMetalLayer = 6,
+        // mrhiSurfaceSourceCanvas, on a surface def.
+        mrhi_structSurfaceSourceCanvas = 7,
+        // mrhiSurfaceSourceTest, on a surface def: a surface of the test
+        // driver.
+        mrhi_structSurfaceSourceTest = 8,
     };
 
     // The header every chained struct opens with. A def's next field, or a

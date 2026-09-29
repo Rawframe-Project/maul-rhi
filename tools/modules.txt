@@ -10,7 +10,7 @@ device_core: capabilities_core driver pool
 driver:
 driver_test: allocator capabilities_core driver invariant
 instance: allocator chain driver driver_test instance_core invariant
-instance_core: driver
+instance_core: driver pool
 invariant:
 label:
 notify: instance_core
@@ -18,3 +18,4 @@ pool:
 resources: capabilities_core device_core
 texture: capabilities_core device_core
 view: capabilities_core device_core
+surface: chain instance_core invariant label

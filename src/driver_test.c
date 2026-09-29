@@ -13,6 +13,18 @@
 #include <stdalign.h>
 #include <string.h>
 
+// The surfaces a test driver holds at once; making more fails as the
+// platform's capacity.
+#define TEST_SURFACES 16
+
+// A test surface slot.
+typedef struct TestSurface
+{
+    bool used;
+    mrhiSurfaceCaps caps;
+    uint32_t presentingAdapters;
+} TestSurface;
+
 typedef struct TestDriver
 {
     mrhiAllocator allocator;
@@ -22,7 +34,78 @@ typedef struct TestDriver
     mrhiDriverEvent* pending;
     uint32_t pendingCount;
     uint32_t pendingLimit;
+    // Surfaces not destroyed yet: the core destroys each before the
+    // driver. A surface's handle is its slot's index plus one.
+    TestSurface surfaces[TEST_SURFACES];
+    uint32_t surfaceCount;
 } TestDriver;
+
+static mrhiResult CreateSurface(void* self, const mrhiChain* source, const mrhiSurfaceDef* def,
+                                uint64_t* handleOut)
+{
+    (void)def;
+    TestDriver* driver = self;
+    if (source->type != mrhi_structSurfaceSourceTest)
+    {
+        return mrhi_errorUnsupported;
+    }
+    const mrhiSurfaceSourceTest* test = (const mrhiSurfaceSourceTest*)source;
+    if (test->fail)
+    {
+        return mrhi_errorPlatform;
+    }
+    uint32_t slot = 0;
+    while (slot < TEST_SURFACES && driver->surfaces[slot].used)
+    {
+        ++slot;
+    }
+    if (slot == TEST_SURFACES)
+    {
+        return mrhi_errorCapacity;
+    }
+    driver->surfaces[slot] = (TestSurface){
+        .used = true,
+        .caps = test->caps,
+        .presentingAdapters = test->presentingAdapters,
+    };
+    ++driver->surfaceCount;
+    *handleOut = slot + 1;
+    return mrhi_success;
+}
+
+static void DestroySurface(void* self, uint64_t handle)
+{
+    TestDriver* driver = self;
+    MRHI_ASSERT(handle != 0 && handle <= TEST_SURFACES && driver->surfaces[handle - 1].used);
+    driver->surfaces[handle - 1].used = false;
+    --driver->surfaceCount;
+}
+
+// The surface's caps with the floors added, on the adapters that
+// present to it.
+static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
+                           mrhiSurfaceCaps* capsOut)
+{
+    const TestDriver* driver = self;
+    MRHI_ASSERT(surface != 0 && surface <= TEST_SURFACES && driver->surfaces[surface - 1].used);
+    const TestSurface* described = &driver->surfaces[surface - 1];
+    if (adapter > 32 || (described->presentingAdapters & (1u << (adapter - 1))) == 0)
+    {
+        *capsOut = (mrhiSurfaceCaps){0};
+        return;
+    }
+    mrhiSurfaceCaps caps = described->caps;
+    caps.presentable = true;
+    if (caps.colorCount == 0 || caps.colorCount > MRHI_SURFACE_COLORS)
+    {
+        caps.colorCount = 1;
+        caps.colors[0] = (mrhiSurfaceColor){.format = mrhi_formatBgra8Unorm};
+    }
+    caps.presentModes |= mrhi_presentFifo;
+    caps.alphaModes |= mrhi_alphaOpaque;
+    caps.usages |= mrhi_textureRenderTarget;
+    *capsOut = caps;
+}
 
 static mrhiResult RequestAdapters(void* self, uint64_t tag)
 {
@@ -284,6 +367,7 @@ static void GetFormatCaps(const void* self, uint64_t adapter, mrhiFormat format,
 static void Destroy(void* self)
 {
     TestDriver* driver = self;
+    MRHI_ASSERT(driver->surfaceCount == 0);
     mrhiAllocator allocator = driver->allocator;
     mrhiRelease(&allocator, driver, driver->bytes, alignof(TestDriver));
 }
@@ -295,6 +379,9 @@ static const mrhiInstanceDriverVtable s_vtable = {
     .poll = Poll,
     .getAdapters = GetAdapters,
     .getFormatCaps = GetFormatCaps,
+    .createSurface = CreateSurface,
+    .destroySurface = DestroySurface,
+    .getSurfaceCaps = GetSurfaceCaps,
     .createDevice = CreateDevice,
     .destroy = Destroy,
 };

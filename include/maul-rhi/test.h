@@ -10,7 +10,7 @@
 #ifndef MAUL_RHI_TEST_H
 #define MAUL_RHI_TEST_H
 
-#include "maul-rhi/device.h"
+#include "maul-rhi/surface.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -52,6 +52,20 @@ extern "C"
         const mrhiTestAdapter* adapters;
         uint32_t adapterCount;
     } mrhiTestDriverDef;
+
+    // A surface of the test driver, chained on a surface def with the type
+    // mrhi_structSurfaceSourceTest.
+    typedef struct mrhiSurfaceSourceTest
+    {
+        mrhiChain chain;
+        // What the surface can do on the adapters that present to it; the
+        // driver adds the floors.
+        mrhiSurfaceCaps caps;
+        // Bit i set when the test driver def's adapter i presents to it.
+        uint32_t presentingAdapters;
+        // Makes the surface's creation fail as the platform.
+        bool fail;
+    } mrhiSurfaceSourceTest;
 
 #ifdef __cplusplus
 }

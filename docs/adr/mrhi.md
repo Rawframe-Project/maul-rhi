@@ -11,3 +11,4 @@ are listed in [README.md](README.md).
 | [mrhi-0004](mrhi-0004-devices.md) | Devices are made at once and ready later | Accepted |
 | [mrhi-0005](mrhi-0005-defs-and-extension-chains.md) | Defs keep the family cookie and carry an extension chain | Accepted |
 | [mrhi-0006](mrhi-0006-features-and-limits.md) | Features and limits, each mapped onto the four APIs | Accepted |
+| [mrhi-0007](mrhi-0007-surfaces.md) | Surfaces from one chained native source, configured on a device | Accepted |

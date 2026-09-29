@@ -2,8 +2,8 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The instance: the contract version check, the def's extension chain,
-// its driver, and one block from the def's allocator for the queue and
-// the adapter table.
+// its driver, and one block from the def's allocator for the queue, the
+// adapter table and the surface table.
 
 #include "allocator.h"
 #include "chain.h"
@@ -34,6 +34,7 @@ mrhiInstanceDef mrhiDefaultInstanceDef(void)
     def.limits.chainDepth = 8;
     def.limits.notifications = 64;
     def.limits.adapters = 16;
+    def.limits.surfaces = 16;
     return def;
 }
 
@@ -41,7 +42,7 @@ static mrhiResult CheckDef(const mrhiInstanceDef* def)
 {
     const mrhiInstanceLimits* limits = &def->limits;
     if (def->cookie != INSTANCE_DEF_COOKIE || limits->chainDepth == 0 ||
-        limits->notifications == 0 || limits->adapters == 0 ||
+        limits->notifications == 0 || limits->adapters == 0 || limits->surfaces == 0 ||
         !mrhiIsAllocatorValid(&def->allocator))
     {
         return mrhi_errorInvalid;
@@ -69,6 +70,12 @@ static mrhiInstance* Allocate(const mrhiInstanceDef* def)
         mrhiLayoutAdd(&layout, limits->adapters, sizeof(uint32_t), alignof(uint32_t));
     size_t foundAt = mrhiLayoutAdd(&layout, limits->adapters, sizeof(mrhiDriverAdapter),
                                    alignof(mrhiDriverAdapter));
+    size_t generationsAt =
+        mrhiLayoutAdd(&layout, limits->surfaces, sizeof(uint32_t), alignof(uint32_t));
+    size_t nextFreeAt =
+        mrhiLayoutAdd(&layout, limits->surfaces, sizeof(uint32_t), alignof(uint32_t));
+    size_t handlesAt =
+        mrhiLayoutAdd(&layout, limits->surfaces, sizeof(uint64_t), alignof(uint64_t));
     unsigned char* block = layout.overflow
                                ? nullptr
                                : mrhiAllocate(&def->allocator, layout.size, alignof(mrhiInstance));
@@ -86,7 +93,10 @@ static mrhiInstance* Allocate(const mrhiInstanceDef* def)
         .slots = (mrhiAdapterSlot*)(block + slotsAt),
         .listing = (uint32_t*)(block + listingAt),
         .found = (mrhiDriverAdapter*)(block + foundAt),
+        .surfaceHandles = (uint64_t*)(block + handlesAt),
     };
+    mrhiPoolInit(&instance->surfaces, limits->surfaces, (uint32_t*)(block + generationsAt),
+                 (uint32_t*)(block + nextFreeAt));
     for (uint32_t i = 0; i < limits->adapters; ++i)
     {
         instance->slots[i] = (mrhiAdapterSlot){.generation = 1};
@@ -158,6 +168,7 @@ void mrhiDestroyInstance(mrhiInstance* instance)
     }
     if (instance->driver.vtable != nullptr)
     {
+        mrhiDestroySurfaces(instance);
         instance->driver.vtable->destroy(instance->driver.self);
     }
     mrhiAllocator allocator = instance->allocator;

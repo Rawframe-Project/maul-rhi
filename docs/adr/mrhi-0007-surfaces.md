@@ -1,0 +1,54 @@
+# mrhi-0007. Surfaces from one chained native source, configured on a device
+
+Status: Accepted
+
+## Context
+
+Every graphics API makes its surface from a window system's handles:
+- Vulkan through one extension per window system;
+- DXGI from an HWND;
+- Metal from a `CAMetalLayer`;
+- WebGPU from a chained source.
+
+Formats, present modes and alpha modes differ per platform and per
+adapter. The library must stay usable without any window library, and
+must not make one a dependency.
+
+## Decision
+
+- **Surfaces** are instance ids made by `mrhiCreateSurface` from a
+  def with exactly one chained source:
+  - `mrhiSurfaceSourceWin32`;
+  - `Wayland`;
+  - `Xcb`;
+  - `Android`;
+  - `MetalLayer`;
+  - `Canvas`.
+
+  A source the driver cannot use is unsupported. A program copies its
+  window library's handles into the source, so no window system header
+  is included. When a window's surface generation ends, the program
+  makes a new surface.
+- **Capabilities per adapter** (`mrhiGetSurfaceCaps`):
+  - whether the adapter presents there;
+  - the color combinations, preferred first;
+  - the present modes;
+  - the alpha modes;
+  - the usages.
+
+  The floors are `fifo`, opaque alpha and the render target usage.
+  Formats are unorm, and sRGB is rendered through the twin view.
+- **Searches:** an adapter request may name a compatible surface, and
+  only the adapters that present to it are listed. The search answers
+  `mrhi_errorStale` if the surface ends first.
+- **Configuration** (next): a device configures a surface with a
+  supported color, size, present mode, alpha mode and usages. Anything
+  unsupported is refused, never replaced. A surface is configured on
+  one device at a time.
+- **Lifetimes:** destroying an instance destroys the surfaces left.
+
+## Consequences
+
+One surface shape serves every window system, including ones added
+later as new chained structs, and every window library. Programs pick
+among what the platform reports rather than trusting one format.

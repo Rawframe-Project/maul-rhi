@@ -7,7 +7,7 @@
 #ifndef MAUL_RHI_SRC_CAPABILITIES_CORE_H
 #define MAUL_RHI_SRC_CAPABILITIES_CORE_H
 
-#include "maul-rhi/resources.h"
+#include "maul-rhi/surface.h"
 
 // Whether every feature asked for is granted.
 bool mrhiFeaturesWithin(const mrhiFeatures* asked, const mrhiFeatures* granted);
@@ -61,5 +61,7 @@ bool mrhiFormatCapsWithin(const mrhiFormatCaps* asked, const mrhiFormatCaps* gra
 // The bits of each bitflags type the contract lists.
 extern const mrhiBufferUsage mrhiBufferUsageKnown;
 extern const mrhiTextureUsage mrhiTextureUsageKnown;
+extern const mrhiPresentModes mrhiPresentModesKnown;
+extern const mrhiAlphaModes mrhiAlphaModesKnown;
 
 #endif // MAUL_RHI_SRC_CAPABILITIES_CORE_H

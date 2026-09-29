@@ -81,3 +81,12 @@ format.
   takes a `label` and `labelLength`, well-formed UTF-8 without NUL of at
   most `MRHI_LABEL_BYTES`, handed to the driver during the call and
   never kept; each mapped onto the four APIs' object names.
+- Surfaces (mrhi-0007, `surface.h`): `mrhiCreateSurface` from exactly
+  one chained native source (Win32, Wayland, XCB, Android, a Metal
+  layer, a web canvas), `mrhiDestroySurface`, and `mrhiGetSurfaceCaps`
+  per adapter: whether it presents there, its color combinations
+  (`mrhiSurfaceColor`: format, primaries, transfer, range), present
+  modes, alpha modes and usages, with `fifo`, opaque alpha and render
+  targets as the floors; each mapped onto the four APIs. Adapter
+  searches may name a `compatibleSurface`; the instance's `surfaces`
+  limit; the test driver's `mrhiSurfaceSourceTest`.

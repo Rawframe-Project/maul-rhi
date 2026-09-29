@@ -39,3 +39,7 @@ edit the contract, not this file.
 | `mrhiDefaultViewDef` | Safe from any thread. |
 | `mrhiCreateView` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDestroyView` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDefaultSurfaceDef` | Safe from any thread. |
+| `mrhiCreateSurface` | Safe from any thread; the instance is used by one thread at a time. |
+| `mrhiDestroySurface` | Safe from any thread; the instance is used by one thread at a time. |
+| `mrhiGetSurfaceCaps` | Safe from any thread; the instance is used by one thread at a time. |

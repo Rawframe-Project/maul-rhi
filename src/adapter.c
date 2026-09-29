@@ -104,8 +104,26 @@ static bool MeetsFloor(const mrhiInstance* instance, const mrhiDriverAdapter* ad
     return true;
 }
 
+// Whether an adapter presents to the search's surface, if it names one.
+static bool Presents(const mrhiInstance* instance, const mrhiPending* search,
+                     const mrhiDriverAdapter* adapter)
+{
+    if (search->compatibleSurface.index1 == 0)
+    {
+        return true;
+    }
+    mrhiSurfaceCaps caps = {0};
+    instance->driver.vtable->getSurfaceCaps(instance->driver.self,
+                                            mrhiFindSurface(instance, search->compatibleSurface),
+                                            adapter->handle, &caps);
+    return caps.presentable;
+}
+
 mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search)
 {
+    // A surface that ended before the answer leaves no adapter to list.
+    bool ended = search->compatibleSurface.index1 != 0 &&
+                 mrhiFindSurface(instance, search->compatibleSurface) == 0;
     size_t total = 0;
     if (instance->driver.vtable != nullptr)
     {
@@ -113,6 +131,7 @@ mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search
                                                      instance->limits.adapters);
     }
     size_t count = total < instance->limits.adapters ? total : instance->limits.adapters;
+    count = ended ? 0 : count;
     for (uint32_t i = 0; i < instance->limits.adapters; ++i)
     {
         instance->slots[i].seen = false;
@@ -123,7 +142,7 @@ mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search
         mrhiDriverAdapter* adapter = &instance->found[i];
         mrhiMaskFeatures(&adapter->features, adapter->info.driver);
         if ((!search->allowSoftware && adapter->info.kind == mrhi_adapterSoftware) ||
-            !MeetsFloor(instance, adapter))
+            !MeetsFloor(instance, adapter) || !Presents(instance, search, adapter))
         {
             continue;
         }
@@ -142,6 +161,10 @@ mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search
         }
     }
     SortListing(instance, search->preference);
+    if (ended)
+    {
+        return mrhi_errorStale;
+    }
     return total > count ? mrhi_errorCapacity : mrhi_success;
 }
 
@@ -162,6 +185,11 @@ mrhiResult mrhiRequestAdapters(mrhiInstance* instance, const mrhiAdapterRequestD
     {
         return chain == mrhi_errorInvalid ? mrhiMisuse(instance) : chain;
     }
+    if (def->compatibleSurface.index1 != 0 &&
+        mrhiFindSurface(instance, def->compatibleSurface) == 0)
+    {
+        return mrhi_errorStale;
+    }
     if (!mrhiHasRoomForAnswer(instance))
     {
         return mrhi_errorCapacity;
@@ -181,6 +209,7 @@ mrhiResult mrhiRequestAdapters(mrhiInstance* instance, const mrhiAdapterRequestD
                                  .kind = mrhiPendingAdapters,
                                  .preference = def->preference,
                                  .allowSoftware = def->allowSoftware,
+                                 .compatibleSurface = def->compatibleSurface,
                              });
     if (instance->driver.vtable == nullptr)
     {

@@ -8,7 +8,7 @@
 #ifndef MAUL_RHI_SRC_DRIVER_H
 #define MAUL_RHI_SRC_DRIVER_H
 
-#include "maul-rhi/resources.h"
+#include "maul-rhi/surface.h"
 
 // The SPI version a driver's vtable must carry.
 #define MRHI_SPI_VERSION 1
@@ -77,6 +77,16 @@ typedef struct mrhiInstanceDriverVtable
     // Fills what a format can do on an adapter.
     void (*getFormatCaps)(const void* self, uint64_t adapter, mrhiFormat format,
                           mrhiFormatCaps* capsOut);
+    // Makes a surface from the one source chained on a def the core has
+    // checked; its handle, never zero. mrhi_errorUnsupported for a
+    // source the driver cannot use.
+    mrhiResult (*createSurface)(void* self, const mrhiChain* source, const mrhiSurfaceDef* def,
+                                uint64_t* handleOut);
+    void (*destroySurface)(void* self, uint64_t handle);
+    // Fills what a surface can do on an adapter, the floors included
+    // when the adapter presents there.
+    void (*getSurfaceCaps)(const void* self, uint64_t surface, uint64_t adapter,
+                           mrhiSurfaceCaps* capsOut);
     // Makes a device on an adapter from a def the core has checked (its
     // features and limits are the grant, its label read only during the
     // call), opening it in the background: the open is answered by an

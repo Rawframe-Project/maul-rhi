@@ -277,3 +277,50 @@ restricted or absent-rejected, with how.
 | `mipCount` | direct: levelCount | direct: MipLevels | direct: levels.length | direct: mipLevelCount |
 | `baseLayer` | direct: baseArrayLayer | direct: FirstArraySlice | direct: slices.location | direct: baseArrayLayer |
 | `layerCount` | direct: layerCount | direct: ArraySize | direct: slices.length | direct: arrayLayerCount |
+
+## mrhiColorPrimaries
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_primariesBt709` | direct: the SRGB, EXTENDED_SRGB and BT709 color spaces | direct: the G22 and G10 P709 color spaces | direct: kCGColorSpaceSRGB and its extended and linear forms | direct: srgb |
+| `mrhi_primariesBt2020` | direct: HDR10_ST2084 and BT2020_LINEAR | direct: G2084_P2020 | direct: kCGColorSpaceITUR_2100_PQ | absent-rejected: absent until the canvas has Rec. 2100 |
+| `mrhi_primariesDisplayP3` | direct: DISPLAY_P3_NONLINEAR and its linear form | absent-rejected: absent: DXGI has no P3 color space | direct: kCGColorSpaceDisplayP3 | direct: display-p3 |
+
+## mrhiTransfer
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_transferSrgb` | direct: the NONLINEAR color spaces | direct: the G22 color spaces | direct: the gamma-encoded color spaces | direct: srgb and display-p3 |
+| `mrhi_transferLinear` | direct: EXTENDED_SRGB_LINEAR and the LINEAR color spaces | direct: G10_NONE_P709 | direct: the linear and extended linear color spaces | direct: an rgba16float canvas with extended tone mapping |
+| `mrhi_transferPq` | direct: HDR10_ST2084 | direct: G2084_NONE_P2020 | direct: kCGColorSpaceITUR_2100_PQ | absent-rejected: absent until the canvas has PQ |
+
+## mrhiColorRange
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_rangeStandard` | direct: the non-extended color spaces | direct: the G22 color spaces | direct: the non-extended color spaces | direct: standard tone mapping |
+| `mrhi_rangeExtended` | direct: EXTENDED_SRGB_LINEAR | direct: G10_NONE_P709 (scRGB) | direct: wantsExtendedDynamicRangeContent and an extended color space | direct: extended tone mapping |
+
+## mrhiSurfaceColor
+
+| Member | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `format` | direct: imageFormat | direct: the buffer Format | direct: pixelFormat | direct: format |
+| `primaries` | direct: imageColorSpace | direct: SetColorSpace1 | direct: colorspace | direct: colorSpace |
+| `transfer` | direct: imageColorSpace | direct: SetColorSpace1 | direct: colorspace | direct: colorSpace and the format |
+| `range` | direct: imageColorSpace | direct: SetColorSpace1 | direct: wantsExtendedDynamicRangeContent | direct: toneMapping.mode |
+
+## mrhiPresentModes
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_presentFifo` | direct: FIFO | direct: sync interval 1 | direct: displaySyncEnabled | direct: fifo, the browser's pacing |
+| `mrhi_presentMailbox` | restricted: MAILBOX, where offered | restricted: sync interval 0 in the flip model's windowed mode | absent-rejected: absent | absent-rejected: absent in browsers |
+| `mrhi_presentImmediate` | restricted: IMMEDIATE, where offered | restricted: sync interval 0 with ALLOW_TEARING, where offered | restricted: displaySyncEnabled off, on macOS | absent-rejected: absent in browsers |
+
+## mrhiAlphaModes
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_alphaOpaque` | restricted: OPAQUE, or INHERIT with an opaque window | direct: DXGI_ALPHA_MODE_IGNORE | direct: opaque | direct: opaque |
+| `mrhi_alphaPremultiplied` | restricted: PRE_MULTIPLIED, where offered | restricted: PREMULTIPLIED, on a composition swapchain | direct: opaque off | direct: premultiplied |

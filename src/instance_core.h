@@ -10,6 +10,7 @@
 #define MAUL_RHI_SRC_INSTANCE_CORE_H
 
 #include "driver.h"
+#include "pool.h"
 
 #include "maul-rhi/device.h"
 
@@ -38,6 +39,7 @@ typedef struct mrhiPending
     mrhiPendingKind kind;
     mrhiPowerPreference preference;
     bool allowSoftware;
+    mrhiSurfaceId compatibleSurface;
     mrhiDevice* device;
 } mrhiPending;
 
@@ -66,6 +68,9 @@ struct mrhiInstance
     uint32_t* listing;
     uint32_t listed;
     mrhiDriverAdapter* found;
+    // Surfaces: ids, and each slot's driver handle.
+    mrhiPool surfaces;
+    uint64_t* surfaceHandles;
 };
 
 // Counts one misuse and returns mrhi_errorInvalid, for a refusal of
@@ -99,6 +104,12 @@ mrhiFormatCaps mrhiAdapterFormatCaps(const mrhiInstance* instance, const mrhiDri
 // Rebuilds the adapter table for an answered search and returns the
 // search's outcome.
 mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search);
+
+// The driver handle of a live surface, or 0 for a stale or null id.
+uint64_t mrhiFindSurface(const mrhiInstance* instance, mrhiSurfaceId surface);
+
+// Destroys every surface left, before the driver goes.
+void mrhiDestroySurfaces(mrhiInstance* instance);
 
 // Moves an opening device to ready, or to failed, and returns the
 // outcome.

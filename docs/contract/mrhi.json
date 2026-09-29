@@ -164,6 +164,41 @@
               "name": "struct_test_driver",
               "value": 1,
               "doc": "mrhiTestDriverDef, on an instance def: turns the test driver on."
+            },
+            {
+              "name": "struct_surface_source_win32",
+              "value": 2,
+              "doc": "mrhiSurfaceSourceWin32, on a surface def."
+            },
+            {
+              "name": "struct_surface_source_wayland",
+              "value": 3,
+              "doc": "mrhiSurfaceSourceWayland, on a surface def."
+            },
+            {
+              "name": "struct_surface_source_xcb",
+              "value": 4,
+              "doc": "mrhiSurfaceSourceXcb, on a surface def."
+            },
+            {
+              "name": "struct_surface_source_android",
+              "value": 5,
+              "doc": "mrhiSurfaceSourceAndroid, on a surface def."
+            },
+            {
+              "name": "struct_surface_source_metal_layer",
+              "value": 6,
+              "doc": "mrhiSurfaceSourceMetalLayer, on a surface def."
+            },
+            {
+              "name": "struct_surface_source_canvas",
+              "value": 7,
+              "doc": "mrhiSurfaceSourceCanvas, on a surface def."
+            },
+            {
+              "name": "struct_surface_source_test",
+              "value": 8,
+              "doc": "mrhiSurfaceSourceTest, on a surface def: a surface of the test driver."
             }
           ]
         },
@@ -376,6 +411,11 @@
           ]
         },
         {
+          "kind": "id",
+          "name": "surface_id",
+          "doc": "A surface of an instance: a window's drawable area, for one generation of the window's surface."
+        },
+        {
           "kind": "struct",
           "name": "adapter_request_def",
           "def": true,
@@ -389,6 +429,11 @@
               "name": "allow_software",
               "type": "bool",
               "doc": "Whether software rasterizers may answer."
+            },
+            {
+              "name": "compatible_surface",
+              "type": "id.surface_id",
+              "doc": "A surface every adapter found must present to, or a null id for none."
             }
           ]
         },
@@ -401,7 +446,7 @@
             {
               "name": "instance_adapters_found",
               "value": 0,
-              "doc": "An adapter request is answered: its outcome is mrhi_success, and mrhiGetAdapters lists the adapters, or an error."
+              "doc": "An adapter request is answered: its outcome is mrhi_success, and mrhiGetAdapters lists the adapters, mrhi_errorStale when its compatible surface ended before the answer, or another error."
             },
             {
               "name": "instance_device_ready",
@@ -450,6 +495,11 @@
               "name": "adapters",
               "type": "uint32",
               "doc": "Adapters the instance keeps; 16 by default."
+            },
+            {
+              "name": "surfaces",
+              "type": "uint32",
+              "doc": "Surfaces the instance holds at once; 16 by default."
             }
           ]
         },
@@ -570,7 +620,7 @@
           "doc": "Asks the instance's drivers for adapters. The request is answered by one mrhi_instanceAdaptersFound record; until then, mrhiGetAdapters lists the adapters found before.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` with the request accepted; `mrhi_errorInvalid` for a NULL argument or a def without its cookie; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the notification queue has no room for the answer."
+            "doc": "`mrhi_success` with the request accepted; `mrhi_errorInvalid` for a NULL argument or a def without its cookie; `mrhi_errorStale` for a compatible surface the instance no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the notification queue has no room for the answer."
           },
           "args": [
             {
@@ -7134,10 +7184,741 @@
       ]
     },
     {
+      "name": "surface",
+      "doc": "Surfaces: a window's drawable area, made from its native handles through one chained source struct per window system, and what each adapter can do with it. The library includes no window system header; a window library's handles are copied into the source.",
+      "includes": [
+        "resources"
+      ],
+      "items": [
+        {
+          "kind": "enum",
+          "name": "color_primaries",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "The primaries a surface's colors are in.",
+          "values": [
+            {
+              "name": "primaries_bt709",
+              "value": 0,
+              "doc": "Rec. 709, as sRGB.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "the SRGB, EXTENDED_SRGB and BT709 color spaces"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the G22 and G10 P709 color spaces"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "kCGColorSpaceSRGB and its extended and linear forms"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "srgb"
+                }
+              }
+            },
+            {
+              "name": "primaries_bt2020",
+              "value": 1,
+              "doc": "Rec. 2020.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "HDR10_ST2084 and BT2020_LINEAR"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "G2084_P2020"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "kCGColorSpaceITUR_2100_PQ"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "absent until the canvas has Rec. 2100"
+                }
+              }
+            },
+            {
+              "name": "primaries_display_p3",
+              "value": 2,
+              "doc": "Display P3.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "DISPLAY_P3_NONLINEAR and its linear form"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "absent: DXGI has no P3 color space"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "kCGColorSpaceDisplayP3"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "display-p3"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "transfer",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "How a surface's values are encoded.",
+          "values": [
+            {
+              "name": "transfer_srgb",
+              "value": 0,
+              "doc": "The sRGB curve; rendered through an sRGB view.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "the NONLINEAR color spaces"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the G22 color spaces"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the gamma-encoded color spaces"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "srgb and display-p3"
+                }
+              }
+            },
+            {
+              "name": "transfer_linear",
+              "value": 1,
+              "doc": "Linear values, for extended range.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "EXTENDED_SRGB_LINEAR and the LINEAR color spaces"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "G10_NONE_P709"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the linear and extended linear color spaces"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "an rgba16float canvas with extended tone mapping"
+                }
+              }
+            },
+            {
+              "name": "transfer_pq",
+              "value": 2,
+              "doc": "SMPTE ST 2084 (PQ), for HDR10.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "HDR10_ST2084"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "G2084_NONE_P2020"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "kCGColorSpaceITUR_2100_PQ"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "absent until the canvas has PQ"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "color_range",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "Whether a surface's values may pass 1.0.",
+          "values": [
+            {
+              "name": "range_standard",
+              "value": 0,
+              "doc": "Values from 0 to 1.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "the non-extended color spaces"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the G22 color spaces"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the non-extended color spaces"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "standard tone mapping"
+                }
+              }
+            },
+            {
+              "name": "range_extended",
+              "value": 1,
+              "doc": "Values past 1.0 and below 0, for HDR on SDR white.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "EXTENDED_SRGB_LINEAR"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "G10_NONE_P709 (scRGB)"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "wantsExtendedDynamicRangeContent and an extended color space"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "extended tone mapping"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "surface_color",
+          "mapped": true,
+          "doc": "A combination of format and color a surface can show (R5's typed fields).",
+          "members": [
+            {
+              "name": "format",
+              "type": "enum.format",
+              "doc": "A unorm or float format; sRGB is rendered through the format's twin view.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "imageFormat"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the buffer Format"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "pixelFormat"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "format"
+                }
+              }
+            },
+            {
+              "name": "primaries",
+              "type": "enum.color_primaries",
+              "doc": "The primaries.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "imageColorSpace"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetColorSpace1"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "colorspace"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "colorSpace"
+                }
+              }
+            },
+            {
+              "name": "transfer",
+              "type": "enum.transfer",
+              "doc": "The encoding.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "imageColorSpace"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetColorSpace1"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "colorspace"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "colorSpace and the format"
+                }
+              }
+            },
+            {
+              "name": "range",
+              "type": "enum.color_range",
+              "doc": "The range.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "imageColorSpace"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetColorSpace1"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "wantsExtendedDynamicRangeContent"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "toneMapping.mode"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "bitflags",
+          "name": "present_modes",
+          "width": "uint32",
+          "mapped": true,
+          "doc": "How presented images reach the display.",
+          "values": [
+            {
+              "name": "present_fifo",
+              "value": 1,
+              "doc": "In order, one per refresh, never torn; always offered.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "FIFO"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "sync interval 1"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "displaySyncEnabled"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "fifo, the browser's pacing"
+                }
+              }
+            },
+            {
+              "name": "present_mailbox",
+              "value": 2,
+              "doc": "The newest image at each refresh, never torn; older ones are dropped.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "MAILBOX, where offered"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "sync interval 0 in the flip model's windowed mode"
+                },
+                "metal": {
+                  "class": "absent_rejected",
+                  "note": "absent"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "absent in browsers"
+                }
+              }
+            },
+            {
+              "name": "present_immediate",
+              "value": 4,
+              "doc": "At once, and may tear.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "IMMEDIATE, where offered"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "sync interval 0 with ALLOW_TEARING, where offered"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "displaySyncEnabled off, on macOS"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "absent in browsers"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "bitflags",
+          "name": "alpha_modes",
+          "width": "uint32",
+          "mapped": true,
+          "doc": "How a surface's alpha blends with what is behind the window.",
+          "values": [
+            {
+              "name": "alpha_opaque",
+              "value": 1,
+              "doc": "Alpha is ignored; always offered.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "OPAQUE, or INHERIT with an opaque window"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_ALPHA_MODE_IGNORE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "opaque"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "opaque"
+                }
+              }
+            },
+            {
+              "name": "alpha_premultiplied",
+              "value": 2,
+              "doc": "Colors are premultiplied by alpha, and the window shows what is behind it.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "PRE_MULTIPLIED, where offered"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "PREMULTIPLIED, on a composition swapchain"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "opaque off"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "premultiplied"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "constant",
+          "name": "surface_colors",
+          "value": 16,
+          "doc": "The color combinations one surface reports at most."
+        },
+        {
+          "kind": "struct",
+          "name": "surface_caps",
+          "doc": "What a surface can do on an adapter.",
+          "members": [
+            {
+              "name": "presentable",
+              "type": "bool",
+              "doc": "Whether the adapter can present to the surface; nothing else is filled when it cannot."
+            },
+            {
+              "name": "colors",
+              "type": "struct.surface_color",
+              "array": "surface_colors",
+              "doc": "The combinations it can show, the platform's preferred first."
+            },
+            {
+              "name": "color_count",
+              "type": "uint32",
+              "doc": "How many colors are filled, at least 1."
+            },
+            {
+              "name": "present_modes",
+              "type": "bitflags.present_modes",
+              "doc": "Its present modes, mrhi_presentFifo among them."
+            },
+            {
+              "name": "alpha_modes",
+              "type": "bitflags.alpha_modes",
+              "doc": "Its alpha modes, mrhi_alphaOpaque among them."
+            },
+            {
+              "name": "usages",
+              "type": "bitflags.texture_usage",
+              "doc": "The usages its images may have, mrhi_textureRenderTarget among them."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "surface_source_win32",
+          "chained": true,
+          "doc": "A Win32 window, chained on a surface def with the type mrhi_structSurfaceSourceWin32.",
+          "members": [
+            {
+              "name": "hinstance",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The HINSTANCE."
+            },
+            {
+              "name": "hwnd",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The HWND."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "surface_source_wayland",
+          "chained": true,
+          "doc": "A Wayland surface, chained on a surface def with the type mrhi_structSurfaceSourceWayland.",
+          "members": [
+            {
+              "name": "display",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The struct wl_display*."
+            },
+            {
+              "name": "surface",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The struct wl_surface*."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "surface_source_xcb",
+          "chained": true,
+          "doc": "An X11 window through XCB, chained on a surface def with the type mrhi_structSurfaceSourceXcb.",
+          "members": [
+            {
+              "name": "connection",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The xcb_connection_t*."
+            },
+            {
+              "name": "window",
+              "type": "uint32",
+              "doc": "The xcb_window_t."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "surface_source_android",
+          "chained": true,
+          "doc": "An Android window, chained on a surface def with the type mrhi_structSurfaceSourceAndroid.",
+          "members": [
+            {
+              "name": "window",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The ANativeWindow*."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "surface_source_metal_layer",
+          "chained": true,
+          "doc": "A CAMetalLayer on macOS or iOS, chained on a surface def with the type mrhi_structSurfaceSourceMetalLayer.",
+          "members": [
+            {
+              "name": "layer",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The CAMetalLayer*."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "surface_source_canvas",
+          "chained": true,
+          "doc": "A web canvas, chained on a surface def with the type mrhi_structSurfaceSourceCanvas.",
+          "members": [
+            {
+              "name": "selector",
+              "type": "char",
+              "pointer": "const",
+              "doc": "The canvas's CSS selector, UTF-8, selectorLength bytes. Only read during the call."
+            },
+            {
+              "name": "selector_length",
+              "type": "size",
+              "doc": "The selector's bytes."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "surface_def",
+          "def": true,
+          "doc": "How a surface is made: exactly one source chained on it, and a label. Build it with mrhiDefaultSurfaceDef.",
+          "members": [
+            {
+              "name": "label",
+              "type": "char",
+              "pointer": "const",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
+            },
+            {
+              "name": "label_length",
+              "type": "size",
+              "doc": "The label's bytes."
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_surface_def",
+          "doc": "Returns the default surface def, with no source, which must be chained.",
+          "returns": {
+            "type": "struct.surface_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "create_surface",
+          "doc": "Makes a surface from a window's native handles.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, or a def without exactly one source; `mrhi_errorUnsupported` for a source the instance's driver cannot use, an instance without a driver, or a critical extension the library does not know; `mrhi_errorCapacity` when the instance's surface limit is reached; `mrhi_errorPlatform` when the driver fails."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "mutable",
+              "doc": "The instance."
+            },
+            {
+              "name": "def",
+              "type": "struct.surface_def",
+              "pointer": "const",
+              "doc": "The surface to make."
+            },
+            {
+              "name": "surface_out",
+              "type": "id.surface_id",
+              "pointer": "mutable",
+              "doc": "Receives the surface."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "destroy_surface",
+          "doc": "Destroys a surface. Its id ends at once.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL instance; `mrhi_errorStale` for a surface the instance no longer has."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "mutable",
+              "doc": "The instance."
+            },
+            {
+              "name": "surface",
+              "type": "id.surface_id",
+              "doc": "The surface."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_surface_caps",
+          "doc": "Reads what a surface can do on an adapter.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`, with presentable false when the adapter cannot present there; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorStale` for a surface or adapter the instance no longer has."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "mutable",
+              "doc": "The instance."
+            },
+            {
+              "name": "surface",
+              "type": "id.surface_id",
+              "doc": "The surface."
+            },
+            {
+              "name": "adapter",
+              "type": "id.adapter_id",
+              "doc": "The adapter."
+            },
+            {
+              "name": "caps_out",
+              "type": "struct.surface_caps",
+              "pointer": "mutable",
+              "doc": "Receives the capabilities."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          }
+        }
+      ]
+    },
+    {
       "name": "test",
       "doc": "The test driver (MAUL_RHI_TEST_DRIVER): a driver without a GPU whose adapters a test describes, for the library's tests and a program's own.",
       "includes": [
-        "device"
+        "surface"
       ],
       "items": [
         {
@@ -7193,6 +7974,29 @@
             {
               "name": "adapter_count",
               "type": "uint32"
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "surface_source_test",
+          "chained": true,
+          "doc": "A surface of the test driver, chained on a surface def with the type mrhi_structSurfaceSourceTest.",
+          "members": [
+            {
+              "name": "caps",
+              "type": "struct.surface_caps",
+              "doc": "What the surface can do on the adapters that present to it; the driver adds the floors."
+            },
+            {
+              "name": "presenting_adapters",
+              "type": "uint32",
+              "doc": "Bit i set when the test driver def's adapter i presents to it."
+            },
+            {
+              "name": "fail",
+              "type": "bool",
+              "doc": "Makes the surface's creation fail as the platform."
             }
           ]
         }
