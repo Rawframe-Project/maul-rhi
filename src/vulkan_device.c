@@ -16,6 +16,7 @@
 #include "invariant.h"
 #include "vulkan_adapter.h"
 #include "vulkan_frame.h"
+#include "vulkan_label.h"
 #include "vulkan_object.h"
 #include "vulkan_pipeline.h"
 #include "vulkan_resource.h"
@@ -308,9 +309,8 @@ static void ReleaseImage(void* self, uint64_t swapchain, uint64_t image)
 static mrhiResult CreateShader(void* self, const mrhiShaderDef* def, const mrhiContainer* container,
                                uint64_t* handleOut)
 {
-    (void)def;
     VulkanDevice* device = self;
-    return mrhiVulkanCreateShader(&device->pipelines, container, handleOut);
+    return mrhiVulkanCreateShader(&device->pipelines, def, container, handleOut);
 }
 
 static void DestroyShader(void* self, uint64_t handle)
@@ -487,6 +487,8 @@ static VkResult Open(VulkanDevice* device, const mrhiDeviceDef* def)
         return VK_ERROR_INITIALIZATION_FAILED;
     }
     device->api.vkGetDeviceQueue(device->device, family, 0, &device->queue);
+    mrhiVulkanName(&device->api, device->device, VK_OBJECT_TYPE_DEVICE,
+                   MRHI_VULKAN_DISPATCHABLE(device->device), def->label, def->labelLength);
     const VkSemaphoreTypeCreateInfo timeline = {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
         .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,

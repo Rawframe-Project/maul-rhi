@@ -193,7 +193,8 @@ static const mrhiInstanceDriverVtable s_vtable = {
 };
 
 // Makes a Vulkan 1.3 instance with its functions read and the surface
-// extensions the loader offers enabled (their bits in enabledOut):
+// extensions and VK_EXT_debug_utils the loader offers enabled (the
+// surface extensions' bits in enabledOut):
 // VK_NULL_HANDLE where the loader is older or refuses. Vulkan's own
 // allocations stay the platform's: its callbacks free without a size,
 // which the program's allocator needs.
@@ -215,7 +216,9 @@ static VkInstance CreateInstance(mrhiVulkan* vulkan, const mrhiAllocator* alloca
     const char* const* wanted = nullptr;
     uint32_t wantedCount = (uint32_t)mrhiVulkanSurfaceExtensions(&wanted);
     uint32_t offered = mrhiVulkanExtensions(vulkan, allocator, VK_NULL_HANDLE, wanted, wantedCount);
-    const char* names[32];
+    const char* const debug = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
+    bool debugUtils = mrhiVulkanExtensions(vulkan, allocator, VK_NULL_HANDLE, &debug, 1) != 0;
+    const char* names[33];
     uint32_t count = 0;
     for (uint32_t i = 0; i < wantedCount; ++i)
     {
@@ -223,6 +226,10 @@ static VkInstance CreateInstance(mrhiVulkan* vulkan, const mrhiAllocator* alloca
         {
             names[count++] = wanted[i];
         }
+    }
+    if (debugUtils)
+    {
+        names[count++] = debug;
     }
     const VkInstanceCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
@@ -244,6 +251,11 @@ static VkInstance CreateInstance(mrhiVulkan* vulkan, const mrhiAllocator* alloca
             vulkan->vkDestroyInstance(instance, nullptr);
         }
         return VK_NULL_HANDLE;
+    }
+    // Labels only help tools: an instance without them works the same.
+    if (debugUtils)
+    {
+        (void)mrhiLoadVulkanDebug(vulkan, instance);
     }
     *enabledOut = offered;
     return instance;

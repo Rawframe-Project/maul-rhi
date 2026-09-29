@@ -131,6 +131,15 @@
     X(vkAcquireNextImageKHR)                                                                       \
     X(vkQueuePresentKHR)
 
+// The functions of VK_EXT_debug_utils, read through the instance when it
+// has the extension and copied into each device's table; NULL without
+// it.
+#define MRHI_VULKAN_DEBUG(X)                                                                       \
+    X(vkSetDebugUtilsObjectNameEXT)                                                                \
+    X(vkCmdBeginDebugUtilsLabelEXT)                                                                \
+    X(vkCmdEndDebugUtilsLabelEXT)                                                                  \
+    X(vkCmdInsertDebugUtilsLabelEXT)
+
 #define MRHI_VULKAN_FIELD(name) PFN_##name name;
 
 // The loader's library and the functions read from it.
@@ -143,6 +152,7 @@ typedef struct mrhiVulkan
     // Whether the instance has VK_KHR_surface, and its functions.
     bool surfaces;
     MRHI_VULKAN_SURFACE(MRHI_VULKAN_FIELD)
+    MRHI_VULKAN_DEBUG(MRHI_VULKAN_FIELD)
 } mrhiVulkan;
 
 // A device's functions.
@@ -150,6 +160,7 @@ typedef struct mrhiVulkanDevice
 {
     MRHI_VULKAN_DEVICE(MRHI_VULKAN_FIELD)
     MRHI_VULKAN_SWAPCHAIN(MRHI_VULKAN_FIELD)
+    MRHI_VULKAN_DEBUG(MRHI_VULKAN_FIELD)
 } mrhiVulkanDevice;
 
 // Opens the loader and reads the global functions: false, with nothing
@@ -163,8 +174,13 @@ bool mrhiLoadVulkanInstance(mrhiVulkan* vulkan, VkInstance instance);
 // when one is missing.
 bool mrhiLoadVulkanSurface(mrhiVulkan* vulkan, VkInstance instance);
 
+// Reads the functions of VK_EXT_debug_utils, which the instance has:
+// false, with none kept, when one is missing.
+bool mrhiLoadVulkanDebug(mrhiVulkan* vulkan, VkInstance instance);
+
 // Reads a device's functions, and those of VK_KHR_swapchain when it has
-// it: false when one is missing.
+// it, and copies the instance's debug functions: false when one is
+// missing.
 bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, bool swapchain,
                           mrhiVulkanDevice* functions);
 

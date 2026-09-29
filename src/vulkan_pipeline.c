@@ -11,6 +11,7 @@
 #include "container.h"
 #include "invariant.h"
 #include "reflection.h"
+#include "vulkan_label.h"
 
 #include <string.h>
 
@@ -56,8 +57,8 @@ void mrhiVulkanPipelinesDestroy(mrhiVulkanPipelines* pipelines)
     pipelines->api->vkDestroyPipelineCache(pipelines->device, pipelines->cache, nullptr);
 }
 
-mrhiResult mrhiVulkanCreateShader(mrhiVulkanPipelines* pipelines, const mrhiContainer* container,
-                                  uint64_t* handleOut)
+mrhiResult mrhiVulkanCreateShader(mrhiVulkanPipelines* pipelines, const mrhiShaderDef* def,
+                                  const mrhiContainer* container, uint64_t* handleOut)
 {
     uint32_t handle = mrhiVulkanTakeSlot(&pipelines->shaderSlots);
     if (handle == 0)
@@ -78,6 +79,9 @@ mrhiResult mrhiVulkanCreateShader(mrhiVulkanPipelines* pipelines, const mrhiCont
         mrhiVulkanGiveSlot(&pipelines->shaderSlots, handle);
         return mrhiVulkanStatus(result);
     }
+    mrhiVulkanName(pipelines->api, pipelines->device, VK_OBJECT_TYPE_SHADER_MODULE,
+                   MRHI_VULKAN_HANDLE(pipelines->shaders[handle - 1]), def->label,
+                   def->labelLength);
     *handleOut = handle;
     return mrhi_success;
 }
@@ -320,6 +324,8 @@ mrhiResult mrhiVulkanCreateCompute(mrhiVulkanPipelines* pipelines,
         return mrhiVulkanStatus(result);
     }
     made->bindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
+    mrhiVulkanName(pipelines->api, pipelines->device, VK_OBJECT_TYPE_PIPELINE,
+                   MRHI_VULKAN_HANDLE(made->pipeline), pipeline->label, pipeline->labelLength);
     mrhiVulkanAnswer(pipelines, handle, tag);
     *handleOut = handle;
     return mrhi_success;

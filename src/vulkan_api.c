@@ -71,6 +71,7 @@ typedef struct Function
 static const Function s_global[] = {MRHI_VULKAN_GLOBAL(MRHI_VULKAN_LOADER_ENTRY)};
 static const Function s_instance[] = {MRHI_VULKAN_INSTANCE(MRHI_VULKAN_LOADER_ENTRY)};
 static const Function s_surface[] = {MRHI_VULKAN_SURFACE(MRHI_VULKAN_LOADER_ENTRY)};
+static const Function s_debug[] = {MRHI_VULKAN_DEBUG(MRHI_VULKAN_LOADER_ENTRY)};
 static const Function s_device[] = {MRHI_VULKAN_DEVICE(MRHI_VULKAN_DEVICE_ENTRY)};
 static const Function s_swapchain[] = {MRHI_VULKAN_SWAPCHAIN(MRHI_VULKAN_DEVICE_ENTRY)};
 
@@ -129,6 +130,19 @@ bool mrhiLoadVulkanSurface(mrhiVulkan* vulkan, VkInstance instance)
     return ReadInstance(vulkan, instance, s_surface, sizeof(s_surface) / sizeof(s_surface[0]));
 }
 
+bool mrhiLoadVulkanDebug(mrhiVulkan* vulkan, VkInstance instance)
+{
+    if (ReadInstance(vulkan, instance, s_debug, sizeof(s_debug) / sizeof(s_debug[0])))
+    {
+        return true;
+    }
+    for (size_t i = 0; i < sizeof(s_debug) / sizeof(s_debug[0]); ++i)
+    {
+        Store(vulkan, s_debug[i].offset, nullptr);
+    }
+    return false;
+}
+
 // Reads functions through vkGetDeviceProcAddr: false when one is
 // missing.
 static bool ReadDevice(const mrhiVulkan* vulkan, VkDevice device, const Function* functions,
@@ -147,7 +161,11 @@ static bool ReadDevice(const mrhiVulkan* vulkan, VkDevice device, const Function
 bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, bool swapchain,
                           mrhiVulkanDevice* functions)
 {
-    *functions = (mrhiVulkanDevice){0};
+    *functions = (mrhiVulkanDevice){
+#define MRHI_VULKAN_COPY(name) .name = vulkan->name,
+        MRHI_VULKAN_DEBUG(MRHI_VULKAN_COPY)
+#undef MRHI_VULKAN_COPY
+    };
     return ReadDevice(vulkan, device, s_device, sizeof(s_device) / sizeof(s_device[0]),
                       functions) &&
            (!swapchain || ReadDevice(vulkan, device, s_swapchain,

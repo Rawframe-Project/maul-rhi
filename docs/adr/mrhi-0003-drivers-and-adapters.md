@@ -103,6 +103,13 @@ ids, requests, the frame graph) can be tested without a GPU.
   after its submission; a present's result is reported at the next
   acquire, and a window with no area is occluded. An image a frame
   gives back stays acquired and is handed out at the next acquire.
+- **Vulkan labels:** the instance enables `VK_EXT_debug_utils` where
+  the loader offers it, which costs nothing unless a tool listens.
+  Devices, buffers, textures, views, samplers, query sets, shaders and
+  pipelines are named from their defs' labels; each labelled pass is a
+  labelled region around its barriers and work; debug groups and
+  markers become command labels. Labels are copied with a NUL, as
+  Vulkan reads them. Without the extension, labels are dropped.
 - **Vulkan queries:** a query set is a query pool. Each set a frame
   names is reset once before its first pass; a pass's timestamps are
   written before and after it, and occlusion queries bracket draws. As

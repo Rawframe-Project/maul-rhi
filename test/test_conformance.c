@@ -31,6 +31,9 @@
 #include <xcb/xcb.h>
 #endif
 
+// A label from a string literal, for a def's label and labelLength.
+#define LABEL(def, text) ((def).label = (text), (def).labelLength = sizeof(text) - 1)
+
 // The limits every adapter reaches at least, as the floor has them.
 #define AT_LEAST(X)                                                                                \
     X(textureDimension2d)                                                                          \
@@ -182,6 +185,7 @@ static mrhiViewId MakeView(mrhiDevice* device, mrhiTextureId texture, mrhiTextur
     def.texture = texture;
     def.kind = kind;
     def.aspect = aspect;
+    LABEL(def, "view");
     mrhiViewId view = {0};
     CHECK(mrhiCreateView(device, &def, &view) == mrhi_success, "a view");
     return view;
@@ -549,6 +553,7 @@ static mrhiTextureId MakeImage(mrhiDevice* device, uint32_t size, mrhiTextureUsa
     def.width = size;
     def.height = size;
     def.usage = usage;
+    LABEL(def, "image");
     mrhiTextureId texture = {0};
     CHECK(mrhiCreateTexture(device, &def, &texture) == mrhi_success, "a texture");
     return texture;
@@ -560,10 +565,12 @@ static void MakeScene(Scene* scene)
     mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
     shaderDef.bytes = s_conformanceContainer;
     shaderDef.byteCount = sizeof(s_conformanceContainer);
+    LABEL(shaderDef, "conformance");
     mrhiShaderId shader = {0};
     CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "a shader");
     mrhiRequestId request = {0};
     mrhiGraphicsPipelineDef draw = GraphicsDef(shader);
+    LABEL(draw, "triangle");
     CHECK(mrhiCreateGraphicsPipeline(device, &draw, &scene->draw, &request) == mrhi_success,
           "a pipeline");
     draw.cullMode = mrhi_cullBack;
@@ -574,6 +581,7 @@ static void MakeScene(Scene* scene)
     compute.shader = shader;
     compute.entry = "cs";
     compute.entryLength = 2;
+    LABEL(compute, "scale");
     const mrhiConstantValue scale = {.id = 0, .value = 3.0};
     compute.constants = &scale;
     compute.constantCount = 1;
@@ -584,11 +592,13 @@ static void MakeScene(Scene* scene)
     mrhiBufferDef uniform = mrhiDefaultBufferDef();
     uniform.size = 16;
     uniform.usage = mrhi_bufferUniform | mrhi_bufferCopyDestination;
+    LABEL(uniform, "scene color");
     CHECK(mrhiCreateBuffer(device, &uniform, &scene->uniform) == mrhi_success, "a uniform");
     scene->white = MakeImage(device, 1, mrhi_textureSampled | mrhi_textureCopyDestination);
     scene->target = MakeImage(device, 8, mrhi_textureRenderTarget | mrhi_textureCopySource);
     mrhiSamplerDef sampler = mrhiDefaultSamplerDef();
     sampler.magFilter = mrhi_filterLinear;
+    LABEL(sampler, "linear");
     CHECK(mrhiCreateSampler(device, &sampler, &scene->sampler) == mrhi_success, "a sampler");
     scene->data = MakeBuffer(device, 32);
 }
@@ -626,6 +636,7 @@ static mrhiPassDef DrawDef(const Scene* scene, const mrhiAccess* accesses)
 static mrhiPassId DrawPass(const Scene* scene, const mrhiAccess* accesses)
 {
     mrhiPassDef def = DrawDef(scene, accesses);
+    LABEL(def, "draw");
     mrhiPassId pass = {0};
     CHECK(mrhiAddPass(scene->device, &def, &pass) == mrhi_success, "a drawing pass");
     return pass;
@@ -717,14 +728,19 @@ static void CheckDrawFrame(Scene* scene)
               mrhiSetRootBlock(device, draw, 0, tint, sizeof(tint)) == mrhi_success,
           "a pipeline set");
     BindScene(scene, draw);
-    CHECK(mrhiDraw(device, draw, 3, 1, 2, 0) == mrhi_success &&
+    CHECK(mrhiPushDebugGroup(device, draw, "half", 4) == mrhi_success &&
+              mrhiInsertDebugMarker(device, draw, "upper left", 10) == mrhi_success &&
+              mrhiDraw(device, draw, 3, 1, 2, 0) == mrhi_success &&
+              mrhiPopDebugGroup(device, draw) == mrhi_success &&
               mrhiEndPass(device, draw) == mrhi_success,
           "drawn");
     CHECK(mrhiBeginPass(device, compute) == mrhi_success &&
               mrhiSetComputePipeline(device, compute, scene->compute) == mrhi_success,
           "a compute pipeline set");
     BindScene(scene, compute);
-    CHECK(mrhiDispatch(device, compute, 1, 1, 1) == mrhi_success &&
+    CHECK(mrhiPushDebugGroup(device, compute, "scale", 5) == mrhi_success &&
+              mrhiDispatch(device, compute, 1, 1, 1) == mrhi_success &&
+              mrhiPopDebugGroup(device, compute) == mrhi_success &&
               mrhiEndPass(device, compute) == mrhi_success,
           "dispatched");
     mrhiRequestId pixels = {0};
@@ -791,6 +807,7 @@ static void CheckCulling(Scene* scene)
 static mrhiQuerySetId MakeQuerySet(mrhiDevice* device, mrhiQueryType type, uint32_t count)
 {
     mrhiQuerySetDef def = mrhiDefaultQuerySetDef();
+    LABEL(def, "queries");
     def.type = type;
     def.count = count;
     mrhiQuerySetId set = {0};
@@ -963,6 +980,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
     def.features = *asked;
+    LABEL(def, "conformance");
     mrhiDevice* device = nullptr;
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "a device");

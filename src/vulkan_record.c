@@ -5,11 +5,13 @@
 // barriers, each state standing for a stage, an access and a layout,
 // then each kept pass's commands: pipelines, binding tables, the root
 // block, dynamic state, draws and dispatches in passes (vulkan_pass.c),
-// queries (vulkan_query.c), and copies, uploads and readbacks.
+// queries (vulkan_query.c), copies, uploads and readbacks, and each
+// pass's label and debug groups and markers (vulkan_label.c).
 
 #include "capabilities_core.h"
 #include "invariant.h"
 #include "vulkan_adapter.h"
+#include "vulkan_label.h"
 #include "vulkan_pass.h"
 #include "vulkan_query.h"
 
@@ -455,8 +457,19 @@ static void RecordCommand(mrhiVulkanRecording* recording, const mrhiCommand* com
     case mrhiCommandResolveQueries:
         mrhiVulkanQuery(recording, command);
         break;
+    case mrhiCommandPushDebugGroup:
+        mrhiVulkanBeginLabel(recording->frames->api, recording->slot->commands,
+                             (const char*)&command[1], (size_t)command->b);
+        break;
+    case mrhiCommandPopDebugGroup:
+        mrhiVulkanEndLabel(recording->frames->api, recording->slot->commands);
+        break;
+    case mrhiCommandDebugMarker:
+        mrhiVulkanInsertLabel(recording->frames->api, recording->slot->commands,
+                              (const char*)&command[1], (size_t)command->b);
+        break;
     default:
-        // Debug groups and markers wait for VK_EXT_debug_utils.
+        MRHI_ASSERT(false);
         break;
     }
 }
@@ -476,6 +489,12 @@ mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
     for (uint32_t p = 0; p < frame->passCount && recording.status == mrhi_success; ++p)
     {
         recording.pass = &frame->passes[p];
+        bool labelled = recording.pass->labelLength > 0;
+        if (labelled)
+        {
+            mrhiVulkanBeginLabel(frames->api, slot->commands, recording.pass->label,
+                                 recording.pass->labelLength);
+        }
         Barriers(&recording, &barrier, recording.pass->id);
         mrhiVulkanPassTimestamp(&recording, false);
         mrhiVulkanBeginPass(&recording);
@@ -490,6 +509,10 @@ mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
         }
         mrhiVulkanEndPass(&recording);
         mrhiVulkanPassTimestamp(&recording, true);
+        if (labelled)
+        {
+            mrhiVulkanEndLabel(frames->api, slot->commands);
+        }
     }
     Barriers(&recording, &barrier, (mrhiPassId){0});
     return recording.status;

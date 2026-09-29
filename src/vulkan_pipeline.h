@@ -62,8 +62,8 @@ mrhiResult mrhiVulkanPipelinesInit(mrhiVulkanPipelines* pipelines);
 // Destroys every pipeline and shader left, and the cache.
 void mrhiVulkanPipelinesDestroy(mrhiVulkanPipelines* pipelines);
 
-mrhiResult mrhiVulkanCreateShader(mrhiVulkanPipelines* pipelines, const mrhiContainer* container,
-                                  uint64_t* handleOut);
+mrhiResult mrhiVulkanCreateShader(mrhiVulkanPipelines* pipelines, const mrhiShaderDef* def,
+                                  const mrhiContainer* container, uint64_t* handleOut);
 void mrhiVulkanDestroyShader(mrhiVulkanPipelines* pipelines, uint64_t handle);
 
 // Makes a compute pipeline at once, answered at the next poll.

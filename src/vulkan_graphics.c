@@ -11,6 +11,7 @@
 #include "invariant.h"
 #include "reflection.h"
 #include "vulkan_adapter.h"
+#include "vulkan_label.h"
 #include "vulkan_pipeline.h"
 
 // Each vertex format's Vulkan format, as its mapping row names it.
@@ -349,6 +350,9 @@ mrhiResult mrhiVulkanCreateGraphics(mrhiVulkanPipelines* pipelines,
         return mrhiVulkanStatus(result);
     }
     made->bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    mrhiVulkanName(pipelines->api, pipelines->device, VK_OBJECT_TYPE_PIPELINE,
+                   MRHI_VULKAN_HANDLE(made->pipeline), pipeline->def->label,
+                   pipeline->def->labelLength);
     mrhiVulkanAnswer(pipelines, handle, tag);
     *handleOut = handle;
     return mrhi_success;

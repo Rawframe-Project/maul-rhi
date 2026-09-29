@@ -96,9 +96,9 @@ endif()
 if(MAUL_RHI_VULKAN_DRIVER)
     target_sources(maul-rhi PRIVATE src/driver_vulkan.c src/vulkan_adapter.c src/vulkan_api.c
                                    src/vulkan_device.c src/vulkan_frame.c src/vulkan_graphics.c
-                                   src/vulkan_memory.c src/vulkan_object.c src/vulkan_pass.c
-                                   src/vulkan_pipeline.c src/vulkan_query.c src/vulkan_record.c
-                                   src/vulkan_resource.c src/vulkan_surface.c
+                                   src/vulkan_label.c src/vulkan_memory.c src/vulkan_object.c
+                                   src/vulkan_pass.c src/vulkan_pipeline.c src/vulkan_query.c
+                                   src/vulkan_record.c src/vulkan_resource.c src/vulkan_surface.c
                                    src/vulkan_swapchain.c)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_VULKAN_DRIVER)
     # The Khronos headers, kept as published (khronos/README.md).
@@ -116,6 +116,13 @@ if(MAUL_RHI_BUILD_TESTS)
     maul_add_test(label WHITEBOX)
     maul_add_test(sha256 WHITEBOX)
     maul_add_test(tlsf WHITEBOX)
+    if(MAUL_RHI_VULKAN_DRIVER)
+        maul_add_test(vulkan_label WHITEBOX)
+        if(TARGET test_vulkan_label)
+            target_include_directories(test_vulkan_label SYSTEM PRIVATE
+                                       ${PROJECT_SOURCE_DIR}/khronos)
+        endif()
+    endif()
     maul_add_test(instance)
     if(MAUL_RHI_TEST_DRIVER)
         maul_add_test(adapter)

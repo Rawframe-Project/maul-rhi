@@ -273,7 +273,9 @@ format.
   frames acquire, render to and present; an image a dropped frame gave
   back is handed out again. A configuration whose size the window does
   not take is `mrhi_errorOutOfDate`, and one naming the twin view
-  format where the device cannot give it is unsupported.
+  format where the device cannot give it is unsupported. Labels name
+  objects and mark passes, debug groups and markers through
+  `VK_EXT_debug_utils` where the loader offers it.
 - A table's bindings record their count as the command's payload, so a
   driver steps over them; before, a driver read the bindings as
   commands.

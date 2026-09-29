@@ -10,6 +10,7 @@
 #include "capabilities_core.h"
 #include "invariant.h"
 #include "vulkan_adapter.h"
+#include "vulkan_label.h"
 #include "vulkan_resource.h"
 
 void mrhiVulkanSlotsInit(mrhiVulkanSlots* slots, uint32_t* next, uint32_t capacity)
@@ -68,6 +69,8 @@ mrhiResult mrhiVulkanCreateBuffer(mrhiVulkanObjects* objects, const mrhiBufferDe
         mrhiVulkanGiveSlot(&objects->bufferSlots, handle);
         return status;
     }
+    mrhiVulkanName(objects->api, objects->device, VK_OBJECT_TYPE_BUFFER,
+                   MRHI_VULKAN_HANDLE(made->buffer), def->label, def->labelLength);
     *handleOut = handle;
     return mrhi_success;
 }
@@ -106,6 +109,8 @@ mrhiResult mrhiVulkanCreateTexture(mrhiVulkanObjects* objects, const mrhiTexture
         mrhiVulkanGiveSlot(&objects->textureSlots, handle);
         return status;
     }
+    mrhiVulkanName(objects->api, objects->device, VK_OBJECT_TYPE_IMAGE,
+                   MRHI_VULKAN_HANDLE(made->image), def->label, def->labelLength);
     *handleOut = handle;
     return mrhi_success;
 }
@@ -183,6 +188,8 @@ mrhiResult mrhiVulkanCreateView(mrhiVulkanObjects* objects, uint64_t texture,
         mrhiVulkanGiveSlot(&objects->viewSlots, handle);
         return StatusOf(result);
     }
+    mrhiVulkanName(objects->api, objects->device, VK_OBJECT_TYPE_IMAGE_VIEW,
+                   MRHI_VULKAN_HANDLE(objects->views[handle - 1]), def->label, def->labelLength);
     *handleOut = handle;
     return mrhi_success;
 }
@@ -244,6 +251,8 @@ mrhiResult mrhiVulkanCreateSampler(mrhiVulkanObjects* objects, const mrhiSampler
         mrhiVulkanGiveSlot(&objects->samplerSlots, handle);
         return StatusOf(result);
     }
+    mrhiVulkanName(objects->api, objects->device, VK_OBJECT_TYPE_SAMPLER,
+                   MRHI_VULKAN_HANDLE(objects->samplers[handle - 1]), def->label, def->labelLength);
     *handleOut = handle;
     return mrhi_success;
 }
@@ -277,6 +286,8 @@ mrhiResult mrhiVulkanCreateQuerySet(mrhiVulkanObjects* objects, const mrhiQueryS
         mrhiVulkanGiveSlot(&objects->querySetSlots, handle);
         return StatusOf(result);
     }
+    mrhiVulkanName(objects->api, objects->device, VK_OBJECT_TYPE_QUERY_POOL,
+                   MRHI_VULKAN_HANDLE(set->pool), def->label, def->labelLength);
     *handleOut = handle;
     return mrhi_success;
 }
