@@ -884,8 +884,8 @@ restricted or absent-rejected, with how.
 
 | Concept | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
-| `mrhiShaderDef` | direct: the container's SPIR-V | restricted: reads a DXIL section, made offline and added to the container beside the SPIR-V; the library never translates at run time | restricted: reads a metallib section, made offline and added to the container beside the SPIR-V; the library never translates at run time | direct: the container's WGSL |
-| `mrhiCreateShader` | direct: vkCreateShaderModule | restricted: the DXIL section kept for the pipelines; a container without one is refused with mrhi_errorUnsupported | restricted: newLibraryWithData from the metallib section; a container without one is refused with mrhi_errorUnsupported | direct: createShaderModule |
+| `mrhiShaderDef` | direct: the container's SPIR-V | restricted: reads a DXIL section, made offline and added to the container beside the SPIR-V; the library never translates at run time | restricted: reads the container's metallib, or its MSL, made offline beside the SPIR-V (tools/mrhi_msl.py), with the Metal map placing each binding; the library never translates at run time | direct: the container's WGSL |
+| `mrhiCreateShader` | direct: vkCreateShaderModule | restricted: the DXIL section kept for the pipelines; a container without one is refused with mrhi_errorUnsupported | restricted: newLibraryWithData from the metallib, or newLibraryWithSource from each entry's MSL; a container with neither is refused with mrhi_errorUnsupported | direct: createShaderModule |
 | `mrhiDestroyShader` | direct: vkDestroyShaderModule | direct: the DXIL released | direct: the MTLLibrary released | direct: the module dropped |
 
 ## shader: the library's own

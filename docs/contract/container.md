@@ -1,8 +1,8 @@
 # The Maul RHI shader container
 
-A shader container holds the SPIR-V and WGSL of a set of entry points,
-made offline, beside one reflection in WebGPU's binding terms (record
-mrhi-0009). `tools/mrhi_container.py` writes it, and
+A shader container holds the SPIR-V, WGSL and Metal code of a set of
+entry points, made offline, beside one reflection in WebGPU's binding
+terms (record mrhi-0009). `tools/mrhi_container.py` writes it, and
 `mrhiCreateShader` reads it, checking every byte as hostile input.
 
 All numbers are little-endian. `mrhiCreateShader` takes the container
@@ -57,10 +57,16 @@ after checking their bounds, so a later writer can add sections.
 | 8 | SPIR-V | yes | a SPIR-V module holding every entry point |
 | 9 | WGSL | unless an entry uses a heap | a WGSL module holding every entry point, UTF-8 |
 | 10 | inter-stage variables | no | 8-byte interface records |
+| 11 | Metal map | with Metal code | where each binding lies in Metal, and each entry's MSL |
+| 12 | MSL | no | Metal Shading Language sources, UTF-8 |
+| 13 | metallib | no | a Metal library holding every entry point |
 
 An array section's size is a whole number of its records, at most
 4,096 of them. Every record is checked, whether or not an entry names
 it.
+
+Metal code is optional: a container has the Metal map exactly when it
+has MSL, a metallib, or both, and none of its entries uses a heap.
 
 ## Entries
 
@@ -138,6 +144,45 @@ record:
 - Locations are unique within an entry's inputs, its outputs and its
   variables.
 
+## The Metal map
+
+Metal binds by index, per class of argument: buffers (0 to 30),
+textures (0 to 127) and samplers (0 to 15). The map says where the
+root block and each binding lie, and where each entry's MSL is:
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | u8 | the root block's buffer index; 255 when the root block is empty |
+| 1 | 7 bytes | zero |
+| 8 | 16 bytes per entry | the entries, in the entries section's order |
+| after them | u8 per binding | each binding's index in its class, in the bindings section's order |
+
+Its size is exactly that. An entry's record:
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | u32 | its MSL's offset in the MSL section |
+| 4 | u32 | its MSL's length in bytes; both 0 when there is no MSL section |
+| 8 | u8 | the buffer index of its buffer sizes (SPIRV-Cross's `spvBufferSizeConstants`); 255 when it has none |
+| 9 | 7 bytes | zero |
+
+- Buffers (uniform, storage and read-only storage) take buffer indices,
+  sampled and storage textures texture indices, samplers sampler
+  indices, each within its class's range.
+- No two bindings share an index in their class, and no binding buffer
+  is the root block's.
+- An entry's buffer sizes index is a buffer index no binding and not
+  the root block uses.
+- With an MSL section, every entry's MSL lies inside it and is
+  well-formed UTF-8 without NUL, holding that entry as a function of
+  the same name; SPIRV-Cross writes one entry per source, so each has
+  its own. A metallib holds every entry as a function of its name, and
+  begins with `MTLB`.
+
+Vertex buffers take buffer indices from 30 downwards, vertex buffer 0
+at 30; the Metal driver refuses a pipeline whose vertex buffers reach
+an index its container uses.
+
 ## On a device
 
 `mrhiCreateShader` refuses as unsupported a container that exceeds the
@@ -174,16 +219,20 @@ same for every pipeline made from it.
 - **The SPIR-V section:** a whole number of 32-bit words, at least the
   five of a module's header, the first of them `0x07230203`.
 - **The WGSL section:** well-formed UTF-8 without NUL.
+- **The MSL section:** its entries' ranges, as the Metal map says.
+- **The metallib section:** at least its four-byte magic.
 
 Drivers check the code itself when they make their modules.
 
 ## The writer
 
-`tools/mrhi_container.py SPIRV WGSL REFLECTION OUTPUT` writes a
-container from the two modules and a JSON reflection (`-` for the WGSL
-of a container whose entries use heaps); its opening
-comment shows the reflection's form, whose enum names are the
-contract's without their prefixes. It applies the rules above, and
+`tools/mrhi_container.py [--msl DIR] [--metallib FILE] SPIRV WGSL
+REFLECTION OUTPUT` writes a container from the two modules and a JSON
+reflection (`-` for the WGSL of a container whose entries use heaps);
+its opening comment shows the reflection's form, whose enum names are
+the contract's without their prefixes. With `--msl`, it reads each
+entry's MSL from `DIR/ENTRY.metal`; with `--metallib`, the library; with
+either, it writes the Metal map by the rule below. It applies the rules above, and
 refuses code that disagrees with the reflection:
 - both modules hold exactly the reflection's entry points, with their
   stages; a WGSL compute entry's workgroup size is literal, since no
@@ -196,3 +245,13 @@ refuses code that disagrees with the reflection:
 
 A module may leave out a binding it does not use. The writer uses
 Python's standard library only.
+
+The writer's Metal rule: the root block at buffer 0; bindings in
+(table, slot) order, buffers from index 1, textures and samplers from
+0. An entry's MSL must declare its function with its stage's keyword
+(`vertex`, `fragment` or `kernel`) and use no buffer, texture or sampler
+index outside the map, except its buffer sizes, which the writer reads
+from the MSL. `tools/mrhi_msl.py SPIRV REFLECTION DIR` makes that MSL
+with SPIRV-Cross: it rewrites a copy of the SPIR-V's descriptor
+decorations to the rule's indices and crosses each entry to
+`DIR/ENTRY.metal`.

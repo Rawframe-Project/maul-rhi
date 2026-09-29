@@ -17,16 +17,17 @@
 #include <stdckdint.h>
 #include <string.h>
 
-#define HEADER_BYTES   64
-#define SECTION_BYTES  24
-#define ENTRY_BYTES    48
-#define BINDING_BYTES  24
-#define VARIABLE_BYTES 8
-#define CONSTANT_BYTES 16
-#define SECTION_TYPES  10
-#define MAX_SECTIONS   64
-#define MAX_ROOT_BLOCK 256
-#define MAX_NAME       256
+#define HEADER_BYTES      64
+#define SECTION_BYTES     24
+#define ENTRY_BYTES       48
+#define BINDING_BYTES     24
+#define VARIABLE_BYTES    8
+#define CONSTANT_BYTES    16
+#define METAL_ENTRY_BYTES 16
+#define SECTION_TYPES     13
+#define MAX_SECTIONS      64
+#define MAX_ROOT_BLOCK    256
+#define MAX_NAME          256
 // The records an array section holds at most, which also bounds the
 // uniqueness checks' work.
 #define MAX_RECORDS 4096
@@ -44,7 +45,15 @@ enum
     SECTION_SPIRV,
     SECTION_WGSL,
     SECTION_VARIABLES,
+    SECTION_METAL_MAP,
+    SECTION_MSL,
+    SECTION_METALLIB,
 };
+
+// Metal's argument indices per class: buffers, textures and samplers.
+#define METAL_BUFFERS  31
+#define METAL_TEXTURES 128
+#define METAL_SAMPLERS 16
 
 static bool IsZero(const uint8_t* at, size_t count)
 {
@@ -229,6 +238,26 @@ mrhiShaderConstant mrhiContainerConstant(const mrhiContainer* container, uint32_
         .bits = mrhiRead32(at + 8),
         .required = at[12] != 0,
     };
+}
+
+uint8_t mrhiContainerMetalRoot(const mrhiContainer* container)
+{
+    return container->metalMap[0];
+}
+
+mrhiMetalEntry mrhiContainerMetalEntry(const mrhiContainer* container, uint32_t index)
+{
+    const uint8_t* at = container->metalMap + 8 + (size_t)index * METAL_ENTRY_BYTES;
+    return (mrhiMetalEntry){
+        .mslOffset = mrhiRead32(at),
+        .mslLength = mrhiRead32(at + 4),
+        .sizesIndex = at[8],
+    };
+}
+
+uint8_t mrhiContainerMetalIndex(const mrhiContainer* container, uint32_t binding)
+{
+    return container->metalMap[8 + (size_t)container->entryCount * METAL_ENTRY_BYTES + binding];
 }
 
 // What an interface record is.
@@ -441,6 +470,121 @@ static bool IsConstantValid(const mrhiContainer* container, uint32_t index)
     return true;
 }
 
+// A binding's Metal class and its count of indices.
+static uint32_t MetalClass(mrhiBindingKind kind, uint32_t* limitOut)
+{
+    switch (kind)
+    {
+    case mrhi_bindingSampler:
+        *limitOut = METAL_SAMPLERS;
+        return 2;
+    case mrhi_bindingSampledTexture:
+    case mrhi_bindingStorageTexture:
+        *limitOut = METAL_TEXTURES;
+        return 1;
+    default:
+        *limitOut = METAL_BUFFERS;
+        return 0;
+    }
+}
+
+// Whether a buffer index is a binding's, or the root block's.
+static bool IsMetalBufferTaken(const mrhiContainer* container, uint8_t index)
+{
+    if (index == mrhiContainerMetalRoot(container))
+    {
+        return true;
+    }
+    for (uint32_t i = 0; i < container->bindingCount; ++i)
+    {
+        uint32_t limit = 0;
+        if (MetalClass(mrhiContainerBinding(container, i).kind, &limit) == 0 &&
+            mrhiContainerMetalIndex(container, i) == index)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Whether each binding's Metal index is in its class's range, apart from
+// the bindings of its class before it and from the root block.
+static bool AreMetalBindingsValid(const mrhiContainer* container)
+{
+    uint8_t root = mrhiContainerMetalRoot(container);
+    for (uint32_t i = 0; i < container->bindingCount; ++i)
+    {
+        uint32_t limit = 0;
+        uint32_t kind = MetalClass(mrhiContainerBinding(container, i).kind, &limit);
+        uint8_t index = mrhiContainerMetalIndex(container, i);
+        if (index >= limit || (kind == 0 && index == root))
+        {
+            return false;
+        }
+        for (uint32_t j = 0; j < i; ++j)
+        {
+            uint32_t otherLimit = 0;
+            if (MetalClass(mrhiContainerBinding(container, j).kind, &otherLimit) == kind &&
+                mrhiContainerMetalIndex(container, j) == index)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+// Whether an entry's Metal record is well formed: its MSL inside the MSL
+// section, or none without one, and its buffer sizes at a free index.
+static bool IsMetalEntryValid(const mrhiContainer* container, uint32_t index)
+{
+    const uint8_t* raw = container->metalMap + 8 + (size_t)index * METAL_ENTRY_BYTES;
+    mrhiMetalEntry entry = mrhiContainerMetalEntry(container, index);
+    uint64_t end = (uint64_t)entry.mslOffset + entry.mslLength;
+    bool code =
+        container->msl == nullptr
+            ? entry.mslOffset == 0 && entry.mslLength == 0
+            : entry.mslLength > 0 && end <= container->mslBytes &&
+                  mrhiIsTextValid((const char*)container->msl + entry.mslOffset, entry.mslLength);
+    bool sizes =
+        entry.sizesIndex == MRHI_METAL_NONE ||
+        (entry.sizesIndex < METAL_BUFFERS && !IsMetalBufferTaken(container, entry.sizesIndex));
+    return IsZero(raw + 9, 7) && code && sizes;
+}
+
+// Whether the Metal code agrees with the rules: the map exactly when
+// there is MSL or a metallib and no entry uses a heap, of its size, with
+// its root block, bindings and entries well formed.
+static bool IsMetalValid(const mrhiContainer* container)
+{
+    bool code = container->msl != nullptr || container->metallib != nullptr;
+    if (container->metalMap == nullptr)
+    {
+        return !code;
+    }
+    uint64_t size =
+        8 + (uint64_t)container->entryCount * METAL_ENTRY_BYTES + container->bindingCount;
+    if (!code || container->heapUses != 0 || container->metalMapBytes != size)
+    {
+        return false;
+    }
+    uint8_t root = mrhiContainerMetalRoot(container);
+    bool rootValid =
+        container->rootBlockBytes == 0 ? root == MRHI_METAL_NONE : root < METAL_BUFFERS;
+    if (!IsZero(container->metalMap + 1, 7) || !rootValid || !AreMetalBindingsValid(container))
+    {
+        return false;
+    }
+    for (uint32_t i = 0; i < container->entryCount; ++i)
+    {
+        if (!IsMetalEntryValid(container, i))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 // Whether the records agree with the rules and with each other; notes
 // 16-bit floats and the builtins and heap uses of the entries.
 static bool AreRecordsValid(mrhiContainer* container)
@@ -485,12 +629,14 @@ static bool AreRecordsValid(mrhiContainer* container)
             return false;
         }
     }
-    return true;
+    return IsMetalValid(container);
 }
 
 // Takes the meta, strings and code sections. An absent section has size
 // 0, so the size checks require the meta and SPIR-V; the strings are
 // required by the entries' names, and the WGSL by entries using no heap.
+// A metallib has its magic; the Metal map and MSL are checked with the
+// records.
 static bool TakeParts(const uint8_t* bytes, const Section* sections, uint32_t count,
                       mrhiContainer* container)
 {
@@ -511,8 +657,17 @@ static bool TakeParts(const uint8_t* bytes, const Section* sections, uint32_t co
     container->wgslBytes = size;
     bool wgsl = size == 0 || mrhiIsTextValid((const char*)container->wgsl, size);
     container->wgsl = size > 0 ? container->wgsl : nullptr;
+    container->metalMap = FindSection(bytes, sections, count, SECTION_METAL_MAP, &size);
+    container->metalMapBytes = size;
+    container->msl = FindSection(bytes, sections, count, SECTION_MSL, &size);
+    container->mslBytes = size;
+    container->msl = size > 0 ? container->msl : nullptr;
+    container->metallib = FindSection(bytes, sections, count, SECTION_METALLIB, &size);
+    container->metallibBytes = size;
+    container->metallib = size > 0 ? container->metallib : nullptr;
+    bool metallib = size == 0 || (size >= 4 && memcmp(container->metallib, "MTLB", 4) == 0);
     return container->rootBlockBytes % 4 == 0 && container->rootBlockBytes <= MAX_ROOT_BLOCK &&
-           strings && spirv && wgsl;
+           strings && spirv && wgsl && metallib;
 }
 
 mrhiResult mrhiParseContainer(const void* bytes, size_t size, mrhiContainer* containerOut)

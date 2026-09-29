@@ -14266,7 +14266,7 @@
             },
             "metal": {
               "class": "restricted",
-              "note": "reads a metallib section, made offline and added to the container beside the SPIR-V; the library never translates at run time"
+              "note": "reads the container's metallib, or its MSL, made offline beside the SPIR-V (tools/mrhi_msl.py), with the Metal map placing each binding; the library never translates at run time"
             },
             "web_gpu": {
               "class": "direct",
@@ -14365,7 +14365,7 @@
             },
             "metal": {
               "class": "restricted",
-              "note": "newLibraryWithData from the metallib section; a container without one is refused with mrhi_errorUnsupported"
+              "note": "newLibraryWithData from the metallib, or newLibraryWithSource from each entry's MSL; a container with neither is refused with mrhi_errorUnsupported"
             },
             "web_gpu": {
               "class": "direct",

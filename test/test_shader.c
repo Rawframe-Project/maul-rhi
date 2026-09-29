@@ -672,6 +672,149 @@ static void TestConstantsAndCode(void)
     CHECK(Built() == mrhi_errorInvalid, "WGSL with NUL");
 }
 
+// Resets and adds every Metal section, then sets byte at of the map.
+static mrhiResult MapWith(size_t at, uint8_t value)
+{
+    Reset();
+    AddMetal(true, true);
+    s_sections[METAL_MAP].bytes[at] = value;
+    return Built();
+}
+
+// The offset in the map of entry index's record, and of binding index.
+#define MAP_ENTRY(index)   (8 + (index) * 16)
+#define MAP_BINDING(index) (56 + (index))
+
+static void TestMetalCode(void)
+{
+    Reset();
+    AddMetal(true, true);
+    Assemble();
+    mrhiContainer container;
+    CHECK(mrhiParseContainer(s_container, s_size, &container) == mrhi_success, "every Metal part");
+    mrhiMetalEntry fragment = mrhiContainerMetalEntry(&container, 1);
+    CHECK(container.metalMap != nullptr && container.mslBytes == 56 &&
+              container.metallibBytes == 8 && mrhiContainerMetalRoot(&container) == 0 &&
+              fragment.mslOffset == 18 && fragment.mslLength == 20 &&
+              memcmp(container.msl + 18, "fragment void fs(){}", 20) == 0 &&
+              fragment.sizesIndex == MRHI_METAL_NONE &&
+              mrhiContainerMetalIndex(&container, 2) == 3 &&
+              mrhiContainerMetalIndex(&container, 5) == 1,
+          "the map read back");
+    Reset();
+    AddMetal(true, false);
+    CHECK(Built() == mrhi_success, "MSL alone");
+    Reset();
+    AddMetal(false, true);
+    CHECK(Built() == mrhi_success, "a metallib alone");
+    Reset();
+    AddMetal(false, false);
+    CHECK(Built() == mrhi_errorInvalid, "a map without code");
+    Reset();
+    AddMetal(true, true);
+    Drop(METAL_MAP);
+    CHECK(Built() == mrhi_errorInvalid, "code without a map");
+    Reset();
+    AddMetal(false, true);
+    Drop(METAL_MAP);
+    CHECK(Built() == mrhi_errorInvalid, "a metallib without a map");
+    Reset();
+    AddMetal(true, true);
+    s_sections[s_sectionCount++] = (Section){.type = 11};
+    CHECK(Built() == mrhi_errorInvalid, "a repeated map");
+    Reset();
+    AddMetal(true, true);
+    s_sections[METAL_MAP].size -= 1;
+    CHECK(Built() == mrhi_errorInvalid, "a map short of a binding");
+    s_sections[METAL_MAP].size += 2;
+    CHECK(Built() == mrhi_errorInvalid, "a map a byte long");
+    s_sections[METAL_MAP].size = 0;
+    CHECK(Built() == mrhi_errorInvalid, "an empty map");
+    Reset();
+    AddMetal(false, true);
+    s_sections[METAL_MAP + 1].bytes[3] = 'C';
+    CHECK(Built() == mrhi_errorInvalid, "a metallib without its magic");
+    s_sections[METAL_MAP + 1].bytes[3] = 'B';
+    s_sections[METAL_MAP + 1].size = 3;
+    Assemble();
+    // The magic's last byte in the padding after it, which nothing checks.
+    s_container[OffsetOf(METAL_MAP + 1) + 3] = 'B';
+    Seal();
+    CHECK(Parse() == mrhi_errorInvalid, "a metallib shorter than its magic");
+    SetHeapUses(2, mrhi_heapUseStorageBuffers);
+    AddMetal(true, true);
+    CHECK(Built() == mrhi_errorInvalid, "Metal code beside a heap");
+}
+
+static void TestMetalMap(void)
+{
+    for (size_t at = 1; at < 8; ++at)
+    {
+        CHECK(MapWith(at, 1) == mrhi_errorInvalid, "a map zero that is not zero");
+    }
+    CHECK(MapWith(0, 30) == mrhi_success, "the root block at buffer 30");
+    CHECK(MapWith(0, 31) == mrhi_errorInvalid, "the root block past the buffers");
+    CHECK(MapWith(0, 255) == mrhi_errorInvalid, "no root block's index for one");
+    CHECK(MapWith(0, 1) == mrhi_errorInvalid, "the root block on a binding's buffer");
+    Reset();
+    Put32(Record(META, 0, 16), 0);
+    AddMetal(true, true);
+    s_sections[METAL_MAP].bytes[0] = 255;
+    CHECK(Built() == mrhi_success, "no root block, no index");
+    s_sections[METAL_MAP].bytes[0] = 0;
+    CHECK(Built() == mrhi_errorInvalid, "an index for an empty root block");
+    CHECK(MapWith(MAP_BINDING(0), 30) == mrhi_success, "a buffer at 30");
+    CHECK(MapWith(MAP_BINDING(0), 31) == mrhi_errorInvalid, "a buffer past 30");
+    CHECK(MapWith(MAP_BINDING(1), 1) == mrhi_errorInvalid, "two buffers at one index");
+    CHECK(MapWith(MAP_BINDING(0), 0) == mrhi_errorInvalid, "a buffer on the root block");
+    CHECK(MapWith(MAP_BINDING(3), 15) == mrhi_success, "a sampler at 15");
+    CHECK(MapWith(MAP_BINDING(3), 16) == mrhi_errorInvalid, "a sampler past 15");
+    CHECK(MapWith(MAP_BINDING(4), 127) == mrhi_success, "a texture at 127");
+    CHECK(MapWith(MAP_BINDING(4), 128) == mrhi_errorInvalid, "a texture past 127");
+    CHECK(MapWith(MAP_BINDING(5), 0) == mrhi_errorInvalid, "two textures at one index");
+    CHECK(MapWith(MAP_BINDING(3), 1) == mrhi_success, "a sampler on a texture's index");
+    CHECK(MapWith(MAP_BINDING(4), 3) == mrhi_success, "a texture on a buffer's index");
+    CHECK(MapWith(MAP_ENTRY(2) + 8, 30) == mrhi_success, "buffer sizes at a free index");
+    CHECK(MapWith(MAP_ENTRY(2) + 8, 31) == mrhi_errorInvalid, "buffer sizes past 30");
+    CHECK(MapWith(MAP_ENTRY(2) + 8, 0) == mrhi_errorInvalid, "buffer sizes on the root block");
+    CHECK(MapWith(MAP_ENTRY(2) + 8, 2) == mrhi_errorInvalid, "buffer sizes on a binding");
+    CHECK(MapWith(MAP_ENTRY(2) + 8, 4) == mrhi_success &&
+              MapWith(MAP_ENTRY(1) + 8, 4) == mrhi_success,
+          "buffer sizes on an index a texture or sampler uses");
+    for (size_t at = 9; at < 16; ++at)
+    {
+        CHECK(MapWith(MAP_ENTRY(0) + at, 1) == mrhi_errorInvalid,
+              "an entry's zero that is not zero");
+    }
+}
+
+static void TestMetalSources(void)
+{
+    CHECK(MapWith(MAP_ENTRY(1) + 4, 0) == mrhi_errorInvalid, "an entry without MSL");
+    CHECK(MapWith(MAP_ENTRY(2) + 4, 19) == mrhi_errorInvalid, "MSL a byte past the section");
+    CHECK(MapWith(MAP_ENTRY(2) + 4, 17) == mrhi_success, "MSL short of the section's end");
+    CHECK(MapWith(MAP_ENTRY(2) + 3, 0xFF) == mrhi_errorInvalid, "MSL far past the section");
+    CHECK(MapWith(MAP_ENTRY(0) + 4, 38) == mrhi_success, "one MSL range over another");
+    Reset();
+    AddMetal(true, true);
+    Put32(s_sections[METAL_MAP].bytes + MAP_ENTRY(2), 0xFFFFFFF0u);
+    Put32(s_sections[METAL_MAP].bytes + MAP_ENTRY(2) + 4, 0x20u);
+    CHECK(Built() == mrhi_errorInvalid, "an MSL range whose end wraps");
+    Reset();
+    AddMetal(true, true);
+    s_sections[MSL].bytes[40] = 0;
+    CHECK(Built() == mrhi_errorInvalid, "MSL with NUL");
+    s_sections[MSL].bytes[40] = 0xC0;
+    CHECK(Built() == mrhi_errorInvalid, "MSL that is not UTF-8");
+    Reset();
+    AddMetal(false, true);
+    Put32(s_sections[METAL_MAP].bytes + MAP_ENTRY(0) + 4, 1);
+    CHECK(Built() == mrhi_errorInvalid, "an MSL range without MSL");
+    Put32(s_sections[METAL_MAP].bytes + MAP_ENTRY(0) + 4, 0);
+    Put32(s_sections[METAL_MAP].bytes + MAP_ENTRY(0), 1);
+    CHECK(Built() == mrhi_errorInvalid, "an MSL offset without MSL");
+}
+
 // A container whose input section is moved past the others and holds
 // count records, each valid on its own.
 static mrhiResult WithInputs(uint32_t count)
@@ -1209,6 +1352,9 @@ int main(int argc, char** argv)
     TestHeapUses();
     TestBindings();
     TestConstantsAndCode();
+    TestMetalCode();
+    TestMetalMap();
+    TestMetalSources();
     TestRecordLimit();
     TestEveryFlip();
     TestCreate();

@@ -56,11 +56,22 @@ they are untrusted.
   must keep its parts inside its bytes and apart, and decode into a
   reflection that finds every entry and frees what it took. CI runs it
   for a minute on every push.
-- **Native codes:** the D3D12 and Metal drivers read DXIL and metallib
+- **Native codes:** the D3D12 and Metal drivers read DXIL and Metal
   sections, made offline beside the SPIR-V and added as new section
   types when those drivers land; readers already skip section types
   they do not know. A container without the section its driver needs
   is refused as unsupported.
+- **Metal code** (amended for the Metal driver): a Metal map, and MSL,
+  a metallib or both, for containers using no heap. Metal takes a
+  metallib, which only Apple's toolchain makes, or Metal Shading
+  Language, which Metal compiles itself; the MSL lets a cook without
+  that toolchain target Metal, while the library still translates
+  nothing, and the driver prefers the metallib. SPIRV-Cross writes one
+  entry per source, so each entry has its own MSL. The map records
+  where the root block and each binding lie, a buffer, texture or
+  sampler index, so a cook other than `tools/mrhi_msl.py` may place
+  them its own way; the reader checks the indices against Metal's
+  ranges and each other.
 - **The writer**, `tools/mrhi_container.py`, standard library only,
   applies the same rules and refuses modules whose entry points or
   bindings disagree with the reflection.

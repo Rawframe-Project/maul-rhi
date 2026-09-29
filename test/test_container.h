@@ -33,6 +33,10 @@ enum
     WGSL,
     VARIABLES,
     DEFAULT_SECTIONS,
+    // The Metal sections AddMetal appends.
+    METAL_MAP = DEFAULT_SECTIONS,
+    MSL,
+    METALLIB,
 };
 
 typedef struct Section
@@ -172,6 +176,44 @@ static inline void Reset(void)
     Put32(spirv, 0x07230203u);
     Put32(spirv + 4, 0x00010300u);
     memcpy(Record(WGSL, 0, 8), "fn x(){}", 8);
+}
+
+// Appends the Metal map and, as asked, MSL and a metallib to the default
+// container: the root block at buffer 0, the three buffers at 1 to 3,
+// the sampler and both textures from 0, and a source per entry.
+static inline void AddMetal(bool msl, bool metallib)
+{
+    static const char* const sources[] = {"vertex void vs(){}", "fragment void fs(){}",
+                                          "kernel void cs(){}"};
+    s_sections[METAL_MAP] = (Section){.type = 11};
+    Record(METAL_MAP, 0, 8)[0] = 0;
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < 3; ++i)
+    {
+        uint32_t length = (uint32_t)strlen(sources[i]);
+        uint8_t* entry = Record(METAL_MAP, 0, 8 + (i + 1) * 16) + 8 + i * 16;
+        Put32(entry, msl ? offset : 0);
+        Put32(entry + 4, msl ? length : 0);
+        entry[8] = 255;
+        offset += length;
+    }
+    static const uint8_t indices[] = {1, 2, 3, 0, 0, 1};
+    memcpy(Record(METAL_MAP, 0, 56 + sizeof(indices)) + 56, indices, sizeof(indices));
+    s_sectionCount = METAL_MAP + 1;
+    s_sections[s_sectionCount] = (Section){.type = 12};
+    for (uint32_t i = 0, at = 0; i < 3 && msl; ++i)
+    {
+        size_t length = strlen(sources[i]);
+        memcpy(Record(s_sectionCount, 0, at + length) + at, sources[i], length);
+        at += (uint32_t)length;
+    }
+    s_sectionCount += msl ? 1 : 0;
+    s_sections[s_sectionCount] = (Section){.type = 13};
+    if (metallib)
+    {
+        memcpy(Record(s_sectionCount, 0, 8), "MTLB\1\0\0\0", 8);
+        ++s_sectionCount;
+    }
 }
 
 // Writes the digest of the container's bytes past it.

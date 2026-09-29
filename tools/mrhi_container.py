@@ -55,9 +55,20 @@
 # from the first vertex for integers. A constant without a default must
 # be set by every pipeline.
 #
-# usage: mrhi_container.py SPIRV WGSL|- REFLECTION OUTPUT
+# Metal code is optional, and only for containers using no heap: with
+# --msl, each entry's MSL from DIR/NAME.metal (tools/mrhi_msl.py makes
+# them); with --metallib, a Metal library holding every entry. The Metal
+# map then places the root block at buffer 0 and the bindings, in
+# (table, slot) order, at buffers from 1 and textures and samplers from
+# 0. Each entry's MSL must declare its function with its stage's keyword
+# and use no index outside the map, but for SPIRV-Cross's buffer sizes
+# (spvBufferSizeConstants), whose index the map records. Of a metallib,
+# only the magic is checked.
+#
+# usage: mrhi_container.py [--msl DIR] [--metallib FILE] SPIRV WGSL|- REFLECTION OUTPUT
 # Standard library only; exits 1 naming the first problem.
 
+import argparse
 import hashlib
 import json
 import os
@@ -85,6 +96,12 @@ HEAP_SET = 4
 RESOURCE_HEAP = 0
 SAMPLER_HEAP = 1
 RESOURCE_USES = ("sampled_textures", "storage_textures", "storage_buffers")
+# Metal: the indices of each class of argument, the root block's buffer,
+# an unused index, and each stage's function keyword.
+METAL_LIMITS = {"buffer": 31, "texture": 128, "sampler": 16}
+METAL_ROOT = 0
+METAL_NONE = 255
+MSL_KEYWORDS = {"vertex": "vertex", "fragment": "fragment", "compute": "kernel"}
 
 
 class ContainerError(Exception):
@@ -304,7 +321,8 @@ def pack_constant(constant, enums):
 
 # The code's entry points and bindings.
 
-def strip_wgsl_comments(text):
+def strip_comments(text):
+    """WGSL or MSL without its comments."""
     text = re.sub(r"//[^\n]*", "", text)
     out = []
     depth = 0
@@ -356,7 +374,7 @@ def wgsl_facts(space, type_name):
 
 
 def check_wgsl(text, reflection, bindings):
-    text = strip_wgsl_comments(text)
+    text = strip_comments(text)
     entries = {}
     for match in WGSL_ENTRY.finditer(text):
         attributes, name = match.groups()
@@ -437,13 +455,103 @@ def check_spirv(code, reflection, bindings):
              f"SPIR-V binds {key[0]}.{key[1]}, which the reflection does not")
 
 
+# Metal.
+
+def metal_class(kind):
+    if kind == "sampler":
+        return "sampler"
+    return "texture" if kind.endswith("texture") else "buffer"
+
+
+def metal_indices(bindings):
+    """The writer's Metal rule: each binding's index in its class, in the
+    order given, the classes filled in (table, slot) order, buffers from
+    1 after the root block, textures and samplers from 0."""
+    order = sorted(range(len(bindings)), key=lambda i: (bindings[i]["table"],
+                                                        bindings[i]["slot"]))
+    following = {"buffer": METAL_ROOT + 1, "texture": 0, "sampler": 0}
+    indices = [0] * len(bindings)
+    for i in order:
+        kind = metal_class(bindings[i]["kind"])
+        indices[i] = following[kind]
+        following[kind] += 1
+    for kind, limit in METAL_LIMITS.items():
+        need(following[kind] <= limit, f"Metal: more {kind}s than its {limit} indices")
+    return indices
+
+
+MSL_FUNCTION = re.compile(r"\b(vertex|fragment|kernel)\b[^;{}()]*?\b(\w+)\s*\(")
+MSL_INDEX = re.compile(r"\[\[\s*(buffer|texture|sampler)\s*\(\s*(\d+)\s*\)\s*\]\]")
+MSL_SIZES = re.compile(r"\bspvBufferSizeConstants\s*\[\[\s*buffer\s*\(\s*(\d+)\s*\)\s*\]\]")
+
+
+def check_msl(entry, code, root, taken):
+    """Checks an entry's MSL and answers its buffer sizes' index."""
+    where = f"MSL of {entry['name']}"
+    try:
+        text = code.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ContainerError(f"{where}: not UTF-8 ({error})") from error
+    need(text and "\0" not in text, f"{where}: empty, or holds NUL")
+    text = strip_comments(text)
+    keyword = MSL_KEYWORDS[entry["stage"]]
+    functions = {m.groups() for m in MSL_FUNCTION.finditer(text)}
+    need((keyword, entry["name"]) in functions,
+         f"{where}: no {keyword} function {entry['name']}")
+    sizes = [int(m.group(1)) for m in MSL_SIZES.finditer(text)]
+    need(len(sizes) <= 1, f"{where}: buffer sizes twice")
+    allowed = set(taken)
+    if root:
+        allowed.add(("buffer", METAL_ROOT))
+    if sizes:
+        need(sizes[0] < METAL_LIMITS["buffer"] and ("buffer", sizes[0]) not in allowed,
+             f"{where}: buffer sizes at buffer {sizes[0]}, which is taken or past the limit")
+        allowed.add(("buffer", sizes[0]))
+    for match in MSL_INDEX.finditer(text):
+        kind, index = match.group(1), int(match.group(2))
+        need((kind, index) in allowed, f"{where}: {kind} {index} is outside the Metal map")
+    return sizes[0] if sizes else METAL_NONE
+
+
+def metal_sections(reflection, root, msl, metallib):
+    """The Metal map, MSL and metallib sections, or none without Metal
+    code."""
+    if msl is None and metallib is None:
+        return []
+    need(not any(e.get("heap_uses") for e in reflection["entries"]),
+         "Metal reads no heaps yet: a container using one has no Metal code")
+    bindings = reflection.get("bindings", [])
+    indices = metal_indices(bindings)
+    taken = {(metal_class(b["kind"]), i) for b, i in zip(bindings, indices)}
+    records = b""
+    source = b""
+    for entry in reflection["entries"]:
+        offset = length = 0
+        sizes = METAL_NONE
+        if msl is not None:
+            need(entry["name"] in msl, f"no MSL for entry {entry['name']}")
+            code = msl[entry["name"]]
+            sizes = check_msl(entry, code, root, taken)
+            offset, length = len(source), len(code)
+            source += code
+        records += struct.pack("<IIB7x", offset, length, sizes)
+    head = struct.pack("<B7x", METAL_ROOT if root else METAL_NONE)
+    sections = [(11, head + records + bytes(indices))]
+    if msl is not None:
+        sections.append((12, source))
+    if metallib is not None:
+        need(metallib[:4] == b"MTLB", "metallib: not a Metal library")
+        sections.append((13, metallib))
+    return sections
+
+
 # The container.
 
 def pad8(data):
     return data + bytes(-len(data) % 8)
 
 
-def build(spirv, wgsl, reflection, enums):
+def build(spirv, wgsl, reflection, enums, msl=None, metallib=None):
     keys(reflection, ("root_block_bytes", "entries", "bindings", "constants"), "the reflection")
     root = number(reflection.get("root_block_bytes", 0), "the root block's bytes", 0,
                   MAX_ROOT_BLOCK)
@@ -490,6 +598,7 @@ def build(spirv, wgsl, reflection, enums):
         (10, b"".join(r for _, r in variables)),
     ]
     sections = [(kind, data) for kind, data in sections if kind != 9 or data]
+    sections += metal_sections(reflection, root, msl, metallib)
     offset = 64 + 24 * len(sections)
     table = b""
     body = b""
@@ -503,10 +612,16 @@ def build(spirv, wgsl, reflection, enums):
 
 
 def main():
-    if len(sys.argv) != 5:
-        print("usage: mrhi_container.py SPIRV WGSL|- REFLECTION OUTPUT", file=sys.stderr)
-        return 2
-    spirv_path, wgsl_path, reflection_path, output_path = sys.argv[1:]
+    parser = argparse.ArgumentParser(prog="mrhi_container.py")
+    parser.add_argument("--msl", metavar="DIR", help="each entry's MSL, in DIR/NAME.metal")
+    parser.add_argument("--metallib", metavar="FILE", help="a Metal library of every entry")
+    parser.add_argument("spirv", metavar="SPIRV")
+    parser.add_argument("wgsl", metavar="WGSL|-")
+    parser.add_argument("reflection", metavar="REFLECTION")
+    parser.add_argument("output", metavar="OUTPUT")
+    args = parser.parse_args()
+    spirv_path, wgsl_path, reflection_path, output_path = (args.spirv, args.wgsl,
+                                                           args.reflection, args.output)
     try:
         with open(CONTRACT, encoding="utf-8") as f:
             enums = Enums(json.load(f))
@@ -518,7 +633,21 @@ def main():
                 wgsl = f.read()
         with open(reflection_path, encoding="utf-8") as f:
             reflection = json.load(f)
-        container = build(spirv, wgsl, reflection, enums)
+        msl = None
+        if args.msl is not None:
+            msl = {}
+            for entry in reflection.get("entries", []):
+                name = entry.get("name") if isinstance(entry, dict) else None
+                if isinstance(name, str) and os.path.basename(name) == name:
+                    path = os.path.join(args.msl, name + ".metal")
+                    if os.path.exists(path):
+                        with open(path, "rb") as f:
+                            msl[name] = f.read()
+        metallib = None
+        if args.metallib is not None:
+            with open(args.metallib, "rb") as f:
+                metallib = f.read()
+        container = build(spirv, wgsl, reflection, enums, msl, metallib)
     except (OSError, ValueError, ContainerError) as error:
         print(f"mrhi_container: {error}", file=sys.stderr)
         return 1

@@ -8,8 +8,10 @@
 # test/shaders/bindless.{comp,json}, whose entry reads heaps and so has
 # no WGSL, and each sample's samples/shaders/NAME.*. glslangValidator
 # compiles each stage under its entry name, spirv-link joins them into
-# one module, spirv-val checks it for Vulkan 1.3, and
-# tools/mrhi_container.py writes the container, which lands beside its
+# one module, spirv-val checks it for Vulkan 1.3, tools/mrhi_msl.py
+# crosses each entry of a container with WGSL to MSL through
+# spirv-cross, and tools/mrhi_container.py writes the container, which
+# lands beside its
 # sources in NAME_container.h as bytes. CI runs none of these tools; the
 # headers are committed, and this script is run again whenever a source
 # changes.
@@ -23,7 +25,8 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Each container: its directory, its name, its stages' sources and
-# entries, and whether it has WGSL.
+# entries, and whether it has WGSL, and so MSL (a container reading
+# heaps has neither).
 CONTAINERS = (
     ("test/shaders", "conformance", (("vert", "vs"), ("frag", "fs"), ("comp", "cs"),
                                      ("placed.vert", "vp"), ("root.frag", "fr"),
@@ -57,9 +60,15 @@ def build(work, shaders, name, stages, wgsl):
     run("spirv-link", "--target-env", "vulkan1.3", *modules, "-o", linked)
     run("spirv-val", "--target-env", "vulkan1.3", linked)
     container = os.path.join(work, f"{name}.mrsc")
-    run(sys.executable, os.path.join(ROOT, "tools", "mrhi_container.py"), linked,
+    reflection = os.path.join(shaders, f"{name}.json")
+    metal = []
+    if wgsl:
+        msl = os.path.join(work, "msl")
+        run(sys.executable, os.path.join(ROOT, "tools", "mrhi_msl.py"), linked, reflection, msl)
+        metal = ["--msl", msl]
+    run(sys.executable, os.path.join(ROOT, "tools", "mrhi_container.py"), *metal, linked,
         os.path.join(shaders, f"{name}.wgsl") if wgsl else "-",
-        os.path.join(shaders, f"{name}.json"), container)
+        reflection, container)
     with open(container, "rb") as file:
         return file.read()
 

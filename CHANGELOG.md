@@ -344,6 +344,11 @@ format.
   by CTest on the native driver and in headless Chrome.
 - The web test runner's page has a second canvas, and ends a run at
   once when a file it loads is missing.
+- Metal code in shader containers: a Metal map, each entry's MSL and
+  a metallib (sections 11 to 13), checked by the reader;
+  `tools/mrhi_container.py --msl --metallib` writes them and
+  `tools/mrhi_msl.py` makes the MSL offline with SPIRV-Cross. The
+  suite's and the samples' containers carry MSL.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.
