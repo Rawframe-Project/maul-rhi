@@ -80,7 +80,29 @@
     X(vkCmdCopyBuffer)                                                                             \
     X(vkCmdCopyBufferToImage)                                                                      \
     X(vkCmdCopyImageToBuffer)                                                                      \
-    X(vkCmdCopyImage)
+    X(vkCmdCopyImage)                                                                              \
+    X(vkCreateDescriptorPool)                                                                      \
+    X(vkDestroyDescriptorPool)                                                                     \
+    X(vkResetDescriptorPool)                                                                       \
+    X(vkAllocateDescriptorSets)                                                                    \
+    X(vkUpdateDescriptorSets)                                                                      \
+    X(vkCmdBeginRendering)                                                                         \
+    X(vkCmdEndRendering)                                                                           \
+    X(vkCmdBindPipeline)                                                                           \
+    X(vkCmdBindDescriptorSets)                                                                     \
+    X(vkCmdPushConstants)                                                                          \
+    X(vkCmdSetViewport)                                                                            \
+    X(vkCmdSetScissor)                                                                             \
+    X(vkCmdSetBlendConstants)                                                                      \
+    X(vkCmdSetStencilReference)                                                                    \
+    X(vkCmdBindVertexBuffers2)                                                                     \
+    X(vkCmdBindIndexBuffer)                                                                        \
+    X(vkCmdDraw)                                                                                   \
+    X(vkCmdDrawIndexed)                                                                            \
+    X(vkCmdDispatch)                                                                               \
+    X(vkCmdDrawIndirect)                                                                           \
+    X(vkCmdDrawIndexedIndirect)                                                                    \
+    X(vkCmdDispatchIndirect)
 
 #define MRHI_VULKAN_FIELD(name) PFN_##name name;
 

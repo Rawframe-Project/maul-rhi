@@ -72,6 +72,16 @@ ids, requests, the frame graph) can be tested without a GPU.
   so a program may replace each object once between submissions. The
   core's resource states map to Vulkan stages, accesses and layouts for
   its barriers.
+- **Vulkan passes:** a pass renders between `vkCmdBeginRendering` and
+  `vkCmdEndRendering` over views of its targets, a resolve averaging
+  samples; its viewport covers the targets with a negative height, so
+  that +Y points up in normalized device coordinates as on every
+  driver, with the targets' origin at their top-left corner, and every
+  draw state starts at its default. A table's bindings are written into a
+  descriptor set taken from the slot's pools, which reset when the slot
+  is reused, and each recorded binding carries its slot's kind so the
+  driver knows the descriptor type without the reflection. The root
+  block is pushed as constants to the pipeline's stages.
 - **Conformance:** `test_conformance` runs the same checks through the
   public API on the test driver and on every native adapter, with a
   shader container made offline from `test/shaders/` by

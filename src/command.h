@@ -92,8 +92,9 @@ typedef struct mrhiCommand
 // One binding of a table as recorded: its slot and object (a frame
 // resource's slot plus one, 0 for a sampler); a buffer's offset and
 // resolved size, a sampler's driver handle, or a texture view's first
-// layer and layers; and a texture view's format, kind, aspect, first mip
-// and mips.
+// layer and layers; a texture view's format, kind, aspect, first mip
+// and mips; and the slot's binding kind, which says how a driver writes
+// it (a buffer as uniform or storage, a texture as sampled or storage).
 typedef struct mrhiCommandBinding
 {
     uint32_t slot;
@@ -105,7 +106,8 @@ typedef struct mrhiCommandBinding
     uint8_t aspect;
     uint8_t baseMip;
     uint8_t mipCount;
-    uint16_t reserved;
+    uint8_t kind;
+    uint8_t reserved;
 } mrhiCommandBinding;
 
 // A buffer's side of a copy as recorded: its frame resource's slot plus

@@ -865,7 +865,7 @@ restricted or absent-rejected, with how.
 
 | Concept | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
-| `mrhiViewport` | direct: VkViewport | direct: D3D12_VIEWPORT | direct: MTLViewport | direct: setViewport's arguments |
+| `mrhiViewport` | direct: VkViewport with a negative height, y at the bottom edge, so +Y points up | direct: D3D12_VIEWPORT | direct: MTLViewport | direct: setViewport's arguments |
 | `mrhiScissorRect` | direct: VkRect2D | direct: D3D12_RECT | direct: MTLScissorRect | direct: setScissorRect's arguments |
 | `mrhiBinding` | direct: a VkDescriptorBufferInfo, VkDescriptorImageInfo or sampler written to the table's set | direct: a view or sampler descriptor written to the table's range | direct: a buffer, texture or sampler encoded into the table's argument buffer | direct: a GPUBindGroupEntry |
 | `mrhiExtent3d` | direct: VkExtent3D | direct: the box's width, height and depth | direct: MTLSize | direct: GPUExtent3D |

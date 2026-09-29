@@ -265,9 +265,12 @@ format.
   shaders and compute and graphics pipelines are made, answered at the
   next poll, with a pipeline cache. Frames of copies, uploads and
   readbacks run, with transients in each frame slot's memory, and
-  destroyed objects retire after the next frame finishes. Surfaces,
-  queries and passes that draw or dispatch on it are refused as
+  destroyed objects retire after the next frame finishes. Passes draw
+  and dispatch, with +Y up. Surfaces and queries are refused as
   unsupported until they land.
+- A table's bindings record their count as the command's payload, so a
+  driver steps over them; before, a driver read the bindings as
+  commands.
 - The conformance suite (`test_conformance`): the same checks through
   the public API on the test driver and every native adapter, run on
   lavapipe under the Khronos validation layer in Linux CI.

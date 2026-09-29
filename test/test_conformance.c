@@ -514,6 +514,277 @@ static void CheckPipelines(mrhiDevice* device)
           "the cache exported");
 }
 
+// What the drawing checks use: the conformance shader's pipelines, a
+// uniform color, a white texel, a sampler, an 8 by 8 target and a
+// storage buffer.
+typedef struct Scene
+{
+    mrhiDevice* device;
+    mrhiGraphicsPipelineId draw;
+    mrhiGraphicsPipelineId culled;
+    mrhiComputePipelineId compute;
+    mrhiBufferId uniform;
+    mrhiTextureId white;
+    mrhiSamplerId sampler;
+    mrhiTextureId target;
+    mrhiBufferId data;
+    // The same objects imported into the open frame.
+    mrhiResourceId u;
+    mrhiResourceId w;
+    mrhiResourceId t;
+    mrhiResourceId d;
+} Scene;
+
+static const float kColor[4] = {1.0f, 0.2f, 0.6f, 1.0f};
+
+static mrhiTextureId MakeImage(mrhiDevice* device, uint32_t size, mrhiTextureUsage usage)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = mrhi_formatRgba8Unorm;
+    def.width = size;
+    def.height = size;
+    def.usage = usage;
+    mrhiTextureId texture = {0};
+    CHECK(mrhiCreateTexture(device, &def, &texture) == mrhi_success, "a texture");
+    return texture;
+}
+
+static void MakeScene(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_conformanceContainer;
+    shaderDef.byteCount = sizeof(s_conformanceContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "a shader");
+    mrhiRequestId request = {0};
+    mrhiGraphicsPipelineDef draw = GraphicsDef(shader);
+    CHECK(mrhiCreateGraphicsPipeline(device, &draw, &scene->draw, &request) == mrhi_success,
+          "a pipeline");
+    draw.cullMode = mrhi_cullBack;
+    draw.frontFace = mrhi_frontClockwise;
+    CHECK(mrhiCreateGraphicsPipeline(device, &draw, &scene->culled, &request) == mrhi_success,
+          "a culling pipeline");
+    mrhiComputePipelineDef compute = mrhiDefaultComputePipelineDef();
+    compute.shader = shader;
+    compute.entry = "cs";
+    compute.entryLength = 2;
+    const mrhiConstantValue scale = {.id = 0, .value = 3.0};
+    compute.constants = &scale;
+    compute.constantCount = 1;
+    CHECK(mrhiCreateComputePipeline(device, &compute, &scene->compute, &request) == mrhi_success,
+          "a compute pipeline");
+    AwaitPipelines(device, 3, 0);
+    CHECK(mrhiDestroyShader(device, shader) == mrhi_success, "the shader destroyed");
+    mrhiBufferDef uniform = mrhiDefaultBufferDef();
+    uniform.size = 16;
+    uniform.usage = mrhi_bufferUniform | mrhi_bufferCopyDestination;
+    CHECK(mrhiCreateBuffer(device, &uniform, &scene->uniform) == mrhi_success, "a uniform");
+    scene->white = MakeImage(device, 1, mrhi_textureSampled | mrhi_textureCopyDestination);
+    scene->target = MakeImage(device, 8, mrhi_textureRenderTarget | mrhi_textureCopySource);
+    mrhiSamplerDef sampler = mrhiDefaultSamplerDef();
+    sampler.magFilter = mrhi_filterLinear;
+    CHECK(mrhiCreateSampler(device, &sampler, &scene->sampler) == mrhi_success, "a sampler");
+    scene->data = MakeBuffer(device, 32);
+}
+
+// Begins a frame with the scene's objects imported.
+static void BeginScene(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportBuffer(device, scene->uniform, &scene->u) == mrhi_success &&
+              mrhiImportTexture(device, scene->white, &scene->w) == mrhi_success &&
+              mrhiImportTexture(device, scene->target, &scene->t) == mrhi_success &&
+              mrhiImportBuffer(device, scene->data, &scene->d) == mrhi_success,
+          "a frame of the scene");
+}
+
+// A pass drawing the target, cleared to black, with the scene's
+// accesses: table 0 holds the uniform and the storage buffer.
+static mrhiPassId DrawPass(const Scene* scene, const mrhiAccess* accesses)
+{
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.colorTargets[0] = (mrhiColorTarget){
+        .resource = scene->t,
+        .load = mrhi_loadClear,
+        .store = mrhi_storeKeep,
+        .clear = {0.0f, 0.0f, 0.0f, 1.0f},
+    };
+    def.colorTargetCount = 1;
+    def.accesses = accesses;
+    def.accessCount = 3;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(scene->device, &def, &pass) == mrhi_success, "a drawing pass");
+    return pass;
+}
+
+// Binds both of the container's tables, which every pass using one of
+// its pipelines sets.
+static void BindScene(const Scene* scene, mrhiPassId pass)
+{
+    const mrhiBinding table0[2] = {
+        {.slot = 0, .resource = scene->u, .size = MRHI_WHOLE_SIZE},
+        {.slot = 1, .resource = scene->d, .size = MRHI_WHOLE_SIZE},
+    };
+    CHECK(mrhiSetBindings(scene->device, pass, 0, table0, 2) == mrhi_success, "table 0");
+    const mrhiBinding table1[2] = {
+        {.slot = 0,
+         .resource = scene->w,
+         .range = {.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING}},
+        {.slot = 1, .sampler = scene->sampler},
+    };
+    CHECK(mrhiSetBindings(scene->device, pass, 1, table1, 2) == mrhi_success, "table 1");
+}
+
+// Reads the target back: its pixels, 4 bytes each, rows of 8.
+static mrhiRequestId ReadTarget(const Scene* scene, mrhiPassId pass)
+{
+    const mrhiTextureCopy source = {.resource = scene->t};
+    const mrhiExtent3d extent = {8, 8, 1};
+    mrhiRequestId request = {0};
+    CHECK(mrhiReadTexture(scene->device, pass, &source, &extent, &request) == mrhi_success,
+          "a target read");
+    return request;
+}
+
+static bool IsColor(const uint8_t* pixel)
+{
+    const int expected[4] = {255, 51, 153, 255};
+    for (int i = 0; i < 4; ++i)
+    {
+        int difference = pixel[i] - expected[i];
+        if (difference < -1 || difference > 1)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool IsBlack(const uint8_t* pixel)
+{
+    return pixel[0] == 0 && pixel[1] == 0 && pixel[2] == 0 && pixel[3] == 255;
+}
+
+// One frame uploads the scene, draws the upper left half of the target
+// (vertices 2 to 4, the triangle y > x with +Y up), scales the storage buffer in a
+// compute pass and reads both back.
+static void CheckDrawFrame(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    BeginScene(scene);
+    mrhiAccess uploads[3] = {Whole(scene->u, mrhi_accessCopyDestination),
+                             Whole(scene->w, mrhi_accessCopyDestination),
+                             Whole(scene->d, mrhi_accessCopyDestination)};
+    mrhiPassId upload = CopyPass(device, uploads, 3);
+    mrhiAccess draws[3] = {Whole(scene->u, mrhi_accessUniform),
+                           Whole(scene->d, mrhi_accessStorageReadWrite),
+                           Whole(scene->w, mrhi_accessSampled)};
+    mrhiPassId draw = DrawPass(scene, draws);
+    mrhiPassId compute = CopyPass(device, draws, 3);
+    mrhiAccess reads[2] = {Whole(scene->t, mrhi_accessCopySource),
+                           Whole(scene->d, mrhi_accessCopySource)};
+    mrhiPassId read = CopyPass(device, reads, 2);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    const uint8_t white[4] = {255, 255, 255, 255};
+    uint32_t values[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    const mrhiTextureCopy texel = {.resource = scene->w};
+    const mrhiTexelLayout layout = {.bytesPerRow = 4, .rowsPerImage = 1};
+    const mrhiExtent3d one = {1, 1, 1};
+    CHECK(
+        mrhiBeginPass(device, upload) == mrhi_success &&
+            mrhiWriteBuffer(device, upload, scene->u, 0, kColor, sizeof(kColor)) == mrhi_success &&
+            mrhiWriteTexture(device, upload, &texel, white, 4, &layout, &one) == mrhi_success &&
+            mrhiWriteBuffer(device, upload, scene->d, 0, values, sizeof(values)) == mrhi_success &&
+            mrhiEndPass(device, upload) == mrhi_success,
+        "uploaded");
+    const float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    CHECK(mrhiBeginPass(device, draw) == mrhi_success &&
+              mrhiSetGraphicsPipeline(device, draw, scene->draw) == mrhi_success &&
+              mrhiSetRootBlock(device, draw, 0, tint, sizeof(tint)) == mrhi_success,
+          "a pipeline set");
+    BindScene(scene, draw);
+    CHECK(mrhiDraw(device, draw, 3, 1, 2, 0) == mrhi_success &&
+              mrhiEndPass(device, draw) == mrhi_success,
+          "drawn");
+    CHECK(mrhiBeginPass(device, compute) == mrhi_success &&
+              mrhiSetComputePipeline(device, compute, scene->compute) == mrhi_success,
+          "a compute pipeline set");
+    BindScene(scene, compute);
+    CHECK(mrhiDispatch(device, compute, 1, 1, 1) == mrhi_success &&
+              mrhiEndPass(device, compute) == mrhi_success,
+          "dispatched");
+    mrhiRequestId pixels = {0};
+    mrhiRequestId scaled = {0};
+    CHECK(mrhiBeginPass(device, read) == mrhi_success, "reading");
+    pixels = ReadTarget(scene, read);
+    CHECK(mrhiReadBuffer(device, read, scene->d, 0, sizeof(values), &scaled) == mrhi_success &&
+              mrhiEndPass(device, read) == mrhi_success,
+          "read");
+    Finish(device, 2);
+    uint8_t image[256];
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success &&
+              size == sizeof(image),
+          "the pixels");
+    // Pixel (1, 0) lies above y = x with +Y up, and (6, 7) below it.
+    CHECK(!s_runs || (IsColor(&image[4]) && IsBlack(&image[(7 * 8 + 6) * 4])),
+          "the triangle drawn with +Y up");
+    for (int i = 0; i < 8; ++i)
+    {
+        values[i] *= 3;
+    }
+    CHECK(Taken(device, scaled, (const uint8_t*)values, sizeof(values)), "scaled by 3");
+}
+
+// A counter-clockwise triangle with clockwise front faces and back
+// faces culled draws nothing.
+static void CheckCulling(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    BeginScene(scene);
+    mrhiAccess draws[3] = {Whole(scene->u, mrhi_accessUniform),
+                           Whole(scene->d, mrhi_accessStorageReadWrite),
+                           Whole(scene->w, mrhi_accessSampled)};
+    mrhiPassId draw = DrawPass(scene, draws);
+    mrhiAccess reads = Whole(scene->t, mrhi_accessCopySource);
+    mrhiPassId read = CopyPass(device, &reads, 1);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    const float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    CHECK(mrhiBeginPass(device, draw) == mrhi_success &&
+              mrhiSetGraphicsPipeline(device, draw, scene->culled) == mrhi_success &&
+              mrhiSetRootBlock(device, draw, 0, tint, sizeof(tint)) == mrhi_success,
+          "a pipeline set");
+    BindScene(scene, draw);
+    CHECK(mrhiDraw(device, draw, 3, 1, 0, 0) == mrhi_success &&
+              mrhiEndPass(device, draw) == mrhi_success &&
+              mrhiBeginPass(device, read) == mrhi_success,
+          "drawn");
+    mrhiRequestId pixels = ReadTarget(scene, read);
+    CHECK(mrhiEndPass(device, read) == mrhi_success, "read");
+    Finish(device, 1);
+    uint8_t image[256];
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success,
+          "the pixels");
+    bool black = true;
+    for (int i = 0; i < 64; ++i)
+    {
+        black = black && IsBlack(&image[i * 4]);
+    }
+    CHECK(!s_runs || black, "a counter-clockwise triangle culled as a back face");
+}
+
+static void CheckDrawing(mrhiDevice* device)
+{
+    Scene scene = {.device = device};
+    MakeScene(&scene);
+    CheckDrawFrame(&scene);
+    CheckCulling(&scene);
+}
+
 // A device made with the cache the last one exported takes it.
 static void CheckCacheImport(mrhiInstance* instance, mrhiAdapterId adapter)
 {
@@ -558,6 +829,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CheckFrameMemory(device);
     CheckPipelines(device);
     CheckRoundTrip(device);
+    CheckDrawing(device);
     mrhiDestroyDevice(device);
 }
 

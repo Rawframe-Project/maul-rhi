@@ -16643,7 +16643,7 @@
         {
           "kind": "struct",
           "name": "viewport",
-          "doc": "Where rendering lands: a rectangle of the targets and a depth range.",
+          "doc": "Where rendering lands: a rectangle of the targets, from their top-left corner, and a depth range. +Y points up in normalized device coordinates, on every driver.",
           "members": [
             {
               "name": "x",
@@ -16679,7 +16679,7 @@
           "mapping": {
             "vulkan": {
               "class": "direct",
-              "note": "VkViewport"
+              "note": "VkViewport with a negative height, y at the bottom edge, so +Y points up"
             },
             "d3d12": {
               "class": "direct",

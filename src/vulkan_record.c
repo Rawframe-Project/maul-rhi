@@ -3,15 +3,17 @@
 //
 // Records a submitted frame on Vulkan (vulkan_frame.h): the core's
 // barriers, each state standing for a stage, an access and a layout,
-// then each kept pass's commands. This slice runs passes without
-// targets whose commands copy, upload and read back; other work is
-// refused as unsupported until the passes that draw land.
+// then each kept pass's commands: pipelines, binding tables, the root
+// block, dynamic state, draws and dispatches in passes (vulkan_pass.c),
+// and copies, uploads and readbacks. Queries and surface images are
+// refused as unsupported until their slices land.
 
 #include "capabilities_core.h"
-#include "command.h"
 #include "invariant.h"
 #include "vulkan_adapter.h"
-#include "vulkan_frame.h"
+#include "vulkan_pass.h"
+
+#include "maul-rhi/encoder.h"
 
 #include <string.h>
 
@@ -76,60 +78,6 @@ static const Use s_uses[] = {
     [mrhi_statePresent] = {VK_PIPELINE_STAGE_2_NONE, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR},
 };
 
-// A frame resource's Vulkan image and def.
-typedef struct Texture
-{
-    VkImage image;
-    const mrhiTextureDef* def;
-} Texture;
-
-static const mrhiDriverResource* Find(const mrhiDriverFrame* frame, uint32_t index1)
-{
-    MRHI_ASSERT(index1 != 0 && index1 <= frame->resourceCount);
-    return &frame->resources[index1 - 1];
-}
-
-static bool IsTexture(const mrhiDriverResource* resource)
-{
-    return resource->kind == mrhiDriverDeviceTexture ||
-           resource->kind == mrhiDriverTransientTexture;
-}
-
-static Texture TextureOf(const mrhiVulkanFrames* frames, const mrhiVulkanSlot* slot,
-                         const mrhiDriverFrame* frame, uint32_t index1)
-{
-    const mrhiDriverResource* resource = Find(frame, index1);
-    VkImage image = resource->kind == mrhiDriverDeviceTexture
-                        ? frames->objects->textures[resource->handle - 1].image
-                        : slot->images[index1 - 1];
-    return (Texture){.image = image, .def = resource->texture};
-}
-
-static VkBuffer BufferOf(const mrhiVulkanFrames* frames, const mrhiVulkanSlot* slot,
-                         const mrhiDriverFrame* frame, uint32_t index1)
-{
-    const mrhiDriverResource* resource = Find(frame, index1);
-    return resource->kind == mrhiDriverDeviceBuffer
-               ? frames->objects->buffers[resource->handle - 1].buffer
-               : slot->buffers[index1 - 1];
-}
-
-static VkImageAspectFlags AspectOf(mrhiTextureAspect aspect, mrhiFormat format)
-{
-    if (aspect == mrhi_aspectDepthOnly)
-    {
-        return VK_IMAGE_ASPECT_DEPTH_BIT;
-    }
-    if (aspect == mrhi_aspectStencilOnly)
-    {
-        return VK_IMAGE_ASPECT_STENCIL_BIT;
-    }
-    VkImageAspectFlags flags = 0;
-    flags |= mrhiFormatHasDepth(format) ? VK_IMAGE_ASPECT_DEPTH_BIT : 0;
-    flags |= mrhiFormatHasStencil(format) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0;
-    return flags != 0 ? flags : VK_IMAGE_ASPECT_COLOR_BIT;
-}
-
 // The barriers gathered for one vkCmdPipelineBarrier2.
 typedef struct Batch
 {
@@ -139,7 +87,7 @@ typedef struct Batch
     uint32_t bufferCount;
 } Batch;
 
-static void Flush(const mrhiVulkanFrames* frames, const mrhiVulkanSlot* slot, Batch* batch)
+static void Flush(const mrhiVulkanRecording* recording, Batch* batch)
 {
     if (batch->imageCount + batch->bufferCount == 0)
     {
@@ -152,17 +100,25 @@ static void Flush(const mrhiVulkanFrames* frames, const mrhiVulkanSlot* slot, Ba
         .imageMemoryBarrierCount = batch->imageCount,
         .pImageMemoryBarriers = batch->images,
     };
-    frames->api->vkCmdPipelineBarrier2(slot->commands, &dependency);
+    recording->frames->api->vkCmdPipelineBarrier2(recording->slot->commands, &dependency);
     batch->imageCount = 0;
     batch->bufferCount = 0;
 }
 
-static void AddBarrier(const mrhiVulkanFrames* frames, const mrhiVulkanSlot* slot,
-                       const mrhiDriverFrame* frame, const mrhiBarrier* barrier, Batch* batch)
+static bool IsTexture(const mrhiDriverFrame* frame, uint32_t index1)
+{
+    MRHI_ASSERT(index1 != 0 && index1 <= frame->resourceCount);
+    mrhiDriverResourceKind kind = frame->resources[index1 - 1].kind;
+    return kind == mrhiDriverDeviceTexture || kind == mrhiDriverTransientTexture;
+}
+
+static void AddBarrier(const mrhiVulkanRecording* recording, const mrhiBarrier* barrier,
+                       Batch* batch)
 {
     const Use* before = &s_uses[barrier->before];
     const Use* after = &s_uses[barrier->after];
-    if (!IsTexture(Find(frame, barrier->resource.index1)))
+    uint32_t index1 = barrier->resource.index1;
+    if (!IsTexture(recording->frame, index1))
     {
         batch->buffers[batch->bufferCount++] = (VkBufferMemoryBarrier2){
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
@@ -172,14 +128,14 @@ static void AddBarrier(const mrhiVulkanFrames* frames, const mrhiVulkanSlot* slo
             .dstAccessMask = after->access,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .buffer = BufferOf(frames, slot, frame, barrier->resource.index1),
+            .buffer = mrhiVulkanFrameBuffer(recording, index1),
             .size = VK_WHOLE_SIZE,
         };
     }
     else
     {
         const mrhiTextureRange* range = &barrier->range;
-        Texture resource = TextureOf(frames, slot, frame, barrier->resource.index1);
+        mrhiVulkanFrameTexture texture = mrhiVulkanFrameImage(recording, index1);
         batch->images[batch->imageCount++] = (VkImageMemoryBarrier2){
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
             .srcStageMask = before->stages,
@@ -190,37 +146,32 @@ static void AddBarrier(const mrhiVulkanFrames* frames, const mrhiVulkanSlot* slo
             .newLayout = after->layout,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = resource.image,
-            .subresourceRange =
-                {
-                    .aspectMask = AspectOf(range->aspect, resource.def->format),
-                    .baseMipLevel = range->baseMip,
-                    .levelCount = range->mipCount,
-                    .baseArrayLayer = range->baseLayer,
-                    .layerCount = range->layerCount,
-                },
+            .image = texture.image,
+            .subresourceRange = {mrhiVulkanAspect(range->aspect, texture.def->format),
+                                 range->baseMip, range->mipCount, range->baseLayer,
+                                 range->layerCount},
         };
     }
     if (batch->imageCount == BATCH || batch->bufferCount == BATCH)
     {
-        Flush(frames, slot, batch);
+        Flush(recording, batch);
     }
 }
 
 // Records the barriers from the cursor on that come before a pass (a
 // null id for the frame's end), moving the cursor past them.
-static void Barriers(const mrhiVulkanFrames* frames, const mrhiVulkanSlot* slot,
-                     const mrhiDriverFrame* frame, size_t* cursor, mrhiPassId pass)
+static void Barriers(const mrhiVulkanRecording* recording, size_t* cursor, mrhiPassId pass)
 {
+    const mrhiDriverFrame* frame = recording->frame;
     Batch batch = {.imageCount = 0};
     size_t at = *cursor;
     while (at < frame->barrierCount && frame->barriers[at].pass.index1 == pass.index1 &&
            frame->barriers[at].pass.generation == pass.generation)
     {
-        AddBarrier(frames, slot, frame, &frame->barriers[at], &batch);
+        AddBarrier(recording, &frame->barriers[at], &batch);
         ++at;
     }
-    Flush(frames, slot, &batch);
+    Flush(recording, &batch);
     *cursor = at;
 }
 
@@ -247,7 +198,7 @@ static VkBufferImageCopy RegionOf(const mrhiCommandBufferSide* buffer,
         .bufferImageHeight = buffer->rowsPerImage * block.height,
         .imageSubresource =
             {
-                .aspectMask = AspectOf(texture->aspect, def->format),
+                .aspectMask = mrhiVulkanAspect(texture->aspect, def->format),
                 .mipLevel = texture->mip,
                 .baseArrayLayer = volume ? 0 : texture->z,
                 .layerCount = volume ? 1 : depth,
@@ -259,28 +210,26 @@ static VkBufferImageCopy RegionOf(const mrhiCommandBufferSide* buffer,
 
 // A buffer side's Vulkan buffer: staging and the readback ring are
 // object 0.
-static VkBuffer SideBuffer(const mrhiVulkanFrames* frames, const mrhiVulkanSlot* slot,
-                           const mrhiDriverFrame* frame, const mrhiCommand* command,
+static VkBuffer SideBuffer(const mrhiVulkanRecording* recording, const mrhiCommand* command,
                            uint32_t object)
 {
     if (object != 0)
     {
-        return BufferOf(frames, slot, frame, object);
+        return mrhiVulkanFrameBuffer(recording, object);
     }
     bool upload =
         command->type == mrhiCommandWriteBuffer || command->type == mrhiCommandWriteTexture;
-    return upload ? slot->staging : frames->readback;
+    return upload ? recording->slot->staging : recording->frames->readback;
 }
 
-static void NoteReadback(const mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, uint64_t offset,
-                         uint64_t size)
+static void NoteReadback(const mrhiVulkanRecording* recording, uint64_t offset, uint64_t size)
 {
-    MRHI_ASSERT(slot->readbackCount < frames->readbackLimit);
+    mrhiVulkanSlot* slot = recording->slot;
+    MRHI_ASSERT(slot->readbackCount < recording->frames->readbackLimit);
     slot->readbacks[slot->readbackCount++] = (mrhiVulkanRange){.offset = offset, .size = size};
 }
 
-static void CopyBuffers(const mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
-                        const mrhiDriverFrame* frame, const mrhiCommand* command)
+static void CopyBuffers(const mrhiVulkanRecording* recording, const mrhiCommand* command)
 {
     mrhiCommandBufferSide sides[2];
     memcpy(sides, &command[1], sizeof(sides));
@@ -289,17 +238,16 @@ static void CopyBuffers(const mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
         .dstOffset = sides[1].offset,
         .size = command->b,
     };
-    frames->api->vkCmdCopyBuffer(
-        slot->commands, SideBuffer(frames, slot, frame, command, sides[0].object),
-        SideBuffer(frames, slot, frame, command, sides[1].object), 1, &region);
+    recording->frames->api->vkCmdCopyBuffer(
+        recording->slot->commands, SideBuffer(recording, command, sides[0].object),
+        SideBuffer(recording, command, sides[1].object), 1, &region);
     if (command->type == mrhiCommandReadBuffer)
     {
-        NoteReadback(frames, slot, sides[1].offset, command->b);
+        NoteReadback(recording, sides[1].offset, command->b);
     }
 }
 
-static void CopyWithTexture(const mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
-                            const mrhiDriverFrame* frame, const mrhiCommand* command)
+static void CopyWithTexture(const mrhiVulkanRecording* recording, const mrhiCommand* command)
 {
     bool fromBuffer =
         command->type == mrhiCommandCopyBufferToTexture || command->type == mrhiCommandWriteTexture;
@@ -307,66 +255,192 @@ static void CopyWithTexture(const mrhiVulkanFrames* frames, mrhiVulkanSlot* slot
     mrhiCommandTextureSide texture;
     memcpy(&buffer, fromBuffer ? &command[1] : &command[2], sizeof(buffer));
     memcpy(&texture, fromBuffer ? &command[2] : &command[1], sizeof(texture));
-    Texture image = TextureOf(frames, slot, frame, texture.object);
+    mrhiVulkanFrameTexture image = mrhiVulkanFrameImage(recording, texture.object);
     uint64_t bytes = 0;
     VkBufferImageCopy region = RegionOf(&buffer, &texture, image.def, command, &bytes);
-    VkBuffer side = SideBuffer(frames, slot, frame, command, buffer.object);
+    VkBuffer side = SideBuffer(recording, command, buffer.object);
+    const mrhiVulkanDevice* api = recording->frames->api;
     if (fromBuffer)
     {
-        frames->api->vkCmdCopyBufferToImage(slot->commands, side, image.image,
-                                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        api->vkCmdCopyBufferToImage(recording->slot->commands, side, image.image,
+                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
         return;
     }
-    frames->api->vkCmdCopyImageToBuffer(slot->commands, image.image,
-                                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, side, 1, &region);
+    api->vkCmdCopyImageToBuffer(recording->slot->commands, image.image,
+                                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, side, 1, &region);
     if (command->type == mrhiCommandReadTexture)
     {
-        NoteReadback(frames, slot, buffer.offset, bytes);
+        NoteReadback(recording, buffer.offset, bytes);
     }
 }
 
-static void CopyTextures(const mrhiVulkanFrames* frames, const mrhiVulkanSlot* slot,
-                         const mrhiDriverFrame* frame, const mrhiCommand* command)
+static void CopyTextures(const mrhiVulkanRecording* recording, const mrhiCommand* command)
 {
     mrhiCommandTextureSide sides[2];
     memcpy(sides, &command[1], sizeof(sides));
     const mrhiCommandTextureSide* source = &sides[0];
     const mrhiCommandTextureSide* target = &sides[1];
-    Texture from = TextureOf(frames, slot, frame, source->object);
-    Texture to = TextureOf(frames, slot, frame, target->object);
+    mrhiVulkanFrameTexture from = mrhiVulkanFrameImage(recording, source->object);
+    mrhiVulkanFrameTexture to = mrhiVulkanFrameImage(recording, target->object);
     bool volume = from.def->kind == mrhi_texture3d;
     uint32_t depth = (uint32_t)command->d;
     const VkImageCopy region = {
-        .srcSubresource = {AspectOf(source->aspect, from.def->format), source->mip,
+        .srcSubresource = {mrhiVulkanAspect(source->aspect, from.def->format), source->mip,
                            volume ? 0 : source->z, volume ? 1 : depth},
         .srcOffset = {(int32_t)source->x, (int32_t)source->y, volume ? (int32_t)source->z : 0},
-        .dstSubresource = {AspectOf(target->aspect, to.def->format), target->mip,
+        .dstSubresource = {mrhiVulkanAspect(target->aspect, to.def->format), target->mip,
                            volume ? 0 : target->z, volume ? 1 : depth},
         .dstOffset = {(int32_t)target->x, (int32_t)target->y, volume ? (int32_t)target->z : 0},
         .extent = {(uint32_t)command->b, (uint32_t)command->c, volume ? depth : 1},
     };
-    frames->api->vkCmdCopyImage(slot->commands, from.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                to.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    recording->frames->api->vkCmdCopyImage(recording->slot->commands, from.image,
+                                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, to.image,
+                                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 }
 
-static void RecordCommand(const mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
-                          const mrhiDriverFrame* frame, const mrhiCommand* command)
+static void SetPipeline(mrhiVulkanRecording* recording, const mrhiCommand* command)
+{
+    const mrhiVulkanPipeline* pipeline = &recording->frames->pipelines->pipelines[command->b - 1];
+    recording->pipeline = pipeline;
+    recording->frames->api->vkCmdBindPipeline(recording->slot->commands, pipeline->bindPoint,
+                                              pipeline->pipeline);
+}
+
+// Sets dynamic state from a command and the payload that follows it.
+static void SetState(const mrhiVulkanRecording* recording, const mrhiCommand* command)
+{
+    const mrhiVulkanDevice* api = recording->frames->api;
+    VkCommandBuffer commands = recording->slot->commands;
+    switch (command->type)
+    {
+    case mrhiCommandRootBlock:
+        api->vkCmdPushConstants(commands, recording->pipeline->layout,
+                                recording->pipeline->rootStages, command->a, (uint32_t)command->b,
+                                &command[1]);
+        break;
+    case mrhiCommandViewport:
+    {
+        mrhiViewport viewport;
+        memcpy(&viewport, &command[1], sizeof(viewport));
+        mrhiVulkanSetViewport(recording, viewport.x, viewport.y, viewport.width, viewport.height,
+                              viewport.minDepth, viewport.maxDepth);
+        break;
+    }
+    case mrhiCommandScissor:
+    {
+        const VkRect2D scissor = {{(int32_t)command->a, (int32_t)command->b},
+                                  {(uint32_t)command->c, (uint32_t)command->d}};
+        api->vkCmdSetScissor(commands, 0, 1, &scissor);
+        break;
+    }
+    case mrhiCommandBlendConstant:
+    {
+        mrhiClearColor color;
+        memcpy(&color, &command[1], sizeof(color));
+        const float constants[4] = {color.red, color.green, color.blue, color.alpha};
+        api->vkCmdSetBlendConstants(commands, constants);
+        break;
+    }
+    default:
+        MRHI_ASSERT(command->type == mrhiCommandStencilReference);
+        api->vkCmdSetStencilReference(commands, VK_STENCIL_FACE_FRONT_AND_BACK, command->a);
+        break;
+    }
+}
+
+static void BindBuffer(const mrhiVulkanRecording* recording, const mrhiCommand* command)
+{
+    VkBuffer buffer = mrhiVulkanFrameBuffer(recording, (uint32_t)command->b);
+    VkCommandBuffer commands = recording->slot->commands;
+    if (command->type == mrhiCommandIndexBuffer)
+    {
+        VkIndexType type =
+            command->a == mrhi_indexUint16 ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
+        recording->frames->api->vkCmdBindIndexBuffer(commands, buffer, command->c, type);
+        return;
+    }
+    const VkDeviceSize offset = command->c;
+    const VkDeviceSize size = command->d;
+    recording->frames->api->vkCmdBindVertexBuffers2(commands, command->a, 1, &buffer, &offset,
+                                                    &size, nullptr);
+}
+
+static void Draw(const mrhiVulkanRecording* recording, const mrhiCommand* command)
+{
+    const mrhiVulkanDevice* api = recording->frames->api;
+    VkCommandBuffer commands = recording->slot->commands;
+    switch (command->type)
+    {
+    case mrhiCommandDraw:
+        api->vkCmdDraw(commands, command->a, (uint32_t)command->b, (uint32_t)command->c,
+                       (uint32_t)command->d);
+        break;
+    case mrhiCommandDrawIndexed:
+        api->vkCmdDrawIndexed(commands, command->a, (uint32_t)command->b, (uint32_t)command->c,
+                              (int32_t)(uint32_t)(command->c >> 32), (uint32_t)command->d);
+        break;
+    case mrhiCommandDispatch:
+        api->vkCmdDispatch(commands, command->a, (uint32_t)command->b, (uint32_t)command->c);
+        break;
+    case mrhiCommandDrawIndirect:
+        api->vkCmdDrawIndirect(commands, mrhiVulkanFrameBuffer(recording, command->a), command->c,
+                               1, 0);
+        break;
+    case mrhiCommandDrawIndexedIndirect:
+        api->vkCmdDrawIndexedIndirect(commands, mrhiVulkanFrameBuffer(recording, command->a),
+                                      command->c, 1, 0);
+        break;
+    default:
+        MRHI_ASSERT(command->type == mrhiCommandDispatchIndirect);
+        api->vkCmdDispatchIndirect(commands, mrhiVulkanFrameBuffer(recording, command->a),
+                                   command->c);
+        break;
+    }
+}
+
+static void RecordCommand(mrhiVulkanRecording* recording, const mrhiCommand* command)
 {
     switch (command->type)
     {
+    case mrhiCommandGraphicsPipeline:
+    case mrhiCommandComputePipeline:
+        SetPipeline(recording, command);
+        break;
+    case mrhiCommandRootBlock:
+    case mrhiCommandViewport:
+    case mrhiCommandScissor:
+    case mrhiCommandBlendConstant:
+    case mrhiCommandStencilReference:
+        SetState(recording, command);
+        break;
+    case mrhiCommandBindings:
+        mrhiVulkanBindTable(recording, command);
+        break;
+    case mrhiCommandVertexBuffer:
+    case mrhiCommandIndexBuffer:
+        BindBuffer(recording, command);
+        break;
+    case mrhiCommandDraw:
+    case mrhiCommandDrawIndexed:
+    case mrhiCommandDispatch:
+    case mrhiCommandDrawIndirect:
+    case mrhiCommandDrawIndexedIndirect:
+    case mrhiCommandDispatchIndirect:
+        Draw(recording, command);
+        break;
     case mrhiCommandCopyBuffer:
     case mrhiCommandWriteBuffer:
     case mrhiCommandReadBuffer:
-        CopyBuffers(frames, slot, frame, command);
+        CopyBuffers(recording, command);
         break;
     case mrhiCommandCopyBufferToTexture:
     case mrhiCommandCopyTextureToBuffer:
     case mrhiCommandWriteTexture:
     case mrhiCommandReadTexture:
-        CopyWithTexture(frames, slot, frame, command);
+        CopyWithTexture(recording, command);
         break;
     case mrhiCommandCopyTexture:
-        CopyTextures(frames, slot, frame, command);
+        CopyTextures(recording, command);
         break;
     default:
         // Debug groups and markers wait for VK_EXT_debug_utils.
@@ -374,32 +448,8 @@ static void RecordCommand(const mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
     }
 }
 
-// Whether this slice runs a pass: no targets, and nothing but copies,
-// uploads, readbacks and debug labels.
-static bool IsRunnable(const mrhiDriverFrame* frame, const mrhiDriverPass* pass)
-{
-    if (pass->colorTargetCount > 0 || pass->depthTarget.resource.index1 != 0)
-    {
-        return false;
-    }
-    for (uint32_t chunk = pass->firstChunk; chunk != 0; chunk = frame->chunks[chunk - 1].next)
-    {
-        const mrhiCommandChunk* at = &frame->chunks[chunk - 1];
-        for (uint32_t i = 0; i < at->count; i += 1u + at->commands[i].payload)
-        {
-            uint16_t type = at->commands[i].type;
-            bool transfer = type >= mrhiCommandCopyBuffer && type <= mrhiCommandReadTexture;
-            bool label = type >= mrhiCommandPushDebugGroup && type <= mrhiCommandDebugMarker;
-            if (!transfer && !label)
-            {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-static bool IsFrameRunnable(const mrhiDriverFrame* frame)
+// Whether this driver runs a frame: no surface images, no queries.
+static bool IsRunnable(const mrhiDriverFrame* frame)
 {
     for (uint32_t i = 0; i < frame->resourceCount; ++i)
     {
@@ -408,11 +458,24 @@ static bool IsFrameRunnable(const mrhiDriverFrame* frame)
             return false;
         }
     }
-    for (uint32_t i = 0; i < frame->passCount; ++i)
+    for (uint32_t p = 0; p < frame->passCount; ++p)
     {
-        if (!IsRunnable(frame, &frame->passes[i]))
+        const mrhiDriverPass* pass = &frame->passes[p];
+        if (pass->occlusionSet != 0 || pass->timestampSet != 0)
         {
             return false;
+        }
+        for (uint32_t chunk = pass->firstChunk; chunk != 0; chunk = frame->chunks[chunk - 1].next)
+        {
+            const mrhiCommandChunk* at = &frame->chunks[chunk - 1];
+            for (uint32_t i = 0; i < at->count; i += 1u + at->commands[i].payload)
+            {
+                uint16_t type = at->commands[i].type;
+                if (type >= mrhiCommandBeginOcclusionQuery && type <= mrhiCommandResolveQueries)
+                {
+                    return false;
+                }
+            }
         }
     }
     return true;
@@ -421,25 +484,33 @@ static bool IsFrameRunnable(const mrhiDriverFrame* frame)
 mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
                             const mrhiDriverFrame* frame)
 {
-    if (!IsFrameRunnable(frame))
+    if (!IsRunnable(frame))
     {
         return mrhi_errorUnsupported;
     }
+    mrhiVulkanRecording recording = {
+        .frames = frames,
+        .slot = slot,
+        .frame = frame,
+        .status = mrhi_success,
+    };
     size_t barrier = 0;
-    for (uint32_t p = 0; p < frame->passCount; ++p)
+    for (uint32_t p = 0; p < frame->passCount && recording.status == mrhi_success; ++p)
     {
-        const mrhiDriverPass* pass = &frame->passes[p];
-        Barriers(frames, slot, frame, &barrier, pass->id);
-        for (uint32_t chunk = pass->firstChunk; chunk != 0; chunk = frame->chunks[chunk - 1].next)
+        recording.pass = &frame->passes[p];
+        Barriers(&recording, &barrier, recording.pass->id);
+        mrhiVulkanBeginPass(&recording);
+        for (uint32_t chunk = recording.pass->firstChunk; chunk != 0;
+             chunk = frame->chunks[chunk - 1].next)
         {
             const mrhiCommandChunk* at = &frame->chunks[chunk - 1];
             for (uint32_t i = 0; i < at->count; i += 1u + at->commands[i].payload)
             {
-                RecordCommand(frames, slot, frame, &at->commands[i]);
+                RecordCommand(&recording, &at->commands[i]);
             }
         }
+        mrhiVulkanEndPass(&recording);
     }
-    Barriers(frames, slot, frame, &barrier, (mrhiPassId){0});
-    MRHI_ASSERT(barrier == frame->barrierCount);
-    return mrhi_success;
+    Barriers(&recording, &barrier, (mrhiPassId){0});
+    return recording.status;
 }

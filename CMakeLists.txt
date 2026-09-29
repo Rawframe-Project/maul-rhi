@@ -96,7 +96,7 @@ endif()
 if(MAUL_RHI_VULKAN_DRIVER)
     target_sources(maul-rhi PRIVATE src/driver_vulkan.c src/vulkan_adapter.c src/vulkan_api.c
                                    src/vulkan_device.c src/vulkan_frame.c src/vulkan_graphics.c
-                                   src/vulkan_memory.c src/vulkan_object.c src/vulkan_pipeline.c
+                                   src/vulkan_memory.c src/vulkan_object.c src/vulkan_pass.c src/vulkan_pipeline.c
                                    src/vulkan_record.c src/vulkan_resource.c)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_VULKAN_DRIVER)
     # The Khronos headers, kept as published (khronos/README.md).

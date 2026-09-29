@@ -289,7 +289,7 @@ static void TestTables(void)
           "table 0, in any order");
     const mrhiCommand* command = Nth(s_pass, 1);
     CHECK(command != nullptr && command->type == mrhiCommandBindings && command->a == 0 &&
-              command->b == 4 && command->payload == 0,
+              command->b == 4 && command->payload == 4,
           "recorded");
     const mrhiCommandBinding* sampler = NthBinding(2);
     const mrhiCommandBinding* written = NthBinding(3);

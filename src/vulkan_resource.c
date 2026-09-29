@@ -33,7 +33,10 @@ void mrhiVulkanImageOf(const mrhiTextureDef* def, VkFormat depthStencil, mrhiVul
         .info =
             {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-                .flags = cube ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0,
+                .flags = (cube ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0u) |
+                         (volume && (def->usage & mrhi_textureRenderTarget) != 0
+                              ? VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT
+                              : 0u),
                 .imageType = volume ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D,
                 .format = mrhiVulkanFormat(def->format, depthStencil),
                 .extent = {def->width, def->height, volume ? def->depthOrLayers : 1},

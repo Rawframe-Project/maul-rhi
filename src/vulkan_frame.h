@@ -15,6 +15,12 @@
 
 #include "maul-rhi/device.h"
 
+// The descriptor pools a frame slot has at most, and each pool's sets
+// and descriptors of every type.
+#define MRHI_VULKAN_POOLS            64
+#define MRHI_VULKAN_POOL_SETS        256
+#define MRHI_VULKAN_POOL_DESCRIPTORS 1024
+
 // What a destroyed object waiting to retire is.
 typedef enum mrhiVulkanRetired
 {
@@ -66,6 +72,14 @@ typedef struct mrhiVulkanSlot
     uint8_t* ring;
     mrhiVulkanRange* readbacks;
     uint32_t readbackCount;
+    // The views the frame's targets and bindings take.
+    VkImageView* views;
+    uint32_t viewCount;
+    // Descriptor pools, made as the frames need them and reset with the
+    // slot, and the one sets are taken from.
+    VkDescriptorPool pools[MRHI_VULKAN_POOLS];
+    uint32_t poolCount;
+    uint32_t poolInUse;
 } mrhiVulkanSlot;
 
 typedef struct mrhiVulkanFrames
@@ -81,6 +95,7 @@ typedef struct mrhiVulkanFrames
     mrhiVulkanSlot* slots;
     uint32_t slotCount;
     uint32_t readbackLimit;
+    uint32_t viewLimit;
     // Frames submitted, and frames reported finished.
     uint64_t submitted;
     uint64_t finished;

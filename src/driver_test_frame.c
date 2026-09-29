@@ -43,7 +43,8 @@ static bool Names(const Walk* walk, uint64_t object, bool buffer)
            IsBuffer(walk->frame->resources[object - 1].kind) == buffer;
 }
 
-// Checks a table's bindings: frame resources, or samplers by handle.
+// Checks a table's bindings: frame resources, or samplers by handle,
+// each with its slot's kind.
 static void CheckBindings(const Walk* walk, const mrhiCommand* command)
 {
     for (uint32_t i = 0; i < command->payload; ++i)
@@ -52,6 +53,9 @@ static void CheckBindings(const Walk* walk, const mrhiCommand* command)
         memcpy(&binding, &command[1 + i], sizeof(binding));
         WALK_CHECK(binding.object == 0 ? IsHandle(walk, binding.offset)
                                        : binding.object <= walk->frame->resourceCount);
+        WALK_CHECK(binding.kind >= mrhi_bindingUniformBuffer &&
+                   binding.kind <= mrhi_bindingStorageTexture &&
+                   (binding.kind == mrhi_bindingSampler) == (binding.object == 0));
     }
 }
 

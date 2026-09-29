@@ -23,7 +23,9 @@ extern "C"
 {
 #endif
 
-    // Where rendering lands: a rectangle of the targets and a depth range.
+    // Where rendering lands: a rectangle of the targets, from their top-left
+    // corner, and a depth range. +Y points up in normalized device coordinates,
+    // on every driver.
     typedef struct mrhiViewport
     {
         // Its left edge, at least -2 times the 2D texture limit.

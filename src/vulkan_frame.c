@@ -113,7 +113,8 @@ mrhiResult mrhiVulkanFramesInit(mrhiVulkanFrames* frames, uint32_t family,
     return result == VK_SUCCESS ? mrhi_success : mrhiVulkanStatus(result);
 }
 
-// Destroys a slot's transients.
+// Destroys a slot's transients and views, and resets its descriptor
+// pools.
 static void DropTransients(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot)
 {
     for (uint32_t i = 0; i < slot->transients; ++i)
@@ -126,6 +127,16 @@ static void DropTransients(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot)
         slot->own[i] = VK_NULL_HANDLE;
     }
     slot->transients = 0;
+    for (uint32_t i = 0; i < slot->viewCount; ++i)
+    {
+        frames->api->vkDestroyImageView(frames->device, slot->views[i], nullptr);
+    }
+    slot->viewCount = 0;
+    for (uint32_t i = 0; i < slot->poolCount; ++i)
+    {
+        (void)frames->api->vkResetDescriptorPool(frames->device, slot->pools[i], 0);
+    }
+    slot->poolInUse = 0;
 }
 
 // Destroys a retired object for good.
@@ -184,6 +195,10 @@ void mrhiVulkanFramesDestroy(mrhiVulkanFrames* frames)
         frames->api->vkDestroyBuffer(frames->device, slot->staging, nullptr);
         frames->api->vkFreeMemory(frames->device, slot->stagingMemory, nullptr);
         frames->api->vkDestroyCommandPool(frames->device, slot->pool, nullptr);
+        for (uint32_t p = 0; p < slot->poolCount; ++p)
+        {
+            frames->api->vkDestroyDescriptorPool(frames->device, slot->pools[p], nullptr);
+        }
     }
     frames->api->vkDestroyBuffer(frames->device, frames->readback, nullptr);
     frames->api->vkFreeMemory(frames->device, frames->readbackMemory, nullptr);

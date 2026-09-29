@@ -219,7 +219,7 @@ static mrhiResult CheckBinding(const mrhiDevice* device, const mrhiFramePass* pa
                                const mrhiShaderBinding* slot, const mrhiBinding* binding,
                                mrhiCommandBinding* recordedOut)
 {
-    *recordedOut = (mrhiCommandBinding){.slot = binding->slot};
+    *recordedOut = (mrhiCommandBinding){.slot = binding->slot, .kind = slot->kind};
     if (slot->kind == mrhi_bindingSampler)
     {
         return CheckSampler(device, slot, binding, recordedOut);
@@ -322,6 +322,7 @@ mrhiResult mrhiSetBindings(mrhiDevice* device, mrhiPassId id, uint32_t table,
     memcpy(&records[1], recorded, count * sizeof(recorded[0]));
     pass->tablesSet |= (uint8_t)(1u << table);
     memcpy(pass->tableDigests[table], reflection->digest, MRHI_DIGEST_BYTES);
-    records[0] = (mrhiCommand){.type = mrhiCommandBindings, .a = table, .b = count};
+    records[0] = (mrhiCommand){
+        .type = mrhiCommandBindings, .payload = (uint16_t)count, .a = table, .b = count};
     return mrhi_success;
 }

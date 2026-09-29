@@ -13,6 +13,7 @@
 #include "vulkan_device.h"
 
 #include "allocator.h"
+#include "command.h"
 #include "invariant.h"
 #include "vulkan_adapter.h"
 #include "vulkan_frame.h"
@@ -503,6 +504,8 @@ typedef struct Layout
     size_t buffers2;
     size_t own;
     size_t readbacks;
+    size_t frameViews;
+    uint32_t viewLimit;
     size_t retire;
     uint32_t retireCount;
     uint32_t blockCount;
@@ -545,6 +548,12 @@ static Layout LayoutOf(const mrhiDeviceDef* def)
     at.images = mrhiLayoutAdd(layout, transients, sizeof(VkImage), alignof(VkImage));
     at.buffers2 = mrhiLayoutAdd(layout, transients, sizeof(VkBuffer), alignof(VkBuffer));
     at.own = mrhiLayoutAdd(layout, transients, sizeof(VkDeviceMemory), alignof(VkDeviceMemory));
+    // A texture binding takes a record at least, and a pass's targets
+    // and resolves a view each.
+    at.viewLimit = limits->frameCommandBytes / (uint32_t)sizeof(mrhiCommand) +
+                   limits->framePasses * (2u * MRHI_COLOR_TARGETS + 1u);
+    at.frameViews = mrhiLayoutAdd(layout, (size_t)slots * at.viewLimit, sizeof(VkImageView),
+                                  alignof(VkImageView));
     at.readbacks = mrhiLayoutAdd(layout, (size_t)slots * limits->readbacks, sizeof(mrhiVulkanRange),
                                  alignof(mrhiVulkanRange));
     at.retireCount =
@@ -615,6 +624,7 @@ static void PlaceFrames(VulkanDevice* device, const Layout* at, const mrhiDevice
         .slots = (mrhiVulkanSlot*)(block + at->frames),
         .slotCount = def->limits.framesInFlight,
         .readbackLimit = limits->readbacks,
+        .viewLimit = at->viewLimit,
         .atom = device->atom,
         .retire = (mrhiVulkanRetire*)(block + at->retire),
         .retireCapacity = at->retireCount,
@@ -627,6 +637,7 @@ static void PlaceFrames(VulkanDevice* device, const Layout* at, const mrhiDevice
             .buffers = (VkBuffer*)(block + at->buffers2) + first,
             .own = (VkDeviceMemory*)(block + at->own) + first,
             .readbacks = (mrhiVulkanRange*)(block + at->readbacks) + (size_t)i * limits->readbacks,
+            .views = (VkImageView*)(block + at->frameViews) + (size_t)i * at->viewLimit,
         };
     }
 }
