@@ -6,6 +6,7 @@
 #include "allocator.h"
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 bool mrhiIsAllocatorValid(const mrhiAllocator* allocator)
@@ -34,4 +35,17 @@ void mrhiRelease(const mrhiAllocator* allocator, void* memory, size_t size, size
         return;
     }
     free(memory);
+}
+
+size_t mrhiLayoutAdd(mrhiLayout* layout, size_t count, size_t itemSize, size_t alignment)
+{
+    size_t offset = (layout->size + alignment - 1) & ~(alignment - 1);
+    if (layout->overflow || offset < layout->size ||
+        (itemSize != 0 && count > (SIZE_MAX - offset) / itemSize))
+    {
+        layout->overflow = true;
+        return 0;
+    }
+    layout->size = offset + count * itemSize;
+    return offset;
 }

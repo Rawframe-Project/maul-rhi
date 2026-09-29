@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Sirac Ozmen
 #
-# Writes the public headers and the thread safety table from the
-# contract, docs/contract/mrhi.json, which is their source of truth
-# (docs/contract/README.md describes it). The contract's names are
-# snake_case; this generator turns them into the family's C names
-# (docs/conventions.md, section 4). The output is in the family's style,
-# so the format, documentation and source checks apply to it as to
-# hand-written code.
+# Writes the public headers, the result names and the thread safety
+# table from the contract, docs/contract/mrhi.json, which is their
+# source of truth (docs/contract/README.md describes it). The contract's
+# names are snake_case; this generator turns them into the family's C
+# names (docs/conventions.md, section 4). Headers go through the pinned
+# clang-format, so the format, documentation and source checks apply to
+# them as to hand-written code.
 #
 # usage: gen_contract.py [--check]
 #   --check  writes nothing; fails naming each file that differs from
@@ -17,6 +17,8 @@
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import textwrap
 
@@ -24,9 +26,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTRACT = os.path.join("docs", "contract", "mrhi.json")
 WIDTH = 80
 NAME = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
-KINDS = ("result", "enum", "opaque", "struct", "function")
+KINDS = ("constant", "result", "enum", "opaque", "id", "struct", "function")
 # The kinds a type reference may name, as kind.name.
-REFERABLE = ("enum", "opaque", "struct")
+REFERABLE = ("enum", "opaque", "id", "struct")
 WIDTHS = ("uint8", "uint16", "uint32", "int32")
 POINTERS = (None, "const", "mutable", "out")
 PRIMITIVES = {
@@ -43,6 +45,7 @@ PRIMITIVES = {
     "float32": "float",
     "float64": "double",
     "static_cstring": "const char*",
+    "char": "char",
 }
 # The openings of a thread safety paragraph (docs/conventions.md,
 # section 10), by class.
@@ -80,6 +83,9 @@ class Names:
 
     def value(self, name):
         return self.prefix + "_" + camel(name)
+
+    def constant(self, name):
+        return self.macro + "_" + name.upper()
 
 
 # Validation: every message names where the contract is wrong.
@@ -136,6 +142,11 @@ def check_values(errors, where, item):
         errors.append(f"{where}: an enum needs a width, one of {', '.join(WIDTHS)}")
 
 
+def check_constant(errors, where, item):
+    if not isinstance(item.get("value"), int) or item["value"] < 0:
+        errors.append(f"{where}: a constant needs a non-negative integer value")
+
+
 def check_struct(errors, where, item, kind_of):
     if (item.get("def") or item.get("chained")) and kind_of.get("chain") != "struct":
         errors.append(f"{where}: a def or chained struct needs the struct 'chain'")
@@ -144,6 +155,8 @@ def check_struct(errors, where, item, kind_of):
     for member in item.get("members", []):
         check_name(errors, where, member.get("name"))
         check_type(errors, where, kind_of, member)
+        if "array" in member and kind_of.get(member["array"]) != "constant":
+            errors.append(f"{where}: '{member['name']}' needs a constant for its array length")
 
 
 def check_function(errors, where, item, kind_of):
@@ -178,7 +191,7 @@ def validate(contract):
         if item.get("name") in kind_of:
             errors.append(f"{where}: the name is declared twice")
         kind_of[item.get("name")] = item.get("kind")
-    checks = {"result": check_values, "enum": check_values}
+    checks = {"result": check_values, "enum": check_values, "constant": check_constant}
     for item in items:
         where = f"{item['kind']} '{item['name']}'"
         if item["kind"] in checks:
@@ -228,6 +241,8 @@ def c_declaration(names, spec, own=None):
     if spec["type"] == "function":
         returns = c_type(names, spec["returns"]) if spec.get("returns") else "void"
         return f"{returns} (*{name})({c_signature(names, spec)})"
+    if "array" in spec:
+        return f"{c_type(names, spec, own)} {name}[{names.constant(spec['array'])}]"
     return f"{c_type(names, spec, own)} {name}"
 
 
@@ -303,6 +318,19 @@ def c_value(value):
     return f"0x{value:08X}u" if value > 0xFFFF else str(value)
 
 
+def emit_constant(names, item):
+    return comment(item["doc"], 0, "//") + [f"#define {names.constant(item['name'])} "
+                                            f"{item['value']}"]
+
+
+def emit_id(names, item):
+    c_name = names.type(item["name"])
+    lines = comment(item["doc"], 4, "//")
+    lines += [f"    typedef struct {c_name}", "    {", "        uint32_t index1;",
+              "        uint32_t generation;", f"    }} {c_name};"]
+    return lines
+
+
 def emit_opaque(names, item):
     c_name = names.type(item["name"])
     return comment(item["doc"], 4, "//") + [f"    typedef struct {c_name} {c_name};"]
@@ -347,31 +375,13 @@ def emit_function(names, item):
     returns = item.get("returns")
     result = c_type(names, returns) if returns else "void"
     nodiscard = f"{names.macro}_NODISCARD " if returns and returns["type"] == "result" else ""
-    declaration = (f"    {nodiscard}{names.macro}_API {result} "
-                   f"{names.function(item['name'])}({c_signature(names, item)});")
-    return lines + wrap_declaration(declaration)
-
-
-def wrap_declaration(line):
-    """A declaration packed as clang-format packs parameters: as many per
-    line as fit the column limit, continuations aligned after the opening
-    parenthesis."""
-    if len(line) <= 100:
-        return [line]
-    column = line.index("(") + 1
-    parts = line[column:].split(", ")
-    lines, current = [], line[:column] + parts[0]
-    for index, part in enumerate(parts[1:], start=2):
-        trailing = 0 if index == len(parts) else 1
-        if len(current) + 2 + len(part) + trailing <= 100:
-            current += ", " + part
-        else:
-            lines.append(current + ",")
-            current = " " * column + part
-    return lines + [current]
+    return lines + [f"    {nodiscard}{names.macro}_API {result} "
+                    f"{names.function(item['name'])}({c_signature(names, item)});"]
 
 
 EMITTERS = {
+    "constant": emit_constant,
+    "id": emit_id,
     "result": emit_values,
     "enum": emit_values,
     "opaque": emit_opaque,
@@ -446,13 +456,24 @@ def emit_result_names(contract):
     return "\n".join(lines) + "\n"
 
 
+def formatted(path, text):
+    """C text through the project's clang-format, the pinned version CI
+    installs, so that the output needs no reformatting."""
+    tool = shutil.which("clang-format")
+    if tool is None:
+        raise SystemExit("gen_contract.py needs clang-format (pip install clang-format==22.1.5)")
+    style = "file:" + os.path.join(ROOT, ".clang-format")
+    result = subprocess.run([tool, "--style=" + style, "--assume-filename=" + path], input=text,
+                            capture_output=True, text=True, check=True)
+    return result.stdout
+
+
 def outputs(contract):
     """Each generated file's path relative to the root, with its text."""
-    files = {
-        os.path.join("include", contract["library"], header["name"] + ".h"):
-        emit_header(contract, header)
-        for header in contract["headers"]
-    }
+    files = {}
+    for header in contract["headers"]:
+        path = os.path.join("include", contract["library"], header["name"] + ".h")
+        files[path] = formatted(path, emit_header(contract, header))
     files[os.path.join("docs", "contract", "thread-safety.md")] = emit_thread_table(contract)
     files[os.path.join("src", "generated", "result_names.c")] = emit_result_names(contract)
     # The contract itself, in one canonical layout, so that its diffs

@@ -1,6 +1,10 @@
 # The internal module graph (docs/conventions.md, section 6): each module
 # and the modules it may use. tools/check_modules.py enforces it.
+adapter: chain driver instance_core
 allocator:
 base:
 chain:
-instance: allocator chain
+driver:
+driver_test: allocator driver
+instance: allocator chain driver driver_test instance_core
+instance_core: driver

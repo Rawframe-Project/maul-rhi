@@ -30,6 +30,11 @@
               "doc": "The call did what was asked."
             },
             {
+              "name": "empty",
+              "value": 1,
+              "doc": "There is nothing to return: the notification queue is drained."
+            },
+            {
               "name": "error_invalid",
               "value": -1,
               "doc": "An argument is invalid: a null pointer where one is required, a value out of range, a def without its cookie."
@@ -154,6 +159,11 @@
               "name": "struct_none",
               "value": 0,
               "doc": "No struct: never valid in a chain."
+            },
+            {
+              "name": "struct_test_driver",
+              "value": 1,
+              "doc": "mrhiTestDriverDef, on an instance def: turns the test driver on."
             }
           ]
         },
@@ -172,6 +182,11 @@
               "type": "enum.struct_type"
             }
           ]
+        },
+        {
+          "kind": "id",
+          "name": "request_id",
+          "doc": "A request, answered by exactly one notification in its owner's queue."
         },
         {
           "kind": "function",
@@ -220,6 +235,192 @@
           "doc": "An instance, made by mrhiCreateInstance."
         },
         {
+          "kind": "constant",
+          "name": "adapter_name_bytes",
+          "value": 256,
+          "doc": "The bytes an adapter's name may take, in UTF-8."
+        },
+        {
+          "kind": "id",
+          "name": "adapter_id",
+          "doc": "An adapter: a GPU, or a software rasterizer, that a driver found."
+        },
+        {
+          "kind": "enum",
+          "name": "driver_kind",
+          "width": "uint8",
+          "doc": "The GPU API a driver speaks.",
+          "values": [
+            {
+              "name": "driver_test",
+              "value": 0,
+              "doc": "The test driver: no GPU, for tests."
+            },
+            {
+              "name": "driver_vulkan",
+              "value": 1,
+              "doc": "Vulkan."
+            },
+            {
+              "name": "driver_web_gpu",
+              "value": 2,
+              "doc": "The browser's WebGPU."
+            },
+            {
+              "name": "driver_metal",
+              "value": 3,
+              "doc": "Metal."
+            },
+            {
+              "name": "driver_d3d12",
+              "value": 4,
+              "doc": "Direct3D 12."
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "adapter_kind",
+          "width": "uint8",
+          "doc": "What kind of processor an adapter is.",
+          "values": [
+            {
+              "name": "adapter_unknown",
+              "value": 0,
+              "doc": "The driver does not say."
+            },
+            {
+              "name": "adapter_discrete",
+              "value": 1,
+              "doc": "A GPU with its own memory."
+            },
+            {
+              "name": "adapter_integrated",
+              "value": 2,
+              "doc": "A GPU sharing the CPU's memory."
+            },
+            {
+              "name": "adapter_virtual",
+              "value": 3,
+              "doc": "A GPU of a virtual machine."
+            },
+            {
+              "name": "adapter_software",
+              "value": 4,
+              "doc": "A rasterizer running on the CPU."
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "power_preference",
+          "width": "uint8",
+          "doc": "Which adapters a request prefers.",
+          "values": [
+            {
+              "name": "power_default",
+              "value": 0,
+              "doc": "The driver's own order."
+            },
+            {
+              "name": "power_low",
+              "value": 1,
+              "doc": "Integrated and low-power adapters first."
+            },
+            {
+              "name": "power_high",
+              "value": 2,
+              "doc": "Discrete and fast adapters first."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "adapter_info",
+          "doc": "What an adapter is.",
+          "members": [
+            {
+              "name": "driver",
+              "type": "enum.driver_kind"
+            },
+            {
+              "name": "kind",
+              "type": "enum.adapter_kind"
+            },
+            {
+              "name": "vendor_id",
+              "type": "uint32",
+              "doc": "The PCI vendor id, or 0 where the platform hides it."
+            },
+            {
+              "name": "device_id",
+              "type": "uint32",
+              "doc": "The PCI device id, or 0 where the platform hides it."
+            },
+            {
+              "name": "name",
+              "type": "char",
+              "array": "adapter_name_bytes",
+              "doc": "The adapter's name in UTF-8, nameLength bytes, not NUL-terminated."
+            },
+            {
+              "name": "name_length",
+              "type": "uint32"
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "adapter_request_def",
+          "def": true,
+          "doc": "Which adapters a request looks for. Build it with mrhiDefaultAdapterRequestDef.",
+          "members": [
+            {
+              "name": "preference",
+              "type": "enum.power_preference"
+            },
+            {
+              "name": "allow_software",
+              "type": "bool",
+              "doc": "Whether software rasterizers may answer."
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "instance_notification_kind",
+          "width": "uint8",
+          "doc": "What an instance notification reports.",
+          "values": [
+            {
+              "name": "instance_adapters_found",
+              "value": 0,
+              "doc": "An adapter request is answered: its outcome is mrhi_success, and mrhiGetAdapters lists the adapters, or an error."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "instance_notification",
+          "doc": "A record from an instance's notification queue.",
+          "members": [
+            {
+              "name": "kind",
+              "type": "enum.instance_notification_kind"
+            },
+            {
+              "name": "request_id",
+              "type": "id.request_id",
+              "doc": "The request the record answers."
+            },
+            {
+              "name": "outcome",
+              "type": "result",
+              "doc": "How the request ended."
+            }
+          ]
+        },
+        {
           "kind": "struct",
           "name": "instance_limits",
           "doc": "The named limits of an instance.",
@@ -228,6 +429,16 @@
               "name": "chain_depth",
               "type": "uint32",
               "doc": "Chained structs one def may carry; 8 by default."
+            },
+            {
+              "name": "notifications",
+              "type": "uint32",
+              "doc": "Records the notification queue holds; 64 by default."
+            },
+            {
+              "name": "adapters",
+              "type": "uint32",
+              "doc": "Adapters the instance keeps; 16 by default."
             }
           ]
         },
@@ -255,7 +466,7 @@
         {
           "kind": "function",
           "name": "default_instance_def",
-          "doc": "Returns the default instance def: the contract version the program is built against, the C library's allocator and the default limits (8 chained structs per def).",
+          "doc": "Returns the default instance def: the contract version the program is built against, the C library's allocator and the default limits (8 chained structs per def, 64 notifications, 16 adapters).",
           "returns": {
             "type": "struct.instance_def",
             "doc": "The def, with a valid cookie."
@@ -271,7 +482,7 @@
           "doc": "Makes an instance.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a zero limit or an allocator with one function; `mrhi_errorVersion` when the def's contract version is not the library's; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the chain is deeper than the limit or the allocator fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a zero limit or an allocator with one function; `mrhi_errorVersion` when the def's contract version is not the library's; `mrhi_errorUnsupported` for a critical extension the library does not know, such as mrhiTestDriverDef in a build without the test driver; `mrhi_errorCapacity` when the chain is deeper than the limit or the allocator fails."
           },
           "args": [
             {
@@ -307,6 +518,176 @@
             "class": "any_exclusive",
             "object": "the instance"
           }
+        },
+        {
+          "kind": "function",
+          "name": "default_adapter_request_def",
+          "doc": "Returns the default adapter request def: the driver's own order, software rasterizers allowed.",
+          "returns": {
+            "type": "struct.adapter_request_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "request_adapters",
+          "doc": "Asks the instance's drivers for adapters. The request is answered by one mrhi_instanceAdaptersFound record; until then, mrhiGetAdapters lists the adapters found before.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` with the request accepted; `mrhi_errorInvalid` for a NULL argument or a def without its cookie; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the notification queue has no room for the answer."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "mutable",
+              "doc": "The instance."
+            },
+            {
+              "name": "def",
+              "type": "struct.adapter_request_def",
+              "pointer": "const",
+              "doc": "The adapters to look for."
+            },
+            {
+              "name": "request_out",
+              "type": "id.request_id",
+              "pointer": "mutable",
+              "doc": "Receives the request's id."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "next_instance_notification",
+          "doc": "Takes the oldest record from the instance's notification queue, first polling its drivers for finished work.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` with a record; `mrhi_empty` when the queue is drained; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "mutable",
+              "doc": "The instance."
+            },
+            {
+              "name": "notification_out",
+              "type": "struct.instance_notification",
+              "pointer": "mutable",
+              "doc": "Receives the record."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_adapters",
+          "doc": "Lists the adapters the last answered request found, best first by its preference.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL instance or count, or a NULL array with a capacity."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "const",
+              "doc": "The instance."
+            },
+            {
+              "name": "adapters",
+              "type": "id.adapter_id",
+              "pointer": "mutable",
+              "doc": "Receives up to capacity ids. May be NULL when capacity is 0."
+            },
+            {
+              "name": "capacity",
+              "type": "size",
+              "doc": "The ids adapters holds."
+            },
+            {
+              "name": "count_out",
+              "type": "size",
+              "pointer": "mutable",
+              "doc": "Receives the number of adapters, which may exceed capacity."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_adapter_info",
+          "doc": "Reads what an adapter is.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorStale` for an adapter the instance no longer has."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "const",
+              "doc": "The instance."
+            },
+            {
+              "name": "adapter",
+              "type": "id.adapter_id",
+              "doc": "The adapter."
+            },
+            {
+              "name": "info_out",
+              "type": "struct.adapter_info",
+              "pointer": "mutable",
+              "doc": "Receives the facts."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          }
+        }
+      ]
+    },
+    {
+      "name": "test",
+      "doc": "The test driver (MAUL_RHI_TEST_DRIVER): a driver without a GPU whose adapters a test describes, for the library's tests and a program's own.",
+      "includes": [
+        "instance"
+      ],
+      "items": [
+        {
+          "kind": "struct",
+          "name": "test_driver_def",
+          "chained": true,
+          "doc": "Turns the test driver on for an instance, chained on its def with the type mrhi_structTestDriver. The test driver is the only driver of such an instance.",
+          "members": [
+            {
+              "name": "adapters",
+              "type": "struct.adapter_info",
+              "pointer": "const",
+              "doc": "The adapters the driver finds, in its own order. May be NULL when adapterCount is 0."
+            },
+            {
+              "name": "adapter_count",
+              "type": "uint32"
+            }
+          ]
         }
       ]
     }

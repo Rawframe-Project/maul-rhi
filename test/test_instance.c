@@ -74,6 +74,12 @@ static void TestInvalidDefs(void)
     def.limits.chainDepth = 0;
     CHECK(Create(&def) == mrhi_errorInvalid, "a zero chain depth");
     def = mrhiDefaultInstanceDef();
+    def.limits.notifications = 0;
+    CHECK(Create(&def) == mrhi_errorInvalid, "a zero notification limit");
+    def = mrhiDefaultInstanceDef();
+    def.limits.adapters = 0;
+    CHECK(Create(&def) == mrhi_errorInvalid, "a zero adapter limit");
+    def = mrhiDefaultInstanceDef();
     def.allocator.alloc = CountingAlloc;
     CHECK(Create(&def) == mrhi_errorInvalid, "an allocator with one function");
 }

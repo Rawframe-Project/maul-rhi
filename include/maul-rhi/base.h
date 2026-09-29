@@ -64,6 +64,8 @@ extern "C"
     {
         // The call did what was asked.
         mrhi_success = 0,
+        // There is nothing to return: the notification queue is drained.
+        mrhi_empty = 1,
         // An argument is invalid: a null pointer where one is required, a value
         // out of range, a def without its cookie.
         mrhi_errorInvalid = -1,
@@ -110,6 +112,8 @@ extern "C"
     {
         // No struct: never valid in a chain.
         mrhi_structNone = 0,
+        // mrhiTestDriverDef, on an instance def: turns the test driver on.
+        mrhi_structTestDriver = 1,
     };
 
     // The header every chained struct opens with. A def's next field, or a
@@ -120,6 +124,13 @@ extern "C"
         const struct mrhiChain* next;
         mrhiStructType type;
     } mrhiChain;
+
+    // A request, answered by exactly one notification in its owner's queue.
+    typedef struct mrhiRequestId
+    {
+        uint32_t index1;
+        uint32_t generation;
+    } mrhiRequestId;
 
     /// Returns the version of the library that was linked, which may differ
     /// from the MRHI_VERSION macros a program was compiled with.

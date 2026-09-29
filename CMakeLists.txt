@@ -22,6 +22,7 @@ option(MAUL_RHI_WERROR "Treat compiler warnings as errors" OFF)
 option(MAUL_RHI_SANITIZE "Instrument with AddressSanitizer and UBSan" OFF)
 option(MAUL_RHI_TSAN "Instrument with ThreadSanitizer" OFF)
 option(MAUL_RHI_COVERAGE "Instrument for gcov coverage" OFF)
+option(MAUL_RHI_TEST_DRIVER "Build the test driver (mrhiTestDriverDef)" ${MAUL_RHI_BUILD_TESTS})
 
 # Every executable (tests, benchmarks, tools) lands in the top of the
 # build tree, so scripts and CI find them in one place.
@@ -40,18 +41,27 @@ else()
     set(MAUL_LIBRARY_KIND STATIC)
 endif()
 add_library(maul-rhi ${MAUL_LIBRARY_KIND}
+    src/adapter.c
     src/allocator.c
     src/base.c
     src/chain.c
+    src/driver.c
     src/generated/result_names.c
     src/instance.c)
 maul_configure_library(maul-rhi)
+if(MAUL_RHI_TEST_DRIVER)
+    target_sources(maul-rhi PRIVATE src/driver_test.c)
+    target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_TEST_DRIVER)
+endif()
 
 if(MAUL_RHI_BUILD_TESTS)
     enable_testing()
     maul_add_test(base)
     maul_add_test(chain WHITEBOX)
     maul_add_test(instance)
+    if(MAUL_RHI_TEST_DRIVER)
+        maul_add_test(adapter)
+    endif()
     maul_add_header_tests()
 endif()
 

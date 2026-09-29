@@ -25,3 +25,10 @@ format.
 - The family's result codes (`mrhi_errorStale`,
   `mrhi_errorUnsupported`, `mrhi_errorPlatform`, `mrhi_errorState`),
   with their names generated from the contract.
+- Adapters (mrhi-0003): `mrhiRequestAdapters` with a power preference,
+  answered once in the instance's notification queue
+  (`mrhiNextInstanceNotification`, `mrhi_empty`), then
+  `mrhiGetAdapters` and `mrhiGetAdapterInfo` by generation-checked id;
+  the instance's notification and adapter limits.
+- The test driver (`MAUL_RHI_TEST_DRIVER`, `mrhiTestDriverDef`): no
+  GPU, the adapters a test describes.
