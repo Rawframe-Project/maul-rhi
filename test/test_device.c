@@ -231,6 +231,12 @@ static void TestInvalidDefs(void)
     def.deviceLimits.buffers = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no buffers");
     def = Def(adapter);
+    def.deviceLimits.textures = 0;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no textures");
+    def = Def(adapter);
+    def.deviceLimits.views = 0;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no views");
+    def = Def(adapter);
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def.next = &critical;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorUnsupported,
@@ -242,7 +248,7 @@ static void TestInvalidDefs(void)
     def.allocator.free = CountingFree;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
           "an allocator with one function");
-    CHECK(mrhiGetInstanceMisuse(instance) == 9, "each invalid call counted");
+    CHECK(mrhiGetInstanceMisuse(instance) == 11, "each invalid call counted");
     mrhiDestroyInstance(instance);
 }
 

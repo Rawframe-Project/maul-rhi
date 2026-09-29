@@ -343,6 +343,101 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyTexture(mrhiDevice* device,
                                                           mrhiTextureId texture);
 
+    // The part of a texture's texels a view sees.
+    typedef uint8_t mrhiTextureAspect;
+
+    enum
+    {
+        // Every aspect the format has.
+        mrhi_aspectAll = 0,
+        // The depth of a depth format.
+        mrhi_aspectDepthOnly = 1,
+        // The stencil of a format with stencil.
+        mrhi_aspectStencilOnly = 2,
+    };
+
+// A mip or layer count that reaches the texture's last.
+#define MRHI_REMAINING 0xFFFFFFFFu
+
+    // A view of a texture.
+    typedef struct mrhiViewId
+    {
+        uint32_t index1;
+        uint32_t generation;
+    } mrhiViewId;
+
+    // How a view is made: a subrange of a texture's mips and layers, seen with
+    // a shape, a format, uses and an aspect. Build it with mrhiDefaultViewDef
+    // and set its texture.
+    typedef struct mrhiViewDef
+    {
+        uint32_t cookie;
+        // Extensions, or NULL.
+        const mrhiChain* next;
+        // The texture it views.
+        mrhiTextureId texture;
+        // Its shape: 2D or 2D array on any texture but a 3D one, a cube or cube
+        // array on a cube or cube array texture, 3D on a 3D texture.
+        mrhiTextureKind kind;
+        // The texture's format or one of its view formats; mrhi_formatNone for
+        // the texture's.
+        mrhiFormat format;
+        // Some of the texture's uses, each one the view's format can take on
+        // the device; 0 for all of the texture's.
+        mrhiTextureUsage usage;
+        // The aspect it sees; depth or stencil only on a format that has it.
+        mrhiTextureAspect aspect;
+        // Its first mip.
+        uint32_t baseMip;
+        // Its mips, at least 1, or MRHI_REMAINING.
+        uint32_t mipCount;
+        // Its first layer; 0 on a 3D texture.
+        uint32_t baseLayer;
+        // Its layers, or MRHI_REMAINING: 1 for 2D and 3D, 6 for a cube, a
+        // multiple of 6 for a cube array.
+        uint32_t layerCount;
+    } mrhiViewDef;
+
+    /// Returns the default view def: a 2D view of every mip and layer in the
+    /// texture's format, uses and aspects, with no texture, which must be set.
+    ///
+    /// @return The def, with a valid cookie.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MRHI_API mrhiViewDef mrhiDefaultViewDef(void);
+
+    /// Makes a view of a texture on a ready device.
+    ///
+    /// @param device   The device.
+    /// @param def      The view to make.
+    /// @param viewOut  Receives the view.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
+    /// without its cookie, an unknown kind, usage or aspect, a kind the texture
+    /// cannot be seen as, a format the texture was not given, uses the texture
+    /// lacks, an aspect its format lacks, or a mip or layer range that is
+    /// empty, past the texture's end or wrong for the kind; `mrhi_errorStale`
+    /// for a texture the device no longer has; `mrhi_errorUnsupported` for a
+    /// use the view's format cannot take on the device, or a critical extension
+    /// the library does not know; `mrhi_errorState` for a device that is not
+    /// ready; `mrhi_errorCapacity` when the device's view limit is reached;
+    /// `mrhi_errorPlatform` when the driver fails.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateView(mrhiDevice* device, const mrhiViewDef* def,
+                                                      mrhiViewId* viewOut);
+
+    /// Destroys a view. Its id ends at once; the device retires it after the
+    /// frames that used it.
+    ///
+    /// @param device  The device.
+    /// @param view    The view.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
+    /// `mrhi_errorStale` for a view the device no longer has, its texture's
+    /// destruction included.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyView(mrhiDevice* device, mrhiViewId view);
+
 #ifdef __cplusplus
 }
 #endif

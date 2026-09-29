@@ -723,6 +723,29 @@ mrhiFormat mrhiFormatSrgbPair(mrhiFormat format)
     }
 }
 
+bool mrhiFormatHasDepth(mrhiFormat format)
+{
+    switch (format)
+    {
+    case mrhi_formatDepth32Float:
+    case mrhi_formatDepthStencil:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool mrhiFormatHasStencil(mrhiFormat format)
+{
+    switch (format)
+    {
+    case mrhi_formatDepthStencil:
+        return true;
+    default:
+        return false;
+    }
+}
+
 uint32_t mrhiFormatIndex(mrhiFormat format)
 {
     switch (format)

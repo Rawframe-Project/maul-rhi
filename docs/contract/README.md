@@ -77,3 +77,19 @@ driver's API has classed absent-rejected.
 A struct with `defaults` gives every member a `default`, which makes its
 Default function, generated in `src/generated/defaults.c`. A member may
 add `better: lower` (the alignments); the others are better higher.
+
+## Formats
+
+A value of the `format` enum listed for textures carries, besides its
+mapping:
+
+| Field | Meaning |
+|---|---|
+| `floor` | the capabilities every listed adapter has (WebGPU's guarantees) |
+| `block` | the width and height of a block in texels, `[1, 1]` if uncompressed |
+| `family` | the feature a compressed format needs |
+| `srgb_pair` | its sRGB or linear twin, the one format its views may change to |
+| `aspects` | `depth` and `stencil` for depth formats; a color format has none |
+
+They make `src/generated/capabilities.c`: the known formats, the floor,
+the family and block, the twin, and the aspect checks.

@@ -48,6 +48,10 @@ mrhiFormatBlock mrhiGetFormatBlock(mrhiFormat format);
 // may make, or mrhi_formatNone.
 mrhiFormat mrhiFormatSrgbPair(mrhiFormat format);
 
+// Whether a format has a depth aspect, and a stencil aspect.
+bool mrhiFormatHasDepth(mrhiFormat format);
+bool mrhiFormatHasStencil(mrhiFormat format);
+
 // A known format's position in mrhiKnownFormats, or MRHI_KNOWN_FORMATS.
 uint32_t mrhiFormatIndex(mrhiFormat format);
 

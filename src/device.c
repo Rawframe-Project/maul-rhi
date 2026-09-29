@@ -25,6 +25,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.samplers = 256;
     def.deviceLimits.buffers = 4096;
     def.deviceLimits.textures = 4096;
+    def.deviceLimits.views = 8192;
     return def;
 }
 
@@ -37,8 +38,9 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
     mrhiResult chain = mrhiCheckChain(def->next, nullptr, 0, instance->limits.chainDepth);
     if (def->cookie != DEVICE_DEF_COOKIE || def->deviceLimits.notifications == 0 ||
         def->deviceLimits.samplers == 0 || def->deviceLimits.buffers == 0 ||
-        def->deviceLimits.textures == 0 || !mrhiIsAllocatorValid(&def->allocator) ||
-        !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
+        def->deviceLimits.textures == 0 || def->deviceLimits.views == 0 ||
+        !mrhiIsAllocatorValid(&def->allocator) || !mrhiLimitsWithin(&floor, &def->limits) ||
+        chain == mrhi_errorInvalid)
     {
         *statusOut = mrhiMisuse(instance);
         return nullptr;
@@ -105,6 +107,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
         AddTable(&layout, limits->buffers, sizeof(mrhiBufferSlot), alignof(mrhiBufferSlot));
     TableParts textures =
         AddTable(&layout, limits->textures, sizeof(mrhiTextureSlot), alignof(mrhiTextureSlot));
+    TableParts views =
+        AddTable(&layout, limits->views, sizeof(mrhiViewSlot), alignof(mrhiViewSlot));
     unsigned char* block =
         layout.overflow ? nullptr : mrhiAllocate(&def->allocator, layout.size, alignof(mrhiDevice));
     if (block == nullptr)
@@ -116,6 +120,7 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     device->samplerHandles = InitTable(block, samplers, &device->samplers, limits->samplers);
     device->bufferSlots = InitTable(block, buffers, &device->buffers, limits->buffers);
     device->textureSlots = InitTable(block, textures, &device->textures, limits->textures);
+    device->viewSlots = InitTable(block, views, &device->views, limits->views);
     return device;
 }
 

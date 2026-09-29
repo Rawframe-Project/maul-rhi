@@ -22,13 +22,25 @@ typedef struct mrhiBufferSlot
 } mrhiBufferSlot;
 
 // A texture as its device keeps it: its def (without its chain), its
-// driver handle, and how many of its views exist.
+// driver handle, and the slot of its newest view, 0 for none.
 typedef struct mrhiTextureSlot
 {
     uint64_t handle;
     mrhiTextureDef def;
-    uint32_t views;
+    uint32_t firstView;
 } mrhiTextureSlot;
+
+// A view as its device keeps it: its resolved def (without its chain),
+// its driver handle, its texture's slot, and the slots of its texture's
+// views before and after it, 0 for none.
+typedef struct mrhiViewSlot
+{
+    uint64_t handle;
+    mrhiViewDef def;
+    uint32_t texture;
+    uint32_t previous;
+    uint32_t next;
+} mrhiViewSlot;
 
 struct mrhiDevice
 {
@@ -53,6 +65,8 @@ struct mrhiDevice
     mrhiBufferSlot* bufferSlots;
     mrhiPool textures;
     mrhiTextureSlot* textureSlots;
+    mrhiPool views;
+    mrhiViewSlot* viewSlots;
     // What each known format can do on this device: the adapter's
     // capabilities, with the compressed families the device was not
     // granted cleared.
@@ -69,5 +83,11 @@ mrhiResult mrhiDeviceMisuse(mrhiDevice* device);
 // success, or the refusal (invalid input counted as misuse).
 mrhiResult mrhiCheckObjectDef(mrhiDevice* device, uint32_t cookie, uint32_t expected,
                               const mrhiChain* next);
+
+// Whether a format can take the usages on the device.
+bool mrhiFormatTakes(const mrhiDevice* device, mrhiFormat format, mrhiTextureUsage usage);
+
+// Destroys a texture's views and ends their ids.
+void mrhiDestroyViewsOf(mrhiDevice* device, mrhiTextureSlot* texture);
 
 #endif // MAUL_RHI_SRC_DEVICE_CORE_H

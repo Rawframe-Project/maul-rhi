@@ -50,6 +50,8 @@ extern "C"
         uint32_t buffers;
         // Textures the device holds at once; 4096 by default.
         uint32_t textures;
+        // Views the device holds at once; 8192 by default.
+        uint32_t views;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the

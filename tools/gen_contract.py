@@ -165,6 +165,8 @@ def check_values(errors, where, item):
         if "floor" in value and not (isinstance(value.get("block"), list) and
                                      len(value["block"]) == 2):
             errors.append(f"{where}: '{value.get('name')}' needs a block of two sizes")
+        if not set(value.get("aspects", [])) <= {"depth", "stencil"}:
+            errors.append(f"{where}: '{value.get('name')}' has aspects other than depth and stencil")
         pair = value.get("srgb_pair")
         if pair is not None and pair not in {other["name"] for other in item["values"]}:
             errors.append(f"{where}: '{value.get('name')}' pairs with an unknown format")
@@ -371,7 +373,7 @@ def c_value(value, bits=False):
 
 def emit_constant(names, item):
     return comment(item["doc"], 0, "//") + [f"#define {names.constant(item['name'])} "
-                                            f"{item['value']}"]
+                                            f"{c_value(item['value'])}"]
 
 
 def emit_id(names, item):
@@ -625,6 +627,12 @@ def format_checks(contract):
             lines += [f"    case {names.value(value['name'])}:",
                       f"        return {names.value(value['srgb_pair'])};"]
     lines += ["    default:", f"        return {names.value('format_none')};", "    }", "}"]
+    for aspect in ("depth", "stencil"):
+        lines += ["", f"bool mrhiFormatHas{aspect.capitalize()}(mrhiFormat format)", "{",
+                  "    switch (format)", "    {"]
+        lines += [f"    case {names.value(value['name'])}:" for value in listed
+                  if aspect in value.get("aspects", [])]
+        lines += ["        return true;", "    default:", "        return false;", "    }", "}"]
     lines += ["", "uint32_t mrhiFormatIndex(mrhiFormat format)", "{", "    switch (format)", "    {"]
     for position, value in enumerate(listed):
         lines += [f"    case {names.value(value['name'])}:", f"        return {position};"]

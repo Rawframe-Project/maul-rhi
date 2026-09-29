@@ -46,7 +46,13 @@ typedef struct mrhiDeviceDriverVtable
     void (*destroyBuffer)(void* self, uint64_t handle);
     // Makes a texture the core has checked; its handle, never zero.
     mrhiResult (*createTexture)(void* self, const mrhiTextureDef* def, uint64_t* handleOut);
+    // Destroys a texture whose views the core has destroyed.
     void (*destroyTexture)(void* self, uint64_t handle);
+    // Makes a view of a texture from a def the core has checked and
+    // resolved: its format, usage and counts filled in.
+    mrhiResult (*createView)(void* self, uint64_t texture, const mrhiViewDef* def,
+                             uint64_t* handleOut);
+    void (*destroyView)(void* self, uint64_t handle);
 } mrhiDeviceDriverVtable;
 
 typedef struct mrhiDeviceDriver

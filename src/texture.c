@@ -4,7 +4,8 @@
 // Textures: the def's shape checked against its kind, its format's block
 // and the device's limits, its usages and sample count against the
 // format's capabilities on the device, and its view formats limited to
-// the format's sRGB or linear twin.
+// the format's sRGB or linear twin. Destroying one destroys its views
+// first.
 
 #include "capabilities_core.h"
 #include "device_core.h"
@@ -117,16 +118,21 @@ static bool AreViewFormatsValid(const mrhiTextureDef* def)
     return true;
 }
 
-// Whether the format can take the usages and sample count on the device.
 // A compressed family the device was not granted has no capabilities
-// there, so its textures are refused here too.
+// there, so its textures and views are refused here too.
+bool mrhiFormatTakes(const mrhiDevice* device, mrhiFormat format, mrhiTextureUsage usage)
+{
+    const mrhiFormatCaps* caps = &device->formatCaps[mrhiFormatIndex(format)];
+    return ((usage & mrhi_textureSampled) == 0 || caps->sampling) &&
+           ((usage & mrhi_textureStorage) == 0 || caps->storage) &&
+           ((usage & mrhi_textureRenderTarget) == 0 || caps->rendering);
+}
+
+// Whether the format can take the usages and sample count on the device.
 static bool IsGranted(const mrhiDevice* device, const mrhiTextureDef* def)
 {
     const mrhiFormatCaps* caps = &device->formatCaps[mrhiFormatIndex(def->format)];
-    mrhiTextureUsage usage = def->usage;
-    return ((usage & mrhi_textureSampled) == 0 || caps->sampling) &&
-           ((usage & mrhi_textureStorage) == 0 || caps->storage) &&
-           ((usage & mrhi_textureRenderTarget) == 0 || caps->rendering) &&
+    return mrhiFormatTakes(device, def->format, def->usage) &&
            (caps->sampleCounts & def->sampleCount) != 0;
 }
 
@@ -196,8 +202,9 @@ mrhiResult mrhiDestroyTexture(mrhiDevice* device, mrhiTextureId texture)
     {
         return mrhi_errorStale;
     }
-    device->driver.vtable->destroyTexture(device->driver.self,
-                                          device->textureSlots[texture.index1 - 1].handle);
+    mrhiTextureSlot* slot = &device->textureSlots[texture.index1 - 1];
+    mrhiDestroyViewsOf(device, slot);
+    device->driver.vtable->destroyTexture(device->driver.self, slot->handle);
     mrhiPoolRelease(&device->textures, texture.index1);
     return mrhi_success;
 }

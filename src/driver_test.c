@@ -63,6 +63,16 @@ static size_t GetAdapters(const void* self, mrhiDriverAdapter* adapters, size_t 
     return driver->adapterCount;
 }
 
+// The views a test device holds at once; making more fails as the
+// platform.
+#define TEST_VIEWS 64
+
+typedef struct TestView
+{
+    uint64_t handle;
+    uint64_t texture;
+} TestView;
+
 typedef struct TestDevice
 {
     mrhiAllocator allocator;
@@ -75,6 +85,10 @@ typedef struct TestDevice
     uint32_t buffers;
     uint64_t bufferBytes;
     uint32_t textures;
+    // The live views and their textures, so that a texture destroyed
+    // before its views traps.
+    TestView views[TEST_VIEWS];
+    uint32_t viewCount;
 } TestDevice;
 
 // A new object's handle, or mrhi_errorPlatform once the adapter's
@@ -131,7 +145,41 @@ static void DestroyTexture(void* self, uint64_t handle)
 {
     TestDevice* device = self;
     MRHI_ASSERT(handle != 0 && handle <= device->nextHandle && device->textures > 0);
+    for (uint32_t i = 0; i < device->viewCount; ++i)
+    {
+        MRHI_ASSERT(device->views[i].texture != handle);
+    }
     --device->textures;
+}
+
+static mrhiResult CreateView(void* self, uint64_t texture, const mrhiViewDef* def,
+                             uint64_t* handleOut)
+{
+    (void)def;
+    TestDevice* device = self;
+    MRHI_ASSERT(texture != 0 && texture <= device->nextHandle);
+    if (device->viewCount == TEST_VIEWS)
+    {
+        return mrhi_errorPlatform;
+    }
+    mrhiResult status = MakeObject(device, handleOut);
+    if (status == mrhi_success)
+    {
+        device->views[device->viewCount++] = (TestView){*handleOut, texture};
+    }
+    return status;
+}
+
+static void DestroyView(void* self, uint64_t handle)
+{
+    TestDevice* device = self;
+    uint32_t i = 0;
+    while (i < device->viewCount && device->views[i].handle != handle)
+    {
+        ++i;
+    }
+    MRHI_ASSERT(handle != 0 && i < device->viewCount);
+    device->views[i] = device->views[--device->viewCount];
 }
 
 static void DestroySampler(void* self, uint64_t handle)
@@ -158,6 +206,8 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .destroyBuffer = DestroyBuffer,
     .createTexture = CreateTexture,
     .destroyTexture = DestroyTexture,
+    .createView = CreateView,
+    .destroyView = DestroyView,
 };
 
 static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiFeatures* features,

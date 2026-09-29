@@ -71,3 +71,9 @@ format.
   linear twin its views may take (`viewFormats`); sizes checked against
   the kind, the format's block and the device's limits; the device's
   `textures` limit.
+- Views: `mrhiCreateView` and `mrhiDestroyView` over a texture's mips
+  and layers (`MRHI_REMAINING` for the rest), with a kind the texture
+  allows, its format or a view format it was given, some of its usages
+  (0 for all) that the view's format can take on the device, and an
+  aspect (`mrhiTextureAspect`) its format has; each mapped onto the four
+  APIs. Destroying a texture ends its views; the device's `views` limit.

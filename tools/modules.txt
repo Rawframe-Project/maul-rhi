@@ -16,3 +16,4 @@ notify: instance_core
 pool:
 resources: capabilities_core device_core
 texture: capabilities_core device_core
+view: capabilities_core device_core

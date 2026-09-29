@@ -36,3 +36,6 @@ edit the contract, not this file.
 | `mrhiDefaultTextureDef` | Safe from any thread. |
 | `mrhiCreateTexture` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDestroyTexture` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDefaultViewDef` | Safe from any thread. |
+| `mrhiCreateView` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDestroyView` | Safe from any thread; the device is used by one thread at a time. |

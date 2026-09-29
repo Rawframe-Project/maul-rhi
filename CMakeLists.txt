@@ -54,7 +54,8 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/notify.c
     src/pool.c
     src/resources.c
-    src/texture.c)
+    src/texture.c
+    src/view.c)
 maul_configure_library(maul-rhi)
 if(MAUL_RHI_TEST_DRIVER)
     target_sources(maul-rhi PRIVATE src/driver_test.c)
@@ -76,6 +77,7 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(sampler)
         maul_add_test(buffer)
         maul_add_test(texture)
+        maul_add_test(view)
     endif()
     maul_add_header_tests()
 endif()

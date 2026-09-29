@@ -2508,6 +2508,9 @@
               "block": [
                 1,
                 1
+              ],
+              "aspects": [
+                "depth"
               ]
             },
             {
@@ -2543,6 +2546,10 @@
               "block": [
                 1,
                 1
+              ],
+              "aspects": [
+                "depth",
+                "stencil"
               ]
             },
             {
@@ -4787,6 +4794,11 @@
               "name": "textures",
               "type": "uint32",
               "doc": "Textures the device holds at once; 4096 by default."
+            },
+            {
+              "name": "views",
+              "type": "uint32",
+              "doc": "Views the device holds at once; 8192 by default."
             }
           ]
         },
@@ -6530,6 +6542,383 @@
               "name": "texture",
               "type": "id.texture_id",
               "doc": "The texture."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "enum",
+          "name": "texture_aspect",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "The part of a texture's texels a view sees.",
+          "values": [
+            {
+              "name": "aspect_all",
+              "value": 0,
+              "doc": "Every aspect the format has.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "COLOR_BIT, or DEPTH_BIT and STENCIL_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the format's own planes"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the texture's pixel format"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "all"
+                }
+              }
+            },
+            {
+              "name": "aspect_depth_only",
+              "value": 1,
+              "doc": "The depth of a depth format.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "DEPTH_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "plane 0 of a depth-stencil format"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the depth pixel format of a depth-stencil texture"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "depth-only"
+                }
+              }
+            },
+            {
+              "name": "aspect_stencil_only",
+              "value": 2,
+              "doc": "The stencil of a format with stencil.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "STENCIL_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "plane 1 of a depth-stencil format"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the X32_Stencil8 view format"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "stencil-only"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "constant",
+          "name": "remaining",
+          "value": 4294967295,
+          "doc": "A mip or layer count that reaches the texture's last."
+        },
+        {
+          "kind": "id",
+          "name": "view_id",
+          "doc": "A view of a texture."
+        },
+        {
+          "kind": "struct",
+          "name": "view_def",
+          "def": true,
+          "mapped": true,
+          "doc": "How a view is made: a subrange of a texture's mips and layers, seen with a shape, a format, uses and an aspect. Build it with mrhiDefaultViewDef and set its texture.",
+          "members": [
+            {
+              "name": "texture",
+              "type": "id.texture_id",
+              "doc": "The texture it views.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "image"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the resource"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the texture newTextureView is sent to"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "the texture createView is called on"
+                }
+              }
+            },
+            {
+              "name": "kind",
+              "type": "enum.texture_kind",
+              "doc": "Its shape: 2D or 2D array on any texture but a 3D one, a cube or cube array on a cube or cube array texture, 3D on a 3D texture.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "viewType"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "ViewDimension"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "textureType"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "dimension"
+                }
+              }
+            },
+            {
+              "name": "format",
+              "type": "enum.format",
+              "doc": "The texture's format or one of its view formats; mrhi_formatNone for the texture's.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "format"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "Format"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "pixelFormat"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "format"
+                }
+              }
+            },
+            {
+              "name": "usage",
+              "type": "bitflags.texture_usage",
+              "doc": "Some of the texture's uses, each one the view's format can take on the device; 0 for all of the texture's.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VkImageViewUsageCreateInfo"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the kind of view made"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "usage checked by the core"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "usage"
+                }
+              }
+            },
+            {
+              "name": "aspect",
+              "type": "enum.texture_aspect",
+              "doc": "The aspect it sees; depth or stencil only on a format that has it.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "subresourceRange.aspectMask"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the view format's plane"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the view's pixel format"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "aspect"
+                }
+              }
+            },
+            {
+              "name": "base_mip",
+              "type": "uint32",
+              "doc": "Its first mip.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "baseMipLevel"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "MostDetailedMip or MipSlice"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "levels.location"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "baseMipLevel"
+                }
+              }
+            },
+            {
+              "name": "mip_count",
+              "type": "uint32",
+              "doc": "Its mips, at least 1, or MRHI_REMAINING.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "levelCount"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "MipLevels"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "levels.length"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "mipLevelCount"
+                }
+              }
+            },
+            {
+              "name": "base_layer",
+              "type": "uint32",
+              "doc": "Its first layer; 0 on a 3D texture.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "baseArrayLayer"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "FirstArraySlice"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "slices.location"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "baseArrayLayer"
+                }
+              }
+            },
+            {
+              "name": "layer_count",
+              "type": "uint32",
+              "doc": "Its layers, or MRHI_REMAINING: 1 for 2D and 3D, 6 for a cube, a multiple of 6 for a cube array.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "layerCount"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "ArraySize"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "slices.length"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "arrayLayerCount"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_view_def",
+          "doc": "Returns the default view def: a 2D view of every mip and layer in the texture's format, uses and aspects, with no texture, which must be set.",
+          "returns": {
+            "type": "struct.view_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "create_view",
+          "doc": "Makes a view of a texture on a ready device.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, an unknown kind, usage or aspect, a kind the texture cannot be seen as, a format the texture was not given, uses the texture lacks, an aspect its format lacks, or a mip or layer range that is empty, past the texture's end or wrong for the kind; `mrhi_errorStale` for a texture the device no longer has; `mrhi_errorUnsupported` for a use the view's format cannot take on the device, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's view limit is reached; `mrhi_errorPlatform` when the driver fails."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "def",
+              "type": "struct.view_def",
+              "pointer": "const",
+              "doc": "The view to make."
+            },
+            {
+              "name": "view_out",
+              "type": "id.view_id",
+              "pointer": "mutable",
+              "doc": "Receives the view."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "destroy_view",
+          "doc": "Destroys a view. Its id ends at once; the device retires it after the frames that used it.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device; `mrhi_errorStale` for a view the device no longer has, its texture's destruction included."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "view",
+              "type": "id.view_id",
+              "doc": "The view."
             }
           ],
           "thread_safety": {

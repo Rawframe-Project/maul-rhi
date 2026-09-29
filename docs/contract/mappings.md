@@ -247,3 +247,25 @@ restricted or absent-rejected, with how.
 | `sampleCount` | direct: samples | direct: SampleDesc.Count | direct: sampleCount | restricted: sampleCount, 1 or 4 |
 | `usage` | direct: usage | direct: Flags | direct: usage and storageMode | direct: usage |
 | `viewFormats` | direct: MUTABLE_FORMAT and a format list | direct: castable formats | direct: pixelFormatView | direct: viewFormats |
+
+## mrhiTextureAspect
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_aspectAll` | direct: COLOR_BIT, or DEPTH_BIT and STENCIL_BIT | direct: the format's own planes | direct: the texture's pixel format | direct: all |
+| `mrhi_aspectDepthOnly` | direct: DEPTH_BIT | direct: plane 0 of a depth-stencil format | direct: the depth pixel format of a depth-stencil texture | direct: depth-only |
+| `mrhi_aspectStencilOnly` | direct: STENCIL_BIT | direct: plane 1 of a depth-stencil format | direct: the X32_Stencil8 view format | direct: stencil-only |
+
+## mrhiViewDef
+
+| Member | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `texture` | direct: image | direct: the resource | direct: the texture newTextureView is sent to | direct: the texture createView is called on |
+| `kind` | direct: viewType | direct: ViewDimension | direct: textureType | direct: dimension |
+| `format` | direct: format | direct: Format | direct: pixelFormat | direct: format |
+| `usage` | direct: VkImageViewUsageCreateInfo | direct: the kind of view made | direct: usage checked by the core | direct: usage |
+| `aspect` | direct: subresourceRange.aspectMask | direct: the view format's plane | direct: the view's pixel format | direct: aspect |
+| `baseMip` | direct: baseMipLevel | direct: MostDetailedMip or MipSlice | direct: levels.location | direct: baseMipLevel |
+| `mipCount` | direct: levelCount | direct: MipLevels | direct: levels.length | direct: mipLevelCount |
+| `baseLayer` | direct: baseArrayLayer | direct: FirstArraySlice | direct: slices.location | direct: baseArrayLayer |
+| `layerCount` | direct: layerCount | direct: ArraySize | direct: slices.length | direct: arrayLayerCount |
