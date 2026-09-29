@@ -188,6 +188,20 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiGetDeviceLimits(mrhiDevice* device,
                                                            mrhiLimits* limitsOut);
 
+    /// Reads the nanoseconds one tick of the device's timestamps takes: 1 where
+    /// the API reports nanoseconds already.
+    ///
+    /// @param device     The device.
+    /// @param periodOut  Receives the nanoseconds per tick.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
+    /// `mrhi_errorState` for a device that is not ready;
+    /// `mrhi_errorUnsupported` for a device without the timestamp_query
+    /// feature.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetDeviceTimestampPeriod(mrhiDevice* device,
+                                                                    double* periodOut);
+
     /// Returns how many calls the device has refused as invalid input
     /// (mrhi_errorInvalid).
     ///

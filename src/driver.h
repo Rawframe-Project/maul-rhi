@@ -111,6 +111,8 @@ typedef struct mrhiDeviceDriverVtable
     // Makes a query set the core has checked; its handle, never zero.
     mrhiResult (*createQuerySet)(void* self, const mrhiQuerySetDef* def, uint64_t* handleOut);
     void (*destroyQuerySet)(void* self, uint64_t handle);
+    // The nanoseconds per timestamp tick of a device granted timestamps.
+    double (*timestampPeriod)(void* self);
     // Takes a pipeline cache blob it exported on an earlier run, right
     // after the device is made; false when it declines it. The bytes are
     // only read during the call.

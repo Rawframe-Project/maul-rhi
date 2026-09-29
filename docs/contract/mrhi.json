@@ -5714,6 +5714,33 @@
         },
         {
           "kind": "function",
+          "name": "get_device_timestamp_period",
+          "doc": "Reads the nanoseconds one tick of the device's timestamps takes: 1 where the API reports nanoseconds already.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a device without the timestamp_query feature."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "period_out",
+              "type": "float64",
+              "pointer": "mutable",
+              "doc": "Receives the nanoseconds per tick."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
           "name": "get_device_misuse",
           "doc": "Returns how many calls the device has refused as invalid input (mrhi_errorInvalid).",
           "returns": {
@@ -7907,6 +7934,12 @@
           "kind": "id",
           "name": "query_set_id",
           "doc": "A query set of a device."
+        },
+        {
+          "kind": "constant",
+          "name": "no_query",
+          "value": 4294967295,
+          "doc": "A query index that names no query."
         },
         {
           "kind": "struct",
@@ -10122,13 +10155,28 @@
               "name": "occlusion_query_set",
               "type": "id.query_set_id",
               "doc": "The occlusion query set the pass's occlusion queries write, for a pass with targets; a null id for none."
+            },
+            {
+              "name": "timestamp_query_set",
+              "type": "id.query_set_id",
+              "doc": "The timestamp query set the pass writes its start and end times into, for a pass of the graphics class; a null id for none."
+            },
+            {
+              "name": "timestamp_begin",
+              "type": "uint32",
+              "doc": "The query written at the pass's start, or MRHI_NO_QUERY."
+            },
+            {
+              "name": "timestamp_end",
+              "type": "uint32",
+              "doc": "The query written at the pass's end, or MRHI_NO_QUERY."
             }
           ]
         },
         {
           "kind": "function",
           "name": "default_pass_def",
-          "doc": "Returns the default pass def: a graphics pass with no accesses or targets.",
+          "doc": "Returns the default pass def: a graphics pass with no accesses, targets or queries.",
           "returns": {
             "type": "struct.pass_def",
             "doc": "The def, with a valid cookie."
@@ -10144,7 +10192,7 @@
           "doc": "Declares a pass of the open frame, after the passes declared before it in its class.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an unknown class, kind, aspect or operation, an access or target its resource cannot take (a kind for the other resource type, a range outside the texture, a use an imported object was not made with, a target that does not render or depth-test), targets of different sizes or sample counts, a resolve that does not match, a subresource written and used otherwise in the pass, an access the class does not allow, a declared resource read before any pass wrote it, or an occlusion query set that is not one or is named by a pass without targets; `mrhi_errorStale` for a resource of another frame, an imported object destroyed since, or a query set the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorCapacity` when the device's framePasses or frameAccesses limit is reached."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an unknown class, kind, aspect or operation, an access or target its resource cannot take (a kind for the other resource type, a range outside the texture, a use an imported object was not made with, a target that does not render or depth-test), targets of different sizes or sample counts, a resolve that does not match, a subresource written and used otherwise in the pass, an access the class does not allow, a declared resource read before any pass wrote it, an occlusion query set that is not one or is named by a pass without targets, or timestamps of a set that is not a timestamp set, on a pass not of the graphics class, without a set, with neither query, with both the same, or with a query past the set's count or already written in this frame; `mrhi_errorStale` for a resource of another frame, an imported object destroyed since, or a query set the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorCapacity` when the device's framePasses or frameAccesses limit is reached."
           },
           "args": [
             {
@@ -16492,6 +16540,11 @@
               "name": "pipeline_outcome",
               "type": "result",
               "doc": "What pipelines made on the adapter's devices are answered with at the next poll: mrhi_success, or the error their creation fails with."
+            },
+            {
+              "name": "timestamp_period",
+              "type": "float64",
+              "doc": "The nanoseconds per timestamp tick its devices report; 0 for 1."
             }
           ]
         },

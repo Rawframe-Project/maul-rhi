@@ -250,6 +250,11 @@ typedef struct mrhiFramePass
     uint32_t occlusionSet;
     uint32_t occlusionGeneration;
     bool occlusionOpen;
+    // Its timestamp query set's driver handle (0 for none) and the
+    // queries written at its start and end (MRHI_NO_QUERY for none).
+    uint64_t timestampSet;
+    uint32_t timestampBegin;
+    uint32_t timestampEnd;
 } mrhiFramePass;
 
 // A surface as the device that configured it keeps it: the surface, the
@@ -565,5 +570,16 @@ void mrhiQueueAnswer(mrhiDevice* device, mrhiDeviceNotificationKind kind, uint32
 // Answers a pending pipeline the driver finished, by its tag: its slot
 // above its request.
 void mrhiFinishPipeline(mrhiDevice* device, uint64_t tag, mrhiResult outcome);
+
+// Checks the query sets a pass def names: success; mrhi_errorStale for
+// one the device no longer has; or mrhi_errorInvalid for an occlusion
+// set that is not one or is named by a pass without targets, or
+// timestamps that are not a graphics pass's two different queries, at
+// least one given, in range and not yet written this frame.
+mrhiResult mrhiCheckPassQueries(const mrhiDevice* device, const mrhiPassDef* def);
+
+// Marks a checked pass def's timestamp queries written this frame and
+// keeps them in its pass.
+void mrhiMarkPassTimestamps(mrhiDevice* device, const mrhiPassDef* def, mrhiFramePass* pass);
 
 #endif // MAUL_RHI_SRC_DEVICE_CORE_H

@@ -196,6 +196,8 @@ typedef struct TestDevice
     TestPipeline pending[TEST_PIPELINES];
     uint32_t pendingCount;
     mrhiResult pipelineOutcome;
+    // Nanoseconds per timestamp tick.
+    double timestampPeriod;
     // Pipelines made, and those a pipeline cache said earlier devices made.
     uint64_t pipelinesMade;
     uint64_t pipelinesCached;
@@ -333,6 +335,12 @@ static void DestroyQuerySet(void* self, uint64_t handle)
     TestDevice* device = self;
     MRHI_ASSERT(handle != 0 && handle <= device->nextHandle && device->querySets > 0);
     --device->querySets;
+}
+
+static double TimestampPeriod(void* self)
+{
+    const TestDevice* device = self;
+    return device->timestampPeriod;
 }
 
 static void DestroySampler(void* self, uint64_t handle)
@@ -588,6 +596,7 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .destroyPipeline = DestroyPipeline,
     .createQuerySet = CreateQuerySet,
     .destroyQuerySet = DestroyQuerySet,
+    .timestampPeriod = TimestampPeriod,
     .importPipelineCache = ImportPipelineCache,
     .exportPipelineCache = ExportPipelineCache,
     .textureMemory = TextureMemory,
@@ -616,6 +625,9 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
         .holdFrames = driver->adapters[adapter - 1].holdFrames,
         .frameOutcome = driver->adapters[adapter - 1].frameOutcome,
         .pipelineOutcome = driver->adapters[adapter - 1].pipelineOutcome,
+        .timestampPeriod = driver->adapters[adapter - 1].timestampPeriod > 0.0
+                               ? driver->adapters[adapter - 1].timestampPeriod
+                               : 1.0,
     };
     Name(device, def->label, def->labelLength);
     driver->pending[driver->pendingCount++] = (mrhiDriverEvent){

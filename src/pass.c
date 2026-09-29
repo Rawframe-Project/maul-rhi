@@ -17,6 +17,8 @@ mrhiPassDef mrhiDefaultPassDef(void)
     mrhiPassDef def = {0};
     def.cookie = PASS_DEF_COOKIE;
     def.passClass = mrhi_passGraphics;
+    def.timestampBegin = MRHI_NO_QUERY;
+    def.timestampEnd = MRHI_NO_QUERY;
     return def;
 }
 
@@ -456,26 +458,6 @@ static mrhiResult CheckDef(mrhiDevice* device, const mrhiPassDef* def)
     return mrhi_success;
 }
 
-// Checks the query sets a pass names: success, mrhi_errorStale for one
-// the device no longer has, or mrhi_errorInvalid for an occlusion set
-// that is not one or is named by a pass without targets.
-static mrhiResult CheckQuerySets(const mrhiDevice* device, const mrhiPassDef* def)
-{
-    mrhiQuerySetId set = def->occlusionQuerySet;
-    if (set.index1 == 0)
-    {
-        return mrhi_success;
-    }
-    if (!mrhiPoolIsLive(&device->querySets, set.index1, set.generation))
-    {
-        return mrhi_errorStale;
-    }
-    bool renders = def->colorTargetCount > 0 || def->depthTarget.resource.index1 != 0;
-    return renders && device->querySetSlots[set.index1 - 1].type == mrhi_queryOcclusion
-               ? mrhi_success
-               : mrhi_errorInvalid;
-}
-
 mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* passOut)
 {
     if (device == nullptr)
@@ -491,7 +473,7 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
     {
         return status;
     }
-    status = CheckQuerySets(device, def);
+    status = mrhiCheckPassQueries(device, def);
     uint32_t count = status == mrhi_success ? MakeUses(device, def, &status) : 0;
     if (status != mrhi_success)
     {
@@ -513,6 +495,7 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
         .occlusionSet = def->occlusionQuerySet.index1,
         .occlusionGeneration = def->occlusionQuerySet.generation,
     };
+    mrhiMarkPassTimestamps(device, def, pass);
     for (uint32_t i = 0; i < def->colorTargetCount; ++i)
     {
         pass->colorTargets[i] = def->colorTargets[i];

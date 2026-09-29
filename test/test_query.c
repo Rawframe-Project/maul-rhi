@@ -372,6 +372,117 @@ static void TestSetsApart(void)
     Close(s_device);
 }
 
+// A pass def writing timestamps of a set at its start and end.
+static mrhiPassDef TimedDef(mrhiQuerySetId set, uint32_t begin, uint32_t end)
+{
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    def.timestampQuerySet = set;
+    def.timestampBegin = begin;
+    def.timestampEnd = end;
+    return def;
+}
+
+static void TestTimestamps(void)
+{
+    OpenFrames(1u << 20);
+    // The timestamps' run starts past the occlusion set's.
+    mrhiQuerySetId occlusion = MakeSet(mrhi_queryOcclusion, 8);
+    mrhiQuerySetId set = MakeSet(mrhi_queryTimestamp, 8);
+    mrhiQuerySetId gone = MakeSet(mrhi_queryTimestamp, 8);
+    CHECK(mrhiDestroyQuerySet(s_device, gone) == mrhi_success, "one destroyed");
+    mrhiPassDef def = mrhiDefaultPassDef();
+    CHECK(def.timestampQuerySet.index1 == 0 && def.timestampBegin == MRHI_NO_QUERY &&
+              def.timestampEnd == MRHI_NO_QUERY,
+          "none by default");
+    mrhiResourceId target = BeginFrame();
+    mrhiPassId pass;
+    def = TimedDef(set, 0, 1);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "both ends");
+    const mrhiFramePass* kept = &s_device->framePasses[pass.index1 - 1];
+    CHECK(kept->timestampSet == s_device->querySetSlots[set.index1 - 1].handle &&
+              kept->timestampBegin == 0 && kept->timestampEnd == 1,
+          "kept with the set's handle");
+    def = TimedDef(set, 2, MRHI_NO_QUERY);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "its start only");
+    def = TimedDef(set, MRHI_NO_QUERY, 3);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "its end only");
+    def = RenderDef(target, occlusion);
+    def.timestampQuerySet = set;
+    def.timestampBegin = 4;
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "a render pass with both sets");
+    uint32_t misuse = 0;
+    def = TimedDef(set, 0, MRHI_NO_QUERY);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a start written");
+    def = TimedDef(set, MRHI_NO_QUERY, 1);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "an end written");
+    def = TimedDef(set, 5, 5);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "the same query");
+    def = TimedDef(set, MRHI_NO_QUERY, MRHI_NO_QUERY);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "neither");
+    def = TimedDef(set, 8, MRHI_NO_QUERY);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a start past the set");
+    def = TimedDef(set, 5, 8);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "an end past it");
+    def = TimedDef(occlusion, 5, 6);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "an occlusion set");
+    def = TimedDef(set, 5, 6);
+    def.passClass = mrhi_passAsyncCompute;
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "async compute");
+    def.passClass = mrhi_passTransfer;
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a transfer pass");
+    def = TimedDef((mrhiQuerySetId){0}, 5, MRHI_NO_QUERY);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a start without a set");
+    def = TimedDef((mrhiQuerySetId){0}, MRHI_NO_QUERY, 5);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "an end without a set");
+    misuse += 11;
+    def = TimedDef(set, 6, 0);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a start with a written end");
+    def = TimedDef(set, 7, 1);
+    def.occlusionQuerySet = occlusion;
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "an occlusion set refused");
+    misuse += 2;
+    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "each counted");
+    def = TimedDef(gone, 5, 6);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorStale, "a destroyed set");
+    def = TimedDef(set, 6, 7);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success,
+          "queries a refused pass named, unwritten");
+    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "the stale one not counted");
+    Drop();
+    BeginFrame();
+    def = TimedDef(set, 0, 1);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "written again in the next frame");
+    Drop();
+    Close(s_device);
+}
+
+static void TestPeriod(void)
+{
+    s_adapter.timestampPeriod = 83.333;
+    OpenFrames(1u << 20);
+    double period = 0.0;
+    CHECK(mrhiGetDeviceTimestampPeriod(s_device, &period) == mrhi_success && period == 83.333,
+          "the driver's period");
+    CHECK(mrhiGetDeviceTimestampPeriod(s_device, nullptr) == mrhi_errorInvalid &&
+              mrhiGetDeviceMisuse(s_device) == 1,
+          "no out, counted");
+    CHECK(mrhiGetDeviceTimestampPeriod(nullptr, &period) == mrhi_errorInvalid, "no device");
+    Close(s_device);
+    s_adapter.timestampPeriod = 0.0;
+    OpenFrames(1u << 20);
+    CHECK(mrhiGetDeviceTimestampPeriod(s_device, &period) == mrhi_success && period == 1.0,
+          "nanoseconds when the driver says none");
+    Close(s_device);
+    mrhiDevice* device = Open(1, 1, false, true);
+    CHECK(mrhiGetDeviceTimestampPeriod(device, &period) == mrhi_errorUnsupported,
+          "a device without timestamps");
+    Close(device);
+    device = Open(1, 1, true, false);
+    CHECK(mrhiGetDeviceTimestampPeriod(device, &period) == mrhi_errorState, "not ready yet");
+    Close(device);
+}
+
 // A query refused for capacity still opens and closes, so the pass ends.
 static void TestOcclusionCapacity(void)
 {
@@ -408,5 +519,7 @@ int main(void)
     TestOcclusion();
     TestSetsApart();
     TestOcclusionCapacity();
+    TestTimestamps();
+    TestPeriod();
     return s_failures == 0 ? 0 : 1;
 }

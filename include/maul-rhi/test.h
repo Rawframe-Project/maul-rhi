@@ -48,6 +48,8 @@ extern "C"
         // What pipelines made on the adapter's devices are answered with at the
         // next poll: mrhi_success, or the error their creation fails with.
         mrhiResult pipelineOutcome;
+        // The nanoseconds per timestamp tick its devices report; 0 for 1.
+        double timestampPeriod;
     } mrhiTestAdapter;
 
     // Turns the test driver on for an instance, chained on its def with the

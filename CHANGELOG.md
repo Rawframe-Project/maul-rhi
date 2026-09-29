@@ -214,3 +214,8 @@ format.
   (`occlusionQuerySet`), and `mrhiBeginOcclusionQuery` and
   `mrhiEndOcclusionQuery` bracket its draws, one query open at a time
   and each query written at most once a frame.
+- Timestamps: a graphics pass names a timestamp query set
+  (`timestampQuerySet`) and the queries written at its start and end
+  (`timestampBegin`, `timestampEnd`, `MRHI_NO_QUERY` for none), each
+  written at most once a frame; `mrhiGetDeviceTimestampPeriod` reads
+  the nanoseconds per tick.

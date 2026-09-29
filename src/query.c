@@ -128,6 +128,83 @@ mrhiResult mrhiDestroyQuerySet(mrhiDevice* device, mrhiQuerySetId set)
     return mrhi_success;
 }
 
+// Checks the occlusion set a pass def names, if any.
+static mrhiResult CheckOcclusionSet(const mrhiDevice* device, const mrhiPassDef* def)
+{
+    mrhiQuerySetId set = def->occlusionQuerySet;
+    if (set.index1 == 0)
+    {
+        return mrhi_success;
+    }
+    if (!mrhiPoolIsLive(&device->querySets, set.index1, set.generation))
+    {
+        return mrhi_errorStale;
+    }
+    bool renders = def->colorTargetCount > 0 || def->depthTarget.resource.index1 != 0;
+    return renders && device->querySetSlots[set.index1 - 1].type == mrhi_queryOcclusion
+               ? mrhi_success
+               : mrhi_errorInvalid;
+}
+
+// Whether a timestamp query is none, or one of the set not yet written
+// this frame.
+static bool IsTimestampFree(const mrhiDevice* device, const mrhiQuerySetSlot* set, uint32_t query)
+{
+    return query == MRHI_NO_QUERY ||
+           (query < set->count &&
+            atomic_load_explicit(&device->queryMarks[set->first + query], memory_order_relaxed) !=
+                device->frameNumber);
+}
+
+mrhiResult mrhiCheckPassQueries(const mrhiDevice* device, const mrhiPassDef* def)
+{
+    mrhiResult status = CheckOcclusionSet(device, def);
+    if (status != mrhi_success)
+    {
+        return status;
+    }
+    mrhiQuerySetId set = def->timestampQuerySet;
+    uint32_t begin = def->timestampBegin;
+    uint32_t end = def->timestampEnd;
+    if (set.index1 == 0)
+    {
+        return begin == MRHI_NO_QUERY && end == MRHI_NO_QUERY ? mrhi_success : mrhi_errorInvalid;
+    }
+    if (!mrhiPoolIsLive(&device->querySets, set.index1, set.generation))
+    {
+        return mrhi_errorStale;
+    }
+    const mrhiQuerySetSlot* slot = &device->querySetSlots[set.index1 - 1];
+    // Passes are added on one thread, so a load and a later store suffice.
+    bool valid = slot->type == mrhi_queryTimestamp && def->passClass == mrhi_passGraphics &&
+                 begin != end && IsTimestampFree(device, slot, begin) &&
+                 IsTimestampFree(device, slot, end);
+    return valid ? mrhi_success : mrhi_errorInvalid;
+}
+
+void mrhiMarkPassTimestamps(mrhiDevice* device, const mrhiPassDef* def, mrhiFramePass* pass)
+{
+    pass->timestampBegin = MRHI_NO_QUERY;
+    pass->timestampEnd = MRHI_NO_QUERY;
+    if (def->timestampQuerySet.index1 == 0)
+    {
+        return;
+    }
+    const mrhiQuerySetSlot* set = &device->querySetSlots[def->timestampQuerySet.index1 - 1];
+    pass->timestampSet = set->handle;
+    pass->timestampBegin = def->timestampBegin;
+    pass->timestampEnd = def->timestampEnd;
+    uint32_t queries[2] = {def->timestampBegin, def->timestampEnd};
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        if (queries[i] != MRHI_NO_QUERY)
+        {
+            atomic_store_explicit(&device->queryMarks[set->first + queries[i]], device->frameNumber,
+                                  memory_order_relaxed);
+        }
+    }
+}
+
 // Marks a query of a set as written in the open frame: false when the
 // frame already wrote it. Passes record in parallel, so the exchange is
 // atomic.

@@ -405,10 +405,17 @@ extern "C"
         // The occlusion query set the pass's occlusion queries write, for a
         // pass with targets; a null id for none.
         mrhiQuerySetId occlusionQuerySet;
+        // The timestamp query set the pass writes its start and end times into,
+        // for a pass of the graphics class; a null id for none.
+        mrhiQuerySetId timestampQuerySet;
+        // The query written at the pass's start, or MRHI_NO_QUERY.
+        uint32_t timestampBegin;
+        // The query written at the pass's end, or MRHI_NO_QUERY.
+        uint32_t timestampEnd;
     } mrhiPassDef;
 
-    /// Returns the default pass def: a graphics pass with no accesses or
-    /// targets.
+    /// Returns the default pass def: a graphics pass with no accesses, targets
+    /// or queries.
     ///
     /// @return The def, with a valid cookie.
     /// @par Thread safety
@@ -429,8 +436,11 @@ extern "C"
     /// targets of different sizes or sample counts, a resolve that does not
     /// match, a subresource written and used otherwise in the pass, an access
     /// the class does not allow, a declared resource read before any pass wrote
-    /// it, or an occlusion query set that is not one or is named by a pass
-    /// without targets; `mrhi_errorStale` for a resource of another frame, an
+    /// it, an occlusion query set that is not one or is named by a pass without
+    /// targets, or timestamps of a set that is not a timestamp set, on a pass
+    /// not of the graphics class, without a set, with neither query, with both
+    /// the same, or with a query past the set's count or already written in
+    /// this frame; `mrhi_errorStale` for a resource of another frame, an
     /// imported object destroyed since, or a query set the device no longer
     /// has; `mrhi_errorUnsupported` for a critical extension the library does
     /// not know; `mrhi_errorState` for a device without an open frame, or a

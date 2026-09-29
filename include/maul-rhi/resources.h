@@ -487,6 +487,9 @@ extern "C"
         uint32_t generation;
     } mrhiQuerySetId;
 
+// A query index that names no query.
+#define MRHI_NO_QUERY 0xFFFFFFFFu
+
     // How a query set is made. Build it with mrhiDefaultQuerySetDef.
     typedef struct mrhiQuerySetDef
     {

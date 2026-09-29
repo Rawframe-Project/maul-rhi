@@ -34,8 +34,11 @@ record on several threads (mrhi-0011).
   one query at a time, none open when the pass ends. A result other
   than 0 means some sample passed.
 - **Timestamps:** a pass's def names a timestamp set and the queries
-  written at its start and end, each optional. A culled pass writes
-  none. Values are ticks; the device reports nanoseconds per tick.
+  written at its start and end (`MRHI_NO_QUERY` for either, not both).
+  A culled pass writes none. A pass that is not one WebGPU pass, such
+  as copies beside dispatches, gets its times from empty compute passes
+  that write them. Values are ticks; `mrhiGetDeviceTimestampPeriod`
+  reads nanoseconds per tick.
 - **Once a frame:** a query is written at most once in a frame, which
   is stricter than WebGPU's once a pass. A second write is invalid. A
   driver then resets each set once, before the frame's first use, as

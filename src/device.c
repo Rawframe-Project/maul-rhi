@@ -437,6 +437,25 @@ mrhiResult mrhiGetDeviceLimits(mrhiDevice* device, mrhiLimits* limitsOut)
     return mrhi_success;
 }
 
+mrhiResult mrhiGetDeviceTimestampPeriod(mrhiDevice* device, double* periodOut)
+{
+    if (device == nullptr || periodOut == nullptr)
+    {
+        return device == nullptr ? mrhi_errorInvalid : mrhiDeviceMisuse(device);
+    }
+    mrhiResult status = mrhiDeviceUsable(device);
+    if (status != mrhi_success)
+    {
+        return status;
+    }
+    if (!device->features.timestampQuery)
+    {
+        return mrhi_errorUnsupported;
+    }
+    *periodOut = device->driver.vtable->timestampPeriod(device->driver.self);
+    return mrhi_success;
+}
+
 uint64_t mrhiGetDeviceMisuse(mrhiDevice* device)
 {
     return device == nullptr ? 0 : atomic_load_explicit(&device->misuse, memory_order_relaxed);
