@@ -232,7 +232,11 @@ static void TestInvalidDefs(void)
     mrhiChain untyped = {.next = nullptr, .type = mrhi_structNone};
     def.next = &untyped;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "untyped");
-    CHECK(mrhiGetInstanceMisuse(instance) == 6, "each invalid call counted");
+    def = Def(adapter);
+    def.allocator.free = CountingFree;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
+          "an allocator with one function");
+    CHECK(mrhiGetInstanceMisuse(instance) == 7, "each invalid call counted");
     mrhiDestroyInstance(instance);
 }
 
