@@ -182,6 +182,16 @@ extern "C"
     /// Safe from any thread; the instance is used by one thread at a time.
     MRHI_API void mrhiDestroyInstance(mrhiInstance* instance);
 
+    /// Returns how many calls the instance has refused as invalid input
+    /// (mrhi_errorInvalid): a count release builds can watch to catch a
+    /// caller's bugs. Stale ids are not misuse.
+    ///
+    /// @param instance  The instance.
+    /// @return The count; 0 for a NULL instance.
+    /// @par Thread safety
+    /// Safe from any thread; the instance is used by one thread at a time.
+    MRHI_API uint64_t mrhiGetInstanceMisuse(mrhiInstance* instance);
+
     /// Returns the default adapter request def: the driver's own order,
     /// software rasterizers allowed.
     ///
@@ -232,7 +242,7 @@ extern "C"
     /// count, or a NULL array with a capacity.
     /// @par Thread safety
     /// Safe from any thread; the instance is used by one thread at a time.
-    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetAdapters(const mrhiInstance* instance,
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetAdapters(mrhiInstance* instance,
                                                        mrhiAdapterId* adapters, size_t capacity,
                                                        size_t* countOut);
 
@@ -245,7 +255,7 @@ extern "C"
     /// `mrhi_errorStale` for an adapter the instance no longer has.
     /// @par Thread safety
     /// Safe from any thread; the instance is used by one thread at a time.
-    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetAdapterInfo(const mrhiInstance* instance,
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetAdapterInfo(mrhiInstance* instance,
                                                           mrhiAdapterId adapter,
                                                           mrhiAdapterInfo* infoOut);
 

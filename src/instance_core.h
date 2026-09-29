@@ -36,6 +36,8 @@ struct mrhiInstance
     mrhiAllocator allocator;
     mrhiInstanceLimits limits;
     size_t bytes;
+    // Calls refused as invalid input.
+    uint64_t misuse;
     // No driver when its vtable is NULL.
     mrhiInstanceDriver driver;
     uint32_t nextRequest;
@@ -54,6 +56,10 @@ struct mrhiInstance
     uint32_t listed;
     mrhiDriverAdapter* found;
 };
+
+// Counts one misuse and returns mrhi_errorInvalid, for a refusal of
+// invalid input on a live instance.
+mrhiResult mrhiMisuse(mrhiInstance* instance);
 
 // Appends a record; the caller has made sure there is room.
 void mrhiPushInstanceNotification(mrhiInstance* instance, mrhiInstanceNotification notification);

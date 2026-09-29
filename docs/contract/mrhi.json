@@ -521,6 +521,27 @@
         },
         {
           "kind": "function",
+          "name": "get_instance_misuse",
+          "doc": "Returns how many calls the instance has refused as invalid input (mrhi_errorInvalid): a count release builds can watch to catch a caller's bugs. Stale ids are not misuse.",
+          "returns": {
+            "type": "uint64",
+            "doc": "The count; 0 for a NULL instance."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "mutable",
+              "doc": "The instance."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          }
+        },
+        {
+          "kind": "function",
           "name": "default_adapter_request_def",
           "doc": "Returns the default adapter request def: the driver's own order, software rasterizers allowed.",
           "returns": {
@@ -604,7 +625,7 @@
             {
               "name": "instance",
               "type": "opaque.instance",
-              "pointer": "const",
+              "pointer": "mutable",
               "doc": "The instance."
             },
             {
@@ -642,7 +663,7 @@
             {
               "name": "instance",
               "type": "opaque.instance",
-              "pointer": "const",
+              "pointer": "mutable",
               "doc": "The instance."
             },
             {
@@ -1897,7 +1918,7 @@
             {
               "name": "instance",
               "type": "opaque.instance",
-              "pointer": "const",
+              "pointer": "mutable",
               "doc": "The instance."
             },
             {
@@ -1929,7 +1950,7 @@
             {
               "name": "instance",
               "type": "opaque.instance",
-              "pointer": "const",
+              "pointer": "mutable",
               "doc": "The instance."
             },
             {

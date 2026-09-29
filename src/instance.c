@@ -154,3 +154,14 @@ void mrhiDestroyInstance(mrhiInstance* instance)
     mrhiAllocator allocator = instance->allocator;
     mrhiRelease(&allocator, instance, instance->bytes, alignof(mrhiInstance));
 }
+
+mrhiResult mrhiMisuse(mrhiInstance* instance)
+{
+    ++instance->misuse;
+    return mrhi_errorInvalid;
+}
+
+uint64_t mrhiGetInstanceMisuse(mrhiInstance* instance)
+{
+    return instance == nullptr ? 0 : instance->misuse;
+}

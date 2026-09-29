@@ -38,3 +38,5 @@ format.
   `mrhiGetAdapterLimits`). Each maps onto Vulkan, D3D12, Metal and
   WebGPU in `docs/contract/mappings.md`; adapters below the floor are
   left out, and features an API cannot grant are never reported.
+- The instance's misuse count (`mrhiGetInstanceMisuse`): each call
+  refused as invalid input on a live instance counts once.

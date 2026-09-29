@@ -164,15 +164,19 @@ static void PollDriver(mrhiInstance* instance)
 mrhiResult mrhiRequestAdapters(mrhiInstance* instance, const mrhiAdapterRequestDef* def,
                                mrhiRequestId* requestOut)
 {
-    if (instance == nullptr || def == nullptr || requestOut == nullptr ||
-        def->cookie != ADAPTER_REQUEST_DEF_COOKIE || def->preference > mrhi_powerHigh)
+    if (instance == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    if (def == nullptr || requestOut == nullptr || def->cookie != ADAPTER_REQUEST_DEF_COOKIE ||
+        def->preference > mrhi_powerHigh)
+    {
+        return mrhiMisuse(instance);
     }
     mrhiResult chain = mrhiCheckChain(def->next, nullptr, 0, instance->limits.chainDepth);
     if (chain != mrhi_success)
     {
-        return chain;
+        return chain == mrhi_errorInvalid ? mrhiMisuse(instance) : chain;
     }
     if (instance->queueCount + instance->queryCount == instance->limits.notifications)
     {
@@ -203,7 +207,7 @@ mrhiResult mrhiNextInstanceNotification(mrhiInstance* instance,
 {
     if (instance == nullptr || notificationOut == nullptr)
     {
-        return mrhi_errorInvalid;
+        return instance == nullptr ? mrhi_errorInvalid : mrhiMisuse(instance);
     }
     if (instance->queueCount == 0)
     {
@@ -219,12 +223,12 @@ mrhiResult mrhiNextInstanceNotification(mrhiInstance* instance,
     return mrhi_success;
 }
 
-mrhiResult mrhiGetAdapters(const mrhiInstance* instance, mrhiAdapterId* adapters, size_t capacity,
+mrhiResult mrhiGetAdapters(mrhiInstance* instance, mrhiAdapterId* adapters, size_t capacity,
                            size_t* countOut)
 {
     if (instance == nullptr || countOut == nullptr || (adapters == nullptr && capacity > 0))
     {
-        return mrhi_errorInvalid;
+        return instance == nullptr ? mrhi_errorInvalid : mrhiMisuse(instance);
     }
     for (uint32_t i = 0; i < instance->listed && i < capacity; ++i)
     {
@@ -247,12 +251,12 @@ static const mrhiAdapterSlot* FindSlot(const mrhiInstance* instance, mrhiAdapter
     return &instance->slots[slot];
 }
 
-mrhiResult mrhiGetAdapterInfo(const mrhiInstance* instance, mrhiAdapterId adapter,
+mrhiResult mrhiGetAdapterInfo(mrhiInstance* instance, mrhiAdapterId adapter,
                               mrhiAdapterInfo* infoOut)
 {
     if (instance == nullptr || infoOut == nullptr)
     {
-        return mrhi_errorInvalid;
+        return instance == nullptr ? mrhi_errorInvalid : mrhiMisuse(instance);
     }
     const mrhiAdapterSlot* slot = FindSlot(instance, adapter);
     if (slot == nullptr)
@@ -263,12 +267,12 @@ mrhiResult mrhiGetAdapterInfo(const mrhiInstance* instance, mrhiAdapterId adapte
     return mrhi_success;
 }
 
-mrhiResult mrhiGetAdapterFeatures(const mrhiInstance* instance, mrhiAdapterId adapter,
+mrhiResult mrhiGetAdapterFeatures(mrhiInstance* instance, mrhiAdapterId adapter,
                                   mrhiFeatures* featuresOut)
 {
     if (instance == nullptr || featuresOut == nullptr)
     {
-        return mrhi_errorInvalid;
+        return instance == nullptr ? mrhi_errorInvalid : mrhiMisuse(instance);
     }
     const mrhiAdapterSlot* slot = FindSlot(instance, adapter);
     if (slot == nullptr)
@@ -279,12 +283,12 @@ mrhiResult mrhiGetAdapterFeatures(const mrhiInstance* instance, mrhiAdapterId ad
     return mrhi_success;
 }
 
-mrhiResult mrhiGetAdapterLimits(const mrhiInstance* instance, mrhiAdapterId adapter,
+mrhiResult mrhiGetAdapterLimits(mrhiInstance* instance, mrhiAdapterId adapter,
                                 mrhiLimits* limitsOut)
 {
     if (instance == nullptr || limitsOut == nullptr)
     {
-        return mrhi_errorInvalid;
+        return instance == nullptr ? mrhi_errorInvalid : mrhiMisuse(instance);
     }
     const mrhiAdapterSlot* slot = FindSlot(instance, adapter);
     if (slot == nullptr)

@@ -153,7 +153,7 @@ extern "C"
     /// `mrhi_errorStale` for an adapter the instance no longer has.
     /// @par Thread safety
     /// Safe from any thread; the instance is used by one thread at a time.
-    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetAdapterFeatures(const mrhiInstance* instance,
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetAdapterFeatures(mrhiInstance* instance,
                                                               mrhiAdapterId adapter,
                                                               mrhiFeatures* featuresOut);
 
@@ -166,7 +166,7 @@ extern "C"
     /// `mrhi_errorStale` for an adapter the instance no longer has.
     /// @par Thread safety
     /// Safe from any thread; the instance is used by one thread at a time.
-    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetAdapterLimits(const mrhiInstance* instance,
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetAdapterLimits(mrhiInstance* instance,
                                                             mrhiAdapterId adapter,
                                                             mrhiLimits* limitsOut);
 

@@ -287,10 +287,20 @@ static void TestInvalidRequests(void)
     def.next = &critical;
     CHECK(mrhiRequestAdapters(instance, &def, &request) == mrhi_errorUnsupported,
           "an unknown critical extension");
+    mrhiChain untyped = {.next = nullptr, .type = mrhi_structNone};
+    def.next = &untyped;
+    CHECK(mrhiRequestAdapters(instance, &def, &request) == mrhi_errorInvalid, "an untyped node");
     CHECK(mrhiNextInstanceNotification(instance, nullptr) == mrhi_errorInvalid, "no record");
     CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_empty, "refusals queue nothing");
     CHECK(mrhiGetAdapters(instance, nullptr, 1, &count) == mrhi_errorInvalid, "a NULL array");
     CHECK(mrhiGetAdapters(instance, nullptr, 0, nullptr) == mrhi_errorInvalid, "no count");
+    CHECK(mrhiGetInstanceMisuse(instance) == 8, "each invalid call on the instance counted once");
+    mrhiAdapterInfo info;
+    CHECK(mrhiGetAdapterInfo(instance, (mrhiAdapterId){3, 9}, &info) == mrhi_errorStale, "stale");
+    CHECK(mrhiGetAdapterInfo(instance, (mrhiAdapterId){3, 9}, nullptr) == mrhi_errorInvalid,
+          "no out");
+    CHECK(mrhiGetInstanceMisuse(instance) == 9, "stale ids and unknown extensions are not misuse");
+    CHECK(mrhiGetInstanceMisuse(nullptr) == 0, "no instance");
     mrhiDestroyInstance(instance);
 }
 

@@ -10,6 +10,7 @@ edit the contract, not this file.
 | `mrhiDefaultInstanceDef` | Safe from any thread. |
 | `mrhiCreateInstance` | Safe from any thread. |
 | `mrhiDestroyInstance` | Safe from any thread; the instance is used by one thread at a time. |
+| `mrhiGetInstanceMisuse` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiDefaultAdapterRequestDef` | Safe from any thread. |
 | `mrhiRequestAdapters` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiNextInstanceNotification` | Safe from any thread; the instance is used by one thread at a time. |
