@@ -213,6 +213,23 @@ ids, requests, the frame graph) can be tested without a GPU.
   plane. An occlusion query set is a query heap. A resource's memory is
   what `GetResourceAllocationInfo` says. A destroyed object waits until
   no frame can name it.
+- **D3D12 pipelines:** a shader keeps a copy of each entry's DXIL and
+  makes one root signature (version 1.1) for every pipeline of the
+  container: root constants for the root block, the constants (in rows
+  of four, as the constants' buffer declares them) and the vertex
+  information where the container has them, then per table a
+  descriptor table of its resources and one of its samplers, each
+  binding a one-descriptor range at the register and space the D3D12
+  map gives, visible to every stage, resource data volatile. A container
+  whose root signature passes D3D12's 64 words is refused as
+  unsupported. A pipeline's state is made at the call and answered at
+  the next poll; it holds a reference on the root signature and a copy
+  of the bindings and its constants' words, each constant's default
+  unless given, so that it outlives its shader, and a fixed constant
+  given another value is refused as unsupported. Vertex attributes are
+  the TEXCOORD semantic of their location, as SPIRV-Cross names vertex
+  inputs; alpha blend factors read alpha, and minimum and maximum blend
+  with factors of one. The pipeline cache is empty for now.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`

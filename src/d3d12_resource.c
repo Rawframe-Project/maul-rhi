@@ -40,16 +40,6 @@ mrhiD3d12ObjectRoom mrhiD3d12PlanObjects(mrhiLayout* layout, const mrhiDeviceLim
     };
 }
 
-static uint32_t* InitSlots(mrhiD3d12Slots* slots, uint32_t* next, uint32_t capacity)
-{
-    for (uint32_t i = 0; i < capacity; ++i)
-    {
-        next[i] = i + 1 < capacity ? i + 2 : 0;
-    }
-    *slots = (mrhiD3d12Slots){.next = next, .head = capacity > 0 ? 1 : 0, .capacity = capacity};
-    return next + capacity;
-}
-
 void mrhiD3d12LayObjects(mrhiD3d12Objects* objects, unsigned char* block,
                          const mrhiD3d12ObjectRoom* room, const mrhiDeviceLimits* limits)
 {
@@ -58,28 +48,11 @@ void mrhiD3d12LayObjects(mrhiD3d12Objects* objects, unsigned char* block,
     objects->views = (mrhiD3d12View*)(block + room->views);
     objects->querySets = (mrhiD3d12QuerySet*)(block + room->querySets);
     uint32_t* next = (uint32_t*)(block + room->slots);
-    next = InitSlots(&objects->bufferSlots, next, limits->buffers);
-    next = InitSlots(&objects->textureSlots, next, limits->textures);
-    next = InitSlots(&objects->viewSlots, next, limits->views);
-    next = InitSlots(&objects->samplerSlots, next, limits->samplers);
-    (void)InitSlots(&objects->querySetSlots, next, limits->querySets);
-}
-
-uint32_t mrhiD3d12TakeSlot(mrhiD3d12Slots* slots)
-{
-    uint32_t handle = slots->head;
-    if (handle != 0)
-    {
-        slots->head = slots->next[handle - 1];
-    }
-    return handle;
-}
-
-static void GiveSlot(mrhiD3d12Slots* slots, uint64_t handle)
-{
-    MRHI_ASSERT(handle != 0 && handle <= slots->capacity);
-    slots->next[handle - 1] = slots->head;
-    slots->head = (uint32_t)handle;
+    next = mrhiD3d12InitSlots(&objects->bufferSlots, next, limits->buffers);
+    next = mrhiD3d12InitSlots(&objects->textureSlots, next, limits->textures);
+    next = mrhiD3d12InitSlots(&objects->viewSlots, next, limits->views);
+    next = mrhiD3d12InitSlots(&objects->samplerSlots, next, limits->samplers);
+    (void)mrhiD3d12InitSlots(&objects->querySetSlots, next, limits->querySets);
 }
 
 // A CPU-only descriptor heap of count descriptors, and where it starts.
@@ -176,7 +149,7 @@ mrhiResult mrhiD3d12CreateBuffer(mrhiD3d12Objects* objects, const mrhiBufferDef*
     ID3D12Resource* resource = Commit(objects, &desc, def->label, def->labelLength);
     if (resource == nullptr)
     {
-        GiveSlot(&objects->bufferSlots, handle);
+        mrhiD3d12GiveSlot(&objects->bufferSlots, handle);
         return mrhi_errorCapacity;
     }
     objects->buffers[handle - 1] = (mrhiD3d12Buffer){.resource = resource, .size = def->size};
@@ -234,7 +207,7 @@ mrhiResult mrhiD3d12CreateTexture(mrhiD3d12Objects* objects, const mrhiTextureDe
     ID3D12Resource* resource = Commit(objects, &desc, def->label, def->labelLength);
     if (resource == nullptr)
     {
-        GiveSlot(&objects->textureSlots, handle);
+        mrhiD3d12GiveSlot(&objects->textureSlots, handle);
         return mrhi_errorCapacity;
     }
     mrhiD3d12Texture* texture = &objects->textures[handle - 1];
@@ -260,7 +233,7 @@ mrhiResult mrhiD3d12CreateQuerySet(mrhiD3d12Objects* objects, const mrhiQuerySet
     if (FAILED(ID3D12Device_CreateQueryHeap(objects->device, &desc, &IID_ID3D12QueryHeap,
                                             (void**)&heap)))
     {
-        GiveSlot(&objects->querySetSlots, handle);
+        mrhiD3d12GiveSlot(&objects->querySetSlots, handle);
         return mrhi_errorCapacity;
     }
     mrhiD3d12Label((ID3D12Object*)heap, def->label, def->labelLength);
@@ -276,21 +249,21 @@ void mrhiD3d12ReleaseObject(mrhiD3d12Objects* objects, mrhiD3d12Kind kind, uint6
     {
     case mrhiD3d12KindBuffer:
         ID3D12Resource_Release(objects->buffers[handle - 1].resource);
-        GiveSlot(&objects->bufferSlots, handle);
+        mrhiD3d12GiveSlot(&objects->bufferSlots, handle);
         break;
     case mrhiD3d12KindTexture:
         ID3D12Resource_Release(objects->textures[handle - 1].resource);
-        GiveSlot(&objects->textureSlots, handle);
+        mrhiD3d12GiveSlot(&objects->textureSlots, handle);
         break;
     case mrhiD3d12KindQuerySet:
         ID3D12QueryHeap_Release(objects->querySets[handle - 1].heap);
-        GiveSlot(&objects->querySetSlots, handle);
+        mrhiD3d12GiveSlot(&objects->querySetSlots, handle);
         break;
     case mrhiD3d12KindView:
-        GiveSlot(&objects->viewSlots, handle);
+        mrhiD3d12GiveSlot(&objects->viewSlots, handle);
         break;
     default:
-        GiveSlot(&objects->samplerSlots, handle);
+        mrhiD3d12GiveSlot(&objects->samplerSlots, handle);
         break;
     }
 }

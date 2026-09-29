@@ -404,9 +404,9 @@ static void Finish(mrhiDevice* device, uint32_t readbacks)
 // bytes, so only its answers are checked.
 static bool s_runs;
 
-// Whether the driver makes objects only: the D3D12 driver, whose
-// shaders, pipelines and frames are not made yet (mrhi-0003).
-static bool s_objectsOnly;
+// Whether the driver runs no frames: the D3D12 driver, whose frames are
+// not made yet (mrhi-0003).
+static bool s_noFrames;
 
 static bool Taken(mrhiDevice* device, mrhiRequestId request, const uint8_t* expected, size_t size)
 {
@@ -1579,15 +1579,16 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
                                 : status == mrhi_errorUnsupported,
           "a timestamp period with timestamps");
     CheckObjects(device, asked->timestampQuery);
-    if (s_objectsOnly)
+    if (!s_noFrames)
     {
-        mrhiDestroyDevice(device);
-        return;
+        CheckFrameMemory(device);
     }
-    CheckFrameMemory(device);
     CheckPipelines(device);
-    CheckRoundTrip(device);
-    CheckDrawing(device, asked->timestampQuery);
+    if (!s_noFrames)
+    {
+        CheckRoundTrip(device);
+        CheckDrawing(device, asked->timestampQuery);
+    }
     mrhiDestroyDevice(device);
 }
 
@@ -1598,7 +1599,7 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
     mrhiAdapterId ids[16];
     size_t count = Search(instance, ids, 16);
     s_runs = driver != mrhi_driverTest;
-    s_objectsOnly = driver == mrhi_driverD3d12;
+    s_noFrames = driver == mrhi_driverD3d12;
     for (size_t i = 0; i < count; ++i)
     {
         mrhiAdapterInfo info;
@@ -1613,12 +1614,12 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         mrhiFeatures all;
         CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
         CheckDevice(instance, ids[i], &all);
-        if (!s_objectsOnly)
+        CheckCacheImport(instance, ids[i]);
+        if (!s_noFrames)
         {
-            CheckCacheImport(instance, ids[i]);
             CheckRetirement(instance, ids[i]);
-            CheckHeaps(instance, ids[i], driver != mrhi_driverTest);
         }
+        CheckHeaps(instance, ids[i], driver != mrhi_driverTest);
     }
     mrhiAdapterId again[16];
     CHECK(Search(instance, again, 16) == count && memcmp(ids, again, count * sizeof(ids[0])) == 0,

@@ -247,7 +247,8 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
     {
         return mrhi_errorPlatform;
     }
-    mrhiResult status = mrhiCreateD3d12Device(&driver->allocator, device, def, deviceOut);
+    mrhiResult status =
+        mrhiCreateD3d12Device(&driver->allocator, &driver->api, device, def, deviceOut);
     if (status == mrhi_success)
     {
         driver->pending[driver->pendingCount++] =

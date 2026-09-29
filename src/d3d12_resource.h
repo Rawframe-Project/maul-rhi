@@ -11,6 +11,7 @@
 
 #include "allocator.h"
 #include "d3d12_api.h"
+#include "d3d12_slots.h"
 #include "driver.h"
 
 typedef struct mrhiD3d12Buffer
@@ -52,15 +53,6 @@ typedef enum mrhiD3d12Kind
     mrhiD3d12KindSampler,
     mrhiD3d12KindQuerySet,
 } mrhiD3d12Kind;
-
-// Free slots of a table, linked by index plus one; a handle is its
-// slot's index plus one.
-typedef struct mrhiD3d12Slots
-{
-    uint32_t* next;
-    uint32_t head;
-    uint32_t capacity;
-} mrhiD3d12Slots;
 
 // A device's objects: tables of each kind in the device's block, and
 // the descriptor heaps of views and samplers, two descriptors a view
@@ -106,9 +98,6 @@ void mrhiD3d12LayObjects(mrhiD3d12Objects* objects, unsigned char* block,
 // mrhi_errorCapacity when D3D12 makes none.
 mrhiResult mrhiD3d12OpenObjects(mrhiD3d12Objects* objects);
 void mrhiD3d12CloseObjects(mrhiD3d12Objects* objects);
-
-// A free slot's handle, taken: 0 when the table is full.
-uint32_t mrhiD3d12TakeSlot(mrhiD3d12Slots* slots);
 
 // Each maker answers success with the handle, never zero, or
 // mrhi_errorCapacity when D3D12 or the table makes nothing.

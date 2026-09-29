@@ -3,34 +3,39 @@
 //
 // The D3D12 driver's devices (mrhi-0003): a D3D12 device, its direct
 // command queue and its objects (d3d12_resource.c), released when the
-// device is destroyed. A destroyed object waits until no frame can name
-// it; until frames run, that is the device's end. Pipelines and frames
-// land in the driver's later slices; until then every call that makes
-// one answers mrhi_errorUnsupported.
+// device is destroyed, and its shaders and pipelines (d3d12_pipeline.c).
+// A destroyed object or pipeline waits until no frame can name it;
+// until frames run, that is the device's end. Frames land in the
+// driver's later slices; until then submitting one answers
+// mrhi_errorUnsupported.
 
 #include "d3d12_device.h"
 
 #include "allocator.h"
 #include "d3d12_names.h"
+#include "d3d12_pipeline.h"
 #include "d3d12_resource.h"
 #include "invariant.h"
 
 #include <stdalign.h>
 
-// A destroyed object waiting until no frame can name it.
+// A destroyed object or pipeline waiting until no frame can name it.
 typedef struct Retiree
 {
     uint64_t handle;
     mrhiD3d12Kind kind;
+    bool pipeline;
 } Retiree;
 
 typedef struct D3d12Device
 {
     mrhiAllocator allocator;
     size_t bytes;
+    mrhiD3d12Api api;
     ID3D12Device* device;
     ID3D12CommandQueue* queue;
     mrhiD3d12Objects objects;
+    mrhiD3d12Pipelines pipelines;
     Retiree* retirees;
     uint32_t retireeCount;
     uint32_t retireeLimit;
@@ -43,12 +48,25 @@ static void Retire(D3d12Device* device, uint64_t handle, mrhiD3d12Kind kind)
     device->retirees[device->retireeCount++] = (Retiree){.handle = handle, .kind = kind};
 }
 
+static void RetirePipeline(D3d12Device* device, uint64_t handle)
+{
+    MRHI_ASSERT(device->retireeCount < device->retireeLimit);
+    device->retirees[device->retireeCount++] = (Retiree){.handle = handle, .pipeline = true};
+}
+
 static void ReleaseRetirees(D3d12Device* device)
 {
     for (uint32_t i = 0; i < device->retireeCount; ++i)
     {
-        mrhiD3d12ReleaseObject(&device->objects, device->retirees[i].kind,
-                               device->retirees[i].handle);
+        const Retiree* retiree = &device->retirees[i];
+        if (retiree->pipeline)
+        {
+            mrhiD3d12ReleasePipeline(&device->pipelines, retiree->handle);
+        }
+        else
+        {
+            mrhiD3d12ReleaseObject(&device->objects, retiree->kind, retiree->handle);
+        }
     }
     device->retireeCount = 0;
 }
@@ -136,31 +154,35 @@ static mrhiResult ConfigureSurface(void* self, uint64_t surface, const mrhiSurfa
 static mrhiResult CreateShader(void* self, const mrhiShaderDef* def, const mrhiContainer* container,
                                uint64_t* handleOut)
 {
-    (void)self;
-    (void)def;
-    (void)container;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    D3d12Device* device = self;
+    return mrhiD3d12CreateShader(&device->pipelines, def, container, handleOut);
+}
+
+static void DestroyShader(void* self, uint64_t handle)
+{
+    D3d12Device* device = self;
+    mrhiD3d12DestroyShader(&device->pipelines, handle);
 }
 
 static mrhiResult CreateComputePipeline(void* self, const mrhiDriverComputePipeline* pipeline,
                                         uint64_t tag, uint64_t* handleOut)
 {
-    (void)self;
-    (void)pipeline;
-    (void)tag;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    D3d12Device* device = self;
+    return mrhiD3d12CreateCompute(&device->pipelines, pipeline, tag, handleOut);
 }
 
 static mrhiResult CreateGraphicsPipeline(void* self, const mrhiDriverGraphicsPipeline* pipeline,
                                          uint64_t tag, uint64_t* handleOut)
 {
-    (void)self;
-    (void)pipeline;
-    (void)tag;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    D3d12Device* device = self;
+    return mrhiD3d12CreateGraphics(&device->pipelines, pipeline, tag, handleOut);
+}
+
+static void DestroyPipeline(void* self, uint64_t handle)
+{
+    D3d12Device* device = self;
+    mrhiD3d12ForgetPipeline(&device->pipelines, handle);
+    RetirePipeline(device, handle);
 }
 
 static void LossReport(void* self, mrhiDeviceLossReport* reportOut)
@@ -239,10 +261,8 @@ static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t
 
 static size_t Poll(void* self, mrhiDriverEvent* events, size_t capacity)
 {
-    (void)self;
-    (void)events;
-    (void)capacity;
-    return 0;
+    D3d12Device* device = self;
+    return mrhiD3d12PollPipelines(&device->pipelines, events, capacity);
 }
 
 static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
@@ -295,10 +315,10 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .configureSurface = ConfigureSurface,
     .unconfigureSurface = Never,
     .createShader = CreateShader,
-    .destroyShader = Never,
+    .destroyShader = DestroyShader,
     .createComputePipeline = CreateComputePipeline,
     .createGraphicsPipeline = CreateGraphicsPipeline,
-    .destroyPipeline = Never,
+    .destroyPipeline = DestroyPipeline,
     .lossReport = LossReport,
     .acquireImage = AcquireImage,
     .releaseImage = ReleaseImage,
@@ -318,11 +338,13 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .writeHeapSampler = WriteHeapSampler,
 };
 
-// The room a device takes: itself, its object tables and its retirees.
+// The room a device takes: itself, its object and pipeline tables and
+// its retirees.
 typedef struct Room
 {
     mrhiLayout layout;
     mrhiD3d12ObjectRoom objects;
+    mrhiD3d12PipelineRoom pipelines;
     size_t retirees;
     uint32_t retireeLimit;
 } Room;
@@ -331,8 +353,9 @@ static Room RoomOf(const mrhiDeviceLimits* limits)
 {
     Room room = {.layout = {.size = sizeof(D3d12Device)}};
     room.objects = mrhiD3d12PlanObjects(&room.layout, limits);
+    room.pipelines = mrhiD3d12PlanPipelines(&room.layout, limits);
     uint64_t retirees = (uint64_t)limits->buffers + limits->textures + limits->views +
-                        limits->samplers + limits->querySets;
+                        limits->samplers + limits->querySets + limits->pipelines;
     room.retireeLimit = retirees < UINT32_MAX ? (uint32_t)retirees : UINT32_MAX;
     room.retirees =
         mrhiLayoutAdd(&room.layout, room.retireeLimit, sizeof(Retiree), alignof(Retiree));
@@ -346,12 +369,19 @@ static void Lay(D3d12Device* made, const Room* room, const mrhiDeviceLimits* lim
     unsigned char* block = (unsigned char*)made;
     made->objects = (mrhiD3d12Objects){.device = made->device};
     mrhiD3d12LayObjects(&made->objects, block, &room->objects, limits);
+    made->pipelines = (mrhiD3d12Pipelines){
+        .allocator = &made->allocator,
+        .api = &made->api,
+        .device = made->device,
+    };
+    mrhiD3d12LayPipelines(&made->pipelines, block, &room->pipelines, limits);
     made->retirees = (Retiree*)(block + room->retirees);
     made->retireeLimit = room->retireeLimit;
 }
 
-mrhiResult mrhiCreateD3d12Device(const mrhiAllocator* allocator, ID3D12Device* device,
-                                 const mrhiDeviceDef* def, mrhiDeviceDriver* deviceOut)
+mrhiResult mrhiCreateD3d12Device(const mrhiAllocator* allocator, const mrhiD3d12Api* api,
+                                 ID3D12Device* device, const mrhiDeviceDef* def,
+                                 mrhiDeviceDriver* deviceOut)
 {
     Room room = RoomOf(&def->deviceLimits);
     D3d12Device* made = room.layout.overflow
@@ -375,6 +405,7 @@ mrhiResult mrhiCreateD3d12Device(const mrhiAllocator* allocator, ID3D12Device* d
     *made = (D3d12Device){
         .allocator = *allocator,
         .bytes = room.layout.size,
+        .api = *api,
         .device = device,
         .queue = queue,
     };

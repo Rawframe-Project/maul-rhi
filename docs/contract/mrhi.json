@@ -14361,7 +14361,7 @@
             },
             "d3d12": {
               "class": "restricted",
-              "note": "the DXIL section kept for the pipelines; a container without one is refused with mrhi_errorUnsupported"
+              "note": "the DXIL section kept for the pipelines, and a root signature from the container's layout and D3D12 map; a container without DXIL, or whose root signature passes its 64 words, is refused with mrhi_errorUnsupported"
             },
             "metal": {
               "class": "restricted",
@@ -17234,7 +17234,7 @@
             },
             "d3d12": {
               "class": "direct",
-              "note": "CreatePipelineState, answered at the next poll"
+              "note": "CreateGraphicsPipelineState at the call, answered at the next poll"
             },
             "metal": {
               "class": "direct",
@@ -17418,7 +17418,7 @@
             },
             "d3d12": {
               "class": "direct",
-              "note": "CreateComputePipelineState, answered at the next poll"
+              "note": "CreateComputePipelineState at the call, answered at the next poll"
             },
             "metal": {
               "class": "direct",
