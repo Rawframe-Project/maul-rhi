@@ -173,7 +173,11 @@ ids, requests, the frame graph) can be tested without a GPU.
   mapped staging, and the readback ranges it fills. A frame signals the
   device's timeline semaphore with its serial, so a poll reads one
   counter, copies finished frames' readbacks into the core's ring and
-  reports them in order. A destroyed object waits in a queue and is
+  reports them in order. A frame also waits on the timeline for the
+  frame that used its slot before it: the host has seen that frame
+  finish before reusing the slot's memory, so the wait costs nothing,
+  but it puts the reuse in the queue's order, where synchronization
+  validation sees it. A destroyed object waits in a queue and is
   destroyed once the next frame submitted after its destruction
   finishes; the driver's tables hold twice the objects the core allows,
   so a program may replace each object once between submissions. The

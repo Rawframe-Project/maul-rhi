@@ -364,3 +364,10 @@ format.
 - The conformance suite (`test_conformance`): the same checks through
   the public API on the test driver and every native adapter, run on
   lavapipe under the Khronos validation layer in Linux CI.
+
+### Fixed
+
+- The Vulkan driver's frames wait on the timeline for the frame that
+  last used their slot, so synchronization validation sees the reuse
+  of the slot's transient memory ordered; a conformance check that
+  clears a target to a color with distinct channels exposed it.
