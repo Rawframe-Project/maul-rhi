@@ -8,6 +8,8 @@
 // are held until the process ends, so that each adapter keeps the one
 // device the library then opens.
 
+// getenv is standard C; MSVC's runtime deprecates it for its own.
+#define _CRT_SECURE_NO_WARNINGS
 #define INITGUID
 #include "d3d12_debug.h"
 
