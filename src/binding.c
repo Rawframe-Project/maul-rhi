@@ -269,10 +269,8 @@ static mrhiResult CheckBinding(const mrhiDevice* device, const mrhiFramePass* pa
     uint8_t planes = 1;
     if (buffer)
     {
-        uint64_t total = resource->kind == mrhiFrameBuffer
-                             ? resource->size
-                             : device->bufferSlots[resource->index1 - 1].size;
-        status = CheckBuffer(device, slot, binding, total, recordedOut);
+        status =
+            CheckBuffer(device, slot, binding, mrhiBufferBytesOf(device, resource), recordedOut);
     }
     else
     {
@@ -344,6 +342,8 @@ mrhiResult mrhiSetBindings(mrhiDevice* device, mrhiPassId id, uint32_t table,
         return mrhi_errorCapacity;
     }
     memcpy(&records[1], recorded, count * sizeof(recorded[0]));
+    pass->tablesSet |= (uint8_t)(1u << table);
+    memcpy(pass->tableDigests[table], reflection->digest, MRHI_DIGEST_BYTES);
     records[0] = (mrhiCommand){.type = mrhiCommandBindings, .a = table, .b = count};
     return mrhi_success;
 }

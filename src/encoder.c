@@ -42,6 +42,12 @@ static mrhiFramePass* Find(mrhiDevice* device, mrhiPassId id, mrhiResult* status
     return &device->framePasses[id.index1 - 1];
 }
 
+uint64_t mrhiBufferBytesOf(const mrhiDevice* device, const mrhiFrameResource* resource)
+{
+    return resource->kind == mrhiFrameBuffer ? resource->size
+                                             : device->bufferSlots[resource->index1 - 1].size;
+}
+
 mrhiFramePass* mrhiRecordingPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
 {
     mrhiFramePass* pass = Find(device, id, statusOut);
@@ -157,6 +163,8 @@ mrhiResult mrhiBeginPass(mrhiDevice* device, mrhiPassId id)
         return mrhi_errorState;
     }
     MeasureTargets(device, pass);
+    uint32_t slots = device->limits.vertexBuffers;
+    memset(&device->frameVertexBytes[(size_t)(id.index1 - 1) * slots], 0, slots * sizeof(uint64_t));
     return mrhi_success;
 }
 

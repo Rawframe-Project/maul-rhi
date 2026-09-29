@@ -169,6 +169,118 @@ extern "C"
                                                        uint32_t table, const mrhiBinding* bindings,
                                                        uint32_t count);
 
+    /// Sets the buffer later draws read one of the pipeline's vertex buffers
+    /// from.
+    ///
+    /// @param device    The device.
+    /// @param pass      The pass, recording, with targets.
+    /// @param slot      The vertex buffer's index among the pipeline's, below
+    ///                  the device's vertexBuffers.
+    /// @param resource  A buffer of the open frame the pass declares with the
+    ///                  vertex access.
+    /// @param offset    Its first byte, a multiple of 4.
+    /// @param size      Its bytes from the offset, or MRHI_WHOLE_SIZE for the
+    ///                  rest.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass
+    /// without targets, a slot past the device's vertexBuffers, a resource that
+    /// is not a buffer the pass declares with the vertex access, or an offset
+    /// or size out of range or an offset not a multiple of 4; `mrhi_errorStale`
+    /// for a pass of another frame, a destroyed pipeline, or a resource that is
+    /// not live; `mrhi_errorState` for a pass that is not recording;
+    /// `mrhi_errorCapacity` when the frame's commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiSetVertexBuffer(mrhiDevice* device, mrhiPassId pass,
+                                                           uint32_t slot, mrhiResourceId resource,
+                                                           uint64_t offset, uint64_t size);
+
+    /// Sets the buffer later indexed draws read indices from.
+    ///
+    /// @param device    The device.
+    /// @param pass      The pass, recording, with targets.
+    /// @param resource  A buffer of the open frame the pass declares with the
+    ///                  index access.
+    /// @param format    The width of its indices.
+    /// @param offset    Its first byte, a multiple of the index width.
+    /// @param size      Its bytes from the offset, a multiple of the index
+    ///                  width, or MRHI_WHOLE_SIZE for the rest.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass
+    /// without targets, a format that is not an index width, a resource that is
+    /// not a buffer the pass declares with the index access, or an offset or
+    /// size out of range or not a multiple of the index width;
+    /// `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or
+    /// a resource that is not live; `mrhi_errorState` for a pass that is not
+    /// recording; `mrhi_errorCapacity` when the frame's commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiSetIndexBuffer(mrhiDevice* device, mrhiPassId pass,
+                                                          mrhiResourceId resource,
+                                                          mrhiIndexFormat format, uint64_t offset,
+                                                          uint64_t size);
+
+    /// Draws vertices with the pass's pipeline, tables and vertex buffers.
+    ///
+    /// @param device         The device.
+    /// @param pass           The pass, recording, with a graphics pipeline set.
+    /// @param vertexCount    The vertices.
+    /// @param instanceCount  The instances.
+    /// @param firstVertex    The first vertex.
+    /// @param firstInstance  The first instance.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass
+    /// without targets, or vertex buffers too small for the vertices or
+    /// instances; `mrhi_errorStale` for a pass of another frame or a destroyed
+    /// pipeline; `mrhi_errorState` for a pass that is not recording, has no
+    /// pipeline set, or lacks a table or vertex buffer the pipeline reads;
+    /// `mrhi_errorCapacity` when the frame's commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDraw(mrhiDevice* device, mrhiPassId pass,
+                                                uint32_t vertexCount, uint32_t instanceCount,
+                                                uint32_t firstVertex, uint32_t firstInstance);
+
+    /// Draws indexed vertices with the pass's pipeline, tables, vertex buffers
+    /// and index buffer.
+    ///
+    /// @param device         The device.
+    /// @param pass           The pass, recording, with a graphics pipeline set.
+    /// @param indexCount     The indices.
+    /// @param instanceCount  The instances.
+    /// @param firstIndex     The first index.
+    /// @param baseVertex     Added to each index.
+    /// @param firstInstance  The first instance.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass
+    /// without targets, an index buffer too small for the indices or instance-
+    /// step vertex buffers too small for the instances; `mrhi_errorStale` for a
+    /// pass of another frame or a destroyed pipeline; `mrhi_errorState` for a
+    /// pass that is not recording, has no pipeline set, lacks a table or vertex
+    /// buffer the pipeline reads, or lacks an index buffer of the pipeline's
+    /// strip index format; `mrhi_errorCapacity` when the frame's commands are
+    /// full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDrawIndexed(mrhiDevice* device, mrhiPassId pass,
+                                                       uint32_t indexCount, uint32_t instanceCount,
+                                                       uint32_t firstIndex, int32_t baseVertex,
+                                                       uint32_t firstInstance);
+
+    /// Dispatches workgroups with the pass's compute pipeline and tables.
+    ///
+    /// @param device  The device.
+    /// @param pass    The pass, recording, with a compute pipeline set.
+    /// @param x       Workgroups in x.
+    /// @param y       Workgroups in y.
+    /// @param z       Workgroups in z.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass
+    /// that renders or copies, or a count past the device's
+    /// workgroupsPerDimension; `mrhi_errorStale` for a pass of another frame or
+    /// a destroyed pipeline; `mrhi_errorState` for a pass that is not
+    /// recording, has no pipeline set, or lacks a table the pipeline reads;
+    /// `mrhi_errorCapacity` when the frame's commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDispatch(mrhiDevice* device, mrhiPassId pass, uint32_t x,
+                                                    uint32_t y, uint32_t z);
+
     /// Writes bytes of the root block later draws or dispatches read.
     ///
     /// @param device  The device.

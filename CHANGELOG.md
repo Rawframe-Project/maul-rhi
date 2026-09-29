@@ -182,3 +182,7 @@ format.
   checked against the slots of the pass's pipeline as WebGPU checks a
   bind group, and against the pass's declared accesses. Shaders whose
   tables hold more than `MRHI_TABLE_BINDINGS` bindings are unsupported.
+- Draws and dispatches: `mrhiSetVertexBuffer`, `mrhiSetIndexBuffer`,
+  `mrhiDraw`, `mrhiDrawIndexed` and `mrhiDispatch`, refused unless the
+  pass's pipeline, the tables it reads and vertex and index buffers
+  large enough for the elements drawn are set, as WebGPU refuses them.

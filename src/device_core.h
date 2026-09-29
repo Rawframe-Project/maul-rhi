@@ -142,6 +142,9 @@ typedef struct mrhiFrameUse
     uint32_t layerCount;
 } mrhiFrameUse;
 
+// The binding tables a container has.
+#define MRHI_TABLES 4
+
 // What a render pass's targets are, and what a graphics pipeline expects
 // of them: the color formats by location (mrhi_formatNone past the
 // count), the depth or stencil format, the sample count, and whether
@@ -182,8 +185,11 @@ typedef struct mrhiFramePass
     // Its recording: an mrhiRecording, claimed atomically by the thread
     // that begins it; its chunks (indices plus one, 0 for none); its open
     // debug groups; whether a command found the arena full; for a render
-    // pass, its targets' layout and size; and the pipeline last set (a
-    // slot plus one and its generation, 0 for none).
+    // pass, its targets' layout and size; the pipeline last set (a slot
+    // plus one and its generation, 0 for none); the tables set, by bit,
+    // with the digests of the containers they were set under; and the
+    // index buffer's format (none when unset) and bytes. Its vertex
+    // buffers' bytes are in the device's frameVertexBytes.
     _Atomic uint32_t recording;
     uint32_t firstChunk;
     uint32_t lastChunk;
@@ -194,6 +200,10 @@ typedef struct mrhiFramePass
     uint32_t height;
     uint32_t pipeline;
     uint32_t pipelineGeneration;
+    uint8_t tablesSet;
+    uint8_t tableDigests[MRHI_TABLES][MRHI_DIGEST_BYTES];
+    mrhiIndexFormat indexFormat;
+    uint64_t indexBytes;
 } mrhiFramePass;
 
 // A surface as the device that configured it keeps it: the surface, the
@@ -240,9 +250,21 @@ typedef struct mrhiPipelineSlot
     uint64_t handle;
     mrhiReflection* reflection;
     uint32_t entries[2];
-    // A graphics pipeline's targets.
+    // A graphics pipeline's targets, its vertex buffers (their facts in
+    // the device's pipelineVertex), and its strip index format.
     mrhiRenderLayout layout;
+    uint32_t vertexBufferCount;
+    mrhiIndexFormat stripIndexFormat;
 } mrhiPipelineSlot;
+
+// What a draw needs of one of a graphics pipeline's vertex buffers: its
+// stride, the bytes its attributes reach in an element, and its step.
+typedef struct mrhiVertexFacts
+{
+    uint32_t stride;
+    uint32_t lastStride;
+    mrhiVertexStepMode stepMode;
+} mrhiVertexFacts;
 
 struct mrhiDevice
 {
@@ -282,6 +304,8 @@ struct mrhiDevice
     mrhiShaderSlot* shaderSlots;
     mrhiPool pipelines;
     mrhiPipelineSlot* pipelineSlots;
+    // Each graphics pipeline's vertex buffers, vertexBuffers per slot.
+    mrhiVertexFacts* pipelineVertex;
     // Pipelines whose creation the driver has not answered; each has room
     // for its answer in the queue.
     uint32_t pendingCount;
@@ -310,6 +334,9 @@ struct mrhiDevice
     uint64_t frameMemory;
     uint32_t* frameOrder;
     // The frame's command arena: its chunks, and those taken so far.
+    // Each pass's vertex buffers' bytes plus one (0 for unset),
+    // vertexBuffers per pass.
+    uint64_t* frameVertexBytes;
     mrhiCommandChunk* frameChunks;
     uint32_t frameChunkCount;
     _Atomic uint32_t frameChunksTaken;

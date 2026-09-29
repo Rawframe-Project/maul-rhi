@@ -113,6 +113,71 @@ static void* InitTable(unsigned char* block, TableParts parts, mrhiPool* pool, u
     return block + parts.payload;
 }
 
+// Where a frame's tables sit in the device's block.
+typedef struct FrameParts
+{
+    size_t resources;
+    size_t passes;
+    size_t uses;
+    size_t barriers;
+    size_t scratch;
+    size_t counts;
+    size_t boxes;
+    size_t boxLimit;
+    size_t order;
+    size_t vertexBytes;
+    size_t chunks;
+    uint32_t chunkCount;
+} FrameParts;
+
+// Lays out the tables of the open frame, sized by the device's limits.
+static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
+{
+    const mrhiDeviceLimits* limits = &def->deviceLimits;
+    FrameParts parts = {
+        .boxLimit = (size_t)limits->frameAccesses * 4 + 16,
+        .chunkCount = limits->frameCommandBytes / MRHI_CHUNK_BYTES,
+    };
+    parts.resources = mrhiLayoutAdd(layout, limits->frameResources, sizeof(mrhiFrameResource),
+                                    alignof(mrhiFrameResource));
+    parts.passes =
+        mrhiLayoutAdd(layout, limits->framePasses, sizeof(mrhiFramePass), alignof(mrhiFramePass));
+    parts.uses =
+        mrhiLayoutAdd(layout, limits->frameAccesses, sizeof(mrhiFrameUse), alignof(mrhiFrameUse));
+    parts.barriers =
+        mrhiLayoutAdd(layout, limits->frameBarriers, sizeof(mrhiBarrier), alignof(mrhiBarrier));
+    parts.scratch =
+        mrhiLayoutAdd(layout, limits->frameBarriers, sizeof(mrhiBarrier), alignof(mrhiBarrier));
+    parts.counts =
+        mrhiLayoutAdd(layout, (size_t)limits->framePasses + 2, sizeof(uint32_t), alignof(uint32_t));
+    parts.boxes = mrhiLayoutAdd(layout, parts.boxLimit, sizeof(mrhiBox), alignof(mrhiBox));
+    parts.order =
+        mrhiLayoutAdd(layout, limits->frameResources, sizeof(uint32_t), alignof(uint32_t));
+    parts.vertexBytes =
+        mrhiLayoutAdd(layout, (size_t)limits->framePasses * def->limits.vertexBuffers,
+                      sizeof(uint64_t), alignof(uint64_t));
+    parts.chunks = mrhiLayoutAdd(layout, parts.chunkCount, sizeof(mrhiCommandChunk),
+                                 alignof(mrhiCommandChunk));
+    return parts;
+}
+
+// Points the device at its frame's tables in its block.
+static void PlaceFrameParts(mrhiDevice* device, unsigned char* block, const FrameParts* parts)
+{
+    device->frameResources = (mrhiFrameResource*)(block + parts->resources);
+    device->framePasses = (mrhiFramePass*)(block + parts->passes);
+    device->frameUses = (mrhiFrameUse*)(block + parts->uses);
+    device->frameBarriers = (mrhiBarrier*)(block + parts->barriers);
+    device->frameBarrierScratch = (mrhiBarrier*)(block + parts->scratch);
+    device->frameCounts = (uint32_t*)(block + parts->counts);
+    device->frameBoxes = (mrhiBox*)(block + parts->boxes);
+    device->frameBoxLimit = (uint32_t)parts->boxLimit;
+    device->frameOrder = (uint32_t*)(block + parts->order);
+    device->frameVertexBytes = (uint64_t*)(block + parts->vertexBytes);
+    device->frameChunks = (mrhiCommandChunk*)(block + parts->chunks);
+    device->frameChunkCount = parts->chunkCount;
+}
+
 // The device's block: the struct, then its tables, sized by its limits.
 static mrhiDevice* Allocate(const mrhiDeviceDef* def)
 {
@@ -132,27 +197,11 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
         AddTable(&layout, limits->shaders, sizeof(mrhiShaderSlot), alignof(mrhiShaderSlot));
     TableParts pipelines =
         AddTable(&layout, limits->pipelines, sizeof(mrhiPipelineSlot), alignof(mrhiPipelineSlot));
+    size_t vertexAt = mrhiLayoutAdd(&layout, (size_t)limits->pipelines * def->limits.vertexBuffers,
+                                    sizeof(mrhiVertexFacts), alignof(mrhiVertexFacts));
     size_t runningAt =
         mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
-    size_t resourcesAt = mrhiLayoutAdd(&layout, limits->frameResources, sizeof(mrhiFrameResource),
-                                       alignof(mrhiFrameResource));
-    size_t passesAt =
-        mrhiLayoutAdd(&layout, limits->framePasses, sizeof(mrhiFramePass), alignof(mrhiFramePass));
-    size_t usesAt =
-        mrhiLayoutAdd(&layout, limits->frameAccesses, sizeof(mrhiFrameUse), alignof(mrhiFrameUse));
-    size_t barriersAt =
-        mrhiLayoutAdd(&layout, limits->frameBarriers, sizeof(mrhiBarrier), alignof(mrhiBarrier));
-    size_t scratchAt =
-        mrhiLayoutAdd(&layout, limits->frameBarriers, sizeof(mrhiBarrier), alignof(mrhiBarrier));
-    size_t countsAt = mrhiLayoutAdd(&layout, (size_t)limits->framePasses + 2, sizeof(uint32_t),
-                                    alignof(uint32_t));
-    size_t boxLimit = (size_t)limits->frameAccesses * 4 + 16;
-    size_t boxesAt = mrhiLayoutAdd(&layout, boxLimit, sizeof(mrhiBox), alignof(mrhiBox));
-    size_t orderAt =
-        mrhiLayoutAdd(&layout, limits->frameResources, sizeof(uint32_t), alignof(uint32_t));
-    uint32_t chunks = limits->frameCommandBytes / MRHI_CHUNK_BYTES;
-    size_t chunksAt =
-        mrhiLayoutAdd(&layout, chunks, sizeof(mrhiCommandChunk), alignof(mrhiCommandChunk));
+    FrameParts frame = AddFrameParts(&layout, def);
     size_t queueAt = mrhiLayoutAdd(&layout, limits->notifications, sizeof(mrhiDeviceNotification),
                                    alignof(mrhiDeviceNotification));
     unsigned char* block =
@@ -178,19 +227,10 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     {
         device->pipelineSlots[i] = (mrhiPipelineSlot){0};
     }
+    device->pipelineVertex = (mrhiVertexFacts*)(block + vertexAt);
     device->running = (uint32_t*)(block + runningAt);
     device->queue = (mrhiDeviceNotification*)(block + queueAt);
-    device->frameResources = (mrhiFrameResource*)(block + resourcesAt);
-    device->framePasses = (mrhiFramePass*)(block + passesAt);
-    device->frameUses = (mrhiFrameUse*)(block + usesAt);
-    device->frameBarriers = (mrhiBarrier*)(block + barriersAt);
-    device->frameBarrierScratch = (mrhiBarrier*)(block + scratchAt);
-    device->frameCounts = (uint32_t*)(block + countsAt);
-    device->frameBoxes = (mrhiBox*)(block + boxesAt);
-    device->frameBoxLimit = (uint32_t)boxLimit;
-    device->frameOrder = (uint32_t*)(block + orderAt);
-    device->frameChunks = (mrhiCommandChunk*)(block + chunksAt);
-    device->frameChunkCount = chunks;
+    PlaceFrameParts(device, block, &frame);
     return device;
 }
 

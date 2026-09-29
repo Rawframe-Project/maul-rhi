@@ -420,6 +420,28 @@ static mrhiRenderLayout LayoutOf(const mrhiGraphicsPipelineDef* def)
     return layout;
 }
 
+// Keeps what draws need of a checked def's vertex buffers: each one's
+// stride and step, and the bytes its attributes reach in an element.
+static void KeepVertexFacts(mrhiDevice* device, uint32_t index1, const mrhiGraphicsPipelineDef* def)
+{
+    mrhiVertexFacts* facts =
+        &device->pipelineVertex[(size_t)(index1 - 1) * device->limits.vertexBuffers];
+    for (uint32_t i = 0; i < def->vertexBufferCount; ++i)
+    {
+        facts[i] = (mrhiVertexFacts){
+            .stride = def->vertexBuffers[i].stride,
+            .stepMode = def->vertexBuffers[i].stepMode,
+        };
+    }
+    for (uint32_t i = 0; i < def->vertexAttributeCount; ++i)
+    {
+        const mrhiVertexAttribute* attribute = &def->vertexAttributes[i];
+        uint32_t end = attribute->offset + mrhiGetVertexLayout(attribute->format).bytes;
+        mrhiVertexFacts* buffer = &facts[attribute->buffer];
+        buffer->lastStride = end > buffer->lastStride ? end : buffer->lastStride;
+    }
+}
+
 // Finds the def's entries in the shader: false when either is missing.
 static bool FindStages(const mrhiShaderSlot* shader, const mrhiGraphicsPipelineDef* def,
                        Stages* stagesOut)
@@ -499,6 +521,9 @@ mrhiResult mrhiCreateGraphicsPipeline(mrhiDevice* device, const mrhiGraphicsPipe
     const mrhiReflection* reflection = shader->reflection;
     mrhiPipelineSlot* slot = &device->pipelineSlots[index1 - 1];
     slot->layout = LayoutOf(def);
+    slot->vertexBufferCount = def->vertexBufferCount;
+    slot->stripIndexFormat = def->stripIndexFormat;
+    KeepVertexFacts(device, index1, def);
     slot->entries[0] = (uint32_t)(stages.vertex - reflection->entries);
     slot->entries[1] = stages.fragment == nullptr
                            ? reflection->entryCount

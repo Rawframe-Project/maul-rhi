@@ -31,4 +31,7 @@ mrhiFramePass* mrhiRecordingPass(mrhiDevice* device, mrhiPassId id, mrhiResult* 
 // pass so that its frame is never submitted without the command.
 mrhiCommand* mrhiTakeCommands(mrhiDevice* device, mrhiFramePass* pass, uint32_t count);
 
+// The bytes of a buffer of the open frame, declared or imported.
+uint64_t mrhiBufferBytesOf(const mrhiDevice* device, const mrhiFrameResource* resource);
+
 #endif // MAUL_RHI_SRC_ENCODER_CORE_H

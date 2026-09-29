@@ -52,6 +52,16 @@ them at submission.
   covering it, of the kind the slot needs: the declarations stay the
   only source of hazards. A table fits one chunk with its command, so a
   shader's table holds at most `MRHI_TABLE_BINDINGS` bindings.
+- **Draws and dispatches** need what WebGPU needs, else they are
+  refused: the pass's pipeline; every table its reflection has bindings
+  in, set under a container of the same digest, so identical containers
+  stay compatible; every vertex buffer it reads, each holding the
+  vertices and instances drawn (the last element only its attributes'
+  bytes), and for an indexed draw an index buffer holding the indices,
+  of the pipeline's strip index format when it has one; and workgroup
+  counts within `workgroupsPerDimension`. Something not set is a state
+  refusal, something too small invalid. The root block is not tracked:
+  each pass starts with it zeroed, which the driver ensures.
 - **Debug groups** balance by the pass's end. A push or pop refused for
   capacity still counts, so a pass that found the arena full still
   ends.

@@ -33,6 +33,18 @@ typedef enum mrhiCommandType
     // a: the table; b: the bindings, an mrhiCommandBinding each, which
     // follow.
     mrhiCommandBindings,
+    // a: the slot or the index format; b: the frame resource's slot plus
+    // one; c: the offset; d: the size.
+    mrhiCommandVertexBuffer,
+    mrhiCommandIndexBuffer,
+    // a: the vertices; b: the instances; c: the first vertex; d: the
+    // first instance.
+    mrhiCommandDraw,
+    // a: the indices; b: the instances; c: the first index, and the base
+    // vertex in the upper half; d: the first instance.
+    mrhiCommandDrawIndexed,
+    // a, b, c: the workgroups in x, y and z.
+    mrhiCommandDispatch,
 } mrhiCommandType;
 
 typedef struct mrhiCommand

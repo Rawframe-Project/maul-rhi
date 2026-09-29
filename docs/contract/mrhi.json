@@ -14485,6 +14485,236 @@
         },
         {
           "kind": "function",
+          "name": "set_vertex_buffer",
+          "doc": "Sets the buffer later draws read one of the pipeline's vertex buffers from.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass without targets, a slot past the device's vertexBuffers, a resource that is not a buffer the pass declares with the vertex access, or an offset or size out of range or an offset not a multiple of 4; `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, with targets."
+            },
+            {
+              "name": "slot",
+              "type": "uint32",
+              "doc": "The vertex buffer's index among the pipeline's, below the device's vertexBuffers."
+            },
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "A buffer of the open frame the pass declares with the vertex access."
+            },
+            {
+              "name": "offset",
+              "type": "uint64",
+              "doc": "Its first byte, a multiple of 4."
+            },
+            {
+              "name": "size",
+              "type": "uint64",
+              "doc": "Its bytes from the offset, or MRHI_WHOLE_SIZE for the rest."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "set_index_buffer",
+          "doc": "Sets the buffer later indexed draws read indices from.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass without targets, a format that is not an index width, a resource that is not a buffer the pass declares with the index access, or an offset or size out of range or not a multiple of the index width; `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, with targets."
+            },
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "A buffer of the open frame the pass declares with the index access."
+            },
+            {
+              "name": "format",
+              "type": "enum.index_format",
+              "doc": "The width of its indices."
+            },
+            {
+              "name": "offset",
+              "type": "uint64",
+              "doc": "Its first byte, a multiple of the index width."
+            },
+            {
+              "name": "size",
+              "type": "uint64",
+              "doc": "Its bytes from the offset, a multiple of the index width, or MRHI_WHOLE_SIZE for the rest."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "draw",
+          "doc": "Draws vertices with the pass's pipeline, tables and vertex buffers.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass without targets, or vertex buffers too small for the vertices or instances; `mrhi_errorStale` for a pass of another frame or a destroyed pipeline; `mrhi_errorState` for a pass that is not recording, has no pipeline set, or lacks a table or vertex buffer the pipeline reads; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, with a graphics pipeline set."
+            },
+            {
+              "name": "vertex_count",
+              "type": "uint32",
+              "doc": "The vertices."
+            },
+            {
+              "name": "instance_count",
+              "type": "uint32",
+              "doc": "The instances."
+            },
+            {
+              "name": "first_vertex",
+              "type": "uint32",
+              "doc": "The first vertex."
+            },
+            {
+              "name": "first_instance",
+              "type": "uint32",
+              "doc": "The first instance."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "draw_indexed",
+          "doc": "Draws indexed vertices with the pass's pipeline, tables, vertex buffers and index buffer.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass without targets, an index buffer too small for the indices or instance-step vertex buffers too small for the instances; `mrhi_errorStale` for a pass of another frame or a destroyed pipeline; `mrhi_errorState` for a pass that is not recording, has no pipeline set, lacks a table or vertex buffer the pipeline reads, or lacks an index buffer of the pipeline's strip index format; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, with a graphics pipeline set."
+            },
+            {
+              "name": "index_count",
+              "type": "uint32",
+              "doc": "The indices."
+            },
+            {
+              "name": "instance_count",
+              "type": "uint32",
+              "doc": "The instances."
+            },
+            {
+              "name": "first_index",
+              "type": "uint32",
+              "doc": "The first index."
+            },
+            {
+              "name": "base_vertex",
+              "type": "int32",
+              "doc": "Added to each index."
+            },
+            {
+              "name": "first_instance",
+              "type": "uint32",
+              "doc": "The first instance."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "dispatch",
+          "doc": "Dispatches workgroups with the pass's compute pipeline and tables.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass that renders or copies, or a count past the device's workgroupsPerDimension; `mrhi_errorStale` for a pass of another frame or a destroyed pipeline; `mrhi_errorState` for a pass that is not recording, has no pipeline set, or lacks a table the pipeline reads; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, with a compute pipeline set."
+            },
+            {
+              "name": "x",
+              "type": "uint32",
+              "doc": "Workgroups in x."
+            },
+            {
+              "name": "y",
+              "type": "uint32",
+              "doc": "Workgroups in y."
+            },
+            {
+              "name": "z",
+              "type": "uint32",
+              "doc": "Workgroups in z."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
           "name": "set_root_block",
           "doc": "Writes bytes of the root block later draws or dispatches read.",
           "returns": {

@@ -81,6 +81,11 @@ edit the contract, not this file.
 | `mrhiSetGraphicsPipeline` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiSetComputePipeline` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiSetBindings` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiSetVertexBuffer` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiSetIndexBuffer` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiDraw` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiDrawIndexed` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiDispatch` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiSetRootBlock` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiSetViewport` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiSetScissor` | Safe from any thread; the pass is used by one thread at a time. |
