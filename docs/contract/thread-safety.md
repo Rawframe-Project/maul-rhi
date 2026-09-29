@@ -28,6 +28,7 @@ edit the contract, not this file.
 | `mrhiGetDeviceLimits` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiGetDeviceTimestampPeriod` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiGetDeviceMisuse` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiGetDeviceLossReport` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDefaultSamplerDef` | Safe from any thread. |
 | `mrhiCreateSampler` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDestroySampler` | Safe from any thread; the device is used by one thread at a time. |

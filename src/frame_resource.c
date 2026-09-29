@@ -183,6 +183,10 @@ mrhiResult mrhiAcquireSurfaceImage(mrhiDevice* device, mrhiSurfaceId surface,
     {
         return mrhi_errorState;
     }
+    if (device->state == mrhi_deviceLost)
+    {
+        return mrhi_errorDeviceLost;
+    }
     mrhiSwapchainSlot* swapchain = &device->swapchainSlots[found->swapchain - 1];
     if (swapchain->acquired.frame == device->frameSerial)
     {
@@ -197,7 +201,8 @@ mrhiResult mrhiAcquireSurfaceImage(mrhiDevice* device, mrhiSurfaceId surface,
     }
     uint64_t image = 0;
     mrhiResult outcome =
-        device->driver.vtable->acquireImage(device->driver.self, swapchain->handle, &image);
+        mrhiDriverStatus(device, device->driver.vtable->acquireImage(device->driver.self,
+                                                                     swapchain->handle, &image));
     if (outcome == mrhi_success || outcome == mrhi_suboptimal)
     {
         mrhiFrameResource resource = {

@@ -18,3 +18,4 @@ are listed in [README.md](README.md).
 | [mrhi-0011](mrhi-0011-encoders.md) | Encoders: passes recorded into a frame's arena | Accepted |
 | [mrhi-0012](mrhi-0012-queries.md) | Queries: sets on the device, written once a frame, resolved into buffers | Accepted |
 | [mrhi-0013](mrhi-0013-submission.md) | Submission: a frame reaches its driver as one read-only view | Accepted |
+| [mrhi-0014](mrhi-0014-device-loss.md) | Device loss: terminal, answered, reported | Accepted |

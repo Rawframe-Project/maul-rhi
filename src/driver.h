@@ -26,7 +26,8 @@ typedef struct mrhiDriverAdapter
     mrhiLimits limits;
 } mrhiDriverAdapter;
 
-// Finished work: the tag the core gave the request, and its outcome.
+// Finished work: the tag the core gave the request, and its outcome; or,
+// with tag 0 and mrhi_errorDeviceLost, the device's loss.
 typedef struct mrhiDriverEvent
 {
     uint64_t tag;
@@ -201,6 +202,10 @@ typedef struct mrhiDeviceDriverVtable
     // Destroys a pipeline, pending or not; a pending one is never
     // reported.
     void (*destroyPipeline)(void* self, uint64_t handle);
+    // Fills what the driver knows of its device's loss: the reason, the
+    // faulting frame's tag and pass index when the API tells, and a
+    // message. Called once, when the core loses the device.
+    void (*lossReport)(void* self, mrhiDeviceLossReport* reportOut);
     // Acquires a swapchain's next image: mrhi_success or mrhi_suboptimal
     // with the image, never zero; mrhi_occluded or mrhi_errorOutOfDate
     // without one; or mrhi_errorDeviceLost.

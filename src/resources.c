@@ -78,7 +78,8 @@ mrhiResult mrhiCreateSampler(mrhiDevice* device, const mrhiSamplerDef* def,
         return mrhi_errorCapacity;
     }
     uint64_t handle = 0;
-    status = device->driver.vtable->createSampler(device->driver.self, def, &handle);
+    status = mrhiDriverStatus(
+        device, device->driver.vtable->createSampler(device->driver.self, def, &handle));
     if (status != mrhi_success)
     {
         mrhiPoolRelease(&device->samplers, index1);
@@ -162,7 +163,8 @@ mrhiResult mrhiCreateBuffer(mrhiDevice* device, const mrhiBufferDef* def, mrhiBu
         return mrhi_errorCapacity;
     }
     uint64_t handle = 0;
-    status = device->driver.vtable->createBuffer(device->driver.self, def, &handle);
+    status = mrhiDriverStatus(
+        device, device->driver.vtable->createBuffer(device->driver.self, def, &handle));
     if (status != mrhi_success)
     {
         mrhiPoolRelease(&device->buffers, index1);

@@ -535,8 +535,9 @@ mrhiResult mrhiCreateGraphicsPipeline(mrhiDevice* device, const mrhiGraphicsPipe
         .fragmentEntry = slot->entries[1],
         .def = def,
     };
-    status = device->driver.vtable->createGraphicsPipeline(
-        device->driver.self, &pipeline, mrhiPipelineTag(device, index1), &slot->handle);
+    status = mrhiDriverStatus(device, device->driver.vtable->createGraphicsPipeline(
+                                          device->driver.self, &pipeline,
+                                          mrhiPipelineTag(device, index1), &slot->handle));
     if (status != mrhi_success)
     {
         mrhiFreePipelineSlot(device, index1);

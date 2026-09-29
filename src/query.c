@@ -90,7 +90,8 @@ mrhiResult mrhiCreateQuerySet(mrhiDevice* device, const mrhiQuerySetDef* def,
         return mrhi_errorCapacity;
     }
     uint64_t handle = 0;
-    status = device->driver.vtable->createQuerySet(device->driver.self, def, &handle);
+    status = mrhiDriverStatus(
+        device, device->driver.vtable->createQuerySet(device->driver.self, def, &handle));
     if (status != mrhi_success)
     {
         mrhiPoolRelease(&device->querySets, index1);

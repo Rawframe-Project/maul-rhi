@@ -206,8 +206,9 @@ mrhiResult mrhiCreateComputePipeline(mrhiDevice* device, const mrhiComputePipeli
         .constants = def->constants,
         .constantCount = def->constantCount,
     };
-    status = device->driver.vtable->createComputePipeline(
-        device->driver.self, &pipeline, mrhiPipelineTag(device, index1), &slot->handle);
+    status = mrhiDriverStatus(device, device->driver.vtable->createComputePipeline(
+                                          device->driver.self, &pipeline,
+                                          mrhiPipelineTag(device, index1), &slot->handle));
     if (status != mrhi_success)
     {
         mrhiFreePipelineSlot(device, index1);
@@ -244,6 +245,22 @@ mrhiResult mrhiDestroyComputePipeline(mrhiDevice* device, mrhiComputePipelineId 
         return mrhi_errorInvalid;
     }
     return mrhiDestroyPipeline(device, mrhiPipelineCompute, pipeline.index1, pipeline.generation);
+}
+
+void mrhiLosePipelines(mrhiDevice* device)
+{
+    for (uint32_t i = 0; i < device->deviceLimits.pipelines && device->pendingCount > 0; ++i)
+    {
+        // A free slot is zeroed, which reads as pending.
+        mrhiPipelineSlot* slot = &device->pipelineSlots[i];
+        bool live = mrhiPoolIsLive(&device->pipelines, i + 1, device->pipelines.generations[i]);
+        if (live && slot->state == mrhiPipelinePending)
+        {
+            slot->state = mrhiPipelineFailed;
+            --device->pendingCount;
+            mrhiQueueAnswer(device, mrhi_devicePipelineReady, slot->request, mrhi_errorDeviceLost);
+        }
+    }
 }
 
 void mrhiFinishPipeline(mrhiDevice* device, uint64_t tag, mrhiResult outcome)

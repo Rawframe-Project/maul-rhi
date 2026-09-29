@@ -52,7 +52,7 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
 {
     mrhiLimits floor = mrhiDefaultLimits();
     mrhiResult chain = mrhiCheckChain(def->next, nullptr, 0, instance->limits.chainDepth);
-    if (def->cookie != DEVICE_DEF_COOKIE || def->deviceLimits.notifications == 0 ||
+    if (def->cookie != DEVICE_DEF_COOKIE || def->deviceLimits.notifications < 2 ||
         def->deviceLimits.samplers == 0 || def->deviceLimits.buffers == 0 ||
         def->deviceLimits.textures == 0 || def->deviceLimits.views == 0 ||
         def->deviceLimits.surfaces == 0 || def->deviceLimits.frameResources == 0 ||
@@ -430,6 +430,10 @@ mrhiResult mrhiDeviceMisuse(mrhiDevice* device)
 
 mrhiResult mrhiDeviceUsable(const mrhiDevice* device)
 {
+    if (device->state == mrhi_deviceLost)
+    {
+        return mrhi_errorDeviceLost;
+    }
     return device->state == mrhi_deviceReady ? mrhi_success : mrhi_errorState;
 }
 
@@ -469,6 +473,20 @@ mrhiResult mrhiGetDeviceTimestampPeriod(mrhiDevice* device, double* periodOut)
         return mrhi_errorUnsupported;
     }
     *periodOut = device->driver.vtable->timestampPeriod(device->driver.self);
+    return mrhi_success;
+}
+
+mrhiResult mrhiGetDeviceLossReport(mrhiDevice* device, mrhiDeviceLossReport* reportOut)
+{
+    if (device == nullptr || reportOut == nullptr)
+    {
+        return device == nullptr ? mrhi_errorInvalid : mrhiDeviceMisuse(device);
+    }
+    if (device->state != mrhi_deviceLost)
+    {
+        return mrhi_errorState;
+    }
+    *reportOut = device->lossReport;
     return mrhi_success;
 }
 

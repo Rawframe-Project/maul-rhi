@@ -46,6 +46,10 @@ extern "C"
         // mrhiTakeReadback copies its bytes out, or the error that ended the
         // frame.
         mrhi_deviceReadbackReady = 2,
+        // The device was lost; its request id is null and its outcome
+        // mrhi_errorDeviceLost. Every answer still owed follows with that
+        // outcome.
+        mrhi_deviceLostNotice = 3,
     };
 
     // A record from a device's notification queue.

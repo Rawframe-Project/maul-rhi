@@ -242,3 +242,9 @@ format.
   new results `mrhi_suboptimal`, `mrhi_occluded`, `mrhi_errorOutOfDate`
   and `mrhi_errorDeviceLost`; the test adapter's `acquireOutcome` picks
   what acquiring answers.
+- Device loss (mrhi-0014): a lost device answers a
+  `mrhi_deviceLostNotice` and everything it owed with
+  `mrhi_errorDeviceLost`, refuses GPU work with that code, and gives a
+  fixed-size `mrhiDeviceLossReport` (`mrhiGetDeviceLossReport`); one
+  notification record is kept for the notice, so devices hold at least
+  2; the test adapter's `loseDevice` and `lossReason` inject a loss.

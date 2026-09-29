@@ -229,6 +229,9 @@ static void TestInvalidDefs(void)
     def = Def(adapter);
     def.deviceLimits.notifications = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "zero");
+    def.deviceLimits.notifications = 1;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
+          "only the record kept for the loss notice");
     def = Def(adapter);
     def.deviceLimits.samplers = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no samplers");
@@ -283,7 +286,7 @@ static void TestInvalidDefs(void)
     def.allocator.free = CountingFree;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
           "an allocator with one function");
-    CHECK(mrhiGetInstanceMisuse(instance) == 21, "each invalid call counted");
+    CHECK(mrhiGetInstanceMisuse(instance) == 22, "each invalid call counted");
     mrhiDestroyInstance(instance);
 }
 

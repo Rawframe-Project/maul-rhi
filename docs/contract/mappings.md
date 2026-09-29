@@ -150,6 +150,16 @@ restricted or absent-rejected, with how.
 | `storage` | direct: STORAGE_IMAGE | direct: TYPED_UNORDERED_ACCESS_VIEW | direct: Write capability | direct: STORAGE_BINDING |
 | `sampleCounts` | direct: sampleCounts of the format's image properties | direct: CheckMultisampleQualityLevels | direct: supportsTextureSampleCount | restricted: 1 and 4 only |
 
+## mrhiDeviceLossReason
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_lossUnknown` | direct: VK_ERROR_DEVICE_LOST without VK_EXT_device_fault | direct: an unrecognized GetDeviceRemovedReason | direct: an unknown command buffer error | direct: "unknown" |
+| `mrhi_lossHung` | direct: VK_EXT_device_fault's fault | direct: DXGI_ERROR_DEVICE_HUNG | direct: MTLCommandBufferErrorTimeout | restricted: "unknown" with its message |
+| `mrhi_lossReset` | restricted: VK_ERROR_DEVICE_LOST after a reset | direct: DXGI_ERROR_DEVICE_RESET | direct: MTLCommandBufferErrorBlacklisted or a reset | restricted: "unknown" with its message |
+| `mrhi_lossRemoved` | restricted: VK_ERROR_DEVICE_LOST with the adapter gone | direct: DXGI_ERROR_DEVICE_REMOVED | direct: MTLCommandBufferErrorDeviceRemoved | direct: "destroyed" by the browser |
+| `mrhi_lossDriverFault` | restricted: VK_EXT_device_fault's vendor data | direct: DXGI_ERROR_DRIVER_INTERNAL_ERROR | direct: MTLCommandBufferErrorInternal | restricted: "unknown" with its message |
+
 ## mrhiFilter
 
 | Value | Vulkan | D3D12 | Metal | WebGPU |

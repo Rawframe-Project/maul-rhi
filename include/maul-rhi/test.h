@@ -98,6 +98,11 @@ extern "C"
         // at each acquire: mrhi_success, mrhi_suboptimal, mrhi_occluded,
         // mrhi_errorOutOfDate or mrhi_errorDeviceLost; NULL for mrhi_success.
         const mrhiResult* acquireOutcome;
+        // Set to lose the adapter's devices at their next poll, submission or
+        // acquire, read each time; NULL for never.
+        const bool* loseDevice;
+        // The reason a lost device's report gives.
+        mrhiDeviceLossReason lossReason;
     } mrhiTestAdapter;
 
     // Turns the test driver on for an instance, chained on its def with the

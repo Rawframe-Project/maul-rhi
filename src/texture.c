@@ -209,7 +209,8 @@ mrhiResult mrhiCreateTexture(mrhiDevice* device, const mrhiTextureDef* def,
         return mrhi_errorCapacity;
     }
     uint64_t handle = 0;
-    status = device->driver.vtable->createTexture(device->driver.self, def, &handle);
+    status = mrhiDriverStatus(
+        device, device->driver.vtable->createTexture(device->driver.self, def, &handle));
     if (status != mrhi_success)
     {
         mrhiPoolRelease(&device->textures, index1);

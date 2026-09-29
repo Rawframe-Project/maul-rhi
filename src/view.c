@@ -173,7 +173,8 @@ mrhiResult mrhiCreateView(mrhiDevice* device, const mrhiViewDef* def, mrhiViewId
     mrhiTextureSlot* texture = &device->textureSlots[def->texture.index1 - 1];
     uint64_t handle = 0;
     status =
-        device->driver.vtable->createView(device->driver.self, texture->handle, &resolved, &handle);
+        mrhiDriverStatus(device, device->driver.vtable->createView(
+                                     device->driver.self, texture->handle, &resolved, &handle));
     if (status != mrhi_success)
     {
         mrhiPoolRelease(&device->views, index1);

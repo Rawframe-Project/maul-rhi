@@ -42,7 +42,8 @@ extern "C"
     // The named limits of a device's own bookkeeping.
     typedef struct mrhiDeviceLimits
     {
-        // Records the device's notification queue holds; 256 by default.
+        // Records the device's notification queue holds, at least 2, one kept
+        // for the loss notice; 256 by default.
         uint32_t notifications;
         // Samplers the device holds at once; 256 by default.
         uint32_t samplers;
@@ -210,6 +211,59 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_API uint64_t mrhiGetDeviceMisuse(mrhiDevice* device);
+
+    // Why a device was lost.
+    typedef uint8_t mrhiDeviceLossReason;
+
+    enum
+    {
+        // The API gave no reason.
+        mrhi_lossUnknown = 0,
+        // The GPU stopped making progress, often a shader that never ends.
+        mrhi_lossHung = 1,
+        // The GPU was reset, perhaps by another program's fault.
+        mrhi_lossReset = 2,
+        // The GPU is gone: unplugged, disabled, or its driver updated.
+        mrhi_lossRemoved = 3,
+        // The GPU's driver failed.
+        mrhi_lossDriverFault = 4,
+    };
+
+// The bytes a device loss report's message may take, in UTF-8.
+#define MRHI_LOSS_MESSAGE_BYTES 256
+
+    // What is known about a device's loss, fixed in size, filled once when the
+    // device is lost.
+    typedef struct mrhiDeviceLossReport
+    {
+        // Why it was lost.
+        mrhiDeviceLossReason reason;
+        // The token of the last frame submitted, or a null id.
+        mrhiRequestId lastSubmitted;
+        // The token of the last frame the GPU finished before the loss, or a
+        // null id.
+        mrhiRequestId lastFinished;
+        // The token of the frame the GPU was running when it failed, when the
+        // API tells; a null id otherwise.
+        mrhiRequestId faultingFrame;
+        // That frame's pass, its id's index, when the API tells; 0 otherwise.
+        uint32_t faultingPass;
+        // The driver's message: UTF-8 without NUL, messageLength bytes.
+        char message[MRHI_LOSS_MESSAGE_BYTES];
+        // Its bytes.
+        uint32_t messageLength;
+    } mrhiDeviceLossReport;
+
+    /// Reads what is known about a lost device's loss.
+    ///
+    /// @param device     The device.
+    /// @param reportOut  Receives the report.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
+    /// `mrhi_errorState` for a device that is not lost.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetDeviceLossReport(mrhiDevice* device,
+                                                               mrhiDeviceLossReport* reportOut);
 
 #ifdef __cplusplus
 }

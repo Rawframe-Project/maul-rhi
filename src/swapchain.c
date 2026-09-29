@@ -163,8 +163,9 @@ mrhiResult mrhiConfigureSurface(mrhiDevice* device, const mrhiSurfaceConfig* con
     mrhiSwapchainSlot* slot = &device->swapchainSlots[index1 - 1];
     uint64_t old = surface->device == nullptr ? 0 : slot->handle;
     uint64_t handle = 0;
-    status = device->driver.vtable->configureSurface(device->driver.self, surface->handle, config,
-                                                     old, &handle);
+    status =
+        mrhiDriverStatus(device, device->driver.vtable->configureSurface(
+                                     device->driver.self, surface->handle, config, old, &handle));
     if (status != mrhi_success)
     {
         mrhiPoolRelease(&device->swapchains, index1);

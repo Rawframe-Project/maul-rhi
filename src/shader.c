@@ -192,8 +192,8 @@ mrhiResult mrhiCreateShader(mrhiDevice* device, const mrhiShaderDef* def, mrhiSh
         mrhiPoolRelease(&device->shaders, index1);
         return mrhi_errorCapacity;
     }
-    status =
-        device->driver.vtable->createShader(device->driver.self, def, &container, &slot->handle);
+    status = mrhiDriverStatus(device, device->driver.vtable->createShader(
+                                          device->driver.self, def, &container, &slot->handle));
     if (status != mrhi_success)
     {
         mrhiReleaseReflection(&device->allocator, slot->reflection);

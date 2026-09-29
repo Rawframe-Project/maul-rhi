@@ -85,7 +85,8 @@ static void TestFramesInFlight(void)
 static void TestQueueRoom(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.notifications = 2;
+    // Two answers, and the record kept for the loss notice.
+    def.deviceLimits.notifications = 3;
     mrhiDevice* device = OpenWith(def, true);
     Run(device);
     Run(device);
@@ -102,7 +103,8 @@ static void TestQueueRoom(void)
 static void TestQueueWraps(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.notifications = 2;
+    // Two answers, and the record kept for the loss notice.
+    def.deviceLimits.notifications = 3;
     mrhiDevice* device = OpenWith(def, true);
     mrhiRequestId a = Run(device);
     mrhiRequestId b = Run(device);
@@ -129,7 +131,8 @@ static void TestRunningNeedRoom(void)
     s_adapter.limits.framesInFlight = 3;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.limits.framesInFlight = 3;
-    def.deviceLimits.notifications = 2;
+    // Two answers, and the record kept for the loss notice.
+    def.deviceLimits.notifications = 3;
     mrhiDevice* device = OpenWith(def, true);
     Run(device);
     Run(device);

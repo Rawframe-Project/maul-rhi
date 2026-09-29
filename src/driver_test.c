@@ -209,6 +209,16 @@ typedef struct TestDevice
     mrhiTestFrameLog* frameLog;
     const mrhiResult* acquireOutcome;
     uint32_t imagesOut;
+    // The flag that loses the device, why, and whether it is lost and the
+    // loss reported.
+    const bool* loseDevice;
+    mrhiDeviceLossReason lossReason;
+    bool lost;
+    bool lossReported;
+    // Whether the core has been told, which asks for no more work.
+    bool lossTold;
+    // The first frame running when it was lost, its tag, or 0.
+    uint64_t faultingTag;
     // Pipelines made, and those a pipeline cache said earlier devices made.
     uint64_t pipelinesMade;
     uint64_t pipelinesCached;
@@ -240,10 +250,28 @@ static void Name(TestDevice* device, const char* label, size_t length)
     device->label[length] = '\0';
 }
 
-// A new object's handle, or mrhi_errorPlatform once the adapter's
-// object budget is spent.
+// Whether the device is lost: once its adapter's flag is set, for good,
+// the frame it was running then taken as the faulting one.
+static bool IsLost(TestDevice* device)
+{
+    if (!device->lost && device->loseDevice != nullptr && *device->loseDevice)
+    {
+        device->lost = true;
+        device->faultingTag = device->frameCount > 0 ? device->frames[0].tag : 0;
+    }
+    return device->lost;
+}
+
+// A new object's handle, mrhi_errorDeviceLost on a lost device, or
+// mrhi_errorPlatform once the adapter's object budget is spent.
 static mrhiResult MakeObject(TestDevice* device, uint64_t* handleOut)
 {
+    MRHI_ASSERT(!device->lossTold);
+    if (IsLost(device))
+    {
+        device->lossTold = true;
+        return mrhi_errorDeviceLost;
+    }
     if (device->madeBeforeFailure != 0 && device->made == device->madeBeforeFailure)
     {
         return mrhi_errorPlatform;
@@ -499,7 +527,13 @@ static mrhiResult AcquireImage(void* self, uint64_t swapchain, uint64_t* imageOu
 {
     TestDevice* device = self;
     MRHI_ASSERT(swapchain > HANDLE_BASE && swapchain <= device->nextHandle);
+    MRHI_ASSERT(!device->lossTold);
     mrhiResult outcome = device->acquireOutcome == nullptr ? mrhi_success : *device->acquireOutcome;
+    if (IsLost(device))
+    {
+        device->lossTold = true;
+        outcome = mrhi_errorDeviceLost;
+    }
     if (outcome != mrhi_success && outcome != mrhi_suboptimal)
     {
         return outcome;
@@ -548,7 +582,12 @@ static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* b
 static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag)
 {
     TestDevice* device = self;
-    MRHI_ASSERT(tag != 0 && device->frameCount < TEST_FRAMES);
+    MRHI_ASSERT(tag != 0 && device->frameCount < TEST_FRAMES && !device->lossTold);
+    if (IsLost(device))
+    {
+        device->lossTold = true;
+        return mrhi_errorDeviceLost;
+    }
     mrhiTestFrameLog log = {0};
     mrhiWalkTestFrame(frame, HANDLE_BASE + 1, device->nextHandle, &log);
     // Every image the frame acquired is presented.
@@ -574,6 +613,29 @@ static size_t PollDevice(void* self, mrhiDriverEvent* events, size_t capacity)
 {
     TestDevice* device = self;
     size_t moved = 0;
+    // A lost device reports its loss once, then what it had finished, as a
+    // driver's queue may still hold it; the core has answered those.
+    if (IsLost(device))
+    {
+        if (device->lossReported || capacity == 0)
+        {
+            return 0;
+        }
+        device->lossReported = true;
+        device->lossTold = true;
+        events[moved++] = (mrhiDriverEvent){.tag = 0, .outcome = mrhi_errorDeviceLost};
+        while (device->pendingCount > 0 && moved < capacity)
+        {
+            events[moved++] = (mrhiDriverEvent){.tag = device->pending[--device->pendingCount].tag,
+                                                .outcome = mrhi_success};
+        }
+        while (device->frameCount > 0 && moved < capacity)
+        {
+            events[moved++] = (mrhiDriverEvent){.tag = device->frames[--device->frameCount].tag,
+                                                .outcome = mrhi_success};
+        }
+        return moved;
+    }
     while (device->pendingCount > 0 && moved < capacity)
     {
         events[moved++] = (mrhiDriverEvent){.tag = device->pending[--device->pendingCount].tag,
@@ -612,6 +674,24 @@ static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
     return true;
 }
 
+// The reason the adapter gives, the frame running when it was lost as the
+// one that faulted, and a message.
+static void LossReport(void* self, mrhiDeviceLossReport* reportOut)
+{
+    TestDevice* device = self;
+    static const char message[] = "the test driver lost its device";
+    *reportOut = (mrhiDeviceLossReport){
+        .reason = device->lossReason,
+        .messageLength = sizeof(message) - 1,
+    };
+    memcpy(reportOut->message, message, sizeof(message) - 1);
+    if (device->faultingTag != 0)
+    {
+        reportOut->faultingFrame = (mrhiRequestId){(uint32_t)device->faultingTag, 1};
+        reportOut->faultingPass = 1;
+    }
+}
+
 static void DestroyDevice(void* self)
 {
     TestDevice* device = self;
@@ -642,6 +722,7 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .destroyPipeline = DestroyPipeline,
     .createQuerySet = CreateQuerySet,
     .destroyQuerySet = DestroyQuerySet,
+    .lossReport = LossReport,
     .acquireImage = AcquireImage,
     .releaseImage = ReleaseImage,
     .timestampPeriod = TimestampPeriod,
@@ -676,6 +757,8 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
         .pipelineOutcome = driver->adapters[adapter - 1].pipelineOutcome,
         .frameLog = driver->adapters[adapter - 1].frameLog,
         .acquireOutcome = driver->adapters[adapter - 1].acquireOutcome,
+        .loseDevice = driver->adapters[adapter - 1].loseDevice,
+        .lossReason = driver->adapters[adapter - 1].lossReason,
         .timestampPeriod = driver->adapters[adapter - 1].timestampPeriod > 0.0
                                ? driver->adapters[adapter - 1].timestampPeriod
                                : 1.0,

@@ -5445,7 +5445,7 @@
             {
               "name": "notifications",
               "type": "uint32",
-              "doc": "Records the device's notification queue holds; 256 by default."
+              "doc": "Records the device's notification queue holds, at least 2, one kept for the loss notice; 256 by default."
             },
             {
               "name": "samplers",
@@ -5773,6 +5773,206 @@
               "type": "opaque.device",
               "pointer": "mutable",
               "doc": "The device."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "enum",
+          "name": "device_loss_reason",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "Why a device was lost.",
+          "values": [
+            {
+              "name": "loss_unknown",
+              "value": 0,
+              "doc": "The API gave no reason.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_ERROR_DEVICE_LOST without VK_EXT_device_fault"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "an unrecognized GetDeviceRemovedReason"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "an unknown command buffer error"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "\"unknown\""
+                }
+              }
+            },
+            {
+              "name": "loss_hung",
+              "value": 1,
+              "doc": "The GPU stopped making progress, often a shader that never ends.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_EXT_device_fault's fault"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_ERROR_DEVICE_HUNG"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLCommandBufferErrorTimeout"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "\"unknown\" with its message"
+                }
+              }
+            },
+            {
+              "name": "loss_reset",
+              "value": 2,
+              "doc": "The GPU was reset, perhaps by another program's fault.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "VK_ERROR_DEVICE_LOST after a reset"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_ERROR_DEVICE_RESET"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLCommandBufferErrorBlacklisted or a reset"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "\"unknown\" with its message"
+                }
+              }
+            },
+            {
+              "name": "loss_removed",
+              "value": 3,
+              "doc": "The GPU is gone: unplugged, disabled, or its driver updated.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "VK_ERROR_DEVICE_LOST with the adapter gone"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_ERROR_DEVICE_REMOVED"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLCommandBufferErrorDeviceRemoved"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "\"destroyed\" by the browser"
+                }
+              }
+            },
+            {
+              "name": "loss_driver_fault",
+              "value": 4,
+              "doc": "The GPU's driver failed.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "VK_EXT_device_fault's vendor data"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI_ERROR_DRIVER_INTERNAL_ERROR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLCommandBufferErrorInternal"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "\"unknown\" with its message"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "constant",
+          "name": "loss_message_bytes",
+          "value": 256,
+          "doc": "The bytes a device loss report's message may take, in UTF-8."
+        },
+        {
+          "kind": "struct",
+          "name": "device_loss_report",
+          "doc": "What is known about a device's loss, fixed in size, filled once when the device is lost.",
+          "members": [
+            {
+              "name": "reason",
+              "type": "enum.device_loss_reason",
+              "doc": "Why it was lost."
+            },
+            {
+              "name": "last_submitted",
+              "type": "id.request_id",
+              "doc": "The token of the last frame submitted, or a null id."
+            },
+            {
+              "name": "last_finished",
+              "type": "id.request_id",
+              "doc": "The token of the last frame the GPU finished before the loss, or a null id."
+            },
+            {
+              "name": "faulting_frame",
+              "type": "id.request_id",
+              "doc": "The token of the frame the GPU was running when it failed, when the API tells; a null id otherwise."
+            },
+            {
+              "name": "faulting_pass",
+              "type": "uint32",
+              "doc": "That frame's pass, its id's index, when the API tells; 0 otherwise."
+            },
+            {
+              "name": "message",
+              "type": "char",
+              "array": "loss_message_bytes",
+              "doc": "The driver's message: UTF-8 without NUL, messageLength bytes."
+            },
+            {
+              "name": "message_length",
+              "type": "uint32",
+              "doc": "Its bytes."
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "get_device_loss_report",
+          "doc": "Reads what is known about a lost device's loss.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorState` for a device that is not lost."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "report_out",
+              "type": "struct.device_loss_report",
+              "pointer": "mutable",
+              "doc": "Receives the report."
             }
           ],
           "thread_safety": {
@@ -9165,6 +9365,11 @@
               "name": "device_readback_ready",
               "value": 2,
               "doc": "A readback's frame finished: its outcome is mrhi_success, and mrhiTakeReadback copies its bytes out, or the error that ended the frame."
+            },
+            {
+              "name": "device_lost_notice",
+              "value": 3,
+              "doc": "The device was lost; its request id is null and its outcome mrhi_errorDeviceLost. Every answer still owed follows with that outcome."
             }
           ]
         },
@@ -16821,6 +17026,17 @@
               "type": "result",
               "pointer": "const",
               "doc": "What acquiring a surface image on the adapter's devices answers, read at each acquire: mrhi_success, mrhi_suboptimal, mrhi_occluded, mrhi_errorOutOfDate or mrhi_errorDeviceLost; NULL for mrhi_success."
+            },
+            {
+              "name": "lose_device",
+              "type": "bool",
+              "pointer": "const",
+              "doc": "Set to lose the adapter's devices at their next poll, submission or acquire, read each time; NULL for never."
+            },
+            {
+              "name": "loss_reason",
+              "type": "enum.device_loss_reason",
+              "doc": "The reason a lost device's report gives."
             }
           ]
         },

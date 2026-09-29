@@ -25,8 +25,10 @@ mrhiFrameDef mrhiDefaultFrameDef(void)
 
 uint32_t mrhiAnswerRoom(const mrhiDevice* device)
 {
+    // One record is kept for the loss notice until it is queued.
+    uint64_t kept = device->state == mrhi_deviceLost ? 0 : 1;
     uint64_t used = (uint64_t)device->queueCount + device->runningCount + device->pendingCount +
-                    device->readbackPending;
+                    device->readbackPending + kept;
     // Every answer is reserved before it is owed, so none overfills it.
     MRHI_ASSERT(used <= device->deviceLimits.notifications);
     return (uint32_t)(device->deviceLimits.notifications - used);
@@ -43,7 +45,8 @@ void mrhiQueueAnswer(mrhiDevice* device, mrhiDeviceNotificationKind kind, uint32
     uint32_t tail = (device->queueHead + device->queueCount) % device->deviceLimits.notifications;
     device->queue[tail] = (mrhiDeviceNotification){
         .kind = kind,
-        .requestId = {request, 1},
+        // Request 0, a loss notice's, is the null id.
+        .requestId = {request, request != 0},
         .outcome = outcome,
     };
     ++device->queueCount;
@@ -76,6 +79,7 @@ static void Finish(mrhiDevice* device, uint64_t tag, mrhiResult outcome)
     {
         if (device->running[i] == tag)
         {
+            device->lastFinished = (uint32_t)tag;
             mrhiQueueAnswer(device, mrhi_deviceFrameDone, (uint32_t)tag, outcome);
             mrhiAnswerReadbacks(device, device->runningReadbackFirst[i],
                                 device->runningReadbackCount[i], outcome);
@@ -89,6 +93,37 @@ static void Finish(mrhiDevice* device, uint64_t tag, mrhiResult outcome)
     }
 }
 
+void mrhiLoseDevice(mrhiDevice* device)
+{
+    if (device->state == mrhi_deviceLost)
+    {
+        return;
+    }
+    device->state = mrhi_deviceLost;
+    mrhiDeviceLossReport report = {0};
+    device->driver.vtable->lossReport(device->driver.self, &report);
+    report.lastSubmitted = (mrhiRequestId){device->lastSubmitted, device->lastSubmitted != 0};
+    report.lastFinished = (mrhiRequestId){device->lastFinished, device->lastFinished != 0};
+    MRHI_ASSERT(report.messageLength <= MRHI_LOSS_MESSAGE_BYTES);
+    device->lossReport = report;
+    // The notice's record was kept free, and every other answer reserved.
+    mrhiQueueAnswer(device, mrhi_deviceLostNotice, 0, mrhi_errorDeviceLost);
+    while (device->runningCount > 0)
+    {
+        Finish(device, device->running[0], mrhi_errorDeviceLost);
+    }
+    mrhiLosePipelines(device);
+}
+
+mrhiResult mrhiDriverStatus(mrhiDevice* device, mrhiResult status)
+{
+    if (status == mrhi_errorDeviceLost)
+    {
+        mrhiLoseDevice(device);
+    }
+    return status;
+}
+
 // Takes in the work the driver has finished: frames, whose tags are
 // their tokens, and pipelines, whose tags carry their slot above.
 static void TakeFinished(mrhiDevice* device)
@@ -97,9 +132,14 @@ static void TakeFinished(mrhiDevice* device)
     size_t moved;
     while ((moved = device->driver.vtable->poll(device->driver.self, events, POLL_BATCH)) > 0)
     {
-        for (size_t i = 0; i < moved; ++i)
+        // A lost device answered everything it owed when it was lost.
+        for (size_t i = 0; i < moved && device->state != mrhi_deviceLost; ++i)
         {
-            if (events[i].tag > UINT32_MAX)
+            if (events[i].tag == 0)
+            {
+                mrhiLoseDevice(device);
+            }
+            else if (events[i].tag > UINT32_MAX)
             {
                 mrhiFinishPipeline(device, events[i].tag, events[i].outcome);
             }
@@ -185,6 +225,12 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     {
         return mrhi_errorState;
     }
+    // A frame recorded while its device was lost never runs.
+    if (device->state == mrhi_deviceLost)
+    {
+        mrhiResult dropped = mrhiDropFrame(device);
+        return dropped == mrhi_success ? mrhi_errorDeviceLost : dropped;
+    }
     mrhiResult compiled = device->frameCompiled ? mrhi_success : mrhiCompile(device);
     if (compiled != mrhi_success)
     {
@@ -210,7 +256,8 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     mrhiViewFrame(device, &view);
     device->frameOpen = false;
     uint32_t token = device->lastRequest + 1;
-    mrhiResult status = device->driver.vtable->submitFrame(device->driver.self, &view, token);
+    mrhiResult status = mrhiDriverStatus(
+        device, device->driver.vtable->submitFrame(device->driver.self, &view, token));
     if (status != mrhi_success)
     {
         mrhiDropReadbacks(device);
@@ -219,6 +266,7 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     }
     mrhiApplyFinalStates(device);
     device->lastRequest = token;
+    device->lastSubmitted = token;
     device->runningRegions[device->runningCount] = device->stagingRegion;
     device->runningReadbackFirst[device->runningCount] = device->frameReadbackFirst;
     device->runningReadbackCount[device->runningCount] =

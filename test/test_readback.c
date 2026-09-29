@@ -59,7 +59,8 @@ static void Open(uint32_t ringBytes, uint32_t readbacks, uint32_t notifications)
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.deviceLimits.readbackBytes = ringBytes;
     def.deviceLimits.readbacks = readbacks;
-    def.deviceLimits.notifications = notifications;
+    // The answers asked for, and the record kept for the loss notice.
+    def.deviceLimits.notifications = notifications + 1;
     s_device = OpenWith(def, true);
     mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
     bufferDef.size = 4096;

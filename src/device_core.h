@@ -447,6 +447,11 @@ struct mrhiDevice
     uint32_t lastRequest;
     uint32_t* running;
     uint32_t runningCount;
+    // The tokens of the last frame submitted and the last finished, and
+    // what is known of the device's loss once it is lost.
+    uint32_t lastSubmitted;
+    uint32_t lastFinished;
+    mrhiDeviceLossReport lossReport;
     // A ring of deviceLimits.notifications records.
     mrhiDeviceNotification* queue;
     uint32_t queueHead;
@@ -597,6 +602,17 @@ void mrhiQueueAnswer(mrhiDevice* device, mrhiDeviceNotificationKind kind, uint32
 // Answers a pending pipeline the driver finished, by its tag: its slot
 // above its request.
 void mrhiFinishPipeline(mrhiDevice* device, uint64_t tag, mrhiResult outcome);
+
+// Answers every pending pipeline of a device being lost.
+void mrhiLosePipelines(mrhiDevice* device);
+
+// Loses a device, once (mrhi-0014): its state, the driver's report, then
+// a loss notice and every answer still owed, each mrhi_errorDeviceLost.
+void mrhiLoseDevice(mrhiDevice* device);
+
+// Passes a driver call's status through, losing the device when it is
+// mrhi_errorDeviceLost.
+mrhiResult mrhiDriverStatus(mrhiDevice* device, mrhiResult status);
 
 // Checks the query sets a pass def names: success; mrhi_errorStale for
 // one the device no longer has; or mrhi_errorInvalid for an occlusion
