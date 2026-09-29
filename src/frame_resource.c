@@ -107,10 +107,14 @@ mrhiResult mrhiImportTexture(mrhiDevice* device, mrhiTextureId texture, mrhiReso
     {
         return mrhi_errorStale;
     }
+    const mrhiTextureSlot* slot = &device->textureSlots[texture.index1 - 1];
     mrhiFrameResource resource = {
         .kind = mrhiImportedTexture,
+        .texture = slot->def,
+        .handle = slot->handle,
         .index1 = texture.index1,
         .generation = texture.generation,
+        .initialState = slot->state,
     };
     return Import(device, &device->textureSlots[texture.index1 - 1].import, resource, resourceOut);
 }
@@ -129,10 +133,14 @@ mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer, mrhiResourc
     {
         return mrhi_errorStale;
     }
+    const mrhiBufferSlot* slot = &device->bufferSlots[buffer.index1 - 1];
     mrhiFrameResource resource = {
         .kind = mrhiImportedBuffer,
+        .size = slot->size,
+        .handle = slot->handle,
         .index1 = buffer.index1,
         .generation = buffer.generation,
+        .initialState = slot->state,
     };
     return Import(device, &device->bufferSlots[buffer.index1 - 1].import, resource, resourceOut);
 }

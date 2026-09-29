@@ -652,6 +652,43 @@ static void TestIndirectDispatch(void)
     CloseDevice();
 }
 
+// A frame of every draw and dispatch, submitted: the test driver walks
+// each record as a driver would translate it.
+static void TestSubmitted(void)
+{
+    mrhiTestFrameLog log = {0};
+    s_adapter.frameLog = &log;
+    Open();
+    Unbound();
+    mrhiGraphicsPipelineId graphics = MakeGraphics();
+    mrhiComputePipelineId compute = MakeCompute();
+    Frame();
+    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, graphics) == mrhi_success, "set");
+    SetVertices();
+    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+              mrhi_success,
+          "indices");
+    CHECK(mrhiDraw(s_device, s_render, 3, 1, 0, 0) == mrhi_success &&
+              mrhiDrawIndexed(s_device, s_render, 3, 1, 0, 0, 0) == mrhi_success &&
+              mrhiDrawIndirect(s_device, s_render, s_a, 0) == mrhi_success &&
+              mrhiDrawIndexedIndirect(s_device, s_render, s_a, 16) == mrhi_success,
+          "four draws");
+    CHECK(mrhiSetComputePipeline(s_device, s_compute, compute) == mrhi_success &&
+              mrhiDispatch(s_device, s_compute, 1, 1, 1) == mrhi_success &&
+              mrhiDispatchIndirect(s_device, s_compute, s_a, 32) == mrhi_success,
+          "two dispatches");
+    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success &&
+              mrhiEndPass(s_device, s_compute) == mrhi_success &&
+              mrhiEndPass(s_device, s_copy) == mrhi_success,
+          "ended");
+    mrhiRequestId token;
+    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(log.frames == 1 && log.passes == 3 && log.commands == 11 && log.records == 11,
+          "every command walked");
+    CloseDevice();
+    s_adapter.frameLog = nullptr;
+}
+
 static void TestArena(void)
 {
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
@@ -698,6 +735,7 @@ int main(void)
     TestDispatch();
     TestIndirectDraws();
     TestIndirectDispatch();
+    TestSubmitted();
     TestArena();
     return s_failures == 0 ? 0 : 1;
 }

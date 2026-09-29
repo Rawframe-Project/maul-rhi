@@ -42,6 +42,6 @@ bool mrhiPassDeclares(const mrhiDevice* device, const mrhiFramePass* pass, uint3
                       uint32_t kinds, const mrhiFrameUse* part);
 
 // The bytes of a buffer of the open frame, declared or imported.
-uint64_t mrhiBufferBytesOf(const mrhiDevice* device, const mrhiFrameResource* resource);
+uint64_t mrhiBufferBytesOf(const mrhiFrameResource* resource);
 
 #endif // MAUL_RHI_SRC_ENCODER_CORE_H

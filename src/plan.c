@@ -30,19 +30,11 @@ static bool NeedsBarrier(mrhiResourceState before, mrhiResourceState after, bool
 }
 
 // The box a whole resource covers.
-static mrhiBox WholeOf(const mrhiDevice* device, const mrhiFrameResource* resource)
+static mrhiBox WholeOf(const mrhiFrameResource* resource)
 {
     mrhiBox box = {.mipCount = 1, .layerCount = 1, .planes = 1};
-    const mrhiTextureDef* def = nullptr;
-    if (resource->kind == mrhiFrameTexture)
-    {
-        def = &resource->texture;
-    }
-    else if (resource->kind == mrhiImportedTexture)
-    {
-        def = &device->textureSlots[resource->index1 - 1].def;
-    }
-    if (def != nullptr)
+    const mrhiTextureDef* def = &resource->texture;
+    if (resource->kind == mrhiFrameTexture || resource->kind == mrhiImportedTexture)
     {
         box.mipCount = def->mipLevels;
         box.layerCount = def->kind == mrhi_texture3d ? 1 : def->depthOrLayers;
@@ -51,15 +43,17 @@ static mrhiBox WholeOf(const mrhiDevice* device, const mrhiFrameResource* resour
     return box;
 }
 
-// The state an imported object begins the frame in; a declared resource
-// begins undefined.
+// Where an imported object that is still live keeps the state frames
+// leave it in: NULL for a declared resource or a destroyed object.
 static mrhiResourceState* CarriedState(mrhiDevice* device, const mrhiFrameResource* resource)
 {
-    if (resource->kind == mrhiImportedTexture)
+    if (resource->kind == mrhiImportedTexture &&
+        mrhiPoolIsLive(&device->textures, resource->index1, resource->generation))
     {
         return &device->textureSlots[resource->index1 - 1].state;
     }
-    if (resource->kind == mrhiImportedBuffer)
+    if (resource->kind == mrhiImportedBuffer &&
+        mrhiPoolIsLive(&device->buffers, resource->index1, resource->generation))
     {
         return &device->bufferSlots[resource->index1 - 1].state;
     }
@@ -223,9 +217,9 @@ static void Move(Map* map, uint32_t pass, mrhiBox cut)
 static bool PlanResource(mrhiDevice* device, uint32_t slot)
 {
     mrhiFrameResource* resource = &device->frameResources[slot - 1];
-    mrhiResourceState* carried = CarriedState(device, resource);
-    mrhiBox whole = WholeOf(device, resource);
-    whole.state = carried != nullptr ? *carried : mrhi_stateUndefined;
+    mrhiBox whole = WholeOf(resource);
+    // A declared resource begins undefined.
+    whole.state = resource->initialState;
     uint32_t half = device->frameBoxLimit / 2;
     Map map = {
         .device = device,
@@ -264,7 +258,7 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
     }
     resource->transient =
         resource->kind == mrhiFrameTexture && resource->firstPass != 0 && targetsOnly;
-    if (carried != nullptr)
+    if (mrhiIsImported(resource))
     {
         whole.state = resource->finalState;
         Move(&map, 0, whole);

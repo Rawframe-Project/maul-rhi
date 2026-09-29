@@ -16589,6 +16589,93 @@
       "items": [
         {
           "kind": "struct",
+          "name": "test_frame_log",
+          "doc": "What the test driver found walking the frames submitted on an adapter's devices: counts over every frame, and the last frame's own.",
+          "members": [
+            {
+              "name": "frames",
+              "type": "uint32",
+              "doc": "Frames submitted."
+            },
+            {
+              "name": "passes",
+              "type": "uint32",
+              "doc": "The last frame's kept passes."
+            },
+            {
+              "name": "labeled",
+              "type": "uint32",
+              "doc": "Its passes with a label."
+            },
+            {
+              "name": "occlusion_passes",
+              "type": "uint32",
+              "doc": "Its passes with an occlusion query set."
+            },
+            {
+              "name": "timestamp_passes",
+              "type": "uint32",
+              "doc": "Its passes writing timestamps."
+            },
+            {
+              "name": "label_bytes",
+              "type": "uint64",
+              "doc": "Their labels' bytes together."
+            },
+            {
+              "name": "barriers",
+              "type": "uint32",
+              "doc": "Its barriers."
+            },
+            {
+              "name": "resources",
+              "type": "uint32",
+              "doc": "Its resources."
+            },
+            {
+              "name": "needed",
+              "type": "uint32",
+              "doc": "Its resources a kept pass uses."
+            },
+            {
+              "name": "transients",
+              "type": "uint32",
+              "doc": "Its resources the frame makes."
+            },
+            {
+              "name": "chunks",
+              "type": "uint32",
+              "doc": "Its command chunks walked."
+            },
+            {
+              "name": "commands",
+              "type": "uint32",
+              "doc": "Its commands."
+            },
+            {
+              "name": "records",
+              "type": "uint32",
+              "doc": "Its records, commands and their payloads."
+            },
+            {
+              "name": "staging_bytes",
+              "type": "uint64",
+              "doc": "Its upload bytes."
+            },
+            {
+              "name": "upload_sum",
+              "type": "uint64",
+              "doc": "The sum of the bytes its uploads copy from staging."
+            },
+            {
+              "name": "memory_bytes",
+              "type": "uint64",
+              "doc": "The bytes its transients take together."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
           "name": "test_adapter",
           "doc": "An adapter the test driver finds: its facts, features and limits, and how a device opening on it ends.",
           "members": [
@@ -16642,6 +16729,12 @@
               "name": "timestamp_period",
               "type": "float64",
               "doc": "The nanoseconds per timestamp tick its devices report; 0 for 1."
+            },
+            {
+              "name": "frame_log",
+              "type": "struct.test_frame_log",
+              "pointer": "mutable",
+              "doc": "Where the test driver reports the frames its devices are submitted, walking every command of each; NULL for nowhere. It must outlive the adapter's devices."
             }
           ]
         },

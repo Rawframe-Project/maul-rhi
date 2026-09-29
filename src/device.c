@@ -208,6 +208,9 @@ typedef struct FrameParts
     size_t vertexBytes;
     size_t chunks;
     uint32_t chunkCount;
+    size_t labels;
+    size_t driverPasses;
+    size_t driverResources;
 } FrameParts;
 
 // Lays out the tables of the open frame, sized by the device's limits.
@@ -238,6 +241,11 @@ static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
                       sizeof(uint64_t), alignof(uint64_t));
     parts.chunks = mrhiLayoutAdd(layout, parts.chunkCount, sizeof(mrhiCommandChunk),
                                  alignof(mrhiCommandChunk));
+    parts.labels = mrhiLayoutAdd(layout, (size_t)limits->framePasses * MRHI_LABEL_BYTES, 1, 1);
+    parts.driverPasses =
+        mrhiLayoutAdd(layout, limits->framePasses, sizeof(mrhiDriverPass), alignof(mrhiDriverPass));
+    parts.driverResources = mrhiLayoutAdd(layout, limits->frameResources,
+                                          sizeof(mrhiDriverResource), alignof(mrhiDriverResource));
     return parts;
 }
 
@@ -256,6 +264,9 @@ static void PlaceFrameParts(mrhiDevice* device, unsigned char* block, const Fram
     device->frameVertexBytes = (uint64_t*)(block + parts->vertexBytes);
     device->frameChunks = (mrhiCommandChunk*)(block + parts->chunks);
     device->frameChunkCount = parts->chunkCount;
+    device->frameLabels = (char*)(block + parts->labels);
+    device->driverPasses = (mrhiDriverPass*)(block + parts->driverPasses);
+    device->driverResources = (mrhiDriverResource*)(block + parts->driverResources);
 }
 
 // The device's block: the struct, then its tables, sized by its limits.

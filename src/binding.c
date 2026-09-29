@@ -241,12 +241,11 @@ static mrhiResult CheckBinding(const mrhiDevice* device, const mrhiFramePass* pa
     uint8_t planes = 1;
     if (buffer)
     {
-        status =
-            CheckBuffer(device, slot, binding, mrhiBufferBytesOf(device, resource), recordedOut);
+        status = CheckBuffer(device, slot, binding, mrhiBufferBytesOf(resource), recordedOut);
     }
     else
     {
-        const mrhiTextureDef* texture = mrhiFrameTextureOf(device, resource);
+        const mrhiTextureDef* texture = mrhiFrameTextureOf(resource);
         status = CheckTexture(device, slot, binding, texture, recordedOut);
         planes = recordedOut->aspect == mrhi_aspectStencilOnly ? 2
                  : recordedOut->aspect == mrhi_aspectDepthOnly ? 1

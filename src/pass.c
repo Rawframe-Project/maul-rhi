@@ -10,6 +10,8 @@
 #include "capabilities_core.h"
 #include "device_core.h"
 
+#include <string.h>
+
 #define PASS_DEF_COOKIE 0x6D727061u
 
 mrhiPassDef mrhiDefaultPassDef(void)
@@ -32,13 +34,8 @@ static bool IsBuffer(const mrhiFrameResource* resource)
     return resource->kind == mrhiFrameBuffer || resource->kind == mrhiImportedBuffer;
 }
 
-const mrhiTextureDef* mrhiFrameTextureOf(const mrhiDevice* device,
-                                         const mrhiFrameResource* resource)
+const mrhiTextureDef* mrhiFrameTextureOf(const mrhiFrameResource* resource)
 {
-    if (resource->kind == mrhiImportedTexture)
-    {
-        return &device->textureSlots[resource->index1 - 1].def;
-    }
     return &resource->texture;
 }
 
@@ -179,7 +176,7 @@ static mrhiResult UseOfAccess(const mrhiDevice* device, const mrhiAccess* access
     {
         return mrhi_success;
     }
-    const mrhiTextureDef* def = mrhiFrameTextureOf(device, resource);
+    const mrhiTextureDef* def = mrhiFrameTextureOf(resource);
     const mrhiTextureRange* range = &access->range;
     uint32_t layers = def->kind == mrhi_texture3d ? 1 : def->depthOrLayers;
     uint8_t planes = mrhiFormatPlanes(def->format);
@@ -237,7 +234,7 @@ static uint32_t FindTarget(const mrhiDevice* device, mrhiResourceId id, uint32_t
     {
         return 0;
     }
-    const mrhiTextureDef* def = mrhiFrameTextureOf(device, resource);
+    const mrhiTextureDef* def = mrhiFrameTextureOf(resource);
     if (mip >= def->mipLevels || layer >= LayersAt(def, mip))
     {
         return 0;
@@ -257,7 +254,7 @@ static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* tar
     {
         return 0;
     }
-    const mrhiTextureDef* def = mrhiFrameTextureOf(device, &device->frameResources[slot - 1]);
+    const mrhiTextureDef* def = mrhiFrameTextureOf(&device->frameResources[slot - 1]);
     *statusOut = mrhi_errorInvalid;
     if (target->load > mrhi_loadDiscard || target->store > mrhi_storeDiscard ||
         mrhiFormatHasDepth(def->format) || !Agrees(shape, def, target->mip))
@@ -287,7 +284,7 @@ static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* tar
     {
         return 0;
     }
-    const mrhiTextureDef* into = mrhiFrameTextureOf(device, &device->frameResources[resolve - 1]);
+    const mrhiTextureDef* into = mrhiFrameTextureOf(&device->frameResources[resolve - 1]);
     TargetShape resolveShape = {0};
     Agrees(&resolveShape, into, target->resolveMip);
     if (def->sampleCount == 1 || into->sampleCount != 1 || into->format != def->format ||
@@ -321,7 +318,7 @@ static mrhiResult UseOfDepth(const mrhiDevice* device, const mrhiDepthTarget* ta
     {
         return status;
     }
-    const mrhiTextureDef* def = mrhiFrameTextureOf(device, &device->frameResources[slot - 1]);
+    const mrhiTextureDef* def = mrhiFrameTextureOf(&device->frameResources[slot - 1]);
     bool stencil = mrhiFormatHasStencil(def->format);
     bool known = target->depthLoad <= mrhi_loadDiscard && target->depthStore <= mrhi_storeDiscard &&
                  target->stencilLoad <= mrhi_loadDiscard &&
@@ -465,6 +462,32 @@ static mrhiResult CheckDef(mrhiDevice* device, const mrhiPassDef* def)
     return mrhi_success;
 }
 
+// The layout and size of a render pass's targets, from their textures;
+// nothing for a pass without targets.
+static void MeasureTargets(const mrhiDevice* device, mrhiFramePass* pass)
+{
+    for (uint32_t i = 0; i < pass->colorTargetCount; ++i)
+    {
+        const mrhiColorTarget* target = &pass->colorTargets[i];
+        const mrhiTextureDef* texture =
+            mrhiFrameTextureOf(&device->frameResources[target->resource.index1 - 1]);
+        pass->layout.colors[i] = texture->format;
+        pass->layout.samples = texture->sampleCount;
+        pass->width = texture->width >> target->mip > 0 ? texture->width >> target->mip : 1;
+        pass->height = texture->height >> target->mip > 0 ? texture->height >> target->mip : 1;
+    }
+    const mrhiDepthTarget* depth = &pass->depthTarget;
+    if (depth->resource.index1 != 0)
+    {
+        const mrhiTextureDef* texture =
+            mrhiFrameTextureOf(&device->frameResources[depth->resource.index1 - 1]);
+        pass->layout.depth = texture->format;
+        pass->layout.samples = texture->sampleCount;
+        pass->width = texture->width >> depth->mip > 0 ? texture->width >> depth->mip : 1;
+        pass->height = texture->height >> depth->mip > 0 ? texture->height >> depth->mip : 1;
+    }
+}
+
 mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* passOut)
 {
     if (device == nullptr)
@@ -501,12 +524,23 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
         .depthTarget = def->depthTarget,
         .occlusionSet = def->occlusionQuerySet.index1,
         .occlusionGeneration = def->occlusionQuerySet.generation,
+        .labelLength = (uint32_t)def->labelLength,
     };
+    if (def->occlusionQuerySet.index1 != 0)
+    {
+        pass->occlusionHandle = device->querySetSlots[def->occlusionQuerySet.index1 - 1].handle;
+    }
+    if (def->labelLength > 0)
+    {
+        memcpy(&device->frameLabels[(size_t)(device->framePassCount - 1) * MRHI_LABEL_BYTES],
+               def->label, def->labelLength);
+    }
     mrhiMarkPassTimestamps(device, def, pass);
     for (uint32_t i = 0; i < def->colorTargetCount; ++i)
     {
         pass->colorTargets[i] = def->colorTargets[i];
     }
+    MeasureTargets(device, pass);
     device->frameUseCount += count;
     *passOut = (mrhiPassId){device->framePassCount, device->frameSerial};
     return mrhi_success;

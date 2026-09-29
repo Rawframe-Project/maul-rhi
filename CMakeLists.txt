@@ -54,6 +54,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/upload.c
     src/query.c
     src/readback.c
+    src/submit.c
     src/draw.c
     src/encoder.c
     src/frame.c
@@ -81,7 +82,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/view.c)
 maul_configure_library(maul-rhi)
 if(MAUL_RHI_TEST_DRIVER)
-    target_sources(maul-rhi PRIVATE src/driver_test.c)
+    target_sources(maul-rhi PRIVATE src/driver_test.c src/driver_test_frame.c)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_TEST_DRIVER)
 endif()
 
@@ -121,6 +122,7 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(upload WHITEBOX)
         maul_add_test(query WHITEBOX)
         maul_add_test(readback WHITEBOX)
+        maul_add_test(submit WHITEBOX)
         # The container writer against the reader, where Python runs.
         find_package(Python3 COMPONENTS Interpreter)
         if(TARGET test_shader AND Python3_Interpreter_FOUND AND NOT CMAKE_CROSSCOMPILING)

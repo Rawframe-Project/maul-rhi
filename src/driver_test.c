@@ -8,6 +8,7 @@
 
 #include "allocator.h"
 #include "capabilities_core.h"
+#include "driver_test_frame.h"
 #include "invariant.h"
 
 #include <stdalign.h>
@@ -202,6 +203,8 @@ typedef struct TestDevice
     mrhiResult pipelineOutcome;
     // Nanoseconds per timestamp tick.
     double timestampPeriod;
+    // Where walked frames are reported, or NULL.
+    mrhiTestFrameLog* frameLog;
     // Pipelines made, and those a pipeline cache said earlier devices made.
     uint64_t pipelinesMade;
     uint64_t pipelinesCached;
@@ -514,10 +517,12 @@ static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* b
     *alignmentOut = 256;
 }
 
-static mrhiResult SubmitFrame(void* self, uint64_t tag)
+// Walks the frame as a driver would translate it, then runs it at once.
+static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag)
 {
     TestDevice* device = self;
     MRHI_ASSERT(tag != 0 && device->frameCount < TEST_FRAMES);
+    mrhiWalkTestFrame(frame, HANDLE_BASE + 1, device->nextHandle, device->frameLog);
     uint64_t handle = 0;
     mrhiResult status = MakeObject(device, &handle);
     if (status == mrhi_success)
@@ -630,6 +635,7 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
         .holdFrames = driver->adapters[adapter - 1].holdFrames,
         .frameOutcome = driver->adapters[adapter - 1].frameOutcome,
         .pipelineOutcome = driver->adapters[adapter - 1].pipelineOutcome,
+        .frameLog = driver->adapters[adapter - 1].frameLog,
         .timestampPeriod = driver->adapters[adapter - 1].timestampPeriod > 0.0
                                ? driver->adapters[adapter - 1].timestampPeriod
                                : 1.0,

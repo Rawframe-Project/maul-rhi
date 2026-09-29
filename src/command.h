@@ -74,6 +74,8 @@ typedef enum mrhiCommandType
     // device's readback ring (object 0), placed and pitched as uploads.
     mrhiCommandReadBuffer,
     mrhiCommandReadTexture,
+    // One past the last type.
+    mrhiCommandTypeEnd,
 } mrhiCommandType;
 
 typedef struct mrhiCommand

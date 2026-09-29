@@ -65,10 +65,9 @@ bool mrhiPassDeclares(const mrhiDevice* device, const mrhiFramePass* pass, uint3
     return false;
 }
 
-uint64_t mrhiBufferBytesOf(const mrhiDevice* device, const mrhiFrameResource* resource)
+uint64_t mrhiBufferBytesOf(const mrhiFrameResource* resource)
 {
-    return resource->kind == mrhiFrameBuffer ? resource->size
-                                             : device->bufferSlots[resource->index1 - 1].size;
+    return resource->size;
 }
 
 mrhiFramePass* mrhiRecordingPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
@@ -140,32 +139,6 @@ static mrhiResult Record(mrhiDevice* device, mrhiFramePass* pass, mrhiCommand co
     return mrhi_success;
 }
 
-// The layout and size of a render pass's targets, from their textures;
-// nothing for a pass without targets.
-static void MeasureTargets(const mrhiDevice* device, mrhiFramePass* pass)
-{
-    for (uint32_t i = 0; i < pass->colorTargetCount; ++i)
-    {
-        const mrhiColorTarget* target = &pass->colorTargets[i];
-        const mrhiTextureDef* texture =
-            mrhiFrameTextureOf(device, &device->frameResources[target->resource.index1 - 1]);
-        pass->layout.colors[i] = texture->format;
-        pass->layout.samples = texture->sampleCount;
-        pass->width = texture->width >> target->mip > 0 ? texture->width >> target->mip : 1;
-        pass->height = texture->height >> target->mip > 0 ? texture->height >> target->mip : 1;
-    }
-    const mrhiDepthTarget* depth = &pass->depthTarget;
-    if (depth->resource.index1 != 0)
-    {
-        const mrhiTextureDef* texture =
-            mrhiFrameTextureOf(device, &device->frameResources[depth->resource.index1 - 1]);
-        pass->layout.depth = texture->format;
-        pass->layout.samples = texture->sampleCount;
-        pass->width = texture->width >> depth->mip > 0 ? texture->width >> depth->mip : 1;
-        pass->height = texture->height >> depth->mip > 0 ? texture->height >> depth->mip : 1;
-    }
-}
-
 mrhiResult mrhiBeginPass(mrhiDevice* device, mrhiPassId id)
 {
     if (device == nullptr)
@@ -185,7 +158,6 @@ mrhiResult mrhiBeginPass(mrhiDevice* device, mrhiPassId id)
     {
         return mrhi_errorState;
     }
-    MeasureTargets(device, pass);
     uint32_t slots = device->limits.vertexBuffers;
     memset(&device->frameVertexBytes[(size_t)(id.index1 - 1) * slots], 0, slots * sizeof(uint64_t));
     return mrhi_success;

@@ -81,8 +81,8 @@ mrhiResult mrhiCopyBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId sour
     {
         return mrhiRefuse(device, status);
     }
-    uint64_t fromBytes = mrhiBufferBytesOf(device, &device->frameResources[from - 1]);
-    uint64_t toBytes = mrhiBufferBytesOf(device, &device->frameResources[to - 1]);
+    uint64_t fromBytes = mrhiBufferBytesOf(&device->frameResources[from - 1]);
+    uint64_t toBytes = mrhiBufferBytesOf(&device->frameResources[to - 1]);
     // One buffer as both is refused by the pass's declarations: a pass
     // never declares a buffer as both a copy source and destination.
     if (size % 4 != 0 || sourceOffset % 4 != 0 || destinationOffset % 4 != 0 ||
@@ -133,7 +133,7 @@ mrhiResult mrhiCheckTextureSide(const mrhiDevice* device, const mrhiTextureCopy*
     {
         return status;
     }
-    const mrhiTextureDef* def = mrhiFrameTextureOf(device, &device->frameResources[object - 1]);
+    const mrhiTextureDef* def = mrhiFrameTextureOf(&device->frameResources[object - 1]);
     // A mip past the texture's is refused by the pass's declarations,
     // which never name one.
     if (copy->aspect > mrhi_aspectStencilOnly || !mrhiFormatHasAspect(def->format, copy->aspect))
@@ -253,7 +253,7 @@ static mrhiResult CheckBufferTexture(const mrhiDevice* device, const mrhiFramePa
     }
     const mrhiTextureDef* def = textureOut->def;
     uint32_t alignment = mrhiFormatHasDepth(def->format) ? 4 : facts.bytes;
-    uint64_t total = mrhiBufferBytesOf(device, &device->frameResources[object - 1]);
+    uint64_t total = mrhiBufferBytesOf(&device->frameResources[object - 1]);
     bool valid = buffer->offset % alignment == 0 &&
                  mrhiIsLayoutValid(buffer->offset, buffer->bytesPerRow, buffer->rowsPerImage, total,
                                    mrhiGetFormatBlock(def->format), facts.bytes, size, true);

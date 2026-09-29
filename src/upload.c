@@ -62,7 +62,7 @@ mrhiResult mrhiWriteBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId res
     {
         return mrhiRefuse(device, status);
     }
-    uint64_t total = mrhiBufferBytesOf(device, &device->frameResources[object - 1]);
+    uint64_t total = mrhiBufferBytesOf(&device->frameResources[object - 1]);
     if (offset % 4 != 0 || size % 4 != 0 || offset > total || size > total - offset ||
         !mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessCopyDestination), nullptr))
     {

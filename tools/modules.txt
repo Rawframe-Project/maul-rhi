@@ -7,8 +7,9 @@ capabilities_core:
 chain:
 device: allocator capabilities_core chain device_core driver instance_core invariant label pool
 device_core: capabilities_core command driver pool reflection
-driver: reflection
-driver_test: allocator capabilities_core driver invariant
+driver: command reflection
+driver_test: allocator capabilities_core command driver driver_test_frame invariant
+driver_test_frame: command driver label
 instance: allocator chain driver driver_test instance_core invariant
 instance_core: driver pool
 invariant:
@@ -36,6 +37,7 @@ copy: copy_core
 upload: copy_core
 query: device_core encoder_core
 readback: copy_core
+submit: device_core invariant
 copy_core: capabilities_core encoder_core
 cache: bytes device_core sha256
 bytes:

@@ -229,3 +229,10 @@ format.
 - Clang builds for 64-bit targets warn when a 64-bit value is cut to
   32 bits (`-Wshorten-64-to-32`), and the test driver's handles start
   above 32 bits.
+- Submission (mrhi-0013): a submitted frame reaches its driver as one
+  read-only view of its resources, kept passes, barriers, commands,
+  uploads and readback ring. Imported objects are snapshotted into the
+  frame, so one destroyed while the frame is open never affects the
+  object that takes its slot. The test driver walks every submitted
+  frame's commands and reports them in `mrhiTestFrameLog`
+  (`mrhiTestAdapter.frameLog`).

@@ -21,6 +21,44 @@ extern "C"
 {
 #endif
 
+    // What the test driver found walking the frames submitted on an adapter's
+    // devices: counts over every frame, and the last frame's own.
+    typedef struct mrhiTestFrameLog
+    {
+        // Frames submitted.
+        uint32_t frames;
+        // The last frame's kept passes.
+        uint32_t passes;
+        // Its passes with a label.
+        uint32_t labeled;
+        // Its passes with an occlusion query set.
+        uint32_t occlusionPasses;
+        // Its passes writing timestamps.
+        uint32_t timestampPasses;
+        // Their labels' bytes together.
+        uint64_t labelBytes;
+        // Its barriers.
+        uint32_t barriers;
+        // Its resources.
+        uint32_t resources;
+        // Its resources a kept pass uses.
+        uint32_t needed;
+        // Its resources the frame makes.
+        uint32_t transients;
+        // Its command chunks walked.
+        uint32_t chunks;
+        // Its commands.
+        uint32_t commands;
+        // Its records, commands and their payloads.
+        uint32_t records;
+        // Its upload bytes.
+        uint64_t stagingBytes;
+        // The sum of the bytes its uploads copy from staging.
+        uint64_t uploadSum;
+        // The bytes its transients take together.
+        uint64_t memoryBytes;
+    } mrhiTestFrameLog;
+
     // An adapter the test driver finds: its facts, features and limits, and how
     // a device opening on it ends.
     typedef struct mrhiTestAdapter
@@ -50,6 +88,10 @@ extern "C"
         mrhiResult pipelineOutcome;
         // The nanoseconds per timestamp tick its devices report; 0 for 1.
         double timestampPeriod;
+        // Where the test driver reports the frames its devices are submitted,
+        // walking every command of each; NULL for nowhere. It must outlive the
+        // adapter's devices.
+        mrhiTestFrameLog* frameLog;
     } mrhiTestAdapter;
 
     // Turns the test driver on for an instance, chained on its def with the

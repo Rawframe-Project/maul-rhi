@@ -205,9 +205,11 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     {
         return mrhi_errorCapacity;
     }
+    mrhiDriverFrame view;
+    mrhiViewFrame(device, &view);
     device->frameOpen = false;
     uint32_t token = device->lastRequest + 1;
-    mrhiResult status = device->driver.vtable->submitFrame(device->driver.self, token);
+    mrhiResult status = device->driver.vtable->submitFrame(device->driver.self, &view, token);
     if (status != mrhi_success)
     {
         mrhiDropReadbacks(device);

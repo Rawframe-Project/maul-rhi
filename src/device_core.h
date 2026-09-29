@@ -118,16 +118,20 @@ typedef enum mrhiFrameResourceKind
     mrhiImportedBuffer,
 } mrhiFrameResourceKind;
 
-// A resource of the open frame: a declared texture's def or buffer's
-// size (without their chains and labels), or the id of an imported
-// device texture or buffer.
+// A resource of the open frame: a texture's def or a buffer's size
+// (without their chains and labels); for an imported device texture or
+// buffer, its id, and its driver handle and the state it begins the
+// frame in, all as they were when it was imported, since it may be
+// destroyed and its slot taken again while the frame is open.
 typedef struct mrhiFrameResource
 {
     mrhiFrameResourceKind kind;
     mrhiTextureDef texture;
     uint64_t size;
+    uint64_t handle;
     uint32_t index1;
     uint32_t generation;
+    mrhiResourceState initialState;
     // Whether a pass declared so far writes it; imports count as written.
     bool written;
     // Whether a kept pass needs it, and the usages kept passes make of
@@ -249,12 +253,15 @@ typedef struct mrhiFramePass
     // none), and whether one of its queries is open.
     uint32_t occlusionSet;
     uint32_t occlusionGeneration;
+    uint64_t occlusionHandle;
     bool occlusionOpen;
     // Its timestamp query set's driver handle (0 for none) and the
     // queries written at its start and end (MRHI_NO_QUERY for none).
     uint64_t timestampSet;
     uint32_t timestampBegin;
     uint32_t timestampEnd;
+    // Its label's bytes, in the device's frameLabels.
+    uint32_t labelLength;
 } mrhiFramePass;
 
 // A surface as the device that configured it keeps it: the surface, the
@@ -422,6 +429,11 @@ struct mrhiDevice
     mrhiCommandChunk* frameChunks;
     uint32_t frameChunkCount;
     _Atomic uint32_t frameChunksTaken;
+    // Each pass's label, MRHI_LABEL_BYTES apiece; and the tables a
+    // submitted frame's view is built in.
+    char* frameLabels;
+    mrhiDriverPass* driverPasses;
+    mrhiDriverResource* driverResources;
     // The last request given, frames' tokens and pipelines' requests
     // alike.
     uint32_t lastRequest;
@@ -484,8 +496,7 @@ bool mrhiIsRangeValid(uint32_t base, uint32_t count, uint32_t total);
 
 // The def of a texture resource: its declaration, or the imported
 // texture's.
-const mrhiTextureDef* mrhiFrameTextureOf(const mrhiDevice* device,
-                                         const mrhiFrameResource* resource);
+const mrhiTextureDef* mrhiFrameTextureOf(const mrhiFrameResource* resource);
 
 // Finds a resource of the open frame whose imported object still lives:
 // its slot, or 0.
@@ -581,5 +592,9 @@ mrhiResult mrhiCheckPassQueries(const mrhiDevice* device, const mrhiPassDef* def
 // Marks a checked pass def's timestamp queries written this frame and
 // keeps them in its pass.
 void mrhiMarkPassTimestamps(mrhiDevice* device, const mrhiPassDef* def, mrhiFramePass* pass);
+
+// Builds the view of the open, compiled frame a driver is submitted
+// (mrhi-0013).
+void mrhiViewFrame(mrhiDevice* device, mrhiDriverFrame* frameOut);
 
 #endif // MAUL_RHI_SRC_DEVICE_CORE_H

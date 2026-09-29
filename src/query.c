@@ -303,7 +303,7 @@ mrhiResult mrhiResolveQueries(mrhiDevice* device, mrhiPassId id, mrhiQuerySetId 
         return mrhiDeviceMisuse(device);
     }
     const mrhiQuerySetSlot* slot = &device->querySetSlots[set.index1 - 1];
-    uint64_t total = mrhiBufferBytesOf(device, &device->frameResources[object - 1]);
+    uint64_t total = mrhiBufferBytesOf(&device->frameResources[object - 1]);
     if (first >= slot->count || count > slot->count - first || offset % 256 != 0 ||
         offset > total || (uint64_t)count * 8 > total - offset)
     {

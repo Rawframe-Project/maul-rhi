@@ -8,6 +8,7 @@
 #ifndef MAUL_RHI_SRC_DRIVER_H
 #define MAUL_RHI_SRC_DRIVER_H
 
+#include "command.h"
 #include "reflection.h"
 
 #include "maul-rhi/pipeline.h"
@@ -58,6 +59,90 @@ typedef struct mrhiDriverGraphicsPipeline
     uint32_t fragmentEntry;
     const mrhiGraphicsPipelineDef* def;
 } mrhiDriverGraphicsPipeline;
+
+// What a submitted frame's resource is to the driver.
+typedef enum mrhiDriverResourceKind
+{
+    // A texture or buffer the frame makes in its memory.
+    mrhiDriverTransientTexture,
+    mrhiDriverTransientBuffer,
+    // A device texture or buffer, by its handle.
+    mrhiDriverDeviceTexture,
+    mrhiDriverDeviceBuffer,
+} mrhiDriverResourceKind;
+
+// A resource of a submitted frame: its kind; whether a kept pass uses it
+// (the driver makes nothing for one no pass does); a device object's
+// handle (0 for a transient); a texture's def, whose usage is the
+// usage field for a transient; a buffer's bytes; its usage, a
+// transient's the one its passes derive; and where a transient lives in
+// the frame's memory.
+typedef struct mrhiDriverResource
+{
+    mrhiDriverResourceKind kind;
+    bool needed;
+    uint64_t handle;
+    const mrhiTextureDef* texture;
+    uint64_t size;
+    uint32_t usage;
+    uint64_t memoryOffset;
+    uint64_t memoryBytes;
+} mrhiDriverResource;
+
+// A kept pass of a submitted frame: its id, which its barriers name; its
+// class and label (labelLength bytes of UTF-8 without NUL); its targets,
+// naming frame resources by slot plus one, with the stores the compile
+// derived; its render area; its occlusion query set's handle (0 for
+// none); its timestamp query set's handle and the queries written at
+// its start and end (MRHI_NO_QUERY for none); and its first command
+// chunk, an index into the frame's chunks plus one (0 for none), each
+// chunk naming the next.
+typedef struct mrhiDriverPass
+{
+    mrhiPassId id;
+    mrhiPassClass passClass;
+    const char* label;
+    size_t labelLength;
+    mrhiColorTarget colorTargets[MRHI_COLOR_TARGETS];
+    mrhiStoreOp colorStores[MRHI_COLOR_TARGETS];
+    uint32_t colorTargetCount;
+    mrhiDepthTarget depthTarget;
+    mrhiStoreOp depthStore;
+    mrhiStoreOp stencilStore;
+    uint32_t width;
+    uint32_t height;
+    uint64_t occlusionSet;
+    uint64_t timestampSet;
+    uint32_t timestampBegin;
+    uint32_t timestampEnd;
+    uint32_t firstChunk;
+} mrhiDriverPass;
+
+// A submitted frame as the driver sees it (mrhi-0013): its
+// resources by frame slot less one; its kept passes in the order they
+// run; its barriers in the order they run, each before a pass or, with
+// a null pass id, at the frame's end; its command chunks; its upload
+// bytes, which copies from staging read at the offsets they name, valid
+// until the frame finishes; the readback ring, which the driver fills
+// at the offsets readbacks name before it reports the frame finished;
+// and the bytes its transients take together. Everything else is valid
+// during the call.
+typedef struct mrhiDriverFrame
+{
+    const mrhiDriverResource* resources;
+    uint32_t resourceCount;
+    const mrhiDriverPass* passes;
+    uint32_t passCount;
+    const mrhiBarrier* barriers;
+    size_t barrierCount;
+    const mrhiCommandChunk* chunks;
+    uint32_t chunkCount;
+    const uint8_t* staging;
+    uint64_t stagingBytes;
+    uint8_t* readbackRing;
+    uint64_t readbackBytes;
+    uint64_t memoryBytes;
+} mrhiDriverFrame;
 
 // The driver side of a device: its vtable and pointer. A device driver
 // is made at once and opens in the background; its instance driver
@@ -135,7 +220,7 @@ typedef struct mrhiDeviceDriverVtable
                          uint64_t* alignmentOut);
     // Runs a frame on the GPU; finished, it is reported by poll with the
     // tag.
-    mrhiResult (*submitFrame)(void* self, uint64_t tag);
+    mrhiResult (*submitFrame)(void* self, const mrhiDriverFrame* frame, uint64_t tag);
     // Moves up to capacity finished frames and pipelines into events and
     // returns how many it moved.
     size_t (*poll)(void* self, mrhiDriverEvent* events, size_t capacity);
