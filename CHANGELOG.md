@@ -308,6 +308,9 @@ format.
   browser's adapter listed with the contract's WebGPU features and
   limits, the root block as immediates. The conformance suite runs in
   headless Chrome on the web (`test/web_runner.cjs`).
+- WebGPU devices (mrhi-0003): opened from a fresh adapter with the
+  granted features and limits; buffers, textures, views, samplers and
+  query sets; loss polled; WebGPU errors kept for the web test runner.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

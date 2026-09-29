@@ -15,10 +15,11 @@
 #include "allocator.h"
 #include "format_caps.h"
 #include "invariant.h"
+#include "webgpu_device.h"
+#include "webgpu_names.h"
 
 #include <emscripten/em_js.h>
 #include <stdalign.h>
-#include <stddef.h>
 #include <string.h>
 
 // The handle of the browser's adapter.
@@ -33,8 +34,10 @@ typedef struct WebGpuDriver
     size_t bytes;
     // The instance's state on the JavaScript side.
     int state;
-    // Each request slot's tag, 0 for a free slot.
+    // Each request slot's tag, 0 for a free slot, and whether it is a
+    // search or a device's opening.
     uint64_t* tags;
+    bool* searches;
     uint32_t slotCount;
     // What the last finished search found.
     bool found;
@@ -42,10 +45,30 @@ typedef struct WebGpuDriver
 } WebGpuDriver;
 
 // clang-format off
+// The driver's JavaScript side, one per module: the instances' and
+// devices' states, every device's uncaptured errors, which the web test
+// runner reads, and a device state's objects under handles.
 EM_JS(int, JsCreateState, (void), {
-    const gpu = Module.mrhiGpu || (Module.mrhiGpu = {states: [null]});
-    gpu.states.push({settled: [], adapter: null});
-    return gpu.states.length - 1;
+    const gpu = Module.mrhiGpu || (Module.mrhiGpu = {
+        states: [null],
+        errors: [],
+        add(state) {
+            this.states.push(state);
+            return this.states.length - 1;
+        },
+        put(state, object) {
+            const handle = state.free.length > 0 ? state.free.pop() : state.objects.length;
+            state.objects[handle] = object;
+            return handle;
+        },
+        take(state, handle) {
+            const object = state.objects[handle];
+            state.objects[handle] = null;
+            state.free.push(handle);
+            return object;
+        },
+    });
+    return gpu.add({settled: [], adapter: null});
 });
 
 EM_JS(void, JsDestroyState, (int state), {
@@ -109,83 +132,6 @@ EM_JS(int, JsAdapterName, (int state, char* out, int capacity), {
 
 EM_JS_DEPS(mrhi_webgpu_driver, "$UTF8ToString,$stringToUTF8");
 
-// A feature as the browser names it, and its flag.
-typedef struct Feature
-{
-    const char* name;
-    size_t offset;
-} Feature;
-
-// The contract's WebGPU feature rows that are not absent.
-static const Feature s_features[] = {
-    {"timestamp-query", offsetof(mrhiFeatures, timestampQuery)},
-    {"texture-compression-bc", offsetof(mrhiFeatures, textureCompressionBc)},
-    {"texture-compression-etc2", offsetof(mrhiFeatures, textureCompressionEtc2)},
-    {"texture-compression-astc", offsetof(mrhiFeatures, textureCompressionAstc)},
-    {"float32-filterable", offsetof(mrhiFeatures, float32Filterable)},
-    {"rg11b10ufloat-renderable", offsetof(mrhiFeatures, rg11b10Renderable)},
-    {"dual-source-blending", offsetof(mrhiFeatures, dualSourceBlending)},
-    {"depth-clip-control", offsetof(mrhiFeatures, unclippedDepth)},
-    {"shader-f16", offsetof(mrhiFeatures, shaderF16)},
-    {"subgroups", offsetof(mrhiFeatures, subgroups)},
-    {"indirect-first-instance", offsetof(mrhiFeatures, indirectFirstInstance)},
-};
-
-// A limit as the browser names it, its field, and whether it is 64-bit.
-typedef struct Limit
-{
-    const char* name;
-    size_t offset;
-    bool wide;
-} Limit;
-
-// The contract's WebGPU limit rows; the root block is immediates.
-static const Limit s_limits[] = {
-    {"maxTextureDimension2D", offsetof(mrhiLimits, textureDimension2d), false},
-    {"maxTextureDimension3D", offsetof(mrhiLimits, textureDimension3d), false},
-    {"maxTextureArrayLayers", offsetof(mrhiLimits, textureArrayLayers), false},
-    {"maxBindGroups", offsetof(mrhiLimits, bindingTables), false},
-    {"maxBindingsPerBindGroup", offsetof(mrhiLimits, bindingsPerTable), false},
-    {"maxSampledTexturesPerShaderStage", offsetof(mrhiLimits, sampledTexturesPerStage), false},
-    {"maxSamplersPerShaderStage", offsetof(mrhiLimits, samplersPerStage), false},
-    {"maxStorageBuffersPerShaderStage", offsetof(mrhiLimits, storageBuffersPerStage), false},
-    {"maxStorageTexturesPerShaderStage", offsetof(mrhiLimits, storageTexturesPerStage), false},
-    {"maxUniformBuffersPerShaderStage", offsetof(mrhiLimits, uniformBuffersPerStage), false},
-    {"maxUniformBufferBindingSize", offsetof(mrhiLimits, uniformBindingBytes), false},
-    {"maxStorageBufferBindingSize", offsetof(mrhiLimits, storageBindingBytes), true},
-    {"minUniformBufferOffsetAlignment", offsetof(mrhiLimits, uniformOffsetAlignment), false},
-    {"minStorageBufferOffsetAlignment", offsetof(mrhiLimits, storageOffsetAlignment), false},
-    {"maxVertexBuffers", offsetof(mrhiLimits, vertexBuffers), false},
-    {"maxBindGroupsPlusVertexBuffers", offsetof(mrhiLimits, tablesPlusVertexBuffers), false},
-    {"maxBufferSize", offsetof(mrhiLimits, bufferBytes), true},
-    {"maxVertexAttributes", offsetof(mrhiLimits, vertexAttributes), false},
-    {"maxVertexBufferArrayStride", offsetof(mrhiLimits, vertexStride), false},
-    {"maxInterStageShaderVariables", offsetof(mrhiLimits, interStageVariables), false},
-    {"maxColorAttachments", offsetof(mrhiLimits, colorAttachments), false},
-    {"maxColorAttachmentBytesPerSample", offsetof(mrhiLimits, colorBytesPerSample), false},
-    {"maxComputeWorkgroupStorageSize", offsetof(mrhiLimits, workgroupStorageBytes), false},
-    {"maxComputeInvocationsPerWorkgroup", offsetof(mrhiLimits, workgroupInvocations), false},
-    {"maxComputeWorkgroupSizeX", offsetof(mrhiLimits, workgroupSizeX), false},
-    {"maxComputeWorkgroupSizeY", offsetof(mrhiLimits, workgroupSizeY), false},
-    {"maxComputeWorkgroupSizeZ", offsetof(mrhiLimits, workgroupSizeZ), false},
-    {"maxComputeWorkgroupsPerDimension", offsetof(mrhiLimits, workgroupsPerDimension), false},
-    {"maxImmediateSize", offsetof(mrhiLimits, rootBlockBytes), false},
-};
-
-// A limit's value in its field's width, clamped.
-static void SetLimit(mrhiLimits* limits, const Limit* limit, double value)
-{
-    unsigned char* field = (unsigned char*)limits + limit->offset;
-    if (limit->wide)
-    {
-        uint64_t wide = value < 18446744073709551615.0 ? (uint64_t)value : UINT64_MAX;
-        memcpy(field, &wide, sizeof(wide));
-        return;
-    }
-    uint32_t narrow = value < 4294967295.0 ? (uint32_t)value : UINT32_MAX;
-    memcpy(field, &narrow, sizeof(narrow));
-}
-
 // Reads the adapter the last search found, when there is one with
 // WebGPU's core features: false otherwise.
 static bool Describe(const WebGpuDriver* driver, mrhiDriverAdapter* adapterOut)
@@ -203,15 +149,16 @@ static bool Describe(const WebGpuDriver* driver, mrhiDriverAdapter* adapterOut)
     int length = JsAdapterName(driver->state, name, (int)sizeof(name));
     memcpy(info->name, name, (size_t)length);
     info->nameLength = (uint32_t)length;
-    for (size_t i = 0; i < sizeof(s_features) / sizeof(s_features[0]); ++i)
+    for (size_t i = 0; i < mrhiWebGpuFeatureCount; ++i)
     {
-        bool has = JsAdapterHas(driver->state, s_features[i].name);
-        memcpy((unsigned char*)&adapterOut->features + s_features[i].offset, &has, sizeof(has));
+        bool has = JsAdapterHas(driver->state, mrhiWebGpuFeatures[i].name);
+        memcpy((unsigned char*)&adapterOut->features + mrhiWebGpuFeatures[i].offset, &has,
+               sizeof(has));
     }
-    for (size_t i = 0; i < sizeof(s_limits) / sizeof(s_limits[0]); ++i)
+    for (size_t i = 0; i < mrhiWebGpuLimitCount; ++i)
     {
-        SetLimit(&adapterOut->limits, &s_limits[i],
-                 JsAdapterLimit(driver->state, s_limits[i].name));
+        mrhiSetWebGpuLimit(&adapterOut->limits, &mrhiWebGpuLimits[i],
+                           JsAdapterLimit(driver->state, mrhiWebGpuLimits[i].name));
     }
     adapterOut->limits.framesInFlight = WEBGPU_FRAMES_IN_FLIGHT;
     return true;
@@ -219,13 +166,15 @@ static bool Describe(const WebGpuDriver* driver, mrhiDriverAdapter* adapterOut)
 
 // Takes a free request slot for a tag: its index, or slotCount when all
 // are waiting.
-static uint32_t TakeSlot(WebGpuDriver* driver, uint64_t tag)
+static uint32_t TakeSlot(WebGpuDriver* driver, uint64_t tag, bool search)
 {
+    MRHI_ASSERT(tag != 0);
     for (uint32_t i = 0; i < driver->slotCount; ++i)
     {
         if (driver->tags[i] == 0)
         {
             driver->tags[i] = tag;
+            driver->searches[i] = search;
             return i;
         }
     }
@@ -235,8 +184,7 @@ static uint32_t TakeSlot(WebGpuDriver* driver, uint64_t tag)
 static mrhiResult RequestAdapters(void* self, uint64_t tag)
 {
     WebGpuDriver* driver = self;
-    MRHI_ASSERT(tag != 0);
-    uint32_t slot = TakeSlot(driver, tag);
+    uint32_t slot = TakeSlot(driver, tag, true);
     if (slot == driver->slotCount)
     {
         return mrhi_errorCapacity;
@@ -255,7 +203,10 @@ static size_t Poll(void* self, mrhiDriverEvent* events, size_t capacity)
     {
         MRHI_ASSERT((uint32_t)slot < driver->slotCount && driver->tags[slot] != 0);
         // A search reads what it found as it settles.
-        driver->found = Describe(driver, &driver->adapter);
+        if (driver->searches[slot])
+        {
+            driver->found = Describe(driver, &driver->adapter);
+        }
         events[moved++] = (mrhiDriverEvent){.tag = driver->tags[slot], .outcome = outcome};
         driver->tags[slot] = 0;
         slot = moved < capacity ? JsTakeSettled(driver->state, &outcome) : -1;
@@ -308,16 +259,24 @@ static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
     *capsOut = (mrhiSurfaceCaps){0};
 }
 
-// Devices come with the device slice.
+// Makes the device at once and answers its opening when the browser has.
 static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef* def, uint64_t tag,
                                mrhiDeviceDriver* deviceOut)
 {
-    (void)self;
-    (void)adapter;
-    (void)def;
-    (void)tag;
-    (void)deviceOut;
-    return mrhi_errorUnsupported;
+    WebGpuDriver* driver = self;
+    MRHI_ASSERT(adapter == ADAPTER_HANDLE);
+    uint32_t slot = TakeSlot(driver, tag, false);
+    if (slot == driver->slotCount)
+    {
+        return mrhi_errorCapacity;
+    }
+    mrhiResult status =
+        mrhiCreateWebGpuDevice(&driver->allocator, driver->state, slot, def, deviceOut);
+    if (status != mrhi_success)
+    {
+        driver->tags[slot] = 0;
+    }
+    return status;
 }
 
 static void Destroy(void* self)
@@ -348,6 +307,7 @@ mrhiResult mrhiCreateWebGpuDriver(const mrhiAllocator* allocator, uint32_t pendi
     *driverOut = (mrhiInstanceDriver){0};
     mrhiLayout layout = {.size = sizeof(WebGpuDriver)};
     size_t tagsAt = mrhiLayoutAdd(&layout, pendingLimit, sizeof(uint64_t), alignof(uint64_t));
+    size_t searchesAt = mrhiLayoutAdd(&layout, pendingLimit, sizeof(bool), alignof(bool));
     WebGpuDriver* driver =
         layout.overflow ? nullptr : mrhiAllocate(allocator, layout.size, alignof(WebGpuDriver));
     if (driver == nullptr)
@@ -360,6 +320,7 @@ mrhiResult mrhiCreateWebGpuDriver(const mrhiAllocator* allocator, uint32_t pendi
         .bytes = layout.size,
         .state = JsCreateState(),
         .tags = (uint64_t*)(block + tagsAt),
+        .searches = (bool*)(block + searchesAt),
         .slotCount = pendingLimit,
     };
     memset(driver->tags, 0, (size_t)pendingLimit * sizeof(uint64_t));

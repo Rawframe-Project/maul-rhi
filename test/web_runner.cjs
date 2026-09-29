@@ -4,8 +4,8 @@
 // Runs a web test in headless Chrome with WebGPU (mrhi-0003): serves the
 // test's directory from localhost, a secure context, opens a page with
 // a canvas (#mrhi-canvas) that loads the test, prints the test's output,
-// and exits with the test's status. A page error, or an error the
-// browser logs (WebGPU reports invalid calls there), fails it. Puppeteer
+// and exits with the test's status. A page error, an error the browser
+// logs, or a WebGPU error the driver kept fails it. Puppeteer
 // comes from MRHI_NODE_MODULES; without it the test is skipped (77).
 //
 // usage: node web_runner.cjs <test.js>
@@ -64,8 +64,9 @@ server.listen(0, async () => {
         args: ['--no-sandbox', '--enable-unsafe-webgpu'],
     });
     let failed = false;
+    const tab = await browser.newPage();
     const done = new Promise(resolve => {
-        browser.newPage().then(async tab => {
+        (async () => {
             tab.on('console', message => {
                 const text = message.text();
                 const exit = /^mrhi-test: exit (-?\d+)$/.exec(text);
@@ -83,13 +84,27 @@ server.listen(0, async () => {
                 resolve(1);
             });
             await tab.goto(`http://localhost:${server.address().port}/`);
-        });
+        })();
         setTimeout(() => {
             console.log('timed out');
             resolve(1);
         }, 600000);
     });
     const status = await done;
+    // The driver keeps every device's uncaptured WebGPU errors: any fails
+    // the test, as validation errors do on Vulkan.
+    const errors = await tab.evaluate(async () => {
+        const gpu = Module.mrhiGpu;
+        // Devices still closing read their error scopes first.
+        for (let waited = 0; gpu && gpu.closing > 0 && waited < 10000; waited += 10) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        return (gpu && gpu.errors) || [];
+    });
+    for (const error of errors) {
+        console.log(`WebGPU error: ${error}`);
+        failed = true;
+    }
     await browser.close();
     server.close();
     if (failed) {

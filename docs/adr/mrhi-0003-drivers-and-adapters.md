@@ -54,6 +54,18 @@ ids, requests, the frame graph) can be tested without a GPU.
   block, falls below the floor. Its features and limits follow the
   contract's WebGPU rows, and its format capabilities are the floor and
   what its features add.
+- **WebGPU devices:** a device asks a fresh adapter for its GPUDevice,
+  since a WebGPU adapter makes one device, with the granted features
+  and limits (a limit below WebGPU's default is raised by the browser);
+  the opening is answered when the browser settles it. Objects live on
+  the JavaScript side under small handles; a destroyed one waits there
+  until the frames submitted before its destruction finish, since
+  frames are recorded at submission. A view of one aspect takes the
+  format the browser resolves for it. Loss is reported by the next
+  poll with the browser's message. WebGPU places memory itself, so a
+  declared resource's bytes are an estimate for the frame's report.
+  Each device holds a validation error scope for its life, read as it
+  closes, so that the web test runner fails on any WebGPU error.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`

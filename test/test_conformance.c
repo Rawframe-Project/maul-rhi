@@ -213,11 +213,29 @@ static mrhiViewId MakeView(mrhiDevice* device, mrhiTextureId texture, mrhiTextur
     return view;
 }
 
+// A 64 by 64 by 4 volume, sampled and copied to.
+static mrhiTextureId MakeVolume(mrhiDevice* device)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.kind = mrhi_texture3d;
+    def.format = mrhi_formatRgba8Unorm;
+    def.width = 64;
+    def.height = 64;
+    def.depthOrLayers = 4;
+    def.mipLevels = 3;
+    def.usage = mrhi_textureSampled | mrhi_textureCopyDestination;
+    mrhiTextureId texture = {0};
+    CHECK(mrhiCreateTexture(device, &def, &texture) == mrhi_success, "a volume");
+    return texture;
+}
+
+static mrhiQuerySetId MakeQuerySet(mrhiDevice* device, mrhiQueryType type, uint32_t count);
+
 // Objects of every kind: many buffers over more than one block, one
 // larger than half a block, textures and views of each shape, a
-// comparing anisotropic sampler; some destroyed, the rest left for the
-// device's end.
-static void CheckObjects(mrhiDevice* device)
+// comparing anisotropic sampler, query sets (timestamps where granted);
+// some destroyed, the rest left for the device's end.
+static void CheckObjects(mrhiDevice* device, bool timestamps)
 {
     mrhiBufferId buffers[80];
     for (int i = 0; i < 80; ++i)
@@ -242,6 +260,17 @@ static void CheckObjects(mrhiDevice* device)
     mrhiViewId depthView = MakeView(device, depth, mrhi_texture2d, mrhi_aspectDepthOnly);
     (void)MakeView(device, depth, mrhi_texture2d, mrhi_aspectAll);
     (void)MakeView(device, cube, mrhi_textureCube, mrhi_aspectAll);
+    mrhiTextureId array = MakeTexture(device, mrhi_texture2dArray, mrhi_formatRgba8Unorm, 4);
+    (void)MakeView(device, array, mrhi_texture2dArray, mrhi_aspectAll);
+    mrhiTextureId cubes = MakeTexture(device, mrhi_textureCubeArray, mrhi_formatRgba8Unorm, 12);
+    (void)MakeView(device, cubes, mrhi_textureCubeArray, mrhi_aspectAll);
+    (void)MakeView(device, MakeVolume(device), mrhi_texture3d, mrhi_aspectAll);
+    mrhiQuerySetId occlusion = MakeQuerySet(device, mrhi_queryOcclusion, 8);
+    CHECK(mrhiDestroyQuerySet(device, occlusion) == mrhi_success, "a query set destroyed");
+    if (timestamps)
+    {
+        (void)MakeQuerySet(device, mrhi_queryTimestamp, 8);
+    }
     CHECK(mrhiDestroyView(device, depthView) == mrhi_success, "a view destroyed");
     CHECK(mrhiDestroyTexture(device, depth) == mrhi_success, "a texture destroyed");
     mrhiSamplerDef def = mrhiDefaultSamplerDef();
@@ -1166,8 +1195,15 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CHECK(asked->timestampQuery ? status == mrhi_success && period > 0.0
                                 : status == mrhi_errorUnsupported,
           "a timestamp period with timestamps");
-    CheckObjects(device);
+    CheckObjects(device, asked->timestampQuery);
     CheckFrameMemory(device);
+    mrhiAdapterInfo info;
+    CHECK(mrhiGetAdapterInfo(instance, adapter, &info) == mrhi_success, "info");
+    if (info.driver == mrhi_driverWebGpu)
+    {
+        mrhiDestroyDevice(device);
+        return;
+    }
     CheckPipelines(device);
     CheckRoundTrip(device);
     CheckDrawing(device, asked->timestampQuery);
@@ -1190,17 +1226,17 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         CHECK(info.nameLength > 0 && info.nameLength <= MRHI_ADAPTER_NAME_BYTES, "a name");
         CheckLimits(instance, ids[i]);
         CheckFormats(instance, ids[i]);
-        // The WebGPU driver opens no device yet: its devices are the
-        // next part of the driver's work.
-        if (driver == mrhi_driverWebGpu)
-        {
-            continue;
-        }
         mrhiFeatures none = {0};
         CheckDevice(instance, ids[i], &none);
         mrhiFeatures all;
         CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
         CheckDevice(instance, ids[i], &all);
+        // The WebGPU driver makes no shaders or frames yet: they are the
+        // next parts of its work.
+        if (driver == mrhi_driverWebGpu)
+        {
+            continue;
+        }
         CheckCacheImport(instance, ids[i]);
         CheckRetirement(instance, ids[i]);
         CheckHeaps(instance, ids[i], driver != mrhi_driverTest);
