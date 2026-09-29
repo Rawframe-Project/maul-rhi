@@ -28,6 +28,7 @@ typedef enum mrhiVulkanRetired
     mrhiVulkanRetiredTexture,
     mrhiVulkanRetiredView,
     mrhiVulkanRetiredSampler,
+    mrhiVulkanRetiredQuerySet,
     mrhiVulkanRetiredPipeline,
 } mrhiVulkanRetired;
 

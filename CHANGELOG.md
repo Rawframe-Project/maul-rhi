@@ -266,8 +266,8 @@ format.
   next poll, with a pipeline cache. Frames of copies, uploads and
   readbacks run, with transients in each frame slot's memory, and
   destroyed objects retire after the next frame finishes. Passes draw
-  and dispatch, with +Y up. Surfaces and queries are refused as
-  unsupported until they land.
+  and dispatch, with +Y up, and query sets measure occlusion and
+  timestamps. Surfaces are refused as unsupported until they land.
 - A table's bindings record their count as the command's payload, so a
   driver steps over them; before, a driver read the bindings as
   commands.

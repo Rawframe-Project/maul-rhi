@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// A Vulkan device's objects (mrhi-0003): buffers, textures, views and
-// samplers in tables sized from the device limits, each handle its
-// slot's index plus one.
+// A Vulkan device's objects (mrhi-0003): buffers, textures, views,
+// samplers and query sets in tables sized from the device limits, each
+// handle its slot's index plus one.
 
 #ifndef MAUL_RHI_SRC_VULKAN_OBJECT_H
 #define MAUL_RHI_SRC_VULKAN_OBJECT_H
@@ -32,6 +32,21 @@ typedef struct mrhiVulkanTexture
     mrhiVulkanAllocation allocation;
 } mrhiVulkanTexture;
 
+// The most queries a set has (mrhi-0012), and the words of a set's
+// bits.
+#define MRHI_VULKAN_SET_QUERIES 4096
+#define MRHI_VULKAN_SET_WORDS   (MRHI_VULKAN_SET_QUERIES / 64)
+
+// A query set: its pool, its queries, the frame that reset it last, and
+// the queries that frame has written so far as it records.
+typedef struct mrhiVulkanQuerySet
+{
+    VkQueryPool pool;
+    uint32_t count;
+    uint64_t resetSerial;
+    uint64_t written[MRHI_VULKAN_SET_WORDS];
+} mrhiVulkanQuerySet;
+
 typedef struct mrhiVulkanObjects
 {
     const mrhiVulkanDevice* api;
@@ -47,6 +62,8 @@ typedef struct mrhiVulkanObjects
     mrhiVulkanSlots viewSlots;
     VkSampler* samplers;
     mrhiVulkanSlots samplerSlots;
+    mrhiVulkanQuerySet* querySets;
+    mrhiVulkanSlots querySetSlots;
 } mrhiVulkanObjects;
 
 // Sets up a table's free slots over an array of capacity entries.
@@ -67,11 +84,14 @@ mrhiResult mrhiVulkanCreateView(mrhiVulkanObjects* objects, uint64_t texture,
                                 const mrhiViewDef* def, uint64_t* handleOut);
 mrhiResult mrhiVulkanCreateSampler(mrhiVulkanObjects* objects, const mrhiSamplerDef* def,
                                    uint64_t* handleOut);
+mrhiResult mrhiVulkanCreateQuerySet(mrhiVulkanObjects* objects, const mrhiQuerySetDef* def,
+                                    uint64_t* handleOut);
 
 // Destroys an object at once, with its memory.
 void mrhiVulkanDestroyBuffer(mrhiVulkanObjects* objects, uint64_t handle);
 void mrhiVulkanDestroyTexture(mrhiVulkanObjects* objects, uint64_t handle);
 void mrhiVulkanDestroyView(mrhiVulkanObjects* objects, uint64_t handle);
 void mrhiVulkanDestroySampler(mrhiVulkanObjects* objects, uint64_t handle);
+void mrhiVulkanDestroyQuerySet(mrhiVulkanObjects* objects, uint64_t handle);
 
 #endif // MAUL_RHI_SRC_VULKAN_OBJECT_H

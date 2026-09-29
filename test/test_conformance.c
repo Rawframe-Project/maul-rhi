@@ -603,7 +603,7 @@ static void BeginScene(Scene* scene)
 
 // A pass drawing the target, cleared to black, with the scene's
 // accesses: table 0 holds the uniform and the storage buffer.
-static mrhiPassId DrawPass(const Scene* scene, const mrhiAccess* accesses)
+static mrhiPassDef DrawDef(const Scene* scene, const mrhiAccess* accesses)
 {
     mrhiPassDef def = mrhiDefaultPassDef();
     def.colorTargets[0] = (mrhiColorTarget){
@@ -615,6 +615,12 @@ static mrhiPassId DrawPass(const Scene* scene, const mrhiAccess* accesses)
     def.colorTargetCount = 1;
     def.accesses = accesses;
     def.accessCount = 3;
+    return def;
+}
+
+static mrhiPassId DrawPass(const Scene* scene, const mrhiAccess* accesses)
+{
+    mrhiPassDef def = DrawDef(scene, accesses);
     mrhiPassId pass = {0};
     CHECK(mrhiAddPass(scene->device, &def, &pass) == mrhi_success, "a drawing pass");
     return pass;
@@ -777,12 +783,156 @@ static void CheckCulling(Scene* scene)
     CHECK(!s_runs || black, "a counter-clockwise triangle culled as a back face");
 }
 
-static void CheckDrawing(mrhiDevice* device)
+static mrhiQuerySetId MakeQuerySet(mrhiDevice* device, mrhiQueryType type, uint32_t count)
+{
+    mrhiQuerySetDef def = mrhiDefaultQuerySetDef();
+    def.type = type;
+    def.count = count;
+    mrhiQuerySetId set = {0};
+    CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_success, "a query set");
+    return set;
+}
+
+// Draws a triangle from firstVertex with a pipeline of the scene, its
+// root block and tables set.
+static void DrawWith(const Scene* scene, mrhiPassId pass, mrhiGraphicsPipelineId pipeline,
+                     uint32_t firstVertex)
+{
+    const float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    CHECK(mrhiSetGraphicsPipeline(scene->device, pass, pipeline) == mrhi_success &&
+              mrhiSetRootBlock(scene->device, pass, 0, tint, sizeof(tint)) == mrhi_success,
+          "a pipeline set");
+    BindScene(scene, pass);
+    CHECK(mrhiDraw(scene->device, pass, 3, 1, firstVertex, 0) == mrhi_success, "drawn");
+}
+
+// A frame that writes none of a set's queries resolves them all to 0,
+// whatever an earlier frame wrote.
+static void CheckUnwritten(Scene* scene, mrhiQuerySetId occlusion, mrhiBufferId results)
+{
+    mrhiDevice* device = scene->device;
+    BeginScene(scene);
+    mrhiResourceId r = {0};
+    CHECK(mrhiImportBuffer(device, results, &r) == mrhi_success, "imported");
+    mrhiAccess fill = Whole(r, mrhi_accessCopyDestination);
+    mrhiPassId filled = CopyPass(device, &fill, 1);
+    mrhiAccess resolves = Whole(r, mrhi_accessQueryResolve);
+    mrhiPassId resolve = CopyPass(device, &resolves, 1);
+    mrhiAccess reads = Whole(r, mrhi_accessCopySource);
+    mrhiPassId read = CopyPass(device, &reads, 1);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    uint8_t ones[24];
+    memset(ones, 0xFF, sizeof(ones));
+    mrhiRequestId request = {0};
+    CHECK(mrhiBeginPass(device, filled) == mrhi_success &&
+              mrhiWriteBuffer(device, filled, r, 0, ones, sizeof(ones)) == mrhi_success &&
+              mrhiEndPass(device, filled) == mrhi_success &&
+              mrhiBeginPass(device, resolve) == mrhi_success &&
+              mrhiResolveQueries(device, resolve, occlusion, 0, 3, r, 0) == mrhi_success &&
+              mrhiEndPass(device, resolve) == mrhi_success &&
+              mrhiBeginPass(device, read) == mrhi_success &&
+              mrhiReadBuffer(device, read, r, 0, sizeof(ones), &request) == mrhi_success &&
+              mrhiEndPass(device, read) == mrhi_success,
+          "resolved");
+    Finish(device, 1);
+    const uint8_t zeros[24] = {0};
+    CHECK(Taken(device, request, zeros, sizeof(zeros)), "every query 0");
+}
+
+// Occlusion queries around a draw that covers pixels and one culled
+// (the counter-clockwise triangle, with clockwise front faces),
+// a third query left unwritten, and the pass's timestamps when the
+// device has them; resolved over bytes set to 0xFF, so that the query
+// left unwritten shows it resolves to 0.
+static void CheckQueries(Scene* scene, bool timestamps)
+{
+    mrhiDevice* device = scene->device;
+    mrhiQuerySetId occlusion = MakeQuerySet(device, mrhi_queryOcclusion, 3);
+    mrhiQuerySetId times = {0};
+    if (timestamps)
+    {
+        times = MakeQuerySet(device, mrhi_queryTimestamp, 2);
+    }
+    mrhiBufferDef resultsDef = mrhiDefaultBufferDef();
+    resultsDef.size = 512;
+    resultsDef.usage = mrhi_bufferQueryResolve | mrhi_bufferCopySource | mrhi_bufferCopyDestination;
+    mrhiBufferId results = {0};
+    CHECK(mrhiCreateBuffer(device, &resultsDef, &results) == mrhi_success, "a results buffer");
+    BeginScene(scene);
+    mrhiResourceId r = {0};
+    CHECK(mrhiImportBuffer(device, results, &r) == mrhi_success, "imported");
+    mrhiAccess fill = Whole(r, mrhi_accessCopyDestination);
+    mrhiPassId filled = CopyPass(device, &fill, 1);
+    mrhiAccess draws[3] = {Whole(scene->u, mrhi_accessUniform),
+                           Whole(scene->d, mrhi_accessStorageReadWrite),
+                           Whole(scene->w, mrhi_accessSampled)};
+    mrhiPassDef def = DrawDef(scene, draws);
+    def.occlusionQuerySet = occlusion;
+    if (timestamps)
+    {
+        def.timestampQuerySet = times;
+        def.timestampBegin = 0;
+        def.timestampEnd = 1;
+    }
+    mrhiPassId draw = {0};
+    CHECK(mrhiAddPass(device, &def, &draw) == mrhi_success, "a pass with queries");
+    mrhiAccess resolves = Whole(r, mrhi_accessQueryResolve);
+    mrhiPassId resolve = CopyPass(device, &resolves, 1);
+    mrhiAccess reads = Whole(r, mrhi_accessCopySource);
+    mrhiPassId read = CopyPass(device, &reads, 1);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    uint8_t ones[512];
+    memset(ones, 0xFF, sizeof(ones));
+    CHECK(mrhiBeginPass(device, filled) == mrhi_success &&
+              mrhiWriteBuffer(device, filled, r, 0, ones, sizeof(ones)) == mrhi_success &&
+              mrhiEndPass(device, filled) == mrhi_success,
+          "filled");
+    CHECK(mrhiBeginPass(device, draw) == mrhi_success &&
+              mrhiBeginOcclusionQuery(device, draw, 0) == mrhi_success,
+          "query 0 begun");
+    DrawWith(scene, draw, scene->draw, 2);
+    CHECK(mrhiEndOcclusionQuery(device, draw) == mrhi_success &&
+              mrhiBeginOcclusionQuery(device, draw, 1) == mrhi_success,
+          "query 1 begun");
+    DrawWith(scene, draw, scene->culled, 0);
+    CHECK(mrhiEndOcclusionQuery(device, draw) == mrhi_success &&
+              mrhiEndPass(device, draw) == mrhi_success,
+          "queried");
+    CHECK(mrhiBeginPass(device, resolve) == mrhi_success &&
+              mrhiResolveQueries(device, resolve, occlusion, 0, 3, r, 0) == mrhi_success &&
+              (!timestamps ||
+               mrhiResolveQueries(device, resolve, times, 0, 2, r, 256) == mrhi_success) &&
+              mrhiEndPass(device, resolve) == mrhi_success,
+          "resolved");
+    mrhiRequestId request = {0};
+    CHECK(mrhiBeginPass(device, read) == mrhi_success &&
+              mrhiReadBuffer(device, read, r, 0, sizeof(ones), &request) == mrhi_success &&
+              mrhiEndPass(device, read) == mrhi_success,
+          "read");
+    Finish(device, 1);
+    uint64_t values[64];
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, request, values, sizeof(values), &size) == mrhi_success &&
+              size == sizeof(values),
+          "the values");
+    CHECK(!s_runs || (values[0] != 0 && values[1] == 0 && values[2] == 0),
+          "samples passed only for the drawn triangle, and 0 for the query left unwritten");
+    CHECK(!s_runs || !timestamps || (values[32] != 0 && values[33] >= values[32]),
+          "the pass ends after it starts");
+    CheckUnwritten(scene, occlusion, results);
+    CHECK(mrhiDestroyQuerySet(device, occlusion) == mrhi_success &&
+              (!timestamps || mrhiDestroyQuerySet(device, times) == mrhi_success) &&
+              mrhiDestroyBuffer(device, results) == mrhi_success,
+          "destroyed");
+}
+
+static void CheckDrawing(mrhiDevice* device, bool timestamps)
 {
     Scene scene = {.device = device};
     MakeScene(&scene);
     CheckDrawFrame(&scene);
     CheckCulling(&scene);
+    CheckQueries(&scene, timestamps);
 }
 
 // A device made with the cache the last one exported takes it.
@@ -829,7 +979,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CheckFrameMemory(device);
     CheckPipelines(device);
     CheckRoundTrip(device);
-    CheckDrawing(device);
+    CheckDrawing(device, asked->timestampQuery);
     mrhiDestroyDevice(device);
 }
 

@@ -55,6 +55,8 @@
     X(vkDestroyImageView)                                                                          \
     X(vkCreateSampler)                                                                             \
     X(vkDestroySampler)                                                                            \
+    X(vkCreateQueryPool)                                                                           \
+    X(vkDestroyQueryPool)                                                                          \
     X(vkCreateShaderModule)                                                                        \
     X(vkDestroyShaderModule)                                                                       \
     X(vkCreateDescriptorSetLayout)                                                                 \
@@ -102,7 +104,13 @@
     X(vkCmdDispatch)                                                                               \
     X(vkCmdDrawIndirect)                                                                           \
     X(vkCmdDrawIndexedIndirect)                                                                    \
-    X(vkCmdDispatchIndirect)
+    X(vkCmdDispatchIndirect)                                                                       \
+    X(vkCmdResetQueryPool)                                                                         \
+    X(vkCmdBeginQuery)                                                                             \
+    X(vkCmdEndQuery)                                                                               \
+    X(vkCmdWriteTimestamp2)                                                                        \
+    X(vkCmdCopyQueryPoolResults)                                                                   \
+    X(vkCmdFillBuffer)
 
 #define MRHI_VULKAN_FIELD(name) PFN_##name name;
 

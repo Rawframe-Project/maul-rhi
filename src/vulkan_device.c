@@ -5,10 +5,9 @@
 // granted ones, one queue, and a timeline semaphore for the frames. The
 // memory a declared resource takes is read from the create info alone
 // (Vulkan 1.3's device memory requirements). Buffers, textures, views
-// and samplers are made in device-local memory; shader modules and
-// pipelines are made at the call. Frames of copies, uploads and
-// readbacks run; queries, passes that draw or dispatch, and surfaces
-// are refused as unsupported until their slices land.
+// and samplers are made in device-local memory, query sets as query
+// pools; shader modules and pipelines are made at the call. Frames run;
+// surfaces are refused as unsupported until their slice lands.
 
 #include "vulkan_device.h"
 
@@ -132,6 +131,10 @@ static void DestroyObjects(mrhiVulkanObjects* objects)
     {
         objects->api->vkDestroySampler(objects->device, objects->samplers[i], nullptr);
     }
+    for (uint32_t i = 0; i < objects->querySetSlots.capacity; ++i)
+    {
+        objects->api->vkDestroyQueryPool(objects->device, objects->querySets[i].pool, nullptr);
+    }
     for (uint32_t i = 0; i < objects->bufferSlots.capacity; ++i)
     {
         objects->api->vkDestroyBuffer(objects->device, objects->buffers[i].buffer, nullptr);
@@ -168,6 +171,18 @@ static void DestroySampler(void* self, uint64_t handle)
 {
     VulkanDevice* device = self;
     mrhiVulkanRetireLater(&device->frames, mrhiVulkanRetiredSampler, handle);
+}
+
+static mrhiResult CreateQuerySet(void* self, const mrhiQuerySetDef* def, uint64_t* handleOut)
+{
+    VulkanDevice* device = self;
+    return mrhiVulkanCreateQuerySet(&device->objects, def, handleOut);
+}
+
+static void DestroyQuerySet(void* self, uint64_t handle)
+{
+    VulkanDevice* device = self;
+    mrhiVulkanRetireLater(&device->frames, mrhiVulkanRetiredQuerySet, handle);
 }
 
 static mrhiResult CreateBuffer(void* self, const mrhiBufferDef* def, uint64_t* handleOut)
@@ -266,14 +281,6 @@ static mrhiResult RefuseSurface(void* self, uint64_t surface, const mrhiSurfaceC
     (void)config;
     (void)swapchainOut;
     MRHI_ASSERT(oldSwapchain == 0);
-    return mrhi_errorUnsupported;
-}
-
-static mrhiResult RefuseQuerySet(void* self, const mrhiQuerySetDef* def, uint64_t* handleOut)
-{
-    (void)self;
-    (void)def;
-    (void)handleOut;
     return mrhi_errorUnsupported;
 }
 
@@ -390,8 +397,8 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .lossReport = LossReport,
     .acquireImage = NeverAcquired,
     .releaseImage = NeverReleased,
-    .createQuerySet = RefuseQuerySet,
-    .destroyQuerySet = NeverDestroyed,
+    .createQuerySet = CreateQuerySet,
+    .destroyQuerySet = DestroyQuerySet,
     .timestampPeriod = TimestampPeriod,
     .importPipelineCache = ImportPipelineCache,
     .exportPipelineCache = ExportPipelineCache,
@@ -490,6 +497,7 @@ typedef struct Layout
     size_t textures;
     size_t views;
     size_t samplers;
+    size_t querySets;
     size_t shaders;
     size_t pipelines;
     size_t pending;
@@ -530,6 +538,8 @@ static Layout LayoutOf(const mrhiDeviceDef* def)
                                 alignof(mrhiVulkanTexture));
     at.views = mrhiLayoutAdd(layout, limits->views, sizeof(VkImageView), alignof(VkImageView));
     at.samplers = mrhiLayoutAdd(layout, limits->samplers, sizeof(VkSampler), alignof(VkSampler));
+    at.querySets = mrhiLayoutAdd(layout, limits->querySets, sizeof(mrhiVulkanQuerySet),
+                                 alignof(mrhiVulkanQuerySet));
     at.shaders =
         mrhiLayoutAdd(layout, limits->shaders, sizeof(VkShaderModule), alignof(VkShaderModule));
     at.pipelines = mrhiLayoutAdd(layout, limits->pipelines, sizeof(mrhiVulkanPipeline),
@@ -541,7 +551,7 @@ static Layout LayoutOf(const mrhiDeviceDef* def)
     at.constants =
         mrhiLayoutAdd(layout, 1, sizeof(mrhiVulkanConstants), alignof(mrhiVulkanConstants));
     size_t links = (size_t)limits->buffers + limits->textures + limits->views + limits->samplers +
-                   limits->shaders + limits->pipelines;
+                   limits->querySets + limits->shaders + limits->pipelines;
     at.slots = mrhiLayoutAdd(layout, links, sizeof(uint32_t), alignof(uint32_t));
     at.frames = mrhiLayoutAdd(layout, slots, sizeof(mrhiVulkanSlot), alignof(mrhiVulkanSlot));
     size_t transients = (size_t)slots * limits->frameResources;
@@ -556,8 +566,8 @@ static Layout LayoutOf(const mrhiDeviceDef* def)
                                   alignof(VkImageView));
     at.readbacks = mrhiLayoutAdd(layout, (size_t)slots * limits->readbacks, sizeof(mrhiVulkanRange),
                                  alignof(mrhiVulkanRange));
-    at.retireCount =
-        limits->buffers + limits->textures + limits->views + limits->samplers + limits->pipelines;
+    at.retireCount = limits->buffers + limits->textures + limits->views + limits->samplers +
+                     limits->querySets + limits->pipelines;
     at.retire =
         mrhiLayoutAdd(layout, at.retireCount, sizeof(mrhiVulkanRetire), alignof(mrhiVulkanRetire));
     return at;
@@ -583,6 +593,7 @@ static void PlaceTables(VulkanDevice* device, const Layout* at, const mrhiDevice
     objects->textures = (mrhiVulkanTexture*)(block + at->textures);
     objects->views = (VkImageView*)(block + at->views);
     objects->samplers = (VkSampler*)(block + at->samplers);
+    objects->querySets = (mrhiVulkanQuerySet*)(block + at->querySets);
     uint32_t* slots = (uint32_t*)(block + at->slots);
     mrhiVulkanSlotsInit(&objects->bufferSlots, slots, limits->buffers);
     slots += limits->buffers;
@@ -592,6 +603,8 @@ static void PlaceTables(VulkanDevice* device, const Layout* at, const mrhiDevice
     slots += limits->views;
     mrhiVulkanSlotsInit(&objects->samplerSlots, slots, limits->samplers);
     slots += limits->samplers;
+    mrhiVulkanSlotsInit(&objects->querySetSlots, slots, limits->querySets);
+    slots += limits->querySets;
     mrhiVulkanPipelines* pipelines = &device->pipelines;
     pipelines->api = &device->api;
     pipelines->device = device->device;
@@ -654,6 +667,7 @@ static bool WithRetiring(const mrhiDeviceDef* def, mrhiDeviceDef* heldOut)
            !ckd_mul(&limits->textures, limits->textures, 2u) &&
            !ckd_mul(&limits->views, limits->views, 2u) &&
            !ckd_mul(&limits->samplers, limits->samplers, 2u) &&
+           !ckd_mul(&limits->querySets, limits->querySets, 2u) &&
            !ckd_mul(&limits->pipelines, limits->pipelines, 2u);
 }
 

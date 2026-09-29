@@ -5,13 +5,14 @@
 // barriers, each state standing for a stage, an access and a layout,
 // then each kept pass's commands: pipelines, binding tables, the root
 // block, dynamic state, draws and dispatches in passes (vulkan_pass.c),
-// and copies, uploads and readbacks. Queries and surface images are
-// refused as unsupported until their slices land.
+// queries (vulkan_query.c), and copies, uploads and readbacks. Surface
+// images are refused as unsupported until their slice lands.
 
 #include "capabilities_core.h"
 #include "invariant.h"
 #include "vulkan_adapter.h"
 #include "vulkan_pass.h"
+#include "vulkan_query.h"
 
 #include "maul-rhi/encoder.h"
 
@@ -73,8 +74,8 @@ static const Use s_uses[] = {
                              VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
                                  VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
                              VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL},
-    [mrhi_stateQueryResolve] = {VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                                VK_IMAGE_LAYOUT_UNDEFINED},
+    [mrhi_stateQueryResolve] = {VK_PIPELINE_STAGE_2_COPY_BIT | VK_PIPELINE_STAGE_2_CLEAR_BIT,
+                                VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED},
     [mrhi_statePresent] = {VK_PIPELINE_STAGE_2_NONE, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR},
 };
 
@@ -442,13 +443,18 @@ static void RecordCommand(mrhiVulkanRecording* recording, const mrhiCommand* com
     case mrhiCommandCopyTexture:
         CopyTextures(recording, command);
         break;
+    case mrhiCommandBeginOcclusionQuery:
+    case mrhiCommandEndOcclusionQuery:
+    case mrhiCommandResolveQueries:
+        mrhiVulkanQuery(recording, command);
+        break;
     default:
         // Debug groups and markers wait for VK_EXT_debug_utils.
         break;
     }
 }
 
-// Whether this driver runs a frame: no surface images, no queries.
+// Whether this driver runs a frame: no surface images yet.
 static bool IsRunnable(const mrhiDriverFrame* frame)
 {
     for (uint32_t i = 0; i < frame->resourceCount; ++i)
@@ -456,26 +462,6 @@ static bool IsRunnable(const mrhiDriverFrame* frame)
         if (frame->resources[i].kind == mrhiDriverSurfaceImage && frame->resources[i].needed)
         {
             return false;
-        }
-    }
-    for (uint32_t p = 0; p < frame->passCount; ++p)
-    {
-        const mrhiDriverPass* pass = &frame->passes[p];
-        if (pass->occlusionSet != 0 || pass->timestampSet != 0)
-        {
-            return false;
-        }
-        for (uint32_t chunk = pass->firstChunk; chunk != 0; chunk = frame->chunks[chunk - 1].next)
-        {
-            const mrhiCommandChunk* at = &frame->chunks[chunk - 1];
-            for (uint32_t i = 0; i < at->count; i += 1u + at->commands[i].payload)
-            {
-                uint16_t type = at->commands[i].type;
-                if (type >= mrhiCommandBeginOcclusionQuery && type <= mrhiCommandResolveQueries)
-                {
-                    return false;
-                }
-            }
         }
     }
     return true;
@@ -492,13 +478,16 @@ mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
         .frames = frames,
         .slot = slot,
         .frame = frame,
+        .serial = frames->submitted + 1,
         .status = mrhi_success,
     };
+    mrhiVulkanResetQueries(&recording);
     size_t barrier = 0;
     for (uint32_t p = 0; p < frame->passCount && recording.status == mrhi_success; ++p)
     {
         recording.pass = &frame->passes[p];
         Barriers(&recording, &barrier, recording.pass->id);
+        mrhiVulkanPassTimestamp(&recording, false);
         mrhiVulkanBeginPass(&recording);
         for (uint32_t chunk = recording.pass->firstChunk; chunk != 0;
              chunk = frame->chunks[chunk - 1].next)
@@ -510,6 +499,7 @@ mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
             }
         }
         mrhiVulkanEndPass(&recording);
+        mrhiVulkanPassTimestamp(&recording, true);
     }
     Barriers(&recording, &barrier, (mrhiPassId){0});
     return recording.status;

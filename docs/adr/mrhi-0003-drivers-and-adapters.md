@@ -82,6 +82,13 @@ ids, requests, the frame graph) can be tested without a GPU.
   is reused, and each recorded binding carries its slot's kind so the
   driver knows the descriptor type without the reflection. The root
   block is pushed as constants to the pipeline's stages.
+- **Vulkan queries:** a query set is a query pool. Each set a frame
+  names is reset once before its first pass; a pass's timestamps are
+  written before and after it, and occlusion queries bracket draws. As
+  it records, the driver marks the queries the frame writes, and a
+  resolve copies those with their results awaited and fills the others
+  with 0, since Vulkan writes nothing for a query never written
+  (mrhi-0012).
 - **Conformance:** `test_conformance` runs the same checks through the
   public API on the test driver and on every native adapter, with a
   shader container made offline from `test/shaders/` by

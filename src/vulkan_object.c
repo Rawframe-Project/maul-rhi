@@ -254,3 +254,37 @@ void mrhiVulkanDestroySampler(mrhiVulkanObjects* objects, uint64_t handle)
     objects->samplers[handle - 1] = VK_NULL_HANDLE;
     mrhiVulkanGiveSlot(&objects->samplerSlots, handle);
 }
+
+mrhiResult mrhiVulkanCreateQuerySet(mrhiVulkanObjects* objects, const mrhiQuerySetDef* def,
+                                    uint64_t* handleOut)
+{
+    uint32_t handle = mrhiVulkanTakeSlot(&objects->querySetSlots);
+    if (handle == 0)
+    {
+        return mrhi_errorCapacity;
+    }
+    const VkQueryPoolCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+        .queryType =
+            def->type == mrhi_queryTimestamp ? VK_QUERY_TYPE_TIMESTAMP : VK_QUERY_TYPE_OCCLUSION,
+        .queryCount = def->count,
+    };
+    mrhiVulkanQuerySet* set = &objects->querySets[handle - 1];
+    *set = (mrhiVulkanQuerySet){.count = def->count};
+    VkResult result = objects->api->vkCreateQueryPool(objects->device, &info, nullptr, &set->pool);
+    if (result != VK_SUCCESS)
+    {
+        mrhiVulkanGiveSlot(&objects->querySetSlots, handle);
+        return StatusOf(result);
+    }
+    *handleOut = handle;
+    return mrhi_success;
+}
+
+void mrhiVulkanDestroyQuerySet(mrhiVulkanObjects* objects, uint64_t handle)
+{
+    mrhiVulkanQuerySet* set = &objects->querySets[handle - 1];
+    objects->api->vkDestroyQueryPool(objects->device, set->pool, nullptr);
+    set->pool = VK_NULL_HANDLE;
+    mrhiVulkanGiveSlot(&objects->querySetSlots, handle);
+}

@@ -15,6 +15,9 @@ typedef struct mrhiVulkanRecording
     mrhiVulkanFrames* frames;
     mrhiVulkanSlot* slot;
     const mrhiDriverFrame* frame;
+    // The frame's serial, and the occlusion query open in the pass.
+    uint64_t serial;
+    uint32_t openQuery;
     // The pass recording, and the pipeline it set last.
     const mrhiDriverPass* pass;
     const mrhiVulkanPipeline* pipeline;
