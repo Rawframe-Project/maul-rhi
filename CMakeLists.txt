@@ -47,6 +47,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/chain.c
     src/device.c
     src/frame.c
+    src/frame_resource.c
     src/driver.c
     src/generated/capabilities.c
     src/generated/defaults.c
@@ -86,6 +87,7 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(surface)
         maul_add_test(swapchain)
         maul_add_test(frame)
+        maul_add_test(frame_resource)
     endif()
     maul_add_header_tests()
 endif()

@@ -52,3 +52,7 @@ edit the contract, not this file.
 | `mrhiSubmitFrame` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiWaitFrame` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiNextDeviceNotification` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDeclareTexture` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDeclareBuffer` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiImportTexture` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiImportBuffer` | Safe from any thread; the device is used by one thread at a time. |

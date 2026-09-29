@@ -245,6 +245,10 @@ static void TestInvalidDefs(void)
     def.deviceLimits.surfaces = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no surfaces");
     def = Def(adapter);
+    def.deviceLimits.frameResources = 0;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
+          "no frame resources");
+    def = Def(adapter);
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def.next = &critical;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorUnsupported,
@@ -256,7 +260,7 @@ static void TestInvalidDefs(void)
     def.allocator.free = CountingFree;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
           "an allocator with one function");
-    CHECK(mrhiGetInstanceMisuse(instance) == 13, "each invalid call counted");
+    CHECK(mrhiGetInstanceMisuse(instance) == 14, "each invalid call counted");
     mrhiDestroyInstance(instance);
 }
 

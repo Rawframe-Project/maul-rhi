@@ -54,6 +54,8 @@ extern "C"
         uint32_t views;
         // Surfaces the device configures at once; 8 by default.
         uint32_t surfaces;
+        // Resources one frame declares and imports; 1024 by default.
+        uint32_t frameResources;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the

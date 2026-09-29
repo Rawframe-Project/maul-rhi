@@ -86,21 +86,26 @@ static bool FitsLimits(const mrhiTextureDef* def, const mrhiLimits* limits)
            def->depthOrLayers <= limits->textureArrayLayers;
 }
 
-// Whether the usages and sample count are well formed: known bits, a
-// transient texture only a render target, several samples only on a 2D
-// render target of one mip without storage.
+// Whether the sample count is 1, 2 or 4, several only on a 2D texture of
+// one mip.
+static bool AreSamplesValid(const mrhiTextureDef* def)
+{
+    bool samples = def->sampleCount == 1 || def->sampleCount == 2 || def->sampleCount == 4;
+    return samples &&
+           (def->sampleCount == 1 || (def->kind == mrhi_texture2d && def->mipLevels == 1));
+}
+
+// Whether the usages are well formed: known bits, a transient texture
+// only a render target, several samples only on a render target without
+// storage.
 static bool IsUsageValid(const mrhiTextureDef* def)
 {
     mrhiTextureUsage usage = def->usage;
     mrhiTextureUsage transient = mrhi_textureTransient | mrhi_textureRenderTarget;
     bool bits = usage != 0 && (usage & ~mrhiTextureUsageKnown) == 0 &&
                 ((usage & mrhi_textureTransient) == 0 || usage == transient);
-    bool samples = def->sampleCount == 1 || def->sampleCount == 2 || def->sampleCount == 4;
-    bool multisampled = def->sampleCount > 1;
-    bool single = !multisampled ||
-                  (def->kind == mrhi_texture2d && def->mipLevels == 1 &&
-                   (usage & mrhi_textureRenderTarget) != 0 && (usage & mrhi_textureStorage) == 0);
-    return bits && samples && single;
+    return bits && (def->sampleCount == 1 || ((usage & mrhi_textureRenderTarget) != 0 &&
+                                              (usage & mrhi_textureStorage) == 0));
 }
 
 // Whether every view format is unused or the format's twin.
@@ -136,22 +141,47 @@ static bool IsGranted(const mrhiDevice* device, const mrhiTextureDef* def)
            (caps->sampleCounts & def->sampleCount) != 0;
 }
 
-// Checks a def on a live device: success, or the refusal.
-static mrhiResult CheckTexture(mrhiDevice* device, const mrhiTextureDef* def)
+mrhiResult mrhiCheckTextureShape(mrhiDevice* device, const mrhiTextureDef* def)
 {
     mrhiResult status = mrhiCheckObjectDef(device, MRHI_DEF_HEAD(def), TEXTURE_DEF_COOKIE);
     if (status != mrhi_success)
     {
         return status;
     }
-    if (!mrhiIsFormatKnown(def->format) || !IsShapeValid(def) || !IsUsageValid(def) ||
+    if (!mrhiIsFormatKnown(def->format) || !IsShapeValid(def) || !AreSamplesValid(def) ||
         !AreViewFormatsValid(def))
     {
         return mrhiDeviceMisuse(device);
     }
-    if (!FitsLimits(def, &device->limits) || !IsGranted(device, def))
+    if (!FitsLimits(def, &device->limits) ||
+        !mrhiFormatFamilyGranted(def->format, &device->features))
     {
         return mrhi_errorUnsupported;
+    }
+    return mrhi_success;
+}
+
+mrhiResult mrhiCheckTextureUsage(mrhiDevice* device, const mrhiTextureDef* def)
+{
+    if (!IsUsageValid(def))
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    return IsGranted(device, def) ? mrhi_success : mrhi_errorUnsupported;
+}
+
+// Checks a def on a live device: success, or the refusal.
+static mrhiResult CheckTexture(mrhiDevice* device, const mrhiTextureDef* def)
+{
+    mrhiResult status = mrhiCheckTextureShape(device, def);
+    if (status != mrhi_success)
+    {
+        return status;
+    }
+    status = mrhiCheckTextureUsage(device, def);
+    if (status != mrhi_success)
+    {
+        return status;
     }
     return mrhiDeviceUsable(device);
 }

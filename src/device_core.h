@@ -13,12 +13,21 @@
 
 #include "maul-rhi/device.h"
 
+// Where a device texture or buffer was imported: the frame's serial and
+// the frame's slot for it.
+typedef struct mrhiImport
+{
+    uint32_t frame;
+    uint32_t resource;
+} mrhiImport;
+
 // A buffer as its device keeps it.
 typedef struct mrhiBufferSlot
 {
     uint64_t handle;
     uint64_t size;
     mrhiBufferUsage usage;
+    mrhiImport import;
 } mrhiBufferSlot;
 
 // A texture as its device keeps it: its def (without its chain), its
@@ -28,6 +37,7 @@ typedef struct mrhiTextureSlot
     uint64_t handle;
     mrhiTextureDef def;
     uint32_t firstView;
+    mrhiImport import;
 } mrhiTextureSlot;
 
 // A view as its device keeps it: its resolved def (without its chain),
@@ -41,6 +51,27 @@ typedef struct mrhiViewSlot
     uint32_t previous;
     uint32_t next;
 } mrhiViewSlot;
+
+// What a frame resource is.
+typedef enum mrhiFrameResourceKind
+{
+    mrhiFrameTexture,
+    mrhiFrameBuffer,
+    mrhiImportedTexture,
+    mrhiImportedBuffer,
+} mrhiFrameResourceKind;
+
+// A resource of the open frame: a declared texture's def or buffer's
+// size (without their chains and labels), or the id of an imported
+// device texture or buffer.
+typedef struct mrhiFrameResource
+{
+    mrhiFrameResourceKind kind;
+    mrhiTextureDef texture;
+    uint64_t size;
+    uint32_t index1;
+    uint32_t generation;
+} mrhiFrameResource;
 
 // A surface as the device that configured it keeps it: the surface, the
 // driver's swapchain handle, and the configuration (without its chain).
@@ -81,9 +112,13 @@ struct mrhiDevice
     // The surfaces it configured.
     mrhiPool swapchains;
     mrhiSwapchainSlot* swapchainSlots;
-    // Frames: whether one is open, the last token given, and the tokens
-    // of the frames the GPU has not finished, at most framesInFlight.
+    // Frames: whether one is open and its serial, never 0, its resources,
+    // the last token given, and the tokens of the frames the GPU has not
+    // finished, at most framesInFlight.
     bool frameOpen;
+    uint32_t frameSerial;
+    mrhiFrameResource* frameResources;
+    uint32_t frameResourceCount;
     uint32_t lastToken;
     uint32_t* running;
     uint32_t runningCount;
@@ -119,6 +154,19 @@ typedef struct mrhiDefHead
 // Checks an object def's cookie, extension chain and label on a live
 // device: success, or the refusal (invalid input counted as misuse).
 mrhiResult mrhiCheckObjectDef(mrhiDevice* device, mrhiDefHead head, uint32_t expected);
+
+// Checks what a texture def says of its shape on a live device (its
+// cookie, chain and label, format, size, layers, mips, samples and view
+// formats): success, or the refusal, invalid input counted as misuse.
+mrhiResult mrhiCheckTextureShape(mrhiDevice* device, const mrhiTextureDef* def);
+
+// Checks what a buffer def says of its shape on a live device (its
+// cookie, chain and label, and size): success, or the refusal.
+mrhiResult mrhiCheckBufferShape(mrhiDevice* device, const mrhiBufferDef* def);
+
+// Checks a texture def's usages, and that its format takes them and its
+// sample count on the device: success, or the refusal.
+mrhiResult mrhiCheckTextureUsage(mrhiDevice* device, const mrhiTextureDef* def);
 
 // Whether a format can take the usages on the device.
 bool mrhiFormatTakes(const mrhiDevice* device, mrhiFormat format, mrhiTextureUsage usage);

@@ -122,6 +122,84 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult
     mrhiNextDeviceNotification(mrhiDevice* device, mrhiDeviceNotification* notificationOut);
 
+    // A resource of the open frame: a declared texture or buffer, or an
+    // imported one. It ends with the frame.
+    typedef struct mrhiResourceId
+    {
+        uint32_t index1;
+        uint32_t generation;
+    } mrhiResourceId;
+
+    /// Declares a texture the open frame's graph makes, aliases and ends with
+    /// the frame. Its usages are derived from the passes that use it, and
+    /// checked against its format when the frame is compiled.
+    ///
+    /// @param device       The device.
+    /// @param def          The texture, with a usage of 0.
+    /// @param resourceOut  Receives the frame's id for it.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
+    /// without its cookie, a label that is not UTF-8 without NUL within
+    /// MRHI_LABEL_BYTES, a usage other than 0, or a shape mrhiCreateTexture
+    /// refuses as invalid; `mrhi_errorUnsupported` for a size past the device's
+    /// limits, a compressed format without its feature, or a critical extension
+    /// the library does not know; `mrhi_errorState` for a device without an
+    /// open frame; `mrhi_errorCapacity` when the device's frameResources limit
+    /// is reached.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDeclareTexture(mrhiDevice* device,
+                                                          const mrhiTextureDef* def,
+                                                          mrhiResourceId* resourceOut);
+
+    /// Declares a buffer the open frame's graph makes, aliases and ends with
+    /// the frame. Its usages are derived from the passes that use it.
+    ///
+    /// @param device       The device.
+    /// @param def          The buffer, with a usage of 0.
+    /// @param resourceOut  Receives the frame's id for it.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
+    /// without its cookie, a label that is not UTF-8 without NUL within
+    /// MRHI_LABEL_BYTES, a usage other than 0, or a size that is zero or not a
+    /// multiple of 4; `mrhi_errorUnsupported` for a size past the device's
+    /// bufferBytes, or a critical extension the library does not know;
+    /// `mrhi_errorState` for a device without an open frame;
+    /// `mrhi_errorCapacity` when the device's frameResources limit is reached.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDeclareBuffer(mrhiDevice* device,
+                                                         const mrhiBufferDef* def,
+                                                         mrhiResourceId* resourceOut);
+
+    /// Brings a device texture into the open frame, whose graph tracks it and
+    /// never aliases it. Importing it again returns the same id.
+    ///
+    /// @param device       The device.
+    /// @param texture      The texture.
+    /// @param resourceOut  Receives the frame's id for it.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
+    /// `mrhi_errorStale` for a texture the device no longer has;
+    /// `mrhi_errorState` for a device without an open frame;
+    /// `mrhi_errorCapacity` when the device's frameResources limit is reached.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiImportTexture(mrhiDevice* device, mrhiTextureId texture,
+                                                         mrhiResourceId* resourceOut);
+
+    /// Brings a device buffer into the open frame, whose graph tracks it and
+    /// never aliases it. Importing it again returns the same id.
+    ///
+    /// @param device       The device.
+    /// @param buffer       The buffer.
+    /// @param resourceOut  Receives the frame's id for it.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
+    /// `mrhi_errorStale` for a buffer the device no longer has;
+    /// `mrhi_errorState` for a device without an open frame;
+    /// `mrhi_errorCapacity` when the device's frameResources limit is reached.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer,
+                                                        mrhiResourceId* resourceOut);
+
 #ifdef __cplusplus
 }
 #endif

@@ -28,6 +28,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.textures = 4096;
     def.deviceLimits.views = 8192;
     def.deviceLimits.surfaces = 8;
+    def.deviceLimits.frameResources = 1024;
     return def;
 }
 
@@ -41,9 +42,9 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
     if (def->cookie != DEVICE_DEF_COOKIE || def->deviceLimits.notifications == 0 ||
         def->deviceLimits.samplers == 0 || def->deviceLimits.buffers == 0 ||
         def->deviceLimits.textures == 0 || def->deviceLimits.views == 0 ||
-        def->deviceLimits.surfaces == 0 || !mrhiIsLabelValid(def->label, def->labelLength) ||
-        !mrhiIsAllocatorValid(&def->allocator) || !mrhiLimitsWithin(&floor, &def->limits) ||
-        chain == mrhi_errorInvalid)
+        def->deviceLimits.surfaces == 0 || def->deviceLimits.frameResources == 0 ||
+        !mrhiIsLabelValid(def->label, def->labelLength) || !mrhiIsAllocatorValid(&def->allocator) ||
+        !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
     {
         *statusOut = mrhiMisuse(instance);
         return nullptr;
@@ -116,6 +117,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
         AddTable(&layout, limits->surfaces, sizeof(mrhiSwapchainSlot), alignof(mrhiSwapchainSlot));
     size_t runningAt =
         mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
+    size_t resourcesAt = mrhiLayoutAdd(&layout, limits->frameResources, sizeof(mrhiFrameResource),
+                                       alignof(mrhiFrameResource));
     size_t queueAt = mrhiLayoutAdd(&layout, limits->notifications, sizeof(mrhiDeviceNotification),
                                    alignof(mrhiDeviceNotification));
     unsigned char* block =
@@ -133,6 +136,7 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     device->swapchainSlots = InitTable(block, swapchains, &device->swapchains, limits->surfaces);
     device->running = (uint32_t*)(block + runningAt);
     device->queue = (mrhiDeviceNotification*)(block + queueAt);
+    device->frameResources = (mrhiFrameResource*)(block + resourcesAt);
     return device;
 }
 

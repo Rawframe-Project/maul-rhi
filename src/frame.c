@@ -87,6 +87,8 @@ mrhiResult mrhiBeginFrame(mrhiDevice* device, const mrhiFrameDef* def)
         return mrhi_errorCapacity;
     }
     device->frameOpen = true;
+    device->frameSerial = device->frameSerial == UINT32_MAX ? 1 : device->frameSerial + 1;
+    device->frameResourceCount = 0;
     return mrhi_success;
 }
 

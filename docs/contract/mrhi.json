@@ -4865,6 +4865,11 @@
               "name": "surfaces",
               "type": "uint32",
               "doc": "Surfaces the device configures at once; 8 by default."
+            },
+            {
+              "name": "frame_resources",
+              "type": "uint32",
+              "doc": "Resources one frame declares and imports; 1024 by default."
             }
           ]
         },
@@ -8374,6 +8379,141 @@
               "type": "struct.device_notification",
               "pointer": "mutable",
               "doc": "Receives the record."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "id",
+          "name": "resource_id",
+          "doc": "A resource of the open frame: a declared texture or buffer, or an imported one. It ends with the frame."
+        },
+        {
+          "kind": "function",
+          "name": "declare_texture",
+          "doc": "Declares a texture the open frame's graph makes, aliases and ends with the frame. Its usages are derived from the passes that use it, and checked against its format when the frame is compiled.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a usage other than 0, or a shape mrhiCreateTexture refuses as invalid; `mrhi_errorUnsupported` for a size past the device's limits, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's frameResources limit is reached."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "def",
+              "type": "struct.texture_def",
+              "pointer": "const",
+              "doc": "The texture, with a usage of 0."
+            },
+            {
+              "name": "resource_out",
+              "type": "id.resource_id",
+              "pointer": "mutable",
+              "doc": "Receives the frame's id for it."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "declare_buffer",
+          "doc": "Declares a buffer the open frame's graph makes, aliases and ends with the frame. Its usages are derived from the passes that use it.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a usage other than 0, or a size that is zero or not a multiple of 4; `mrhi_errorUnsupported` for a size past the device's bufferBytes, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's frameResources limit is reached."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "def",
+              "type": "struct.buffer_def",
+              "pointer": "const",
+              "doc": "The buffer, with a usage of 0."
+            },
+            {
+              "name": "resource_out",
+              "type": "id.resource_id",
+              "pointer": "mutable",
+              "doc": "Receives the frame's id for it."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "import_texture",
+          "doc": "Brings a device texture into the open frame, whose graph tracks it and never aliases it. Importing it again returns the same id.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorStale` for a texture the device no longer has; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's frameResources limit is reached."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "texture",
+              "type": "id.texture_id",
+              "doc": "The texture."
+            },
+            {
+              "name": "resource_out",
+              "type": "id.resource_id",
+              "pointer": "mutable",
+              "doc": "Receives the frame's id for it."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "import_buffer",
+          "doc": "Brings a device buffer into the open frame, whose graph tracks it and never aliases it. Importing it again returns the same id.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorStale` for a buffer the device no longer has; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's frameResources limit is reached."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "buffer",
+              "type": "id.buffer_id",
+              "doc": "The buffer."
+            },
+            {
+              "name": "resource_out",
+              "type": "id.resource_id",
+              "pointer": "mutable",
+              "doc": "Receives the frame's id for it."
             }
           ],
           "thread_safety": {

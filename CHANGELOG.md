@@ -104,3 +104,9 @@ format.
   `framesInFlight` refuses a new frame until one finishes. The test
   adapter can hold frames (`holdFrames`) and fail them
   (`frameOutcome`).
+- Frame resources: `mrhiDeclareTexture` and `mrhiDeclareBuffer` for
+  what the graph makes, checked as their device objects are but with
+  usages left to the passes, and `mrhiImportTexture` and
+  `mrhiImportBuffer` for device objects, one id per frame; frame-local
+  `mrhiResourceId`s that end with their frame; the device's
+  `frameResources` limit.

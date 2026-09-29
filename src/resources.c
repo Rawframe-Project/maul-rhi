@@ -112,6 +112,20 @@ mrhiBufferDef mrhiDefaultBufferDef(void)
     return def;
 }
 
+mrhiResult mrhiCheckBufferShape(mrhiDevice* device, const mrhiBufferDef* def)
+{
+    mrhiResult status = mrhiCheckObjectDef(device, MRHI_DEF_HEAD(def), BUFFER_DEF_COOKIE);
+    if (status != mrhi_success)
+    {
+        return status;
+    }
+    if (def->size == 0 || def->size % 4 != 0)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    return def->size > device->limits.bufferBytes ? mrhi_errorUnsupported : mrhi_success;
+}
+
 mrhiResult mrhiCreateBuffer(mrhiDevice* device, const mrhiBufferDef* def, mrhiBufferId* bufferOut)
 {
     if (device == nullptr)
@@ -122,19 +136,14 @@ mrhiResult mrhiCreateBuffer(mrhiDevice* device, const mrhiBufferDef* def, mrhiBu
     {
         return mrhiDeviceMisuse(device);
     }
-    mrhiResult status = mrhiCheckObjectDef(device, MRHI_DEF_HEAD(def), BUFFER_DEF_COOKIE);
+    mrhiResult status = mrhiCheckBufferShape(device, def);
     if (status != mrhi_success)
     {
         return status;
     }
-    if (def->size == 0 || def->size % 4 != 0 || def->usage == 0 ||
-        (def->usage & ~mrhiBufferUsageKnown) != 0)
+    if (def->usage == 0 || (def->usage & ~mrhiBufferUsageKnown) != 0)
     {
         return mrhiDeviceMisuse(device);
-    }
-    if (def->size > device->limits.bufferBytes)
-    {
-        return mrhi_errorUnsupported;
     }
     status = mrhiDeviceUsable(device);
     if (status != mrhi_success)
