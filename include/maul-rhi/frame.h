@@ -250,6 +250,8 @@ extern "C"
         mrhi_accessCopySource = 8,
         // Copied to.
         mrhi_accessCopyDestination = 9,
+        // Written with query results, by a graphics pass without targets.
+        mrhi_accessQueryResolve = 10,
     };
 
     // What a target holds when its pass begins.
@@ -519,6 +521,8 @@ extern "C"
         mrhi_stateDepthTarget = 13,
         // Depth-tested without writing, and perhaps sampled.
         mrhi_stateDepthRead = 14,
+        // Written with query results.
+        mrhi_stateQueryResolve = 15,
     };
 
     // A transition a compiled frame makes: a part of a resource, from one state

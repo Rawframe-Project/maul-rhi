@@ -219,3 +219,7 @@ format.
   (`timestampBegin`, `timestampEnd`, `MRHI_NO_QUERY` for none), each
   written at most once a frame; `mrhiGetDeviceTimestampPeriod` reads
   the nanoseconds per tick.
+- Resolving queries: `mrhiResolveQueries` writes a set's queries as
+  64-bit values into a buffer a graphics pass without targets declares
+  with the new query resolve access (`mrhi_accessQueryResolve`, leaving
+  `mrhi_stateQueryResolve`), at a 256-byte boundary.

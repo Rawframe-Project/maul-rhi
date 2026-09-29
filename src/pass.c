@@ -85,6 +85,8 @@ static uint32_t UsageOf(uint8_t use, bool buffer)
         return buffer ? mrhi_bufferCopySource : mrhi_textureCopySource;
     case mrhi_accessCopyDestination:
         return buffer ? mrhi_bufferCopyDestination : mrhi_textureCopyDestination;
+    case mrhi_accessQueryResolve:
+        return mrhi_bufferQueryResolve;
     default:
         return mrhi_textureRenderTarget;
     }
@@ -120,11 +122,14 @@ static bool IsKindAllowed(mrhiAccessKind kind, bool buffer, mrhiPassClass passCl
 {
     bool textureOnly = kind == mrhi_accessSampled;
     bool bufferOnly = kind == mrhi_accessUniform || kind == mrhi_accessVertex ||
-                      kind == mrhi_accessIndex || kind == mrhi_accessIndirect;
+                      kind == mrhi_accessIndex || kind == mrhi_accessIndirect ||
+                      kind == mrhi_accessQueryResolve;
     bool copy = kind == mrhi_accessCopySource || kind == mrhi_accessCopyDestination;
-    bool geometry = kind == mrhi_accessVertex || kind == mrhi_accessIndex;
+    // Queries are resolved only in graphics passes (mrhi-0012).
+    bool graphicsOnly =
+        kind == mrhi_accessVertex || kind == mrhi_accessIndex || kind == mrhi_accessQueryResolve;
     bool classOk = passClass == mrhi_passGraphics ||
-                   (passClass == mrhi_passAsyncCompute && !geometry) ||
+                   (passClass == mrhi_passAsyncCompute && !graphicsOnly) ||
                    (passClass == mrhi_passTransfer && copy);
     return classOk && !(buffer ? textureOnly : bufferOnly);
 }
@@ -151,20 +156,22 @@ static mrhiResult UseOfAccess(const mrhiDevice* device, const mrhiAccess* access
     }
     const mrhiFrameResource* resource = &device->frameResources[slot - 1];
     mrhiAccessKind kind = access->kind;
-    if (kind > mrhi_accessCopyDestination || !IsKindAllowed(kind, IsBuffer(resource), passClass) ||
+    if (kind > mrhi_accessQueryResolve || !IsKindAllowed(kind, IsBuffer(resource), passClass) ||
         !IsUsageMade(device, resource, kind))
     {
         return mrhi_errorInvalid;
     }
-    bool writes = kind == mrhi_accessStorageWrite || kind == mrhi_accessStorageReadWrite ||
-                  kind == mrhi_accessCopyDestination;
+    bool overwrites = kind == mrhi_accessStorageWrite || kind == mrhi_accessCopyDestination ||
+                      kind == mrhi_accessQueryResolve;
+    // The states follow the kinds up to the targets' states.
     *useOut = (mrhiFrameUse){
         .resource = slot,
         .use = kind,
-        .state = (mrhiResourceState)(kind + 1),
+        .state = kind == mrhi_accessQueryResolve ? mrhi_stateQueryResolve
+                                                 : (mrhiResourceState)(kind + 1),
         .planes = 1,
-        .reads = kind != mrhi_accessStorageWrite && kind != mrhi_accessCopyDestination,
-        .writes = writes,
+        .reads = !overwrites,
+        .writes = overwrites || kind == mrhi_accessStorageReadWrite,
         .mipCount = 1,
         .layerCount = 1,
     };

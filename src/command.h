@@ -53,6 +53,10 @@ typedef enum mrhiCommandType
     // a: the query set's driver handle; b: the query.
     mrhiCommandBeginOcclusionQuery,
     mrhiCommandEndOcclusionQuery,
+    // a: the query set's driver handle; b: the first query, and the count
+    // in the upper half; c: the frame resource's slot plus one; d: the
+    // offset.
+    mrhiCommandResolveQueries,
     // b, c, d: the width (the bytes of a copy between buffers), height
     // and depth or layers; the source's and destination's sides follow,
     // an mrhiCommandBufferSide or mrhiCommandTextureSide each.

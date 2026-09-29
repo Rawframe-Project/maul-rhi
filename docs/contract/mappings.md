@@ -376,6 +376,7 @@ restricted or absent-rejected, with how.
 | `mrhi_accessStorageReadWrite` | direct: SHADER_STORAGE_READ and WRITE | direct: UNORDERED_ACCESS | direct: a read and written resource | direct: STORAGE, read-write |
 | `mrhi_accessCopySource` | direct: TRANSFER_READ, TRANSFER_SRC_OPTIMAL | direct: COPY_SOURCE | direct: a blit source | direct: COPY_SRC |
 | `mrhi_accessCopyDestination` | direct: TRANSFER_WRITE, TRANSFER_DST_OPTIMAL | direct: COPY_DEST | direct: a blit destination | direct: COPY_DST |
+| `mrhi_accessQueryResolve` | direct: TRANSFER_WRITE, from vkCmdCopyQueryPoolResults | direct: COPY_DEST, from ResolveQueryData | direct: a blit destination, from resolveCounters or a visibility buffer copy | direct: QUERY_RESOLVE, from resolveQuerySet |
 
 ## mrhiLoadOp
 
@@ -411,6 +412,7 @@ restricted or absent-rejected, with how.
 | `mrhi_stateResolve` | direct: COLOR_ATTACHMENT_OPTIMAL, as a resolve attachment | direct: RESOLVE_DEST | direct: tracked by Metal on the resource | direct: implicit between passes |
 | `mrhi_stateDepthTarget` | direct: DEPTH_STENCIL_ATTACHMENT_OPTIMAL | direct: DEPTH_STENCIL_WRITE | direct: tracked by Metal on the resource | direct: implicit between passes |
 | `mrhi_stateDepthRead` | direct: DEPTH_STENCIL_READ_ONLY_OPTIMAL | direct: DEPTH_STENCIL_READ | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateQueryResolve` | direct: TRANSFER_WRITE | direct: COPY_DEST | direct: tracked by Metal on the resource | direct: implicit between passes |
 
 ## mrhiShaderStages
 

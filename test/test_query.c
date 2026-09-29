@@ -183,6 +183,8 @@ static void TestDriverFailure(void)
 
 static mrhiDevice* s_device;
 static mrhiTextureId s_target;
+static mrhiBufferId s_results;
+static mrhiResourceId s_r;
 static mrhiPassId s_render;
 static mrhiPassId s_compute;
 
@@ -201,6 +203,10 @@ static void OpenFrames(uint32_t commandBytes)
     textureDef.height = 16;
     textureDef.usage = mrhi_textureRenderTarget;
     CHECK(mrhiCreateTexture(s_device, &textureDef, &s_target) == mrhi_success, "a target");
+    mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
+    bufferDef.size = 1024;
+    bufferDef.usage = mrhi_bufferQueryResolve | mrhi_bufferCopySource;
+    CHECK(mrhiCreateBuffer(s_device, &bufferDef, &s_results) == mrhi_success, "a results buffer");
 }
 
 static mrhiQuerySetId MakeSet(mrhiQueryType type, uint32_t count)
@@ -221,24 +227,28 @@ static mrhiPassDef RenderDef(mrhiResourceId target, mrhiQuerySetId set)
     return def;
 }
 
-// Begins a frame and imports the target.
+// Begins a frame and imports the target and the results buffer.
 static mrhiResourceId BeginFrame(void)
 {
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
     CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     mrhiResourceId target = {0};
-    CHECK(mrhiImportTexture(s_device, s_target, &target) == mrhi_success, "imported");
+    CHECK(mrhiImportTexture(s_device, s_target, &target) == mrhi_success &&
+              mrhiImportBuffer(s_device, s_results, &s_r) == mrhi_success,
+          "imported");
     return target;
 }
 
-// Opens a frame of a render pass naming a set and a compute pass,
-// compiled and begun.
+// Opens a frame of a render pass naming a set and a graphics pass without
+// targets resolving into the results buffer, compiled and begun.
 static void Frame(mrhiQuerySetId set)
 {
     mrhiPassDef def = RenderDef(BeginFrame(), set);
     CHECK(mrhiAddPass(s_device, &def, &s_render) == mrhi_success, "the render pass");
+    mrhiAccess results = {.resource = s_r, .kind = mrhi_accessQueryResolve};
     def = mrhiDefaultPassDef();
-    def.neverCull = true;
+    def.accesses = &results;
+    def.accessCount = 1;
     CHECK(mrhiAddPass(s_device, &def, &s_compute) == mrhi_success, "the compute pass");
     CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
@@ -483,6 +493,168 @@ static void TestPeriod(void)
     Close(device);
 }
 
+static void TestResolveAccess(void)
+{
+    OpenFrames(1u << 20);
+    mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
+    bufferDef.size = 256;
+    bufferDef.usage = mrhi_bufferCopyDestination;
+    mrhiBufferId plain;
+    CHECK(mrhiCreateBuffer(s_device, &bufferDef, &plain) == mrhi_success, "a copy buffer");
+    mrhiResourceId target = BeginFrame();
+    mrhiResourceId imported = {0};
+    mrhiResourceId declared = {0};
+    bufferDef.usage = 0;
+    CHECK(mrhiImportBuffer(s_device, plain, &imported) == mrhi_success &&
+              mrhiDeclareBuffer(s_device, &bufferDef, &declared) == mrhi_success,
+          "buffers");
+    mrhiAccess access = {.resource = declared, .kind = mrhi_accessQueryResolve};
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.accesses = &access;
+    def.accessCount = 1;
+    mrhiPassId resolving;
+    CHECK(mrhiAddPass(s_device, &def, &resolving) == mrhi_success, "a transient written");
+    access.kind = mrhi_accessCopySource;
+    def.neverCull = true;
+    mrhiPassId reading;
+    CHECK(mrhiAddPass(s_device, &def, &reading) == mrhi_success, "and read");
+    access.kind = mrhi_accessQueryResolve;
+    def.passClass = mrhi_passAsyncCompute;
+    mrhiPassId refused;
+    CHECK(mrhiAddPass(s_device, &def, &refused) == mrhi_errorInvalid, "async compute");
+    def.passClass = mrhi_passTransfer;
+    CHECK(mrhiAddPass(s_device, &def, &refused) == mrhi_errorInvalid, "a transfer pass");
+    def.passClass = mrhi_passGraphics;
+    access.resource = target;
+    CHECK(mrhiAddPass(s_device, &def, &refused) == mrhi_errorInvalid, "a texture");
+    mrhiTextureDef textureDef = mrhiDefaultTextureDef();
+    textureDef.format = mrhi_formatRgba8Unorm;
+    textureDef.width = 4;
+    textureDef.height = 4;
+    CHECK(mrhiDeclareTexture(s_device, &textureDef, &access.resource) == mrhi_success,
+          "a transient texture");
+    access.range = (mrhiTextureRange){.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING};
+    CHECK(mrhiAddPass(s_device, &def, &refused) == mrhi_errorInvalid, "a transient texture");
+    access.resource = imported;
+    CHECK(mrhiAddPass(s_device, &def, &refused) == mrhi_errorInvalid, "a buffer made without it");
+    access.kind = 11;
+    access.resource = declared;
+    CHECK(mrhiAddPass(s_device, &def, &refused) == mrhi_errorInvalid, "a kind past it");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 6, "each counted");
+    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    mrhiResourcePlan plan;
+    CHECK(mrhiGetResourcePlan(s_device, declared, &plan) == mrhi_success &&
+              plan.usage == (mrhi_bufferQueryResolve | mrhi_bufferCopySource),
+          "the transient's usage");
+    mrhiBarrier barriers[8];
+    size_t count = 0;
+    CHECK(mrhiGetFrameBarriers(s_device, barriers, 8, &count) == mrhi_success, "barriers");
+    bool found = false;
+    for (size_t i = 0; i < count; ++i)
+    {
+        found = found || (barriers[i].resource.index1 == declared.index1 &&
+                          barriers[i].before == mrhi_stateQueryResolve &&
+                          barriers[i].after == mrhi_stateCopySource);
+    }
+    CHECK(found, "a barrier from the resolve to the read");
+    Drop();
+    Close(s_device);
+}
+
+static void TestResolve(void)
+{
+    OpenFrames(1u << 20);
+    mrhiQuerySetId other = MakeSet(mrhi_queryOcclusion, 8);
+    mrhiQuerySetId set = MakeSet(mrhi_queryOcclusion, 64);
+    Frame(set);
+    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 64, s_r, 0) == mrhi_success,
+          "every query");
+    const mrhiCommand* command = Nth(s_compute, 0);
+    CHECK(command != nullptr && command->type == mrhiCommandResolveQueries &&
+              command->a == s_device->querySetSlots[set.index1 - 1].handle &&
+              command->b == 0 + (64ull << 32) && command->c == s_r.index1 && command->d == 0,
+          "recorded");
+    CHECK(mrhiResolveQueries(s_device, s_compute, set, 63, 1, s_r, 768) == mrhi_success,
+          "the last into the last 256 bytes");
+    command = Nth(s_compute, 1);
+    CHECK(command != nullptr && command->b == 63 + (1ull << 32) && command->d == 768,
+          "recorded with its first query and offset");
+    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 32, s_r, 768) == mrhi_success &&
+              mrhiResolveQueries(s_device, s_compute, set, 0, 0, s_r, 1024) == mrhi_success,
+          "the buffer's end");
+    CHECK(mrhiResolveQueries(s_device, s_compute, other, 0, 8, s_r, 0) == mrhi_success,
+          "another set");
+    uint32_t misuse = 0;
+    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 33, s_r, 768) == mrhi_errorInvalid,
+          "a value past the buffer");
+    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 0, s_r, 1280) == mrhi_errorInvalid,
+          "an offset past it");
+    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 1, s_r, 128) == mrhi_errorInvalid,
+          "an offset off 256");
+    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 65, s_r, 0) == mrhi_errorInvalid &&
+              mrhiResolveQueries(s_device, s_compute, set, 60, 5, s_r, 0) == mrhi_errorInvalid &&
+              mrhiResolveQueries(s_device, s_compute, set, 1, UINT32_MAX, s_r, 0) ==
+                  mrhi_errorInvalid,
+          "queries past the set");
+    CHECK(mrhiResolveQueries(s_device, s_compute, set, 64, 0, s_r, 0) == mrhi_errorInvalid,
+          "a first query at its end");
+    CHECK(mrhiResolveQueries(s_device, s_render, set, 0, 1, s_r, 0) == mrhi_errorInvalid,
+          "a pass with targets");
+    misuse += 8;
+    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "each counted");
+    CHECK(mrhiDestroyQuerySet(s_device, other) == mrhi_success &&
+              mrhiResolveQueries(s_device, s_compute, other, 0, 1, s_r, 0) == mrhi_errorStale,
+          "a destroyed set");
+    mrhiResourceId none = {0};
+    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 1, none, 0) == mrhi_errorStale,
+          "no resource");
+    CHECK(mrhiResolveQueries(nullptr, s_compute, set, 0, 1, s_r, 0) == mrhi_errorInvalid,
+          "no device");
+    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "none counted");
+    CHECK(mrhiEndPass(s_device, s_compute) == mrhi_success &&
+              mrhiResolveQueries(s_device, s_compute, set, 0, 1, s_r, 0) == mrhi_errorState,
+          "not recording");
+    Drop();
+    // A pass that does not declare the buffer, one of async compute, and
+    // a render pass that does.
+    mrhiResourceId target = BeginFrame();
+    mrhiAccess resolved = {.resource = s_r, .kind = mrhi_accessQueryResolve};
+    mrhiPassDef def = RenderDef(target, (mrhiQuerySetId){0});
+    def.accesses = &resolved;
+    def.accessCount = 1;
+    mrhiPassId drawing;
+    CHECK(mrhiAddPass(s_device, &def, &drawing) == mrhi_success, "a render pass declaring it");
+    def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    mrhiPassId bare;
+    CHECK(mrhiAddPass(s_device, &def, &bare) == mrhi_success, "a pass declaring nothing");
+    mrhiAccess copy = {.resource = s_r, .kind = mrhi_accessCopySource};
+    def.accesses = &copy;
+    def.accessCount = 1;
+    mrhiPassId copying;
+    CHECK(mrhiAddPass(s_device, &def, &copying) == mrhi_success, "one reading it");
+    def.passClass = mrhi_passAsyncCompute;
+    def.accessCount = 0;
+    mrhiPassId async;
+    CHECK(mrhiAddPass(s_device, &def, &async) == mrhi_success, "an async compute pass");
+    CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
+              mrhiBeginPass(s_device, bare) == mrhi_success &&
+              mrhiBeginPass(s_device, drawing) == mrhi_success &&
+              mrhiBeginPass(s_device, copying) == mrhi_success &&
+              mrhiBeginPass(s_device, async) == mrhi_success,
+          "begun");
+    CHECK(mrhiResolveQueries(s_device, bare, set, 0, 0, s_r, 0) == mrhi_errorInvalid &&
+              mrhiResolveQueries(s_device, copying, set, 0, 1, s_r, 0) == mrhi_errorInvalid,
+          "not declared for resolves");
+    CHECK(mrhiResolveQueries(s_device, async, set, 0, 1, s_r, 0) == mrhi_errorInvalid,
+          "async compute");
+    CHECK(mrhiResolveQueries(s_device, drawing, set, 0, 0, s_r, 0) == mrhi_errorInvalid,
+          "a render pass declaring it");
+    CHECK(mrhiGetDeviceMisuse(s_device) == misuse + 4, "each counted");
+    Drop();
+    Close(s_device);
+}
+
 // A query refused for capacity still opens and closes, so the pass ends.
 static void TestOcclusionCapacity(void)
 {
@@ -501,6 +673,8 @@ static void TestOcclusionCapacity(void)
               mrhiEndOcclusionQuery(s_device, s_render) == mrhi_errorCapacity,
           "still full");
     CHECK(mrhiEndPass(s_device, s_render) == mrhi_success, "the pass ends");
+    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 1, s_r, 0) == mrhi_errorCapacity,
+          "a resolve too");
     CHECK(mrhiGetDeviceMisuse(s_device) == 0, "no misuse");
     Drop();
     Close(s_device);
@@ -521,5 +695,7 @@ int main(void)
     TestOcclusionCapacity();
     TestTimestamps();
     TestPeriod();
+    TestResolveAccess();
+    TestResolve();
     return s_failures == 0 ? 0 : 1;
 }

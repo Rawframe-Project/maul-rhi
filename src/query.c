@@ -276,3 +276,50 @@ mrhiResult mrhiEndOcclusionQuery(mrhiDevice* device, mrhiPassId id)
     *record = (mrhiCommand){.type = mrhiCommandEndOcclusionQuery};
     return mrhi_success;
 }
+
+mrhiResult mrhiResolveQueries(mrhiDevice* device, mrhiPassId id, mrhiQuerySetId set, uint32_t first,
+                              uint32_t count, mrhiResourceId resource, uint64_t offset)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    uint32_t object = mrhiFindFrameResource(device, resource);
+    if (!mrhiPoolIsLive(&device->querySets, set.index1, set.generation) || object == 0)
+    {
+        return mrhi_errorStale;
+    }
+    // Only a graphics pass declares a buffer with the query resolve access
+    // (mrhi-0012), so the pass is one without targets of that class.
+    if (mrhiWorkOf(pass) != mrhiWorkCompute ||
+        !mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessQueryResolve), nullptr))
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    const mrhiQuerySetSlot* slot = &device->querySetSlots[set.index1 - 1];
+    uint64_t total = mrhiBufferBytesOf(device, &device->frameResources[object - 1]);
+    if (first >= slot->count || count > slot->count - first || offset % 256 != 0 ||
+        offset > total || (uint64_t)count * 8 > total - offset)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
+    if (record == nullptr)
+    {
+        return mrhi_errorCapacity;
+    }
+    *record = (mrhiCommand){
+        .type = mrhiCommandResolveQueries,
+        .a = slot->handle,
+        .b = first | (uint64_t)count << 32,
+        .c = object,
+        .d = offset,
+    };
+    return mrhi_success;
+}

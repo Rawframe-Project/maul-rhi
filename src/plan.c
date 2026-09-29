@@ -13,7 +13,8 @@ bool mrhiStateWrites(mrhiResourceState state)
 {
     return state == mrhi_stateStorageWrite || state == mrhi_stateStorageReadWrite ||
            state == mrhi_stateCopyDestination || state == mrhi_stateColorTarget ||
-           state == mrhi_stateResolve || state == mrhi_stateDepthTarget;
+           state == mrhi_stateResolve || state == mrhi_stateDepthTarget ||
+           state == mrhi_stateQueryResolve;
 }
 
 // Whether going from one state to another needs a barrier: a texture

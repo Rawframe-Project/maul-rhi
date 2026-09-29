@@ -9764,6 +9764,29 @@
                   "note": "COPY_DST"
                 }
               }
+            },
+            {
+              "name": "access_query_resolve",
+              "value": 10,
+              "doc": "Written with query results, by a graphics pass without targets.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRANSFER_WRITE, from vkCmdCopyQueryPoolResults"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "COPY_DEST, from ResolveQueryData"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a blit destination, from resolveCounters or a visibility buffer copy"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "QUERY_RESOLVE, from resolveQuerySet"
+                }
+              }
             }
           ]
         },
@@ -10613,6 +10636,29 @@
                 "d3d12": {
                   "class": "direct",
                   "note": "DEPTH_STENCIL_READ"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_query_resolve",
+              "value": 15,
+              "doc": "Written with query results.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRANSFER_WRITE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "COPY_DEST"
                 },
                 "metal": {
                   "class": "direct",
@@ -15786,6 +15832,57 @@
               "name": "pass",
               "type": "id.pass_id",
               "doc": "The pass, recording, with an occlusion query open."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "resolve_queries",
+          "doc": "Writes queries of a set into a buffer as 64-bit values: an occlusion query's result, or a timestamp in ticks. A query not written earlier in the frame reads 0.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass with targets or not of the graphics class, queries past the set's count or a first query at or past it, a resource that is not a buffer the pass declares with the query resolve access, or an offset not a multiple of 256 or without 8 bytes per query after it; `mrhi_errorStale` for a pass of another frame, a destroyed query set, or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, of the graphics class without targets."
+            },
+            {
+              "name": "set",
+              "type": "id.query_set_id",
+              "doc": "The query set."
+            },
+            {
+              "name": "first",
+              "type": "uint32",
+              "doc": "The first query, below the set's count."
+            },
+            {
+              "name": "count",
+              "type": "uint32",
+              "doc": "The queries from it."
+            },
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "A buffer of the open frame the pass declares with the query resolve access."
+            },
+            {
+              "name": "offset",
+              "type": "uint64",
+              "doc": "Where the first value goes, a multiple of 256."
             }
           ],
           "thread_safety": {

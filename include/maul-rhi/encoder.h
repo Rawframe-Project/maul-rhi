@@ -450,6 +450,34 @@ extern "C"
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiEndOcclusionQuery(mrhiDevice* device, mrhiPassId pass);
 
+    /// Writes queries of a set into a buffer as 64-bit values: an occlusion
+    /// query's result, or a timestamp in ticks. A query not written earlier in
+    /// the frame reads 0.
+    ///
+    /// @param device    The device.
+    /// @param pass      The pass, recording, of the graphics class without
+    ///                  targets.
+    /// @param set       The query set.
+    /// @param first     The first query, below the set's count.
+    /// @param count     The queries from it.
+    /// @param resource  A buffer of the open frame the pass declares with the
+    ///                  query resolve access.
+    /// @param offset    Where the first value goes, a multiple of 256.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass
+    /// with targets or not of the graphics class, queries past the set's count
+    /// or a first query at or past it, a resource that is not a buffer the pass
+    /// declares with the query resolve access, or an offset not a multiple of
+    /// 256 or without 8 bytes per query after it; `mrhi_errorStale` for a pass
+    /// of another frame, a destroyed query set, or a resource that is not live;
+    /// `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity`
+    /// when the frame's commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiResolveQueries(mrhiDevice* device, mrhiPassId pass,
+                                                          mrhiQuerySetId set, uint32_t first,
+                                                          uint32_t count, mrhiResourceId resource,
+                                                          uint64_t offset);
+
     /// Copies bytes from one buffer of the frame to another.
     ///
     /// @param device             The device.
