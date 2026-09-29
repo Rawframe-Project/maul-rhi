@@ -1,0 +1,7 @@
+# ThreadSanitizer suppressions for the conformance suite (mrhi-0003).
+# Lavapipe runs its rasterizer on threads of its own and compiles
+# shaders with LLVM, in libraries built without ThreadSanitizer, which
+# cannot see how they order their threads and locks; they are not the
+# driver's to check.
+called_from_lib:libvulkan_lvp.so
+called_from_lib:libLLVM

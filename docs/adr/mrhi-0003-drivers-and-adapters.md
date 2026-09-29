@@ -91,6 +91,8 @@ ids, requests, the frame graph) can be tested without a GPU.
   CI sets it, runs lavapipe, and enables the Khronos validation layer
   with synchronization validation, which logs to each test's output;
   CTest fails any test whose output reports a validation error.
+  ThreadSanitizer skips lavapipe's and LLVM's own threads and locks
+  (`test/tsan.supp`), which it cannot see ordered.
 
 ## Consequences
 

@@ -158,10 +158,16 @@ if(MAUL_RHI_BUILD_TESTS)
     # The Vulkan loader keeps drivers loaded after an instance ends, so
     # that LeakSanitizer reads their memory as held, not lost. Where the
     # validation layer runs, it logs to the test's output, and a
-    # validation error there fails the test (mrhi-0003).
+    # validation error there fails the test (mrhi-0003). ThreadSanitizer
+    # leaves lavapipe's own threads alone (test/tsan.supp).
+    set(maul_rhi_test_env VK_LOADER_DISABLE_DYNAMIC_LIBRARY_UNLOADING=1)
+    if(MAUL_RHI_TSAN)
+        list(APPEND maul_rhi_test_env
+             TSAN_OPTIONS=suppressions=${PROJECT_SOURCE_DIR}/test/tsan.supp)
+    endif()
     get_property(maul_rhi_tests DIRECTORY PROPERTY TESTS)
     set_tests_properties(${maul_rhi_tests} PROPERTIES
-                         ENVIRONMENT VK_LOADER_DISABLE_DYNAMIC_LIBRARY_UNLOADING=1
+                         ENVIRONMENT "${maul_rhi_test_env}"
                          FAIL_REGULAR_EXPRESSION "Validation Error")
 endif()
 
