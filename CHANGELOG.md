@@ -285,6 +285,11 @@ format.
   emptied when the object they name is destroyed; a pass names the heap
   its draws and dispatches read. Needs `bindless_sampling`, and
   `bindless_heterogeneous` for storage textures and buffers.
+- Sealed resources (mrhi-0015): `mrhiSealResource` ends an imported
+  texture or buffer in `mrhi_stateSealed` after the frame's passes;
+  later frames read it without barriers and may declare only the
+  sealed state's reads until `mrhiUnsealResource` returns it to
+  tracking.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

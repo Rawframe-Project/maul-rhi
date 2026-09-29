@@ -81,7 +81,28 @@ static const Use s_uses[] = {
     // the transition to presenting before it.
     [mrhi_statePresent] = {VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, 0,
                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR},
+    // A sealed texture is sampled by every shader stage.
+    [mrhi_stateSealed] = {SHADERS, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
 };
+
+static_assert(sizeof s_uses / sizeof s_uses[0] == mrhi_stateSealed + 1, "a use per state");
+
+// A sealed buffer is read every way a buffer is read.
+static const Use s_sealedBuffer = {
+    SHADERS | VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT | VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT |
+        VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
+    VK_ACCESS_2_UNIFORM_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
+        VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_2_INDEX_READ_BIT |
+        VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
+    VK_IMAGE_LAYOUT_UNDEFINED,
+};
+
+// What a state is to Vulkan for a buffer.
+static const Use* BufferUse(mrhiResourceState state)
+{
+    return state == mrhi_stateSealed ? &s_sealedBuffer : &s_uses[state];
+}
 
 // The barriers gathered for one vkCmdPipelineBarrier2.
 typedef struct Batch
@@ -126,6 +147,8 @@ static void AddBarrier(const mrhiVulkanRecording* recording, const mrhiBarrier* 
     uint32_t index1 = barrier->resource.index1;
     if (!IsTexture(recording->frame, index1))
     {
+        before = BufferUse(barrier->before);
+        after = BufferUse(barrier->after);
         batch->buffers[batch->bufferCount++] = (VkBufferMemoryBarrier2){
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
             .srcStageMask = before->stages,

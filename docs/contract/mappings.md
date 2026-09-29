@@ -452,6 +452,7 @@ restricted or absent-rejected, with how.
 | `mrhi_stateDepthRead` | direct: DEPTH_STENCIL_READ_ONLY_OPTIMAL | direct: DEPTH_STENCIL_READ | direct: tracked by Metal on the resource | direct: implicit between passes |
 | `mrhi_stateQueryResolve` | direct: TRANSFER_WRITE | direct: COPY_DEST | direct: tracked by Metal on the resource | direct: implicit between passes |
 | `mrhi_statePresent` | direct: PRESENT_SRC_KHR | direct: PRESENT | direct: presentDrawable, tracked by Metal | direct: implicit at the frame's end |
+| `mrhi_stateSealed` | direct: SHADER_READ_ONLY_OPTIMAL, SHADER_SAMPLED_READ in every shader stage for textures; every read access and stage for buffers | direct: LAYOUT_SHADER_RESOURCE, ACCESS_SHADER_RESOURCE for textures; every read access for buffers | direct: tracked by Metal on the resource | absent-rejected: sealing needs bindless_sampling, which WebGPU lacks |
 
 ## mrhiShaderStages
 
@@ -852,6 +853,8 @@ restricted or absent-rejected, with how.
 | `mrhiNextDeviceNotification` | reads the library's own notification queue |
 | `mrhiImportTexture` | brings a device texture into the library's tracking for the frame |
 | `mrhiImportBuffer` | brings a device buffer into the library's tracking for the frame |
+| `mrhiSealResource` | marks the resource; the compile ends it in the sealed state |
+| `mrhiUnsealResource` | marks the resource; nothing reaches the driver |
 | `mrhiAccess` | a declaration the library plans barriers, culling and aliasing from; the access kinds map |
 | `mrhiDefaultPassDef` | fills a def with the library's defaults |
 | `mrhiAddPass` | declares a pass to the library's graph |

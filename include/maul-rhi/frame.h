@@ -240,6 +240,49 @@ extern "C"
                                                                mrhiSurfaceId surface,
                                                                mrhiResourceId* imageOut);
 
+    /// Ends an imported texture or buffer of the open frame sealed (mrhi-0015):
+    /// after the frame's passes it moves to the sealed state, the frame that
+    /// uploads it sealing it without a frame of its own. From the next frame on
+    /// any pass may read it through a heap without declaring it, and a frame
+    /// that imports it may declare only the reads the sealed state allows (a
+    /// texture sampled; a buffer as uniforms, vertices, indices, indirect
+    /// arguments or storage read) until it is unsealed. Writing it through a
+    /// heap while it is sealed is invalid, with undefined results. Sealing it
+    /// again does nothing. Needs the bindless_sampling feature.
+    ///
+    /// @param device    The device.
+    /// @param resource  The imported texture or buffer.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a
+    /// resource the frame declared, a surface image, or a texture without
+    /// sampled usage; `mrhi_errorUnsupported` without the bindless_sampling
+    /// feature; `mrhi_errorState` for a device without an open frame or with a
+    /// compiled one; `mrhi_errorStale` for a resource not of the open frame, or
+    /// whose object the device no longer has.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiSealResource(mrhiDevice* device,
+                                                        mrhiResourceId resource);
+
+    /// Returns an imported texture or buffer of the open frame to the graph's
+    /// tracking (mrhi-0015): passes added after it may declare any use of it,
+    /// and it leaves the frame in its last use's state. Undoes a seal made
+    /// earlier in the frame; sealing it after unsealing ends it sealed again.
+    /// Unsealing a resource that is not sealed does nothing. Needs the
+    /// bindless_sampling feature.
+    ///
+    /// @param device    The device.
+    /// @param resource  The imported texture or buffer.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a
+    /// resource the frame declared, or a surface image; `mrhi_errorUnsupported`
+    /// without the bindless_sampling feature; `mrhi_errorState` for a device
+    /// without an open frame or with a compiled one; `mrhi_errorStale` for a
+    /// resource not of the open frame, or whose object the device no longer
+    /// has.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiUnsealResource(mrhiDevice* device,
+                                                          mrhiResourceId resource);
+
     // Where a pass runs: a hint drivers without the queue ignore, running it on
     // the graphics queue.
     typedef uint8_t mrhiPassClass;
@@ -466,7 +509,8 @@ extern "C"
     /// without its cookie, a bad label, an unknown class, kind, aspect or
     /// operation, an access or target its resource cannot take (a kind for the
     /// other resource type, a range outside the texture, a use an imported
-    /// object was not made with, a target that does not render or depth-test),
+    /// object was not made with, a target that does not render or depth-test, a
+    /// use of a sealed resource other than the reads its sealed state allows),
     /// targets of different sizes or sample counts, a resolve that does not
     /// match, a subresource written and used otherwise in the pass, an access
     /// the class does not allow, a declared resource read before any pass wrote
@@ -475,10 +519,10 @@ extern "C"
     /// not of the graphics class, without a set, with neither query, with both
     /// the same, or with a query past the set's count or already written in
     /// this frame; `mrhi_errorStale` for a resource of another frame, an
-    /// imported object destroyed since, or a query set the device no longer
-    /// has; `mrhi_errorUnsupported` for a critical extension the library does
-    /// not know; `mrhi_errorState` for a device without an open frame, or a
-    /// frame already compiled; `mrhi_errorCapacity` when the device's
+    /// imported object destroyed since, or a query set or heap the device no
+    /// longer has; `mrhi_errorUnsupported` for a critical extension the library
+    /// does not know; `mrhi_errorState` for a device without an open frame, or
+    /// a frame already compiled; `mrhi_errorCapacity` when the device's
     /// framePasses or frameAccesses limit is reached.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
@@ -557,6 +601,10 @@ extern "C"
         mrhi_stateQueryResolve = 15,
         // Ready to present: a surface image at the end of its frame.
         mrhi_statePresent = 16,
+        // Sealed (mrhi-0015): read through heaps by any pass without a barrier,
+        // and by the reads a pass may declare of it; for a texture, sampling by
+        // every shader stage.
+        mrhi_stateSealed = 17,
     };
 
     // A transition a compiled frame makes: a part of a resource, from one state

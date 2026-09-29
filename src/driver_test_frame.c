@@ -244,7 +244,9 @@ void mrhiWalkTestFrame(const mrhiDriverFrame* frame, uint64_t firstHandle, uint6
     for (size_t i = 0; i < frame->barrierCount; ++i)
     {
         WALK_CHECK(frame->barriers[i].resource.index1 != 0 &&
-                   frame->barriers[i].resource.index1 <= frame->resourceCount);
+                   frame->barriers[i].resource.index1 <= frame->resourceCount &&
+                   frame->barriers[i].before <= mrhi_stateSealed &&
+                   frame->barriers[i].after <= mrhi_stateSealed);
     }
     if (log != nullptr)
     {

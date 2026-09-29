@@ -264,11 +264,15 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
     }
     resource->transient =
         resource->kind == mrhiFrameTexture && resource->firstPass != 0 && targetsOnly;
-    // A surface image ends ready to present, an imported object in its
-    // last use's state.
+    // A surface image ends ready to present, a sealed object sealed, and
+    // an imported object otherwise in its last use's state.
     if (resource->kind == mrhiSurfaceImage)
     {
         resource->finalState = mrhi_statePresent;
+    }
+    if (resource->seal)
+    {
+        resource->finalState = mrhi_stateSealed;
     }
     if (mrhiOutlivesFrame(resource))
     {

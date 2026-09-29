@@ -116,6 +116,7 @@ mrhiResult mrhiImportTexture(mrhiDevice* device, mrhiTextureId texture, mrhiReso
         .index1 = texture.index1,
         .generation = texture.generation,
         .initialState = slot->state,
+        .sealed = slot->state == mrhi_stateSealed,
     };
     return Import(device, &device->textureSlots[texture.index1 - 1].import, resource, resourceOut);
 }
@@ -142,8 +143,72 @@ mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer, mrhiResourc
         .index1 = buffer.index1,
         .generation = buffer.generation,
         .initialState = slot->state,
+        .sealed = slot->state == mrhi_stateSealed,
     };
     return Import(device, &device->bufferSlots[buffer.index1 - 1].import, resource, resourceOut);
+}
+
+// Finds an imported object of the open frame to seal or unseal: its
+// resource, or NULL with the refusal in statusOut.
+static mrhiFrameResource* FindSealable(mrhiDevice* device, mrhiResourceId id, mrhiResult* statusOut)
+{
+    *statusOut = mrhi_errorUnsupported;
+    if (!device->features.bindlessSampling)
+    {
+        return nullptr;
+    }
+    *statusOut = mrhi_errorState;
+    if (!device->frameOpen || device->frameCompiled)
+    {
+        return nullptr;
+    }
+    *statusOut = mrhi_errorStale;
+    uint32_t slot = mrhiFindFrameResource(device, id);
+    if (slot == 0)
+    {
+        return nullptr;
+    }
+    mrhiFrameResource* resource = &device->frameResources[slot - 1];
+    *statusOut = mrhiIsImported(resource) ? mrhi_success : mrhiDeviceMisuse(device);
+    return *statusOut == mrhi_success ? resource : nullptr;
+}
+
+mrhiResult mrhiSealResource(mrhiDevice* device, mrhiResourceId resource)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFrameResource* found = FindSealable(device, resource, &status);
+    if (found == nullptr)
+    {
+        return status;
+    }
+    // A sealed texture is sampled.
+    if (found->kind == mrhiImportedTexture && (found->texture.usage & mrhi_textureSampled) == 0)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    found->seal = true;
+    return mrhi_success;
+}
+
+mrhiResult mrhiUnsealResource(mrhiDevice* device, mrhiResourceId resource)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFrameResource* found = FindSealable(device, resource, &status);
+    if (found == nullptr)
+    {
+        return status;
+    }
+    found->sealed = false;
+    found->seal = false;
+    return mrhi_success;
 }
 
 // The texture a surface's images are: its configured format, size,

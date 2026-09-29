@@ -167,6 +167,10 @@ typedef struct mrhiFrameResource
     uint32_t index1;
     uint32_t generation;
     mrhiResourceState initialState;
+    // Whether it began the frame sealed and was not unsealed, which allows
+    // only the reads of the sealed state, and whether it ends sealed.
+    bool sealed;
+    bool seal;
     // A surface image's driver image; its handle is its swapchain's.
     uint64_t image;
     // Whether a pass declared so far writes it; imports count as written.

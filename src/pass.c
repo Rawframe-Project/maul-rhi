@@ -149,6 +149,18 @@ static uint32_t LayersAt(const mrhiTextureDef* def, uint32_t mip)
     return depth > 0 ? depth : 1;
 }
 
+// Whether an access kind is a read the sealed state allows: sampling a
+// texture, or a buffer's reads other than copies.
+static bool IsSealedRead(mrhiAccessKind kind, bool buffer)
+{
+    if (!buffer)
+    {
+        return kind == mrhi_accessSampled;
+    }
+    return kind == mrhi_accessUniform || kind == mrhi_accessVertex || kind == mrhi_accessIndex ||
+           kind == mrhi_accessIndirect || kind == mrhi_accessStorageRead;
+}
+
 // Makes the use of an access: success, stale, or invalid (not counted).
 static mrhiResult UseOfAccess(const mrhiDevice* device, const mrhiAccess* access,
                               mrhiPassClass passClass, mrhiFrameUse* useOut)
@@ -162,6 +174,10 @@ static mrhiResult UseOfAccess(const mrhiDevice* device, const mrhiAccess* access
     mrhiAccessKind kind = access->kind;
     if (kind > mrhi_accessQueryResolve || !IsKindAllowed(kind, IsBuffer(resource), passClass) ||
         !IsUsageMade(device, resource, kind))
+    {
+        return mrhi_errorInvalid;
+    }
+    if (resource->sealed && !IsSealedRead(kind, IsBuffer(resource)))
     {
         return mrhi_errorInvalid;
     }
@@ -179,6 +195,11 @@ static mrhiResult UseOfAccess(const mrhiDevice* device, const mrhiAccess* access
         .mipCount = 1,
         .layerCount = 1,
     };
+    // A sealed resource stays in its state.
+    if (resource->sealed)
+    {
+        useOut->state = mrhi_stateSealed;
+    }
     if (IsBuffer(resource))
     {
         return mrhi_success;
@@ -237,7 +258,7 @@ static uint32_t FindTarget(const mrhiDevice* device, mrhiResourceId id, uint32_t
     }
     const mrhiFrameResource* resource = &device->frameResources[slot - 1];
     *statusOut = mrhi_errorInvalid;
-    if (IsBuffer(resource) || !IsUsageMade(device, resource, use))
+    if (IsBuffer(resource) || resource->sealed || !IsUsageMade(device, resource, use))
     {
         return 0;
     }
