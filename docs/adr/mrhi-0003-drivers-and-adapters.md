@@ -59,7 +59,7 @@ ids, requests, the frame graph) can be tested without a GPU.
   and limits (a limit below WebGPU's default is raised by the browser);
   the opening is answered when the browser settles it. Objects live on
   the JavaScript side under small handles; a destroyed one waits there
-  until the frames submitted before its destruction finish, since
+  until the next frame submitted after its destruction finishes, since
   frames are recorded at submission. A view of one aspect takes the
   format the browser resolves for it. Loss is reported by the next
   poll with the browser's message. WebGPU places memory itself, so a
@@ -74,6 +74,24 @@ ids, requests, the frame graph) can be tested without a GPU.
   settle; one refused is reported as a platform failure and kept with
   the device's errors, since the core has checked it. The driver's
   pipeline cache is empty, and it takes back only its own.
+- **WebGPU frames:** a frame is recorded at submission into one command
+  encoder, one call into JavaScript per command, and the browser's
+  synchronization replaces the core's barriers. A pass with targets is
+  a render pass; a graphics pass without them is a compute pass, which
+  leaves its GPU compute pass for copies, query resolves and debug
+  labels on the command encoder and sets its pipeline, bind groups and
+  immediates again in the next one, its end timestamp then written by
+  a pass of its own. A binding table is a bind group made at its
+  command in the pipeline's layout. Uploads are written into one
+  staging buffer before the frame's commands, so queue order keeps
+  them apart from earlier frames'; readbacks are copied into a mirror
+  of the ring, mapped after submission and copied into the ring before
+  the frame is reported finished. A frame without readbacks finishes
+  when the queue has done its work. Frames are reported in order.
+  Declared resources come from a pool keyed by their descriptors,
+  each its own object, never aliased, and one no frame took in the
+  last 8 is destroyed. A query set keeps its values across frames, so
+  the queries a frame did not write are cleared to 0 after a resolve.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`

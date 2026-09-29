@@ -30,7 +30,8 @@ vulkan_label: invariant vulkan_api
 vulkan_api:
 instance: allocator chain driver driver_test driver_vulkan driver_webgpu instance_core invariant
 driver_webgpu: allocator driver format_caps invariant webgpu_device webgpu_names
-webgpu_device: allocator capabilities_core driver invariant webgpu_names webgpu_pipeline
+webgpu_device: allocator capabilities_core driver invariant webgpu_frame webgpu_names webgpu_pipeline
+webgpu_frame: capabilities_core driver invariant webgpu_names
 webgpu_pipeline: container driver invariant reflection webgpu_names
 webgpu_names: capabilities_core invariant
 instance_core: driver pool

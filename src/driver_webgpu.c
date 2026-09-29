@@ -47,7 +47,9 @@ typedef struct WebGpuDriver
 // clang-format off
 // The driver's JavaScript side, one per module: the instances' and
 // devices' states, every device's uncaptured errors, which the web test
-// runner reads, and a device state's objects under handles.
+// runner reads, a device state's objects under handles, and the makers
+// of buffers and textures, whose usage flags are the browser's for the
+// contract's bits, by name.
 EM_JS(int, JsCreateState, (void), {
     const gpu = Module.mrhiGpu || (Module.mrhiGpu = {
         states: [null],
@@ -66,6 +68,31 @@ EM_JS(int, JsCreateState, (void), {
             state.objects[handle] = null;
             state.free.push(handle);
             return object;
+        },
+        flags(bits, table, names) {
+            let flags = 0;
+            names.forEach((name, bit) => {
+                flags |= (bits >> bit & 1) ? table[name] : 0;
+            });
+            return flags;
+        },
+        buffer(device, size, usage) {
+            const names = ['VERTEX', 'INDEX', 'UNIFORM', 'STORAGE', 'INDIRECT', 'COPY_SRC',
+                           'COPY_DST', 'QUERY_RESOLVE'];
+            return device.createBuffer({size, usage: this.flags(usage, GPUBufferUsage, names)});
+        },
+        texture(device, volume, format, width, height, depth, mips, samples, usage, views) {
+            const names = ['TEXTURE_BINDING', 'STORAGE_BINDING', 'RENDER_ATTACHMENT',
+                           'TRANSIENT_ATTACHMENT', 'COPY_SRC', 'COPY_DST'];
+            return device.createTexture({
+                size: [width, height, depth],
+                dimension: volume ? '3d' : '2d',
+                format,
+                mipLevelCount: mips,
+                sampleCount: samples,
+                usage: this.flags(usage, GPUTextureUsage, names),
+                viewFormats: views ? views.split(',') : [],
+            });
         },
     });
     return gpu.add({settled: [], adapter: null});

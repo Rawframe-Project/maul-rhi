@@ -8,7 +8,8 @@
 // the whole container's, as on every driver: a bind group layout per
 // table up to the last one used, empty where a table has no binding,
 // and the root block's bytes as immediates. The pipeline's entry holds
-// its bind group layouts for the bind groups frames make.
+// its bind group layouts for the bind groups frames make, and an empty
+// bind group for each table without bindings.
 
 #include "webgpu_pipeline.h"
 
@@ -53,6 +54,7 @@ EM_JS(void, JsDefineNames, (void), {
                   'dst', 'one-minus-dst', 'dst-alpha', 'one-minus-dst-alpha',
                   'src-alpha-saturated', 'constant', 'one-minus-constant'],
         operations: ['add', 'subtract', 'reverse-subtract', 'min', 'max'],
+        aspects: ['all', 'depth-only', 'stencil-only'],
     };
 });
 
@@ -198,7 +200,11 @@ EM_JS(int, JsStart, (int state, bool compute, int shader, const char* vertex, in
     const module = self.objects[shader];
     const stage = (entry, length) => ({module, entryPoint: UTF8ToString(entry, length),
                                        constants: building.constants});
-    const entry = {pipeline: null, layouts};
+    // A table without bindings takes an empty bind group, set with the
+    // pipeline, since WebGPU wants every group of the layout.
+    const empty = building.tables.map((entries, table) => entries.length > 0 ? null :
+        device.createBindGroup({layout: layouts[table], entries: []}));
+    const entry = {pipeline: null, layouts, empty};
     const handle = gpu.put(self, entry);
     const descriptor = {label: UTF8ToString(label, labelLength), layout};
     let started;
@@ -246,6 +252,11 @@ EM_JS(int, JsTakePipeline, (int state, int32_t* outcomeOut), {
 
 EM_JS_DEPS(mrhi_webgpu_pipeline, "$UTF8ToString");
 
+void mrhiWebGpuDefineNames(void)
+{
+    JsDefineNames();
+}
+
 uint64_t mrhiWebGpuCreateShader(int state, const mrhiShaderDef* def, const mrhiContainer* container)
 {
     return (uint64_t)JsCreateShader(state, (const char*)container->wgsl,
@@ -256,7 +267,6 @@ uint64_t mrhiWebGpuCreateShader(int state, const mrhiShaderDef* def, const mrhiC
 // Describes the whole container's bindings, table by table.
 static void DescribeLayout(int state, const mrhiReflection* reflection)
 {
-    JsDefineNames();
     JsBegin(state);
     for (uint32_t i = 0; i < reflection->bindingCount; ++i)
     {

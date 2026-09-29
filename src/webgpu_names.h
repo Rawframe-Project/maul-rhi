@@ -8,6 +8,7 @@
 #define MAUL_RHI_SRC_WEBGPU_NAMES_H
 
 #include "maul-rhi/capabilities.h"
+#include "maul-rhi/resources.h"
 
 #include <stddef.h>
 
@@ -42,5 +43,13 @@ void mrhiSetWebGpuLimit(mrhiLimits* limits, const mrhiWebGpuLimit* limit, double
 
 // A known format's WebGPU name.
 const char* mrhiWebGpuFormat(mrhiFormat format);
+
+// The bytes a texture's view formats take as a list; every WebGPU format
+// name is shorter than 32 bytes.
+#define MRHI_WEBGPU_VIEW_FORMAT_BYTES (MRHI_VIEW_FORMATS * 32)
+
+// Writes the formats a texture's views may take besides its own, their
+// names comma-separated and NUL-terminated.
+void mrhiWebGpuViewFormats(const mrhiTextureDef* def, char out[MRHI_WEBGPU_VIEW_FORMAT_BYTES]);
 
 #endif // MAUL_RHI_SRC_WEBGPU_NAMES_H

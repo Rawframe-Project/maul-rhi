@@ -12,6 +12,10 @@
 
 #include "driver.h"
 
+// Names the contract's enums on the JavaScript side, for pipelines and
+// frames; once per module is enough.
+void mrhiWebGpuDefineNames(void);
+
 // Makes a shader module from a checked container's WGSL: its handle.
 uint64_t mrhiWebGpuCreateShader(int state, const mrhiShaderDef* def,
                                 const mrhiContainer* container);

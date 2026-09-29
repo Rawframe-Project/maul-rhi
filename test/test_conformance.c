@@ -104,6 +104,21 @@ static mrhiResult NextDevice(mrhiDevice* device, mrhiDeviceNotification* recordO
     return status;
 }
 
+// Waits for a frame; a browser never blocks, so on the web the suite
+// sleeps until it has finished.
+static mrhiResult WaitFor(mrhiDevice* device, mrhiRequestId token)
+{
+    mrhiResult status = mrhiWaitFrame(device, token, UINT64_C(10000000000));
+#ifdef __EMSCRIPTEN__
+    for (int slept = 0; status == mrhi_timeout && slept < 10000; ++slept)
+    {
+        emscripten_sleep(1);
+        status = mrhiWaitFrame(device, token, 0);
+    }
+#endif
+    return status;
+}
+
 static mrhiInstance* Create(const mrhiChain* driver)
 {
     mrhiInstanceDef def = mrhiDefaultInstanceDef();
@@ -364,7 +379,7 @@ static void Finish(mrhiDevice* device, uint32_t readbacks)
 {
     mrhiRequestId token = {0};
     CHECK(mrhiSubmitFrame(device, &token) == mrhi_success, "submitted");
-    CHECK(mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success, "finished");
+    CHECK(WaitFor(device, token) == mrhi_success, "finished");
     mrhiDeviceNotification record;
     uint32_t done = 0;
     uint32_t answered = 0;
@@ -1221,13 +1236,6 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CheckObjects(device, asked->timestampQuery);
     CheckFrameMemory(device);
     CheckPipelines(device);
-    mrhiAdapterInfo info;
-    CHECK(mrhiGetAdapterInfo(instance, adapter, &info) == mrhi_success, "info");
-    if (info.driver == mrhi_driverWebGpu)
-    {
-        mrhiDestroyDevice(device);
-        return;
-    }
     CheckRoundTrip(device);
     CheckDrawing(device, asked->timestampQuery);
     mrhiDestroyDevice(device);
@@ -1255,12 +1263,6 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
         CheckDevice(instance, ids[i], &all);
         CheckCacheImport(instance, ids[i]);
-        // The WebGPU driver runs no frames yet: they are the next part of
-        // its work.
-        if (driver == mrhi_driverWebGpu)
-        {
-            continue;
-        }
         CheckRetirement(instance, ids[i]);
         CheckHeaps(instance, ids[i], driver != mrhi_driverTest);
     }
@@ -1461,9 +1463,7 @@ static void CheckFramesInFlight(mrhiDevice* device, mrhiSurfaceId surface)
         mrhiResult begun = mrhiBeginFrame(device, &frame);
         while (begun == mrhi_errorCapacity && waited < submitted)
         {
-            CHECK(mrhiWaitFrame(device, tokens[waited++ % 16], UINT64_C(10000000000)) ==
-                      mrhi_success,
-                  "a frame finished");
+            CHECK(WaitFor(device, tokens[waited++ % 16]) == mrhi_success, "a frame finished");
             begun = mrhiBeginFrame(device, &frame);
         }
         mrhiRequestId request = {0};
@@ -1473,8 +1473,7 @@ static void CheckFramesInFlight(mrhiDevice* device, mrhiSurfaceId surface)
     }
     while (waited < submitted)
     {
-        CHECK(mrhiWaitFrame(device, tokens[waited++ % 16], UINT64_C(10000000000)) == mrhi_success,
-              "a frame finished");
+        CHECK(WaitFor(device, tokens[waited++ % 16]) == mrhi_success, "a frame finished");
     }
     mrhiDeviceNotification record;
     while (mrhiNextDeviceNotification(device, &record) == mrhi_success)

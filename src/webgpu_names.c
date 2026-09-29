@@ -164,3 +164,21 @@ const char* mrhiWebGpuFormat(mrhiFormat format)
     MRHI_ASSERT(mrhiIsFormatKnown(format));
     return s_formats[format];
 }
+
+void mrhiWebGpuViewFormats(const mrhiTextureDef* def, char out[MRHI_WEBGPU_VIEW_FORMAT_BYTES])
+{
+    size_t length = 0;
+    out[0] = '\0';
+    for (uint32_t i = 0; i < MRHI_VIEW_FORMATS && def->viewFormats[i] != mrhi_formatNone; ++i)
+    {
+        const char* name = mrhiWebGpuFormat(def->viewFormats[i]);
+        size_t bytes = strlen(name);
+        MRHI_ASSERT(length + bytes + 2 <= MRHI_WEBGPU_VIEW_FORMAT_BYTES);
+        if (length > 0)
+        {
+            out[length++] = ',';
+        }
+        memcpy(out + length, name, bytes + 1);
+        length += bytes;
+    }
+}

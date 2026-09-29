@@ -314,6 +314,11 @@ format.
 - WebGPU shaders and pipelines (mrhi-0003): WGSL modules, layouts from
   the whole container with the root block as immediates, pipelines made
   asynchronously and answered by the poll.
+- WebGPU frames (mrhi-0003): recorded at submission into one command
+  encoder, uploads through a staging buffer written before the frame,
+  readbacks mapped into the ring, declared resources pooled across
+  frames, queries the frame did not write resolved to 0; the
+  conformance suite's frames run in headless Chrome.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

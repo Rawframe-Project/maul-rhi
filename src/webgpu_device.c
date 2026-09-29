@@ -6,8 +6,9 @@
 // reads them (a validation scope held for its life, read as it closes),
 // and its loss reported by the next poll. Objects
 // live on the JavaScript side under small handles. A destroyed object
-// waits there until the frames submitted before its destruction finish,
-// since frames are recorded at submission. WebGPU places memory itself,
+// waits there until the next frame submitted after its destruction
+// finishes, since frames are recorded at submission; frames are
+// reported finished in order. WebGPU places memory itself,
 // so a declared resource's bytes are an estimate for the frame's report.
 
 #include "webgpu_device.h"
@@ -15,6 +16,7 @@
 #include "allocator.h"
 #include "capabilities_core.h"
 #include "invariant.h"
+#include "webgpu_frame.h"
 #include "webgpu_names.h"
 #include "webgpu_pipeline.h"
 
@@ -40,15 +42,20 @@ typedef struct WebGpuDevice
     Pending* pending;
     uint32_t pendingCount;
     uint32_t pendingLimit;
-    // Frames submitted and finished.
+    // Frames submitted and reported finished, and the tags of those
+    // running by number, at most the frames in flight.
     uint64_t submitted;
     uint64_t finished;
+    uint64_t* tags;
+    uint32_t tagCount;
 } WebGpuDevice;
 
 // clang-format off
 EM_JS(int, JsCreateDeviceState, (void), {
     return Module.mrhiGpu.add({device: null, objects: [null], free: [], retiring: [], lost: null,
-                               features: [], limits: {}, pipelines: []});
+                               features: [], limits: {}, pipelines: [], frame: null,
+                               running: [], finished: 0, pool: [], readbacks: [],
+                               staging: null});
 });
 
 EM_JS(void, JsWantFeature, (int state, const char* feature), {
@@ -110,6 +117,11 @@ EM_JS(void, JsCloseDevice, (int state), {
                 object.destroy();
             }
         }
+        self.pool.forEach(entry => entry.object.destroy());
+        self.readbacks.forEach(buffer => buffer.destroy());
+        if (self.staging) {
+            self.staging.destroy();
+        }
         if (self.device) {
             self.device.destroy();
         }
@@ -141,41 +153,19 @@ EM_JS(int, JsLossMessage, (int state, char* out, int capacity), {
     return stringToUTF8(lost ? lost.message : "", out, capacity);
 });
 
-// The browser's usage flags for the contract's, by name, so that the
-// browser's values are the ones used.
 EM_JS(int, JsCreateBuffer, (int state, double size, uint32_t usage), {
-    const names = ['VERTEX', 'INDEX', 'UNIFORM', 'STORAGE', 'INDIRECT', 'COPY_SRC', 'COPY_DST',
-                   'QUERY_RESOLVE'];
-    let flags = 0;
-    names.forEach((name, bit) => {
-        flags |= (usage >> bit & 1) ? GPUBufferUsage[name] : 0;
-    });
     const gpu = Module.mrhiGpu;
     const self = gpu.states[state];
-    return gpu.put(self, self.device.createBuffer({size, usage: flags}));
+    return gpu.put(self, gpu.buffer(self.device, size, usage));
 });
 
 EM_JS(int, JsCreateTexture, (int state, bool volume, const char* format, uint32_t width,
                              uint32_t height, uint32_t depth, uint32_t mips, uint32_t samples,
                              uint32_t usage, const char* viewFormats), {
-    const names = ['TEXTURE_BINDING', 'STORAGE_BINDING', 'RENDER_ATTACHMENT',
-                   'TRANSIENT_ATTACHMENT', 'COPY_SRC', 'COPY_DST'];
-    let flags = 0;
-    names.forEach((name, bit) => {
-        flags |= (usage >> bit & 1) ? GPUTextureUsage[name] : 0;
-    });
-    const listed = UTF8ToString(viewFormats);
     const gpu = Module.mrhiGpu;
     const self = gpu.states[state];
-    return gpu.put(self, self.device.createTexture({
-        size: [width, height, depth],
-        dimension: volume ? '3d' : '2d',
-        format: UTF8ToString(format),
-        mipLevelCount: mips,
-        sampleCount: samples,
-        usage: flags,
-        viewFormats: listed ? listed.split(',') : [],
-    }));
+    return gpu.put(self, gpu.texture(self.device, volume, UTF8ToString(format), width, height,
+                                     depth, mips, samples, usage, UTF8ToString(viewFormats)));
 });
 
 EM_JS(int, JsCreateView, (int state, int texture, const char* format, const char* dimension,
@@ -253,12 +243,11 @@ EM_JS(void, JsSweep, (int state, double finished), {
 
 EM_JS_DEPS(mrhi_webgpu_device, "$UTF8ToString,$stringToUTF8");
 
-// Retires an object after the frames submitted so far, at once when none
-// runs.
+// Retires an object once the next frame submitted has finished, since
+// the frame recording may name it.
 static void Retire(WebGpuDevice* device, uint64_t handle)
 {
-    JsRetire(device->state, (int)handle, (double)(device->submitted));
-    JsSweep(device->state, (double)device->finished);
+    JsRetire(device->state, (int)handle, (double)(device->submitted + 1));
 }
 
 static void Destroy(void* self)
@@ -317,26 +306,8 @@ static mrhiResult CreateBuffer(void* self, const mrhiBufferDef* def, uint64_t* h
 static mrhiResult CreateTexture(void* self, const mrhiTextureDef* def, uint64_t* handleOut)
 {
     const WebGpuDevice* device = self;
-    // The formats views may take besides the texture's, comma-separated;
-    // every WebGPU format name is shorter than 32 bytes.
-    enum
-    {
-        VIEW_FORMAT_BYTES = MRHI_VIEW_FORMATS * 32,
-    };
-    char viewFormats[VIEW_FORMAT_BYTES] = {0};
-    size_t length = 0;
-    for (uint32_t i = 0; i < MRHI_VIEW_FORMATS && def->viewFormats[i] != mrhi_formatNone; ++i)
-    {
-        const char* name = mrhiWebGpuFormat(def->viewFormats[i]);
-        size_t bytes = strlen(name);
-        MRHI_ASSERT(length + bytes + 2 <= VIEW_FORMAT_BYTES);
-        if (length > 0)
-        {
-            viewFormats[length++] = ',';
-        }
-        memcpy(viewFormats + length, name, bytes + 1);
-        length += bytes;
-    }
+    char viewFormats[MRHI_WEBGPU_VIEW_FORMAT_BYTES];
+    mrhiWebGpuViewFormats(def, viewFormats);
     *handleOut = (uint64_t)JsCreateTexture(
         device->state, def->kind == mrhi_texture3d, mrhiWebGpuFormat(def->format), def->width,
         def->height, def->depthOrLayers, def->mipLevels, def->sampleCount, def->usage, viewFormats);
@@ -437,8 +408,29 @@ static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* b
     *alignmentOut = 256;
 }
 
-// Reports settled pipelines, then the device's loss once. A pipeline
-// destroyed while it waited is not reported.
+// Reports finished frames in order, destroying the objects that waited
+// for them.
+static size_t PollFrames(WebGpuDevice* device, mrhiDriverEvent* events, size_t capacity)
+{
+    uint64_t finished = mrhiWebGpuFinishedFrames(device->state);
+    size_t moved = 0;
+    while (moved < capacity && device->finished < finished)
+    {
+        device->finished += 1;
+        events[moved++] = (mrhiDriverEvent){
+            .tag = device->tags[device->finished % device->tagCount],
+            .outcome = mrhi_success,
+        };
+    }
+    if (moved > 0)
+    {
+        JsSweep(device->state, (double)device->finished);
+    }
+    return moved;
+}
+
+// Reports settled pipelines, finished frames, then the device's loss
+// once. A pipeline destroyed while it waited is not reported.
 static size_t Poll(void* self, mrhiDriverEvent* events, size_t capacity)
 {
     WebGpuDevice* device = self;
@@ -458,6 +450,7 @@ static size_t Poll(void* self, mrhiDriverEvent* events, size_t capacity)
             }
         }
     }
+    moved += PollFrames(device, events + moved, capacity - moved);
     if (moved < capacity && !device->lossTold && JsIsLost(device->state))
     {
         device->lossTold = true;
@@ -471,10 +464,18 @@ static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
 {
     (void)timeoutNs;
     const WebGpuDevice* device = self;
-    return tag <= device->finished;
+    uint64_t finished = mrhiWebGpuFinishedFrames(device->state);
+    for (uint64_t serial = device->finished + 1; serial <= device->submitted; ++serial)
+    {
+        if (device->tags[serial % device->tagCount] == tag)
+        {
+            return serial <= finished;
+        }
+    }
+    return true;
 }
 
-// Frames and canvases come with the driver's next parts.
+// Canvases come with the driver's next part.
 static mrhiResult Unsupported(void)
 {
     return mrhi_errorUnsupported;
@@ -563,10 +564,12 @@ static void ReleaseImage(void* self, uint64_t swapchain, uint64_t image)
 
 static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag)
 {
-    (void)self;
-    (void)frame;
-    (void)tag;
-    return Unsupported();
+    WebGpuDevice* device = self;
+    device->submitted += 1;
+    MRHI_ASSERT(device->submitted - device->finished <= device->tagCount);
+    device->tags[device->submitted % device->tagCount] = tag;
+    mrhiWebGpuSubmitFrame(device->state, frame, device->submitted);
+    return mrhi_success;
 }
 
 static mrhiResult CreateHeap(void* self, const mrhiHeapDef* def, uint64_t* handleOut)
@@ -640,6 +643,8 @@ mrhiResult mrhiCreateWebGpuDevice(const mrhiAllocator* allocator, int instanceSt
     uint32_t pipelines = def->deviceLimits.pipelines;
     mrhiLayout layout = {.size = sizeof(WebGpuDevice)};
     size_t pendingAt = mrhiLayoutAdd(&layout, pipelines, sizeof(Pending), alignof(Pending));
+    uint32_t frames = def->limits.framesInFlight;
+    size_t tagsAt = mrhiLayoutAdd(&layout, frames, sizeof(uint64_t), alignof(uint64_t));
     WebGpuDevice* device =
         layout.overflow ? nullptr : mrhiAllocate(allocator, layout.size, alignof(WebGpuDevice));
     if (device == nullptr)
@@ -652,7 +657,10 @@ mrhiResult mrhiCreateWebGpuDevice(const mrhiAllocator* allocator, int instanceSt
         .state = JsCreateDeviceState(),
         .pending = (Pending*)((unsigned char*)device + pendingAt),
         .pendingLimit = pipelines,
+        .tags = (uint64_t*)((unsigned char*)device + tagsAt),
+        .tagCount = frames,
     };
+    mrhiWebGpuDefineNames();
     for (size_t i = 0; i < mrhiWebGpuFeatureCount; ++i)
     {
         bool wanted = false;
