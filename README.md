@@ -25,9 +25,9 @@ library thread runs, and no callback delivers a result.
 
 ## Status
 
-Not released. The first decisions are made and the skeleton builds;
-the contract schema, the Vulkan and WebGPU drivers and the conformance
-suite follow, then Metal and Direct3D 12.
+Not released. The contract, the Vulkan and WebGPU drivers and the
+conformance suite are in place; the samples are being written, then
+Metal and Direct3D 12 follow.
 
 ## Building
 
@@ -39,6 +39,16 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build
 ```
+
+## Samples
+
+`samples/` holds small programs, each one file on a shared harness
+(`samples/harness.c`): `triangle.c` draws a triangle offscreen and
+reads it back, `upload_readback.c` moves bytes and texels through the
+GPU and back. Each checks its own result, so CTest runs them as tests
+on the build's native driver, and in headless Chrome on the web. They
+are built unless `MAUL_RHI_BUILD_SAMPLES` is off; their shader
+containers are made by `tools/gen_test_shaders.py`.
 
 ## Design
 

@@ -165,6 +165,6 @@ jobs:
         run: |
           emcmake cmake -B build-size -DCMAKE_BUILD_TYPE=MinSizeRel \
             "-DCMAKE_C_FLAGS_MINSIZEREL=-Oz -DNDEBUG" -D${PREFIX}_BUILD_TESTS=OFF \
-            -D${PREFIX}_BUILD_BENCH=OFF >/dev/null
+            -D${PREFIX}_BUILD_BENCH=OFF -D${PREFIX}_BUILD_SAMPLES=OFF >/dev/null
           cmake --build build-size -j 4
           python3 tools/wasm_size.py build-size/libmaul-rhi.a

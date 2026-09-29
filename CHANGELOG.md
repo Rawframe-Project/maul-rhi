@@ -331,6 +331,9 @@ format.
 - The wasm budget (mrhi-0001): `tools/wasm_size.py` links the web
   library at `-Oz` with every public function exported, and CI fails
   past 128 KiB of wasm.
+- Samples that test themselves (`samples/`, `MAUL_RHI_BUILD_SAMPLES`): a
+  harness, a triangle, and an upload and readback, run by CTest on the
+  native driver and in headless Chrome.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.
