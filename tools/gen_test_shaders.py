@@ -33,6 +33,9 @@ CONTAINERS = (
     ("samples/shaders", "textured", (("vert", "vs"), ("frag", "fs")), True),
     ("samples/shaders", "compute_plan", (("comp", "plan"),), True),
     ("samples/shaders", "compute_square", (("comp", "square"),), True),
+    ("samples/shaders", "shadow_depth", (("vert", "place"),), True),
+    ("samples/shaders", "shadow_scene", (("vert", "place"), ("lit.frag", "lit"),
+                                         ("solid.frag", "solid")), True),
 )
 
 

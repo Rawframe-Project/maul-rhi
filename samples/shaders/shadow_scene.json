@@ -1,0 +1,19 @@
+{
+  "root_block_bytes": 16,
+  "entries": [
+    {"name": "place", "stage": "vertex",
+     "inputs": [{"location": 0, "type": "float32", "components": 3}],
+     "variables": [{"location": 0, "type": "float32", "components": 3}]},
+    {"name": "lit", "stage": "fragment",
+     "variables": [{"location": 0, "type": "float32", "components": 3}],
+     "outputs": [{"location": 0, "type": "float32", "components": 4}]},
+    {"name": "solid", "stage": "fragment",
+     "outputs": [{"location": 0, "type": "float32", "components": 4}]}
+  ],
+  "bindings": [
+    {"table": 0, "slot": 0, "kind": "sampled_texture", "stages": ["fragment"],
+     "sample_type": "depth", "view_dimension": "2d", "multisampled": false},
+    {"table": 0, "slot": 1, "kind": "sampler", "stages": ["fragment"], "sampler": "comparison"}
+  ],
+  "constants": []
+}

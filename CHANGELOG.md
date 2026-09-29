@@ -333,8 +333,9 @@ format.
   past 128 KiB of wasm.
 - Samples that test themselves (`samples/`, `MAUL_RHI_BUILD_SAMPLES`): a
   harness, a triangle, an upload and readback, a textured scene under
-  the binding model, and compute with an indirect dispatch, run by CTest
-  on the native driver and in headless Chrome.
+  the binding model, compute with an indirect dispatch, MSAA with a
+  resolve, and reversed-Z depth with a shadow map, run by CTest on the
+  native driver and in headless Chrome.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

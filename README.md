@@ -46,8 +46,9 @@ ctest --test-dir build
 (`samples/harness.c`): `triangle.c` draws a triangle offscreen and
 reads it back, `upload_readback.c` moves bytes and texels through the
 GPU and back, `textured.c` draws a textured quad with both binding
-tables set, and `compute_indirect.c` plans a dispatch on the GPU and
-runs it indirectly. Each checks its own result, so CTest runs them as tests
+tables set, `compute_indirect.c` plans a dispatch on the GPU and runs
+it indirectly, `msaa.c` resolves a four-sample target, and `shadow.c`
+draws with reversed-Z depth and a shadow map. Each checks its own result, so CTest runs them as tests
 on the build's native driver, and in headless Chrome on the web. They
 are built unless `MAUL_RHI_BUILD_SAMPLES` is off; their shader
 containers are made by `tools/gen_test_shaders.py`.
