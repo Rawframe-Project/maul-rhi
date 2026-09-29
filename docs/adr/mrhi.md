@@ -13,3 +13,4 @@ are listed in [README.md](README.md).
 | [mrhi-0006](mrhi-0006-features-and-limits.md) | Features and limits, each mapped onto the four APIs | Accepted |
 | [mrhi-0007](mrhi-0007-surfaces.md) | Surfaces from one chained native source, configured on a device | Accepted |
 | [mrhi-0008](mrhi-0008-frame-graph.md) | The frame graph: declare, compile, record, submit | Accepted |
+| [mrhi-0009](mrhi-0009-shader-containers.md) | Shader containers: both codes, one reflection, checked as hostile input | Accepted |

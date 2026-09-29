@@ -1,0 +1,95 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// Shader containers (mrhi-0009, docs/contract/container.md): the parse
+// that checks every byte as hostile input, and the decoded reflection.
+
+#ifndef MAUL_RHI_SRC_CONTAINER_H
+#define MAUL_RHI_SRC_CONTAINER_H
+
+#include "maul-rhi/shader.h"
+
+// An entry point: its stage, its name in the strings, its workgroup
+// size, and its ranges of vertex inputs and color outputs.
+typedef struct mrhiShaderEntry
+{
+    mrhiShaderStages stage;
+    uint32_t nameOffset;
+    uint32_t nameLength;
+    uint32_t workgroup[3];
+    uint16_t firstInput;
+    uint16_t inputCount;
+    uint16_t firstOutput;
+    uint16_t outputCount;
+} mrhiShaderEntry;
+
+typedef struct mrhiShaderBinding
+{
+    uint8_t table;
+    mrhiBindingKind kind;
+    uint16_t slot;
+    mrhiShaderStages stages;
+    mrhiSamplerBinding sampler;
+    mrhiSampleType sampleType;
+    mrhiTextureKind viewDimension;
+    mrhiStorageAccess access;
+    mrhiFormat format;
+    bool multisampled;
+    uint64_t minSize;
+} mrhiShaderBinding;
+
+typedef struct mrhiShaderInput
+{
+    uint32_t location;
+    mrhiVertexFormat format;
+} mrhiShaderInput;
+
+typedef struct mrhiShaderOutput
+{
+    uint32_t location;
+    mrhiOutputKind kind;
+} mrhiShaderOutput;
+
+typedef struct mrhiShaderConstant
+{
+    uint32_t id;
+    mrhiConstantType type;
+    uint32_t bits;
+} mrhiShaderConstant;
+
+// A checked container: its digest and root block, and its sections in
+// the caller's bytes.
+typedef struct mrhiContainer
+{
+    uint8_t digest[MRHI_DIGEST_BYTES];
+    uint32_t rootBlockBytes;
+    const uint8_t* strings;
+    uint32_t stringBytes;
+    const uint8_t* entries;
+    uint32_t entryCount;
+    const uint8_t* bindings;
+    uint32_t bindingCount;
+    const uint8_t* inputs;
+    uint32_t inputCount;
+    const uint8_t* outputs;
+    uint32_t outputCount;
+    const uint8_t* constants;
+    uint32_t constantCount;
+    const uint8_t* spirv;
+    size_t spirvBytes;
+    const uint8_t* wgsl;
+    size_t wgslBytes;
+} mrhiContainer;
+
+// Checks a container: success with its sections, mrhi_errorVersion for
+// another version, or mrhi_errorInvalid.
+mrhiResult mrhiParseContainer(const void* bytes, size_t size, mrhiContainer* containerOut);
+
+// The records of a checked container, by index.
+mrhiShaderEntry mrhiContainerEntry(const mrhiContainer* container, uint32_t index);
+mrhiShaderBinding mrhiContainerBinding(const mrhiContainer* container, uint32_t index);
+mrhiShaderInput mrhiContainerInput(const mrhiContainer* container, uint32_t index);
+mrhiShaderOutput mrhiContainerOutput(const mrhiContainer* container, uint32_t index);
+mrhiShaderConstant mrhiContainerConstant(const mrhiContainer* container, uint32_t index);
+
+#endif // MAUL_RHI_SRC_CONTAINER_H

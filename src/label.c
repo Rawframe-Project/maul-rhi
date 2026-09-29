@@ -54,11 +54,12 @@ bool mrhiIsLabelValid(const char* label, size_t length)
     {
         return true;
     }
-    if (label == nullptr || length > MRHI_LABEL_BYTES)
-    {
-        return false;
-    }
-    const unsigned char* bytes = (const unsigned char*)label;
+    return label != nullptr && length <= MRHI_LABEL_BYTES && mrhiIsTextValid(label, length);
+}
+
+bool mrhiIsTextValid(const char* text, size_t length)
+{
+    const unsigned char* bytes = (const unsigned char*)text;
     size_t at = 0;
     while (at < length)
     {

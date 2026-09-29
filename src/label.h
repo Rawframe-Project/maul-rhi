@@ -15,4 +15,7 @@
 // MRHI_LABEL_BYTES.
 bool mrhiIsLabelValid(const char* label, size_t length);
 
+// Whether length bytes, at least 1, are well-formed UTF-8 without NUL.
+bool mrhiIsTextValid(const char* text, size_t length);
+
 #endif // MAUL_RHI_SRC_LABEL_H

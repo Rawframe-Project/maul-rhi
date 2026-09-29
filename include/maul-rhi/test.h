@@ -10,7 +10,7 @@
 #ifndef MAUL_RHI_TEST_H
 #define MAUL_RHI_TEST_H
 
-#include "maul-rhi/frame.h"
+#include "maul-rhi/shader.h"
 
 #include <stdbool.h>
 #include <stddef.h>

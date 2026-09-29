@@ -7,7 +7,7 @@
 #ifndef MAUL_RHI_SRC_CAPABILITIES_CORE_H
 #define MAUL_RHI_SRC_CAPABILITIES_CORE_H
 
-#include "maul-rhi/surface.h"
+#include "maul-rhi/shader.h"
 
 // Whether every feature asked for is granted.
 bool mrhiFeaturesWithin(const mrhiFeatures* asked, const mrhiFeatures* granted);
@@ -63,5 +63,6 @@ extern const mrhiBufferUsage mrhiBufferUsageKnown;
 extern const mrhiTextureUsage mrhiTextureUsageKnown;
 extern const mrhiPresentModes mrhiPresentModesKnown;
 extern const mrhiAlphaModes mrhiAlphaModesKnown;
+extern const mrhiShaderStages mrhiShaderStagesKnown;
 
 #endif // MAUL_RHI_SRC_CAPABILITIES_CORE_H

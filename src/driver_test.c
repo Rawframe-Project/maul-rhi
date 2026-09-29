@@ -178,6 +178,8 @@ typedef struct TestDevice
     uint32_t buffers;
     uint64_t bufferBytes;
     uint32_t textures;
+    // Live shaders; the core destroys each before the device.
+    uint32_t shaders;
     // The last label an object was given, copied as a real driver would.
     char label[MRHI_LABEL_BYTES + 1];
     // Configured surfaces; the core ends each before the device.
@@ -305,6 +307,26 @@ static void DestroySampler(void* self, uint64_t handle)
     --device->samplers;
 }
 
+// A shader, from a container whose code sections the core has checked.
+static mrhiResult CreateShader(void* self, const mrhiShaderDef* def, const mrhiContainer* container,
+                               uint64_t* handleOut)
+{
+    TestDevice* device = self;
+    Name(device, def->label, def->labelLength);
+    MRHI_ASSERT(container->entryCount > 0 && container->spirvBytes >= 20 &&
+                container->wgslBytes > 0);
+    mrhiResult status = MakeObject(device, handleOut);
+    device->shaders += status == mrhi_success ? 1 : 0;
+    return status;
+}
+
+static void DestroyShader(void* self, uint64_t handle)
+{
+    TestDevice* device = self;
+    MRHI_ASSERT(handle != 0 && handle <= device->nextHandle && device->shaders > 0);
+    --device->shaders;
+}
+
 static mrhiResult ConfigureSurface(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
                                    uint64_t oldSwapchain, uint64_t* swapchainOut)
 {
@@ -404,7 +426,7 @@ static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
 static void DestroyDevice(void* self)
 {
     TestDevice* device = self;
-    MRHI_ASSERT(device->swapchains == 0);
+    MRHI_ASSERT(device->swapchains == 0 && device->shaders == 0);
     mrhiAllocator allocator = device->allocator;
     mrhiRelease(&allocator, device, sizeof(TestDevice), alignof(TestDevice));
 }
@@ -423,6 +445,8 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .destroyView = DestroyView,
     .configureSurface = ConfigureSurface,
     .unconfigureSurface = UnconfigureSurface,
+    .createShader = CreateShader,
+    .destroyShader = DestroyShader,
     .textureMemory = TextureMemory,
     .bufferMemory = BufferMemory,
     .submitFrame = SubmitFrame,

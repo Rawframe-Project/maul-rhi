@@ -64,3 +64,7 @@ edit the contract, not this file.
 | `mrhiGetResourcePlan` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiGetPassPlan` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiGetFrameMemory` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDefaultShaderDef` | Safe from any thread. |
+| `mrhiCreateShader` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDestroyShader` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiGetShaderInfo` | Safe from any thread; the device is used by one thread at a time. |

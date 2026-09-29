@@ -134,3 +134,10 @@ format.
   `mrhiGetFrameMemory`), transient textures taking none where the GPU
   keeps them on chip; each target's store kept only when a later kept
   pass reads it or it is imported (`mrhiGetPassPlan`).
+- Shader containers (mrhi-0009, `shader.h`, `docs/contract/container.md`):
+  SPIR-V and WGSL beside one reflection in WebGPU's binding terms,
+  identified by a SHA-256 digest; `mrhiCreateShader` checks every byte
+  as hostile input, `mrhiDestroyShader` and `mrhiGetShaderInfo`; the
+  device's `shaders` limit. `tools/mrhi_container.py` writes them from
+  the two modules and a JSON reflection, refusing code that disagrees
+  with it.

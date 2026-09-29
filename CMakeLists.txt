@@ -46,6 +46,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/base.c
     src/chain.c
     src/compile.c
+    src/container.c
     src/device.c
     src/frame.c
     src/frame_resource.c
@@ -61,6 +62,8 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/plan.c
     src/pool.c
     src/resources.c
+    src/sha256.c
+    src/shader.c
     src/surface.c
     src/swapchain.c
     src/texture.c
@@ -79,6 +82,7 @@ if(MAUL_RHI_BUILD_TESTS)
     maul_add_test(notify WHITEBOX)
     maul_add_test(pool WHITEBOX)
     maul_add_test(label WHITEBOX)
+    maul_add_test(sha256 WHITEBOX)
     maul_add_test(instance)
     if(MAUL_RHI_TEST_DRIVER)
         maul_add_test(adapter)
@@ -95,6 +99,14 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(pass)
         maul_add_test(plan)
         maul_add_test(memory)
+        maul_add_test(shader WHITEBOX)
+        # The container writer against the reader, where Python runs.
+        find_package(Python3 COMPONENTS Interpreter)
+        if(TARGET test_shader AND Python3_Interpreter_FOUND AND NOT CMAKE_CROSSCOMPILING)
+            add_test(NAME container_writer
+                     COMMAND Python3::Interpreter ${PROJECT_SOURCE_DIR}/test/test_container_writer.py
+                             $<TARGET_FILE:test_shader>)
+        endif()
     endif()
     maul_add_header_tests()
 endif()

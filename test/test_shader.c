@@ -1,0 +1,891 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// Shader containers: every rule of docs/contract/container.md broken
+// once against a container built here, the shaders a device makes from
+// them, and, given a file tools/mrhi_container.py wrote and what it
+// should hold, a check that the library reads it the same way.
+
+#include "container.h"
+#include "sha256.h"
+#include "test_device_setup.h"
+
+#include "maul-rhi/shader.h"
+
+#include <stdalign.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define SECTION_ROOM   512
+#define CONTAINER_ROOM 65536
+
+enum
+{
+    META,
+    STRINGS,
+    ENTRIES,
+    BINDINGS,
+    INPUTS,
+    OUTPUTS,
+    CONSTANTS,
+    SPIRV,
+    WGSL,
+    DEFAULT_SECTIONS,
+};
+
+typedef struct Section
+{
+    uint32_t type;
+    uint8_t bytes[SECTION_ROOM];
+    size_t size;
+} Section;
+
+static Section s_sections[65];
+static uint32_t s_sectionCount;
+static alignas(8) uint8_t s_container[CONTAINER_ROOM];
+static size_t s_size;
+
+static void Put16(uint8_t* at, uint16_t value)
+{
+    at[0] = (uint8_t)value;
+    at[1] = (uint8_t)(value >> 8);
+}
+
+static void Put32(uint8_t* at, uint32_t value)
+{
+    Put16(at, (uint16_t)value);
+    Put16(at + 2, (uint16_t)(value >> 16));
+}
+
+static void Put64(uint8_t* at, uint64_t value)
+{
+    Put32(at, (uint32_t)value);
+    Put32(at + 4, (uint32_t)(value >> 32));
+}
+
+// A record of a section, which grows to hold it.
+static uint8_t* Record(uint32_t section, uint32_t index, size_t bytes)
+{
+    size_t end = (index + 1) * bytes;
+    if (s_sections[section].size < end)
+    {
+        s_sections[section].size = end;
+    }
+    return s_sections[section].bytes + index * bytes;
+}
+
+static void Entry(uint32_t index, mrhiShaderStages stage, uint32_t nameOffset, uint32_t nameLength)
+{
+    uint8_t* at = Record(ENTRIES, index, 32);
+    Put32(at, stage);
+    Put32(at + 4, nameOffset);
+    Put32(at + 8, nameLength);
+}
+
+static uint8_t* Binding(uint32_t index, uint8_t table, uint16_t slot, mrhiBindingKind kind,
+                        mrhiShaderStages stages)
+{
+    uint8_t* at = Record(BINDINGS, index, 24);
+    at[0] = table;
+    at[1] = kind;
+    Put16(at + 2, slot);
+    Put32(at + 4, stages);
+    return at;
+}
+
+// The default container's sections: a vertex entry "vs" with one input,
+// a fragment entry "fs" with one output, a compute entry "cs", one
+// binding of each kind, a constant, and minimal code.
+static void Reset(void)
+{
+    memset(s_sections, 0, sizeof(s_sections));
+    s_sectionCount = DEFAULT_SECTIONS;
+    for (uint32_t i = 0; i < DEFAULT_SECTIONS; ++i)
+    {
+        s_sections[i].type = i + 1;
+    }
+    Put32(Record(META, 0, 16), 16);
+    memcpy(Record(STRINGS, 0, 6), "vsfscs", 6);
+    Entry(0, mrhi_stageVertex, 0, 2);
+    Put16(Record(ENTRIES, 0, 32) + 26, 1);
+    Entry(1, mrhi_stageFragment, 2, 2);
+    Put16(Record(ENTRIES, 1, 32) + 30, 1);
+    Entry(2, mrhi_stageCompute, 4, 2);
+    uint8_t* compute = Record(ENTRIES, 2, 32);
+    Put32(compute + 12, 8);
+    Put32(compute + 16, 8);
+    Put32(compute + 20, 1);
+    Put64(Binding(0, 0, 0, mrhi_bindingUniformBuffer, mrhi_stageVertex | mrhi_stageFragment) + 16,
+          64);
+    Binding(1, 0, 1, mrhi_bindingStorageBuffer, mrhi_stageCompute);
+    Binding(2, 0, 2, mrhi_bindingReadOnlyStorageBuffer, mrhi_stageVertex);
+    Binding(3, 0, 3, mrhi_bindingSampler, mrhi_stageFragment)[8] = mrhi_samplerFiltering;
+    uint8_t* sampled = Binding(4, 1, 0, mrhi_bindingSampledTexture, mrhi_stageFragment);
+    sampled[9] = mrhi_sampleFloat;
+    sampled[10] = mrhi_textureCube;
+    uint8_t* storage = Binding(5, 1, 1, mrhi_bindingStorageTexture, mrhi_stageCompute);
+    storage[10] = mrhi_texture2dArray;
+    storage[11] = mrhi_storageWriteOnly;
+    Put16(storage + 12, mrhi_formatRgba8Unorm);
+    uint8_t* input = Record(INPUTS, 0, 8);
+    Put32(input, 3);
+    input[4] = mrhi_vertexFloat32x3;
+    Record(OUTPUTS, 0, 8)[4] = mrhi_outputFloat;
+    uint8_t* constant = Record(CONSTANTS, 0, 16);
+    Put32(constant, 7);
+    constant[4] = mrhi_constantFloat32;
+    Put32(constant + 8, 0x3F800000u);
+    uint8_t* spirv = Record(SPIRV, 0, 20);
+    Put32(spirv, 0x07230203u);
+    Put32(spirv + 4, 0x00010300u);
+    memcpy(Record(WGSL, 0, 8), "fn x(){}", 8);
+}
+
+// Writes the digest of the container's bytes past it.
+static void Seal(void)
+{
+    mrhiSha256(s_container + 48, s_size - 48, s_container + 16);
+}
+
+// Lays the sections out after the header and table, 8-byte aligned,
+// and seals the container.
+static void Assemble(void)
+{
+    memset(s_container, 0, sizeof(s_container));
+    memcpy(s_container, "MRSC", 4);
+    Put32(s_container + 4, 1);
+    Put32(s_container + 48, s_sectionCount);
+    size_t offset = 64 + (size_t)s_sectionCount * 24;
+    for (uint32_t i = 0; i < s_sectionCount; ++i)
+    {
+        uint8_t* record = s_container + 64 + (size_t)i * 24;
+        Put32(record, s_sections[i].type);
+        Put64(record + 8, offset);
+        Put64(record + 16, s_sections[i].size);
+        memcpy(s_container + offset, s_sections[i].bytes, s_sections[i].size);
+        offset += (s_sections[i].size + 7) & ~(size_t)7;
+    }
+    s_size = offset;
+    Put64(s_container + 8, s_size);
+    Seal();
+}
+
+// Parses a copy of exactly the container's bytes, so that a read past
+// them is caught under the sanitizers.
+static mrhiResult Parse(void)
+{
+    uint8_t* copy = malloc(s_size);
+    CHECK(copy != nullptr, "room for a copy");
+    if (copy == nullptr)
+    {
+        return mrhi_errorCapacity;
+    }
+    memcpy(copy, s_container, s_size);
+    mrhiContainer container;
+    mrhiResult status = mrhiParseContainer(copy, s_size, &container);
+    free(copy);
+    return status;
+}
+
+// Assembles the sections and parses them.
+static mrhiResult Built(void)
+{
+    Assemble();
+    return Parse();
+}
+
+// Removes a section.
+static void Drop(uint32_t section)
+{
+    memmove(&s_sections[section], &s_sections[section + 1],
+            (s_sectionCount - section - 1) * sizeof(Section));
+    --s_sectionCount;
+}
+
+static void TestDefault(void)
+{
+    Reset();
+    Assemble();
+    mrhiContainer container;
+    CHECK(mrhiParseContainer(s_container, s_size, &container) == mrhi_success, "it parses");
+    CHECK(memcmp(container.digest, s_container + 16, MRHI_DIGEST_BYTES) == 0, "its digest");
+    CHECK(container.rootBlockBytes == 16 && container.entryCount == 3 &&
+              container.bindingCount == 6 && container.inputCount == 1 &&
+              container.outputCount == 1 && container.constantCount == 1 &&
+              container.spirvBytes == 20 && container.wgslBytes == 8 && container.stringBytes == 6,
+          "its counts");
+    mrhiShaderEntry compute = mrhiContainerEntry(&container, 2);
+    CHECK(compute.stage == mrhi_stageCompute && compute.nameOffset == 4 &&
+              compute.nameLength == 2 && compute.workgroup[0] == 8 && compute.workgroup[2] == 1,
+          "an entry");
+    mrhiShaderEntry vertex = mrhiContainerEntry(&container, 0);
+    CHECK(vertex.inputCount == 1 && vertex.outputCount == 0, "the vertex entry's input");
+    mrhiShaderBinding uniform = mrhiContainerBinding(&container, 0);
+    CHECK(uniform.kind == mrhi_bindingUniformBuffer && uniform.minSize == 64 &&
+              uniform.stages == (mrhi_stageVertex | mrhi_stageFragment),
+          "a buffer binding");
+    mrhiShaderBinding storage = mrhiContainerBinding(&container, 5);
+    CHECK(storage.table == 1 && storage.slot == 1 && storage.access == mrhi_storageWriteOnly &&
+              storage.format == mrhi_formatRgba8Unorm &&
+              storage.viewDimension == mrhi_texture2dArray,
+          "a storage texture binding");
+    CHECK(mrhiContainerInput(&container, 0).location == 3 &&
+              mrhiContainerInput(&container, 0).format == mrhi_vertexFloat32x3,
+          "the input");
+    CHECK(mrhiContainerOutput(&container, 0).kind == mrhi_outputFloat, "the output");
+    mrhiShaderConstant constant = mrhiContainerConstant(&container, 0);
+    CHECK(constant.id == 7 && constant.type == mrhi_constantFloat32 && constant.bits == 0x3F800000u,
+          "the constant");
+    for (uint32_t section = BINDINGS; section <= CONSTANTS; ++section)
+    {
+        Reset();
+        Drop(section);
+        if (section == INPUTS)
+        {
+            Put16(Record(ENTRIES, 0, 32) + 26, 0);
+        }
+        if (section == OUTPUTS)
+        {
+            Put16(Record(ENTRIES, 1, 32) + 30, 0);
+        }
+        CHECK(Built() == mrhi_success, "an optional section left out");
+    }
+    Reset();
+    s_sections[s_sectionCount++] = (Section){.type = 100, .size = 3};
+    s_sections[s_sectionCount++] = (Section){.type = 100, .size = 0};
+    CHECK(Built() == mrhi_success, "unknown sections skipped, even repeated");
+}
+
+static void TestHeader(void)
+{
+    Reset();
+    Assemble();
+    CHECK(mrhiParseContainer(s_container, 63, &(mrhiContainer){0}) == mrhi_errorInvalid,
+          "shorter than a header");
+    s_container[0] = 'm';
+    CHECK(Parse() == mrhi_errorInvalid, "another magic");
+    Assemble();
+    Put32(s_container + 4, 2);
+    CHECK(Parse() == mrhi_errorVersion, "another version");
+    Assemble();
+    Put32(s_container + 4, 0);
+    CHECK(Parse() == mrhi_errorVersion, "version 0");
+    Assemble();
+    Put64(s_container + 8, s_size + 8);
+    CHECK(Parse() == mrhi_errorInvalid, "a size past the bytes");
+    Assemble();
+    CHECK(mrhiParseContainer(s_container, s_size - 8, &(mrhiContainer){0}) == mrhi_errorInvalid,
+          "fewer bytes than its size");
+    Assemble();
+    s_container[s_size - 1] ^= 1;
+    CHECK(Parse() == mrhi_errorInvalid, "a damaged byte");
+    Assemble();
+    s_container[20] ^= 0x80;
+    CHECK(Parse() == mrhi_errorInvalid, "a damaged digest");
+    for (size_t at = 52; at < 64; at += 4)
+    {
+        Assemble();
+        s_container[at] = 1;
+        Seal();
+        CHECK(Parse() == mrhi_errorInvalid, "a header zero that is not zero");
+    }
+    Assemble();
+    Put32(s_container + 48, 65);
+    Seal();
+    CHECK(Parse() == mrhi_errorInvalid, "too many sections");
+    Assemble();
+    Put32(s_container + 48, 30);
+    Seal();
+    CHECK(Parse() == mrhi_errorInvalid, "a table past the end");
+}
+
+// Sets section index's offset, or size, in the assembled table.
+static void Move(uint32_t index, uint64_t offset, uint64_t size)
+{
+    Put64(s_container + 64 + (size_t)index * 24 + 8, offset);
+    Put64(s_container + 64 + (size_t)index * 24 + 16, size);
+    Seal();
+}
+
+static uint64_t OffsetOf(uint32_t index)
+{
+    const uint8_t* at = s_container + 64 + (size_t)index * 24 + 8;
+    uint64_t value = 0;
+    for (int i = 7; i >= 0; --i)
+    {
+        value = value << 8 | at[i];
+    }
+    return value;
+}
+
+static void TestSections(void)
+{
+    Reset();
+    Assemble();
+    Move(WGSL, OffsetOf(WGSL) + 4, 4);
+    CHECK(Parse() == mrhi_errorInvalid, "a misaligned section");
+    Assemble();
+    Move(META, 64, 16);
+    CHECK(Parse() == mrhi_errorInvalid, "a section in the table");
+    Reset();
+    s_sections[s_sectionCount++] = (Section){.type = 100};
+    Assemble();
+    Move(s_sectionCount - 1, 64 + (uint64_t)s_sectionCount * 24 - 8, 0);
+    CHECK(Parse() == mrhi_errorInvalid, "an empty section in the table's last record");
+    Move(s_sectionCount - 1, s_size, 0);
+    CHECK(Parse() == mrhi_success, "an empty section at the end");
+    s_sections[s_sectionCount - 1].size = 8;
+    Assemble();
+    Move(s_sectionCount - 1, OffsetOf(s_sectionCount - 1), 9);
+    CHECK(Parse() == mrhi_errorInvalid, "an unknown section a byte past the end");
+    Move(s_sectionCount - 1, OffsetOf(s_sectionCount - 1), 0 - OffsetOf(s_sectionCount - 1));
+    CHECK(Parse() == mrhi_errorInvalid, "an unknown section whose end wraps to 0");
+    Reset();
+    while (s_sectionCount < 64)
+    {
+        s_sections[s_sectionCount++] = (Section){.type = 100};
+    }
+    CHECK(Built() == mrhi_success, "64 sections");
+    s_sections[s_sectionCount++] = (Section){.type = 100};
+    CHECK(Built() == mrhi_errorInvalid, "65 sections");
+    Reset();
+    Assemble();
+    uint32_t fit = (uint32_t)((s_size - 64) / 24);
+    Put32(s_container + 48, fit + 1);
+    Seal();
+    CHECK(Parse() == mrhi_errorInvalid, "a table a record past the end");
+    Assemble();
+    Move(WGSL, OffsetOf(SPIRV), 8);
+    CHECK(Parse() == mrhi_errorInvalid, "overlapping sections");
+    Assemble();
+    Move(WGSL, OffsetOf(WGSL), 9);
+    CHECK(Parse() == mrhi_errorInvalid, "a section a byte past the end");
+    Assemble();
+    uint8_t first[24];
+    memcpy(first, s_container + 64, 24);
+    memmove(s_container + 64, s_container + 88, 24);
+    memcpy(s_container + 88, first, 24);
+    Seal();
+    CHECK(Parse() == mrhi_success, "touching sections listed out of order");
+    Assemble();
+    Move(WGSL, OffsetOf(WGSL), UINT64_MAX);
+    CHECK(Parse() == mrhi_errorInvalid, "a size that wraps");
+    Assemble();
+    s_container[64 + 4] = 1;
+    Seal();
+    CHECK(Parse() == mrhi_errorInvalid, "a table zero that is not zero");
+    Reset();
+    s_sections[s_sectionCount++] = s_sections[CONSTANTS];
+    CHECK(Built() == mrhi_errorInvalid, "a known section twice");
+    Reset();
+    s_sections[s_sectionCount++] = s_sections[WGSL];
+    CHECK(Built() == mrhi_errorInvalid, "the last known section twice");
+    Reset();
+    s_sections[s_sectionCount++] = (Section){.type = 100, .size = 8};
+    Assemble();
+    Move(s_sectionCount - 1, OffsetOf(WGSL), 8);
+    CHECK(Parse() == mrhi_errorInvalid, "an unknown section overlapping");
+    uint32_t required[] = {META, STRINGS, ENTRIES, SPIRV, WGSL};
+    for (size_t i = 0; i < sizeof(required) / sizeof(required[0]); ++i)
+    {
+        Reset();
+        Drop(required[i]);
+        CHECK(Built() == mrhi_errorInvalid, "a required section left out");
+    }
+    Reset();
+    s_sections[ENTRIES].size = 0;
+    CHECK(Built() == mrhi_errorInvalid, "no entries");
+    uint32_t arrays[] = {ENTRIES, BINDINGS, INPUTS, OUTPUTS, CONSTANTS};
+    for (size_t i = 0; i < sizeof(arrays) / sizeof(arrays[0]); ++i)
+    {
+        Reset();
+        s_sections[arrays[i]].size += 4;
+        CHECK(Built() == mrhi_errorInvalid, "a part of a record");
+    }
+}
+
+static void TestMeta(void)
+{
+    Reset();
+    s_sections[META].size = 12;
+    CHECK(Built() == mrhi_errorInvalid, "a short meta");
+    Reset();
+    Put32(s_sections[META].bytes, 18);
+    CHECK(Built() == mrhi_errorInvalid, "a root block not a multiple of 4");
+    Reset();
+    Put32(s_sections[META].bytes, 260);
+    CHECK(Built() == mrhi_errorInvalid, "a root block past 256");
+    Reset();
+    Put32(s_sections[META].bytes, 256);
+    CHECK(Built() == mrhi_success, "a root block of 256");
+    Reset();
+    s_sections[META].bytes[15] = 1;
+    CHECK(Built() == mrhi_errorInvalid, "a meta zero that is not zero");
+}
+
+static void TestEntries(void)
+{
+    mrhiShaderStages stages[] = {0, mrhi_stageVertex | mrhi_stageFragment, 8};
+    for (size_t i = 0; i < sizeof(stages) / sizeof(stages[0]); ++i)
+    {
+        Reset();
+        Put32(Record(ENTRIES, 2, 32), stages[i]);
+        CHECK(Built() == mrhi_errorInvalid, "not one stage");
+    }
+    Reset();
+    Entry(0, mrhi_stageVertex, 0, 0);
+    CHECK(Built() == mrhi_errorInvalid, "an empty name");
+    Reset();
+    Entry(0, mrhi_stageVertex, 5, 2);
+    CHECK(Built() == mrhi_errorInvalid, "a name past the strings");
+    Reset();
+    Entry(0, mrhi_stageVertex, UINT32_MAX, 2);
+    CHECK(Built() == mrhi_errorInvalid, "a name offset that wraps");
+    Reset();
+    Entry(0, mrhi_stageVertex, 2, 2);
+    CHECK(Built() == mrhi_errorInvalid, "a repeated name");
+    Reset();
+    Entry(1, mrhi_stageFragment, 0, 1);
+    CHECK(Built() == mrhi_success, "a name that is the start of one before it");
+    Reset();
+    s_sections[STRINGS].bytes[0] = 0xFF;
+    CHECK(Built() == mrhi_errorInvalid, "a name that is not UTF-8");
+    Reset();
+    s_sections[STRINGS].bytes[1] = 0;
+    CHECK(Built() == mrhi_errorInvalid, "a name with NUL");
+    Reset();
+    memset(Record(STRINGS, 0, 263) + 6, 'a', 257);
+    Entry(0, mrhi_stageVertex, 6, 257);
+    CHECK(Built() == mrhi_errorInvalid, "a name past 256 bytes");
+    Entry(0, mrhi_stageVertex, 6, 256);
+    CHECK(Built() == mrhi_success, "a name of 256 bytes");
+    for (uint32_t axis = 0; axis < 3; ++axis)
+    {
+        Reset();
+        Put32(Record(ENTRIES, 2, 32) + 12 + axis * 4, 0);
+        CHECK(Built() == mrhi_errorInvalid, "a compute entry with no workgroup");
+        Reset();
+        Put32(Record(ENTRIES, 1, 32) + 12 + axis * 4, 1);
+        CHECK(Built() == mrhi_errorInvalid, "a fragment entry with a workgroup");
+    }
+    Reset();
+    Put16(Record(ENTRIES, 1, 32) + 26, 1);
+    CHECK(Built() == mrhi_errorInvalid, "inputs on a fragment entry");
+    Reset();
+    Put16(Record(ENTRIES, 0, 32) + 30, 1);
+    CHECK(Built() == mrhi_errorInvalid, "outputs on a vertex entry");
+    Reset();
+    Put16(Record(ENTRIES, 0, 32) + 24, 1);
+    CHECK(Built() == mrhi_errorInvalid, "inputs past their section");
+    Reset();
+    Put16(Record(ENTRIES, 1, 32) + 28, UINT16_MAX);
+    CHECK(Built() == mrhi_errorInvalid, "outputs far past their section");
+}
+
+static void TestInterfaces(void)
+{
+    uint8_t formats[] = {mrhi_vertexNone, mrhi_vertexUnorm1010102 + 1};
+    for (size_t i = 0; i < sizeof(formats); ++i)
+    {
+        Reset();
+        Record(INPUTS, 0, 8)[4] = formats[i];
+        CHECK(Built() == mrhi_errorInvalid, "an unknown vertex format");
+    }
+    Reset();
+    Record(INPUTS, 0, 8)[4] = mrhi_vertexUnorm1010102;
+    CHECK(Built() == mrhi_success, "the last vertex format");
+    Reset();
+    Record(INPUTS, 0, 8)[7] = 1;
+    CHECK(Built() == mrhi_errorInvalid, "an input zero that is not zero");
+    Reset();
+    Record(INPUTS, 1, 8)[4] = mrhi_vertexNone;
+    CHECK(Built() == mrhi_errorInvalid, "an input no entry names, of no format");
+    Reset();
+    uint8_t* unnamed = Record(OUTPUTS, 1, 8);
+    unnamed[4] = mrhi_outputFloat;
+    Put32(unnamed, MRHI_COLOR_TARGETS);
+    CHECK(Built() == mrhi_errorInvalid, "an output no entry names, past the targets");
+    Reset();
+    uint8_t* second = Record(INPUTS, 1, 8);
+    Put32(second, 3);
+    second[4] = mrhi_vertexUint32;
+    Put16(Record(ENTRIES, 0, 32) + 26, 2);
+    CHECK(Built() == mrhi_errorInvalid, "a repeated input location");
+    Put32(second, 4);
+    CHECK(Built() == mrhi_success, "two input locations");
+    uint8_t kinds[] = {mrhi_outputNone, mrhi_outputUint + 1};
+    for (size_t i = 0; i < sizeof(kinds); ++i)
+    {
+        Reset();
+        Record(OUTPUTS, 0, 8)[4] = kinds[i];
+        CHECK(Built() == mrhi_errorInvalid, "an unknown output kind");
+    }
+    Reset();
+    Put32(Record(OUTPUTS, 0, 8), MRHI_COLOR_TARGETS);
+    CHECK(Built() == mrhi_errorInvalid, "an output past the color targets");
+    Put32(Record(OUTPUTS, 0, 8), MRHI_COLOR_TARGETS - 1);
+    CHECK(Built() == mrhi_success, "the last color target");
+    Record(OUTPUTS, 0, 8)[5] = 1;
+    CHECK(Built() == mrhi_errorInvalid, "an output zero that is not zero");
+    Reset();
+    Record(OUTPUTS, 1, 8)[4] = mrhi_outputSint;
+    Put16(Record(ENTRIES, 1, 32) + 30, 2);
+    CHECK(Built() == mrhi_errorInvalid, "a repeated output location");
+    Put32(Record(OUTPUTS, 1, 8), 1);
+    CHECK(Built() == mrhi_success, "two output locations");
+}
+
+// Resets, then breaks binding index's byte at to value.
+static mrhiResult BindingWith(uint32_t index, size_t at, uint8_t value)
+{
+    Reset();
+    Record(BINDINGS, index, 24)[at] = value;
+    return Built();
+}
+
+static void TestBindings(void)
+{
+    CHECK(BindingWith(0, 0, 4) == mrhi_errorInvalid, "a fifth table");
+    CHECK(BindingWith(0, 0, 3) == mrhi_success, "the fourth table");
+    CHECK(BindingWith(2, 1, mrhi_bindingNone) == mrhi_errorInvalid, "no kind");
+    CHECK(BindingWith(2, 1, mrhi_bindingStorageTexture + 1) == mrhi_errorInvalid,
+          "an unknown kind");
+    CHECK(BindingWith(0, 4, 0) == mrhi_errorInvalid, "no stages");
+    CHECK(BindingWith(0, 4, 8) == mrhi_errorInvalid, "an unknown stage");
+    CHECK(BindingWith(1, 4, mrhi_stageVertex) == mrhi_errorInvalid,
+          "a vertex stage writing a storage buffer");
+    CHECK(BindingWith(5, 4, mrhi_stageVertex) == mrhi_errorInvalid,
+          "a vertex stage writing a storage texture");
+    Reset();
+    uint8_t* storage = Record(BINDINGS, 5, 24);
+    storage[4] = mrhi_stageVertex;
+    storage[11] = mrhi_storageReadOnly;
+    CHECK(Built() == mrhi_success, "a vertex stage reading a storage texture");
+    CHECK(BindingWith(0, 2, 1) == mrhi_errorInvalid, "a repeated table and slot");
+    CHECK(BindingWith(3, 8, mrhi_samplerNone) == mrhi_errorInvalid, "a sampler with no type");
+    CHECK(BindingWith(3, 8, mrhi_samplerComparison + 1) == mrhi_errorInvalid,
+          "an unknown sampler type");
+    CHECK(BindingWith(3, 8, mrhi_samplerComparison) == mrhi_success, "a comparison sampler");
+    CHECK(BindingWith(0, 8, mrhi_samplerFiltering) == mrhi_errorInvalid, "a buffer's sampler type");
+    CHECK(BindingWith(4, 9, mrhi_sampleNone) == mrhi_errorInvalid, "no sample type");
+    CHECK(BindingWith(4, 9, mrhi_sampleUint + 1) == mrhi_errorInvalid, "an unknown sample type");
+    CHECK(BindingWith(3, 9, mrhi_sampleFloat) == mrhi_errorInvalid, "a sampler's sample type");
+    CHECK(BindingWith(4, 10, mrhi_texture3d + 1) == mrhi_errorInvalid, "an unknown dimension");
+    CHECK(BindingWith(0, 10, mrhi_texture2dArray) == mrhi_errorInvalid, "a buffer's dimension");
+    CHECK(BindingWith(5, 10, mrhi_textureCube) == mrhi_errorInvalid, "a storage cube");
+    CHECK(BindingWith(5, 10, mrhi_texture3d) == mrhi_success, "a 3D storage texture");
+    CHECK(BindingWith(5, 11, mrhi_storageNone) == mrhi_errorInvalid, "no access");
+    CHECK(BindingWith(5, 11, mrhi_storageReadWrite + 1) == mrhi_errorInvalid, "an unknown access");
+    CHECK(BindingWith(4, 11, mrhi_storageReadOnly) == mrhi_errorInvalid, "a sampled access");
+    CHECK(BindingWith(5, 12, 0) == mrhi_errorInvalid, "a storage texture with no format");
+    CHECK(BindingWith(5, 12, 0xFF) == mrhi_errorInvalid, "an unknown format");
+    CHECK(BindingWith(4, 12, mrhi_formatRgba8Unorm) == mrhi_errorInvalid, "a sampled format");
+    CHECK(BindingWith(4, 14, 1) == mrhi_errorInvalid, "a filterable multisampled cube");
+    Reset();
+    uint8_t* sampled = Record(BINDINGS, 4, 24);
+    sampled[9] = mrhi_sampleUnfilterableFloat;
+    sampled[10] = mrhi_texture2d;
+    sampled[14] = 1;
+    CHECK(Built() == mrhi_success, "an unfilterable multisampled 2D texture");
+    sampled[14] = 2;
+    CHECK(Built() == mrhi_errorInvalid, "multisampled neither 0 nor 1");
+    sampled[14] = 1;
+    sampled[10] = mrhi_texture2dArray;
+    CHECK(Built() == mrhi_errorInvalid, "a multisampled array");
+    sampled[10] = mrhi_texture2d;
+    sampled[9] = mrhi_sampleFloat;
+    CHECK(Built() == mrhi_errorInvalid, "a filterable multisampled texture");
+    CHECK(BindingWith(0, 14, 1) == mrhi_errorInvalid, "a multisampled buffer");
+    CHECK(BindingWith(0, 15, 1) == mrhi_errorInvalid, "a binding zero that is not zero");
+    CHECK(BindingWith(4, 16, 1) == mrhi_errorInvalid, "a texture's minimum size");
+    CHECK(BindingWith(3, 23, 1) == mrhi_errorInvalid, "a sampler's minimum size");
+    CHECK(BindingWith(1, 23, 1) == mrhi_success, "a storage buffer's minimum size");
+}
+
+static void TestConstantsAndCode(void)
+{
+    Reset();
+    Record(CONSTANTS, 0, 16)[4] = mrhi_constantNone;
+    CHECK(Built() == mrhi_errorInvalid, "a constant with no type");
+    Record(CONSTANTS, 0, 16)[4] = mrhi_constantFloat32 + 1;
+    CHECK(Built() == mrhi_errorInvalid, "an unknown constant type");
+    Reset();
+    uint8_t* flag = Record(CONSTANTS, 1, 16);
+    flag[4] = mrhi_constantBool;
+    Put32(flag, 8);
+    Put32(flag + 8, 1);
+    CHECK(Built() == mrhi_success, "a true boolean");
+    Put32(flag + 8, 2);
+    CHECK(Built() == mrhi_errorInvalid, "a boolean neither 0 nor 1");
+    Put32(flag + 8, 0);
+    Put32(flag, 7);
+    CHECK(Built() == mrhi_errorInvalid, "a repeated constant id");
+    size_t zeros[] = {5, 6, 7, 12, 15};
+    for (size_t i = 0; i < sizeof(zeros) / sizeof(zeros[0]); ++i)
+    {
+        Reset();
+        Record(CONSTANTS, 0, 16)[zeros[i]] = 1;
+        CHECK(Built() == mrhi_errorInvalid, "a constant zero that is not zero");
+    }
+    Reset();
+    s_sections[SPIRV].size = 16;
+    CHECK(Built() == mrhi_errorInvalid, "SPIR-V shorter than its header");
+    Reset();
+    s_sections[SPIRV].size = 22;
+    CHECK(Built() == mrhi_errorInvalid, "SPIR-V not in words");
+    Reset();
+    s_sections[SPIRV].bytes[0] = 0x04;
+    CHECK(Built() == mrhi_errorInvalid, "SPIR-V without its magic");
+    Reset();
+    s_sections[WGSL].size = 0;
+    CHECK(Built() == mrhi_errorInvalid, "empty WGSL");
+    Reset();
+    s_sections[WGSL].bytes[3] = 0xC0;
+    CHECK(Built() == mrhi_errorInvalid, "WGSL that is not UTF-8");
+    Reset();
+    s_sections[WGSL].bytes[7] = 0;
+    CHECK(Built() == mrhi_errorInvalid, "WGSL with NUL");
+}
+
+// A container whose input section is moved past the others and holds
+// count records, each valid on its own.
+static mrhiResult WithInputs(uint32_t count)
+{
+    Reset();
+    Assemble();
+    size_t offset = s_size;
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        uint8_t* input = s_container + offset + (size_t)i * 8;
+        memset(input, 0, 8);
+        input[4] = mrhi_vertexFloat32;
+    }
+    s_size = offset + (size_t)count * 8;
+    Put64(s_container + 8, s_size);
+    Move(INPUTS, offset, (uint64_t)count * 8);
+    return Parse();
+}
+
+static void TestRecordLimit(void)
+{
+    CHECK(WithInputs(4096) == mrhi_success, "4096 records");
+    CHECK(WithInputs(4097) == mrhi_errorInvalid, "4097 records");
+}
+
+// Every single-bit flip of the default container is refused: the digest
+// covers every byte past it, and the header's fields before it are all
+// checked.
+static void TestEveryFlip(void)
+{
+    Reset();
+    Assemble();
+    bool refused = true;
+    for (size_t at = 0; at < s_size; ++at)
+    {
+        for (int bit = 0; bit < 8; ++bit)
+        {
+            s_container[at] ^= (uint8_t)(1u << bit);
+            refused = refused && Parse() != mrhi_success;
+            s_container[at] ^= (uint8_t)(1u << bit);
+        }
+    }
+    CHECK(refused, "every flipped bit refused");
+    CHECK(Parse() == mrhi_success, "restored");
+}
+
+// Fails the device's allocations while s_failAllocations is set.
+static bool s_failAllocations;
+
+static void* Alloc(size_t size, size_t alignment, void* context)
+{
+    (void)alignment;
+    (void)context;
+    return s_failAllocations ? nullptr : malloc(size);
+}
+
+static void Free(void* memory, size_t size, size_t alignment, void* context)
+{
+    (void)size;
+    (void)alignment;
+    (void)context;
+    free(memory);
+}
+
+static mrhiDevice* Open(uint32_t shaders, bool ready)
+{
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.deviceLimits.shaders = shaders;
+    def.allocator = (mrhiAllocator){.alloc = Alloc, .free = Free};
+    return OpenWith(def, ready);
+}
+
+static mrhiShaderDef Def(void)
+{
+    mrhiShaderDef def = mrhiDefaultShaderDef();
+    def.bytes = s_container;
+    def.byteCount = s_size;
+    return def;
+}
+
+static void TestCreate(void)
+{
+    Reset();
+    Assemble();
+    mrhiDevice* device = Open(2, true);
+    mrhiShaderDef def = Def();
+    def.label = "lit";
+    def.labelLength = 3;
+    mrhiShaderId a = {0};
+    CHECK(mrhiCreateShader(device, &def, &a) == mrhi_success && a.index1 != 0, "a shader");
+    memset(s_container, 0, s_size);
+    mrhiShaderInfo info = {0};
+    CHECK(mrhiGetShaderInfo(device, a, &info) == mrhi_success, "its info");
+    Reset();
+    Assemble();
+    CHECK(memcmp(info.digest, s_container + 16, MRHI_DIGEST_BYTES) == 0 && info.entryCount == 3 &&
+              info.bindingCount == 6 && info.rootBlockBytes == 16,
+          "kept past the container's bytes");
+    mrhiShaderId b = {0};
+    CHECK(mrhiCreateShader(device, &def, &b) == mrhi_success, "a second from the same bytes");
+    mrhiShaderId c = {0};
+    CHECK(mrhiCreateShader(device, &def, &c) == mrhi_errorCapacity, "the limit");
+    CHECK(mrhiDestroyShader(device, a) == mrhi_success, "destroyed");
+    CHECK(mrhiDestroyShader(device, a) == mrhi_errorStale, "its id has ended");
+    CHECK(mrhiGetShaderInfo(device, a, &info) == mrhi_errorStale, "no info for it");
+    CHECK(mrhiCreateShader(device, &def, &c) == mrhi_success, "room again");
+    CHECK(mrhiDestroyShader(nullptr, b) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiGetShaderInfo(nullptr, b, &info) == mrhi_errorInvalid, "no device for info");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "no misuse");
+    // b and c are still live: the device frees them.
+    Close(device);
+}
+
+static void TestRefusals(void)
+{
+    Reset();
+    Assemble();
+    mrhiDevice* device = Open(4, true);
+    mrhiShaderId shader;
+    mrhiShaderDef def = Def();
+    CHECK(mrhiCreateShader(nullptr, &def, &shader) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiCreateShader(device, nullptr, &shader) == mrhi_errorInvalid, "no def");
+    CHECK(mrhiCreateShader(device, &def, nullptr) == mrhi_errorInvalid, "no out");
+    CHECK(mrhiGetShaderInfo(device, shader, nullptr) == mrhi_errorInvalid, "no info out");
+    def.cookie = 0;
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorInvalid, "no cookie");
+    def = Def();
+    def.label = "\xC0\x80";
+    def.labelLength = 2;
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorInvalid, "a bad label");
+    def = Def();
+    def.bytes = nullptr;
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorInvalid, "no bytes");
+    def = Def();
+    memmove(s_container + 4, s_container, s_size);
+    def.bytes = s_container + 4;
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorInvalid, "misaligned bytes");
+    Assemble();
+    s_container[s_size - 1] ^= 1;
+    def = Def();
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorInvalid, "a damaged container");
+    CHECK(mrhiGetDeviceMisuse(device) == 8, "each counted");
+    Assemble();
+    Put32(s_container + 4, 2);
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorVersion, "another version");
+    Put32(s_sections[META].bytes, mrhiDefaultLimits().rootBlockBytes + 4);
+    Assemble();
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported,
+          "a root block past the device's");
+    Put32(s_sections[META].bytes, mrhiDefaultLimits().rootBlockBytes);
+    Assemble();
+    mrhiChain critical = {.next = nullptr, .type = 0x7000u};
+    def.next = &critical;
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported, "an extension");
+    CHECK(mrhiGetDeviceMisuse(device) == 8, "other refusals are not misuse");
+    def.next = nullptr;
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "the device's root block");
+    Close(device);
+}
+
+static void TestStateAndFailure(void)
+{
+    Reset();
+    Assemble();
+    mrhiDevice* device = Open(2, false);
+    mrhiShaderDef def = Def();
+    mrhiShaderId a;
+    mrhiShaderId b;
+    CHECK(mrhiCreateShader(device, &def, &a) == mrhi_errorState, "not ready yet");
+    mrhiInstanceNotification record;
+    CHECK(mrhiNextInstanceNotification(s_instance, &record) == mrhi_success, "ready");
+    s_failAllocations = true;
+    CHECK(mrhiCreateShader(device, &def, &a) == mrhi_errorCapacity, "the allocator fails");
+    s_failAllocations = false;
+    CHECK(mrhiCreateShader(device, &def, &a) == mrhi_success, "one");
+    CHECK(mrhiCreateShader(device, &def, &b) == mrhi_success, "no slot was lost");
+    Close(device);
+    s_adapter.objectsBeforeFailure = 1;
+    device = Open(2, true);
+    CHECK(mrhiCreateShader(device, &def, &a) == mrhi_success, "the one the driver makes");
+    CHECK(mrhiCreateShader(device, &def, &b) == mrhi_errorPlatform, "the driver fails");
+    CHECK(mrhiCreateShader(device, &def, &b) == mrhi_errorPlatform, "again, no slot lost");
+    CHECK(mrhiDestroyShader(device, a) == mrhi_success, "the made one destroyed");
+    Close(device);
+}
+
+// Reads a written container and checks what it holds: its digest in
+// hex, its entry and binding counts, and its root block.
+static int CheckFile(char** args)
+{
+    FILE* file = fopen(args[0], "rb");
+    CHECK(file != nullptr, "the file opens");
+    if (file == nullptr)
+    {
+        return 1;
+    }
+    s_size = fread(s_container, 1, sizeof(s_container), file);
+    fclose(file);
+    uint8_t digest[MRHI_DIGEST_BYTES];
+    for (int i = 0; i < MRHI_DIGEST_BYTES; ++i)
+    {
+        unsigned value = 0;
+        CHECK(sscanf(args[1] + 2 * i, "%2x", &value) == 1, "a digest in hex");
+        digest[i] = (uint8_t)value;
+    }
+    mrhiDevice* device = Open(1, true);
+    mrhiShaderDef def = Def();
+    mrhiShaderId shader;
+    mrhiShaderInfo info = {0};
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "the library reads it");
+    CHECK(mrhiGetShaderInfo(device, shader, &info) == mrhi_success, "its info");
+    CHECK(memcmp(info.digest, digest, MRHI_DIGEST_BYTES) == 0, "the same digest");
+    CHECK(info.entryCount == (uint32_t)atoi(args[2]) &&
+              info.bindingCount == (uint32_t)atoi(args[3]) &&
+              info.rootBlockBytes == (uint32_t)atoi(args[4]),
+          "the same reflection");
+    Close(device);
+    return s_failures == 0 ? 0 : 1;
+}
+
+int main(int argc, char** argv)
+{
+    ResetAdapter();
+    if (argc == 6)
+    {
+        return CheckFile(argv + 1);
+    }
+    TestDefault();
+    TestHeader();
+    TestSections();
+    TestMeta();
+    TestEntries();
+    TestInterfaces();
+    TestBindings();
+    TestConstantsAndCode();
+    TestRecordLimit();
+    TestEveryFlip();
+    TestCreate();
+    TestRefusals();
+    TestStateAndFailure();
+    return s_failures == 0 ? 0 : 1;
+}

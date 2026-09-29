@@ -72,10 +72,26 @@ static void TestBound(void)
     CHECK(mrhiIsLabelValid(bytes, MRHI_LABEL_BYTES), "a sequence ending at the bound");
 }
 
+// Text is checked as labels are, at any length.
+static void TestText(void)
+{
+    char bytes[1000];
+    memset(bytes, 'a', sizeof(bytes));
+    CHECK(mrhiIsTextValid(bytes, sizeof(bytes)), "text past a label's bound");
+    bytes[998] = (char)0xC3;
+    bytes[999] = (char)0xB6;
+    CHECK(mrhiIsTextValid(bytes, sizeof(bytes)), "a sequence ending the text");
+    CHECK(!mrhiIsTextValid(bytes, sizeof(bytes) - 1), "a sequence cut by the length");
+    bytes[500] = '\0';
+    CHECK(!mrhiIsTextValid(bytes, sizeof(bytes)), "a NUL inside");
+    CHECK(!mrhiIsTextValid("\xED\xA0\x80", 3), "a surrogate");
+}
+
 int main(void)
 {
     TestWellFormed();
     TestIllFormed();
     TestBound();
+    TestText();
     return s_failures == 0 ? 0 : 1;
 }

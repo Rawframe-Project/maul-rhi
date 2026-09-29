@@ -8,6 +8,7 @@
 #define MAUL_RHI_SRC_DEVICE_CORE_H
 
 #include "capabilities_core.h"
+#include "container.h"
 #include "driver.h"
 #include "pool.h"
 
@@ -157,6 +158,30 @@ typedef struct mrhiSwapchainSlot
     mrhiSurfaceConfig config;
 } mrhiSwapchainSlot;
 
+// A shader container as its device keeps it: its driver handle, digest
+// and root block, and its reflection in one block from the device's
+// allocator, NULL for a free slot. The entries' names are packed after
+// the records, and each entry's nameOffset points into them.
+typedef struct mrhiShaderSlot
+{
+    uint64_t handle;
+    uint8_t digest[MRHI_DIGEST_BYTES];
+    uint32_t rootBlockBytes;
+    uint32_t entryCount;
+    uint32_t bindingCount;
+    uint32_t inputCount;
+    uint32_t outputCount;
+    uint32_t constantCount;
+    mrhiShaderEntry* entries;
+    mrhiShaderBinding* bindings;
+    mrhiShaderInput* inputs;
+    mrhiShaderOutput* outputs;
+    mrhiShaderConstant* constants;
+    const char* names;
+    void* reflection;
+    size_t reflectionBytes;
+} mrhiShaderSlot;
+
 struct mrhiDevice
 {
     mrhiInstance* instance;
@@ -187,6 +212,8 @@ struct mrhiDevice
     // The surfaces it configured.
     mrhiPool swapchains;
     mrhiSwapchainSlot* swapchainSlots;
+    mrhiPool shaders;
+    mrhiShaderSlot* shaderSlots;
     // Frames: whether one is open and its serial, never 0, its resources,
     // the last token given, and the tokens of the frames the GPU has not
     // finished, at most framesInFlight.
@@ -311,5 +338,8 @@ void mrhiEndConfiguration(mrhiDevice* device, uint32_t swapchain);
 
 // Ends every configuration the device holds.
 void mrhiEndConfigurations(mrhiDevice* device);
+
+// Destroys every shader the device holds, in its driver and its tables.
+void mrhiDestroyShaders(mrhiDevice* device);
 
 #endif // MAUL_RHI_SRC_DEVICE_CORE_H

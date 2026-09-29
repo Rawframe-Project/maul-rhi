@@ -63,6 +63,8 @@ extern "C"
         uint32_t frameAccesses;
         // Barriers one frame's compile plans; 4096 by default.
         uint32_t frameBarriers;
+        // Shader containers the device holds at once; 256 by default.
+        uint32_t shaders;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the

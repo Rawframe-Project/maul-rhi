@@ -32,6 +32,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.framePasses = 256;
     def.deviceLimits.frameAccesses = 4096;
     def.deviceLimits.frameBarriers = 4096;
+    def.deviceLimits.shaders = 256;
     return def;
 }
 
@@ -47,9 +48,9 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
         def->deviceLimits.textures == 0 || def->deviceLimits.views == 0 ||
         def->deviceLimits.surfaces == 0 || def->deviceLimits.frameResources == 0 ||
         def->deviceLimits.framePasses == 0 || def->deviceLimits.frameAccesses == 0 ||
-        def->deviceLimits.frameBarriers == 0 || !mrhiIsLabelValid(def->label, def->labelLength) ||
-        !mrhiIsAllocatorValid(&def->allocator) || !mrhiLimitsWithin(&floor, &def->limits) ||
-        chain == mrhi_errorInvalid)
+        def->deviceLimits.frameBarriers == 0 || def->deviceLimits.shaders == 0 ||
+        !mrhiIsLabelValid(def->label, def->labelLength) || !mrhiIsAllocatorValid(&def->allocator) ||
+        !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
     {
         *statusOut = mrhiMisuse(instance);
         return nullptr;
@@ -120,6 +121,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
         AddTable(&layout, limits->views, sizeof(mrhiViewSlot), alignof(mrhiViewSlot));
     TableParts swapchains =
         AddTable(&layout, limits->surfaces, sizeof(mrhiSwapchainSlot), alignof(mrhiSwapchainSlot));
+    TableParts shaders =
+        AddTable(&layout, limits->shaders, sizeof(mrhiShaderSlot), alignof(mrhiShaderSlot));
     size_t runningAt =
         mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
     size_t resourcesAt = mrhiLayoutAdd(&layout, limits->frameResources, sizeof(mrhiFrameResource),
@@ -153,6 +156,11 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     device->textureSlots = InitTable(block, textures, &device->textures, limits->textures);
     device->viewSlots = InitTable(block, views, &device->views, limits->views);
     device->swapchainSlots = InitTable(block, swapchains, &device->swapchains, limits->surfaces);
+    device->shaderSlots = InitTable(block, shaders, &device->shaders, limits->shaders);
+    for (uint32_t i = 0; i < limits->shaders; ++i)
+    {
+        device->shaderSlots[i] = (mrhiShaderSlot){0};
+    }
     device->running = (uint32_t*)(block + runningAt);
     device->queue = (mrhiDeviceNotification*)(block + queueAt);
     device->frameResources = (mrhiFrameResource*)(block + resourcesAt);
@@ -249,6 +257,7 @@ void mrhiDestroyDevice(mrhiDevice* device)
     if (device->driver.vtable != nullptr)
     {
         mrhiEndConfigurations(device);
+        mrhiDestroyShaders(device);
         device->driver.vtable->destroy(device->driver.self);
     }
     --instance->deviceCount;

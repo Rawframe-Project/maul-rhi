@@ -8,6 +8,8 @@
 #ifndef MAUL_RHI_SRC_DRIVER_H
 #define MAUL_RHI_SRC_DRIVER_H
 
+#include "container.h"
+
 #include "maul-rhi/frame.h"
 
 // The SPI version a driver's vtable must carry.
@@ -60,6 +62,13 @@ typedef struct mrhiDeviceDriverVtable
     mrhiResult (*configureSurface)(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
                                    uint64_t oldSwapchain, uint64_t* swapchainOut);
     void (*unconfigureSurface)(void* self, uint64_t swapchain);
+    // Makes a shader from a container the core has checked, labeled by
+    // the def; its handle, never zero. The container's bytes are only
+    // read during the call. The core destroys every shader before its
+    // device.
+    mrhiResult (*createShader)(void* self, const mrhiShaderDef* def, const mrhiContainer* container,
+                               uint64_t* handleOut);
+    void (*destroyShader)(void* self, uint64_t handle);
     // The bytes a declared texture with its derived usages takes, and
     // their alignment, a power of two; 0 bytes when the GPU keeps it on
     // chip.
