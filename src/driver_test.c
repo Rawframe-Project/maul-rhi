@@ -17,6 +17,10 @@
 // platform's capacity.
 #define TEST_SURFACES 16
 
+// A device's first object handle less one: handles pass 32 bits, so a
+// handle the core cut to 32 bits names nothing.
+#define HANDLE_BASE (UINT64_C(1) << 32)
+
 // A test surface slot.
 typedef struct TestSurface
 {
@@ -621,6 +625,7 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
     }
     *device = (TestDevice){
         .allocator = driver->allocator,
+        .nextHandle = HANDLE_BASE,
         .madeBeforeFailure = driver->adapters[adapter - 1].objectsBeforeFailure,
         .holdFrames = driver->adapters[adapter - 1].holdFrames,
         .frameOutcome = driver->adapters[adapter - 1].frameOutcome,

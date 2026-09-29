@@ -247,7 +247,7 @@ mrhiResult mrhiBeginOcclusionQuery(mrhiDevice* device, mrhiPassId id, uint32_t q
     {
         return mrhi_errorCapacity;
     }
-    *record = (mrhiCommand){.type = mrhiCommandBeginOcclusionQuery, .a = set->handle, .b = query};
+    *record = (mrhiCommand){.type = mrhiCommandBeginOcclusionQuery, .a = query, .b = set->handle};
     return mrhi_success;
 }
 
@@ -316,9 +316,9 @@ mrhiResult mrhiResolveQueries(mrhiDevice* device, mrhiPassId id, mrhiQuerySetId 
     }
     *record = (mrhiCommand){
         .type = mrhiCommandResolveQueries,
-        .a = slot->handle,
-        .b = first | (uint64_t)count << 32,
-        .c = object,
+        .a = object,
+        .b = slot->handle,
+        .c = first | (uint64_t)count << 32,
         .d = offset,
     };
     return mrhi_success;

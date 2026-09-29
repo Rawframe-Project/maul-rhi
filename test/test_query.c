@@ -316,7 +316,7 @@ static void TestOcclusion(void)
     CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 2) == mrhi_success, "begun");
     const mrhiCommand* command = Nth(s_render, 0);
     CHECK(command != nullptr && command->type == mrhiCommandBeginOcclusionQuery &&
-              command->a == s_device->querySetSlots[set.index1 - 1].handle && command->b == 2,
+              command->b == s_device->querySetSlots[set.index1 - 1].handle && command->a == 2,
           "recorded with the set's handle");
     CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 3) == mrhi_errorInvalid, "one open");
     CHECK(mrhiEndPass(s_device, s_render) == mrhi_errorInvalid, "no end while open");
@@ -571,13 +571,13 @@ static void TestResolve(void)
           "every query");
     const mrhiCommand* command = Nth(s_compute, 0);
     CHECK(command != nullptr && command->type == mrhiCommandResolveQueries &&
-              command->a == s_device->querySetSlots[set.index1 - 1].handle &&
-              command->b == 0 + (64ull << 32) && command->c == s_r.index1 && command->d == 0,
+              command->b == s_device->querySetSlots[set.index1 - 1].handle &&
+              command->c == 0 + (64ull << 32) && command->a == s_r.index1 && command->d == 0,
           "recorded");
     CHECK(mrhiResolveQueries(s_device, s_compute, set, 63, 1, s_r, 768) == mrhi_success,
           "the last into the last 256 bytes");
     command = Nth(s_compute, 1);
-    CHECK(command != nullptr && command->b == 63 + (1ull << 32) && command->d == 768,
+    CHECK(command != nullptr && command->c == 63 + (1ull << 32) && command->d == 768,
           "recorded with its first query and offset");
     CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 32, s_r, 768) == mrhi_success &&
               mrhiResolveQueries(s_device, s_compute, set, 0, 0, s_r, 1024) == mrhi_success,

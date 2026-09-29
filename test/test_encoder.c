@@ -235,14 +235,14 @@ static void TestPipelines(void)
           "a graphics pipeline for its targets");
     const mrhiCommand* command = Nth(s_render, 0);
     CHECK(command != nullptr && command->type == mrhiCommandGraphicsPipeline &&
-              command->a == s_device->pipelineSlots[s_graphics.index1 - 1].handle &&
+              command->b == s_device->pipelineSlots[s_graphics.index1 - 1].handle &&
               command->payload == 0,
           "recorded");
     CHECK(mrhiSetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_success,
           "a compute pipeline");
     command = Nth(s_dispatch, 0);
     CHECK(command != nullptr && command->type == mrhiCommandComputePipeline &&
-              command->a == s_device->pipelineSlots[s_compute.index1 - 1].handle,
+              command->b == s_device->pipelineSlots[s_compute.index1 - 1].handle,
           "recorded");
     CHECK(mrhiSetComputePipeline(s_device, s_render, s_compute) == mrhi_errorInvalid,
           "no dispatch in a render pass");
@@ -275,12 +275,12 @@ static void TestPipelines(void)
     CHECK(Nth(s_render, 1) != nullptr && Nth(s_render, 2) == nullptr, "two records");
     // The stream keeps the handle: a slot freed and taken again while the
     // frame records names another pipeline.
-    uint64_t handle = Nth(s_render, 1)->a;
+    uint64_t handle = Nth(s_render, 1)->b;
     CHECK(mrhiDestroyGraphicsPipeline(s_device, pending) == mrhi_success &&
               mrhiCreateGraphicsPipeline(s_device, &def, &pending, &request) == mrhi_success,
           "destroyed and its slot taken again");
     CHECK(pending.index1 != 0 && s_device->pipelineSlots[pending.index1 - 1].handle != handle &&
-              Nth(s_render, 1)->a == handle,
+              Nth(s_render, 1)->b == handle,
           "the recorded handle unchanged");
     CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_success, "answered");
     CHECK(mrhiGetDeviceMisuse(s_device) == 6, "none of that misuse");

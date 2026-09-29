@@ -10,10 +10,11 @@
 
 #include <stdint.h>
 
-// What a command record does. Fields a to d hold its operands.
+// What a command record does. Fields a to d hold its operands; a is 32
+// bits, so a driver handle goes in b, c or d.
 typedef enum mrhiCommandType
 {
-    // a: the pipeline's driver handle.
+    // b: the pipeline's driver handle.
     mrhiCommandGraphicsPipeline = 1,
     mrhiCommandComputePipeline,
     // a: the offset; b: the size; the bytes follow.
@@ -50,11 +51,11 @@ typedef enum mrhiCommandType
     mrhiCommandDrawIndirect,
     mrhiCommandDrawIndexedIndirect,
     mrhiCommandDispatchIndirect,
-    // a: the query set's driver handle; b: the query.
+    // a: the query; b: the query set's driver handle.
     mrhiCommandBeginOcclusionQuery,
     mrhiCommandEndOcclusionQuery,
-    // a: the query set's driver handle; b: the first query, and the count
-    // in the upper half; c: the frame resource's slot plus one; d: the
+    // a: the frame resource's slot plus one; b: the query set's driver
+    // handle; c: the first query, and the count in the upper half; d: the
     // offset.
     mrhiCommandResolveQueries,
     // b, c, d: the width (the bytes of a copy between buffers), height

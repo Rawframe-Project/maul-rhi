@@ -226,3 +226,6 @@ format.
 - Command streams name pipelines, samplers and query sets by their
   driver handles, so an object destroyed and its slot reused while a
   frame records never changes what the frame's streams name.
+- Clang builds for 64-bit targets warn when a 64-bit value is cut to
+  32 bits (`-Wshorten-64-to-32`), and the test driver's handles start
+  above 32 bits.

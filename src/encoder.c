@@ -277,7 +277,7 @@ mrhiResult mrhiSetGraphicsPipeline(mrhiDevice* device, mrhiPassId id,
     }
     pass->pipeline = pipeline.index1;
     pass->pipelineGeneration = pipeline.generation;
-    mrhiCommand command = {.type = mrhiCommandGraphicsPipeline, .a = slot->handle};
+    mrhiCommand command = {.type = mrhiCommandGraphicsPipeline, .b = slot->handle};
     return Record(device, pass, command, nullptr, 0);
 }
 
@@ -305,7 +305,7 @@ mrhiResult mrhiSetComputePipeline(mrhiDevice* device, mrhiPassId id, mrhiCompute
     }
     pass->pipeline = pipeline.index1;
     pass->pipelineGeneration = pipeline.generation;
-    mrhiCommand command = {.type = mrhiCommandComputePipeline, .a = slot->handle};
+    mrhiCommand command = {.type = mrhiCommandComputePipeline, .b = slot->handle};
     return Record(device, pass, command, nullptr, 0);
 }
 
