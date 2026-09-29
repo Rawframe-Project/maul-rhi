@@ -1056,6 +1056,42 @@ static void CheckDrawFrame(Scene* scene)
     CHECK(Taken(device, scaled, (const uint8_t*)values, sizeof(values)), "scaled by 3");
 }
 
+// A target cleared to a color whose channels all differ reads back as
+// that color, channel by channel.
+static void CheckClear(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    BeginScene(scene);
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.colorTargets[0] = (mrhiColorTarget){
+        .resource = scene->t,
+        .load = mrhi_loadClear,
+        .store = mrhi_storeKeep,
+        .clear = {0.2f, 0.4f, 0.6f, 0.8f},
+    };
+    def.colorTargetCount = 1;
+    mrhiPassId clear = {0};
+    CHECK(mrhiAddPass(device, &def, &clear) == mrhi_success, "a clearing pass");
+    mrhiAccess reads = Whole(scene->t, mrhi_accessCopySource);
+    mrhiPassId read = CopyPass(device, &reads, 1);
+    CHECK(mrhiCompileFrame(device) == mrhi_success &&
+              mrhiBeginPass(device, clear) == mrhi_success &&
+              mrhiEndPass(device, clear) == mrhi_success &&
+              mrhiBeginPass(device, read) == mrhi_success,
+          "cleared");
+    mrhiRequestId pixels = ReadTarget(scene, read);
+    CHECK(mrhiEndPass(device, read) == mrhi_success, "read");
+    Finish(device, 1);
+    uint8_t image[256];
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success &&
+              size == sizeof(image),
+          "the pixels");
+    static const uint8_t kCleared[4] = {51, 102, 153, 204};
+    CHECK(!s_runs || (IsNear(&image[0], kCleared) && IsNear(&image[(7 * 8 + 7) * 4], kCleared)),
+          "the clear color, channel by channel");
+}
+
 // A counter-clockwise triangle with clockwise front faces and back
 // faces culled draws nothing.
 static void CheckCulling(Scene* scene)
@@ -1484,6 +1520,7 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     Scene scene = {.device = device};
     MakeScene(&scene);
     CheckDrawFrame(&scene);
+    CheckClear(&scene);
     CheckCulling(&scene);
     CheckQueries(&scene, timestamps);
     CheckRenderState(&scene);
