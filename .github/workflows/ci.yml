@@ -81,6 +81,8 @@ jobs:
         env:
           MAUL_RHI_REQUIRE_VULKAN: ${{ runner.os == 'Linux' && '1' || '' }}
           VK_INSTANCE_LAYERS: ${{ runner.os == 'Linux' && 'VK_LAYER_KHRONOS_validation' || '' }}
+          # Synchronization validation checks the barriers the graph makes.
+          VK_KHRONOS_VALIDATION_VALIDATE_SYNC: "true"
         run: ctest --test-dir build --output-on-failure
 
   windows-clang-cl:

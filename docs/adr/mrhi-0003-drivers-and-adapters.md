@@ -60,15 +60,27 @@ ids, requests, the frame graph) can be tested without a GPU.
   made at the call, with no thread, and answered at the next poll; the
   device keeps one pipeline cache, which takes a blob only when
   Vulkan's own header names the device and its cache UUID.
+- **Vulkan frames:** each frame in flight has a slot: its command
+  buffer, its transients made at submission and bound where the core
+  placed them in the slot's block (grown when a frame needs more), its
+  mapped staging, and the readback ranges it fills. A frame signals the
+  device's timeline semaphore with its serial, so a poll reads one
+  counter, copies finished frames' readbacks into the core's ring and
+  reports them in order. A destroyed object waits in a queue and is
+  destroyed once the next frame submitted after its destruction
+  finishes; the driver's tables hold twice the objects the core allows,
+  so a program may replace each object once between submissions. The
+  core's resource states map to Vulkan stages, accesses and layouts for
+  its barriers.
 - **Conformance:** `test_conformance` runs the same checks through the
   public API on the test driver and on every native adapter, with a
   shader container made offline from `test/shaders/` by
   `tools/gen_test_shaders.py` (glslang, spirv-link, spirv-val and the
   container writer), committed as bytes so CI needs no shader tools. A host
   without one skips it unless `MAUL_RHI_REQUIRE_VULKAN` is set; Linux
-  CI sets it, runs lavapipe, and enables the Khronos validation layer,
-  which logs to each test's output; CTest fails any test whose output
-  reports a validation error.
+  CI sets it, runs lavapipe, and enables the Khronos validation layer
+  with synchronization validation, which logs to each test's output;
+  CTest fails any test whose output reports a validation error.
 
 ## Consequences
 

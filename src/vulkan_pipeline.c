@@ -325,7 +325,7 @@ mrhiResult mrhiVulkanCreateCompute(mrhiVulkanPipelines* pipelines,
     return mrhi_success;
 }
 
-void mrhiVulkanDestroyPipeline(mrhiVulkanPipelines* pipelines, uint64_t handle)
+void mrhiVulkanForgetPipeline(mrhiVulkanPipelines* pipelines, uint64_t handle)
 {
     for (uint32_t i = 0; i < pipelines->pendingCount; ++i)
     {
@@ -339,6 +339,11 @@ void mrhiVulkanDestroyPipeline(mrhiVulkanPipelines* pipelines, uint64_t handle)
             break;
         }
     }
+}
+
+void mrhiVulkanDestroyPipeline(mrhiVulkanPipelines* pipelines, uint64_t handle)
+{
+    mrhiVulkanForgetPipeline(pipelines, handle);
     DestroyPipeline(pipelines, &pipelines->pipelines[handle - 1]);
     mrhiVulkanGivePipeline(pipelines, (uint32_t)handle);
 }

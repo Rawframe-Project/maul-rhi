@@ -263,8 +263,11 @@ format.
   ones, one queue and a timeline semaphore; buffers, textures, views
   and samplers are made in device-local memory suballocated with TLSF;
   shaders and compute and graphics pipelines are made, answered at the
-  next poll, with a pipeline cache. Surfaces, queries and frames on it
-  are refused as unsupported until they land.
+  next poll, with a pipeline cache. Frames of copies, uploads and
+  readbacks run, with transients in each frame slot's memory, and
+  destroyed objects retire after the next frame finishes. Surfaces,
+  queries and passes that draw or dispatch on it are refused as
+  unsupported until they land.
 - The conformance suite (`test_conformance`): the same checks through
   the public API on the test driver and every native adapter, run on
   lavapipe under the Khronos validation layer in Linux CI.

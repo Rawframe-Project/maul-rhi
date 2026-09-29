@@ -1,0 +1,131 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// A Vulkan device's frames (mrhi-0003, mrhi-0013): a slot per frame in
+// flight with its command buffer, its transients' memory and objects,
+// its mapped staging and the readbacks it fills; the timeline semaphore
+// whose value counts the frames finished; and the queue of destroyed
+// objects, retired once the next frame submitted after their
+// destruction finishes.
+
+#ifndef MAUL_RHI_SRC_VULKAN_FRAME_H
+#define MAUL_RHI_SRC_VULKAN_FRAME_H
+
+#include "vulkan_pipeline.h"
+
+#include "maul-rhi/device.h"
+
+// What a destroyed object waiting to retire is.
+typedef enum mrhiVulkanRetired
+{
+    mrhiVulkanRetiredBuffer,
+    mrhiVulkanRetiredTexture,
+    mrhiVulkanRetiredView,
+    mrhiVulkanRetiredSampler,
+    mrhiVulkanRetiredPipeline,
+} mrhiVulkanRetired;
+
+typedef struct mrhiVulkanRetire
+{
+    // The frame whose end retires it: the frames submitted when it was
+    // destroyed, plus one.
+    uint64_t serial;
+    uint64_t handle;
+    mrhiVulkanRetired kind;
+} mrhiVulkanRetire;
+
+// A range of the readback ring a frame fills.
+typedef struct mrhiVulkanRange
+{
+    uint64_t offset;
+    uint64_t size;
+} mrhiVulkanRange;
+
+typedef struct mrhiVulkanSlot
+{
+    VkCommandPool pool;
+    VkCommandBuffer commands;
+    // The core's tag while its frame runs; 0 when idle.
+    uint64_t tag;
+    // The frame's serial, the timeline value its end signals.
+    uint64_t serial;
+    // The transients' block and its size.
+    VkDeviceMemory memory;
+    VkDeviceSize memoryBytes;
+    uint32_t memoryType;
+    // The frame's transients by frame slot, and memory of their own for
+    // a target a tile GPU keeps on chip.
+    VkImage* images;
+    VkBuffer* buffers;
+    VkDeviceMemory* own;
+    uint32_t transients;
+    VkDeviceMemory stagingMemory;
+    VkBuffer staging;
+    uint8_t* stagingBytes;
+    // The core's ring and the ranges of it the frame fills.
+    uint8_t* ring;
+    mrhiVulkanRange* readbacks;
+    uint32_t readbackCount;
+} mrhiVulkanSlot;
+
+typedef struct mrhiVulkanFrames
+{
+    const mrhiVulkanDevice* api;
+    VkDevice device;
+    VkQueue queue;
+    VkSemaphore timeline;
+    VkFormat depthStencil;
+    const VkPhysicalDeviceMemoryProperties* memory;
+    mrhiVulkanObjects* objects;
+    mrhiVulkanPipelines* pipelines;
+    mrhiVulkanSlot* slots;
+    uint32_t slotCount;
+    uint32_t readbackLimit;
+    // Frames submitted, and frames reported finished.
+    uint64_t submitted;
+    uint64_t finished;
+    VkDeviceMemory readbackMemory;
+    VkBuffer readback;
+    uint8_t* readbackBytes;
+    VkDeviceSize readbackSize;
+    bool readbackCoherent;
+    VkDeviceSize atom;
+    mrhiVulkanRetire* retire;
+    uint32_t retireFirst;
+    uint32_t retireCount;
+    uint32_t retireCapacity;
+    bool lost;
+} mrhiVulkanFrames;
+
+// Makes each slot's command pool on the queue family, its buffer and
+// staging, and the readback buffer, for a device with these limits:
+// mrhi_success, or the error.
+mrhiResult mrhiVulkanFramesInit(mrhiVulkanFrames* frames, uint32_t family,
+                                const mrhiDeviceLimits* limits);
+
+// Destroys everything the frames hold, the retiring objects included,
+// on an idle device.
+void mrhiVulkanFramesDestroy(mrhiVulkanFrames* frames);
+
+// Records and submits a frame: mrhi_success, mrhi_errorUnsupported for
+// work this driver does not run yet, mrhi_errorCapacity, or
+// mrhi_errorDeviceLost.
+mrhiResult mrhiVulkanSubmit(mrhiVulkanFrames* frames, const mrhiDriverFrame* frame, uint64_t tag);
+
+// Moves up to capacity finished frames into events, in order, their
+// readbacks filled and their objects and the objects they retire gone;
+// or reports the device's loss with tag 0.
+size_t mrhiVulkanPollFrames(mrhiVulkanFrames* frames, mrhiDriverEvent* events, size_t capacity);
+
+// Waits up to timeoutNs for a running frame: whether it finished.
+bool mrhiVulkanWaitFrame(mrhiVulkanFrames* frames, uint64_t tag, uint64_t timeoutNs);
+
+// Destroys an object once the next frame submitted finishes.
+void mrhiVulkanRetireLater(mrhiVulkanFrames* frames, mrhiVulkanRetired kind, uint64_t handle);
+
+// Records a frame's work into its slot's command buffer
+// (vulkan_record.c): mrhi_errorUnsupported for work not run yet.
+mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
+                            const mrhiDriverFrame* frame);
+
+#endif // MAUL_RHI_SRC_VULKAN_FRAME_H

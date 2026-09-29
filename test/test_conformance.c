@@ -14,6 +14,7 @@
 
 #include "maul-rhi/capabilities.h"
 #include "maul-rhi/device.h"
+#include "maul-rhi/encoder.h"
 #include "maul-rhi/frame.h"
 #include "maul-rhi/instance.h"
 #include "maul-rhi/pipeline.h"
@@ -262,6 +263,164 @@ static void CheckFrameMemory(mrhiDevice* device)
     CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
 }
 
+static mrhiPassId CopyPass(mrhiDevice* device, const mrhiAccess* accesses, uint32_t count)
+{
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.accesses = accesses;
+    def.accessCount = count;
+    def.neverCull = true;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(device, &def, &pass) == mrhi_success, "a pass");
+    return pass;
+}
+
+static mrhiAccess Whole(mrhiResourceId resource, mrhiAccessKind kind)
+{
+    return (mrhiAccess){
+        .resource = resource,
+        .kind = kind,
+        .range = {.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING},
+    };
+}
+
+// Submits the open frame, waits for it, and takes the device's
+// notifications: the frame done and its readbacks answered.
+static void Finish(mrhiDevice* device, uint32_t readbacks)
+{
+    mrhiRequestId token = {0};
+    CHECK(mrhiSubmitFrame(device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success, "finished");
+    mrhiDeviceNotification record;
+    uint32_t done = 0;
+    uint32_t answered = 0;
+    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    {
+        CHECK(record.outcome == mrhi_success, "a success");
+        done += record.kind == mrhi_deviceFrameDone ? 1 : 0;
+        answered += record.kind == mrhi_deviceReadbackReady ? 1 : 0;
+    }
+    CHECK(done == 1 && answered == readbacks, "the frame and its readbacks answered");
+}
+
+// Whether the device's driver runs work: the test driver moves no
+// bytes, so only its answers are checked.
+static bool s_runs;
+
+static bool Taken(mrhiDevice* device, mrhiRequestId request, const uint8_t* expected, size_t size)
+{
+    static uint8_t bytes[4096];
+    size_t taken = 0;
+    return mrhiTakeReadback(device, request, bytes, sizeof(bytes), &taken) == mrhi_success &&
+           taken == size && (!s_runs || memcmp(bytes, expected, size) == 0);
+}
+
+// Bytes and texels uploaded to device objects, copied through a
+// transient buffer and read back; then read again in a frame that
+// destroys the buffer after recording, which it must keep until the
+// frame finishes.
+static void CheckRoundTrip(mrhiDevice* device)
+{
+    uint8_t pattern[1024];
+    for (size_t i = 0; i < sizeof(pattern); ++i)
+    {
+        pattern[i] = (uint8_t)(i * 7 + 3);
+    }
+    mrhiBufferId buffer = MakeBuffer(device, sizeof(pattern));
+    mrhiTextureDef textureDef = mrhiDefaultTextureDef();
+    textureDef.format = mrhi_formatRgba8Unorm;
+    textureDef.width = 16;
+    textureDef.height = 16;
+    textureDef.usage = mrhi_textureCopySource | mrhi_textureCopyDestination;
+    mrhiTextureId texture = {0};
+    CHECK(mrhiCreateTexture(device, &textureDef, &texture) == mrhi_success, "a texture");
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiResourceId b = {0};
+    mrhiResourceId t = {0};
+    mrhiResourceId x = {0};
+    mrhiResourceId y = {0};
+    mrhiBufferDef transient = mrhiDefaultBufferDef();
+    transient.size = 256;
+    CHECK(mrhiImportBuffer(device, buffer, &b) == mrhi_success &&
+              mrhiImportTexture(device, texture, &t) == mrhi_success &&
+              mrhiDeclareBuffer(device, &transient, &x) == mrhi_success &&
+              mrhiDeclareBuffer(device, &transient, &y) == mrhi_success,
+          "the resources");
+    mrhiAccess writes[2] = {Whole(b, mrhi_accessCopyDestination),
+                            Whole(t, mrhi_accessCopyDestination)};
+    mrhiPassId upload = CopyPass(device, writes, 2);
+    mrhiAccess moves[3] = {Whole(b, mrhi_accessCopySource), Whole(x, mrhi_accessCopyDestination),
+                           Whole(y, mrhi_accessCopyDestination)};
+    mrhiPassId move = CopyPass(device, moves, 3);
+    mrhiAccess reads[3] = {Whole(x, mrhi_accessCopySource), Whole(y, mrhi_accessCopySource),
+                           Whole(t, mrhi_accessCopySource)};
+    mrhiPassId read = CopyPass(device, reads, 3);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    const mrhiTextureCopy texels = {.resource = t};
+    const mrhiTexelLayout layout = {.bytesPerRow = 64, .rowsPerImage = 16};
+    const mrhiExtent3d extent = {16, 16, 1};
+    mrhiRequestId fromX = {0};
+    mrhiRequestId fromY = {0};
+    mrhiRequestId fromT = {0};
+    CHECK(mrhiBeginPass(device, upload) == mrhi_success &&
+              mrhiWriteBuffer(device, upload, b, 0, pattern, sizeof(pattern)) == mrhi_success &&
+              mrhiWriteTexture(device, upload, &texels, pattern, sizeof(pattern), &layout,
+                               &extent) == mrhi_success &&
+              mrhiEndPass(device, upload) == mrhi_success,
+          "uploaded");
+    CHECK(mrhiBeginPass(device, move) == mrhi_success &&
+              mrhiCopyBuffer(device, move, b, 256, x, 0, 256) == mrhi_success &&
+              mrhiCopyBuffer(device, move, b, 768, y, 0, 256) == mrhi_success &&
+              mrhiEndPass(device, move) == mrhi_success,
+          "copied");
+    CHECK(mrhiBeginPass(device, read) == mrhi_success &&
+              mrhiReadBuffer(device, read, x, 0, 256, &fromX) == mrhi_success &&
+              mrhiReadBuffer(device, read, y, 0, 256, &fromY) == mrhi_success &&
+              mrhiReadTexture(device, read, &texels, &extent, &fromT) == mrhi_success &&
+              mrhiEndPass(device, read) == mrhi_success,
+          "read");
+    Finish(device, 3);
+    CHECK(Taken(device, fromX, pattern + 256, 256), "the buffer's bytes, through a transient");
+    CHECK(Taken(device, fromY, pattern + 768, 256), "a second transient apart from the first");
+    CHECK(Taken(device, fromT, pattern, sizeof(pattern)), "the texture's texels");
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "another frame");
+    CHECK(mrhiImportBuffer(device, buffer, &b) == mrhi_success, "imported again");
+    mrhiAccess again = Whole(b, mrhi_accessCopySource);
+    read = CopyPass(device, &again, 1);
+    CHECK(mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, read) == mrhi_success &&
+              mrhiReadBuffer(device, read, b, 512, 512, &fromX) == mrhi_success &&
+              mrhiEndPass(device, read) == mrhi_success,
+          "read again");
+    CHECK(mrhiDestroyBuffer(device, buffer) == mrhi_success, "destroyed while recorded");
+    Finish(device, 1);
+    CHECK(Taken(device, fromX, pattern + 512, 512), "kept across frames and until the end");
+}
+
+// A device allowed one buffer replaces it every frame: a destroyed
+// buffer retires when the next frame finishes, freeing room.
+static void CheckRetirement(mrhiInstance* instance, mrhiAdapterId adapter)
+{
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.adapter = adapter;
+    def.deviceLimits.buffers = 1;
+    mrhiDevice* device = nullptr;
+    mrhiRequestId request;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "a device");
+    mrhiInstanceNotification record;
+    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success, "ready");
+    for (int i = 0; i < 4; ++i)
+    {
+        mrhiBufferId buffer = MakeBuffer(device, 256);
+        CHECK(mrhiDestroyBuffer(device, buffer) == mrhi_success, "destroyed");
+        mrhiFrameDef frame = mrhiDefaultFrameDef();
+        CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+                  mrhiCompileFrame(device) == mrhi_success,
+              "an empty frame");
+        Finish(device, 0);
+    }
+    mrhiDestroyDevice(device);
+}
+
 // A pipeline cache a device exported, for the next device to import.
 static uint8_t s_cache[1u << 20];
 static size_t s_cacheBytes;
@@ -398,6 +557,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CheckObjects(device);
     CheckFrameMemory(device);
     CheckPipelines(device);
+    CheckRoundTrip(device);
     mrhiDestroyDevice(device);
 }
 
@@ -407,6 +567,7 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
 {
     mrhiAdapterId ids[16];
     size_t count = Search(instance, ids, 16);
+    s_runs = driver != mrhi_driverTest;
     for (size_t i = 0; i < count; ++i)
     {
         mrhiAdapterInfo info;
@@ -422,6 +583,7 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
         CheckDevice(instance, ids[i], &all);
         CheckCacheImport(instance, ids[i]);
+        CheckRetirement(instance, ids[i]);
     }
     mrhiAdapterId again[16];
     CHECK(Search(instance, again, 16) == count && memcmp(ids, again, count * sizeof(ids[0])) == 0,

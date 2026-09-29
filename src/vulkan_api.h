@@ -66,7 +66,21 @@
     X(vkDestroyPipeline)                                                                           \
     X(vkCreatePipelineCache)                                                                       \
     X(vkDestroyPipelineCache)                                                                      \
-    X(vkGetPipelineCacheData)
+    X(vkGetPipelineCacheData)                                                                      \
+    X(vkCreateCommandPool)                                                                         \
+    X(vkDestroyCommandPool)                                                                        \
+    X(vkResetCommandPool)                                                                          \
+    X(vkAllocateCommandBuffers)                                                                    \
+    X(vkBeginCommandBuffer)                                                                        \
+    X(vkEndCommandBuffer)                                                                          \
+    X(vkQueueSubmit2)                                                                              \
+    X(vkMapMemory)                                                                                 \
+    X(vkInvalidateMappedMemoryRanges)                                                              \
+    X(vkCmdPipelineBarrier2)                                                                       \
+    X(vkCmdCopyBuffer)                                                                             \
+    X(vkCmdCopyBufferToImage)                                                                      \
+    X(vkCmdCopyImageToBuffer)                                                                      \
+    X(vkCmdCopyImage)
 
 #define MRHI_VULKAN_FIELD(name) PFN_##name name;
 

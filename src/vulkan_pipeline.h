@@ -77,6 +77,9 @@ mrhiResult mrhiVulkanCreateGraphics(mrhiVulkanPipelines* pipelines,
                                     const mrhiDriverGraphicsPipeline* pipeline, uint64_t tag,
                                     uint64_t* handleOut);
 
+// Drops a pipeline's answer if it is still pending.
+void mrhiVulkanForgetPipeline(mrhiVulkanPipelines* pipelines, uint64_t handle);
+
 // Destroys a pipeline, dropping its answer if it is still pending.
 void mrhiVulkanDestroyPipeline(mrhiVulkanPipelines* pipelines, uint64_t handle);
 
