@@ -205,3 +205,8 @@ format.
   `mrhi_deviceReadbackReady`; `mrhiTakeReadback` copies the bytes out
   once, a texture's rows tightly packed, and frees them in order. A
   dropped or failed frame gives its ring room back.
+- Query sets (mrhi-0012): `mrhiCreateQuerySet`, `mrhiDestroyQuerySet`
+  and `mrhiDefaultQuerySetDef` (`mrhiQuerySetDef`, `mrhiQueryType`),
+  occlusion or timestamp sets of up to 4096 queries, timestamps with
+  the `timestamp_query` feature, within the device's `querySets` and
+  `queries` limits.

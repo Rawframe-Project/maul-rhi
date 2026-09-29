@@ -40,6 +40,8 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.frameUploadBytes = 1u << 20;
     def.deviceLimits.readbackBytes = 1u << 20;
     def.deviceLimits.readbacks = 64;
+    def.deviceLimits.querySets = 16;
+    def.deviceLimits.queries = 4096;
     return def;
 }
 
@@ -118,6 +120,79 @@ static void* InitTable(unsigned char* block, TableParts parts, mrhiPool* pool, u
     return block + parts.payload;
 }
 
+// Where the tables of the device's objects sit in its block.
+typedef struct ObjectParts
+{
+    TableParts samplers;
+    TableParts buffers;
+    TableParts textures;
+    TableParts views;
+    TableParts querySets;
+    size_t marks;
+    TableParts swapchains;
+    TableParts shaders;
+    TableParts pipelines;
+    size_t vertex;
+} ObjectParts;
+
+static ObjectParts AddObjectParts(mrhiLayout* layout, const mrhiDeviceDef* def)
+{
+    const mrhiDeviceLimits* limits = &def->deviceLimits;
+    ObjectParts parts;
+    parts.samplers =
+        AddTable(layout, limits->samplers, sizeof(mrhiSamplerSlot), alignof(mrhiSamplerSlot));
+    parts.buffers =
+        AddTable(layout, limits->buffers, sizeof(mrhiBufferSlot), alignof(mrhiBufferSlot));
+    parts.textures =
+        AddTable(layout, limits->textures, sizeof(mrhiTextureSlot), alignof(mrhiTextureSlot));
+    parts.views = AddTable(layout, limits->views, sizeof(mrhiViewSlot), alignof(mrhiViewSlot));
+    parts.querySets =
+        AddTable(layout, limits->querySets, sizeof(mrhiQuerySetSlot), alignof(mrhiQuerySetSlot));
+    parts.marks =
+        mrhiLayoutAdd(layout, limits->queries, sizeof(_Atomic uint64_t), alignof(_Atomic uint64_t));
+    parts.swapchains =
+        AddTable(layout, limits->surfaces, sizeof(mrhiSwapchainSlot), alignof(mrhiSwapchainSlot));
+    parts.shaders =
+        AddTable(layout, limits->shaders, sizeof(mrhiShaderSlot), alignof(mrhiShaderSlot));
+    parts.pipelines =
+        AddTable(layout, limits->pipelines, sizeof(mrhiPipelineSlot), alignof(mrhiPipelineSlot));
+    parts.vertex = mrhiLayoutAdd(layout, (size_t)limits->pipelines * def->limits.vertexBuffers,
+                                 sizeof(mrhiVertexFacts), alignof(mrhiVertexFacts));
+    return parts;
+}
+
+// Starts the device's object tables in its block, zeroing the slots
+// whose fields are read while free.
+static void PlaceObjectParts(mrhiDevice* device, unsigned char* block, const ObjectParts* parts,
+                             const mrhiDeviceLimits* limits)
+{
+    device->samplerSlots = InitTable(block, parts->samplers, &device->samplers, limits->samplers);
+    device->bufferSlots = InitTable(block, parts->buffers, &device->buffers, limits->buffers);
+    device->textureSlots = InitTable(block, parts->textures, &device->textures, limits->textures);
+    device->viewSlots = InitTable(block, parts->views, &device->views, limits->views);
+    device->querySetSlots =
+        InitTable(block, parts->querySets, &device->querySets, limits->querySets);
+    for (uint32_t i = 0; i < limits->querySets; ++i)
+    {
+        device->querySetSlots[i] = (mrhiQuerySetSlot){0};
+    }
+    device->queryMarks = (_Atomic uint64_t*)(block + parts->marks);
+    device->swapchainSlots =
+        InitTable(block, parts->swapchains, &device->swapchains, limits->surfaces);
+    device->shaderSlots = InitTable(block, parts->shaders, &device->shaders, limits->shaders);
+    for (uint32_t i = 0; i < limits->shaders; ++i)
+    {
+        device->shaderSlots[i] = (mrhiShaderSlot){0};
+    }
+    device->pipelineSlots =
+        InitTable(block, parts->pipelines, &device->pipelines, limits->pipelines);
+    for (uint32_t i = 0; i < limits->pipelines; ++i)
+    {
+        device->pipelineSlots[i] = (mrhiPipelineSlot){0};
+    }
+    device->pipelineVertex = (mrhiVertexFacts*)(block + parts->vertex);
+}
+
 // Where a frame's tables sit in the device's block.
 typedef struct FrameParts
 {
@@ -188,22 +263,7 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
 {
     const mrhiDeviceLimits* limits = &def->deviceLimits;
     mrhiLayout layout = {.size = sizeof(mrhiDevice)};
-    TableParts samplers =
-        AddTable(&layout, limits->samplers, sizeof(mrhiSamplerSlot), alignof(mrhiSamplerSlot));
-    TableParts buffers =
-        AddTable(&layout, limits->buffers, sizeof(mrhiBufferSlot), alignof(mrhiBufferSlot));
-    TableParts textures =
-        AddTable(&layout, limits->textures, sizeof(mrhiTextureSlot), alignof(mrhiTextureSlot));
-    TableParts views =
-        AddTable(&layout, limits->views, sizeof(mrhiViewSlot), alignof(mrhiViewSlot));
-    TableParts swapchains =
-        AddTable(&layout, limits->surfaces, sizeof(mrhiSwapchainSlot), alignof(mrhiSwapchainSlot));
-    TableParts shaders =
-        AddTable(&layout, limits->shaders, sizeof(mrhiShaderSlot), alignof(mrhiShaderSlot));
-    TableParts pipelines =
-        AddTable(&layout, limits->pipelines, sizeof(mrhiPipelineSlot), alignof(mrhiPipelineSlot));
-    size_t vertexAt = mrhiLayoutAdd(&layout, (size_t)limits->pipelines * def->limits.vertexBuffers,
-                                    sizeof(mrhiVertexFacts), alignof(mrhiVertexFacts));
+    ObjectParts objects = AddObjectParts(&layout, def);
     size_t runningAt =
         mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
     size_t regionsAt =
@@ -229,22 +289,7 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     }
     mrhiDevice* device = (mrhiDevice*)block;
     *device = (mrhiDevice){.bytes = layout.size};
-    device->samplerSlots = InitTable(block, samplers, &device->samplers, limits->samplers);
-    device->bufferSlots = InitTable(block, buffers, &device->buffers, limits->buffers);
-    device->textureSlots = InitTable(block, textures, &device->textures, limits->textures);
-    device->viewSlots = InitTable(block, views, &device->views, limits->views);
-    device->swapchainSlots = InitTable(block, swapchains, &device->swapchains, limits->surfaces);
-    device->shaderSlots = InitTable(block, shaders, &device->shaders, limits->shaders);
-    for (uint32_t i = 0; i < limits->shaders; ++i)
-    {
-        device->shaderSlots[i] = (mrhiShaderSlot){0};
-    }
-    device->pipelineSlots = InitTable(block, pipelines, &device->pipelines, limits->pipelines);
-    for (uint32_t i = 0; i < limits->pipelines; ++i)
-    {
-        device->pipelineSlots[i] = (mrhiPipelineSlot){0};
-    }
-    device->pipelineVertex = (mrhiVertexFacts*)(block + vertexAt);
+    PlaceObjectParts(device, block, &objects, limits);
     device->running = (uint32_t*)(block + runningAt);
     device->runningRegions = (uint32_t*)(block + regionsAt);
     device->frameStaging = block + stagingAt;

@@ -63,6 +63,17 @@ typedef struct mrhiSamplerSlot
     bool filtering;
 } mrhiSamplerSlot;
 
+// A query set as its device keeps it: its driver handle, its type, and
+// the run of the device's query marks it holds; a count of 0 for a free
+// slot.
+typedef struct mrhiQuerySetSlot
+{
+    uint64_t handle;
+    uint32_t first;
+    uint32_t count;
+    mrhiQueryType type;
+} mrhiQuerySetSlot;
+
 // A buffer as its device keeps it.
 typedef struct mrhiBufferSlot
 {
@@ -327,6 +338,11 @@ struct mrhiDevice
     mrhiTextureSlot* textureSlots;
     mrhiPool views;
     mrhiViewSlot* viewSlots;
+    // Query sets: ids, each slot's handle and run, and a mark per query:
+    // the serial of the frame that last wrote it.
+    mrhiPool querySets;
+    mrhiQuerySetSlot* querySetSlots;
+    _Atomic uint64_t* queryMarks;
     // The surfaces it configured.
     mrhiPool swapchains;
     mrhiSwapchainSlot* swapchainSlots;

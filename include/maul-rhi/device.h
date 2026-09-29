@@ -82,6 +82,10 @@ extern "C"
         // The readbacks recorded and not yet taken at once; 64 by default, 0
         // for none.
         uint32_t readbacks;
+        // Query sets the device holds at once; 16 by default, 0 for none.
+        uint32_t querySets;
+        // Queries the device's sets hold in all; 4096 by default, 0 for none.
+        uint32_t queries;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the

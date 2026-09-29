@@ -39,6 +39,9 @@ edit the contract, not this file.
 | `mrhiDefaultViewDef` | Safe from any thread. |
 | `mrhiCreateView` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDestroyView` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDefaultQuerySetDef` | Safe from any thread. |
+| `mrhiCreateQuerySet` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDestroyQuerySet` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDefaultSurfaceDef` | Safe from any thread. |
 | `mrhiCreateSurface` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiDestroySurface` | Safe from any thread; the instance and the device that configured the surface are used by one thread at a time. |

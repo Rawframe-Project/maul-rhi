@@ -5501,6 +5501,16 @@
               "name": "readbacks",
               "type": "uint32",
               "doc": "The readbacks recorded and not yet taken at once; 64 by default, 0 for none."
+            },
+            {
+              "name": "query_sets",
+              "type": "uint32",
+              "doc": "Query sets the device holds at once; 16 by default, 0 for none."
+            },
+            {
+              "name": "queries",
+              "type": "uint32",
+              "doc": "Queries the device's sets hold in all; 4096 by default, 0 for none."
             }
           ]
         },
@@ -7831,6 +7841,240 @@
               "name": "view",
               "type": "id.view_id",
               "doc": "The view."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "enum",
+          "name": "query_type",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "What a query set's queries measure.",
+          "values": [
+            {
+              "name": "query_occlusion",
+              "value": 0,
+              "doc": "Whether samples passed the depth and stencil tests between a begin and an end in a render pass: 0 when none did, another value when some did.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_QUERY_TYPE_OCCLUSION"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_QUERY_HEAP_TYPE_OCCLUSION, as D3D12_QUERY_TYPE_BINARY_OCCLUSION"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a visibility result buffer, MTLVisibilityResultModeBoolean"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "occlusion"
+                }
+              }
+            },
+            {
+              "name": "query_timestamp",
+              "value": 1,
+              "doc": "The GPU's time at a pass's start or end, in ticks of the device's timestamp period. Needs the timestamp_query feature.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_QUERY_TYPE_TIMESTAMP"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_QUERY_HEAP_TYPE_TIMESTAMP"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a counter sample buffer of the timestamp counter set"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "timestamp"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "id",
+          "name": "query_set_id",
+          "doc": "A query set of a device."
+        },
+        {
+          "kind": "struct",
+          "name": "query_set_def",
+          "def": true,
+          "mapped": true,
+          "doc": "How a query set is made. Build it with mrhiDefaultQuerySetDef.",
+          "members": [
+            {
+              "name": "label",
+              "type": "char",
+              "pointer": "const",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "vkSetDebugUtilsObjectNameEXT, with VK_EXT_debug_utils"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetName, as UTF-16"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "label"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "label"
+                }
+              }
+            },
+            {
+              "name": "label_length",
+              "type": "size",
+              "doc": "The label's bytes.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "vkSetDebugUtilsObjectNameEXT's length, with VK_EXT_debug_utils"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetName's length, as UTF-16"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "label's length"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "label's length"
+                }
+              }
+            },
+            {
+              "name": "type",
+              "type": "enum.query_type",
+              "doc": "What its queries measure.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "queryType"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the heap's Type"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the buffer's kind"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "type"
+                }
+              }
+            },
+            {
+              "name": "count",
+              "type": "uint32",
+              "doc": "Its queries, 1 to 4096.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "queryCount"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "Count"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "sampleCount, or the visibility buffer's bytes over 8"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "count"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_query_set_def",
+          "doc": "Returns the default query set def: one occlusion query.",
+          "returns": {
+            "type": "struct.query_set_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "create_query_set",
+          "doc": "Makes a query set on a ready device.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, an unknown type, or a count of 0 or past 4096; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know, or timestamps without the timestamp_query feature; `mrhi_errorCapacity` when the device's querySets limit is reached or its queries limit lacks a run of count queries."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "def",
+              "type": "struct.query_set_def",
+              "pointer": "const",
+              "doc": "The query set to make."
+            },
+            {
+              "name": "set_out",
+              "type": "id.query_set_id",
+              "pointer": "mutable",
+              "doc": "Receives the query set."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "destroy_query_set",
+          "doc": "Destroys a query set. Its id ends at once; the device retires it after the frames that used it.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device; `mrhi_errorStale` for a query set the device no longer has."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "set",
+              "type": "id.query_set_id",
+              "doc": "The query set."
             }
           ],
           "thread_safety": {

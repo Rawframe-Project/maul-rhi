@@ -466,6 +466,82 @@ extern "C"
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyView(mrhiDevice* device, mrhiViewId view);
 
+    // What a query set's queries measure.
+    typedef uint8_t mrhiQueryType;
+
+    enum
+    {
+        // Whether samples passed the depth and stencil tests between a begin
+        // and an end in a render pass: 0 when none did, another value when some
+        // did.
+        mrhi_queryOcclusion = 0,
+        // The GPU's time at a pass's start or end, in ticks of the device's
+        // timestamp period. Needs the timestamp_query feature.
+        mrhi_queryTimestamp = 1,
+    };
+
+    // A query set of a device.
+    typedef struct mrhiQuerySetId
+    {
+        uint32_t index1;
+        uint32_t generation;
+    } mrhiQuerySetId;
+
+    // How a query set is made. Build it with mrhiDefaultQuerySetDef.
+    typedef struct mrhiQuerySetDef
+    {
+        uint32_t cookie;
+        // Extensions, or NULL.
+        const mrhiChain* next;
+        // A name for debugging tools: UTF-8 without NUL, labelLength bytes, at
+        // most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during
+        // the call.
+        const char* label;
+        // The label's bytes.
+        size_t labelLength;
+        // What its queries measure.
+        mrhiQueryType type;
+        // Its queries, 1 to 4096.
+        uint32_t count;
+    } mrhiQuerySetDef;
+
+    /// Returns the default query set def: one occlusion query.
+    ///
+    /// @return The def, with a valid cookie.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MRHI_API mrhiQuerySetDef mrhiDefaultQuerySetDef(void);
+
+    /// Makes a query set on a ready device.
+    ///
+    /// @param device  The device.
+    /// @param def     The query set to make.
+    /// @param setOut  Receives the query set.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
+    /// without its cookie, a label that is not UTF-8 without NUL within
+    /// MRHI_LABEL_BYTES, an unknown type, or a count of 0 or past 4096;
+    /// `mrhi_errorState` for a device that is not ready;
+    /// `mrhi_errorUnsupported` for a critical extension the library does not
+    /// know, or timestamps without the timestamp_query feature;
+    /// `mrhi_errorCapacity` when the device's querySets limit is reached or its
+    /// queries limit lacks a run of count queries.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateQuerySet(mrhiDevice* device,
+                                                          const mrhiQuerySetDef* def,
+                                                          mrhiQuerySetId* setOut);
+
+    /// Destroys a query set. Its id ends at once; the device retires it after
+    /// the frames that used it.
+    ///
+    /// @param device  The device.
+    /// @param set     The query set.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
+    /// `mrhi_errorStale` for a query set the device no longer has.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyQuerySet(mrhiDevice* device, mrhiQuerySetId set);
+
 #ifdef __cplusplus
 }
 #endif

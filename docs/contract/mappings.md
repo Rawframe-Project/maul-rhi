@@ -278,6 +278,22 @@ restricted or absent-rejected, with how.
 | `baseLayer` | direct: baseArrayLayer | direct: FirstArraySlice | direct: slices.location | direct: baseArrayLayer |
 | `layerCount` | direct: layerCount | direct: ArraySize | direct: slices.length | direct: arrayLayerCount |
 
+## mrhiQueryType
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_queryOcclusion` | direct: VK_QUERY_TYPE_OCCLUSION | direct: D3D12_QUERY_HEAP_TYPE_OCCLUSION, as D3D12_QUERY_TYPE_BINARY_OCCLUSION | direct: a visibility result buffer, MTLVisibilityResultModeBoolean | direct: occlusion |
+| `mrhi_queryTimestamp` | direct: VK_QUERY_TYPE_TIMESTAMP | direct: D3D12_QUERY_HEAP_TYPE_TIMESTAMP | direct: a counter sample buffer of the timestamp counter set | direct: timestamp |
+
+## mrhiQuerySetDef
+
+| Member | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `label` | restricted: vkSetDebugUtilsObjectNameEXT, with VK_EXT_debug_utils | direct: SetName, as UTF-16 | direct: label | direct: label |
+| `labelLength` | restricted: vkSetDebugUtilsObjectNameEXT's length, with VK_EXT_debug_utils | direct: SetName's length, as UTF-16 | direct: label's length | direct: label's length |
+| `type` | direct: queryType | direct: the heap's Type | direct: the buffer's kind | direct: type |
+| `count` | direct: queryCount | direct: Count | direct: sampleCount, or the visibility buffer's bytes over 8 | direct: count |
+
 ## mrhiColorPrimaries
 
 | Value | Vulkan | D3D12 | Metal | WebGPU |

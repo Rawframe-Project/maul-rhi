@@ -188,6 +188,7 @@ typedef struct TestDevice
     uint32_t buffers;
     uint64_t bufferBytes;
     uint32_t textures;
+    uint32_t querySets;
     // Live shaders and pipelines; the core destroys each before the device.
     uint32_t shaders;
     uint32_t pipelines;
@@ -316,6 +317,22 @@ static void DestroyView(void* self, uint64_t handle)
     }
     MRHI_ASSERT(handle != 0 && i < device->viewCount);
     device->views[i] = device->views[--device->viewCount];
+}
+
+static mrhiResult CreateQuerySet(void* self, const mrhiQuerySetDef* def, uint64_t* handleOut)
+{
+    TestDevice* device = self;
+    Name(device, def->label, def->labelLength);
+    mrhiResult status = MakeObject(device, handleOut);
+    device->querySets += status == mrhi_success ? 1 : 0;
+    return status;
+}
+
+static void DestroyQuerySet(void* self, uint64_t handle)
+{
+    TestDevice* device = self;
+    MRHI_ASSERT(handle != 0 && handle <= device->nextHandle && device->querySets > 0);
+    --device->querySets;
 }
 
 static void DestroySampler(void* self, uint64_t handle)
@@ -569,6 +586,8 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .createComputePipeline = CreateComputePipeline,
     .createGraphicsPipeline = CreateGraphicsPipeline,
     .destroyPipeline = DestroyPipeline,
+    .createQuerySet = CreateQuerySet,
+    .destroyQuerySet = DestroyQuerySet,
     .importPipelineCache = ImportPipelineCache,
     .exportPipelineCache = ExportPipelineCache,
     .textureMemory = TextureMemory,

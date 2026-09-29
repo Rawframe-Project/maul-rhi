@@ -108,6 +108,9 @@ typedef struct mrhiDeviceDriverVtable
     // Destroys a pipeline, pending or not; a pending one is never
     // reported.
     void (*destroyPipeline)(void* self, uint64_t handle);
+    // Makes a query set the core has checked; its handle, never zero.
+    mrhiResult (*createQuerySet)(void* self, const mrhiQuerySetDef* def, uint64_t* handleOut);
+    void (*destroyQuerySet)(void* self, uint64_t handle);
     // Takes a pipeline cache blob it exported on an earlier run, right
     // after the device is made; false when it declines it. The bytes are
     // only read during the call.
