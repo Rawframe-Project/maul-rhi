@@ -120,3 +120,11 @@ format.
   submitting compiles a frame not yet compiled; classes, access kinds
   and operations mapped onto the four APIs; the device's `framePasses`
   and `frameAccesses` limits.
+- The compile's plan: barriers per mip, layer and plane from the states
+  uses leave (`mrhiResourceState`, mapped onto each API's layouts and
+  accesses), readable with `mrhiGetFrameBarriers` in the order they run;
+  imported objects carry their state between frames, unified at a
+  frame's end; `mrhiGetResourcePlan` reads each resource's derived
+  usages, transience (targets that live only inside their passes) and
+  first and last kept passes; a texture's part is in one state per pass;
+  the device's `frameBarriers` limit.

@@ -2,9 +2,10 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The frame's compile (mrhi-0008): passes are culled from the frame's
-// outputs backwards, at the granularity of whole resources, and the
-// usages the kept passes make of each declared texture are checked
-// against its format. Declaration order stays execution order.
+// outputs backwards, at the granularity of whole resources, the kept
+// ones are planned, and the usages they make of each declared texture
+// are checked against its format. Declaration order stays execution
+// order.
 
 #include "device_core.h"
 
@@ -41,16 +42,22 @@ static void Cull(mrhiDevice* device)
 mrhiResult mrhiCompile(mrhiDevice* device)
 {
     Cull(device);
+    mrhiResult status = mrhiPlan(device);
+    if (status != mrhi_success)
+    {
+        return status;
+    }
     for (uint32_t i = 0; i < device->frameResourceCount; ++i)
     {
-        const mrhiFrameResource* resource = &device->frameResources[i];
+        mrhiFrameResource* resource = &device->frameResources[i];
         if (resource->kind != mrhiFrameTexture || resource->usage == 0)
         {
             continue;
         }
+        resource->usage |= resource->transient ? mrhi_textureTransient : 0u;
         mrhiTextureDef def = resource->texture;
         def.usage = resource->usage;
-        mrhiResult status = mrhiCheckTextureUsage(device, &def);
+        status = mrhiCheckTextureUsage(device, &def);
         if (status != mrhi_success)
         {
             return status;

@@ -55,10 +55,16 @@ thread.
     `out_of_date`, `occluded_skip` or `device_lost`, and surfaces
     present at submit.
 - **Obligations:**
-  - barriers synthesized per subresource;
+  - barriers synthesized per mip, layer and plane, from the states
+    uses leave;
   - transients aliased by lifetime (pooled on WebGPU);
-  - transient load and store operations derived;
-  - the plan exposed by the test driver for conformance.
+  - transient load and store operations derived.
+- **The plan is readable** after the compile (`mrhiGetFrameBarriers`,
+  `mrhiGetResourcePlan`), for conformance tests and graph tools.
+- **Imported state:** an imported object carries one state between
+  frames. Parts left in other states are unified at the frame's end.
+- **One state per pass:** within a pass, a texture's part is in one
+  state. Sampling a read-only depth target shares its state.
 
 ## Consequences
 

@@ -375,3 +375,23 @@ restricted or absent-rejected, with how.
 | --- | --- | --- | --- | --- |
 | `mrhi_storeKeep` | direct: STORE | direct: PRESERVE | direct: MTLStoreActionStore | direct: store |
 | `mrhi_storeDiscard` | direct: DONT_CARE | direct: DISCARD | direct: MTLStoreActionDontCare | direct: discard |
+
+## mrhiResourceState
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_stateUndefined` | direct: UNDEFINED | direct: LAYOUT_UNDEFINED, ACCESS_NO_ACCESS | direct: nothing | direct: implicit between passes |
+| `mrhi_stateSampled` | direct: SHADER_READ_ONLY_OPTIMAL, SHADER_SAMPLED_READ | direct: SHADER_RESOURCE | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateUniform` | direct: UNIFORM_READ | direct: CONSTANT_BUFFER | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateVertex` | direct: VERTEX_ATTRIBUTE_READ | direct: VERTEX_BUFFER | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateIndex` | direct: INDEX_READ | direct: INDEX_BUFFER | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateIndirect` | direct: INDIRECT_COMMAND_READ | direct: INDIRECT_ARGUMENT | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateStorageRead` | direct: GENERAL, SHADER_STORAGE_READ | direct: SHADER_RESOURCE | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateStorageWrite` | direct: GENERAL, SHADER_STORAGE_WRITE | direct: UNORDERED_ACCESS | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateStorageReadWrite` | direct: GENERAL, SHADER_STORAGE_READ and WRITE | direct: UNORDERED_ACCESS | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateCopySource` | direct: TRANSFER_SRC_OPTIMAL | direct: COPY_SOURCE | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateCopyDestination` | direct: TRANSFER_DST_OPTIMAL | direct: COPY_DEST | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateColorTarget` | direct: COLOR_ATTACHMENT_OPTIMAL | direct: RENDER_TARGET | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateResolve` | direct: COLOR_ATTACHMENT_OPTIMAL, as a resolve attachment | direct: RESOLVE_DEST | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateDepthTarget` | direct: DEPTH_STENCIL_ATTACHMENT_OPTIMAL | direct: DEPTH_STENCIL_WRITE | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_stateDepthRead` | direct: DEPTH_STENCIL_READ_ONLY_OPTIMAL | direct: DEPTH_STENCIL_READ | direct: tracked by Metal on the resource | direct: implicit between passes |

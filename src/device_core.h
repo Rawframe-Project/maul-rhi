@@ -28,6 +28,8 @@ typedef struct mrhiBufferSlot
     uint64_t size;
     mrhiBufferUsage usage;
     mrhiImport import;
+    // The state frames leave it in.
+    mrhiResourceState state;
 } mrhiBufferSlot;
 
 // A texture as its device keeps it: its def (without its chain), its
@@ -38,6 +40,8 @@ typedef struct mrhiTextureSlot
     mrhiTextureDef def;
     uint32_t firstView;
     mrhiImport import;
+    // The state frames leave it in.
+    mrhiResourceState state;
 } mrhiTextureSlot;
 
 // A view as its device keeps it: its resolved def (without its chain),
@@ -74,10 +78,26 @@ typedef struct mrhiFrameResource
     // Whether a pass declared so far writes it; imports count as written.
     bool written;
     // Whether a kept pass needs it, and the usages kept passes make of
-    // it, found by the compile.
+    // it, found by the compile, with the plan's transience, its first
+    // and last kept passes (0 for none) and the state it ends in.
     bool needed;
     uint32_t usage;
+    bool transient;
+    uint32_t firstPass;
+    uint32_t lastPass;
+    mrhiResourceState finalState;
 } mrhiFrameResource;
+
+// A part of a resource in one state, in the compile's map of it.
+typedef struct mrhiBox
+{
+    uint32_t baseMip;
+    uint32_t mipCount;
+    uint32_t baseLayer;
+    uint32_t layerCount;
+    uint8_t planes;
+    mrhiResourceState state;
+} mrhiBox;
 
 // The uses a pass makes of a resource beyond the access kinds.
 enum
@@ -94,9 +114,12 @@ typedef struct mrhiFrameUse
 {
     uint32_t resource;
     uint8_t use;
+    // The state it leaves its part in, and the planes of that part: 1
+    // for color or depth, 2 for stencil.
+    mrhiResourceState state;
+    uint8_t planes;
     bool reads;
     bool writes;
-    mrhiTextureAspect aspect;
     uint32_t baseMip;
     uint32_t mipCount;
     uint32_t baseLayer;
@@ -168,6 +191,14 @@ struct mrhiDevice
     uint32_t framePassCount;
     mrhiFrameUse* frameUses;
     uint32_t frameUseCount;
+    // The compile's plan: the barriers in the order they run, and room to
+    // sort them and to map one resource's states.
+    mrhiBarrier* frameBarriers;
+    mrhiBarrier* frameBarrierScratch;
+    uint32_t frameBarrierCount;
+    uint32_t* frameCounts;
+    mrhiBox* frameBoxes;
+    uint32_t frameBoxLimit;
     uint32_t lastToken;
     uint32_t* running;
     uint32_t runningCount;
@@ -231,6 +262,19 @@ bool mrhiIsImported(const mrhiFrameResource* resource);
 
 // The usage bit of a texture or buffer a use needs.
 uint32_t mrhiUsageOf(const mrhiFrameResource* resource, uint8_t use);
+
+// Whether a state writes what is there.
+bool mrhiStateWrites(mrhiResourceState state);
+
+// The planes of a format: 3 with stencil, else 1.
+uint8_t mrhiFormatPlanes(mrhiFormat format);
+
+// Plans the kept passes' barriers and each resource's lifetime,
+// transience and final state: success, or mrhi_errorCapacity.
+mrhiResult mrhiPlan(mrhiDevice* device);
+
+// Leaves each imported object in the state the submitted frame left it.
+void mrhiApplyFinalStates(mrhiDevice* device);
 
 // Compiles the open frame: culls, derives usages and checks them.
 mrhiResult mrhiCompile(mrhiDevice* device);

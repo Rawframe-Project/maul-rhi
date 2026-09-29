@@ -91,6 +91,11 @@ static uint32_t UsageOf(uint8_t use, bool buffer)
     }
 }
 
+uint8_t mrhiFormatPlanes(mrhiFormat format)
+{
+    return mrhiFormatHasStencil(format) ? 3 : 1;
+}
+
 uint32_t mrhiUsageOf(const mrhiFrameResource* resource, uint8_t use)
 {
     return UsageOf(use, IsBuffer(resource));
@@ -157,6 +162,8 @@ static mrhiResult UseOfAccess(const mrhiDevice* device, const mrhiAccess* access
     *useOut = (mrhiFrameUse){
         .resource = slot,
         .use = kind,
+        .state = (mrhiResourceState)(kind + 1),
+        .planes = 1,
         .reads = kind != mrhi_accessStorageWrite && kind != mrhi_accessCopyDestination,
         .writes = writes,
         .mipCount = 1,
@@ -169,7 +176,10 @@ static mrhiResult UseOfAccess(const mrhiDevice* device, const mrhiAccess* access
     const mrhiTextureDef* def = TextureOf(device, resource);
     const mrhiTextureRange* range = &access->range;
     uint32_t layers = def->kind == mrhi_texture3d ? 1 : def->depthOrLayers;
-    useOut->aspect = range->aspect;
+    uint8_t planes = mrhiFormatPlanes(def->format);
+    useOut->planes = range->aspect == mrhi_aspectDepthOnly     ? 1
+                     : range->aspect == mrhi_aspectStencilOnly ? 2
+                                                               : planes;
     useOut->baseMip = range->baseMip;
     useOut->mipCount = mrhiResolveCount(range->mipCount, range->baseMip, def->mipLevels);
     useOut->baseLayer = range->baseLayer;
@@ -251,6 +261,8 @@ static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* tar
     usesOut[0] = (mrhiFrameUse){
         .resource = slot,
         .use = mrhiUseColorTarget,
+        .state = mrhi_stateColorTarget,
+        .planes = 1,
         .reads = target->load == mrhi_loadKeep,
         .writes = true,
         .baseMip = target->mip,
@@ -281,6 +293,8 @@ static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* tar
     usesOut[1] = (mrhiFrameUse){
         .resource = resolve,
         .use = mrhiUseResolve,
+        .state = mrhi_stateResolve,
+        .planes = 1,
         .writes = true,
         .baseMip = target->resolveMip,
         .mipCount = 1,
@@ -317,6 +331,8 @@ static mrhiResult UseOfDepth(const mrhiDevice* device, const mrhiDepthTarget* ta
     *useOut = (mrhiFrameUse){
         .resource = slot,
         .use = mrhiUseDepthTarget,
+        .state = target->readOnly ? mrhi_stateDepthRead : mrhi_stateDepthTarget,
+        .planes = mrhiFormatPlanes(def->format),
         .reads =
             target->depthLoad == mrhi_loadKeep || (stencil && target->stencilLoad == mrhi_loadKeep),
         .writes = !target->readOnly,
@@ -334,15 +350,20 @@ static bool Overlaps(uint32_t baseA, uint32_t countA, uint32_t baseB, uint32_t c
     return baseA < baseB + countB && baseB < baseA + countA;
 }
 
-// Whether two uses of a pass conflict: the same subresource, one of them
-// writing.
-static bool Conflicts(const mrhiFrameUse* a, const mrhiFrameUse* b)
+// Whether two uses of a pass meet on a subresource.
+static bool Meet(const mrhiFrameUse* a, const mrhiFrameUse* b)
 {
-    bool aspects =
-        a->aspect == mrhi_aspectAll || b->aspect == mrhi_aspectAll || a->aspect == b->aspect;
-    return a->resource == b->resource && (a->writes || b->writes) && aspects &&
+    return a->resource == b->resource && (a->planes & b->planes) != 0 &&
            Overlaps(a->baseMip, a->mipCount, b->baseMip, b->mipCount) &&
            Overlaps(a->baseLayer, a->layerCount, b->baseLayer, b->layerCount);
+}
+
+// Whether two uses of a pass conflict: where they meet, one writes, or a
+// texture would need two states at once.
+static bool Conflicts(const mrhiDevice* device, const mrhiFrameUse* a, const mrhiFrameUse* b)
+{
+    bool texture = !IsBuffer(&device->frameResources[a->resource - 1]);
+    return Meet(a, b) && (a->writes || b->writes || (texture && a->state != b->state));
 }
 
 // Whether the pass's uses keep WebGPU's usage scopes, and read declared
@@ -358,7 +379,7 @@ static bool AreUsesValid(const mrhiDevice* device, const mrhiFrameUse* uses, uin
         }
         for (uint32_t j = i + 1; j < count; ++j)
         {
-            if (Conflicts(&uses[i], &uses[j]))
+            if (Conflicts(device, &uses[i], &uses[j]))
             {
                 return false;
             }
@@ -390,7 +411,18 @@ static uint32_t MakeUses(const mrhiDevice* device, const mrhiPassDef* def, mrhiR
     }
     if (*statusOut == mrhi_success && def->depthTarget.resource.index1 != 0)
     {
-        *statusOut = UseOfDepth(device, &def->depthTarget, &shape, &uses[count++]);
+        *statusOut = UseOfDepth(device, &def->depthTarget, &shape, &uses[count]);
+        // Sampling a read-only depth target shares its state, which allows
+        // it.
+        for (uint32_t i = 0; i < def->accessCount && *statusOut == mrhi_success; ++i)
+        {
+            if (uses[i].state == mrhi_stateSampled && uses[count].state == mrhi_stateDepthRead &&
+                Meet(&uses[i], &uses[count]))
+            {
+                uses[i].state = mrhi_stateDepthRead;
+            }
+        }
+        ++count;
     }
     if (*statusOut == mrhi_success && !AreUsesValid(device, uses, count))
     {

@@ -31,6 +31,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.frameResources = 1024;
     def.deviceLimits.framePasses = 256;
     def.deviceLimits.frameAccesses = 4096;
+    def.deviceLimits.frameBarriers = 4096;
     return def;
 }
 
@@ -46,8 +47,9 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
         def->deviceLimits.textures == 0 || def->deviceLimits.views == 0 ||
         def->deviceLimits.surfaces == 0 || def->deviceLimits.frameResources == 0 ||
         def->deviceLimits.framePasses == 0 || def->deviceLimits.frameAccesses == 0 ||
-        !mrhiIsLabelValid(def->label, def->labelLength) || !mrhiIsAllocatorValid(&def->allocator) ||
-        !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
+        def->deviceLimits.frameBarriers == 0 || !mrhiIsLabelValid(def->label, def->labelLength) ||
+        !mrhiIsAllocatorValid(&def->allocator) || !mrhiLimitsWithin(&floor, &def->limits) ||
+        chain == mrhi_errorInvalid)
     {
         *statusOut = mrhiMisuse(instance);
         return nullptr;
@@ -126,6 +128,14 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
         mrhiLayoutAdd(&layout, limits->framePasses, sizeof(mrhiFramePass), alignof(mrhiFramePass));
     size_t usesAt =
         mrhiLayoutAdd(&layout, limits->frameAccesses, sizeof(mrhiFrameUse), alignof(mrhiFrameUse));
+    size_t barriersAt =
+        mrhiLayoutAdd(&layout, limits->frameBarriers, sizeof(mrhiBarrier), alignof(mrhiBarrier));
+    size_t scratchAt =
+        mrhiLayoutAdd(&layout, limits->frameBarriers, sizeof(mrhiBarrier), alignof(mrhiBarrier));
+    size_t countsAt = mrhiLayoutAdd(&layout, (size_t)limits->framePasses + 2, sizeof(uint32_t),
+                                    alignof(uint32_t));
+    size_t boxLimit = (size_t)limits->frameAccesses * 4 + 16;
+    size_t boxesAt = mrhiLayoutAdd(&layout, boxLimit, sizeof(mrhiBox), alignof(mrhiBox));
     size_t queueAt = mrhiLayoutAdd(&layout, limits->notifications, sizeof(mrhiDeviceNotification),
                                    alignof(mrhiDeviceNotification));
     unsigned char* block =
@@ -146,6 +156,11 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     device->frameResources = (mrhiFrameResource*)(block + resourcesAt);
     device->framePasses = (mrhiFramePass*)(block + passesAt);
     device->frameUses = (mrhiFrameUse*)(block + usesAt);
+    device->frameBarriers = (mrhiBarrier*)(block + barriersAt);
+    device->frameBarrierScratch = (mrhiBarrier*)(block + scratchAt);
+    device->frameCounts = (uint32_t*)(block + countsAt);
+    device->frameBoxes = (mrhiBox*)(block + boxesAt);
+    device->frameBoxLimit = (uint32_t)boxLimit;
     return device;
 }
 

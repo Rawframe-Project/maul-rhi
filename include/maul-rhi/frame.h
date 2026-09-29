@@ -426,17 +426,19 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def,
                                                    mrhiPassId* passOut);
 
-    /// Compiles the open frame: culls the passes nothing kept needs, and checks
-    /// each declared resource's derived usages against its format. After it,
-    /// nothing more is declared; submitting compiles a frame not yet compiled.
+    /// Compiles the open frame: culls the passes nothing kept needs, checks
+    /// each declared resource's derived usages against its format, and plans
+    /// the barriers between uses. After it, nothing more is declared;
+    /// submitting compiles a frame not yet compiled.
     ///
     /// @param device  The device.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, or a
     /// declared texture of several samples its kept passes use other than as a
     /// render target, or with storage; `mrhi_errorUnsupported` for a declared
     /// texture whose format cannot take the usages its kept passes make of it,
-    /// the frame staying open; `mrhi_errorState` for a device without an open
-    /// frame, or a frame already compiled.
+    /// the frame staying open; `mrhi_errorCapacity` when the barriers exceed
+    /// the device's frameBarriers, the frame staying open; `mrhi_errorState`
+    /// for a device without an open frame, or a frame already compiled.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCompileFrame(mrhiDevice* device);
@@ -454,6 +456,106 @@ extern "C"
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiIsPassKept(mrhiDevice* device, mrhiPassId pass,
                                                       bool* keptOut);
+
+    // The state a compiled frame leaves a part of a resource in, from the use
+    // that made it.
+    typedef uint8_t mrhiResourceState;
+
+    enum
+    {
+        // Nothing kept: before a declared resource's first use, or a new device
+        // object's.
+        mrhi_stateUndefined = 0,
+        // Sampled by shaders.
+        mrhi_stateSampled = 1,
+        // Read as uniforms.
+        mrhi_stateUniform = 2,
+        // Read as vertices.
+        mrhi_stateVertex = 3,
+        // Read as indices.
+        mrhi_stateIndex = 4,
+        // Read as indirect arguments.
+        mrhi_stateIndirect = 5,
+        // Read as storage.
+        mrhi_stateStorageRead = 6,
+        // Written as storage.
+        mrhi_stateStorageWrite = 7,
+        // Read and written as storage.
+        mrhi_stateStorageReadWrite = 8,
+        // Copied from.
+        mrhi_stateCopySource = 9,
+        // Copied to.
+        mrhi_stateCopyDestination = 10,
+        // Rendered to.
+        mrhi_stateColorTarget = 11,
+        // Resolved into.
+        mrhi_stateResolve = 12,
+        // Depth-tested and written.
+        mrhi_stateDepthTarget = 13,
+        // Depth-tested without writing, and perhaps sampled.
+        mrhi_stateDepthRead = 14,
+    };
+
+    // A transition a compiled frame makes: a part of a resource, from one state
+    // to another, before a pass or at the frame's end.
+    typedef struct mrhiBarrier
+    {
+        // The pass it comes before, or a null id for the frame's end.
+        mrhiPassId pass;
+        // The resource.
+        mrhiResourceId resource;
+        // The texture's part, with counts filled in; a buffer's is one mip, one
+        // layer, every aspect.
+        mrhiTextureRange range;
+        // Its state until then.
+        mrhiResourceState before;
+        // Its state from then.
+        mrhiResourceState after;
+    } mrhiBarrier;
+
+    // What a compiled frame does with a resource.
+    typedef struct mrhiResourcePlan
+    {
+        // The texture or buffer usages its kept passes make of it.
+        uint32_t usage;
+        // Whether it is a declared texture living only inside its render
+        // passes, which tile GPUs keep on chip.
+        bool transient;
+        // The first kept pass using it, or a null id when none does.
+        mrhiPassId firstPass;
+        // The last kept pass using it, or a null id when none does.
+        mrhiPassId lastPass;
+    } mrhiResourcePlan;
+
+    /// Copies the barriers of the compiled frame, in the order they run.
+    ///
+    /// @param device    The device.
+    /// @param barriers  Receives up to capacity barriers; NULL when capacity is
+    ///                  0.
+    /// @param capacity  The array's length.
+    /// @param countOut  Receives how many barriers there are.
+    /// @return `mrhi_success` with the total in countOut, which may exceed the
+    /// capacity; `mrhi_errorInvalid` for a NULL device or count, or a NULL
+    /// array with a capacity; `mrhi_errorState` for a frame not compiled.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetFrameBarriers(mrhiDevice* device,
+                                                            mrhiBarrier* barriers, size_t capacity,
+                                                            size_t* countOut);
+
+    /// Reads what the compiled frame does with a resource.
+    ///
+    /// @param device    The device.
+    /// @param resource  The resource.
+    /// @param planOut   Receives the plan.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
+    /// `mrhi_errorStale` for a resource of another frame; `mrhi_errorState` for
+    /// a frame not compiled.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetResourcePlan(mrhiDevice* device,
+                                                           mrhiResourceId resource,
+                                                           mrhiResourcePlan* planOut);
 
 #ifdef __cplusplus
 }

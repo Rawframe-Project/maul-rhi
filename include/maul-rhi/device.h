@@ -61,6 +61,8 @@ extern "C"
         // Accesses and targets one frame's passes declare in all; 4096 by
         // default.
         uint32_t frameAccesses;
+        // Barriers one frame's compile plans; 4096 by default.
+        uint32_t frameBarriers;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the

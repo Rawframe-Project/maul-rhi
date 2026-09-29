@@ -329,7 +329,14 @@ static void TestScopes(void)
     CHECK(Add(Pass((mrhiColorTarget){0}, pair, 2)) == mrhi_errorInvalid, "overlapping mips");
     pair[0] = Access(texture, mrhi_accessSampled);
     pair[1] = Access(texture, mrhi_accessCopySource);
-    CHECK(Add(Pass((mrhiColorTarget){0}, pair, 2)) == mrhi_success, "two reads");
+    CHECK(Add(Pass((mrhiColorTarget){0}, pair, 2)) == mrhi_errorInvalid,
+          "a texture's part in two read states");
+    pair[1] = Access(texture, mrhi_accessSampled);
+    pair[1].range = (mrhiTextureRange){.baseMip = 1, .mipCount = 2, .layerCount = 1};
+    CHECK(Add(Pass((mrhiColorTarget){0}, pair, 2)) == mrhi_success, "two reads in one state");
+    mrhiAccess reads[2] = {Access(buffer, mrhi_accessStorageRead),
+                           Access(buffer, mrhi_accessIndirect)};
+    CHECK(Add(Pass((mrhiColorTarget){0}, reads, 2)) == mrhi_success, "a buffer read two ways");
     mrhiResourceId layers = DeclareSized(mrhi_texture2dArray, 16, 16, 4, 1);
     mrhiAccess fill = Access(layers, mrhi_accessStorageWrite);
     CHECK(Add(Pass((mrhiColorTarget){0}, &fill, 1)) == mrhi_success, "layers written");

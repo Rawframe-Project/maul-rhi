@@ -4880,6 +4880,11 @@
               "name": "frame_accesses",
               "type": "uint32",
               "doc": "Accesses and targets one frame's passes declare in all; 4096 by default."
+            },
+            {
+              "name": "frame_barriers",
+              "type": "uint32",
+              "doc": "Barriers one frame's compile plans; 4096 by default."
             }
           ]
         },
@@ -9283,10 +9288,10 @@
         {
           "kind": "function",
           "name": "compile_frame",
-          "doc": "Compiles the open frame: culls the passes nothing kept needs, and checks each declared resource's derived usages against its format. After it, nothing more is declared; submitting compiles a frame not yet compiled.",
+          "doc": "Compiles the open frame: culls the passes nothing kept needs, checks each declared resource's derived usages against its format, and plans the barriers between uses. After it, nothing more is declared; submitting compiles a frame not yet compiled.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, or a declared texture of several samples its kept passes use other than as a render target, or with storage; `mrhi_errorUnsupported` for a declared texture whose format cannot take the usages its kept passes make of it, the frame staying open; `mrhi_errorState` for a device without an open frame, or a frame already compiled."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, or a declared texture of several samples its kept passes use other than as a render target, or with storage; `mrhi_errorUnsupported` for a declared texture whose format cannot take the usages its kept passes make of it, the frame staying open; `mrhi_errorCapacity` when the barriers exceed the device's frameBarriers, the frame staying open; `mrhi_errorState` for a device without an open frame, or a frame already compiled."
           },
           "args": [
             {
@@ -9326,6 +9331,489 @@
               "type": "bool",
               "pointer": "mutable",
               "doc": "Receives whether it is kept."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "enum",
+          "name": "resource_state",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "The state a compiled frame leaves a part of a resource in, from the use that made it.",
+          "values": [
+            {
+              "name": "state_undefined",
+              "value": 0,
+              "doc": "Nothing kept: before a declared resource's first use, or a new device object's.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "UNDEFINED"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "LAYOUT_UNDEFINED, ACCESS_NO_ACCESS"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "nothing"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_sampled",
+              "value": 1,
+              "doc": "Sampled by shaders.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SHADER_READ_ONLY_OPTIMAL, SHADER_SAMPLED_READ"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SHADER_RESOURCE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_uniform",
+              "value": 2,
+              "doc": "Read as uniforms.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "UNIFORM_READ"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "CONSTANT_BUFFER"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_vertex",
+              "value": 3,
+              "doc": "Read as vertices.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VERTEX_ATTRIBUTE_READ"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "VERTEX_BUFFER"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_index",
+              "value": 4,
+              "doc": "Read as indices.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "INDEX_READ"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "INDEX_BUFFER"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_indirect",
+              "value": 5,
+              "doc": "Read as indirect arguments.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "INDIRECT_COMMAND_READ"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "INDIRECT_ARGUMENT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_storage_read",
+              "value": 6,
+              "doc": "Read as storage.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "GENERAL, SHADER_STORAGE_READ"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SHADER_RESOURCE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_storage_write",
+              "value": 7,
+              "doc": "Written as storage.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "GENERAL, SHADER_STORAGE_WRITE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "UNORDERED_ACCESS"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_storage_read_write",
+              "value": 8,
+              "doc": "Read and written as storage.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "GENERAL, SHADER_STORAGE_READ and WRITE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "UNORDERED_ACCESS"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_copy_source",
+              "value": 9,
+              "doc": "Copied from.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRANSFER_SRC_OPTIMAL"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "COPY_SOURCE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_copy_destination",
+              "value": 10,
+              "doc": "Copied to.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRANSFER_DST_OPTIMAL"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "COPY_DEST"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_color_target",
+              "value": 11,
+              "doc": "Rendered to.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "COLOR_ATTACHMENT_OPTIMAL"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "RENDER_TARGET"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_resolve",
+              "value": 12,
+              "doc": "Resolved into.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "COLOR_ATTACHMENT_OPTIMAL, as a resolve attachment"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "RESOLVE_DEST"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_depth_target",
+              "value": 13,
+              "doc": "Depth-tested and written.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "DEPTH_STENCIL_ATTACHMENT_OPTIMAL"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DEPTH_STENCIL_WRITE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_depth_read",
+              "value": 14,
+              "doc": "Depth-tested without writing, and perhaps sampled.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "DEPTH_STENCIL_READ_ONLY_OPTIMAL"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DEPTH_STENCIL_READ"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tracked by Metal on the resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit between passes"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "barrier",
+          "doc": "A transition a compiled frame makes: a part of a resource, from one state to another, before a pass or at the frame's end.",
+          "members": [
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass it comes before, or a null id for the frame's end."
+            },
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "The resource."
+            },
+            {
+              "name": "range",
+              "type": "struct.texture_range",
+              "doc": "The texture's part, with counts filled in; a buffer's is one mip, one layer, every aspect."
+            },
+            {
+              "name": "before",
+              "type": "enum.resource_state",
+              "doc": "Its state until then."
+            },
+            {
+              "name": "after",
+              "type": "enum.resource_state",
+              "doc": "Its state from then."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "resource_plan",
+          "doc": "What a compiled frame does with a resource.",
+          "members": [
+            {
+              "name": "usage",
+              "type": "uint32",
+              "doc": "The texture or buffer usages its kept passes make of it."
+            },
+            {
+              "name": "transient",
+              "type": "bool",
+              "doc": "Whether it is a declared texture living only inside its render passes, which tile GPUs keep on chip."
+            },
+            {
+              "name": "first_pass",
+              "type": "id.pass_id",
+              "doc": "The first kept pass using it, or a null id when none does."
+            },
+            {
+              "name": "last_pass",
+              "type": "id.pass_id",
+              "doc": "The last kept pass using it, or a null id when none does."
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "get_frame_barriers",
+          "doc": "Copies the barriers of the compiled frame, in the order they run.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` with the total in countOut, which may exceed the capacity; `mrhi_errorInvalid` for a NULL device or count, or a NULL array with a capacity; `mrhi_errorState` for a frame not compiled."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "barriers",
+              "type": "struct.barrier",
+              "pointer": "mutable",
+              "doc": "Receives up to capacity barriers; NULL when capacity is 0."
+            },
+            {
+              "name": "capacity",
+              "type": "size",
+              "doc": "The array's length."
+            },
+            {
+              "name": "count_out",
+              "type": "size",
+              "pointer": "mutable",
+              "doc": "Receives how many barriers there are."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_resource_plan",
+          "doc": "Reads what the compiled frame does with a resource.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorStale` for a resource of another frame; `mrhi_errorState` for a frame not compiled."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "The resource."
+            },
+            {
+              "name": "plan_out",
+              "type": "struct.resource_plan",
+              "pointer": "mutable",
+              "doc": "Receives the plan."
             }
           ],
           "thread_safety": {

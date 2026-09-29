@@ -139,6 +139,7 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     {
         return status;
     }
+    mrhiApplyFinalStates(device);
     device->lastToken = token;
     device->running[device->runningCount++] = token;
     *tokenOut = (mrhiRequestId){token, 1};
