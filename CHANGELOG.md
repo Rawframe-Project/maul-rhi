@@ -164,3 +164,8 @@ format.
   for contradictions, unsupported for what the device cannot do. Color
   formats and vertex formats carry their render target and layout facts
   in the contract.
+- Pipeline caches: `mrhiGetPipelineCache` writes the driver's blob in a
+  checked envelope (SHA-256, library version, driver and adapter), and a
+  device def's `pipelineCache` gives it back; an unusable cache never
+  fails a device, and `mrhiGetPipelineCacheOutcome` reports whether it
+  was taken, absent, stale or damaged.

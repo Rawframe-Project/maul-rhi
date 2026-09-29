@@ -210,6 +210,10 @@ struct mrhiDevice
     // Calls refused as invalid input.
     uint64_t misuse;
     mrhiDeviceDriver driver;
+    // Who made the device, for its pipeline cache's envelope, and what
+    // became of the cache its def gave.
+    mrhiAdapterInfo adapterInfo;
+    mrhiResult cacheOutcome;
     // The block the device and its tables live in.
     size_t bytes;
     // Samplers: ids, and each slot's driver handle.
@@ -361,6 +365,10 @@ void mrhiEndConfigurations(mrhiDevice* device);
 
 // Destroys every shader the device holds, in its driver and its tables.
 void mrhiDestroyShaders(mrhiDevice* device);
+
+// Checks the pipeline cache a def gives and hands its blob to the
+// driver: what became of it, for mrhiGetPipelineCacheOutcome.
+mrhiResult mrhiImportPipelineCache(mrhiDevice* device, const void* bytes, size_t size);
 
 // Destroys every pipeline the device holds, answering none.
 void mrhiDestroyPipelines(mrhiDevice* device);

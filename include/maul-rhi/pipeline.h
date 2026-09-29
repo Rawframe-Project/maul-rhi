@@ -575,6 +575,35 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyComputePipeline(mrhiDevice* device,
                                                                   mrhiComputePipelineId pipeline);
 
+    /// Writes the device's pipeline cache, for a later device's def: the
+    /// driver's compiled pipelines in a checked envelope.
+    ///
+    /// @param device    The device.
+    /// @param bytesOut  Receives the cache, or NULL to learn its size.
+    /// @param capacity  The bytes bytesOut holds.
+    /// @param sizeOut   Receives the cache's size.
+    /// @return `mrhi_success` with the cache written, or only its size when
+    /// bytesOut is NULL; `mrhi_errorInvalid` for a NULL device or sizeOut;
+    /// `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity`
+    /// when capacity is less than the size, which sizeOut receives;
+    /// `mrhi_errorPlatform` when the driver fails to write it.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetPipelineCache(mrhiDevice* device, void* bytesOut,
+                                                            size_t capacity, size_t* sizeOut);
+
+    /// Reports what became of the pipeline cache the device's def gave. An
+    /// unusable cache never fails a device; it only goes unused.
+    ///
+    /// @param device  The device.
+    /// @return `mrhi_success` for a cache the driver took; `mrhi_empty` when
+    /// the def gave none; `mrhi_errorStale` for one from another library
+    /// version, driver or adapter, or one the driver declined;
+    /// `mrhi_errorInvalid` for a damaged one, or a NULL device.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetPipelineCacheOutcome(mrhiDevice* device);
+
 #ifdef __cplusplus
 }
 #endif

@@ -195,6 +195,9 @@ typedef struct TestDevice
     TestPipeline pending[TEST_PIPELINES];
     uint32_t pendingCount;
     mrhiResult pipelineOutcome;
+    // Pipelines made, and those a pipeline cache said earlier devices made.
+    uint64_t pipelinesMade;
+    uint64_t pipelinesCached;
     // The last label an object was given, copied as a real driver would.
     char label[MRHI_LABEL_BYTES + 1];
     // Configured surfaces; the core ends each before the device.
@@ -355,8 +358,46 @@ static mrhiResult HoldPipeline(TestDevice* device, uint64_t tag, uint64_t* handl
     {
         device->pending[device->pendingCount++] = (TestPipeline){tag, *handleOut};
         ++device->pipelines;
+        ++device->pipelinesMade;
     }
     return status;
+}
+
+// A test pipeline cache: a magic, then the pipelines made by the devices
+// before, as a real cache holds what they compiled.
+static const char TEST_CACHE_MAGIC[8] = {'M', 'R', 'H', 'I', 'T', 'E', 'S', 'T'};
+
+static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
+{
+    TestDevice* device = self;
+    const unsigned char* data = bytes;
+    if (size != 16 || memcmp(data, TEST_CACHE_MAGIC, sizeof(TEST_CACHE_MAGIC)) != 0)
+    {
+        return false;
+    }
+    uint64_t count = 0;
+    for (int i = 7; i >= 0; --i)
+    {
+        count = count << 8 | data[8 + i];
+    }
+    device->pipelinesCached = count;
+    return true;
+}
+
+static size_t ExportPipelineCache(void* self, void* bytes, size_t capacity)
+{
+    TestDevice* device = self;
+    if (capacity >= 16)
+    {
+        unsigned char* data = bytes;
+        memcpy(data, TEST_CACHE_MAGIC, sizeof(TEST_CACHE_MAGIC));
+        uint64_t count = device->pipelinesCached + device->pipelinesMade;
+        for (int i = 0; i < 8; ++i)
+        {
+            data[8 + i] = (unsigned char)(count >> (8 * i));
+        }
+    }
+    return 16;
 }
 
 static mrhiResult CreateComputePipeline(void* self, const mrhiDriverComputePipeline* pipeline,
@@ -528,6 +569,8 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .createComputePipeline = CreateComputePipeline,
     .createGraphicsPipeline = CreateGraphicsPipeline,
     .destroyPipeline = DestroyPipeline,
+    .importPipelineCache = ImportPipelineCache,
+    .exportPipelineCache = ExportPipelineCache,
     .textureMemory = TextureMemory,
     .bufferMemory = BufferMemory,
     .submitFrame = SubmitFrame,

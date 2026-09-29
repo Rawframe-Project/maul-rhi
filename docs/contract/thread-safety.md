@@ -74,3 +74,5 @@ edit the contract, not this file.
 | `mrhiDefaultComputePipelineDef` | Safe from any thread. |
 | `mrhiCreateComputePipeline` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDestroyComputePipeline` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiGetPipelineCache` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiGetPipelineCacheOutcome` | Safe from any thread; the device is used by one thread at a time. |

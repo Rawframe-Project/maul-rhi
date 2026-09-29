@@ -108,6 +108,13 @@ typedef struct mrhiDeviceDriverVtable
     // Destroys a pipeline, pending or not; a pending one is never
     // reported.
     void (*destroyPipeline)(void* self, uint64_t handle);
+    // Takes a pipeline cache blob it exported on an earlier run, right
+    // after the device is made; false when it declines it. The bytes are
+    // only read during the call.
+    bool (*importPipelineCache)(void* self, const void* bytes, size_t size);
+    // Writes its pipeline cache blob when capacity allows and returns its
+    // size either way.
+    size_t (*exportPipelineCache)(void* self, void* bytes, size_t capacity);
     // The bytes a declared texture with its derived usages takes, and
     // their alignment, a power of two; 0 bytes when the GPU keeps it on
     // chip.

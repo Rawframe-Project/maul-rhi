@@ -47,6 +47,15 @@ made.
   refused rather than ignored. Sample counts are 1 or a power of two
   every target format takes on the device.
 
+- **Caches:** `mrhiGetPipelineCache` writes the driver's compiled
+  pipelines in an envelope: a magic, a version, the size, a SHA-256
+  digest, and the library version, driver kind and adapter vendor and
+  device ids. A device def may give one back. It is checked as hostile
+  input, then by the driver, and never fails the device:
+  `mrhiGetPipelineCacheOutcome` reports it taken, absent, stale (another
+  library version, driver or adapter, or declined by the driver) or
+  damaged. WebGPU has no cache and declines every one.
+
 ## Consequences
 
 Programs start pipelines during loading and poll for them, as for

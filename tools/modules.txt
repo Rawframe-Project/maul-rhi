@@ -27,7 +27,9 @@ compile: device_core
 plan: device_core
 memory: device_core
 sha256:
-container: capabilities_core label sha256
+cache: bytes device_core sha256
+bytes:
+container: bytes capabilities_core label sha256
 shader: container device_core
 reflection: allocator container
 pipeline: device_core invariant pipeline_core

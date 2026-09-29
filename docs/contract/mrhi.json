@@ -5033,6 +5033,17 @@
             {
               "name": "allocator",
               "type": "struct.allocator"
+            },
+            {
+              "name": "pipeline_cache",
+              "type": "void",
+              "pointer": "const",
+              "doc": "A pipeline cache mrhiGetPipelineCache wrote, or NULL: checked as hostile input, it is used when it came from this library version, driver and adapter, and otherwise ignored. Only read during the call."
+            },
+            {
+              "name": "pipeline_cache_bytes",
+              "type": "size",
+              "doc": "Its size."
             }
           ]
         },
@@ -14113,6 +14124,65 @@
               "name": "pipeline",
               "type": "id.compute_pipeline_id",
               "doc": "The pipeline."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_pipeline_cache",
+          "doc": "Writes the device's pipeline cache, for a later device's def: the driver's compiled pipelines in a checked envelope.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` with the cache written, or only its size when bytesOut is NULL; `mrhi_errorInvalid` for a NULL device or sizeOut; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when capacity is less than the size, which sizeOut receives; `mrhi_errorPlatform` when the driver fails to write it."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "bytes_out",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "Receives the cache, or NULL to learn its size."
+            },
+            {
+              "name": "capacity",
+              "type": "size",
+              "doc": "The bytes bytesOut holds."
+            },
+            {
+              "name": "size_out",
+              "type": "size",
+              "pointer": "mutable",
+              "doc": "Receives the cache's size."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_pipeline_cache_outcome",
+          "doc": "Reports what became of the pipeline cache the device's def gave. An unusable cache never fails a device; it only goes unused.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` for a cache the driver took; `mrhi_empty` when the def gave none; `mrhi_errorStale` for one from another library version, driver or adapter, or one the driver declined; `mrhi_errorInvalid` for a damaged one, or a NULL device."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
             }
           ],
           "thread_safety": {

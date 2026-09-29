@@ -91,6 +91,12 @@ extern "C"
         mrhiLimits limits;
         mrhiDeviceLimits deviceLimits;
         mrhiAllocator allocator;
+        // A pipeline cache mrhiGetPipelineCache wrote, or NULL: checked as
+        // hostile input, it is used when it came from this library version,
+        // driver and adapter, and otherwise ignored. Only read during the call.
+        const void* pipelineCache;
+        // Its size.
+        size_t pipelineCacheBytes;
     } mrhiDeviceDef;
 
     /// Returns the default device def: no adapter, no optional features, the

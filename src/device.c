@@ -51,8 +51,9 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
         def->deviceLimits.framePasses == 0 || def->deviceLimits.frameAccesses == 0 ||
         def->deviceLimits.frameBarriers == 0 || def->deviceLimits.shaders == 0 ||
         def->deviceLimits.pipelines == 0 || !mrhiIsLabelValid(def->label, def->labelLength) ||
-        !mrhiIsAllocatorValid(&def->allocator) || !mrhiLimitsWithin(&floor, &def->limits) ||
-        chain == mrhi_errorInvalid)
+        !mrhiIsAllocatorValid(&def->allocator) ||
+        (def->pipelineCache == nullptr && def->pipelineCacheBytes > 0) ||
+        !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
     {
         *statusOut = mrhiMisuse(instance);
         return nullptr;
@@ -213,6 +214,7 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     }
     device->instance = instance;
     device->adapter = adapter->handle;
+    device->adapterInfo = adapter->info;
     device->allocator = def->allocator;
     device->features = def->features;
     device->limits = def->limits;
@@ -235,6 +237,8 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
         mrhiRelease(&device->allocator, device, device->bytes, alignof(mrhiDevice));
         return status;
     }
+    device->cacheOutcome =
+        mrhiImportPipelineCache(device, def->pipelineCache, def->pipelineCacheBytes);
     ++instance->deviceCount;
     mrhiAddPending(instance, (mrhiPending){
                                  .request = device->request,

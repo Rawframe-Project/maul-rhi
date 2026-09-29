@@ -9,6 +9,7 @@
 
 #include "container.h"
 
+#include "bytes.h"
 #include "capabilities_core.h"
 #include "label.h"
 #include "sha256.h"
@@ -45,21 +46,6 @@ enum
     SECTION_VARIABLES,
 };
 
-static uint16_t Read16(const uint8_t* at)
-{
-    return (uint16_t)(at[0] | at[1] << 8);
-}
-
-static uint32_t Read32(const uint8_t* at)
-{
-    return (uint32_t)at[0] | (uint32_t)at[1] << 8 | (uint32_t)at[2] << 16 | (uint32_t)at[3] << 24;
-}
-
-static uint64_t Read64(const uint8_t* at)
-{
-    return (uint64_t)Read32(at) | (uint64_t)Read32(at + 4) << 32;
-}
-
 static bool IsZero(const uint8_t* at, size_t count)
 {
     for (size_t i = 0; i < count; ++i)
@@ -88,12 +74,12 @@ static mrhiResult CheckHeader(const uint8_t* bytes, size_t size, uint32_t* count
     {
         return mrhi_errorInvalid;
     }
-    if (Read32(bytes + 4) != 1)
+    if (mrhiRead32(bytes + 4) != 1)
     {
         return mrhi_errorVersion;
     }
-    uint32_t count = Read32(bytes + 48);
-    if (Read64(bytes + 8) != size || !IsZero(bytes + 52, 12) || count > MAX_SECTIONS ||
+    uint32_t count = mrhiRead32(bytes + 48);
+    if (mrhiRead64(bytes + 8) != size || !IsZero(bytes + 52, 12) || count > MAX_SECTIONS ||
         count * (uint64_t)SECTION_BYTES > size - HEADER_BYTES)
     {
         return mrhi_errorInvalid;
@@ -120,9 +106,9 @@ static bool ReadSections(const uint8_t* bytes, size_t size, uint32_t count, Sect
     for (uint32_t i = 0; i < count; ++i)
     {
         const uint8_t* record = bytes + HEADER_BYTES + (size_t)i * SECTION_BYTES;
-        Section section = {Read32(record), Read64(record + 8), Read64(record + 16)};
+        Section section = {mrhiRead32(record), mrhiRead64(record + 8), mrhiRead64(record + 16)};
         uint64_t end = 0;
-        if (Read32(record + 4) != 0 || section.offset % 8 != 0 || section.offset < tableEnd ||
+        if (mrhiRead32(record + 4) != 0 || section.offset % 8 != 0 || section.offset < tableEnd ||
             ckd_add(&end, section.offset, section.size) || end > size)
         {
             return false;
@@ -173,18 +159,18 @@ mrhiShaderEntry mrhiContainerEntry(const mrhiContainer* container, uint32_t inde
 {
     const uint8_t* at = container->entries + (size_t)index * ENTRY_BYTES;
     return (mrhiShaderEntry){
-        .stage = Read32(at),
-        .nameOffset = Read32(at + 4),
-        .nameLength = Read32(at + 8),
-        .workgroup = {Read32(at + 12), Read32(at + 16), Read32(at + 20)},
-        .firstInput = Read16(at + 24),
-        .inputCount = Read16(at + 26),
-        .firstOutput = Read16(at + 28),
-        .outputCount = Read16(at + 30),
-        .firstVariable = Read16(at + 32),
-        .variableCount = Read16(at + 34),
-        .builtins = Read32(at + 36),
-        .workgroupStorageBytes = Read32(at + 40),
+        .stage = mrhiRead32(at),
+        .nameOffset = mrhiRead32(at + 4),
+        .nameLength = mrhiRead32(at + 8),
+        .workgroup = {mrhiRead32(at + 12), mrhiRead32(at + 16), mrhiRead32(at + 20)},
+        .firstInput = mrhiRead16(at + 24),
+        .inputCount = mrhiRead16(at + 26),
+        .firstOutput = mrhiRead16(at + 28),
+        .outputCount = mrhiRead16(at + 30),
+        .firstVariable = mrhiRead16(at + 32),
+        .variableCount = mrhiRead16(at + 34),
+        .builtins = mrhiRead32(at + 36),
+        .workgroupStorageBytes = mrhiRead32(at + 40),
     };
 }
 
@@ -194,15 +180,15 @@ mrhiShaderBinding mrhiContainerBinding(const mrhiContainer* container, uint32_t 
     return (mrhiShaderBinding){
         .table = at[0],
         .kind = at[1],
-        .slot = Read16(at + 2),
-        .stages = Read32(at + 4),
+        .slot = mrhiRead16(at + 2),
+        .stages = mrhiRead32(at + 4),
         .sampler = at[8],
         .sampleType = at[9],
         .viewDimension = at[10],
         .access = at[11],
-        .format = Read16(at + 12),
+        .format = mrhiRead16(at + 12),
         .multisampled = at[14] != 0,
-        .minSize = Read64(at + 16),
+        .minSize = mrhiRead64(at + 16),
     };
 }
 
@@ -210,7 +196,7 @@ static mrhiShaderVariable ReadVariable(const uint8_t* records, uint32_t index)
 {
     const uint8_t* at = records + (size_t)index * VARIABLE_BYTES;
     return (mrhiShaderVariable){
-        .location = Read32(at),
+        .location = mrhiRead32(at),
         .type = at[4],
         .components = at[5],
         .interpolation = at[6],
@@ -237,9 +223,9 @@ mrhiShaderConstant mrhiContainerConstant(const mrhiContainer* container, uint32_
 {
     const uint8_t* at = container->constants + (size_t)index * CONSTANT_BYTES;
     return (mrhiShaderConstant){
-        .id = Read32(at),
+        .id = mrhiRead32(at),
         .type = at[4],
-        .bits = Read32(at + 8),
+        .bits = mrhiRead32(at + 8),
         .required = at[12] != 0,
     };
 }
@@ -501,13 +487,13 @@ static bool TakeParts(const uint8_t* bytes, const Section* sections, uint32_t co
     {
         return false;
     }
-    container->rootBlockBytes = Read32(meta);
+    container->rootBlockBytes = mrhiRead32(meta);
     container->strings = FindSection(bytes, sections, count, SECTION_STRINGS, &size);
     container->stringBytes = (uint32_t)size;
     bool strings = size <= UINT32_MAX;
     container->spirv = FindSection(bytes, sections, count, SECTION_SPIRV, &size);
     container->spirvBytes = size;
-    bool spirv = size >= 20 && size % 4 == 0 && Read32(container->spirv) == SPIRV_MAGIC;
+    bool spirv = size >= 20 && size % 4 == 0 && mrhiRead32(container->spirv) == SPIRV_MAGIC;
     container->wgsl = FindSection(bytes, sections, count, SECTION_WGSL, &size);
     container->wgslBytes = size;
     bool wgsl = size > 0 && mrhiIsTextValid((const char*)container->wgsl, size);
