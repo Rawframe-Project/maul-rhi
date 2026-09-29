@@ -18,10 +18,14 @@
 #     "root_block_bytes": 16,
 #     "entries": [
 #       {"name": "vs", "stage": "vertex",
-#        "inputs": [{"location": 0, "format": "float32x3"}]},
-#       {"name": "fs", "stage": "fragment",
-#        "outputs": [{"location": 0, "kind": "float"}]},
-#       {"name": "cs", "stage": "compute", "workgroup": [8, 8, 1]}
+#        "inputs": [{"location": 0, "type": "float32", "components": 3}],
+#        "variables": [{"location": 0, "type": "float32", "components": 2}]},
+#       {"name": "fs", "stage": "fragment", "builtins": ["front_facing"],
+#        "variables": [{"location": 0, "type": "float32", "components": 2,
+#                       "interpolation": "perspective", "sampling": "center"}],
+#        "outputs": [{"location": 0, "type": "float32", "components": 4}]},
+#       {"name": "cs", "stage": "compute", "workgroup": [8, 8, 1],
+#        "workgroup_storage_bytes": 1024}
 #     ],
 #     "bindings": [
 #       {"table": 0, "slot": 0, "kind": "uniform_buffer",
@@ -35,8 +39,13 @@
 #        "stages": ["compute"], "access": "write_only",
 #        "format": "rgba8_unorm", "view_dimension": "2d"}
 #     ],
-#     "constants": [{"id": 0, "type": "float32", "default": 1.0}]
+#     "constants": [{"id": 0, "type": "float32", "default": 1.0},
+#                   {"id": 1, "type": "uint32"}]
 #   }
+# A vertex entry's variables are its outputs and a fragment entry's its
+# inputs; interpolation defaults to perspective at the center, and flat
+# from the first vertex for integers. A constant without a default must
+# be set by every pipeline.
 #
 # usage: mrhi_container.py SPIRV WGSL REFLECTION OUTPUT
 # Standard library only; exits 1 naming the first problem.
@@ -87,8 +96,10 @@ class Enums:
         self.dimensions = enum(contract, "texture_kind", "texture_")
         self.accesses = enum(contract, "storage_access", "storage_")
         self.formats = enum(contract, "format", "format_")
-        self.vertex_formats = enum(contract, "vertex_format", "vertex_")
-        self.outputs = enum(contract, "output_kind", "output_")
+        self.scalars = enum(contract, "scalar_type", "scalar_")
+        self.interpolations = enum(contract, "interpolation", "interpolation_")
+        self.samplings = enum(contract, "sampling", "sampling_")
+        self.builtins = enum(contract, "shader_builtins", "builtin_")
         self.constants = enum(contract, "constant_type", "constant_")
 
 
@@ -109,59 +120,104 @@ def number(value, what, low=0, high=0xFFFFFFFF):
     return value
 
 
+def keys(item, allowed, where):
+    need(isinstance(item, dict), f"{where} is a JSON object")
+    unknown = sorted(set(item) - set(allowed))
+    need(not unknown, f"{where}: unknown keys {unknown}")
+
+
 def unique(values, what):
     need(len(set(values)) == len(values), f"repeated {what}")
 
 
 # Reflection records, packed as the container lays them out.
 
-def pack_entries(reflection, enums, strings, inputs, outputs):
+def pack_variable(item, role, enums, where):
+    """An interface record: a vertex input, a color output or an
+    inter-stage variable, whose interpolation defaults as WGSL's does."""
+    keys(item, ("location", "type", "components", "interpolation", "sampling"), where)
+    high = COLOR_TARGETS - 1 if role == "output" else 0xFFFFFFFF
+    location = number(item.get("location"), f"{where}: a location", 0, high)
+    kind = item.get("type")
+    code = pick(enums.scalars, kind, "scalar type")
+    need(role != "input" or kind != "float16", f"{where}: a vertex input is not a 16-bit float")
+    components = number(item.get("components"), f"{where}: the components", 1, 4)
+    interpolation = sampling = 0
+    if role == "variable":
+        integer = kind in ("sint32", "uint32")
+        mode = item.get("interpolation", "flat" if integer else "perspective")
+        sample = item.get("sampling", "first" if mode == "flat" else "center")
+        need(not integer or mode == "flat", f"{where}: integers interpolate flat")
+        allowed = ("first", "either") if mode == "flat" else ("center", "centroid", "sample")
+        need(sample in allowed, f"{where}: {mode} interpolation samples at {allowed}")
+        interpolation = pick(enums.interpolations, mode, "interpolation")
+        sampling = pick(enums.samplings, sample, "sampling")
+    else:
+        need("interpolation" not in item and "sampling" not in item,
+             f"{where}: only inter-stage variables interpolate")
+    return location, struct.pack("<IBBBB", location, code, components, interpolation, sampling)
+
+
+def pack_range(entry, key, role, enums, records, where, allowed):
+    """Packs an entry's interface records into records; their range."""
+    items = entry.get(key, [])
+    need(isinstance(items, list), f"{where}: {key} is a list")
+    need(not items or allowed, f"{where}: this stage has no {key}")
+    first = len(records)
+    for item in items:
+        records.append(pack_variable(item, role, enums, where))
+    unique([loc for loc, _ in records[first:]], f"{key} location in {where}")
+    need(len(records) <= MAX_RECORDS, "too many records")
+    return first, len(items)
+
+
+def pack_entries(reflection, enums, strings, inputs, outputs, variables):
     entries = reflection.get("entries")
     need(isinstance(entries, list) and entries, "the reflection needs entries")
     unique([e.get("name") for e in entries], "entry name")
     records = []
     for entry in entries:
+        keys(entry, ("name", "stage", "workgroup", "workgroup_storage_bytes", "builtins",
+                     "inputs", "outputs", "variables"), "an entry")
         name = entry.get("name")
         need(isinstance(name, str), "an entry needs a name")
         encoded = name.encode("utf-8")
         need(0 < len(encoded) <= MAX_NAME and b"\0" not in encoded,
              f"entry name {name!r} must be 1 to {MAX_NAME} bytes without NUL")
+        where = f"entry {name}"
         stage = entry.get("stage")
-        need(stage in ("vertex", "fragment", "compute"), f"entry {name}: unknown stage {stage!r}")
+        need(stage in ("vertex", "fragment", "compute"), f"{where}: unknown stage {stage!r}")
+        compute = stage == "compute"
         workgroup = entry.get("workgroup", [0, 0, 0])
         need(isinstance(workgroup, list) and len(workgroup) == 3,
-             f"entry {name}: the workgroup is three sizes")
-        low = 1 if stage == "compute" else 0
-        high = 0xFFFFFFFF if stage == "compute" else 0
-        workgroup = [number(w, f"entry {name}: a workgroup size", low, high) for w in workgroup]
-        entry_inputs = entry.get("inputs", [])
-        entry_outputs = entry.get("outputs", [])
-        need(not entry_inputs or stage == "vertex", f"entry {name}: only vertex entries take inputs")
-        need(not entry_outputs or stage == "fragment",
-             f"entry {name}: only fragment entries have color outputs")
-        first_input = len(inputs)
-        for item in entry_inputs:
-            location = number(item.get("location"), f"entry {name}: an input location")
-            fmt = pick(enums.vertex_formats, item.get("format"), "vertex format")
-            inputs.append((location, struct.pack("<IB3x", location, fmt)))
-        unique([loc for loc, _ in inputs[first_input:]], f"input location in entry {name}")
-        first_output = len(outputs)
-        for item in entry_outputs:
-            location = number(item.get("location"), f"entry {name}: an output location", 0,
-                              COLOR_TARGETS - 1)
-            kind = pick(enums.outputs, item.get("kind"), "output kind")
-            outputs.append((location, struct.pack("<IB3x", location, kind)))
-        unique([loc for loc, _ in outputs[first_output:]], f"output location in entry {name}")
-        need(len(inputs) <= MAX_RECORDS and len(outputs) <= MAX_RECORDS, "too many records")
-        records.append(struct.pack("<III3IHHHH", enums.stages[stage], len(strings), len(encoded),
-                                   *workgroup, first_input, len(entry_inputs), first_output,
-                                   len(entry_outputs)))
+             f"{where}: the workgroup is three sizes")
+        low, high = (1, 0xFFFFFFFF) if compute else (0, 0)
+        workgroup = [number(w, f"{where}: a workgroup size", low, high) for w in workgroup]
+        storage = number(entry.get("workgroup_storage_bytes", 0), f"{where}: workgroup storage",
+                         0, 0xFFFFFFFF if compute else 0)
+        builtins = entry.get("builtins", [])
+        need(isinstance(builtins, list) and (not builtins or stage == "fragment"),
+             f"{where}: only fragment entries list builtins")
+        unique(builtins, f"builtin in {where}")
+        mask = 0
+        for builtin in builtins:
+            mask |= pick(enums.builtins, builtin, "builtin")
+        ranges = [
+            pack_range(entry, "inputs", "input", enums, inputs, where, stage == "vertex"),
+            pack_range(entry, "outputs", "output", enums, outputs, where, stage == "fragment"),
+            pack_range(entry, "variables", "variable", enums, variables, where, not compute),
+        ]
+        records.append(struct.pack("<III3I6HII4x", enums.stages[stage], len(strings),
+                                   len(encoded), *workgroup,
+                                   *[n for pair in ranges for n in pair], mask, storage))
         strings += encoded
     return records
 
 
 def pack_binding(binding, enums):
     where = f"binding {binding.get('table')}.{binding.get('slot')}"
+    keys(binding, ("table", "slot", "kind", "stages", "sampler", "sample_type", "access",
+                   "format", "view_dimension", "multisampled", "min_size"), where)
     table = number(binding.get("table"), f"{where}: the table", 0, TABLES - 1)
     slot = number(binding.get("slot"), f"{where}: the slot", 0, 0xFFFF)
     kind = binding.get("kind")
@@ -204,10 +260,12 @@ def pack_binding(binding, enums):
 
 
 def pack_constant(constant, enums):
+    keys(constant, ("id", "type", "default"), "a constant")
     ident = number(constant.get("id"), "a constant's id")
     kind = constant.get("type")
     code = pick(enums.constants, kind, "constant type")
-    default = constant.get("default", 0)
+    required = "default" not in constant
+    default = constant.get("default", False if kind == "bool" else 0)
     if kind == "bool":
         need(isinstance(default, bool), f"constant {ident}: the default is true or false")
         bits = int(default)
@@ -218,7 +276,7 @@ def pack_constant(constant, enums):
     else:
         low, high = (-2**31, 2**31 - 1) if kind == "int32" else (0, 2**32 - 1)
         bits = number(default, f"constant {ident}: the default", low, high) & 0xFFFFFFFF
-    return ident, struct.pack("<IB3xI4x", ident, code, bits)
+    return ident, struct.pack("<IB3xIB3x", ident, code, bits, int(required))
 
 
 # The code's entry points and bindings.
@@ -354,14 +412,15 @@ def pad8(data):
 
 
 def build(spirv, wgsl, reflection, enums):
-    need(isinstance(reflection, dict), "the reflection is a JSON object")
+    keys(reflection, ("root_block_bytes", "entries", "bindings", "constants"), "the reflection")
     root = number(reflection.get("root_block_bytes", 0), "the root block's bytes", 0,
                   MAX_ROOT_BLOCK)
     need(root % 4 == 0, "the root block's bytes are a multiple of 4")
     strings = bytearray()
     inputs = []
     outputs = []
-    entries = pack_entries(reflection, enums, strings, inputs, outputs)
+    variables = []
+    entries = pack_entries(reflection, enums, strings, inputs, outputs, variables)
     bindings = {}
     binding_records = []
     for binding in reflection.get("bindings", []):
@@ -390,6 +449,7 @@ def build(spirv, wgsl, reflection, enums):
         (7, b"".join(r for _, r in constants)),
         (8, spirv),
         (9, wgsl),
+        (10, b"".join(r for _, r in variables)),
     ]
     offset = 64 + 24 * len(sections)
     table = b""

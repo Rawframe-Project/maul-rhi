@@ -9,6 +9,7 @@
 // fopen is standard C; MSVC's runtime deprecates it for its own.
 #define _CRT_SECURE_NO_WARNINGS
 
+#include "capabilities_core.h"
 #include "container.h"
 #include "sha256.h"
 #include "test_device_setup.h"
@@ -33,6 +34,7 @@ enum
     CONSTANTS,
     SPIRV,
     WGSL,
+    VARIABLES,
     DEFAULT_SECTIONS,
 };
 
@@ -79,10 +81,23 @@ static uint8_t* Record(uint32_t section, uint32_t index, size_t bytes)
 
 static void Entry(uint32_t index, mrhiShaderStages stage, uint32_t nameOffset, uint32_t nameLength)
 {
-    uint8_t* at = Record(ENTRIES, index, 32);
+    uint8_t* at = Record(ENTRIES, index, 48);
     Put32(at, stage);
     Put32(at + 4, nameOffset);
     Put32(at + 8, nameLength);
+}
+
+// Sets interface record index of a section.
+static uint8_t* Variable(uint32_t section, uint32_t index, uint32_t location, mrhiScalarType type,
+                         uint8_t components, mrhiInterpolation interpolation, mrhiSampling sampling)
+{
+    uint8_t* at = Record(section, index, 8);
+    Put32(at, location);
+    at[4] = type;
+    at[5] = components;
+    at[6] = interpolation;
+    at[7] = sampling;
+    return at;
 }
 
 static uint8_t* Binding(uint32_t index, uint8_t table, uint16_t slot, mrhiBindingKind kind,
@@ -96,9 +111,11 @@ static uint8_t* Binding(uint32_t index, uint8_t table, uint16_t slot, mrhiBindin
     return at;
 }
 
-// The default container's sections: a vertex entry "vs" with one input,
-// a fragment entry "fs" with one output, a compute entry "cs", one
-// binding of each kind, a constant, and minimal code.
+// The default container's sections: a vertex entry "vs" with one input
+// and one output variable, a fragment entry "fs" reading it, reading
+// front_facing and writing one color, a compute entry "cs" with
+// workgroup storage, one binding of each kind, a constant, and minimal
+// code.
 static void Reset(void)
 {
     memset(s_sections, 0, sizeof(s_sections));
@@ -110,14 +127,20 @@ static void Reset(void)
     Put32(Record(META, 0, 16), 16);
     memcpy(Record(STRINGS, 0, 6), "vsfscs", 6);
     Entry(0, mrhi_stageVertex, 0, 2);
-    Put16(Record(ENTRIES, 0, 32) + 26, 1);
+    Put16(Record(ENTRIES, 0, 48) + 26, 1);
+    Put16(Record(ENTRIES, 0, 48) + 34, 1);
     Entry(1, mrhi_stageFragment, 2, 2);
-    Put16(Record(ENTRIES, 1, 32) + 30, 1);
+    uint8_t* fragment = Record(ENTRIES, 1, 48);
+    Put16(fragment + 30, 1);
+    Put16(fragment + 32, 1);
+    Put16(fragment + 34, 1);
+    Put32(fragment + 36, mrhi_builtinFrontFacing);
     Entry(2, mrhi_stageCompute, 4, 2);
-    uint8_t* compute = Record(ENTRIES, 2, 32);
+    uint8_t* compute = Record(ENTRIES, 2, 48);
     Put32(compute + 12, 8);
     Put32(compute + 16, 8);
     Put32(compute + 20, 1);
+    Put32(compute + 40, 1024);
     Put64(Binding(0, 0, 0, mrhi_bindingUniformBuffer, mrhi_stageVertex | mrhi_stageFragment) + 16,
           64);
     Binding(1, 0, 1, mrhi_bindingStorageBuffer, mrhi_stageCompute);
@@ -130,10 +153,13 @@ static void Reset(void)
     storage[10] = mrhi_texture2dArray;
     storage[11] = mrhi_storageWriteOnly;
     Put16(storage + 12, mrhi_formatRgba8Unorm);
-    uint8_t* input = Record(INPUTS, 0, 8);
-    Put32(input, 3);
-    input[4] = mrhi_vertexFloat32x3;
-    Record(OUTPUTS, 0, 8)[4] = mrhi_outputFloat;
+    Variable(INPUTS, 0, 3, mrhi_scalarFloat32, 3, 0, 0);
+    Variable(OUTPUTS, 0, 0, mrhi_scalarFloat32, 4, 0, 0);
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        Variable(VARIABLES, i, 0, mrhi_scalarFloat32, 2, mrhi_interpolationPerspective,
+                 mrhi_samplingCenter);
+    }
     uint8_t* constant = Record(CONSTANTS, 0, 16);
     Put32(constant, 7);
     constant[4] = mrhi_constantFloat32;
@@ -214,15 +240,23 @@ static void TestDefault(void)
     CHECK(memcmp(container.digest, s_container + 16, MRHI_DIGEST_BYTES) == 0, "its digest");
     CHECK(container.rootBlockBytes == 16 && container.entryCount == 3 &&
               container.bindingCount == 6 && container.inputCount == 1 &&
-              container.outputCount == 1 && container.constantCount == 1 &&
-              container.spirvBytes == 20 && container.wgslBytes == 8 && container.stringBytes == 6,
+              container.outputCount == 1 && container.variableCount == 2 &&
+              container.constantCount == 1 && !container.float16 &&
+              container.builtins == mrhi_builtinFrontFacing && container.spirvBytes == 20 &&
+              container.wgslBytes == 8 && container.stringBytes == 6,
           "its counts");
     mrhiShaderEntry compute = mrhiContainerEntry(&container, 2);
     CHECK(compute.stage == mrhi_stageCompute && compute.nameOffset == 4 &&
-              compute.nameLength == 2 && compute.workgroup[0] == 8 && compute.workgroup[2] == 1,
+              compute.nameLength == 2 && compute.workgroup[0] == 8 && compute.workgroup[2] == 1 &&
+              compute.workgroupStorageBytes == 1024,
           "an entry");
     mrhiShaderEntry vertex = mrhiContainerEntry(&container, 0);
-    CHECK(vertex.inputCount == 1 && vertex.outputCount == 0, "the vertex entry's input");
+    CHECK(vertex.inputCount == 1 && vertex.outputCount == 0 && vertex.variableCount == 1,
+          "the vertex entry's input and output");
+    mrhiShaderEntry fragment = mrhiContainerEntry(&container, 1);
+    CHECK(fragment.firstVariable == 1 && fragment.variableCount == 1 &&
+              fragment.builtins == mrhi_builtinFrontFacing,
+          "the fragment entry's input and builtin");
     mrhiShaderBinding uniform = mrhiContainerBinding(&container, 0);
     CHECK(uniform.kind == mrhi_bindingUniformBuffer && uniform.minSize == 64 &&
               uniform.stages == (mrhi_stageVertex | mrhi_stageFragment),
@@ -233,24 +267,29 @@ static void TestDefault(void)
               storage.viewDimension == mrhi_texture2dArray,
           "a storage texture binding");
     CHECK(mrhiContainerInput(&container, 0).location == 3 &&
-              mrhiContainerInput(&container, 0).format == mrhi_vertexFloat32x3,
+              mrhiContainerInput(&container, 0).type == mrhi_scalarFloat32 &&
+              mrhiContainerInput(&container, 0).components == 3,
           "the input");
-    CHECK(mrhiContainerOutput(&container, 0).kind == mrhi_outputFloat, "the output");
+    CHECK(mrhiContainerOutput(&container, 0).components == 4, "the output");
+    mrhiShaderVariable variable = mrhiContainerVariable(&container, 1);
+    CHECK(variable.type == mrhi_scalarFloat32 && variable.components == 2 &&
+              variable.interpolation == mrhi_interpolationPerspective &&
+              variable.sampling == mrhi_samplingCenter,
+          "an inter-stage variable");
     mrhiShaderConstant constant = mrhiContainerConstant(&container, 0);
     CHECK(constant.id == 7 && constant.type == mrhi_constantFloat32 && constant.bits == 0x3F800000u,
           "the constant");
-    for (uint32_t section = BINDINGS; section <= CONSTANTS; ++section)
+    uint32_t optional[] = {BINDINGS, INPUTS, OUTPUTS, CONSTANTS, VARIABLES};
+    for (size_t i = 0; i < sizeof(optional) / sizeof(optional[0]); ++i)
     {
         Reset();
-        Drop(section);
-        if (section == INPUTS)
-        {
-            Put16(Record(ENTRIES, 0, 32) + 26, 0);
-        }
-        if (section == OUTPUTS)
-        {
-            Put16(Record(ENTRIES, 1, 32) + 30, 0);
-        }
+        // The counts naming records of the section go first.
+        Put16(Record(ENTRIES, 0, 48) + 26, optional[i] == INPUTS ? 0 : 1);
+        Put16(Record(ENTRIES, 1, 48) + 30, optional[i] == OUTPUTS ? 0 : 1);
+        Put16(Record(ENTRIES, 0, 48) + 34, optional[i] == VARIABLES ? 0 : 1);
+        Put16(Record(ENTRIES, 1, 48) + 34, optional[i] == VARIABLES ? 0 : 1);
+        Put16(Record(ENTRIES, 1, 48) + 32, optional[i] == VARIABLES ? 0 : 1);
+        Drop(optional[i]);
         CHECK(Built() == mrhi_success, "an optional section left out");
     }
     Reset();
@@ -398,7 +437,7 @@ static void TestSections(void)
     Reset();
     s_sections[ENTRIES].size = 0;
     CHECK(Built() == mrhi_errorInvalid, "no entries");
-    uint32_t arrays[] = {ENTRIES, BINDINGS, INPUTS, OUTPUTS, CONSTANTS};
+    uint32_t arrays[] = {ENTRIES, BINDINGS, INPUTS, OUTPUTS, CONSTANTS, VARIABLES};
     for (size_t i = 0; i < sizeof(arrays) / sizeof(arrays[0]); ++i)
     {
         Reset();
@@ -432,7 +471,7 @@ static void TestEntries(void)
     for (size_t i = 0; i < sizeof(stages) / sizeof(stages[0]); ++i)
     {
         Reset();
-        Put32(Record(ENTRIES, 2, 32), stages[i]);
+        Put32(Record(ENTRIES, 2, 48), stages[i]);
         CHECK(Built() == mrhi_errorInvalid, "not one stage");
     }
     Reset();
@@ -465,77 +504,187 @@ static void TestEntries(void)
     for (uint32_t axis = 0; axis < 3; ++axis)
     {
         Reset();
-        Put32(Record(ENTRIES, 2, 32) + 12 + axis * 4, 0);
+        Put32(Record(ENTRIES, 2, 48) + 12 + axis * 4, 0);
         CHECK(Built() == mrhi_errorInvalid, "a compute entry with no workgroup");
         Reset();
-        Put32(Record(ENTRIES, 1, 32) + 12 + axis * 4, 1);
+        Put32(Record(ENTRIES, 1, 48) + 12 + axis * 4, 1);
         CHECK(Built() == mrhi_errorInvalid, "a fragment entry with a workgroup");
     }
     Reset();
-    Put16(Record(ENTRIES, 1, 32) + 26, 1);
+    Put16(Record(ENTRIES, 1, 48) + 26, 1);
     CHECK(Built() == mrhi_errorInvalid, "inputs on a fragment entry");
     Reset();
-    Put16(Record(ENTRIES, 0, 32) + 30, 1);
+    Put16(Record(ENTRIES, 0, 48) + 30, 1);
     CHECK(Built() == mrhi_errorInvalid, "outputs on a vertex entry");
     Reset();
-    Put16(Record(ENTRIES, 0, 32) + 24, 1);
+    Put16(Record(ENTRIES, 0, 48) + 24, 1);
     CHECK(Built() == mrhi_errorInvalid, "inputs past their section");
     Reset();
-    Put16(Record(ENTRIES, 1, 32) + 28, UINT16_MAX);
+    Put16(Record(ENTRIES, 1, 48) + 28, UINT16_MAX);
     CHECK(Built() == mrhi_errorInvalid, "outputs far past their section");
+}
+
+// Resets, then sets byte at of interface record index in section.
+static mrhiResult VariableWith(uint32_t section, uint32_t index, size_t at, uint8_t value)
+{
+    Reset();
+    Record(section, index, 8)[at] = value;
+    return Built();
 }
 
 static void TestInterfaces(void)
 {
-    uint8_t formats[] = {mrhi_vertexNone, mrhi_vertexUnorm1010102 + 1};
-    for (size_t i = 0; i < sizeof(formats); ++i)
-    {
-        Reset();
-        Record(INPUTS, 0, 8)[4] = formats[i];
-        CHECK(Built() == mrhi_errorInvalid, "an unknown vertex format");
-    }
+    CHECK(VariableWith(INPUTS, 0, 4, mrhi_scalarNone) == mrhi_errorInvalid, "an input of no type");
+    CHECK(VariableWith(INPUTS, 0, 4, mrhi_scalarUint32 + 1) == mrhi_errorInvalid,
+          "an input of an unknown type");
+    CHECK(VariableWith(INPUTS, 0, 4, mrhi_scalarFloat16) == mrhi_errorInvalid,
+          "a 16-bit float input");
+    CHECK(VariableWith(INPUTS, 0, 4, mrhi_scalarUint32) == mrhi_success, "an unsigned input");
+    CHECK(VariableWith(INPUTS, 0, 5, 0) == mrhi_errorInvalid, "an input of no components");
+    CHECK(VariableWith(INPUTS, 0, 5, 5) == mrhi_errorInvalid, "an input of five components");
+    CHECK(VariableWith(INPUTS, 0, 5, 4) == mrhi_success, "an input of four components");
+    CHECK(VariableWith(INPUTS, 0, 6, 1) == mrhi_errorInvalid, "an interpolated input");
+    CHECK(VariableWith(INPUTS, 0, 7, 1) == mrhi_errorInvalid, "a sampled input");
+    CHECK(VariableWith(INPUTS, 1, 4, mrhi_scalarNone) == mrhi_errorInvalid,
+          "an input no entry names, of no type");
     Reset();
-    Record(INPUTS, 0, 8)[4] = mrhi_vertexUnorm1010102;
-    CHECK(Built() == mrhi_success, "the last vertex format");
-    Reset();
-    Record(INPUTS, 0, 8)[7] = 1;
-    CHECK(Built() == mrhi_errorInvalid, "an input zero that is not zero");
-    Reset();
-    Record(INPUTS, 1, 8)[4] = mrhi_vertexNone;
-    CHECK(Built() == mrhi_errorInvalid, "an input no entry names, of no format");
-    Reset();
-    uint8_t* unnamed = Record(OUTPUTS, 1, 8);
-    unnamed[4] = mrhi_outputFloat;
-    Put32(unnamed, MRHI_COLOR_TARGETS);
-    CHECK(Built() == mrhi_errorInvalid, "an output no entry names, past the targets");
-    Reset();
-    uint8_t* second = Record(INPUTS, 1, 8);
-    Put32(second, 3);
-    second[4] = mrhi_vertexUint32;
-    Put16(Record(ENTRIES, 0, 32) + 26, 2);
+    Variable(INPUTS, 1, 3, mrhi_scalarUint32, 1, 0, 0);
+    Put16(Record(ENTRIES, 0, 48) + 26, 2);
     CHECK(Built() == mrhi_errorInvalid, "a repeated input location");
-    Put32(second, 4);
+    Put32(Record(INPUTS, 1, 8), 4);
     CHECK(Built() == mrhi_success, "two input locations");
-    uint8_t kinds[] = {mrhi_outputNone, mrhi_outputUint + 1};
-    for (size_t i = 0; i < sizeof(kinds); ++i)
-    {
-        Reset();
-        Record(OUTPUTS, 0, 8)[4] = kinds[i];
-        CHECK(Built() == mrhi_errorInvalid, "an unknown output kind");
-    }
+
+    CHECK(VariableWith(OUTPUTS, 0, 4, mrhi_scalarNone) == mrhi_errorInvalid,
+          "an output of no type");
+    CHECK(VariableWith(OUTPUTS, 0, 5, 5) == mrhi_errorInvalid, "an output of five components");
+    CHECK(VariableWith(OUTPUTS, 0, 6, 1) == mrhi_errorInvalid, "an interpolated output");
+    CHECK(VariableWith(OUTPUTS, 0, 7, 1) == mrhi_errorInvalid, "a sampled output");
+    Reset();
+    Record(OUTPUTS, 0, 8)[4] = mrhi_scalarFloat16;
+    Assemble();
+    mrhiContainer container;
+    CHECK(mrhiParseContainer(s_container, s_size, &container) == mrhi_success && container.float16,
+          "a 16-bit float output, noted");
     Reset();
     Put32(Record(OUTPUTS, 0, 8), MRHI_COLOR_TARGETS);
     CHECK(Built() == mrhi_errorInvalid, "an output past the color targets");
     Put32(Record(OUTPUTS, 0, 8), MRHI_COLOR_TARGETS - 1);
     CHECK(Built() == mrhi_success, "the last color target");
-    Record(OUTPUTS, 0, 8)[5] = 1;
-    CHECK(Built() == mrhi_errorInvalid, "an output zero that is not zero");
     Reset();
-    Record(OUTPUTS, 1, 8)[4] = mrhi_outputSint;
-    Put16(Record(ENTRIES, 1, 32) + 30, 2);
+    Variable(OUTPUTS, 1, MRHI_COLOR_TARGETS, mrhi_scalarFloat32, 4, 0, 0);
+    CHECK(Built() == mrhi_errorInvalid, "an output no entry names, past the targets");
+    Reset();
+    Variable(OUTPUTS, 1, 0, mrhi_scalarSint32, 4, 0, 0);
+    Put16(Record(ENTRIES, 1, 48) + 30, 2);
     CHECK(Built() == mrhi_errorInvalid, "a repeated output location");
     Put32(Record(OUTPUTS, 1, 8), 1);
     CHECK(Built() == mrhi_success, "two output locations");
+}
+
+// Resets, then gives inter-stage variable 1 a type and interpolation.
+static mrhiResult Interpolated(mrhiScalarType type, mrhiInterpolation interpolation,
+                               mrhiSampling sampling)
+{
+    Reset();
+    Variable(VARIABLES, 1, 0, type, 1, interpolation, sampling);
+    return Built();
+}
+
+static void TestVariables(void)
+{
+    CHECK(Interpolated(mrhi_scalarFloat16, mrhi_interpolationPerspective, mrhi_samplingSample) ==
+              mrhi_success,
+          "a 16-bit float sampled per sample");
+    CHECK(Interpolated(mrhi_scalarFloat32, mrhi_interpolationLinear, mrhi_samplingCentroid) ==
+              mrhi_success,
+          "linear at the centroid");
+    CHECK(Interpolated(mrhi_scalarSint32, mrhi_interpolationFlat, mrhi_samplingFirst) ==
+              mrhi_success,
+          "a flat integer from the first vertex");
+    CHECK(Interpolated(mrhi_scalarUint32, mrhi_interpolationFlat, mrhi_samplingEither) ==
+              mrhi_success,
+          "a flat integer from either vertex");
+    CHECK(Interpolated(mrhi_scalarSint32, mrhi_interpolationPerspective, mrhi_samplingCenter) ==
+              mrhi_errorInvalid,
+          "an interpolated signed integer");
+    CHECK(Interpolated(mrhi_scalarUint32, mrhi_interpolationLinear, mrhi_samplingCenter) ==
+              mrhi_errorInvalid,
+          "an interpolated unsigned integer");
+    CHECK(Interpolated(mrhi_scalarFloat32, mrhi_interpolationFlat, mrhi_samplingCenter) ==
+              mrhi_errorInvalid,
+          "flat at the center");
+    CHECK(Interpolated(mrhi_scalarFloat32, mrhi_interpolationPerspective, mrhi_samplingFirst) ==
+              mrhi_errorInvalid,
+          "perspective from the first vertex");
+    CHECK(Interpolated(mrhi_scalarFloat32, mrhi_interpolationLinear, mrhi_samplingNone) ==
+              mrhi_errorInvalid,
+          "linear with no sampling");
+    CHECK(Interpolated(mrhi_scalarFloat32, mrhi_interpolationNone, mrhi_samplingCenter) ==
+              mrhi_errorInvalid,
+          "no interpolation");
+    CHECK(Interpolated(mrhi_scalarFloat32, mrhi_interpolationFlat + 1, mrhi_samplingFirst) ==
+              mrhi_errorInvalid,
+          "an unknown interpolation");
+    CHECK(Interpolated(mrhi_scalarFloat32, mrhi_interpolationFlat, mrhi_samplingEither + 1) ==
+              mrhi_errorInvalid,
+          "an unknown sampling");
+    CHECK(VariableWith(VARIABLES, 1, 5, 0) == mrhi_errorInvalid, "a variable of no components");
+    CHECK(VariableWith(VARIABLES, 1, 4, mrhi_scalarNone) == mrhi_errorInvalid,
+          "a variable of no type");
+    Reset();
+    Variable(VARIABLES, 2, 0, mrhi_scalarFloat32, 1, mrhi_interpolationLinear, mrhi_samplingCenter);
+    Put16(Record(ENTRIES, 1, 48) + 34, 2);
+    CHECK(Built() == mrhi_errorInvalid, "a repeated variable location");
+    Put32(Record(VARIABLES, 2, 8), 9);
+    CHECK(Built() == mrhi_success, "two variable locations");
+    Reset();
+    Put16(Record(ENTRIES, 1, 48) + 32, 2);
+    CHECK(Built() == mrhi_errorInvalid, "variables past their section");
+    Reset();
+    Put16(Record(ENTRIES, 2, 48) + 34, 1);
+    CHECK(Built() == mrhi_errorInvalid, "variables on a compute entry");
+}
+
+// Resets, then sets entry index's u32 at to value.
+static mrhiResult EntryWith(uint32_t index, size_t at, uint32_t value)
+{
+    Reset();
+    Put32(Record(ENTRIES, index, 48) + at, value);
+    return Built();
+}
+
+static void TestBuiltinsAndStorage(void)
+{
+    CHECK(EntryWith(1, 36, mrhiShaderBuiltinsKnown) == mrhi_success, "every builtin");
+    CHECK(EntryWith(1, 36, mrhiShaderBuiltinsKnown + 1) == mrhi_errorInvalid, "an unknown builtin");
+    CHECK(EntryWith(0, 36, mrhi_builtinFragDepth) == mrhi_errorInvalid, "a vertex builtin");
+    CHECK(EntryWith(2, 36, mrhi_builtinSampleIndex) == mrhi_errorInvalid, "a compute builtin");
+    CHECK(EntryWith(1, 36, 0x80000000u) == mrhi_errorInvalid, "the highest unknown builtin");
+    CHECK(EntryWith(1, 40, 16) == mrhi_errorInvalid, "a fragment entry's workgroup storage");
+    CHECK(EntryWith(1, 40, 0x10000u) == mrhi_errorInvalid,
+          "a fragment entry's workgroup storage past 16 bits");
+    CHECK(EntryWith(2, 40, 0) == mrhi_success, "a compute entry without workgroup storage");
+    for (size_t at = 44; at < 48; ++at)
+    {
+        Reset();
+        Record(ENTRIES, 1, 48)[at] = 1;
+        CHECK(Built() == mrhi_errorInvalid, "an entry zero that is not zero");
+    }
+    Reset();
+    Assemble();
+    mrhiContainer container;
+    CHECK(mrhiParseContainer(s_container, s_size, &container) == mrhi_success &&
+              container.builtins == mrhi_builtinFrontFacing,
+          "the builtins noted");
+    Put32(Record(ENTRIES, 1, 48) + 36, mrhi_builtinFragDepth);
+    uint8_t* second = Record(ENTRIES, 3, 48);
+    Put32(second, mrhi_stageFragment);
+    Put32(second + 8, 1);
+    Put32(second + 36, mrhi_builtinSampleMaskOut);
+    Assemble();
+    CHECK(mrhiParseContainer(s_container, s_size, &container) == mrhi_success &&
+              container.builtins == (mrhi_builtinFragDepth | mrhi_builtinSampleMaskOut),
+          "the builtins of every entry noted");
 }
 
 // Resets, then breaks binding index's byte at to value.
@@ -621,9 +770,17 @@ static void TestConstantsAndCode(void)
     Put32(flag + 8, 2);
     CHECK(Built() == mrhi_errorInvalid, "a boolean neither 0 nor 1");
     Put32(flag + 8, 0);
+    flag[12] = 1;
+    CHECK(Built() == mrhi_success, "a constant with no default");
+    Put32(flag + 8, 1);
+    CHECK(Built() == mrhi_errorInvalid, "a default's bits on one with none");
+    Put32(flag + 8, 0);
+    flag[12] = 2;
+    CHECK(Built() == mrhi_errorInvalid, "a required flag neither 0 nor 1");
+    flag[12] = 0;
     Put32(flag, 7);
     CHECK(Built() == mrhi_errorInvalid, "a repeated constant id");
-    size_t zeros[] = {5, 6, 7, 12, 15};
+    size_t zeros[] = {5, 6, 7, 13, 15};
     for (size_t i = 0; i < sizeof(zeros) / sizeof(zeros[0]); ++i)
     {
         Reset();
@@ -661,7 +818,8 @@ static mrhiResult WithInputs(uint32_t count)
     {
         uint8_t* input = s_container + offset + (size_t)i * 8;
         memset(input, 0, 8);
-        input[4] = mrhi_vertexFloat32;
+        input[4] = mrhi_scalarFloat32;
+        input[5] = 1;
     }
     s_size = offset + (size_t)count * 8;
     Put64(s_container + 8, s_size);
@@ -810,6 +968,30 @@ static void TestRefusals(void)
     Close(device);
 }
 
+static void TestFeatures(void)
+{
+    Reset();
+    Record(OUTPUTS, 0, 8)[4] = mrhi_scalarFloat16;
+    Assemble();
+    mrhiDevice* device = Open(2, true);
+    mrhiShaderDef def = Def();
+    mrhiShaderId shader;
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported,
+          "16-bit floats without the feature");
+    Close(device);
+    s_adapter.features.shaderF16 = true;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.features.shaderF16 = true;
+    device = OpenWith(deviceDef, true);
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "16-bit floats with it");
+    Reset();
+    Put32(Record(ENTRIES, 1, 48) + 36, mrhi_builtinPrimitiveIndex);
+    Assemble();
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported, "the primitive index");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "neither is misuse");
+    Close(device);
+}
+
 static void TestStateAndFailure(void)
 {
     Reset();
@@ -886,12 +1068,15 @@ int main(int argc, char** argv)
     TestMeta();
     TestEntries();
     TestInterfaces();
+    TestVariables();
+    TestBuiltinsAndStorage();
     TestBindings();
     TestConstantsAndCode();
     TestRecordLimit();
     TestEveryFlip();
     TestCreate();
     TestRefusals();
+    TestFeatures();
     TestStateAndFailure();
     return s_failures == 0 ? 0 : 1;
 }

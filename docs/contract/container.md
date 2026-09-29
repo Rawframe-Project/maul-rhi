@@ -49,13 +49,14 @@ after checking their bounds, so a later writer can add sections.
 |---|---|---|---|
 | 1 | meta | yes | 16 bytes: the root block's size (u32, a multiple of 4, at most 256), then 12 zero bytes |
 | 2 | strings | yes | UTF-8 names, referenced by offset and length |
-| 3 | entries | yes | 32-byte entry points, at least one |
+| 3 | entries | yes | 48-byte entry points, at least one |
 | 4 | bindings | no | 24-byte bindings |
-| 5 | vertex inputs | no | 8-byte vertex inputs |
-| 6 | color outputs | no | 8-byte color outputs |
+| 5 | vertex inputs | no | 8-byte interface records |
+| 6 | color outputs | no | 8-byte interface records |
 | 7 | constants | no | 16-byte specialization constants |
 | 8 | SPIR-V | yes | a SPIR-V module holding every entry point |
 | 9 | WGSL | yes | a WGSL module holding every entry point, UTF-8 |
+| 10 | inter-stage variables | no | 8-byte interface records |
 
 An array section's size is a whole number of its records, at most
 4,096 of them. Every record is checked, whether or not an entry names
@@ -73,9 +74,14 @@ it.
 | 26 | u16 | its vertex input count, 0 unless it is a vertex entry |
 | 28 | u16 | its first color output |
 | 30 | u16 | its color output count, 0 unless it is a fragment entry |
+| 32 | u16 | its first inter-stage variable |
+| 34 | u16 | its inter-stage variable count: a vertex entry's outputs or a fragment entry's inputs; 0 for compute |
+| 36 | u32 | the builtins it uses, some `mrhiShaderBuiltins` bits; 0 unless it is a fragment entry |
+| 40 | u32 | its workgroup storage in bytes; 0 unless it is a compute entry |
+| 44 | u32 | zero |
 
-Names are unique. An entry's inputs and outputs are ranges of their
-sections.
+Names are unique. An entry's inputs, outputs and variables are ranges
+of their sections.
 
 ## Bindings
 
@@ -100,15 +106,40 @@ As WebGPU requires:
 - neither a writable storage buffer nor a written storage texture is
   used by the vertex stage.
 
-## Vertex inputs, color outputs and constants
+## Interface records
 
-| Record | Bytes | Fields |
+Vertex inputs, color outputs and inter-stage variables share one
+record:
+
+| Offset | Type | Field |
 |---|---|---|
-| vertex input | 8 | location (u32), a `mrhiVertexFormat` other than none (u8), 3 zero bytes |
-| color output | 8 | location (u32, below `MRHI_COLOR_TARGETS`), a `mrhiOutputKind` other than none (u8), 3 zero bytes |
-| constant | 16 | id (u32, unique), a `mrhiConstantType` other than none (u8), 3 zero bytes, the default's bits (u32; 0 or 1 for a boolean), 4 zero bytes |
+| 0 | u32 | its location |
+| 4 | u8 | its `mrhiScalarType`, other than none |
+| 5 | u8 | its component count, 1 to 4 |
+| 6 | u8 | an inter-stage variable's `mrhiInterpolation`; else 0 |
+| 7 | u8 | an inter-stage variable's `mrhiSampling`; else 0 |
 
-Locations are unique within an entry.
+- A vertex input is a 32-bit float, signed or unsigned integer.
+- A color output's location is below `MRHI_COLOR_TARGETS`.
+- An inter-stage variable is interpolated as WGSL allows: integers
+  flat; perspective or linear sampled at the center, the centroid or
+  per sample; flat taken from the first or either vertex.
+- Locations are unique within an entry's inputs, its outputs and its
+  variables.
+
+A container with 16-bit floats needs a device with `shaderF16`; one
+whose entries use `mrhi_builtinPrimitiveIndex` is unsupported.
+
+## Constants
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | u32 | its id, unique |
+| 4 | u8 | its `mrhiConstantType`, other than none |
+| 5 | 3 bytes | zero |
+| 8 | u32 | its default's bits: 0 or 1 for a boolean, 0 when it has none |
+| 12 | u8 | 1 when it has no default, so every pipeline sets it; else 0 |
+| 13 | 3 bytes | zero |
 
 ## Code
 

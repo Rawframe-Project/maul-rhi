@@ -64,5 +64,6 @@ extern const mrhiTextureUsage mrhiTextureUsageKnown;
 extern const mrhiPresentModes mrhiPresentModesKnown;
 extern const mrhiAlphaModes mrhiAlphaModesKnown;
 extern const mrhiShaderStages mrhiShaderStagesKnown;
+extern const mrhiShaderBuiltins mrhiShaderBuiltinsKnown;
 
 #endif // MAUL_RHI_SRC_CAPABILITIES_CORE_H

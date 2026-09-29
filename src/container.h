@@ -10,7 +10,8 @@
 #include "maul-rhi/shader.h"
 
 // An entry point: its stage, its name in the strings, its workgroup
-// size, and its ranges of vertex inputs and color outputs.
+// size and storage, the builtins it uses, and its ranges of vertex
+// inputs, color outputs and inter-stage variables.
 typedef struct mrhiShaderEntry
 {
     mrhiShaderStages stage;
@@ -21,6 +22,10 @@ typedef struct mrhiShaderEntry
     uint16_t inputCount;
     uint16_t firstOutput;
     uint16_t outputCount;
+    uint16_t firstVariable;
+    uint16_t variableCount;
+    mrhiShaderBuiltins builtins;
+    uint32_t workgroupStorageBytes;
 } mrhiShaderEntry;
 
 typedef struct mrhiShaderBinding
@@ -38,31 +43,34 @@ typedef struct mrhiShaderBinding
     uint64_t minSize;
 } mrhiShaderBinding;
 
-typedef struct mrhiShaderInput
+// A vertex input, a color output or an inter-stage variable.
+typedef struct mrhiShaderVariable
 {
     uint32_t location;
-    mrhiVertexFormat format;
-} mrhiShaderInput;
-
-typedef struct mrhiShaderOutput
-{
-    uint32_t location;
-    mrhiOutputKind kind;
-} mrhiShaderOutput;
+    mrhiScalarType type;
+    uint8_t components;
+    mrhiInterpolation interpolation;
+    mrhiSampling sampling;
+} mrhiShaderVariable;
 
 typedef struct mrhiShaderConstant
 {
     uint32_t id;
     mrhiConstantType type;
     uint32_t bits;
+    // Whether it has no default, so every pipeline sets it.
+    bool required;
 } mrhiShaderConstant;
 
-// A checked container: its digest and root block, and its sections in
-// the caller's bytes.
+// A checked container: its digest and root block, its sections in the
+// caller's bytes, whether it uses 16-bit floats, and the builtins its
+// entries use together.
 typedef struct mrhiContainer
 {
     uint8_t digest[MRHI_DIGEST_BYTES];
     uint32_t rootBlockBytes;
+    bool float16;
+    mrhiShaderBuiltins builtins;
     const uint8_t* strings;
     uint32_t stringBytes;
     const uint8_t* entries;
@@ -73,6 +81,8 @@ typedef struct mrhiContainer
     uint32_t inputCount;
     const uint8_t* outputs;
     uint32_t outputCount;
+    const uint8_t* variables;
+    uint32_t variableCount;
     const uint8_t* constants;
     uint32_t constantCount;
     const uint8_t* spirv;
@@ -88,8 +98,9 @@ mrhiResult mrhiParseContainer(const void* bytes, size_t size, mrhiContainer* con
 // The records of a checked container, by index.
 mrhiShaderEntry mrhiContainerEntry(const mrhiContainer* container, uint32_t index);
 mrhiShaderBinding mrhiContainerBinding(const mrhiContainer* container, uint32_t index);
-mrhiShaderInput mrhiContainerInput(const mrhiContainer* container, uint32_t index);
-mrhiShaderOutput mrhiContainerOutput(const mrhiContainer* container, uint32_t index);
+mrhiShaderVariable mrhiContainerInput(const mrhiContainer* container, uint32_t index);
+mrhiShaderVariable mrhiContainerOutput(const mrhiContainer* container, uint32_t index);
+mrhiShaderVariable mrhiContainerVariable(const mrhiContainer* container, uint32_t index);
 mrhiShaderConstant mrhiContainerConstant(const mrhiContainer* container, uint32_t index);
 
 #endif // MAUL_RHI_SRC_CONTAINER_H

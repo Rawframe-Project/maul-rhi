@@ -11191,21 +11191,21 @@
         },
         {
           "kind": "enum",
-          "name": "output_kind",
+          "name": "scalar_type",
           "width": "uint8",
           "mapped": true,
-          "doc": "The scalar kind of a fragment output, which its target's format must match.",
+          "doc": "The scalar type of a shader interface variable: a vertex input, a color output or an inter-stage variable.",
           "values": [
             {
-              "name": "output_none",
+              "name": "scalar_none",
               "value": 0,
-              "doc": "Not an output.",
+              "doc": "Not a variable.",
               "unmapped": true
             },
             {
-              "name": "output_float",
+              "name": "scalar_float32",
               "value": 1,
-              "doc": "Floats, for float, unorm and snorm targets.",
+              "doc": "32-bit floats; a color output of this type suits float, unorm and snorm targets.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -11226,9 +11226,32 @@
               }
             },
             {
-              "name": "output_sint",
+              "name": "scalar_float16",
               "value": 2,
-              "doc": "Signed integers.",
+              "doc": "16-bit floats, with the shaderF16 feature; not for vertex inputs.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "float16_t"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "float16_t (Shader Model 6.2)"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "half"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "f16"
+                }
+              }
+            },
+            {
+              "name": "scalar_sint32",
+              "value": 3,
+              "doc": "Signed 32-bit integers.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -11249,9 +11272,9 @@
               }
             },
             {
-              "name": "output_uint",
-              "value": 3,
-              "doc": "Unsigned integers.",
+              "name": "scalar_uint32",
+              "value": 4,
+              "doc": "Unsigned 32-bit integers.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -11268,6 +11291,367 @@
                 "web_gpu": {
                   "class": "direct",
                   "note": "u32"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "interpolation",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "How an inter-stage variable is interpolated.",
+          "values": [
+            {
+              "name": "interpolation_none",
+              "value": 0,
+              "doc": "Not an inter-stage variable.",
+              "unmapped": true
+            },
+            {
+              "name": "interpolation_perspective",
+              "value": 1,
+              "doc": "Perspective-correct.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "default"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "linear"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "center_perspective"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "perspective"
+                }
+              }
+            },
+            {
+              "name": "interpolation_linear",
+              "value": 2,
+              "doc": "Linear in screen space.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "NoPerspective"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "noperspective"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "center_no_perspective"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "linear"
+                }
+              }
+            },
+            {
+              "name": "interpolation_flat",
+              "value": 3,
+              "doc": "Not interpolated; required for integers.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "Flat"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "nointerpolation"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "flat"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "flat"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "sampling",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "Where an interpolated inter-stage variable is sampled, or which vertex a flat one takes.",
+          "values": [
+            {
+              "name": "sampling_none",
+              "value": 0,
+              "doc": "Not an inter-stage variable.",
+              "unmapped": true
+            },
+            {
+              "name": "sampling_center",
+              "value": 1,
+              "doc": "At the pixel's center.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "default"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "default"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "center"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "center"
+                }
+              }
+            },
+            {
+              "name": "sampling_centroid",
+              "value": 2,
+              "doc": "Inside the covered part of the pixel.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "Centroid"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "centroid"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "centroid"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "centroid"
+                }
+              }
+            },
+            {
+              "name": "sampling_sample",
+              "value": 3,
+              "doc": "Per sample, running the fragment entry per sample.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "Sample"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "sample"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "sample"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sample"
+                }
+              }
+            },
+            {
+              "name": "sampling_first",
+              "value": 4,
+              "doc": "A flat variable's value from the primitive's first vertex.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "provoking vertex, first by default"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the leading vertex"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the provoking vertex, first"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "first"
+                }
+              }
+            },
+            {
+              "name": "sampling_either",
+              "value": 5,
+              "doc": "A flat variable's value from either its first or its last vertex.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "the provoking vertex"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the leading vertex"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the provoking vertex"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "either"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "bitflags",
+          "name": "shader_builtins",
+          "width": "uint32",
+          "mapped": true,
+          "doc": "The fragment builtins an entry point uses that constrain its pipelines.",
+          "values": [
+            {
+              "name": "builtin_frag_depth",
+              "value": 1,
+              "doc": "Writes the fragment's depth; its pipelines need a depth format.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "FragDepth"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SV_Depth"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "[[depth(any)]]"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "frag_depth"
+                }
+              }
+            },
+            {
+              "name": "builtin_sample_mask_out",
+              "value": 2,
+              "doc": "Writes the sample mask; its pipelines cannot use alpha to coverage.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SampleMask output"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SV_Coverage output"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "[[sample_mask]] output"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sample_mask output"
+                }
+              }
+            },
+            {
+              "name": "builtin_front_facing",
+              "value": 4,
+              "doc": "Reads whether the primitive faces front; counts as an inter-stage variable.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "FrontFacing"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SV_IsFrontFace"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "[[front_facing]]"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "front_facing"
+                }
+              }
+            },
+            {
+              "name": "builtin_sample_index",
+              "value": 8,
+              "doc": "Reads the sample index; counts as an inter-stage variable.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SampleId"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SV_SampleIndex"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "[[sample_id]]"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sample_index"
+                }
+              }
+            },
+            {
+              "name": "builtin_sample_mask_in",
+              "value": 16,
+              "doc": "Reads the sample mask; counts as an inter-stage variable.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SampleMask input"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SV_Coverage input"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "[[sample_mask]] input"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sample_mask input"
+                }
+              }
+            },
+            {
+              "name": "builtin_primitive_index",
+              "value": 32,
+              "doc": "Reads the primitive index; no device grants it yet, so shaders using it are unsupported.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "PrimitiveId"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SV_PrimitiveID"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "[[primitive_id]]"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "primitive_index"
                 }
               }
             }
@@ -11468,7 +11852,7 @@
           "doc": "Loads a shader container on a ready device, checking every byte of it as hostile input.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, or a container that is malformed, damaged, misaligned or contradicts itself; `mrhi_errorVersion` for a container of another version; `mrhi_errorUnsupported` for a root block past the device's limit, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's shader limit is reached or its allocator fails; `mrhi_errorPlatform` when the driver refuses the code."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, or a container that is malformed, damaged, misaligned or contradicts itself; `mrhi_errorVersion` for a container of another version; `mrhi_errorUnsupported` for a root block past the device's limit, 16-bit floats on a device without shaderF16, the primitive index builtin, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's shader limit is reached or its allocator fails; `mrhi_errorPlatform` when the driver refuses the code."
           },
           "args": [
             {

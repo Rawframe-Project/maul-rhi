@@ -477,13 +477,43 @@ restricted or absent-rejected, with how.
 | `mrhi_vertexSint32x4` | direct: VK_FORMAT_R32G32B32A32_SINT | direct: DXGI_FORMAT_R32G32B32A32_SINT | direct: MTLVertexFormatInt4 | direct: sint32x4 |
 | `mrhi_vertexUnorm1010102` | direct: VK_FORMAT_A2B10G10R10_UNORM_PACK32 | direct: DXGI_FORMAT_R10G10B10A2_UNORM | direct: MTLVertexFormatUInt1010102Normalized | direct: unorm10-10-10-2 |
 
-## mrhiOutputKind
+## mrhiScalarType
 
 | Value | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
-| `mrhi_outputFloat` | direct: float | direct: float | direct: float | direct: f32 |
-| `mrhi_outputSint` | direct: int | direct: int | direct: int | direct: i32 |
-| `mrhi_outputUint` | direct: uint | direct: uint | direct: uint | direct: u32 |
+| `mrhi_scalarFloat32` | direct: float | direct: float | direct: float | direct: f32 |
+| `mrhi_scalarFloat16` | direct: float16_t | direct: float16_t (Shader Model 6.2) | direct: half | direct: f16 |
+| `mrhi_scalarSint32` | direct: int | direct: int | direct: int | direct: i32 |
+| `mrhi_scalarUint32` | direct: uint | direct: uint | direct: uint | direct: u32 |
+
+## mrhiInterpolation
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_interpolationPerspective` | direct: default | direct: linear | direct: center_perspective | direct: perspective |
+| `mrhi_interpolationLinear` | direct: NoPerspective | direct: noperspective | direct: center_no_perspective | direct: linear |
+| `mrhi_interpolationFlat` | direct: Flat | direct: nointerpolation | direct: flat | direct: flat |
+
+## mrhiSampling
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_samplingCenter` | direct: default | direct: default | direct: center | direct: center |
+| `mrhi_samplingCentroid` | direct: Centroid | direct: centroid | direct: centroid | direct: centroid |
+| `mrhi_samplingSample` | direct: Sample | direct: sample | direct: sample | direct: sample |
+| `mrhi_samplingFirst` | direct: provoking vertex, first by default | direct: the leading vertex | direct: the provoking vertex, first | direct: first |
+| `mrhi_samplingEither` | direct: the provoking vertex | direct: the leading vertex | direct: the provoking vertex | direct: either |
+
+## mrhiShaderBuiltins
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_builtinFragDepth` | direct: FragDepth | direct: SV_Depth | direct: [[depth(any)]] | direct: frag_depth |
+| `mrhi_builtinSampleMaskOut` | direct: SampleMask output | direct: SV_Coverage output | direct: [[sample_mask]] output | direct: sample_mask output |
+| `mrhi_builtinFrontFacing` | direct: FrontFacing | direct: SV_IsFrontFace | direct: [[front_facing]] | direct: front_facing |
+| `mrhi_builtinSampleIndex` | direct: SampleId | direct: SV_SampleIndex | direct: [[sample_id]] | direct: sample_index |
+| `mrhi_builtinSampleMaskIn` | direct: SampleMask input | direct: SV_Coverage input | direct: [[sample_mask]] input | direct: sample_mask input |
+| `mrhi_builtinPrimitiveIndex` | direct: PrimitiveId | direct: SV_PrimitiveID | direct: [[primitive_id]] | direct: primitive_index |
 
 ## mrhiConstantType
 

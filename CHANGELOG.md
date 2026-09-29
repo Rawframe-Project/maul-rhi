@@ -135,7 +135,10 @@ format.
   keeps them on chip; each target's store kept only when a later kept
   pass reads it or it is imported (`mrhiGetPassPlan`).
 - Shader containers (mrhi-0009, `shader.h`, `docs/contract/container.md`):
-  SPIR-V and WGSL beside one reflection in WebGPU's binding terms,
+  SPIR-V and WGSL beside one reflection in WebGPU's binding terms, with
+  every fact pipeline validation reads (interface variables with
+  `mrhiScalarType`, `mrhiInterpolation` and `mrhiSampling`,
+  `mrhiShaderBuiltins`, workgroup storage, required constants),
   identified by a SHA-256 digest; `mrhiCreateShader` checks every byte
   as hostile input, `mrhiDestroyShader` and `mrhiGetShaderInfo`; the
   device's `shaders` limit. `tools/mrhi_container.py` writes them from

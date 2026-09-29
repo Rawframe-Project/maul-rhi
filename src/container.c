@@ -18,12 +18,11 @@
 
 #define HEADER_BYTES   64
 #define SECTION_BYTES  24
-#define ENTRY_BYTES    32
+#define ENTRY_BYTES    48
 #define BINDING_BYTES  24
-#define INPUT_BYTES    8
-#define OUTPUT_BYTES   8
+#define VARIABLE_BYTES 8
 #define CONSTANT_BYTES 16
-#define SECTION_TYPES  9
+#define SECTION_TYPES  10
 #define MAX_SECTIONS   64
 #define MAX_ROOT_BLOCK 256
 #define MAX_NAME       256
@@ -43,6 +42,7 @@ enum
     SECTION_CONSTANTS,
     SECTION_SPIRV,
     SECTION_WGSL,
+    SECTION_VARIABLES,
 };
 
 static uint16_t Read16(const uint8_t* at)
@@ -181,6 +181,10 @@ mrhiShaderEntry mrhiContainerEntry(const mrhiContainer* container, uint32_t inde
         .inputCount = Read16(at + 26),
         .firstOutput = Read16(at + 28),
         .outputCount = Read16(at + 30),
+        .firstVariable = Read16(at + 32),
+        .variableCount = Read16(at + 34),
+        .builtins = Read32(at + 36),
+        .workgroupStorageBytes = Read32(at + 40),
     };
 }
 
@@ -202,46 +206,90 @@ mrhiShaderBinding mrhiContainerBinding(const mrhiContainer* container, uint32_t 
     };
 }
 
-mrhiShaderInput mrhiContainerInput(const mrhiContainer* container, uint32_t index)
+static mrhiShaderVariable ReadVariable(const uint8_t* records, uint32_t index)
 {
-    const uint8_t* at = container->inputs + (size_t)index * INPUT_BYTES;
-    return (mrhiShaderInput){.location = Read32(at), .format = at[4]};
+    const uint8_t* at = records + (size_t)index * VARIABLE_BYTES;
+    return (mrhiShaderVariable){
+        .location = Read32(at),
+        .type = at[4],
+        .components = at[5],
+        .interpolation = at[6],
+        .sampling = at[7],
+    };
 }
 
-mrhiShaderOutput mrhiContainerOutput(const mrhiContainer* container, uint32_t index)
+mrhiShaderVariable mrhiContainerInput(const mrhiContainer* container, uint32_t index)
 {
-    const uint8_t* at = container->outputs + (size_t)index * OUTPUT_BYTES;
-    return (mrhiShaderOutput){.location = Read32(at), .kind = at[4]};
+    return ReadVariable(container->inputs, index);
+}
+
+mrhiShaderVariable mrhiContainerOutput(const mrhiContainer* container, uint32_t index)
+{
+    return ReadVariable(container->outputs, index);
+}
+
+mrhiShaderVariable mrhiContainerVariable(const mrhiContainer* container, uint32_t index)
+{
+    return ReadVariable(container->variables, index);
 }
 
 mrhiShaderConstant mrhiContainerConstant(const mrhiContainer* container, uint32_t index)
 {
     const uint8_t* at = container->constants + (size_t)index * CONSTANT_BYTES;
-    return (mrhiShaderConstant){.id = Read32(at), .type = at[4], .bits = Read32(at + 8)};
+    return (mrhiShaderConstant){
+        .id = Read32(at),
+        .type = at[4],
+        .bits = Read32(at + 8),
+        .required = at[12] != 0,
+    };
 }
 
-// Whether every vertex input and color output is well formed on its
-// own, whether or not an entry names it.
-static bool AreInterfaceRecordsValid(const mrhiContainer* container)
+// What an interface record is.
+typedef enum Role
 {
-    for (uint32_t i = 0; i < container->inputCount; ++i)
+    ROLE_INPUT,
+    ROLE_OUTPUT,
+    ROLE_VARIABLE,
+} Role;
+
+// Whether an inter-stage variable is interpolated as WGSL allows:
+// integers flat, flat from the first or either vertex, and the others
+// sampled at the center, the centroid or per sample.
+static bool IsInterpolationValid(mrhiShaderVariable variable)
+{
+    bool integer = variable.type == mrhi_scalarSint32 || variable.type == mrhi_scalarUint32;
+    switch (variable.interpolation)
     {
-        mrhiShaderInput input = mrhiContainerInput(container, i);
-        if (input.format == mrhi_vertexNone || input.format > mrhi_vertexUnorm1010102 ||
-            !IsZero(container->inputs + (size_t)i * INPUT_BYTES + 5, 3))
-        {
-            return false;
-        }
+    case mrhi_interpolationPerspective:
+    case mrhi_interpolationLinear:
+        return !integer && variable.sampling >= mrhi_samplingCenter &&
+               variable.sampling <= mrhi_samplingSample;
+    case mrhi_interpolationFlat:
+        return variable.sampling == mrhi_samplingFirst || variable.sampling == mrhi_samplingEither;
+    default:
+        return false;
     }
-    for (uint32_t i = 0; i < container->outputCount; ++i)
+}
+
+// Whether every record of an interface section is well formed for its
+// role, whether or not an entry names it; notes 16-bit floats.
+static bool AreVariablesValid(const uint8_t* records, uint32_t count, Role role, bool* float16Out)
+{
+    for (uint32_t i = 0; i < count; ++i)
     {
-        mrhiShaderOutput output = mrhiContainerOutput(container, i);
-        if (output.kind == mrhi_outputNone || output.kind > mrhi_outputUint ||
-            output.location >= MRHI_COLOR_TARGETS ||
-            !IsZero(container->outputs + (size_t)i * OUTPUT_BYTES + 5, 3))
+        mrhiShaderVariable variable = ReadVariable(records, i);
+        bool type = variable.type >= mrhi_scalarFloat32 && variable.type <= mrhi_scalarUint32 &&
+                    !(role == ROLE_INPUT && variable.type == mrhi_scalarFloat16);
+        bool interpolation = role == ROLE_VARIABLE
+                                 ? IsInterpolationValid(variable)
+                                 : variable.interpolation == 0 && variable.sampling == 0;
+        bool location = role != ROLE_OUTPUT || variable.location < MRHI_COLOR_TARGETS;
+        if (!type || variable.components < 1 || variable.components > 4 || !interpolation ||
+            !location)
         {
             return false;
         }
+        *float16Out = *float16Out || variable.type == mrhi_scalarFloat16;
     }
     return true;
 }
@@ -256,21 +304,28 @@ static bool InArray(uint32_t first, uint32_t length, uint32_t count)
 static bool IsEntryValid(const mrhiContainer* container, uint32_t index)
 {
     mrhiShaderEntry entry = mrhiContainerEntry(container, index);
-    bool stage = entry.stage == mrhi_stageVertex || entry.stage == mrhi_stageFragment ||
-                 entry.stage == mrhi_stageCompute;
+    bool vertex = entry.stage == mrhi_stageVertex;
+    bool fragment = entry.stage == mrhi_stageFragment;
     bool compute = entry.stage == mrhi_stageCompute;
     bool workgroup =
         compute ? entry.workgroup[0] > 0 && entry.workgroup[1] > 0 && entry.workgroup[2] > 0
-                : entry.workgroup[0] == 0 && entry.workgroup[1] == 0 && entry.workgroup[2] == 0;
+                : entry.workgroup[0] == 0 && entry.workgroup[1] == 0 && entry.workgroup[2] == 0 &&
+                      entry.workgroupStorageBytes == 0;
     bool name =
         entry.nameLength > 0 && entry.nameLength <= MAX_NAME &&
         (uint64_t)entry.nameOffset + entry.nameLength <= container->stringBytes &&
         mrhiIsTextValid((const char*)container->strings + entry.nameOffset, entry.nameLength);
     bool inputs = InArray(entry.firstInput, entry.inputCount, container->inputCount) &&
-                  (entry.inputCount == 0 || entry.stage == mrhi_stageVertex);
+                  (entry.inputCount == 0 || vertex);
     bool outputs = InArray(entry.firstOutput, entry.outputCount, container->outputCount) &&
-                   (entry.outputCount == 0 || entry.stage == mrhi_stageFragment);
-    if (!stage || !workgroup || !name || !inputs || !outputs)
+                   (entry.outputCount == 0 || fragment);
+    bool variables = InArray(entry.firstVariable, entry.variableCount, container->variableCount) &&
+                     (entry.variableCount == 0 || !compute);
+    bool builtins =
+        (entry.builtins & ~mrhiShaderBuiltinsKnown) == 0 && (entry.builtins == 0 || fragment);
+    const uint8_t* reserved = container->entries + (size_t)index * ENTRY_BYTES + 44;
+    if (!(vertex || fragment || compute) || !workgroup || !name || !inputs || !outputs ||
+        !variables || !builtins || !IsZero(reserved, 4))
     {
         return false;
     }
@@ -287,32 +342,30 @@ static bool IsEntryValid(const mrhiContainer* container, uint32_t index)
     return true;
 }
 
-// Whether an entry's inputs, and its outputs, have unique locations.
-static bool AreLocationsUnique(const mrhiContainer* container, mrhiShaderEntry entry)
+// Whether the locations of a range of interface records are unique.
+static bool AreLocationsUnique(const uint8_t* records, uint32_t first, uint32_t count)
 {
-    for (uint32_t i = 0; i < entry.inputCount; ++i)
+    for (uint32_t i = 0; i < count; ++i)
     {
-        uint32_t location = mrhiContainerInput(container, entry.firstInput + i).location;
+        uint32_t location = ReadVariable(records, first + i).location;
         for (uint32_t j = 0; j < i; ++j)
         {
-            if (mrhiContainerInput(container, entry.firstInput + j).location == location)
-            {
-                return false;
-            }
-        }
-    }
-    for (uint32_t i = 0; i < entry.outputCount; ++i)
-    {
-        uint32_t location = mrhiContainerOutput(container, entry.firstOutput + i).location;
-        for (uint32_t j = 0; j < i; ++j)
-        {
-            if (mrhiContainerOutput(container, entry.firstOutput + j).location == location)
+            if (ReadVariable(records, first + j).location == location)
             {
                 return false;
             }
         }
     }
     return true;
+}
+
+// Whether an entry's inputs, outputs and variables each have unique
+// locations.
+static bool AreEntryLocationsUnique(const mrhiContainer* container, mrhiShaderEntry entry)
+{
+    return AreLocationsUnique(container->inputs, entry.firstInput, entry.inputCount) &&
+           AreLocationsUnique(container->outputs, entry.firstOutput, entry.outputCount) &&
+           AreLocationsUnique(container->variables, entry.firstVariable, entry.variableCount);
 }
 
 // Whether a binding's details suit its kind.
@@ -379,9 +432,10 @@ static bool IsConstantValid(const mrhiContainer* container, uint32_t index)
 {
     const uint8_t* raw = container->constants + (size_t)index * CONSTANT_BYTES;
     mrhiShaderConstant constant = mrhiContainerConstant(container, index);
-    if (!IsZero(raw + 5, 3) || !IsZero(raw + 12, 4) || constant.type == mrhi_constantNone ||
-        constant.type > mrhi_constantFloat32 ||
-        (constant.type == mrhi_constantBool && constant.bits > 1))
+    if (!IsZero(raw + 5, 3) || raw[12] > 1 || !IsZero(raw + 13, 3) ||
+        constant.type == mrhi_constantNone || constant.type > mrhi_constantFloat32 ||
+        (constant.type == mrhi_constantBool && constant.bits > 1) ||
+        (constant.required && constant.bits != 0))
     {
         return false;
     }
@@ -395,20 +449,28 @@ static bool IsConstantValid(const mrhiContainer* container, uint32_t index)
     return true;
 }
 
-// Whether the records agree with the rules and with each other.
-static bool AreRecordsValid(const mrhiContainer* container)
+// Whether the records agree with the rules and with each other; notes
+// 16-bit floats and the builtins the entries use.
+static bool AreRecordsValid(mrhiContainer* container)
 {
-    if (container->entryCount == 0 || !AreInterfaceRecordsValid(container))
+    if (container->entryCount == 0 ||
+        !AreVariablesValid(container->inputs, container->inputCount, ROLE_INPUT,
+                           &container->float16) ||
+        !AreVariablesValid(container->outputs, container->outputCount, ROLE_OUTPUT,
+                           &container->float16) ||
+        !AreVariablesValid(container->variables, container->variableCount, ROLE_VARIABLE,
+                           &container->float16))
     {
         return false;
     }
     for (uint32_t i = 0; i < container->entryCount; ++i)
     {
-        if (!IsEntryValid(container, i) ||
-            !AreLocationsUnique(container, mrhiContainerEntry(container, i)))
+        mrhiShaderEntry entry = mrhiContainerEntry(container, i);
+        if (!IsEntryValid(container, i) || !AreEntryLocationsUnique(container, entry))
         {
             return false;
         }
+        container->builtins |= entry.builtins;
     }
     for (uint32_t i = 0; i < container->bindingCount; ++i)
     {
@@ -474,12 +536,14 @@ mrhiResult mrhiParseContainer(const void* bytes, size_t size, mrhiContainer* con
                            &container.entryCount) &&
                  TakeArray(data, sections, count, SECTION_BINDINGS, BINDING_BYTES,
                            &container.bindings, &container.bindingCount) &&
-                 TakeArray(data, sections, count, SECTION_INPUTS, INPUT_BYTES, &container.inputs,
+                 TakeArray(data, sections, count, SECTION_INPUTS, VARIABLE_BYTES, &container.inputs,
                            &container.inputCount) &&
-                 TakeArray(data, sections, count, SECTION_OUTPUTS, OUTPUT_BYTES, &container.outputs,
-                           &container.outputCount) &&
+                 TakeArray(data, sections, count, SECTION_OUTPUTS, VARIABLE_BYTES,
+                           &container.outputs, &container.outputCount) &&
                  TakeArray(data, sections, count, SECTION_CONSTANTS, CONSTANT_BYTES,
                            &container.constants, &container.constantCount) &&
+                 TakeArray(data, sections, count, SECTION_VARIABLES, VARIABLE_BYTES,
+                           &container.variables, &container.variableCount) &&
                  AreRecordsValid(&container);
     if (!valid)
     {

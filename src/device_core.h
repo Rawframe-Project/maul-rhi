@@ -171,11 +171,13 @@ typedef struct mrhiShaderSlot
     uint32_t bindingCount;
     uint32_t inputCount;
     uint32_t outputCount;
+    uint32_t variableCount;
     uint32_t constantCount;
     mrhiShaderEntry* entries;
     mrhiShaderBinding* bindings;
-    mrhiShaderInput* inputs;
-    mrhiShaderOutput* outputs;
+    mrhiShaderVariable* inputs;
+    mrhiShaderVariable* outputs;
+    mrhiShaderVariable* variables;
     mrhiShaderConstant* constants;
     const char* names;
     void* reflection;

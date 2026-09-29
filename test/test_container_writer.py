@@ -45,9 +45,16 @@ override scale: f32 = 1.0;
 REFLECTION = {
     "root_block_bytes": 16,
     "entries": [
-        {"name": "vs", "stage": "vertex", "inputs": [{"location": 0, "format": "float32x3"}]},
-        {"name": "fs", "stage": "fragment", "outputs": [{"location": 0, "kind": "float"}]},
-        {"name": "cs", "stage": "compute", "workgroup": [8, 8, 1]},
+        {"name": "vs", "stage": "vertex",
+         "inputs": [{"location": 0, "type": "float32", "components": 3}],
+         "variables": [{"location": 0, "type": "float32", "components": 2},
+                       {"location": 1, "type": "uint32", "components": 1}]},
+        {"name": "fs", "stage": "fragment", "builtins": ["front_facing"],
+         "variables": [{"location": 0, "type": "float32", "components": 2,
+                        "interpolation": "linear", "sampling": "centroid"}],
+         "outputs": [{"location": 0, "type": "float32", "components": 4}]},
+        {"name": "cs", "stage": "compute", "workgroup": [8, 8, 1],
+         "workgroup_storage_bytes": 1024},
     ],
     "bindings": [
         {"table": 0, "slot": 0, "kind": "uniform_buffer", "stages": ["vertex"], "min_size": 64},
@@ -63,7 +70,8 @@ REFLECTION = {
     ],
     "constants": [{"id": 0, "type": "float32", "default": 1.0},
                   {"id": 1, "type": "int32", "default": -2},
-                  {"id": 2, "type": "bool", "default": True}],
+                  {"id": 2, "type": "bool", "default": True},
+                  {"id": 3, "type": "uint32"}],
 }
 
 
@@ -94,15 +102,21 @@ SPIRV_ENTRIES = [("vs", "vertex"), ("fs", "fragment"), ("cs", "compute")]
 SPIRV_BINDINGS = [(0, 0), (0, 2), (1, 1)]
 
 
-def constants(data):
-    """The constant records of a container: id, type and bits."""
+def section(data, wanted):
+    """A section's bytes, or None."""
     count = struct.unpack_from("<I", data, 48)[0]
     for i in range(count):
         kind, _, offset, size = struct.unpack_from("<IIQQ", data, 64 + 24 * i)
-        if kind == 7:
-            return [struct.unpack_from("<IB3xI4x", data, offset + at)
-                    for at in range(0, size, 16)]
-    return []
+        if kind == wanted:
+            return data[offset:offset + size]
+    return None
+
+
+def constants(data):
+    """The constant records of a container: id, type, bits and whether
+    it is required."""
+    records = section(data, 7) or b""
+    return [struct.unpack_from("<IB3xIB3x", records, at) for at in range(0, len(records), 16)]
 
 
 def write(folder, code, text, reflection):
@@ -139,8 +153,16 @@ def main():
             args = [test_shader, output, digest, "3", str(len(REFLECTION["bindings"])), "16"]
             result = subprocess.run(args, capture_output=True, text=True)
             check(result.returncode == 0, f"the library reads it: {result.stdout}")
-            check(constants(data) == [(0, 4, 0x3F800000), (1, 2, 0xFFFFFFFE), (2, 1, 1)],
-                  "the constants' types and default bits")
+            check(constants(data) == [(0, 4, 0x3F800000, 0), (1, 2, 0xFFFFFFFE, 0),
+                                      (2, 1, 1, 0), (3, 3, 0, 1)],
+                  "the constants' types, default bits and required flags")
+            entries = section(data, 3) or b""
+            check([struct.unpack_from("<36xII", entries, at) for at in range(0, len(entries), 48)]
+                  == [(0, 0), (4, 0), (0, 1024)],
+                  "the entries' builtins and workgroup storage")
+            check(section(data, 10) == struct.pack("<IBBBBIBBBBIBBBB", 0, 1, 2, 1, 1,
+                                                   1, 4, 1, 3, 4, 0, 1, 2, 2, 2),
+                  "the inter-stage variables, with WGSL's default interpolation")
 
         def refused(what, code=code, text=WGSL, change=None):
             reflection = copy.deepcopy(REFLECTION)
@@ -172,8 +194,10 @@ def main():
                 change=lambda r: r["bindings"].append(dict(r["bindings"][0])))
         refused("a vertex stage writing storage",
                 change=lambda r: r["bindings"][3]["stages"].append("vertex"))
-        refused("an unknown vertex format",
-                change=lambda r: r["entries"][0]["inputs"][0].update(format="float64"))
+        refused("an unknown scalar type",
+                change=lambda r: r["entries"][0]["inputs"][0].update(type="float64"))
+        refused("an unknown key", change=lambda r: r["entries"][0]["inputs"][0].update(format=1))
+        refused("an unknown top-level key", change=lambda r: r.update(root_block=16))
         refused("an output past the color targets",
                 change=lambda r: r["entries"][1]["outputs"][0].update(location=8))
         refused("a root block past 256", change=lambda r: r.update(root_block_bytes=260))
@@ -181,6 +205,23 @@ def main():
                 change=lambda r: r["bindings"][2].update(multisampled=True))
         refused("a boolean default that is a number",
                 change=lambda r: r["constants"][2].update(default=1))
+        refused("an interpolated integer",
+                change=lambda r: r["entries"][0]["variables"][1].update(interpolation="linear"))
+        refused("flat at the centroid",
+                change=lambda r: r["entries"][1]["variables"][0].update(interpolation="flat"))
+        refused("a 16-bit float vertex input",
+                change=lambda r: r["entries"][0]["inputs"][0].update(type="float16"))
+        refused("variables on a compute entry",
+                change=lambda r: r["entries"][2].update(variables=[r["entries"][1]["variables"][0]]))
+        refused("a vertex builtin", change=lambda r: r["entries"][0].update(builtins=["frag_depth"]))
+        refused("an unknown builtin",
+                change=lambda r: r["entries"][1].update(builtins=["position"]))
+        refused("five components",
+                change=lambda r: r["entries"][1]["outputs"][0].update(components=5))
+        refused("interpolated outputs",
+                change=lambda r: r["entries"][1]["outputs"][0].update(interpolation="flat"))
+        refused("fragment workgroup storage",
+                change=lambda r: r["entries"][1].update(workgroup_storage_bytes=4))
         refused("a repeated entry name",
                 change=lambda r: r["entries"][1].update(name="vs"))
     return 1 if failures else 0

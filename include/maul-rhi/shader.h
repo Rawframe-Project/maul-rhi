@@ -177,20 +177,79 @@ extern "C"
         mrhi_vertexUnorm1010102 = 31,
     };
 
-    // The scalar kind of a fragment output, which its target's format must
-    // match.
-    typedef uint8_t mrhiOutputKind;
+    // The scalar type of a shader interface variable: a vertex input, a color
+    // output or an inter-stage variable.
+    typedef uint8_t mrhiScalarType;
 
     enum
     {
-        // Not an output.
-        mrhi_outputNone = 0,
-        // Floats, for float, unorm and snorm targets.
-        mrhi_outputFloat = 1,
-        // Signed integers.
-        mrhi_outputSint = 2,
-        // Unsigned integers.
-        mrhi_outputUint = 3,
+        // Not a variable.
+        mrhi_scalarNone = 0,
+        // 32-bit floats; a color output of this type suits float, unorm and
+        // snorm targets.
+        mrhi_scalarFloat32 = 1,
+        // 16-bit floats, with the shaderF16 feature; not for vertex inputs.
+        mrhi_scalarFloat16 = 2,
+        // Signed 32-bit integers.
+        mrhi_scalarSint32 = 3,
+        // Unsigned 32-bit integers.
+        mrhi_scalarUint32 = 4,
+    };
+
+    // How an inter-stage variable is interpolated.
+    typedef uint8_t mrhiInterpolation;
+
+    enum
+    {
+        // Not an inter-stage variable.
+        mrhi_interpolationNone = 0,
+        // Perspective-correct.
+        mrhi_interpolationPerspective = 1,
+        // Linear in screen space.
+        mrhi_interpolationLinear = 2,
+        // Not interpolated; required for integers.
+        mrhi_interpolationFlat = 3,
+    };
+
+    // Where an interpolated inter-stage variable is sampled, or which vertex a
+    // flat one takes.
+    typedef uint8_t mrhiSampling;
+
+    enum
+    {
+        // Not an inter-stage variable.
+        mrhi_samplingNone = 0,
+        // At the pixel's center.
+        mrhi_samplingCenter = 1,
+        // Inside the covered part of the pixel.
+        mrhi_samplingCentroid = 2,
+        // Per sample, running the fragment entry per sample.
+        mrhi_samplingSample = 3,
+        // A flat variable's value from the primitive's first vertex.
+        mrhi_samplingFirst = 4,
+        // A flat variable's value from either its first or its last vertex.
+        mrhi_samplingEither = 5,
+    };
+
+    // The fragment builtins an entry point uses that constrain its pipelines.
+    typedef uint32_t mrhiShaderBuiltins;
+
+    enum
+    {
+        // Writes the fragment's depth; its pipelines need a depth format.
+        mrhi_builtinFragDepth = 0x1u,
+        // Writes the sample mask; its pipelines cannot use alpha to coverage.
+        mrhi_builtinSampleMaskOut = 0x2u,
+        // Reads whether the primitive faces front; counts as an inter-stage
+        // variable.
+        mrhi_builtinFrontFacing = 0x4u,
+        // Reads the sample index; counts as an inter-stage variable.
+        mrhi_builtinSampleIndex = 0x8u,
+        // Reads the sample mask; counts as an inter-stage variable.
+        mrhi_builtinSampleMaskIn = 0x10u,
+        // Reads the primitive index; no device grants it yet, so shaders using
+        // it are unsupported.
+        mrhi_builtinPrimitiveIndex = 0x20u,
     };
 
     // The type of a specialization constant.
@@ -269,8 +328,9 @@ extern "C"
     /// without its cookie, a bad label, or a container that is malformed,
     /// damaged, misaligned or contradicts itself; `mrhi_errorVersion` for a
     /// container of another version; `mrhi_errorUnsupported` for a root block
-    /// past the device's limit, or a critical extension the library does not
-    /// know; `mrhi_errorState` for a device that is not ready;
+    /// past the device's limit, 16-bit floats on a device without shaderF16,
+    /// the primitive index builtin, or a critical extension the library does
+    /// not know; `mrhi_errorState` for a device that is not ready;
     /// `mrhi_errorCapacity` when the device's shader limit is reached or its
     /// allocator fails; `mrhi_errorPlatform` when the driver refuses the code.
     /// @par Thread safety

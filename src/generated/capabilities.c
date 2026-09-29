@@ -915,3 +915,5 @@ const mrhiPresentModes mrhiPresentModesKnown = 0x7u;
 const mrhiAlphaModes mrhiAlphaModesKnown = 0x3u;
 
 const mrhiShaderStages mrhiShaderStagesKnown = 0x7u;
+
+const mrhiShaderBuiltins mrhiShaderBuiltinsKnown = 0x3Fu;

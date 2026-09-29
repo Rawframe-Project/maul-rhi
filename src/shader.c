@@ -28,6 +28,7 @@ typedef struct ReflectionParts
     size_t bindings;
     size_t inputs;
     size_t outputs;
+    size_t variables;
     size_t constants;
     size_t names;
 } ReflectionParts;
@@ -54,10 +55,12 @@ static bool KeepReflection(const mrhiAllocator* allocator, const mrhiContainer* 
                                  alignof(mrhiShaderEntry)),
         .bindings = mrhiLayoutAdd(&layout, container->bindingCount, sizeof(mrhiShaderBinding),
                                   alignof(mrhiShaderBinding)),
-        .inputs = mrhiLayoutAdd(&layout, container->inputCount, sizeof(mrhiShaderInput),
-                                alignof(mrhiShaderInput)),
-        .outputs = mrhiLayoutAdd(&layout, container->outputCount, sizeof(mrhiShaderOutput),
-                                 alignof(mrhiShaderOutput)),
+        .inputs = mrhiLayoutAdd(&layout, container->inputCount, sizeof(mrhiShaderVariable),
+                                alignof(mrhiShaderVariable)),
+        .outputs = mrhiLayoutAdd(&layout, container->outputCount, sizeof(mrhiShaderVariable),
+                                 alignof(mrhiShaderVariable)),
+        .variables = mrhiLayoutAdd(&layout, container->variableCount, sizeof(mrhiShaderVariable),
+                                   alignof(mrhiShaderVariable)),
         .constants = mrhiLayoutAdd(&layout, container->constantCount, sizeof(mrhiShaderConstant),
                                    alignof(mrhiShaderConstant)),
         .names = mrhiLayoutAdd(&layout, NameBytes(container), 1, 1),
@@ -72,8 +75,9 @@ static bool KeepReflection(const mrhiAllocator* allocator, const mrhiContainer* 
     slot->reflectionBytes = layout.size;
     slot->entries = (mrhiShaderEntry*)(block + parts.entries);
     slot->bindings = (mrhiShaderBinding*)(block + parts.bindings);
-    slot->inputs = (mrhiShaderInput*)(block + parts.inputs);
-    slot->outputs = (mrhiShaderOutput*)(block + parts.outputs);
+    slot->inputs = (mrhiShaderVariable*)(block + parts.inputs);
+    slot->outputs = (mrhiShaderVariable*)(block + parts.outputs);
+    slot->variables = (mrhiShaderVariable*)(block + parts.variables);
     slot->constants = (mrhiShaderConstant*)(block + parts.constants);
     char* names = (char*)(block + parts.names);
     slot->names = names;
@@ -98,6 +102,10 @@ static bool KeepReflection(const mrhiAllocator* allocator, const mrhiContainer* 
     {
         slot->outputs[i] = mrhiContainerOutput(container, i);
     }
+    for (uint32_t i = 0; i < container->variableCount; ++i)
+    {
+        slot->variables[i] = mrhiContainerVariable(container, i);
+    }
     for (uint32_t i = 0; i < container->constantCount; ++i)
     {
         slot->constants[i] = mrhiContainerConstant(container, i);
@@ -108,6 +116,7 @@ static bool KeepReflection(const mrhiAllocator* allocator, const mrhiContainer* 
     slot->bindingCount = container->bindingCount;
     slot->inputCount = container->inputCount;
     slot->outputCount = container->outputCount;
+    slot->variableCount = container->variableCount;
     slot->constantCount = container->constantCount;
     return true;
 }
@@ -138,11 +147,10 @@ static mrhiResult CheckShaderDef(mrhiDevice* device, const mrhiShaderDef* def,
     {
         return mrhiDeviceMisuse(device);
     }
-    if (status == mrhi_success && containerOut->rootBlockBytes > device->limits.rootBlockBytes)
-    {
-        return mrhi_errorUnsupported;
-    }
-    return status;
+    bool beyond = containerOut->rootBlockBytes > device->limits.rootBlockBytes ||
+                  (containerOut->float16 && !device->features.shaderF16) ||
+                  (containerOut->builtins & mrhi_builtinPrimitiveIndex) != 0;
+    return status == mrhi_success && beyond ? mrhi_errorUnsupported : status;
 }
 
 mrhiResult mrhiCreateShader(mrhiDevice* device, const mrhiShaderDef* def, mrhiShaderId* shaderOut)
