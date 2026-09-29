@@ -62,11 +62,12 @@ jobs:
           - { name: macos-clang,         os: macos-15,     cc: clang,    cxx: clang++,    config: Release, extra: "" }
     steps:
       - uses: actions/checkout@v4
-      - name: Install compilers
+      - name: Install compilers, lavapipe and the validation layer
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q gcc-14 g++-14 clang-20 ninja-build
+          sudo apt-get install -y -q gcc-14 g++-14 clang-20 ninja-build \
+            mesa-vulkan-drivers vulkan-validationlayers
       - name: Configure
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -D${PREFIX}_WERROR=ON \
@@ -74,6 +75,12 @@ jobs:
       - name: Build
         run: cmake --build build -j 4
       - name: Test
+        # Linux runs Vulkan on lavapipe, which must be found, under the
+        # validation layer, which traps on any error (mrhi-0003).
+        env:
+          MAUL_RHI_REQUIRE_VULKAN: ${{ runner.os == 'Linux' && '1' || '' }}
+          VK_INSTANCE_LAYERS: ${{ runner.os == 'Linux' && 'VK_LAYER_KHRONOS_validation' || '' }}
+          VK_KHRONOS_VALIDATION_DEBUG_ACTION: VK_DBG_LAYER_ACTION_LOG_MSG,VK_DBG_LAYER_ACTION_BREAK
         run: ctest --test-dir build --output-on-failure
 
   windows-clang-cl:

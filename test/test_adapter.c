@@ -258,12 +258,22 @@ static void TestLimits(void)
     mrhiDestroyInstance(instance);
 }
 
-static void TestWithoutADriver(void)
+// Without the test driver, an instance lists the native driver's
+// adapters, where the host has any, and never a test adapter.
+static void TestWithoutTheTestDriver(void)
 {
     mrhiInstance* instance = Create(64, 16, false);
     CHECK(Find(instance, mrhi_powerDefault, true) == mrhi_success, "answered");
-    size_t count = 1;
-    CHECK(mrhiGetAdapters(instance, nullptr, 0, &count) == mrhi_success && count == 0, "none");
+    mrhiAdapterId ids[16];
+    size_t count = 0;
+    CHECK(mrhiGetAdapters(instance, ids, 16, &count) == mrhi_success && count <= 16, "listed");
+    for (size_t i = 0; i < count; ++i)
+    {
+        mrhiAdapterInfo info;
+        CHECK(mrhiGetAdapterInfo(instance, ids[i], &info) == mrhi_success &&
+                  info.driver != mrhi_driverTest,
+              "a native adapter");
+    }
     mrhiDestroyInstance(instance);
 }
 
@@ -328,7 +338,7 @@ int main(void)
     TestTheFloor();
     TestFeaturesAreMaskedByTheApi();
     TestDefaultLimits();
-    TestWithoutADriver();
+    TestWithoutTheTestDriver();
     TestInvalidRequests();
     TestTestDriverDef();
     return s_failures == 0 ? 0 : 1;

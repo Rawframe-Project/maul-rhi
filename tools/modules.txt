@@ -10,7 +10,10 @@ device_core: capabilities_core command driver pool reflection
 driver: command reflection
 driver_test: allocator capabilities_core command driver driver_test_frame invariant
 driver_test_frame: command driver label
-instance: allocator chain driver driver_test instance_core invariant
+driver_vulkan: allocator driver invariant vulkan_adapter vulkan_api
+vulkan_adapter: capabilities_core driver vulkan_api
+vulkan_api:
+instance: allocator chain driver driver_test driver_vulkan instance_core invariant
 instance_core: driver pool
 invariant:
 label:

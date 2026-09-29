@@ -23,6 +23,13 @@ option(MAUL_RHI_SANITIZE "Instrument with AddressSanitizer and UBSan" OFF)
 option(MAUL_RHI_TSAN "Instrument with ThreadSanitizer" OFF)
 option(MAUL_RHI_COVERAGE "Instrument for gcov coverage" OFF)
 option(MAUL_RHI_TEST_DRIVER "Build the test driver (mrhiTestDriverDef)" ${MAUL_RHI_BUILD_TESTS})
+# The Vulkan driver (mrhi-0003): every native build; the web has no Vulkan.
+if(EMSCRIPTEN)
+    set(maul_rhi_vulkan_default OFF)
+else()
+    set(maul_rhi_vulkan_default ON)
+endif()
+option(MAUL_RHI_VULKAN_DRIVER "Build the Vulkan driver" ${maul_rhi_vulkan_default})
 
 # Every executable (tests, benchmarks, tools) lands in the top of the
 # build tree, so scripts and CI find them in one place.
@@ -85,6 +92,13 @@ if(MAUL_RHI_TEST_DRIVER)
     target_sources(maul-rhi PRIVATE src/driver_test.c src/driver_test_frame.c)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_TEST_DRIVER)
 endif()
+if(MAUL_RHI_VULKAN_DRIVER)
+    target_sources(maul-rhi PRIVATE src/driver_vulkan.c src/vulkan_adapter.c src/vulkan_api.c)
+    target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_VULKAN_DRIVER)
+    # The Khronos headers, kept as published (khronos/README.md).
+    target_include_directories(maul-rhi SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/khronos)
+    target_link_libraries(maul-rhi PRIVATE ${CMAKE_DL_LIBS})
+endif()
 
 if(MAUL_RHI_BUILD_TESTS)
     enable_testing()
@@ -133,7 +147,14 @@ if(MAUL_RHI_BUILD_TESTS)
                              $<TARGET_FILE:test_shader>)
         endif()
     endif()
+    # Every driver the build has, through the public API (mrhi-0003).
+    maul_add_test(conformance)
     maul_add_header_tests()
+    # The Vulkan loader keeps drivers loaded after an instance ends, so
+    # that LeakSanitizer reads their memory as held, not lost.
+    get_property(maul_rhi_tests DIRECTORY PROPERTY TESTS)
+    set_tests_properties(${maul_rhi_tests} PROPERTIES
+                         ENVIRONMENT VK_LOADER_DISABLE_DYNAMIC_LIBRARY_UNLOADING=1)
 endif()
 
 if(MAUL_RHI_BUILD_BENCH AND EXISTS ${PROJECT_SOURCE_DIR}/bench/bench_main.c)

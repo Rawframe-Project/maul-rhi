@@ -22,7 +22,8 @@ family rulebook (family record 0005).
   caller's allocator; a device owns its objects and its GPU memory,
   which the library suballocates itself, within named limits.
 - **Platform dependencies:** the Vulkan loader, opened at run time, for
-  the Vulkan driver; `webgpu.h` through Emscripten's WebGPU port on the
+  the Vulkan driver, which compiles against the Khronos C headers kept
+  as published in `khronos/`; `webgpu.h` through Emscripten's WebGPU port on the
   web; Metal and Direct3D 12 later. Window handles come in as opaque
   pointers from the program; no window library is linked.
 - **Commit areas:** `api`, `build`, `ci`, `container`, `conformance`,

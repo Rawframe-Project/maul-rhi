@@ -27,6 +27,23 @@ ids, requests, the frame graph) can be tested without a GPU.
 - **The test driver:** built with `MAUL_RHI_TEST_DRIVER` and turned on
   by `mrhiTestDriverDef` on an instance def. It has no GPU, finds the
   adapters the test describes and answers at the next poll.
+- **The Vulkan driver:** built with `MAUL_RHI_VULKAN_DRIVER`, on in
+  every native build, and started by an instance with no test driver
+  chained. It compiles against the Khronos C headers, kept exactly as
+  published in `khronos/`, and opens the loader when the instance
+  starts (`libvulkan.so.1`, `vulkan-1.dll`, `libvulkan.1.dylib`),
+  reading every function through `vkGetInstanceProcAddr`; with no
+  loader, or no Vulkan 1.3, the instance has no driver. It lists a
+  physical device that reports Vulkan 1.3, a queue family with graphics
+  and compute, dynamic rendering, synchronization2, timeline
+  semaphores, buffer device addresses and descriptor indexing, keyed by
+  the physical device, so a device found again keeps its id.
+- **Conformance:** `test_conformance` runs the same checks through the
+  public API on the test driver and on every native adapter. A host
+  without one skips it unless `MAUL_RHI_REQUIRE_VULKAN` is set; Linux
+  CI sets it, runs lavapipe, and enables the Khronos validation layer
+  with its debug action set to break, so a validation error fails the
+  test that caused it.
 
 ## Consequences
 

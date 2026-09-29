@@ -13,6 +13,9 @@
 #ifdef MAUL_RHI_TEST_DRIVER
 #include "driver_test.h"
 #endif
+#ifdef MAUL_RHI_VULKAN_DRIVER
+#include "driver_vulkan.h"
+#endif
 
 #include <stdalign.h>
 
@@ -104,7 +107,8 @@ static mrhiInstance* Allocate(const mrhiInstanceDef* def)
     return instance;
 }
 
-// Starts the driver the def's chain asks for; no driver otherwise.
+// Starts the driver the def's chain asks for, otherwise the build's
+// native driver (mrhi-0003); no driver where there is neither.
 static mrhiResult StartDriver(mrhiInstance* instance, const mrhiInstanceDef* def)
 {
     for (const mrhiChain* node = def->next; node != nullptr; node = node->next)
@@ -120,8 +124,16 @@ static mrhiResult StartDriver(mrhiInstance* instance, const mrhiInstanceDef* def
         }
 #endif
     }
+#ifdef MAUL_RHI_VULKAN_DRIVER
+    mrhiResult status = mrhiCreateVulkanDriver(&instance->allocator, def->limits.notifications,
+                                               def->limits.adapters, &instance->driver);
+    MRHI_ASSERT(instance->driver.vtable == nullptr ||
+                mrhiIsDriverVtableValid(instance->driver.vtable));
+    return status;
+#else
     (void)instance;
     return mrhi_success;
+#endif
 }
 
 mrhiResult mrhiCreateInstance(const mrhiInstanceDef* def, mrhiInstance** instanceOut)

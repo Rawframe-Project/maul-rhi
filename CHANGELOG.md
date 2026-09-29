@@ -254,3 +254,13 @@ format.
   refuses a concept classed no way or more than one. D3D12 and Metal
   read DXIL and metallib sections made offline, so the library never
   translates shaders at run time.
+- The Vulkan driver begins (mrhi-0003, `MAUL_RHI_VULKAN_DRIVER`, on in
+  native builds): the loader opened at run time, a Vulkan 1.3
+  instance, and physical devices that meet the driver's floor listed as
+  adapters with their features, limits and format capabilities; lavapipe
+  is a software adapter. The Khronos C headers are kept as published in
+  `khronos/`. Surfaces and devices on it are refused as unsupported
+  until they land.
+- The conformance suite (`test_conformance`): the same checks through
+  the public API on the test driver and every native adapter, run on
+  lavapipe under the Khronos validation layer in Linux CI.

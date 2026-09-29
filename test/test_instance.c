@@ -142,10 +142,13 @@ static void TestAllocator(void)
     mrhiInstanceDef def = mrhiDefaultInstanceDef();
     def.allocator = (mrhiAllocator){CountingAlloc, CountingFree, &counts};
     CHECK(Create(&def) == mrhi_success, "a caller allocator creates");
-    CHECK(counts.allocations == 1 && counts.frees == 1, "the instance uses and returns it");
+    // The instance, and a native driver's block where one starts.
+    CHECK(counts.allocations >= 1 && counts.frees == counts.allocations,
+          "the instance uses and returns it");
+    int frees = counts.frees;
     counts.fail = true;
     CHECK(Create(&def) == mrhi_errorCapacity, "a failing allocator");
-    CHECK(counts.frees == 1, "nothing to return after a failure");
+    CHECK(counts.frees == frees, "nothing to return after a failure");
 }
 
 int main(void)
