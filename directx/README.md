@@ -15,4 +15,6 @@ platform's API, not code of this project. DXGI's interface headers
   `d3d12sdklayers.h`, `dxgicommon.h` and `dxgiformat.h`, under
   `directx/`.
 
-An update replaces the files from a newer tag and this list.
+The files are the tag's but for line endings, which the repository
+keeps as LF where the tag has CRLF. An update replaces the files from a
+newer tag and this list.
