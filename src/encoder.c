@@ -277,7 +277,7 @@ mrhiResult mrhiSetGraphicsPipeline(mrhiDevice* device, mrhiPassId id,
     }
     pass->pipeline = pipeline.index1;
     pass->pipelineGeneration = pipeline.generation;
-    mrhiCommand command = {.type = mrhiCommandGraphicsPipeline, .a = pipeline.index1};
+    mrhiCommand command = {.type = mrhiCommandGraphicsPipeline, .a = slot->handle};
     return Record(device, pass, command, nullptr, 0);
 }
 
@@ -297,14 +297,15 @@ mrhiResult mrhiSetComputePipeline(mrhiDevice* device, mrhiPassId id, mrhiCompute
     {
         return mrhiDeviceMisuse(device);
     }
-    if (ReadyPipeline(device, mrhiPipelineCompute, pipeline.index1, pipeline.generation, &status) ==
-        nullptr)
+    const mrhiPipelineSlot* slot =
+        ReadyPipeline(device, mrhiPipelineCompute, pipeline.index1, pipeline.generation, &status);
+    if (slot == nullptr)
     {
         return status;
     }
     pass->pipeline = pipeline.index1;
     pass->pipelineGeneration = pipeline.generation;
-    mrhiCommand command = {.type = mrhiCommandComputePipeline, .a = pipeline.index1};
+    mrhiCommand command = {.type = mrhiCommandComputePipeline, .a = slot->handle};
     return Record(device, pass, command, nullptr, 0);
 }
 

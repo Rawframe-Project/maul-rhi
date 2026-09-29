@@ -209,7 +209,7 @@ static mrhiResult CheckSampler(const mrhiDevice* device, const mrhiShaderBinding
     {
         return mrhi_errorInvalid;
     }
-    recordedOut->object = binding->sampler.index1;
+    recordedOut->offset = sampler->handle;
     return mrhi_success;
 }
 

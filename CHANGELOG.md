@@ -223,3 +223,6 @@ format.
   64-bit values into a buffer a graphics pass without targets declares
   with the new query resolve access (`mrhi_accessQueryResolve`, leaving
   `mrhi_stateQueryResolve`), at a 256-byte boundary.
+- Command streams name pipelines, samplers and query sets by their
+  driver handles, so an object destroyed and its slot reused while a
+  frame records never changes what the frame's streams name.

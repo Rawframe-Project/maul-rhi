@@ -295,7 +295,9 @@ static void TestTables(void)
     const mrhiCommandBinding* written = NthBinding(3);
     const mrhiCommandBinding* read = NthBinding(4);
     const mrhiCommandBinding* uniform = NthBinding(5);
-    CHECK(sampler->slot == SAMPLER_SLOT && sampler->object == s_linear.index1, "the sampler");
+    CHECK(sampler->slot == SAMPLER_SLOT && sampler->object == 0 &&
+              sampler->offset == s_device->samplerSlots[s_linear.index1 - 1].handle,
+          "the sampler's handle");
     CHECK(written->slot == 1 && written->object == s_w.index1 && written->offset == 0 &&
               written->size == 1024,
           "the whole written buffer");

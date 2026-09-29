@@ -13,7 +13,7 @@
 // What a command record does. Fields a to d hold its operands.
 typedef enum mrhiCommandType
 {
-    // a: the pipeline's slot index plus one.
+    // a: the pipeline's driver handle.
     mrhiCommandGraphicsPipeline = 1,
     mrhiCommandComputePipeline,
     // a: the offset; b: the size; the bytes follow.
@@ -87,9 +87,10 @@ typedef struct mrhiCommand
 } mrhiCommand;
 
 // One binding of a table as recorded: its slot and object (a frame
-// resource's slot, or a sampler's, plus one); a buffer's offset and
-// resolved size, or a texture view's first layer and layers; and a
-// texture view's format, kind, aspect, first mip and mips.
+// resource's slot plus one, 0 for a sampler); a buffer's offset and
+// resolved size, a sampler's driver handle, or a texture view's first
+// layer and layers; and a texture view's format, kind, aspect, first mip
+// and mips.
 typedef struct mrhiCommandBinding
 {
     uint32_t slot;

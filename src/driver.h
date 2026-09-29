@@ -62,7 +62,11 @@ typedef struct mrhiDriverGraphicsPipeline
 // The driver side of a device: its vtable and pointer. A device driver
 // is made at once and opens in the background; its instance driver
 // answers the opening through a poll event. A def's label is valid
-// (label.h) and read only during the call that passes it.
+// (label.h) and read only during the call that passes it. Command
+// streams name device objects by driver handle, and an object destroyed
+// while a frame records may still be named by that frame's streams: a
+// driver retires a destroyed object only once the next frame submitted
+// after the call has finished, or when the device is destroyed.
 typedef struct mrhiDeviceDriverVtable
 {
     uint32_t spiVersion;

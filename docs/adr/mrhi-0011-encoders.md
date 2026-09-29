@@ -103,6 +103,11 @@ them at submission.
   hold, as passes record in parallel and records must stay in order. A
   dropped frame or a failed submission gives back the frame's records
   and ring bytes.
+- **Handles:** a recorded command names a pipeline, a sampler or a
+  query set by its driver handle, so a slot freed and taken again while
+  the frame records never changes what the stream names. A driver
+  retires a destroyed object once the next frame submitted after the
+  destruction has finished.
 - **Debug groups** balance by the pass's end. A push or pop refused for
   capacity still counts, so a pass that found the arena full still
   ends.
