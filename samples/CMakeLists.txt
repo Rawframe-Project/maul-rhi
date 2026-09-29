@@ -4,8 +4,8 @@
 # there is no adapter and none is required.
 
 # The presentation samples' windows: XCB, where the Vulkan driver is
-# built and the XCB client library installed, or the web runner's
-# canvases.
+# built and the XCB client library installed, the web runner's
+# canvases, or CAMetalLayers outside any window on the Metal driver.
 if(MAUL_RHI_VULKAN_DRIVER)
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
@@ -26,6 +26,14 @@ function(maul_rhi_add_sample name)
         if(MAUL_RHI_SAMPLE_XCB_FOUND)
             target_link_libraries(${target} PRIVATE PkgConfig::MAUL_RHI_SAMPLE_XCB)
             target_compile_definitions(${target} PRIVATE SAMPLE_XCB)
+        endif()
+        if(MAUL_RHI_METAL_DRIVER)
+            target_sources(${target} PRIVATE ${PROJECT_SOURCE_DIR}/test/metal_layer.m)
+            target_include_directories(${target} PRIVATE ${PROJECT_SOURCE_DIR}/test)
+            set_target_properties(${target} PROPERTIES OBJC_STANDARD 23 OBJC_STANDARD_REQUIRED ON)
+            target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:OBJC>:-fno-objc-arc>)
+            target_compile_definitions(${target} PRIVATE SAMPLE_METAL)
+            target_link_libraries(${target} PRIVATE "-framework QuartzCore")
         endif()
     endif()
     maul_apply_flags(${target})

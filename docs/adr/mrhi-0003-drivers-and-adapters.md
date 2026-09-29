@@ -149,6 +149,35 @@ ids, requests, the frame graph) can be tested without a GPU.
   larger than the pipeline's threads. A buffer of stride 0 takes
   Metal's constant step. The driver's pipeline cache is empty, since
   Metal keeps its own.
+- **Metal frames:** a frame is recorded at submission into one command
+  buffer: a render encoder for a pass with targets, a compute encoder
+  for one without, a blit encoder for a transfer pass; copies and
+  resolves in a compute pass leave it for a blit encoder and the next
+  compute encoder takes up the pipeline and state again, the pass's
+  debug groups closed and reopened per encoder. Bindings, the root
+  block and SPIRV-Cross's buffer sizes are applied through the
+  pipeline's map before each draw or dispatch. Metal tracks hazards
+  between encoders, so the core's barriers need no commands. Uploads
+  are copied into the slot's shared staging buffer and readbacks land
+  in a shared mirror of the ring, copied into it once the frame
+  finishes; declared resources are made per frame and released once
+  the command buffer, which holds them, is committed. The query sets a
+  frame resolves are cleared first, so a query it does not write reads
+  0. A poll reads each command buffer's status in order; a waiting
+  program waits on a semaphore the completion signals; a failed command
+  buffer is the device's loss. A destroyed object or pipeline is
+  released after the next frame's commit.
+- **Metal surfaces:** a surface is a CAMetalLayer, retained, and every
+  adapter presents to it: 8-bit sRGB in Rec. 709 and Display P3, and
+  half floats, linear, of standard or extended range, in both; fifo
+  presentation, and immediate on macOS; opaque or premultiplied alpha.
+  Configuring sets the layer's device, pixel format, color space,
+  extended range, drawable size, synchronization and opacity; a
+  program's size is its own, since the layer scales drawables to its
+  bounds. An acquire takes the next drawable: out of date when
+  something else resized the drawables, suboptimal while the layer's
+  bounds in pixels differ. A frame presents each image it acquired
+  after its work.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`

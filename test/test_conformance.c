@@ -38,6 +38,9 @@
 #ifdef MRHI_TEST_XCB
 #include <xcb/xcb.h>
 #endif
+#ifdef MAUL_RHI_METAL_DRIVER
+#include "metal_layer.h"
+#endif
 
 // A label from a string literal, for a def's label and labelLength.
 #define LABEL(def, text) ((def).label = (text), (def).labelLength = sizeof(text) - 1)
@@ -1670,7 +1673,7 @@ static void CheckForeignSources(mrhiInstance* instance)
 #endif
 }
 
-#if defined(MRHI_TEST_XCB) || defined(__EMSCRIPTEN__)
+#if defined(MRHI_TEST_XCB) || defined(__EMSCRIPTEN__) || defined(MAUL_RHI_METAL_DRIVER)
 // Whether caps meet the floors and offer 8-bit sRGB in Rec. 709.
 static bool MeetsFloors(const mrhiSurfaceCaps* caps)
 {
@@ -1991,6 +1994,52 @@ static void CheckCanvasSurface(mrhiInstance* instance, const mrhiAdapterId* ids,
 }
 #endif
 
+#ifdef MAUL_RHI_METAL_DRIVER
+// A CAMetalLayer, which every adapter presents to; drawables a view
+// resizes leave the layer out of date until it is configured again.
+static void CheckMetalSurface(mrhiInstance* instance, const mrhiAdapterId* ids, size_t count)
+{
+    void* layer = mrhiTestNewMetalLayer(64, 48);
+    const mrhiSurfaceSourceMetalLayer source = {
+        .chain = {.type = mrhi_structSurfaceSourceMetalLayer},
+        .layer = layer,
+    };
+    mrhiSurfaceId surface = {0};
+    CHECK(layer != nullptr && MakeSurface(instance, &source.chain, &surface) == mrhi_success,
+          "a layer surface");
+    for (size_t i = 0; i < count; ++i)
+    {
+        mrhiSurfaceCaps caps;
+        CHECK(mrhiGetSurfaceCaps(instance, surface, ids[i], &caps) == mrhi_success &&
+                  caps.presentable && MeetsFloors(&caps),
+              "presentable, with the floors");
+        CheckPresenting(instance, ids[i], surface, &caps, false);
+        mrhiDeviceDef def = mrhiDefaultDeviceDef();
+        def.adapter = ids[i];
+        mrhiDevice* device = nullptr;
+        mrhiRequestId request;
+        mrhiInstanceNotification record;
+        CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success &&
+                  NextInstance(instance, &record) == mrhi_success,
+              "a device");
+        uint8_t pixel[4];
+        CHECK(Configure(device, surface, &caps, 64, 48) == mrhi_success &&
+                  IsAcquired(PresentRed(device, surface, false, pixel)),
+              "configured");
+        mrhiTestResizeMetalLayer(layer, 20, 48);
+        CHECK(PresentRed(device, surface, false, pixel) == mrhi_errorOutOfDate,
+              "out of date once a view resizes it");
+        CHECK(Configure(device, surface, &caps, 20, 48) == mrhi_success &&
+                  IsAcquired(PresentRed(device, surface, false, pixel)),
+              "configured at the new size");
+        mrhiDestroyDevice(device);
+        mrhiTestResizeMetalLayer(layer, 64, 48);
+    }
+    CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "the surface destroyed");
+    mrhiTestReleaseMetalLayer(layer);
+}
+#endif
+
 // Surfaces on the native driver's adapters.
 static void CheckSurfaces(mrhiInstance* instance)
 {
@@ -2001,6 +2050,8 @@ static void CheckSurfaces(mrhiInstance* instance)
     CheckXcbSurface(instance, ids, count);
 #elif defined(__EMSCRIPTEN__)
     CheckCanvasSurface(instance, ids, count);
+#elif defined(MAUL_RHI_METAL_DRIVER)
+    CheckMetalSurface(instance, ids, count);
 #else
     (void)count;
     CHECK(!IsSet("MAUL_RHI_REQUIRE_SURFACE"), "a window system where required");

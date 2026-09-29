@@ -118,7 +118,7 @@ jobs:
         # macOS runs Metal in its own cell.
         env:
           MAUL_RHI_REQUIRE_VULKAN: ${{ runner.os == 'Linux' && '1' || '' }}
-          MAUL_RHI_REQUIRE_SURFACE: ${{ runner.os == 'Linux' && '1' || '' }}
+          MAUL_RHI_REQUIRE_SURFACE: ${{ (runner.os == 'Linux' || contains(matrix.extra, 'METAL_DRIVER=ON')) && '1' || '' }}
           MAUL_RHI_REQUIRE_BINDLESS: ${{ runner.os == 'Linux' && '1' || '' }}
           # The Metal cell must find the runner's device, under Metal's API
           # and shader validation, which stop a test on misuse.

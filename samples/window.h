@@ -18,7 +18,8 @@
 typedef struct SampleWindow
 {
     mrhiSurfaceId surface;
-    // The X connection and window, where there are.
+    // The X connection and window, where there are; the CAMetalLayer on
+    // the Metal driver.
     void* connection;
     uint32_t window;
     // Which window: 0 or 1.

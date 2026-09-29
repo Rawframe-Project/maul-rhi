@@ -18,6 +18,7 @@
 #include "invariant.h"
 #include "metal_encode.h"
 #include "metal_resource.h"
+#include "metal_surface.h"
 
 #include <string.h>
 
@@ -110,6 +111,19 @@ static void ReleaseTransients(mrhiMetalFrames* frames, const mrhiDriverFrame* fr
     }
 }
 
+// Releases the frame's images once its command buffer, which presents
+// them, holds them.
+static void ReleaseImages(const mrhiDriverFrame* frame)
+{
+    for (uint32_t i = 0; i < frame->resourceCount; ++i)
+    {
+        if (frame->resources[i].kind == mrhiDriverSurfaceImage)
+        {
+            mrhiMetalReleaseImage(frame->resources[i].image);
+        }
+    }
+}
+
 // Names the frame's objects by slot: device objects as they are,
 // declared ones made; false when Metal makes one not, with those made
 // released.
@@ -119,11 +133,13 @@ static bool TakeObjects(mrhiMetalFrames* frames, const mrhiDriverFrame* frame)
     for (uint32_t i = 0; i < frame->resourceCount; ++i)
     {
         const mrhiDriverResource* resource = &frame->resources[i];
-        // Surfaces are not configured on Metal yet, so no frame has an
-        // image of one.
-        MRHI_ASSERT(resource->kind != mrhiDriverSurfaceImage);
         bool transient = resource->kind == mrhiDriverTransientBuffer ||
                          resource->kind == mrhiDriverTransientTexture;
+        if (resource->kind == mrhiDriverSurfaceImage)
+        {
+            frames->objects[i] = mrhiMetalImageTexture(resource->image);
+            continue;
+        }
         frames->objects[i] = !resource->needed ? nil
                              : transient       ? MakeTransient(frames->device, resource)
                                                : mrhiMetalObject(resource->handle);
@@ -191,6 +207,15 @@ static void Record(mrhiMetalFrames* frames, mrhiMetalSlot* slot, const mrhiDrive
     {
         mrhiMetalEncodePass(encoder, &frame->passes[p]);
     }
+    // Every image the frame acquired is presented after its work, used or
+    // not, as the core expects.
+    for (uint32_t i = 0; i < frame->resourceCount; ++i)
+    {
+        if (frame->resources[i].kind == mrhiDriverSurfaceImage)
+        {
+            mrhiMetalPresent(commands, frame->resources[i].image);
+        }
+    }
     dispatch_semaphore_t done = dispatch_semaphore_create(0);
     [commands addCompletedHandler:^(id<MTLCommandBuffer> finished) {
       (void)finished;
@@ -222,6 +247,7 @@ mrhiResult mrhiMetalSubmitFrame(mrhiMetalFrames* frames, const mrhiDriverFrame* 
             }
             Record(frames, slot, frame);
             ReleaseTransients(frames, frame, frame->resourceCount);
+            ReleaseImages(frame);
         }
     }
     if (!made)

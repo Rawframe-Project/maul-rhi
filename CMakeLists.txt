@@ -126,7 +126,8 @@ if(MAUL_RHI_METAL_DRIVER)
     enable_language(OBJC)
     target_sources(maul-rhi PRIVATE src/driver_metal.m src/metal_device.m src/metal_names.m
                                    src/metal_copy.m src/metal_encode.m src/metal_frame.m
-                                   src/metal_graphics.m src/metal_pipeline.m src/metal_resource.m)
+                                   src/metal_graphics.m src/metal_pipeline.m src/metal_resource.m
+                                   src/metal_surface.m)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_METAL_DRIVER)
     # The family's C23 for Objective-C, with manual retain and release so
     # that Metal objects sit in plain C structs.
@@ -137,7 +138,8 @@ if(MAUL_RHI_METAL_DRIVER)
         OBJC_VISIBILITY_PRESET hidden)
     target_compile_options(maul-rhi PRIVATE
         $<$<COMPILE_LANGUAGE:OBJC>:-fno-objc-arc -Wmissing-prototypes>)
-    target_link_libraries(maul-rhi PRIVATE "-framework Foundation" "-framework Metal")
+    target_link_libraries(maul-rhi PRIVATE "-framework CoreGraphics" "-framework Foundation"
+                                           "-framework Metal" "-framework QuartzCore")
 endif()
 if(MAUL_RHI_WEBGPU_DRIVER)
     target_sources(maul-rhi PRIVATE src/driver_webgpu.c src/webgpu_device.c src/webgpu_frame.c
@@ -218,7 +220,14 @@ if(MAUL_RHI_BUILD_TESTS)
     else()
         maul_add_test(conformance)
         if(MAUL_RHI_METAL_DRIVER)
+            # A CAMetalLayer outside any window to present to.
+            target_sources(test_conformance PRIVATE test/metal_layer.m)
+            set_target_properties(test_conformance PROPERTIES OBJC_STANDARD 23
+                                                              OBJC_STANDARD_REQUIRED ON)
+            target_compile_options(test_conformance PRIVATE
+                                   $<$<COMPILE_LANGUAGE:OBJC>:-fno-objc-arc>)
             target_compile_definitions(test_conformance PRIVATE MAUL_RHI_METAL_DRIVER)
+            target_link_libraries(test_conformance PRIVATE "-framework QuartzCore")
         endif()
     endif()
     find_package(PkgConfig QUIET)

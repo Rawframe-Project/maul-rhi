@@ -6,8 +6,9 @@
 // (metal_resource.m), shaders and pipelines (metal_pipeline.m) and
 // frames (metal_frame.m). A destroyed object or pipeline may still be
 // named by the next frame submitted, so it waits until that frame is
-// committed, whose command buffer then holds what it uses. Surfaces and
-// heaps are not made yet: those calls answer mrhi_errorUnsupported.
+// committed, whose command buffer then holds what it uses; surfaces are
+// layers (metal_surface.m). Heaps are not made yet: those calls answer
+// mrhi_errorUnsupported.
 
 #include "metal_device.h"
 
@@ -16,6 +17,7 @@
 #include "metal_frame.h"
 #include "metal_pipeline.h"
 #include "metal_resource.h"
+#include "metal_surface.h"
 
 #include <stdalign.h>
 #include <string.h>
@@ -111,7 +113,7 @@ static void DestroyObject(void* self, uint64_t handle)
     Retire(self, handle, false);
 }
 
-// Swapchains and heaps are never made, so never destroyed.
+// Heaps are never made, so never destroyed.
 static void Never(void* self, uint64_t handle)
 {
     (void)self;
@@ -122,12 +124,15 @@ static void Never(void* self, uint64_t handle)
 static mrhiResult ConfigureSurface(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
                                    uint64_t oldSwapchain, uint64_t* swapchainOut)
 {
-    (void)self;
-    (void)surface;
-    (void)config;
-    (void)oldSwapchain;
-    *swapchainOut = 0;
-    return mrhi_errorUnsupported;
+    const MetalDevice* device = self;
+    return mrhiMetalConfigure(&device->allocator, device->device, surface, config, oldSwapchain,
+                              swapchainOut);
+}
+
+static void UnconfigureSurface(void* self, uint64_t swapchain)
+{
+    const MetalDevice* device = self;
+    mrhiMetalUnconfigure(&device->allocator, swapchain);
 }
 
 static mrhiResult CreateShader(void* self, const mrhiShaderDef* def, const mrhiContainer* container,
@@ -178,17 +183,14 @@ static void LossReport(void* self, mrhiDeviceLossReport* reportOut)
 static mrhiResult AcquireImage(void* self, uint64_t swapchain, uint64_t* imageOut)
 {
     (void)self;
-    (void)swapchain;
-    *imageOut = 0;
-    return mrhi_errorUnsupported;
+    return mrhiMetalAcquire(swapchain, imageOut);
 }
 
 static void ReleaseImage(void* self, uint64_t swapchain, uint64_t image)
 {
     (void)self;
     (void)swapchain;
-    (void)image;
-    MRHI_ASSERT(false);
+    mrhiMetalReleaseImage(image);
 }
 
 // Timestamps are not granted yet, so the core never asks.
@@ -293,7 +295,7 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .createView = CreateView,
     .destroyView = DestroyObject,
     .configureSurface = ConfigureSurface,
-    .unconfigureSurface = Never,
+    .unconfigureSurface = UnconfigureSurface,
     .createShader = CreateShader,
     .destroyShader = DestroyShader,
     .createComputePipeline = CreateComputePipeline,

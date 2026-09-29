@@ -8,7 +8,8 @@
 // floor, raised where every Metal device of the family goes further;
 // features are granted as the driver comes to run them. Every entry
 // point that touches Objective-C objects drains its own autorelease
-// pool, since the calling thread may have none.
+// pool, since the calling thread may have none. A surface is a
+// CAMetalLayer the driver retains, which every adapter presents to.
 
 #include "driver_metal.h"
 
@@ -17,7 +18,9 @@
 #include "invariant.h"
 #include "metal_device.h"
 #include "metal_frame.h"
+#include "metal_surface.h"
 
+#import <QuartzCore/CAMetalLayer.h>
 #import <TargetConditionals.h>
 #include <stdalign.h>
 #include <string.h>
@@ -166,31 +169,58 @@ static void GetFormatCaps(const void* self, uint64_t adapter, mrhiFormat format,
     *capsOut = mrhiGrantedFormatCaps(format, &none);
 }
 
+// A CAMetalLayer is the only source Metal presents to; the pointer must
+// be one.
 static mrhiResult CreateSurface(void* self, const mrhiChain* source, const mrhiSurfaceDef* def,
                                 uint64_t* handleOut)
 {
     (void)self;
-    (void)source;
     (void)def;
     *handleOut = 0;
-    return mrhi_errorUnsupported;
+    if (source->type != mrhi_structSurfaceSourceMetalLayer)
+    {
+        return mrhi_errorUnsupported;
+    }
+    id layer = (id)((const mrhiSurfaceSourceMetalLayer*)source)->layer;
+    bool metal = false;
+    @autoreleasepool
+    {
+        metal = layer != nil && [layer isKindOfClass:[CAMetalLayer class]];
+    }
+    if (!metal)
+    {
+        return mrhi_errorUnsupported;
+    }
+    *handleOut = (uint64_t)(uintptr_t)(void*)[layer retain];
+    return mrhi_success;
 }
 
-// No surface is made, so none is destroyed.
 static void DestroySurface(void* self, uint64_t handle)
 {
     (void)self;
-    (void)handle;
-    MRHI_ASSERT(false);
+    [(id)(void*)(uintptr_t)handle release];
 }
 
+// Every Metal device presents to a layer, in the same colors; its
+// images render, are sampled and copied, since configurations that ask
+// for more than rendering turn framebufferOnly off.
 static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
                            mrhiSurfaceCaps* capsOut)
 {
     (void)self;
     (void)surface;
     (void)adapter;
-    *capsOut = (mrhiSurfaceCaps){0};
+    *capsOut = (mrhiSurfaceCaps){
+        .presentable = true,
+        .presentModes = mrhi_presentFifo,
+        .alphaModes = mrhi_alphaOpaque | mrhi_alphaPremultiplied,
+        .usages = mrhi_textureRenderTarget | mrhi_textureSampled | mrhi_textureCopySource |
+                  mrhi_textureCopyDestination,
+    };
+#if TARGET_OS_OSX
+    capsOut->presentModes |= mrhi_presentImmediate;
+#endif
+    capsOut->colorCount = mrhiMetalSurfaceColors(capsOut->colors);
 }
 
 // Opens the device at once and answers the opening at the next poll.

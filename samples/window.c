@@ -16,6 +16,8 @@
 #include <emscripten/em_js.h>
 #elif defined(SAMPLE_XCB)
 #include <xcb/xcb.h>
+#elif defined(SAMPLE_METAL)
+#include "metal_layer.h"
 #endif
 
 static bool IsSurfaceRequired(void)
@@ -125,6 +127,36 @@ void SampleWindowClose(Sample* sample, SampleWindow* window)
                 "the surface destroyed");
     xcb_destroy_window(window->connection, window->window);
     xcb_disconnect(window->connection);
+}
+
+#elif defined(SAMPLE_METAL)
+
+int SampleWindowOpen(Sample* sample, SampleWindow* window, int index, uint32_t width,
+                     uint32_t height)
+{
+    *window = (SampleWindow){.index = index};
+    window->connection = mrhiTestNewMetalLayer(width, height);
+    if (window->connection == nullptr)
+    {
+        return Missing("no CAMetalLayer");
+    }
+    const mrhiSurfaceSourceMetalLayer source = {
+        .chain = {.type = mrhi_structSurfaceSourceMetalLayer},
+        .layer = window->connection,
+    };
+    return MakeSurface(sample, window, &source.chain);
+}
+
+void SampleWindowResize(SampleWindow* window, uint32_t width, uint32_t height)
+{
+    mrhiTestResizeMetalLayer(window->connection, width, height);
+}
+
+void SampleWindowClose(Sample* sample, SampleWindow* window)
+{
+    SampleCheck(sample, mrhiDestroySurface(sample->instance, window->surface) == mrhi_success,
+                "the surface destroyed");
+    mrhiTestReleaseMetalLayer(window->connection);
 }
 
 #else
