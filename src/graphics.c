@@ -393,6 +393,33 @@ static mrhiResult CheckInterface(const mrhiDevice* device, const mrhiGraphicsPip
     return status;
 }
 
+// Whether a stencil face changes the stencil.
+static bool ChangesStencil(const mrhiStencilFace* face)
+{
+    return face->failOp != mrhi_stencilKeep || face->depthFailOp != mrhi_stencilKeep ||
+           face->passOp != mrhi_stencilKeep;
+}
+
+// What a checked def expects of a render pass's targets. Stencil is
+// written when the write mask lets it and a face that is not culled
+// changes it, as WebGPU derives it.
+static mrhiRenderLayout LayoutOf(const mrhiGraphicsPipelineDef* def)
+{
+    mrhiRenderLayout layout = {
+        .depth = def->depthStencilFormat,
+        .samples = def->sampleCount,
+        .writesDepth = def->depthWrite,
+        .writesStencil = def->stencilWriteMask != 0 &&
+                         ((def->cullMode != mrhi_cullFront && ChangesStencil(&def->stencilFront)) ||
+                          (def->cullMode != mrhi_cullBack && ChangesStencil(&def->stencilBack))),
+    };
+    for (uint32_t i = 0; i < def->colorTargetCount; ++i)
+    {
+        layout.colors[i] = def->colorTargets[i].format;
+    }
+    return layout;
+}
+
 // Finds the def's entries in the shader: false when either is missing.
 static bool FindStages(const mrhiShaderSlot* shader, const mrhiGraphicsPipelineDef* def,
                        Stages* stagesOut)
@@ -471,6 +498,7 @@ mrhiResult mrhiCreateGraphicsPipeline(mrhiDevice* device, const mrhiGraphicsPipe
     }
     const mrhiReflection* reflection = shader->reflection;
     mrhiPipelineSlot* slot = &device->pipelineSlots[index1 - 1];
+    slot->layout = LayoutOf(def);
     slot->entries[0] = (uint32_t)(stages.vertex - reflection->entries);
     slot->entries[1] = stages.fragment == nullptr
                            ? reflection->entryCount

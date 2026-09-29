@@ -10,7 +10,7 @@
 #ifndef MAUL_RHI_TEST_H
 #define MAUL_RHI_TEST_H
 
-#include "maul-rhi/pipeline.h"
+#include "maul-rhi/encoder.h"
 
 #include <stdbool.h>
 #include <stddef.h>

@@ -68,6 +68,9 @@ extern "C"
         // Graphics and compute pipelines the device holds at once; 1024 by
         // default.
         uint32_t pipelines;
+        // The bytes one frame's commands take in all, in 4 KiB chunks; 1 MiB by
+        // default.
+        uint32_t frameCommandBytes;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the

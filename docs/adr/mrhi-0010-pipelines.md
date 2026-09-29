@@ -46,7 +46,6 @@ made.
   the format lacks must keep its default, so a forgotten format is
   refused rather than ignored. Sample counts are 1 or a power of two
   every target format takes on the device.
-
 - **Caches:** `mrhiGetPipelineCache` writes the driver's compiled
   pipelines in an envelope: a magic, a version, the size, a SHA-256
   digest, and the library version, driver kind and adapter vendor and

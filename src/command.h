@@ -1,0 +1,62 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// The command stream (mrhi-0011): 32-byte records in 4 KiB chunks of a
+// frame's arena, each pass linking its own chunks. A command's payload
+// records follow it in the same chunk.
+
+#ifndef MAUL_RHI_SRC_COMMAND_H
+#define MAUL_RHI_SRC_COMMAND_H
+
+#include <stdint.h>
+
+// What a command record does. Fields a to d hold its operands.
+typedef enum mrhiCommandType
+{
+    // a: the pipeline's slot index plus one.
+    mrhiCommandGraphicsPipeline = 1,
+    mrhiCommandComputePipeline,
+    // a: the offset; b: the size; the bytes follow.
+    mrhiCommandRootBlock,
+    // The viewport follows.
+    mrhiCommandViewport,
+    // a, b: x and y; c, d: width and height.
+    mrhiCommandScissor,
+    // The color follows.
+    mrhiCommandBlendConstant,
+    // a: the reference.
+    mrhiCommandStencilReference,
+    // b: the label's bytes, which follow.
+    mrhiCommandPushDebugGroup,
+    mrhiCommandPopDebugGroup,
+    mrhiCommandDebugMarker,
+} mrhiCommandType;
+
+typedef struct mrhiCommand
+{
+    uint16_t type;
+    // The payload records that follow.
+    uint16_t payload;
+    uint32_t a;
+    uint64_t b;
+    uint64_t c;
+    uint64_t d;
+} mrhiCommand;
+
+#define MRHI_CHUNK_BYTES    4096
+#define MRHI_CHUNK_COMMANDS ((MRHI_CHUNK_BYTES - 32) / sizeof(mrhiCommand))
+
+// A chunk: the next chunk of its pass (its index plus one, 0 for none),
+// its records in use, and the records.
+typedef struct mrhiCommandChunk
+{
+    uint32_t next;
+    uint32_t count;
+    uint8_t reserved[24];
+    mrhiCommand commands[MRHI_CHUNK_COMMANDS];
+} mrhiCommandChunk;
+
+static_assert(sizeof(mrhiCommand) == 32, "a command is one record");
+static_assert(sizeof(mrhiCommandChunk) == MRHI_CHUNK_BYTES, "a chunk is 4 KiB");
+
+#endif // MAUL_RHI_SRC_COMMAND_H

@@ -15,3 +15,4 @@ are listed in [README.md](README.md).
 | [mrhi-0008](mrhi-0008-frame-graph.md) | The frame graph: declare, compile, record, submit | Accepted |
 | [mrhi-0009](mrhi-0009-shader-containers.md) | Shader containers: both codes, one reflection, checked as hostile input | Accepted |
 | [mrhi-0010](mrhi-0010-pipelines.md) | Pipelines: made asynchronously from a shared reflection | Accepted |
+| [mrhi-0011](mrhi-0011-encoders.md) | Encoders: passes recorded into a frame's arena | Accepted |

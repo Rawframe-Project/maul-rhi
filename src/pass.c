@@ -30,9 +30,8 @@ static bool IsBuffer(const mrhiFrameResource* resource)
     return resource->kind == mrhiFrameBuffer || resource->kind == mrhiImportedBuffer;
 }
 
-// The def of a texture resource: its declaration, or the imported
-// texture's.
-static const mrhiTextureDef* TextureOf(const mrhiDevice* device, const mrhiFrameResource* resource)
+const mrhiTextureDef* mrhiFrameTextureOf(const mrhiDevice* device,
+                                         const mrhiFrameResource* resource)
 {
     if (resource->kind == mrhiImportedTexture)
     {
@@ -173,7 +172,7 @@ static mrhiResult UseOfAccess(const mrhiDevice* device, const mrhiAccess* access
     {
         return mrhi_success;
     }
-    const mrhiTextureDef* def = TextureOf(device, resource);
+    const mrhiTextureDef* def = mrhiFrameTextureOf(device, resource);
     const mrhiTextureRange* range = &access->range;
     uint32_t layers = def->kind == mrhi_texture3d ? 1 : def->depthOrLayers;
     uint8_t planes = mrhiFormatPlanes(def->format);
@@ -231,7 +230,7 @@ static uint32_t FindTarget(const mrhiDevice* device, mrhiResourceId id, uint32_t
     {
         return 0;
     }
-    const mrhiTextureDef* def = TextureOf(device, resource);
+    const mrhiTextureDef* def = mrhiFrameTextureOf(device, resource);
     if (mip >= def->mipLevels || layer >= LayersAt(def, mip))
     {
         return 0;
@@ -251,7 +250,7 @@ static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* tar
     {
         return 0;
     }
-    const mrhiTextureDef* def = TextureOf(device, &device->frameResources[slot - 1]);
+    const mrhiTextureDef* def = mrhiFrameTextureOf(device, &device->frameResources[slot - 1]);
     *statusOut = mrhi_errorInvalid;
     if (target->load > mrhi_loadDiscard || target->store > mrhi_storeDiscard ||
         mrhiFormatHasDepth(def->format) || !Agrees(shape, def, target->mip))
@@ -281,7 +280,7 @@ static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* tar
     {
         return 0;
     }
-    const mrhiTextureDef* into = TextureOf(device, &device->frameResources[resolve - 1]);
+    const mrhiTextureDef* into = mrhiFrameTextureOf(device, &device->frameResources[resolve - 1]);
     TargetShape resolveShape = {0};
     Agrees(&resolveShape, into, target->resolveMip);
     if (def->sampleCount == 1 || into->sampleCount != 1 || into->format != def->format ||
@@ -315,7 +314,7 @@ static mrhiResult UseOfDepth(const mrhiDevice* device, const mrhiDepthTarget* ta
     {
         return status;
     }
-    const mrhiTextureDef* def = TextureOf(device, &device->frameResources[slot - 1]);
+    const mrhiTextureDef* def = mrhiFrameTextureOf(device, &device->frameResources[slot - 1]);
     bool stencil = mrhiFormatHasStencil(def->format);
     bool known = target->depthLoad <= mrhi_loadDiscard && target->depthStore <= mrhi_storeDiscard &&
                  target->stencilLoad <= mrhi_loadDiscard &&

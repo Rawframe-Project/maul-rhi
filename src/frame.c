@@ -8,6 +8,8 @@
 
 #include "device_core.h"
 
+#include <stdatomic.h>
+
 #define FRAME_DEF_COOKIE 0x6D726672u
 
 // Driver events a poll moves at a time.
@@ -111,6 +113,7 @@ mrhiResult mrhiBeginFrame(mrhiDevice* device, const mrhiFrameDef* def)
     device->frameResourceCount = 0;
     device->framePassCount = 0;
     device->frameUseCount = 0;
+    atomic_store_explicit(&device->frameChunksTaken, 0, memory_order_relaxed);
     return mrhi_success;
 }
 
@@ -146,6 +149,18 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     if (compiled != mrhi_success)
     {
         return compiled;
+    }
+    for (uint32_t i = 0; i < device->framePassCount; ++i)
+    {
+        const mrhiFramePass* pass = &device->framePasses[i];
+        if (atomic_load_explicit(&pass->recording, memory_order_acquire) == mrhiRecordingOpen)
+        {
+            return mrhi_errorState;
+        }
+        if (pass->overflowed)
+        {
+            return mrhi_errorCapacity;
+        }
     }
     if (!mrhiHasAnswerRoom(device))
     {

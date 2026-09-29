@@ -1,0 +1,500 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// Encoders (mrhi-0011): a kept pass of a compiled frame, begun by the
+// thread that claims it, records commands into chunks of the frame's
+// arena, which it takes with one atomic counter, and is ended before
+// the frame is submitted. Every command is checked against its pass.
+
+#include "maul-rhi/encoder.h"
+
+#include "device_core.h"
+#include "label.h"
+
+#include <math.h>
+#include <stdatomic.h>
+#include <string.h>
+
+// What a pass records: a render pass draws, a pass without targets
+// dispatches, a transfer pass copies.
+typedef enum Work
+{
+    WORK_RENDER,
+    WORK_COMPUTE,
+    WORK_TRANSFER,
+} Work;
+
+static Work WorkOf(const mrhiFramePass* pass)
+{
+    if (pass->passClass == mrhi_passTransfer)
+    {
+        return WORK_TRANSFER;
+    }
+    bool targets = pass->colorTargetCount > 0 || pass->depthTarget.resource.index1 != 0;
+    return targets ? WORK_RENDER : WORK_COMPUTE;
+}
+
+// The pass an id names in the open, compiled frame: or NULL with the
+// refusal.
+static mrhiFramePass* Find(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
+{
+    if (!device->frameOpen || !device->frameCompiled)
+    {
+        *statusOut = mrhi_errorState;
+        return nullptr;
+    }
+    if (id.generation != device->frameSerial || id.index1 == 0 ||
+        id.index1 > device->framePassCount)
+    {
+        *statusOut = mrhi_errorStale;
+        return nullptr;
+    }
+    return &device->framePasses[id.index1 - 1];
+}
+
+// The pass, recording: or NULL with the refusal.
+static mrhiFramePass* Recording(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
+{
+    mrhiFramePass* pass = Find(device, id, statusOut);
+    if (pass != nullptr &&
+        atomic_load_explicit(&pass->recording, memory_order_relaxed) != mrhiRecordingOpen)
+    {
+        *statusOut = mrhi_errorState;
+        return nullptr;
+    }
+    return pass;
+}
+
+// Takes count records in the pass's last chunk, or in a new one: the
+// records, or NULL when the arena is full, which marks the pass so that
+// its frame is never submitted without the command.
+static mrhiCommand* Take(mrhiDevice* device, mrhiFramePass* pass, uint32_t count)
+{
+    if (pass->overflowed)
+    {
+        return nullptr;
+    }
+    mrhiCommandChunk* chunk =
+        pass->lastChunk == 0 ? nullptr : &device->frameChunks[pass->lastChunk - 1];
+    if (chunk == nullptr || chunk->count + count > MRHI_CHUNK_COMMANDS)
+    {
+        uint32_t index =
+            atomic_fetch_add_explicit(&device->frameChunksTaken, 1, memory_order_relaxed);
+        if (index >= device->frameChunkCount)
+        {
+            pass->overflowed = true;
+            return nullptr;
+        }
+        mrhiCommandChunk* fresh = &device->frameChunks[index];
+        fresh->next = 0;
+        fresh->count = 0;
+        if (chunk == nullptr)
+        {
+            pass->firstChunk = index + 1;
+        }
+        else
+        {
+            chunk->next = index + 1;
+        }
+        pass->lastChunk = index + 1;
+        chunk = fresh;
+    }
+    mrhiCommand* records = &chunk->commands[chunk->count];
+    chunk->count += count;
+    return records;
+}
+
+// Records a command with bytes of payload after it: success, or
+// mrhi_errorCapacity.
+static mrhiResult Record(mrhiDevice* device, mrhiFramePass* pass, mrhiCommand command,
+                         const void* payload, size_t bytes)
+{
+    uint32_t records = (uint32_t)((bytes + sizeof(mrhiCommand) - 1) / sizeof(mrhiCommand));
+    mrhiCommand* at = Take(device, pass, 1 + records);
+    if (at == nullptr)
+    {
+        return mrhi_errorCapacity;
+    }
+    command.payload = (uint16_t)records;
+    at[0] = command;
+    if (bytes > 0)
+    {
+        memcpy(&at[1], payload, bytes);
+    }
+    return mrhi_success;
+}
+
+// The layout and size of a render pass's targets, from their textures;
+// nothing for a pass without targets.
+static void MeasureTargets(const mrhiDevice* device, mrhiFramePass* pass)
+{
+    for (uint32_t i = 0; i < pass->colorTargetCount; ++i)
+    {
+        const mrhiColorTarget* target = &pass->colorTargets[i];
+        const mrhiTextureDef* texture =
+            mrhiFrameTextureOf(device, &device->frameResources[target->resource.index1 - 1]);
+        pass->layout.colors[i] = texture->format;
+        pass->layout.samples = texture->sampleCount;
+        pass->width = texture->width >> target->mip > 0 ? texture->width >> target->mip : 1;
+        pass->height = texture->height >> target->mip > 0 ? texture->height >> target->mip : 1;
+    }
+    const mrhiDepthTarget* depth = &pass->depthTarget;
+    if (depth->resource.index1 != 0)
+    {
+        const mrhiTextureDef* texture =
+            mrhiFrameTextureOf(device, &device->frameResources[depth->resource.index1 - 1]);
+        pass->layout.depth = texture->format;
+        pass->layout.samples = texture->sampleCount;
+        pass->width = texture->width >> depth->mip > 0 ? texture->width >> depth->mip : 1;
+        pass->height = texture->height >> depth->mip > 0 ? texture->height >> depth->mip : 1;
+    }
+}
+
+mrhiResult mrhiBeginPass(mrhiDevice* device, mrhiPassId id)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = Find(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    uint32_t idle = mrhiRecordingIdle;
+    if (!pass->kept ||
+        !atomic_compare_exchange_strong_explicit(&pass->recording, &idle, mrhiRecordingOpen,
+                                                 memory_order_acquire, memory_order_relaxed))
+    {
+        return mrhi_errorState;
+    }
+    MeasureTargets(device, pass);
+    return mrhi_success;
+}
+
+mrhiResult mrhiEndPass(mrhiDevice* device, mrhiPassId id)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = Recording(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (pass->debugDepth > 0)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    atomic_store_explicit(&pass->recording, mrhiRecordingEnded, memory_order_release);
+    return mrhi_success;
+}
+
+// Whether two render layouts are the same targets: formats by location,
+// depth format and sample count.
+static bool AreTargetsEqual(const mrhiRenderLayout* a, const mrhiRenderLayout* b)
+{
+    for (uint32_t i = 0; i < MRHI_COLOR_TARGETS; ++i)
+    {
+        if (a->colors[i] != b->colors[i])
+        {
+            return false;
+        }
+    }
+    return a->depth == b->depth && a->samples == b->samples;
+}
+
+// The pipeline slot a live, ready id of a kind names: or NULL with the
+// refusal.
+static const mrhiPipelineSlot* ReadyPipeline(const mrhiDevice* device, mrhiPipelineKind kind,
+                                             uint32_t index1, uint32_t generation,
+                                             mrhiResult* statusOut)
+{
+    if (!mrhiPoolIsLive(&device->pipelines, index1, generation) ||
+        device->pipelineSlots[index1 - 1].kind != kind)
+    {
+        *statusOut = mrhi_errorStale;
+        return nullptr;
+    }
+    const mrhiPipelineSlot* slot = &device->pipelineSlots[index1 - 1];
+    if (slot->state != mrhiPipelineReady)
+    {
+        *statusOut = mrhi_errorState;
+        return nullptr;
+    }
+    return slot;
+}
+
+mrhiResult mrhiSetGraphicsPipeline(mrhiDevice* device, mrhiPassId id,
+                                   mrhiGraphicsPipelineId pipeline)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = Recording(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (WorkOf(pass) != WORK_RENDER)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    const mrhiPipelineSlot* slot =
+        ReadyPipeline(device, mrhiPipelineGraphics, pipeline.index1, pipeline.generation, &status);
+    if (slot == nullptr)
+    {
+        return status;
+    }
+    bool readOnly = pass->depthTarget.readOnly;
+    if (!AreTargetsEqual(&slot->layout, &pass->layout) ||
+        (readOnly && (slot->layout.writesDepth || slot->layout.writesStencil)))
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    mrhiCommand command = {.type = mrhiCommandGraphicsPipeline, .a = pipeline.index1};
+    return Record(device, pass, command, nullptr, 0);
+}
+
+mrhiResult mrhiSetComputePipeline(mrhiDevice* device, mrhiPassId id, mrhiComputePipelineId pipeline)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = Recording(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (WorkOf(pass) != WORK_COMPUTE)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    if (ReadyPipeline(device, mrhiPipelineCompute, pipeline.index1, pipeline.generation, &status) ==
+        nullptr)
+    {
+        return status;
+    }
+    mrhiCommand command = {.type = mrhiCommandComputePipeline, .a = pipeline.index1};
+    return Record(device, pass, command, nullptr, 0);
+}
+
+mrhiResult mrhiSetRootBlock(mrhiDevice* device, mrhiPassId id, uint32_t offset, const void* bytes,
+                            uint32_t size)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (bytes == nullptr)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = Recording(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (WorkOf(pass) == WORK_TRANSFER || offset % 4 != 0 || size % 4 != 0 || size == 0)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    if ((uint64_t)offset + size > device->limits.rootBlockBytes)
+    {
+        return mrhi_errorUnsupported;
+    }
+    mrhiCommand command = {.type = mrhiCommandRootBlock, .a = offset, .b = size};
+    return Record(device, pass, command, bytes, size);
+}
+
+// The render pass a draw-state command records in: or NULL with the
+// refusal, a pass without targets counted as misuse.
+static mrhiFramePass* RenderPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
+{
+    mrhiFramePass* pass = Recording(device, id, statusOut);
+    if (pass != nullptr && WorkOf(pass) != WORK_RENDER)
+    {
+        *statusOut = mrhiDeviceMisuse(device);
+        return nullptr;
+    }
+    return pass;
+}
+
+// Whether a viewport is within WebGPU's ranges: its size within the 2D
+// texture limit, its edges within twice it, and its depth range ordered
+// within 0 to 1. The comparisons refuse NaN and infinities.
+static bool IsViewportValid(const mrhiDevice* device, const mrhiViewport* viewport)
+{
+    float limit = (float)device->limits.textureDimension2d;
+    float range = 2.0f * limit;
+    return viewport->x >= -range && viewport->y >= -range && viewport->width >= 0.0f &&
+           viewport->width <= limit && viewport->height >= 0.0f && viewport->height <= limit &&
+           viewport->x + viewport->width <= range - 1.0f &&
+           viewport->y + viewport->height <= range - 1.0f && viewport->minDepth >= 0.0f &&
+           viewport->maxDepth <= 1.0f && viewport->minDepth <= viewport->maxDepth;
+}
+
+mrhiResult mrhiSetViewport(mrhiDevice* device, mrhiPassId id, const mrhiViewport* viewport)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (viewport == nullptr)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = RenderPass(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (!IsViewportValid(device, viewport))
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    mrhiCommand command = {.type = mrhiCommandViewport};
+    return Record(device, pass, command, viewport, sizeof(*viewport));
+}
+
+mrhiResult mrhiSetScissor(mrhiDevice* device, mrhiPassId id, const mrhiScissorRect* rect)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (rect == nullptr)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = RenderPass(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if ((uint64_t)rect->x + rect->width > pass->width ||
+        (uint64_t)rect->y + rect->height > pass->height)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    mrhiCommand command = {
+        .type = mrhiCommandScissor,
+        .a = rect->x,
+        .b = rect->y,
+        .c = rect->width,
+        .d = rect->height,
+    };
+    return Record(device, pass, command, nullptr, 0);
+}
+
+mrhiResult mrhiSetBlendConstant(mrhiDevice* device, mrhiPassId id, const mrhiClearColor* color)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (color == nullptr)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = RenderPass(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (!isfinite(color->red) || !isfinite(color->green) || !isfinite(color->blue) ||
+        !isfinite(color->alpha))
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    mrhiCommand command = {.type = mrhiCommandBlendConstant};
+    return Record(device, pass, command, color, sizeof(*color));
+}
+
+mrhiResult mrhiSetStencilReference(mrhiDevice* device, mrhiPassId id, uint32_t reference)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = RenderPass(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    mrhiCommand command = {.type = mrhiCommandStencilReference, .a = reference};
+    return Record(device, pass, command, nullptr, 0);
+}
+
+// Records a labelled debug command: success, or the refusal. Groups
+// balance over the calls made, a push or pop the arena had no room for
+// counted too, so that a pass that found it full still ends.
+static mrhiResult Label(mrhiDevice* device, mrhiPassId id, mrhiCommandType type, const char* label,
+                        size_t length)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (length == 0 || !mrhiIsLabelValid(label, length))
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = Recording(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    mrhiCommand command = {.type = (uint16_t)type, .b = length};
+    if (type == mrhiCommandPushDebugGroup)
+    {
+        ++pass->debugDepth;
+    }
+    return Record(device, pass, command, label, length);
+}
+
+mrhiResult mrhiPushDebugGroup(mrhiDevice* device, mrhiPassId pass, const char* label,
+                              size_t labelLength)
+{
+    return Label(device, pass, mrhiCommandPushDebugGroup, label, labelLength);
+}
+
+mrhiResult mrhiInsertDebugMarker(mrhiDevice* device, mrhiPassId pass, const char* label,
+                                 size_t labelLength)
+{
+    return Label(device, pass, mrhiCommandDebugMarker, label, labelLength);
+}
+
+mrhiResult mrhiPopDebugGroup(mrhiDevice* device, mrhiPassId id)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = Recording(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (pass->debugDepth == 0)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    --pass->debugDepth;
+    mrhiCommand command = {.type = mrhiCommandPopDebugGroup};
+    return Record(device, pass, command, nullptr, 0);
+}

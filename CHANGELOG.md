@@ -169,3 +169,11 @@ format.
   device def's `pipelineCache` gives it back; an unusable cache never
   fails a device, and `mrhiGetPipelineCacheOutcome` reports whether it
   was taken, absent, stale or damaged.
+- Encoders (mrhi-0011, `encoder.h`): `mrhiBeginPass` and `mrhiEndPass`
+  claim and end a kept pass of the compiled frame, one thread per pass;
+  `mrhiSetGraphicsPipeline`, `mrhiSetComputePipeline`,
+  `mrhiSetRootBlock`, `mrhiSetViewport`, `mrhiSetScissor`,
+  `mrhiSetBlendConstant`, `mrhiSetStencilReference` and the debug
+  groups and markers, each checked against its pass as WebGPU checks it
+  and recorded into the frame's arena, the device's `frameCommandBytes`
+  limit. A full arena refuses the command and the frame's submission.

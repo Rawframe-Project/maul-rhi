@@ -6,7 +6,7 @@ base:
 capabilities_core:
 chain:
 device: allocator capabilities_core chain device_core driver instance_core invariant label pool
-device_core: capabilities_core driver pool reflection
+device_core: capabilities_core command driver pool reflection
 driver: reflection
 driver_test: allocator capabilities_core driver invariant
 instance: allocator chain driver driver_test instance_core invariant
@@ -27,6 +27,8 @@ compile: device_core
 plan: device_core
 memory: device_core
 sha256:
+command:
+encoder: device_core label
 cache: bytes device_core sha256
 bytes:
 container: bytes capabilities_core label sha256

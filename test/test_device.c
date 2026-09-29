@@ -264,6 +264,10 @@ static void TestInvalidDefs(void)
     def.deviceLimits.pipelines = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no pipelines");
     def = Def(adapter);
+    def.deviceLimits.frameCommandBytes = 4095;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
+          "less than a chunk of commands");
+    def = Def(adapter);
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def.next = &critical;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorUnsupported,
@@ -275,7 +279,7 @@ static void TestInvalidDefs(void)
     def.allocator.free = CountingFree;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
           "an allocator with one function");
-    CHECK(mrhiGetInstanceMisuse(instance) == 19, "each invalid call counted");
+    CHECK(mrhiGetInstanceMisuse(instance) == 20, "each invalid call counted");
     mrhiDestroyInstance(instance);
 }
 

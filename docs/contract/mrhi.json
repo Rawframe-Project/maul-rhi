@@ -4991,6 +4991,11 @@
               "name": "pipelines",
               "type": "uint32",
               "doc": "Graphics and compute pipelines the device holds at once; 1024 by default."
+            },
+            {
+              "name": "frame_command_bytes",
+              "type": "uint32",
+              "doc": "The bytes one frame's commands take in all, in 4 KiB chunks; 1 MiB by default."
             }
           ]
         },
@@ -8444,7 +8449,7 @@
           "doc": "Submits the open frame to the GPU, compiling it first if it is not, and closes it. Its token is answered by one mrhi_deviceFrameDone record.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` with the token; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorState` for a device without an open frame; `mrhi_errorUnsupported` when compiling finds a declared texture its format cannot take, the frame staying open; `mrhi_errorCapacity` when the device's queue has no room for the answer, the frame staying open; `mrhi_errorPlatform` when the driver fails, the frame closing."
+            "doc": "`mrhi_success` with the token; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorState` for a device without an open frame, or a pass begun and not ended, the frame staying open; `mrhi_errorUnsupported` when compiling finds a declared texture its format cannot take, the frame staying open; `mrhi_errorCapacity` when the device's queue has no room for the answer, or a pass's commands did not fit the frame's, the frame staying open to be dropped; `mrhi_errorPlatform` when the driver fails, the frame closing."
           },
           "args": [
             {
@@ -14193,10 +14198,466 @@
       ]
     },
     {
+      "name": "encoder",
+      "doc": "Recording: a kept pass of a compiled frame is begun, its commands recorded, and ended, all before the frame is submitted. The pass id is the encoder. Different passes may record on different threads at once; while passes record, nothing else uses the device.",
+      "includes": [
+        "pipeline"
+      ],
+      "items": [
+        {
+          "kind": "struct",
+          "name": "viewport",
+          "doc": "Where rendering lands: a rectangle of the targets and a depth range.",
+          "members": [
+            {
+              "name": "x",
+              "type": "float32",
+              "doc": "Its left edge, at least -2 times the 2D texture limit."
+            },
+            {
+              "name": "y",
+              "type": "float32",
+              "doc": "Its top edge, likewise."
+            },
+            {
+              "name": "width",
+              "type": "float32",
+              "doc": "Its width, 0 to the 2D texture limit; the right edge at most 2 times the limit minus 1."
+            },
+            {
+              "name": "height",
+              "type": "float32",
+              "doc": "Its height, likewise."
+            },
+            {
+              "name": "min_depth",
+              "type": "float32",
+              "doc": "The depth its near plane maps to, 0 to 1."
+            },
+            {
+              "name": "max_depth",
+              "type": "float32",
+              "doc": "The depth its far plane maps to, minDepth to 1."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "scissor_rect",
+          "doc": "The pixels rendering may write, within the pass's targets.",
+          "members": [
+            {
+              "name": "x",
+              "type": "uint32",
+              "doc": "Its left edge."
+            },
+            {
+              "name": "y",
+              "type": "uint32",
+              "doc": "Its top edge."
+            },
+            {
+              "name": "width",
+              "type": "uint32",
+              "doc": "Its width."
+            },
+            {
+              "name": "height",
+              "type": "uint32",
+              "doc": "Its height."
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "begin_pass",
+          "doc": "Begins recording a kept pass of the compiled open frame. It records until mrhiEndPass; a kept pass never begun records nothing.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is culled, begun already, or a frame that is not compiled."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "end_pass",
+          "doc": "Ends recording a pass. Its debug groups must be closed.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or open debug groups; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "set_graphics_pipeline",
+          "doc": "Sets the graphics pipeline later draws use, in a pass with targets. It must be ready and fit the pass's targets: their formats and sample count, and no depth or stencil writes to a read-only depth target.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass without targets, or a pipeline that does not fit its targets; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording, or a pipeline that is not ready; `mrhi_errorStale` also for a pipeline the device no longer has; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording."
+            },
+            {
+              "name": "pipeline",
+              "type": "id.graphics_pipeline_id",
+              "doc": "The pipeline."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "set_compute_pipeline",
+          "doc": "Sets the compute pipeline later dispatches use, in a pass without targets.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or a pass that renders or copies; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording, or a pipeline that is not ready; `mrhi_errorStale` also for a pipeline the device no longer has; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording."
+            },
+            {
+              "name": "pipeline",
+              "type": "id.compute_pipeline_id",
+              "doc": "The pipeline."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "set_root_block",
+          "doc": "Writes bytes of the root block later draws or dispatches read.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or bytes, a pass that copies, or an unaligned or empty write; `mrhi_errorUnsupported` for a write past the device's root block; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording."
+            },
+            {
+              "name": "offset",
+              "type": "uint32",
+              "doc": "Where the bytes go in the root block, a multiple of 4."
+            },
+            {
+              "name": "bytes",
+              "type": "void",
+              "pointer": "const",
+              "doc": "The bytes. Only read during the call."
+            },
+            {
+              "name": "size",
+              "type": "uint32",
+              "doc": "How many, a multiple of 4 and at least 4, ending within the device's root block."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "set_viewport",
+          "doc": "Sets where later draws land, in a pass with targets.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass without targets, or a viewport out of range; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording."
+            },
+            {
+              "name": "viewport",
+              "type": "struct.viewport",
+              "pointer": "const",
+              "doc": "The viewport, finite, within WebGPU's ranges."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "set_scissor",
+          "doc": "Sets the pixels later draws may write, in a pass with targets.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass without targets, or a rectangle past them; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording."
+            },
+            {
+              "name": "rect",
+              "type": "struct.scissor_rect",
+              "pointer": "const",
+              "doc": "The rectangle, within the targets."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "set_blend_constant",
+          "doc": "Sets the constant blend factors use, in a pass with targets.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass without targets, or a component that is not finite; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording."
+            },
+            {
+              "name": "color",
+              "type": "struct.clear_color",
+              "pointer": "const",
+              "doc": "The constant, finite."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "set_stencil_reference",
+          "doc": "Sets the reference stencil tests compare with, in a pass with targets.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or a pass without targets; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording."
+            },
+            {
+              "name": "reference",
+              "type": "uint32",
+              "doc": "The reference."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "push_debug_group",
+          "doc": "Opens a named group of the pass's commands for debugging tools.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or a bad label; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording."
+            },
+            {
+              "name": "label",
+              "type": "char",
+              "pointer": "const",
+              "doc": "Its name: UTF-8 without NUL, labelLength bytes, 1 to MRHI_LABEL_BYTES. Only read during the call."
+            },
+            {
+              "name": "label_length",
+              "type": "size",
+              "doc": "The name's bytes."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "pop_debug_group",
+          "doc": "Closes the pass's innermost open debug group.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or no open group; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "insert_debug_marker",
+          "doc": "Marks a point among the pass's commands for debugging tools.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or a bad label; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording."
+            },
+            {
+              "name": "label",
+              "type": "char",
+              "pointer": "const",
+              "doc": "Its name: UTF-8 without NUL, labelLength bytes, 1 to MRHI_LABEL_BYTES. Only read during the call."
+            },
+            {
+              "name": "label_length",
+              "type": "size",
+              "doc": "The name's bytes."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        }
+      ]
+    },
+    {
       "name": "test",
       "doc": "The test driver (MAUL_RHI_TEST_DRIVER): a driver without a GPU whose adapters a test describes, for the library's tests and a program's own.",
       "includes": [
-        "pipeline"
+        "encoder"
       ],
       "items": [
         {

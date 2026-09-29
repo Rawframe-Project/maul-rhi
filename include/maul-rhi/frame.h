@@ -91,10 +91,12 @@ extern "C"
     /// @param device    The device.
     /// @param tokenOut  Receives the frame's token.
     /// @return `mrhi_success` with the token; `mrhi_errorInvalid` for a NULL
-    /// argument; `mrhi_errorState` for a device without an open frame;
+    /// argument; `mrhi_errorState` for a device without an open frame, or a
+    /// pass begun and not ended, the frame staying open;
     /// `mrhi_errorUnsupported` when compiling finds a declared texture its
     /// format cannot take, the frame staying open; `mrhi_errorCapacity` when
-    /// the device's queue has no room for the answer, the frame staying open;
+    /// the device's queue has no room for the answer, or a pass's commands did
+    /// not fit the frame's, the frame staying open to be dropped;
     /// `mrhi_errorPlatform` when the driver fails, the frame closing.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.

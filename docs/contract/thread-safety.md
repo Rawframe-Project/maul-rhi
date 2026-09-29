@@ -76,3 +76,15 @@ edit the contract, not this file.
 | `mrhiDestroyComputePipeline` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiGetPipelineCache` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiGetPipelineCacheOutcome` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiBeginPass` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiEndPass` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiSetGraphicsPipeline` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiSetComputePipeline` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiSetRootBlock` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiSetViewport` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiSetScissor` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiSetBlendConstant` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiSetStencilReference` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiPushDebugGroup` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiPopDebugGroup` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiInsertDebugMarker` | Safe from any thread; the pass is used by one thread at a time. |

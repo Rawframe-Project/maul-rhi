@@ -14,6 +14,7 @@
 #include "label.h"
 
 #include <stdalign.h>
+#include <stdatomic.h>
 
 #define DEVICE_DEF_COOKIE 0x6D726476u
 
@@ -34,6 +35,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.frameBarriers = 4096;
     def.deviceLimits.shaders = 256;
     def.deviceLimits.pipelines = 1024;
+    def.deviceLimits.frameCommandBytes = 1u << 20;
     return def;
 }
 
@@ -50,8 +52,9 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
         def->deviceLimits.surfaces == 0 || def->deviceLimits.frameResources == 0 ||
         def->deviceLimits.framePasses == 0 || def->deviceLimits.frameAccesses == 0 ||
         def->deviceLimits.frameBarriers == 0 || def->deviceLimits.shaders == 0 ||
-        def->deviceLimits.pipelines == 0 || !mrhiIsLabelValid(def->label, def->labelLength) ||
-        !mrhiIsAllocatorValid(&def->allocator) ||
+        def->deviceLimits.pipelines == 0 ||
+        def->deviceLimits.frameCommandBytes < MRHI_CHUNK_BYTES ||
+        !mrhiIsLabelValid(def->label, def->labelLength) || !mrhiIsAllocatorValid(&def->allocator) ||
         (def->pipelineCache == nullptr && def->pipelineCacheBytes > 0) ||
         !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
     {
@@ -146,6 +149,9 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     size_t boxesAt = mrhiLayoutAdd(&layout, boxLimit, sizeof(mrhiBox), alignof(mrhiBox));
     size_t orderAt =
         mrhiLayoutAdd(&layout, limits->frameResources, sizeof(uint32_t), alignof(uint32_t));
+    uint32_t chunks = limits->frameCommandBytes / MRHI_CHUNK_BYTES;
+    size_t chunksAt =
+        mrhiLayoutAdd(&layout, chunks, sizeof(mrhiCommandChunk), alignof(mrhiCommandChunk));
     size_t queueAt = mrhiLayoutAdd(&layout, limits->notifications, sizeof(mrhiDeviceNotification),
                                    alignof(mrhiDeviceNotification));
     unsigned char* block =
@@ -182,6 +188,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     device->frameBoxes = (mrhiBox*)(block + boxesAt);
     device->frameBoxLimit = (uint32_t)boxLimit;
     device->frameOrder = (uint32_t*)(block + orderAt);
+    device->frameChunks = (mrhiCommandChunk*)(block + chunksAt);
+    device->frameChunkCount = chunks;
     return device;
 }
 
@@ -286,7 +294,7 @@ mrhiDeviceState mrhiGetDeviceState(mrhiDevice* device)
 
 mrhiResult mrhiDeviceMisuse(mrhiDevice* device)
 {
-    ++device->misuse;
+    atomic_fetch_add_explicit(&device->misuse, 1, memory_order_relaxed);
     return mrhi_errorInvalid;
 }
 
@@ -317,7 +325,7 @@ mrhiResult mrhiGetDeviceLimits(mrhiDevice* device, mrhiLimits* limitsOut)
 
 uint64_t mrhiGetDeviceMisuse(mrhiDevice* device)
 {
-    return device == nullptr ? 0 : device->misuse;
+    return device == nullptr ? 0 : atomic_load_explicit(&device->misuse, memory_order_relaxed);
 }
 
 mrhiResult mrhiCheckObjectDef(mrhiDevice* device, mrhiDefHead head, uint32_t expected)

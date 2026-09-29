@@ -8,6 +8,7 @@
 #define MAUL_RHI_SRC_DEVICE_CORE_H
 
 #include "capabilities_core.h"
+#include "command.h"
 #include "driver.h"
 #include "pool.h"
 #include "reflection.h"
@@ -131,6 +132,27 @@ typedef struct mrhiFrameUse
     uint32_t layerCount;
 } mrhiFrameUse;
 
+// What a render pass's targets are, and what a graphics pipeline expects
+// of them: the color formats by location (mrhi_formatNone past the
+// count), the depth or stencil format, the sample count, and whether
+// depth or stencil is written.
+typedef struct mrhiRenderLayout
+{
+    mrhiFormat colors[MRHI_COLOR_TARGETS];
+    mrhiFormat depth;
+    uint32_t samples;
+    bool writesDepth;
+    bool writesStencil;
+} mrhiRenderLayout;
+
+// Where a pass's recording stands.
+typedef enum mrhiRecording
+{
+    mrhiRecordingIdle,
+    mrhiRecordingOpen,
+    mrhiRecordingEnded,
+} mrhiRecording;
+
 // A pass of the open frame: its class, its uses in the frame's use
 // table, its targets as declared, and whether the compile kept it.
 typedef struct mrhiFramePass
@@ -147,6 +169,18 @@ typedef struct mrhiFramePass
     mrhiStoreOp colorStores[MRHI_COLOR_TARGETS];
     mrhiStoreOp depthStore;
     mrhiStoreOp stencilStore;
+    // Its recording: an mrhiRecording, claimed atomically by the thread
+    // that begins it; its chunks (indices plus one, 0 for none); its open
+    // debug groups; whether a command found the arena full; and, for a
+    // render pass, its targets' layout and size.
+    _Atomic uint32_t recording;
+    uint32_t firstChunk;
+    uint32_t lastChunk;
+    uint32_t debugDepth;
+    bool overflowed;
+    mrhiRenderLayout layout;
+    uint32_t width;
+    uint32_t height;
 } mrhiFramePass;
 
 // A surface as the device that configured it keeps it: the surface, the
@@ -193,6 +227,8 @@ typedef struct mrhiPipelineSlot
     uint64_t handle;
     mrhiReflection* reflection;
     uint32_t entries[2];
+    // A graphics pipeline's targets.
+    mrhiRenderLayout layout;
 } mrhiPipelineSlot;
 
 struct mrhiDevice
@@ -207,8 +243,8 @@ struct mrhiDevice
     mrhiDeviceState state;
     // The open request, answered when the device leaves opening.
     uint32_t request;
-    // Calls refused as invalid input.
-    uint64_t misuse;
+    // Calls refused as invalid input, counted from any recording thread.
+    _Atomic uint64_t misuse;
     mrhiDeviceDriver driver;
     // Who made the device, for its pipeline cache's envelope, and what
     // became of the cache its def gave.
@@ -260,6 +296,10 @@ struct mrhiDevice
     // the placed resources a new one meets.
     uint64_t frameMemory;
     uint32_t* frameOrder;
+    // The frame's command arena: its chunks, and those taken so far.
+    mrhiCommandChunk* frameChunks;
+    uint32_t frameChunkCount;
+    _Atomic uint32_t frameChunksTaken;
     // The last request given, frames' tokens and pipelines' requests
     // alike.
     uint32_t lastRequest;
@@ -319,6 +359,11 @@ uint32_t mrhiResolveCount(uint32_t count, uint32_t base, uint32_t total);
 
 // Whether a range of at least one fits in the total.
 bool mrhiIsRangeValid(uint32_t base, uint32_t count, uint32_t total);
+
+// The def of a texture resource: its declaration, or the imported
+// texture's.
+const mrhiTextureDef* mrhiFrameTextureOf(const mrhiDevice* device,
+                                         const mrhiFrameResource* resource);
 
 // Whether a frame resource is an imported device object.
 bool mrhiIsImported(const mrhiFrameResource* resource);
