@@ -160,4 +160,11 @@ jobs:
           MAUL_RHI_REQUIRE_WEBGPU: "1"
         run: ctest --test-dir build --output-on-failure
       - name: Size
-        run: ls -l build/libmaul-rhi.a
+        # The wasm budget (mrhi-0001): the library at -Oz without its
+        # tests, every public function kept.
+        run: |
+          emcmake cmake -B build-size -DCMAKE_BUILD_TYPE=MinSizeRel \
+            "-DCMAKE_C_FLAGS_MINSIZEREL=-Oz -DNDEBUG" -D${PREFIX}_BUILD_TESTS=OFF \
+            -D${PREFIX}_BUILD_BENCH=OFF >/dev/null
+          cmake --build build-size -j 4
+          python3 tools/wasm_size.py build-size/libmaul-rhi.a

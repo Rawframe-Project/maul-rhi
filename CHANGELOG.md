@@ -328,6 +328,9 @@ format.
   configuration at the program's size, the current texture acquired
   and out of date once the page resizes the canvas; the conformance
   suite presents to the web runner's canvas.
+- The wasm budget (mrhi-0001): `tools/wasm_size.py` links the web
+  library at `-Oz` with every public function exported, and CI fails
+  past 128 KiB of wasm.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

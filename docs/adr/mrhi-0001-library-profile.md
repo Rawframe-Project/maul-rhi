@@ -23,11 +23,19 @@ family rulebook (family record 0005).
   which the library suballocates itself, within named limits.
 - **Platform dependencies:** the Vulkan loader, opened at run time, for
   the Vulkan driver, which compiles against the Khronos C headers kept
-  as published in `khronos/`; `webgpu.h` through Emscripten's WebGPU port on the
-  web; Metal and Direct3D 12 later. Window handles come in as opaque
+  as published in `khronos/`; the browser's WebGPU, called through
+  `EM_JS` glue compiled into the library, on the web; Metal and
+  Direct3D 12 later. Window handles come in as opaque
   pointers from the program; no window library is linked. The
   conformance suite links the XCB client library where it is
   installed, to make a window of its own.
+- **Size:** the library with its WebGPU driver, built for the web at
+  `-Oz` without its tests and linked with every public function kept,
+  stays within 128 KiB of wasm. CI measures it on every commit
+  (`tools/wasm_size.py`) and fails past the budget, which is lowered
+  as the library allows. This is stricter than the family's rule of
+  budgets checked at release (family record 0013), since the web build
+  is where size costs most.
 - **Commit areas:** `api`, `build`, `ci`, `container`, `conformance`,
   `docs`, `graph`, `schema`, `tests`, `tools`, `vulkan`, `webgpu`.
 
