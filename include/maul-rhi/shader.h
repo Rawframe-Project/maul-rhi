@@ -185,6 +185,27 @@ extern "C"
         mrhi_builtinPrimitiveIndex = 0x20u,
     };
 
+    // What an entry point reads through the pass's heap (mrhi-0015); none for
+    // an entry point that uses no heap.
+    typedef uint32_t mrhiShaderHeapUses;
+
+    enum
+    {
+        // Samples textures from the resource heap; needs bindless_sampling.
+        mrhi_heapUseSampledTextures = 0x1u,
+        // Reads storage textures from the resource heap; needs
+        // bindless_heterogeneous.
+        mrhi_heapUseStorageTextures = 0x2u,
+        // Reads storage buffers from the resource heap; needs
+        // bindless_heterogeneous.
+        mrhi_heapUseStorageBuffers = 0x4u,
+        // Reads samplers from the sampler heap; needs bindless_sampling.
+        mrhi_heapUseSamplers = 0x8u,
+        // Also writes storage textures or buffers it reads from the resource
+        // heap; never in a vertex entry point.
+        mrhi_heapUseWrites = 0x10u,
+    };
+
     // The type of a specialization constant.
     typedef uint8_t mrhiConstantType;
 
@@ -242,6 +263,8 @@ extern "C"
         uint32_t bindingCount;
         // The root block its entry points read.
         uint32_t rootBlockBytes;
+        // What its entry points read through heaps, together.
+        mrhiShaderHeapUses heapUses;
     } mrhiShaderInfo;
 
     /// Returns the default shader def, with no bytes, which must be set.
@@ -263,11 +286,12 @@ extern "C"
     /// container of another version; `mrhi_errorUnsupported` for a root block,
     /// bindings, a workgroup or interface variables past the device's limits, a
     /// table of more than MRHI_TABLE_BINDINGS bindings, 16-bit floats on a
-    /// device without shaderF16, the primitive index builtin, or a critical
-    /// extension the library does not know; `mrhi_errorState` for a device that
-    /// is not ready; `mrhi_errorCapacity` when the device's shader limit is
-    /// reached or its allocator fails; `mrhi_errorPlatform` when the driver
-    /// refuses the code.
+    /// device without shaderF16, the primitive index builtin, heap uses on a
+    /// device without bindless_sampling, or storage ones without
+    /// bindless_heterogeneous, or a critical extension the library does not
+    /// know; `mrhi_errorState` for a device that is not ready;
+    /// `mrhi_errorCapacity` when the device's shader limit is reached or its
+    /// allocator fails; `mrhi_errorPlatform` when the driver refuses the code.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateShader(mrhiDevice* device,

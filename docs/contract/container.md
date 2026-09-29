@@ -55,7 +55,7 @@ after checking their bounds, so a later writer can add sections.
 | 6 | color outputs | no | 8-byte interface records |
 | 7 | constants | no | 16-byte specialization constants |
 | 8 | SPIR-V | yes | a SPIR-V module holding every entry point |
-| 9 | WGSL | yes | a WGSL module holding every entry point, UTF-8 |
+| 9 | WGSL | unless an entry uses a heap | a WGSL module holding every entry point, UTF-8 |
 | 10 | inter-stage variables | no | 8-byte interface records |
 
 An array section's size is a whole number of its records, at most
@@ -78,10 +78,21 @@ it.
 | 34 | u16 | its inter-stage variable count: a vertex entry's outputs or a fragment entry's inputs; 0 for compute |
 | 36 | u32 | the builtins it uses, some `mrhiShaderBuiltins` bits; 0 unless it is a fragment entry |
 | 40 | u32 | its workgroup storage in bytes; 0 unless it is a compute entry |
-| 44 | u32 | zero |
+| 44 | u32 | the heaps it reads, some `mrhiShaderHeapUses` bits |
 
 Names are unique. An entry's inputs, outputs and variables are ranges
 of their sections.
+
+An entry's heap uses name what it reads through the pass's heap (record
+mrhi-0015): sampled textures, storage textures and storage buffers from
+the resource heap, and samplers from the sampler heap. `writes` goes
+with a storage kind, and never in a vertex entry, as WebGPU requires of
+bound storage. SPIR-V reads the resource heap at set 4 binding 0, with
+the types an entry reads aliased there, and the sampler heap at set 4
+binding 1; DXC places SM 6.6 heaps there with
+`-fvk-bind-resource-heap 0 4 -fvk-bind-sampler-heap 1 4`. WGSL reads no
+heaps yet, so a container has a WGSL section exactly when none of its
+entries uses a heap.
 
 ## Bindings
 
@@ -140,7 +151,9 @@ device:
   the limits, or a fragment entry reading more inter-stage variables,
   with the builtins `front_facing`, `sample_index`, `sample_mask` and
   `primitive_index` counted, than the limit;
-- 16-bit floats without `shaderF16`, or `mrhi_builtinPrimitiveIndex`.
+- 16-bit floats without `shaderF16`, or `mrhi_builtinPrimitiveIndex`;
+- heap uses without `bindless_sampling`, or storage textures or buffers
+  from the heap without `bindless_heterogeneous`.
 
 A pipeline's binding layout is the whole container's, so these are the
 same for every pipeline made from it.
@@ -167,7 +180,8 @@ Drivers check the code itself when they make their modules.
 ## The writer
 
 `tools/mrhi_container.py SPIRV WGSL REFLECTION OUTPUT` writes a
-container from the two modules and a JSON reflection; its opening
+container from the two modules and a JSON reflection (`-` for the WGSL
+of a container whose entries use heaps); its opening
 comment shows the reflection's form, whose enum names are the
 contract's without their prefixes. It applies the rules above, and
 refuses code that disagrees with the reflection:
@@ -176,7 +190,9 @@ refuses code that disagrees with the reflection:
   override may change the reflection's, and matches;
 - every binding either module declares is in the reflection, and a
   WGSL binding's kind, texture dimension, depth, multisampling and
-  sampler comparison match it.
+  sampler comparison match it; SPIR-V binds set 4 binding 0 only when
+  an entry reads resources from the heap, and binding 1 only when one
+  reads samplers.
 
 A module may leave out a binding it does not use. The writer uses
 Python's standard library only.

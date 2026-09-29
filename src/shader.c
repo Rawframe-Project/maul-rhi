@@ -121,6 +121,9 @@ static bool IsWithin(const mrhiDevice* device, const mrhiContainer* container)
     if (container->rootBlockBytes > device->limits.rootBlockBytes ||
         (container->float16 && !device->features.shaderF16) ||
         (container->builtins & mrhi_builtinPrimitiveIndex) != 0 ||
+        (container->heapUses != 0 && !device->features.bindlessSampling) ||
+        ((container->heapUses & (mrhi_heapUseStorageTextures | mrhi_heapUseStorageBuffers)) != 0 &&
+         !device->features.bindlessHeterogeneous) ||
         !AreBindingsWithin(&device->limits, container))
     {
         return false;
@@ -242,6 +245,7 @@ mrhiResult mrhiGetShaderInfo(mrhiDevice* device, mrhiShaderId shader, mrhiShader
         .entryCount = reflection->entryCount,
         .bindingCount = reflection->bindingCount,
         .rootBlockBytes = reflection->rootBlockBytes,
+        .heapUses = reflection->heapUses,
     };
     memcpy(infoOut->digest, reflection->digest, MRHI_DIGEST_BYTES);
     return mrhi_success;

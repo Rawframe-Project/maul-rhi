@@ -171,6 +171,7 @@ mrhiShaderEntry mrhiContainerEntry(const mrhiContainer* container, uint32_t inde
         .variableCount = mrhiRead16(at + 34),
         .builtins = mrhiRead32(at + 36),
         .workgroupStorageBytes = mrhiRead32(at + 40),
+        .heapUses = mrhiRead32(at + 44),
     };
 }
 
@@ -309,9 +310,14 @@ static bool IsEntryValid(const mrhiContainer* container, uint32_t index)
                      (entry.variableCount == 0 || !compute);
     bool builtins =
         (entry.builtins & ~mrhiShaderBuiltinsKnown) == 0 && (entry.builtins == 0 || fragment);
-    const uint8_t* reserved = container->entries + (size_t)index * ENTRY_BYTES + 44;
+    // Writes go with the storage kinds, never in a vertex entry, as
+    // WebGPU's rule for bound storage.
+    uint32_t storage = mrhi_heapUseStorageTextures | mrhi_heapUseStorageBuffers;
+    bool writes =
+        (entry.heapUses & mrhi_heapUseWrites) == 0 || ((entry.heapUses & storage) != 0 && !vertex);
+    bool heap = (entry.heapUses & ~mrhiShaderHeapUsesKnown) == 0 && writes;
     if (!(vertex || fragment || compute) || !workgroup || !name || !inputs || !outputs ||
-        !variables || !builtins || !IsZero(reserved, 4))
+        !variables || !builtins || !heap)
     {
         return false;
     }
@@ -436,7 +442,7 @@ static bool IsConstantValid(const mrhiContainer* container, uint32_t index)
 }
 
 // Whether the records agree with the rules and with each other; notes
-// 16-bit floats and the builtins the entries use.
+// 16-bit floats and the builtins and heap uses of the entries.
 static bool AreRecordsValid(mrhiContainer* container)
 {
     if (container->entryCount == 0 ||
@@ -457,6 +463,13 @@ static bool AreRecordsValid(mrhiContainer* container)
             return false;
         }
         container->builtins |= entry.builtins;
+        container->heapUses |= entry.heapUses;
+    }
+    // WGSL reads no heaps yet: a container using one has no WGSL, and
+    // one using none needs it.
+    if ((container->heapUses != 0) == (container->wgslBytes > 0))
+    {
+        return false;
     }
     for (uint32_t i = 0; i < container->bindingCount; ++i)
     {
@@ -476,8 +489,8 @@ static bool AreRecordsValid(mrhiContainer* container)
 }
 
 // Takes the meta, strings and code sections. An absent section has size
-// 0, so the size checks require the meta and code; the strings are
-// required by the entries' names.
+// 0, so the size checks require the meta and SPIR-V; the strings are
+// required by the entries' names, and the WGSL by entries using no heap.
 static bool TakeParts(const uint8_t* bytes, const Section* sections, uint32_t count,
                       mrhiContainer* container)
 {
@@ -496,7 +509,8 @@ static bool TakeParts(const uint8_t* bytes, const Section* sections, uint32_t co
     bool spirv = size >= 20 && size % 4 == 0 && mrhiRead32(container->spirv) == SPIRV_MAGIC;
     container->wgsl = FindSection(bytes, sections, count, SECTION_WGSL, &size);
     container->wgslBytes = size;
-    bool wgsl = size > 0 && mrhiIsTextValid((const char*)container->wgsl, size);
+    bool wgsl = size == 0 || mrhiIsTextValid((const char*)container->wgsl, size);
+    container->wgsl = size > 0 ? container->wgsl : nullptr;
     return container->rootBlockBytes % 4 == 0 && container->rootBlockBytes <= MAX_ROOT_BLOCK &&
            strings && spirv && wgsl;
 }

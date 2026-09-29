@@ -484,12 +484,6 @@ static void TestBuiltinsAndStorage(void)
     CHECK(EntryWith(1, 40, 0x10000u) == mrhi_errorInvalid,
           "a fragment entry's workgroup storage past 16 bits");
     CHECK(EntryWith(2, 40, 0) == mrhi_success, "a compute entry without workgroup storage");
-    for (size_t at = 44; at < 48; ++at)
-    {
-        Reset();
-        Record(ENTRIES, 1, 48)[at] = 1;
-        CHECK(Built() == mrhi_errorInvalid, "an entry zero that is not zero");
-    }
     Reset();
     Assemble();
     mrhiContainer container;
@@ -505,6 +499,57 @@ static void TestBuiltinsAndStorage(void)
     CHECK(mrhiParseContainer(s_container, s_size, &container) == mrhi_success &&
               container.builtins == (mrhi_builtinFragDepth | mrhi_builtinSampleMaskOut),
           "the builtins of every entry noted");
+}
+
+// Resets, then gives entry index heap uses, without the WGSL they
+// exclude.
+static void SetHeapUses(uint32_t index, mrhiShaderHeapUses uses)
+{
+    Reset();
+    Put32(Record(ENTRIES, index, 48) + 44, uses);
+    s_sections[WGSL].size = 0;
+}
+
+static mrhiResult HeapUses(uint32_t index, mrhiShaderHeapUses uses)
+{
+    SetHeapUses(index, uses);
+    return Built();
+}
+
+static void TestHeapUses(void)
+{
+    CHECK(HeapUses(2, mrhiShaderHeapUsesKnown) == mrhi_success, "every heap use");
+    CHECK(HeapUses(1, mrhiShaderHeapUsesKnown + 1) == mrhi_errorInvalid, "an unknown heap use");
+    CHECK(HeapUses(1, 0x80000000u) == mrhi_errorInvalid, "the highest unknown heap use");
+    CHECK(HeapUses(1, mrhi_heapUseWrites) == mrhi_errorInvalid, "writes alone");
+    CHECK(HeapUses(1, mrhi_heapUseWrites | mrhi_heapUseSampledTextures | mrhi_heapUseSamplers) ==
+              mrhi_errorInvalid,
+          "writes without a storage kind");
+    CHECK(HeapUses(1, mrhi_heapUseWrites | mrhi_heapUseStorageTextures) == mrhi_success &&
+              HeapUses(2, mrhi_heapUseWrites | mrhi_heapUseStorageBuffers) == mrhi_success,
+          "fragment and compute entries write");
+    CHECK(HeapUses(0, mrhi_heapUseWrites | mrhi_heapUseStorageBuffers) == mrhi_errorInvalid,
+          "a vertex entry does not");
+    CHECK(HeapUses(0, mrhi_heapUseStorageBuffers) == mrhi_success, "but reads");
+    Reset();
+    Put32(Record(ENTRIES, 1, 48) + 44, mrhi_heapUseSampledTextures);
+    CHECK(Built() == mrhi_errorInvalid, "WGSL beside a heap");
+    Reset();
+    Put32(Record(ENTRIES, 1, 48) + 44, 0x10000u);
+    CHECK(Built() == mrhi_errorInvalid, "a heap use past 16 bits, beside WGSL");
+    SetHeapUses(0, mrhi_heapUseSampledTextures);
+    Put32(Record(ENTRIES, 2, 48) + 44, mrhi_heapUseStorageBuffers | mrhi_heapUseWrites);
+    Assemble();
+    mrhiContainer container;
+    CHECK(mrhiParseContainer(s_container, s_size, &container) == mrhi_success &&
+              container.heapUses ==
+                  (mrhi_heapUseSampledTextures | mrhi_heapUseStorageBuffers | mrhi_heapUseWrites) &&
+              container.wgsl == nullptr && container.wgslBytes == 0 &&
+              mrhiContainerEntry(&container, 2).heapUses ==
+                  (mrhi_heapUseStorageBuffers | mrhi_heapUseWrites),
+          "the heap uses of every entry noted");
+    Drop(WGSL);
+    CHECK(Built() == mrhi_success, "no WGSL section at all");
 }
 
 // Resets, then breaks binding index's byte at to value.
@@ -812,6 +857,59 @@ static void TestFeatures(void)
     Close(device);
 }
 
+// A device granting bindless sampling, and heterogeneous heaps when
+// asked.
+static mrhiDevice* OpenBindless(bool heterogeneous)
+{
+    s_adapter.features.bindlessSampling = true;
+    s_adapter.features.bindlessHeterogeneous = true;
+    s_adapter.limits.heapSize = 4096;
+    s_adapter.limits.samplerHeapSize = 64;
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.features.bindlessSampling = true;
+    def.features.bindlessHeterogeneous = heterogeneous;
+    def.limits.heapSize = 1024;
+    def.limits.samplerHeapSize = 16;
+    return OpenWith(def, true);
+}
+
+// Makes a shader of container whose entries use heaps on devices with
+// and without the features they need.
+static void TestHeapFeatures(void)
+{
+    SetHeapUses(1, mrhi_heapUseSampledTextures | mrhi_heapUseSamplers);
+    Assemble();
+    mrhiDevice* device = Open(2, true);
+    mrhiShaderDef def = Def();
+    mrhiShaderId shader;
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported,
+          "heaps without bindless sampling");
+    Close(device);
+    device = OpenBindless(false);
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "with it");
+    mrhiShaderInfo info;
+    CHECK(mrhiGetShaderInfo(device, shader, &info) == mrhi_success &&
+              info.heapUses == (mrhi_heapUseSampledTextures | mrhi_heapUseSamplers),
+          "its heap uses told");
+    SetHeapUses(2, mrhi_heapUseStorageTextures);
+    Assemble();
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported,
+          "storage textures without heterogeneous heaps");
+    SetHeapUses(2, mrhi_heapUseStorageBuffers);
+    Assemble();
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported,
+          "storage buffers without them");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "neither is misuse");
+    Close(device);
+    device = OpenBindless(true);
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "storage buffers with them");
+    SetHeapUses(2, mrhi_heapUseStorageTextures | mrhi_heapUseWrites);
+    Assemble();
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "storage textures with them");
+    Close(device);
+    ResetAdapter();
+}
+
 // Appends count bindings of a kind used by stages, in table 2 from slot
 // first, with the details the kind needs.
 static void AddBindings(mrhiBindingKind kind, uint32_t count, mrhiShaderStages stages,
@@ -1055,7 +1153,8 @@ static void TestStateAndFailure(void)
 }
 
 // Reads a written container and checks what it holds: its digest in
-// hex, its entry and binding counts, and its root block.
+// hex, its entry and binding counts, its root block, and its heap uses
+// (a device granting both bindless features reads those).
 static int CheckFile(char** args)
 {
     FILE* file = fopen(args[0], "rb");
@@ -1076,7 +1175,8 @@ static int CheckFile(char** args)
         uint8_t value = digit == nullptr ? 0 : (uint8_t)(digit - "0123456789abcdef");
         digest[i / 2] = (uint8_t)(digest[i / 2] << 4 | value);
     }
-    mrhiDevice* device = Open(1, true);
+    uint32_t heapUses = (uint32_t)atoi(args[5]);
+    mrhiDevice* device = heapUses == 0 ? Open(1, true) : OpenBindless(true);
     mrhiShaderDef def = Def();
     mrhiShaderId shader;
     mrhiShaderInfo info = {0};
@@ -1085,7 +1185,7 @@ static int CheckFile(char** args)
     CHECK(memcmp(info.digest, digest, MRHI_DIGEST_BYTES) == 0, "the same digest");
     CHECK(info.entryCount == (uint32_t)atoi(args[2]) &&
               info.bindingCount == (uint32_t)atoi(args[3]) &&
-              info.rootBlockBytes == (uint32_t)atoi(args[4]),
+              info.rootBlockBytes == (uint32_t)atoi(args[4]) && info.heapUses == heapUses,
           "the same reflection");
     Close(device);
     return s_failures == 0 ? 0 : 1;
@@ -1094,7 +1194,7 @@ static int CheckFile(char** args)
 int main(int argc, char** argv)
 {
     ResetAdapter();
-    if (argc == 6)
+    if (argc == 7)
     {
         return CheckFile(argv + 1);
     }
@@ -1106,6 +1206,7 @@ int main(int argc, char** argv)
     TestInterfaces();
     TestVariables();
     TestBuiltinsAndStorage();
+    TestHeapUses();
     TestBindings();
     TestConstantsAndCode();
     TestRecordLimit();
@@ -1113,6 +1214,7 @@ int main(int argc, char** argv)
     TestCreate();
     TestRefusals();
     TestFeatures();
+    TestHeapFeatures();
     TestLimits();
     TestTableSize();
     TestEntryLimits();

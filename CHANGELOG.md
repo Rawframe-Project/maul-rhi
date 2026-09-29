@@ -290,6 +290,11 @@ format.
   later frames read it without barriers and may declare only the
   sealed state's reads until `mrhiUnsealResource` returns it to
   tracking.
+- Heap use in shader containers (mrhi-0015): each entry point records
+  the heaps it reads (`mrhiShaderHeapUses`), in the entry record's last
+  word; SPIR-V reads them at set 4; a container using a heap has no
+  WGSL; `mrhiShaderInfo.heapUses`; the writer takes `heap_uses` and `-`
+  for no WGSL.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

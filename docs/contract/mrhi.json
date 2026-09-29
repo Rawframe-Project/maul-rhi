@@ -13899,6 +13899,130 @@
           ]
         },
         {
+          "kind": "bitflags",
+          "name": "shader_heap_uses",
+          "width": "uint32",
+          "mapped": true,
+          "doc": "What an entry point reads through the pass's heap (mrhi-0015); none for an entry point that uses no heap.",
+          "values": [
+            {
+              "name": "heap_use_sampled_textures",
+              "value": 1,
+              "doc": "Samples textures from the resource heap; needs bindless_sampling.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "set 4 binding 0: SAMPLED_IMAGE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "ResourceDescriptorHeap, SM 6.6"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "argument buffer, tier 2"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "no heaps until WGSL reads resource tables"
+                }
+              }
+            },
+            {
+              "name": "heap_use_storage_textures",
+              "value": 2,
+              "doc": "Reads storage textures from the resource heap; needs bindless_heterogeneous.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "set 4 binding 0: STORAGE_IMAGE, with VK_EXT_mutable_descriptor_type"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "ResourceDescriptorHeap, SM 6.6"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "argument buffer, tier 2"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "no heaps until WGSL reads resource tables"
+                }
+              }
+            },
+            {
+              "name": "heap_use_storage_buffers",
+              "value": 4,
+              "doc": "Reads storage buffers from the resource heap; needs bindless_heterogeneous.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "set 4 binding 0: STORAGE_BUFFER, with VK_EXT_mutable_descriptor_type"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "ResourceDescriptorHeap, SM 6.6"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "argument buffer, tier 2"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "no heaps until WGSL reads resource tables"
+                }
+              }
+            },
+            {
+              "name": "heap_use_samplers",
+              "value": 8,
+              "doc": "Reads samplers from the sampler heap; needs bindless_sampling.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "set 4 binding 1: SAMPLER"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SamplerDescriptorHeap, SM 6.6"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "argument buffer, tier 2"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "no heaps until WGSL reads resource tables"
+                }
+              }
+            },
+            {
+              "name": "heap_use_writes",
+              "value": 16,
+              "doc": "Also writes storage textures or buffers it reads from the resource heap; never in a vertex entry point.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "storage writes through set 4 binding 0"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "RW resources from ResourceDescriptorHeap"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "argument buffer, tier 2, read_write"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "no heaps until WGSL reads resource tables"
+                }
+              }
+            }
+          ]
+        },
+        {
           "kind": "enum",
           "name": "constant_type",
           "width": "uint8",
@@ -14093,6 +14217,11 @@
               "name": "root_block_bytes",
               "type": "uint32",
               "doc": "The root block its entry points read."
+            },
+            {
+              "name": "heap_uses",
+              "type": "bitflags.shader_heap_uses",
+              "doc": "What its entry points read through heaps, together."
             }
           ],
           "library": "reads the container's reflection, which the library checked"
@@ -14117,7 +14246,7 @@
           "doc": "Loads a shader container on a ready device, checking every byte of it as hostile input.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, or a container that is malformed, damaged, misaligned or contradicts itself; `mrhi_errorVersion` for a container of another version; `mrhi_errorUnsupported` for a root block, bindings, a workgroup or interface variables past the device's limits, a table of more than MRHI_TABLE_BINDINGS bindings, 16-bit floats on a device without shaderF16, the primitive index builtin, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's shader limit is reached or its allocator fails; `mrhi_errorPlatform` when the driver refuses the code."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, or a container that is malformed, damaged, misaligned or contradicts itself; `mrhi_errorVersion` for a container of another version; `mrhi_errorUnsupported` for a root block, bindings, a workgroup or interface variables past the device's limits, a table of more than MRHI_TABLE_BINDINGS bindings, 16-bit floats on a device without shaderF16, the primitive index builtin, heap uses on a device without bindless_sampling, or storage ones without bindless_heterogeneous, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's shader limit is reached or its allocator fails; `mrhi_errorPlatform` when the driver refuses the code."
           },
           "args": [
             {

@@ -65,6 +65,8 @@ static void CheckSections(const uint8_t* bytes, size_t size, const mrhiContainer
     Expect(Inside(bytes, size, container->strings, container->stringBytes));
     Expect(Inside(bytes, size, container->spirv, container->spirvBytes));
     Expect(Inside(bytes, size, container->wgsl, container->wgslBytes));
+    // WGSL exactly when no entry uses a heap.
+    Expect((container->wgslBytes > 0) == (container->heapUses == 0));
     // Every record array holds its count of fixed-size records; their
     // sizes are the parse's, so only the first byte of each is checked
     // here and ASan checks the rest as the reflection decodes them.

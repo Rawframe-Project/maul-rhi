@@ -19,6 +19,8 @@ typedef struct mrhiReflection
     size_t bytes;
     uint8_t digest[MRHI_DIGEST_BYTES];
     uint32_t rootBlockBytes;
+    // What its entries read through heaps, together.
+    mrhiShaderHeapUses heapUses;
     uint32_t entryCount;
     uint32_t bindingCount;
     uint32_t inputCount;

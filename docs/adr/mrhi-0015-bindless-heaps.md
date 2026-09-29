@@ -56,6 +56,16 @@ barriers.
   how it ends. On Vulkan the sealed state is `SHADER_READ_ONLY_OPTIMAL`
   with every shader stage's sampled reads for a texture, and every read
   for a buffer. Sealing needs `bindless_sampling`.
+- **Shader reflection:** each entry point of a container records what
+  it reads through the heap (`mrhiShaderHeapUses`: sampled textures,
+  storage textures, storage buffers, samplers, and writes to the
+  storage kinds). SPIR-V reads the resource heap at set 4 binding 0 and
+  the sampler heap at set 4 binding 1, where DXC places SM 6.6 heaps
+  with `-fvk-bind-resource-heap 0 4 -fvk-bind-sampler-heap 1 4`, so
+  existing HLSL compiles unchanged. WGSL reads no heaps until WebGPU's
+  resource tables ship, so a container using a heap has no WGSL.
+  Creating a shader whose entries use heaps needs the features they
+  name.
 - **Drivers** get a heap handle per pass and write entries as the core
   accepts them (`createHeap`, `destroyHeap`, `writeHeapEntry`,
   `writeHeapSampler`; SPI version 2). The test driver checks every
@@ -66,5 +76,5 @@ barriers.
 Content picks resources by index while the graph keeps exact barriers.
 Freeing an index only after earlier frames finish lets every API write
 entries in place, without copies. Sealed resources give
-streamed assets reads without barriers. The shader reflection of heap
-use and the Vulkan heap path follow in their slices.
+streamed assets reads without barriers. The Vulkan heap path follows in
+its slice.

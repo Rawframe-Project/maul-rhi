@@ -112,6 +112,7 @@ mrhiReflection* mrhiKeepReflection(const mrhiAllocator* allocator, const mrhiCon
         .references = 1,
         .bytes = layout.size,
         .rootBlockBytes = container->rootBlockBytes,
+        .heapUses = container->heapUses,
         .entryCount = container->entryCount,
         .bindingCount = container->bindingCount,
         .inputCount = container->inputCount,

@@ -10,8 +10,8 @@
 #include "maul-rhi/shader.h"
 
 // An entry point: its stage, its name in the strings, its workgroup
-// size and storage, the builtins it uses, and its ranges of vertex
-// inputs, color outputs and inter-stage variables.
+// size and storage, the builtins and heaps it uses, and its ranges of
+// vertex inputs, color outputs and inter-stage variables.
 typedef struct mrhiShaderEntry
 {
     mrhiShaderStages stage;
@@ -26,6 +26,7 @@ typedef struct mrhiShaderEntry
     uint16_t variableCount;
     mrhiShaderBuiltins builtins;
     uint32_t workgroupStorageBytes;
+    mrhiShaderHeapUses heapUses;
 } mrhiShaderEntry;
 
 typedef struct mrhiShaderBinding
@@ -63,14 +64,16 @@ typedef struct mrhiShaderConstant
 } mrhiShaderConstant;
 
 // A checked container: its digest and root block, its sections in the
-// caller's bytes, whether it uses 16-bit floats, and the builtins its
-// entries use together.
+// caller's bytes, whether it uses 16-bit floats, and the builtins and
+// heap uses of its entries together; the WGSL is absent (NULL, 0 bytes)
+// exactly when an entry uses a heap.
 typedef struct mrhiContainer
 {
     uint8_t digest[MRHI_DIGEST_BYTES];
     uint32_t rootBlockBytes;
     bool float16;
     mrhiShaderBuiltins builtins;
+    mrhiShaderHeapUses heapUses;
     const uint8_t* strings;
     uint32_t stringBytes;
     const uint8_t* entries;

@@ -537,6 +537,16 @@ restricted or absent-rejected, with how.
 | `mrhi_builtinSampleMaskIn` | direct: SampleMask input | direct: SV_Coverage input | direct: [[sample_mask]] input | direct: sample_mask input |
 | `mrhi_builtinPrimitiveIndex` | direct: PrimitiveId | direct: SV_PrimitiveID | direct: [[primitive_id]] | direct: primitive_index |
 
+## mrhiShaderHeapUses
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_heapUseSampledTextures` | direct: set 4 binding 0: SAMPLED_IMAGE | direct: ResourceDescriptorHeap, SM 6.6 | direct: argument buffer, tier 2 | absent-rejected: no heaps until WGSL reads resource tables |
+| `mrhi_heapUseStorageTextures` | direct: set 4 binding 0: STORAGE_IMAGE, with VK_EXT_mutable_descriptor_type | direct: ResourceDescriptorHeap, SM 6.6 | direct: argument buffer, tier 2 | absent-rejected: no heaps until WGSL reads resource tables |
+| `mrhi_heapUseStorageBuffers` | direct: set 4 binding 0: STORAGE_BUFFER, with VK_EXT_mutable_descriptor_type | direct: ResourceDescriptorHeap, SM 6.6 | direct: argument buffer, tier 2 | absent-rejected: no heaps until WGSL reads resource tables |
+| `mrhi_heapUseSamplers` | direct: set 4 binding 1: SAMPLER | direct: SamplerDescriptorHeap, SM 6.6 | direct: argument buffer, tier 2 | absent-rejected: no heaps until WGSL reads resource tables |
+| `mrhi_heapUseWrites` | direct: storage writes through set 4 binding 0 | direct: RW resources from ResourceDescriptorHeap | direct: argument buffer, tier 2, read_write | absent-rejected: no heaps until WGSL reads resource tables |
+
 ## mrhiConstantType
 
 | Value | Vulkan | D3D12 | Metal | WebGPU |

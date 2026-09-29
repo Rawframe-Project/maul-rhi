@@ -22,7 +22,9 @@ they are untrusted.
       fragment builtins that constrain pipelines, and their interface
       variables (vertex inputs, color outputs, and the inter-stage
       variables a vertex entry writes and a fragment entry reads, each
-      with its location, scalar type, components and interpolation);
+      with its location, scalar type, components and interpolation),
+      and the heaps it reads (added by mrhi-0015, whose containers
+      carry no WGSL until WGSL reads heaps);
     - the bindings: table, slot, stages, kind and its details;
     - the root block's size;
     - the specialization constants, and whether each has a default.

@@ -1480,4 +1480,6 @@ const mrhiShaderStages mrhiShaderStagesKnown = 0x7u;
 
 const mrhiShaderBuiltins mrhiShaderBuiltinsKnown = 0x3Fu;
 
+const mrhiShaderHeapUses mrhiShaderHeapUsesKnown = 0x1Fu;
+
 const mrhiColorWrites mrhiColorWritesKnown = 0xFu;

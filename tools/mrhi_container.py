@@ -12,6 +12,14 @@
 #   WGSL binding's kind, and a texture's dimension, match it.
 # A module may leave out a binding it does not use.
 #
+# An entry may read the pass's heap (record mrhi-0015), listing its
+# "heap_uses" ("sampled_textures", "storage_textures", "storage_buffers",
+# "samplers", and "writes" with a storage kind, never in a vertex entry).
+# SPIR-V reads the resource heap at set 4 binding 0 and the sampler heap
+# at set 4 binding 1 (DXC: -fvk-bind-resource-heap 0 4
+# -fvk-bind-sampler-heap 1 4). WGSL reads no heaps yet, so a container
+# whose entries use one has no WGSL: pass - for it.
+#
 # The enum names are the contract's (docs/contract/mrhi.json) without
 # their prefixes. The reflection:
 #   {
@@ -25,7 +33,7 @@
 #                       "interpolation": "perspective", "sampling": "center"}],
 #        "outputs": [{"location": 0, "type": "float32", "components": 4}]},
 #       {"name": "cs", "stage": "compute", "workgroup": [8, 8, 1],
-#        "workgroup_storage_bytes": 1024}
+#        "workgroup_storage_bytes": 1024, "heap_uses": []}
 #     ],
 #     "bindings": [
 #       {"table": 0, "slot": 0, "kind": "uniform_buffer",
@@ -47,7 +55,7 @@
 # from the first vertex for integers. A constant without a default must
 # be set by every pipeline.
 #
-# usage: mrhi_container.py SPIRV WGSL REFLECTION OUTPUT
+# usage: mrhi_container.py SPIRV WGSL|- REFLECTION OUTPUT
 # Standard library only; exits 1 naming the first problem.
 
 import hashlib
@@ -72,6 +80,11 @@ OP_DECORATE = 71
 DECORATION_BINDING = 33
 DECORATION_SET = 34
 EXECUTION_MODELS = {0: "vertex", 4: "fragment", 5: "compute"}
+# The heap's set and bindings in SPIR-V.
+HEAP_SET = 4
+RESOURCE_HEAP = 0
+SAMPLER_HEAP = 1
+RESOURCE_USES = ("sampled_textures", "storage_textures", "storage_buffers")
 
 
 class ContainerError(Exception):
@@ -100,6 +113,7 @@ class Enums:
         self.interpolations = enum(contract, "interpolation", "interpolation_")
         self.samplings = enum(contract, "sampling", "sampling_")
         self.builtins = enum(contract, "shader_builtins", "builtin_")
+        self.heap_uses = enum(contract, "shader_heap_uses", "heap_use_")
         self.constants = enum(contract, "constant_type", "constant_")
 
 
@@ -178,7 +192,7 @@ def pack_entries(reflection, enums, strings, inputs, outputs, variables):
     records = []
     for entry in entries:
         keys(entry, ("name", "stage", "workgroup", "workgroup_storage_bytes", "builtins",
-                     "inputs", "outputs", "variables"), "an entry")
+                     "inputs", "outputs", "variables", "heap_uses"), "an entry")
         name = entry.get("name")
         need(isinstance(name, str), "an entry needs a name")
         encoded = name.encode("utf-8")
@@ -202,14 +216,23 @@ def pack_entries(reflection, enums, strings, inputs, outputs, variables):
         mask = 0
         for builtin in builtins:
             mask |= pick(enums.builtins, builtin, "builtin")
+        uses = entry.get("heap_uses", [])
+        need(isinstance(uses, list), f"{where}: the heap uses are a list")
+        unique(uses, f"heap use in {where}")
+        heap = 0
+        for use in uses:
+            heap |= pick(enums.heap_uses, use, "heap use")
+        stored = {"storage_textures", "storage_buffers"} & set(uses)
+        need("writes" not in uses or (stored and stage != "vertex"),
+             f"{where}: heap writes need a storage kind, outside a vertex entry")
         ranges = [
             pack_range(entry, "inputs", "input", enums, inputs, where, stage == "vertex"),
             pack_range(entry, "outputs", "output", enums, outputs, where, stage == "fragment"),
             pack_range(entry, "variables", "variable", enums, variables, where, not compute),
         ]
-        records.append(struct.pack("<III3I6HII4x", enums.stages[stage], len(strings),
+        records.append(struct.pack("<III3I6HIII", enums.stages[stage], len(strings),
                                    len(encoded), *workgroup,
-                                   *[n for pair in ranges for n in pair], mask, storage))
+                                   *[n for pair in ranges for n in pair], mask, storage, heap))
         strings += encoded
     return records
 
@@ -402,9 +425,16 @@ def check_spirv(code, reflection, bindings):
         at += count
     wanted = {e["name"]: e["stage"] for e in reflection["entries"]}
     need(entries == wanted, f"SPIR-V entry points {entries} differ from the reflection's {wanted}")
+    uses = {use for e in reflection["entries"] for use in e.get("heap_uses", [])}
+    heaps = set()
+    if uses & set(RESOURCE_USES):
+        heaps.add((HEAP_SET, RESOURCE_HEAP))
+    if "samplers" in uses:
+        heaps.add((HEAP_SET, SAMPLER_HEAP))
     for target, slot in slots.items():
         key = (sets.get(target, 0), slot)
-        need(key in bindings, f"SPIR-V binds {key[0]}.{key[1]}, which the reflection does not")
+        need(key in bindings or key in heaps,
+             f"SPIR-V binds {key[0]}.{key[1]}, which the reflection does not")
 
 
 # The container.
@@ -435,12 +465,18 @@ def build(spirv, wgsl, reflection, enums):
     need(len(binding_records) <= MAX_RECORDS and len(constants) <= MAX_RECORDS,
          "too many records")
     check_spirv(spirv, reflection, bindings)
-    try:
-        text = wgsl.decode("utf-8")
-    except UnicodeDecodeError as error:
-        raise ContainerError(f"WGSL: not UTF-8 ({error})") from error
-    need(wgsl and "\0" not in text, "WGSL: empty, or holds NUL")
-    check_wgsl(text, reflection, bindings)
+    heaps = any(e.get("heap_uses") for e in reflection["entries"])
+    if heaps:
+        need(wgsl is None, "WGSL reads no heaps: a container using one has no WGSL")
+        wgsl = b""
+    else:
+        need(wgsl is not None, "a container using no heap needs WGSL")
+        try:
+            text = wgsl.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise ContainerError(f"WGSL: not UTF-8 ({error})") from error
+        need(wgsl and "\0" not in text, "WGSL: empty, or holds NUL")
+        check_wgsl(text, reflection, bindings)
     sections = [
         (1, struct.pack("<I12x", root)),
         (2, bytes(strings)),
@@ -453,6 +489,7 @@ def build(spirv, wgsl, reflection, enums):
         (9, wgsl),
         (10, b"".join(r for _, r in variables)),
     ]
+    sections = [(kind, data) for kind, data in sections if kind != 9 or data]
     offset = 64 + 24 * len(sections)
     table = b""
     body = b""
@@ -467,7 +504,7 @@ def build(spirv, wgsl, reflection, enums):
 
 def main():
     if len(sys.argv) != 5:
-        print("usage: mrhi_container.py SPIRV WGSL REFLECTION OUTPUT", file=sys.stderr)
+        print("usage: mrhi_container.py SPIRV WGSL|- REFLECTION OUTPUT", file=sys.stderr)
         return 2
     spirv_path, wgsl_path, reflection_path, output_path = sys.argv[1:]
     try:
@@ -475,8 +512,10 @@ def main():
             enums = Enums(json.load(f))
         with open(spirv_path, "rb") as f:
             spirv = f.read()
-        with open(wgsl_path, "rb") as f:
-            wgsl = f.read()
+        wgsl = None
+        if wgsl_path != "-":
+            with open(wgsl_path, "rb") as f:
+                wgsl = f.read()
         with open(reflection_path, encoding="utf-8") as f:
             reflection = json.load(f)
         container = build(spirv, wgsl, reflection, enums)

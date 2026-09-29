@@ -3,8 +3,9 @@
 # Copyright (c) 2026 Sirac Ozmen
 #
 # tools/mrhi_container.py against the library: a container it writes
-# is read by test_shader with the same digest and reflection, and code
-# that disagrees with its reflection is refused.
+# is read by test_shader with the same digest and reflection, as is one
+# whose entries use heaps and so has no WGSL, and code that disagrees
+# with its reflection is refused.
 #
 # usage: test_container_writer.py TEST_SHADER
 
@@ -120,11 +121,15 @@ def constants(data):
 
 
 def write(folder, code, text, reflection):
+    """Writes a container; text None passes no WGSL."""
     paths = [os.path.join(folder, n) for n in ("a.spv", "a.wgsl", "a.json", "a.mrsc")]
     with open(paths[0], "wb") as f:
         f.write(code)
-    with open(paths[1], "w", encoding="utf-8") as f:
-        f.write(text)
+    if text is None:
+        paths[1] = "-"
+    else:
+        with open(paths[1], "w", encoding="utf-8") as f:
+            f.write(text)
     with open(paths[2], "w", encoding="utf-8") as f:
         json.dump(reflection, f)
     if os.path.exists(paths[3]):
@@ -150,7 +155,7 @@ def main():
             with open(output, "rb") as f:
                 data = f.read()
             digest = hashlib.sha256(data[48:]).hexdigest()
-            args = [test_shader, output, digest, "3", str(len(REFLECTION["bindings"])), "16"]
+            args = [test_shader, output, digest, "3", str(len(REFLECTION["bindings"])), "16", "0"]
             result = subprocess.run(args, capture_output=True, text=True)
             check(result.returncode == 0, f"the library reads it: {result.stdout}")
             check(constants(data) == [(0, 4, 0x3F800000, 0), (1, 2, 0xFFFFFFFE, 0),
@@ -163,6 +168,57 @@ def main():
             check(section(data, 10) == struct.pack("<IBBBBIBBBBIBBBB", 0, 1, 2, 1, 1,
                                                    1, 4, 1, 3, 4, 0, 1, 2, 2, 2),
                   "the inter-stage variables, with WGSL's default interpolation")
+
+        # Heaps: fs samples through both heaps, cs writes storage buffers.
+        heaped = copy.deepcopy(REFLECTION)
+        heaped["entries"][1]["heap_uses"] = ["sampled_textures", "samplers"]
+        heaped["entries"][2]["heap_uses"] = ["storage_buffers", "writes"]
+        heap_code = spirv(SPIRV_ENTRIES, SPIRV_BINDINGS + [(4, 0), (4, 1)])
+        status, errors, output = write(folder, heap_code, None, heaped)
+        check(status == 0, f"a container using heaps is written: {errors}")
+        if status == 0:
+            with open(output, "rb") as f:
+                data = f.read()
+            digest = hashlib.sha256(data[48:]).hexdigest()
+            args = [test_shader, output, digest, "3", str(len(REFLECTION["bindings"])), "16",
+                    str(1 | 4 | 8 | 16)]
+            result = subprocess.run(args, capture_output=True, text=True)
+            check(result.returncode == 0, f"the library reads it: {result.stdout}")
+            entries = section(data, 3) or b""
+            check([struct.unpack_from("<44xI", entries, at)[0]
+                   for at in range(0, len(entries), 48)] == [0, 1 | 8, 4 | 16],
+                  "the entries' heap uses")
+            check(section(data, 9) is None, "no WGSL section")
+
+        def heap_refused(what, code=heap_code, text=None, change=None):
+            reflection = copy.deepcopy(heaped)
+            if change:
+                change(reflection)
+            status, _, output = write(folder, code, text, reflection)
+            check(status == 1 and not os.path.exists(output), f"refused: {what}")
+
+        heap_refused("WGSL beside a heap", text=WGSL)
+        heap_refused("no WGSL without a heap", code=code,
+                     change=lambda r: [e.pop("heap_uses", None) for e in r["entries"]])
+        heap_refused("an unknown heap use",
+                     change=lambda r: r["entries"][1].update(heap_uses=["samplers",
+                                                                         "uniform_buffers"]))
+        heap_refused("a repeated heap use",
+                     change=lambda r: r["entries"][1].update(heap_uses=["samplers", "samplers"]))
+        heap_refused("heap writes without a storage kind",
+                     change=lambda r: r["entries"][1].update(heap_uses=["sampled_textures",
+                                                                         "samplers", "writes"]))
+        heap_refused("heap writes in a vertex entry",
+                     change=lambda r: r["entries"][0].update(heap_uses=["storage_textures",
+                                                                         "writes"]))
+        heap_refused("the sampler heap bound without samplers",
+                     change=lambda r: r["entries"][1].update(heap_uses=["sampled_textures"]))
+        heap_refused("the resource heap bound without resources",
+                     code=spirv(SPIRV_ENTRIES, SPIRV_BINDINGS + [(4, 0), (4, 1)]),
+                     change=lambda r: [r["entries"][1].update(heap_uses=["samplers"]),
+                                       r["entries"][2].pop("heap_uses")])
+        heap_refused("another binding of the heap set",
+                     code=spirv(SPIRV_ENTRIES, SPIRV_BINDINGS + [(4, 0), (4, 2)]))
 
         def refused(what, code=code, text=WGSL, change=None):
             reflection = copy.deepcopy(REFLECTION)

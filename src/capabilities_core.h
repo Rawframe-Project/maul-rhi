@@ -102,6 +102,7 @@ extern const mrhiPresentModes mrhiPresentModesKnown;
 extern const mrhiAlphaModes mrhiAlphaModesKnown;
 extern const mrhiShaderStages mrhiShaderStagesKnown;
 extern const mrhiShaderBuiltins mrhiShaderBuiltinsKnown;
+extern const mrhiShaderHeapUses mrhiShaderHeapUsesKnown;
 extern const mrhiColorWrites mrhiColorWritesKnown;
 
 #endif // MAUL_RHI_SRC_CAPABILITIES_CORE_H
