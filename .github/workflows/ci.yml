@@ -78,6 +78,40 @@ jobs:
             -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} ${{ matrix.extra }}
       - name: Build
         run: cmake --build build -j 4
+      - name: Describe the Metal device
+        # What the Metal cell runs on: the device's families and argument
+        # buffer tier, which decide the driver's limits and heaps.
+        if: contains(matrix.extra, 'METAL_DRIVER=ON')
+        run: |
+          cat > probe.m <<'EOF'
+          #import <Metal/Metal.h>
+          #include <stdio.h>
+          int main(void)
+          {
+              id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+              if (device == nil)
+              {
+                  printf("no Metal device\n");
+                  return 0;
+              }
+              printf("%s: argument buffers tier %d, unified memory %d\n", device.name.UTF8String,
+                     (int)device.argumentBuffersSupport + 1, (int)device.hasUnifiedMemory);
+              const struct { MTLGPUFamily family; const char* name; } families[] = {
+                  {MTLGPUFamilyApple5, "Apple5"}, {MTLGPUFamilyApple6, "Apple6"},
+                  {MTLGPUFamilyApple7, "Apple7"}, {MTLGPUFamilyApple8, "Apple8"},
+                  {MTLGPUFamilyApple9, "Apple9"}, {MTLGPUFamilyMac2, "Mac2"},
+                  {MTLGPUFamilyCommon3, "Common3"}, {MTLGPUFamilyMetal3, "Metal3"}};
+              for (size_t i = 0; i < sizeof(families) / sizeof(families[0]); ++i)
+              {
+                  printf("  %s %d\n", families[i].name, (int)[device supportsFamily:families[i].family]);
+              }
+              printf("  threadgroup memory %lu, buffer %lu\n",
+                     (unsigned long)device.maxThreadgroupMemoryLength,
+                     (unsigned long)device.maxBufferLength);
+              return 0;
+          }
+          EOF
+          clang -fobjc-arc probe.m -framework Metal -framework Foundation -o probe && ./probe
       - name: Test
         # Linux runs Vulkan on lavapipe, which must be found, under the
         # validation layer, whose errors in a test's output fail it,
