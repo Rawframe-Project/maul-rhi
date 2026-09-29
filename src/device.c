@@ -37,7 +37,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.shaders = 256;
     def.deviceLimits.pipelines = 1024;
     def.deviceLimits.frameCommandBytes = 1u << 20;
-    def.deviceLimits.frameUploadBytes = 1u << 22;
+    def.deviceLimits.frameUploadBytes = 1u << 20;
     return def;
 }
 

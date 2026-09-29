@@ -5490,7 +5490,7 @@
             {
               "name": "frame_upload_bytes",
               "type": "uint32",
-              "doc": "The bytes one frame's uploads take in all, each at a 512-byte boundary with a texture's rows at a 256-byte pitch; as many again for each frame in flight; 4 MiB by default, 0 for no uploads."
+              "doc": "The bytes one frame's uploads take in all, each at a 512-byte boundary with a texture's rows at a 256-byte pitch; as many again for each frame in flight; 1 MiB by default, 0 for no uploads."
             }
           ]
         },
