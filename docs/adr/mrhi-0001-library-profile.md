@@ -24,8 +24,12 @@ family rulebook (family record 0005).
 - **Platform dependencies:** the Vulkan loader, opened at run time, for
   the Vulkan driver, which compiles against the Khronos C headers kept
   as published in `khronos/`; the browser's WebGPU, called through
-  `EM_JS` glue compiled into the library, on the web; Metal and
-  Direct3D 12 later. Window handles come in as opaque
+  `EM_JS` glue compiled into the library, on the web; the Metal,
+  QuartzCore, CoreGraphics and Foundation frameworks, linked on Apple
+  systems, for the Metal driver; `d3d12.dll` and `dxgi.dll`, opened at
+  run time, for the D3D12 driver, which compiles against the DirectX
+  headers kept as published in `directx/` and the Windows SDK's DXGI
+  headers. Window handles come in as opaque
   pointers from the program; no window library is linked. The
   conformance suite links the XCB client library where it is
   installed, to make a window of its own.
@@ -37,8 +41,8 @@ family rulebook (family record 0005).
   budgets checked at release (family record 0013), since the web build
   is where size costs most.
 - **Commit areas:** `api`, `build`, `ci`, `container`, `conformance`,
-  `docs`, `graph`, `metal`, `samples`, `schema`, `tests`, `tools`,
-  `vulkan`, `webgpu`.
+  `d3d12`, `docs`, `graph`, `metal`, `samples`, `schema`, `tests`,
+  `tools`, `vulkan`, `webgpu`.
 
 ## Consequences
 

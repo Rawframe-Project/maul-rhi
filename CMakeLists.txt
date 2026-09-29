@@ -42,6 +42,17 @@ if(MAUL_RHI_METAL_DRIVER AND MAUL_RHI_VULKAN_DRIVER)
     message(FATAL_ERROR "A build has one native driver: turn MAUL_RHI_VULKAN_DRIVER off "
                         "with MAUL_RHI_METAL_DRIVER on")
 endif()
+# The D3D12 driver (mrhi-0003), on Windows: off by default until it runs
+# everything the core records, then the native driver of Windows
+# builds (R69).
+option(MAUL_RHI_D3D12_DRIVER "Build the D3D12 driver" OFF)
+if(MAUL_RHI_D3D12_DRIVER AND NOT WIN32)
+    message(FATAL_ERROR "The D3D12 driver builds on Windows only")
+endif()
+if(MAUL_RHI_D3D12_DRIVER AND MAUL_RHI_VULKAN_DRIVER)
+    message(FATAL_ERROR "A build has one native driver: turn MAUL_RHI_VULKAN_DRIVER off "
+                        "with MAUL_RHI_D3D12_DRIVER on")
+endif()
 # The WebGPU driver (mrhi-0003): every web build.
 option(MAUL_RHI_WEBGPU_DRIVER "Build the WebGPU driver" ${EMSCRIPTEN})
 
@@ -140,6 +151,12 @@ if(MAUL_RHI_METAL_DRIVER)
     target_link_libraries(maul-rhi PRIVATE "-framework CoreGraphics" "-framework Foundation"
                                            "-framework Metal" "-framework QuartzCore")
 endif()
+if(MAUL_RHI_D3D12_DRIVER)
+    target_sources(maul-rhi PRIVATE src/driver_d3d12.c src/d3d12_api.c src/d3d12_device.c)
+    target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_D3D12_DRIVER)
+    # The DirectX headers, kept as published (directx/README.md).
+    target_include_directories(maul-rhi SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
+endif()
 if(MAUL_RHI_WEBGPU_DRIVER)
     target_sources(maul-rhi PRIVATE src/driver_webgpu.c src/webgpu_device.c src/webgpu_frame.c
                                    src/webgpu_names.c src/webgpu_pipeline.c)
@@ -228,6 +245,14 @@ if(MAUL_RHI_BUILD_TESTS)
                                    $<$<COMPILE_LANGUAGE:OBJC>:-fno-objc-arc>)
             target_compile_definitions(test_conformance PRIVATE MAUL_RHI_METAL_DRIVER)
             target_link_libraries(test_conformance PRIVATE "-framework QuartzCore")
+        endif()
+        if(MAUL_RHI_D3D12_DRIVER)
+            # The debug layer, and the Agility SDK the exe exports.
+            target_sources(test_conformance PRIVATE test/d3d12_debug.c)
+            target_include_directories(test_conformance SYSTEM PRIVATE
+                                       ${PROJECT_SOURCE_DIR}/directx)
+            target_compile_definitions(test_conformance PRIVATE MAUL_RHI_D3D12_DRIVER)
+            target_link_libraries(test_conformance PRIVATE d3d12 dxgi)
         endif()
     endif()
     find_package(PkgConfig QUIET)

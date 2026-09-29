@@ -41,8 +41,9 @@ jobs:
         run: |
           cmake -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-          # The web-only sources are checked by the web job.
-          for f in $(grep -L "emscripten/" src/*.c); do
+          # The web-only sources are checked by the web job; the D3D12 ones
+          # need Windows' headers and build in the Windows jobs.
+          for f in $(grep -L "emscripten/" src/*.c | grep -v d3d12); do
             clang-tidy-20 -p build --quiet --warnings-as-errors='*' "$f" || exit 1
           done
 
@@ -174,6 +175,39 @@ jobs:
         run: cmake --build build --config Release -j 4
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
+
+  # The D3D12 driver on WARP, the runner's software adapter, under the
+  # Agility SDK's debug layer with GPU-based validation, whose errors
+  # fail the suite (R69). The SDK's NuGet package, the version the
+  # directx/ headers are, goes beside each test in D3D12/, where the
+  # tests' exports point.
+  windows-d3d12:
+    name: windows-d3d12
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -B build -T ClangCL -D${PREFIX}_WERROR=ON -D${PREFIX}_D3D12_DRIVER=ON
+          -D${PREFIX}_VULKAN_DRIVER=OFF -D${PREFIX}_BUILD_SAMPLES=OFF
+      - name: Build
+        run: cmake --build build --config Debug -j 4
+      - name: Place the Agility SDK beside the tests
+        run: |
+          curl -sSfL -o agility.zip https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.619.5
+          unzip -q agility.zip -d agility
+          for dir in $(find build -name 'test_*.exe' -exec dirname {} \; | sort -u); do
+            mkdir -p "$dir/D3D12"
+            cp agility/build/native/bin/x64/*.dll "$dir/D3D12/"
+          done
+      - name: Test
+        env:
+          MAUL_RHI_REQUIRE_D3D12: "1"
+          MAUL_RHI_D3D12_DEBUG: "1"
+        run: ctest --test-dir build -C Debug --output-on-failure
 
   web:
     name: web-emscripten

@@ -177,6 +177,27 @@ ids, requests, the frame graph) can be tested without a GPU.
   something else resized the drawables, suboptimal while the layer's
   bounds in pixels differ. A frame presents each image it acquired
   after its work.
+- **The D3D12 driver:** built with `MAUL_RHI_D3D12_DRIVER` on Windows,
+  off by default until it runs everything the core records, and then
+  the native driver of Windows builds (a build has one). It is C over
+  the COM interfaces' C form (`COBJMACROS`), against the DirectX headers
+  kept as published in `directx/` and the Windows SDK's DXGI headers,
+  and opens `d3d12.dll` and `dxgi.dll` from the system directory when
+  the instance starts; without them, or without a DXGI factory, the
+  instance has no D3D12 adapters. It uses whatever D3D12 runtime its
+  process has, the in-box one or the Agility SDK the program's exe
+  selects, and never selects one itself. A search lists every DXGI
+  adapter that opens a feature level 12_0 device with shader model 6.0,
+  WARP among them as a software adapter, under its LUID; opening a
+  device there to read it is cheap, since D3D12 keeps one device per
+  adapter while it is held. Limits are WebGPU's floor, raised where
+  every device at the floor goes further (2D textures of 16384, 2048
+  layers, a 128-byte root block within the root signature's 64 words);
+  features are granted as the driver comes to run them. A device holds
+  its D3D12 device and a direct command queue. CI runs the conformance
+  suite on the hosted Windows runner's WARP under the Agility SDK's
+  debug layer and GPU-based validation, which the suite's exe selects
+  and whose errors fail it.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`

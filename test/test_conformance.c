@@ -4,8 +4,8 @@
 // The conformance suite (mrhi-0003): the same checks, through the public API
 // only, on every driver: the test driver, and each adapter of the
 // build's native driver. A host without native adapters skips them,
-// unless MAUL_RHI_REQUIRE_VULKAN (or _WEBGPU, or _METAL, for the build's
-// driver) is set and not empty.
+// unless MAUL_RHI_REQUIRE_VULKAN (or _WEBGPU, _METAL or _D3D12, for the
+// build's driver) is set and not empty.
 
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
@@ -40,6 +40,9 @@
 #endif
 #ifdef MAUL_RHI_METAL_DRIVER
 #include "metal_layer.h"
+#endif
+#ifdef MAUL_RHI_D3D12_DRIVER
+#include "d3d12_debug.h"
 #endif
 
 // A label from a string literal, for a def's label and labelLength.
@@ -400,6 +403,10 @@ static void Finish(mrhiDevice* device, uint32_t readbacks)
 // Whether the device's driver runs work: the test driver moves no
 // bytes, so only its answers are checked.
 static bool s_runs;
+
+// Whether the driver only opens devices: the D3D12 driver, whose
+// objects, pipelines and frames are not made yet (mrhi-0003).
+static bool s_opensOnly;
 
 static bool Taken(mrhiDevice* device, mrhiRequestId request, const uint8_t* expected, size_t size)
 {
@@ -1571,6 +1578,11 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CHECK(asked->timestampQuery ? status == mrhi_success && period > 0.0
                                 : status == mrhi_errorUnsupported,
           "a timestamp period with timestamps");
+    if (s_opensOnly)
+    {
+        mrhiDestroyDevice(device);
+        return;
+    }
     CheckObjects(device, asked->timestampQuery);
     CheckFrameMemory(device);
     CheckPipelines(device);
@@ -1586,6 +1598,7 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
     mrhiAdapterId ids[16];
     size_t count = Search(instance, ids, 16);
     s_runs = driver != mrhi_driverTest;
+    s_opensOnly = driver == mrhi_driverD3d12;
     for (size_t i = 0; i < count; ++i)
     {
         mrhiAdapterInfo info;
@@ -1600,9 +1613,12 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         mrhiFeatures all;
         CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
         CheckDevice(instance, ids[i], &all);
-        CheckCacheImport(instance, ids[i]);
-        CheckRetirement(instance, ids[i]);
-        CheckHeaps(instance, ids[i], driver != mrhi_driverTest);
+        if (!s_opensOnly)
+        {
+            CheckCacheImport(instance, ids[i]);
+            CheckRetirement(instance, ids[i]);
+            CheckHeaps(instance, ids[i], driver != mrhi_driverTest);
+        }
     }
     mrhiAdapterId again[16];
     CHECK(Search(instance, again, 16) == count && memcmp(ids, again, count * sizeof(ids[0])) == 0,
@@ -2066,14 +2082,17 @@ static void TestNativeDriver(void)
     {
         return;
     }
-    // The build's native driver: WebGPU on the web, Metal where the build
-    // chose it, Vulkan elsewhere.
+    // The build's native driver: WebGPU on the web, Metal or D3D12 where
+    // the build chose it, Vulkan elsewhere.
 #ifdef __EMSCRIPTEN__
     size_t count = CheckDriver(instance, mrhi_driverWebGpu);
     const char* required = getenv("MAUL_RHI_REQUIRE_WEBGPU");
 #elif defined(MAUL_RHI_METAL_DRIVER)
     size_t count = CheckDriver(instance, mrhi_driverMetal);
     const char* required = getenv("MAUL_RHI_REQUIRE_METAL");
+#elif defined(MAUL_RHI_D3D12_DRIVER)
+    size_t count = CheckDriver(instance, mrhi_driverD3d12);
+    const char* required = getenv("MAUL_RHI_REQUIRE_D3D12");
 #else
     size_t count = CheckDriver(instance, mrhi_driverVulkan);
     const char* required = getenv("MAUL_RHI_REQUIRE_VULKAN");
@@ -2092,7 +2111,14 @@ static void TestNativeDriver(void)
 
 int main(void)
 {
+#ifdef MAUL_RHI_D3D12_DRIVER
+    // Before the library opens a device, as the debug layer needs.
+    mrhiTestWatchD3d12();
+#endif
     TestTestDriver();
     TestNativeDriver();
+#ifdef MAUL_RHI_D3D12_DRIVER
+    CHECK(mrhiTestD3d12Errors() == 0, "no D3D12 debug layer error");
+#endif
     return s_failures == 0 ? 0 : 1;
 }

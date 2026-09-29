@@ -363,6 +363,14 @@ format.
   `tools/mrhi_container.py --msl --metallib` writes them and
   `tools/mrhi_msl.py` makes the MSL offline with SPIRV-Cross. The
   suite's and the samples' containers carry MSL.
+- The D3D12 driver (`MAUL_RHI_D3D12_DRIVER`, Windows, off by default
+  for now): adapters for the DXGI adapters at feature level 12_0 with
+  shader model 6.0, WARP among them, under their LUIDs, and devices
+  with a direct queue; everything else answers
+  `mrhi_errorUnsupported` until the driver's later slices. It compiles
+  against the DirectX headers kept as published in `directx/` and opens
+  `d3d12.dll` and `dxgi.dll` at run time. Windows CI opens devices on
+  WARP under the Agility SDK's debug layer.
 - D3D12 code in shader containers: a D3D12 map and each entry's DXIL
   (sections 14 and 15), checked by the reader;
   `tools/mrhi_container.py --dxil` writes them, checking each entry's
