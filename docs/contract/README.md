@@ -54,6 +54,22 @@ constant is a fixed array of that length, such as a name's bytes.
 Headers go through the pinned clang-format (22.1.5, as CI installs it),
 which the generator needs on the path.
 
+## Mappings
+
+Every `function`, `struct`, `enum` and `bitflags` is classed one way:
+
+- `"mapped": true`, with a `mapping` on each value or member (a value
+  or member with `"unmapped": true` is skipped);
+- `mapping` on the item itself, taking it whole: one row per API;
+- `"library"`, the reason no API maps it (the library's bookkeeping).
+
+A `mapping` has a row for each of `vulkan`, `d3d12`, `metal` and
+`web_gpu`: a `class` (`direct`, `emulated`, `restricted` or
+`absent_rejected`), a `note` on how, and for an emulated row its
+`cost`. A header with `"classed": true`, or the whole contract with the
+same key, must class every such item. `docs/contract/mappings.md` shows
+the rows, and each header's whole concepts and the library's own.
+
 ## Thread safety
 
 `thread_safety` has a `class` and, where it applies, an `object`

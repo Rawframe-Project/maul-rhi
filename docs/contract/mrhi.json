@@ -113,7 +113,8 @@
               "name": "patch",
               "type": "uint16"
             }
-          ]
+          ],
+          "library": "the library's own version numbers"
         },
         {
           "kind": "struct",
@@ -172,7 +173,8 @@
               "type": "void",
               "pointer": "mutable"
             }
-          ]
+          ],
+          "library": "the program's memory for the library's own tables; GPU memory is the driver's"
         },
         {
           "kind": "enum",
@@ -225,7 +227,8 @@
               "value": 8,
               "doc": "mrhiSurfaceSourceTest, on a surface def: a surface of the test driver."
             }
-          ]
+          ],
+          "library": "tags of the library's extension chain"
         },
         {
           "kind": "struct",
@@ -241,7 +244,8 @@
               "name": "type",
               "type": "enum.struct_type"
             }
-          ]
+          ],
+          "library": "the library's extension chain"
         },
         {
           "kind": "constant",
@@ -265,7 +269,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "reads the library's version"
         },
         {
           "kind": "function",
@@ -284,9 +289,11 @@
           ],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "names the library's result codes"
         }
-      ]
+      ],
+      "classed": true
     },
     {
       "name": "instance",
@@ -342,7 +349,8 @@
               "value": 4,
               "doc": "Direct3D 12."
             }
-          ]
+          ],
+          "library": "names the library's drivers, one per API"
         },
         {
           "kind": "enum",
@@ -375,7 +383,25 @@
               "value": 4,
               "doc": "A rasterizer running on the CPU."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkPhysicalDeviceType: discrete, integrated, virtual, CPU"
+            },
+            "d3d12": {
+              "class": "restricted",
+              "note": "D3D12_FEATURE_DATA_ARCHITECTURE's UMA for integrated, DXGI_ADAPTER_FLAG_SOFTWARE; no virtual"
+            },
+            "metal": {
+              "class": "restricted",
+              "note": "lowPower and hasUnifiedMemory for integrated; no virtual or software"
+            },
+            "web_gpu": {
+              "class": "restricted",
+              "note": "isFallbackAdapter for software; the rest unknown"
+            }
+          }
         },
         {
           "kind": "enum",
@@ -398,7 +424,27 @@
               "value": 2,
               "doc": "Discrete and fast adapters first."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "emulated",
+              "note": "the adapters sorted by kind: discrete first for high, integrated for low",
+              "cost": "a sort of the adapters"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "DXGI_GPU_PREFERENCE_MINIMUM_POWER, HIGH_PERFORMANCE"
+            },
+            "metal": {
+              "class": "emulated",
+              "note": "the devices sorted by lowPower",
+              "cost": "a sort of the devices"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "powerPreference: low-power, high-performance"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -433,7 +479,25 @@
               "name": "name_length",
               "type": "uint32"
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkPhysicalDeviceProperties: vendorID, deviceID, deviceName, deviceType"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "DXGI_ADAPTER_DESC1: VendorId, DeviceId, Description, the software flag"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLDevice: name, registryID, lowPower and removable"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUAdapterInfo: vendor, architecture, device, description"
+            }
+          }
         },
         {
           "kind": "id",
@@ -460,7 +524,25 @@
               "type": "id.surface_id",
               "doc": "A surface every adapter found must present to, or a null id for none."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkEnumeratePhysicalDevices, sorted by the preference"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "IDXGIFactory6::EnumAdapterByGpuPreference"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLCopyAllDevices, sorted by the preference"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "navigator.gpu.requestAdapter with powerPreference"
+            }
+          }
         },
         {
           "kind": "enum",
@@ -478,7 +560,8 @@
               "value": 1,
               "doc": "A device finished opening: its outcome is mrhi_success and the device is ready, or an error and the device failed. A device destroyed while opening answers mrhi_errorStale."
             }
-          ]
+          ],
+          "library": "kinds of the library's own notification queue"
         },
         {
           "kind": "struct",
@@ -499,7 +582,8 @@
               "type": "result",
               "doc": "How the request ended."
             }
-          ]
+          ],
+          "library": "a record of the library's own notification queue"
         },
         {
           "kind": "struct",
@@ -526,7 +610,8 @@
               "type": "uint32",
               "doc": "Surfaces the instance holds at once; 16 by default."
             }
-          ]
+          ],
+          "library": "sizes of the library's own tables"
         },
         {
           "kind": "struct",
@@ -547,7 +632,25 @@
               "name": "limits",
               "type": "struct.instance_limits"
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkInstanceCreateInfo"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the DXGI factory's flags"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "nothing: devices are found directly"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "the navigator.gpu object"
+            }
+          }
         },
         {
           "kind": "function",
@@ -560,7 +663,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -586,6 +690,24 @@
           ],
           "thread_safety": {
             "class": "any"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateInstance"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CreateDXGIFactory2"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "nothing to make: the driver keeps its own state"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "navigator.gpu, checked present"
+            }
           }
         },
         {
@@ -603,6 +725,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the instance"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkDestroyInstance"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "releasing the factory"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "releasing the driver's state"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "dropping the references"
+            }
           }
         },
         {
@@ -624,7 +764,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the instance"
-          }
+          },
+          "library": "reads the library's misuse count"
         },
         {
           "kind": "function",
@@ -637,7 +778,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -670,6 +812,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the instance"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkEnumeratePhysicalDevices at the next poll"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "EnumAdapterByGpuPreference at the next poll"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLCopyAllDevices at the next poll"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "requestAdapter, answered when its promise settles"
+            }
           }
         },
         {
@@ -697,7 +857,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the instance"
-          }
+          },
+          "library": "reads the library's own notification queue"
         },
         {
           "kind": "function",
@@ -735,7 +896,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the instance"
-          }
+          },
+          "library": "reads the adapters the library found"
         },
         {
           "kind": "function",
@@ -767,9 +929,11 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the instance"
-          }
+          },
+          "library": "reads what the library kept of an adapter"
         }
-      ]
+      ],
+      "classed": true
     },
     {
       "name": "capabilities",
@@ -1098,7 +1262,8 @@
                 },
                 "metal": {
                   "class": "emulated",
-                  "note": "an indirect command buffer filled by a compute pass"
+                  "note": "an indirect command buffer filled by a compute pass",
+                  "cost": "a compute dispatch per multi-draw, and an indirect command buffer of the largest count"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -1901,7 +2066,8 @@
                 },
                 "web_gpu": {
                   "class": "emulated",
-                  "note": "a dynamic-offset uniform buffer where immediates are missing, maxImmediateSize where present"
+                  "note": "a dynamic-offset uniform buffer where immediates are missing, maxImmediateSize where present",
+                  "cost": "where immediates are missing, a 256-byte slot of a per-frame uniform buffer per change and a bind group set with its offset"
                 }
               }
             },
@@ -1973,7 +2139,8 @@
                 },
                 "web_gpu": {
                   "class": "emulated",
-                  "note": "submitted-work-done promises"
+                  "note": "submitted-work-done promises",
+                  "cost": "a promise per frame, settled only when the browser runs its event loop"
                 }
               }
             }
@@ -5292,7 +5459,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "returns the floor the library promises, WebGPU's defaults"
         },
         {
           "kind": "function",
@@ -5324,6 +5492,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the instance"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkGetPhysicalDeviceFeatures2 and the extensions, read when adapters are found"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CheckFeatureSupport, read when adapters are found"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "supportsFamily and the device's properties, read when adapters are found"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUAdapter.features"
+            }
           }
         },
         {
@@ -5356,6 +5542,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the instance"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkPhysicalDeviceLimits, read when adapters are found"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the D3D12 limits of the feature level and tiers"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the Metal feature set tables, by GPU family"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUAdapter.limits"
+            }
           }
         },
         {
@@ -5393,9 +5597,28 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the instance"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkGetPhysicalDeviceFormatProperties2"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CheckFeatureSupport with D3D12_FEATURE_FORMAT_SUPPORT"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the Metal feature set tables' format capabilities, by GPU family"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "the WebGPU format capability tables and the granted features"
+            }
           }
         }
-      ]
+      ],
+      "classed": true
     },
     {
       "name": "device",
@@ -5435,7 +5658,8 @@
               "value": 3,
               "doc": "The GPU or its driver was lost; only destroying it remains."
             }
-          ]
+          ],
+          "library": "the library's lifecycle of a device: opening, ready, failed, lost"
         },
         {
           "kind": "struct",
@@ -5532,7 +5756,8 @@
               "type": "uint32",
               "doc": "Queries the device's sets hold in all; 4096 by default, 0 for none."
             }
-          ]
+          ],
+          "library": "sizes of the library's own tables and rings"
         },
         {
           "kind": "struct",
@@ -5585,7 +5810,25 @@
               "type": "size",
               "doc": "Its size."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkDeviceCreateInfo with the features and queues"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "D3D12CreateDevice at the minimum feature level, then a direct queue"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the MTLDevice and a new command queue"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUDeviceDescriptor: requiredFeatures, requiredLimits"
+            }
+          }
         },
         {
           "kind": "function",
@@ -5598,7 +5841,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -5637,6 +5881,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the instance"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateDevice at the next poll"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "D3D12CreateDevice and CreateCommandQueue at the next poll"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "newCommandQueue on the device at the next poll"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "adapter.requestDevice, answered when its promise settles"
+            }
           }
         },
         {
@@ -5655,6 +5917,24 @@
             "class": "any_exclusive",
             "object": "the device and its instance",
             "plural": true
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkDeviceWaitIdle, then vkDestroyDevice"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "waiting on the queue's fence, then releasing the device"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "waiting on the last command buffer, then releasing the queue"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "device.destroy()"
+            }
           }
         },
         {
@@ -5676,7 +5956,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "reads the library's lifecycle of the device"
         },
         {
           "kind": "function",
@@ -5703,7 +5984,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "reads what the library granted"
         },
         {
           "kind": "function",
@@ -5730,7 +6012,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "reads what the library granted"
         },
         {
           "kind": "function",
@@ -5757,6 +6040,25 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkPhysicalDeviceLimits::timestampPeriod"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "ID3D12CommandQueue::GetTimestampFrequency, as nanoseconds per tick"
+            },
+            "metal": {
+              "class": "emulated",
+              "note": "sampleTimestamps pairs, CPU against GPU time",
+              "cost": "two timestamp samples when the device opens"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "1: timestamps are nanoseconds already"
+            }
           }
         },
         {
@@ -5778,7 +6080,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "reads the library's misuse count"
         },
         {
           "kind": "enum",
@@ -5951,7 +6254,25 @@
               "type": "uint32",
               "doc": "Its bytes."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "restricted",
+              "note": "VK_EXT_device_fault's fault info, where present"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the DRED breadcrumbs and page fault data"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the command buffer's error and its encoders' information"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUDeviceLostInfo: reason and message"
+            }
+          }
         },
         {
           "kind": "function",
@@ -5978,9 +6299,11 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "reads what the library kept of the loss"
         }
-      ]
+      ],
+      "classed": true
     },
     {
       "name": "resources",
@@ -6620,7 +6943,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -6653,6 +6977,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateSampler"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "a sampler descriptor, written into the shader-visible sampler heap when bound"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "newSamplerStateWithDescriptor"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "createSampler"
+            }
           }
         },
         {
@@ -6679,6 +7021,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkDestroySampler once the frames that used it finish"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "its descriptor freed once those frames finish"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "released once those frames finish"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "the reference dropped"
+            }
           }
         },
         {
@@ -6992,7 +7352,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -7025,6 +7386,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateBuffer, bound to a block of device memory"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CreatePlacedResource in a heap, or a committed resource"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "newBufferWithLength in private storage"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "createBuffer"
+            }
           }
         },
         {
@@ -7051,6 +7430,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkDestroyBuffer and its memory freed once the frames that used it finish"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "released once those frames finish"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "released once those frames finish"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUBuffer.destroy"
+            }
           }
         },
         {
@@ -7264,7 +7661,8 @@
                 },
                 "d3d12": {
                   "class": "emulated",
-                  "note": "an ordinary render target"
+                  "note": "an ordinary render target",
+                  "cost": "the texture's memory: nothing is kept on chip"
                 },
                 "metal": {
                   "class": "direct",
@@ -7610,7 +8008,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -7643,6 +8042,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateImage, bound to a block of device memory"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CreatePlacedResource in a heap, or a committed resource"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "newTextureWithDescriptor"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "createTexture"
+            }
           }
         },
         {
@@ -7669,6 +8086,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkDestroyImage and its memory freed once the frames that used it finish"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "released once those frames finish"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "released once those frames finish"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUTexture.destroy"
+            }
           }
         },
         {
@@ -8034,7 +8469,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -8067,6 +8503,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateImageView"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the SRV, UAV, RTV or DSV descriptors its uses need"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "newTextureViewWithPixelFormat:textureType:levels:slices:"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "createView"
+            }
           }
         },
         {
@@ -8093,6 +8547,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkDestroyImageView once the frames that used it finish"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "its descriptors freed once those frames finish"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "released once those frames finish"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "the reference dropped"
+            }
           }
         },
         {
@@ -8274,7 +8746,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -8307,6 +8780,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateQueryPool"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CreateQueryHeap"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "a visibility result buffer of 8 bytes a query, or newCounterSampleBufferWithDescriptor for timestamps"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "createQuerySet"
+            }
           }
         },
         {
@@ -8333,9 +8824,28 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkDestroyQueryPool once the frames that used it finish"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "released once those frames finish"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "released once those frames finish"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUQuerySet.destroy"
+            }
           }
         }
-      ]
+      ],
+      "classed": true
     },
     {
       "name": "surface",
@@ -8830,7 +9340,25 @@
               "type": "bitflags.texture_usage",
               "doc": "The usages its images may have, mrhi_textureRenderTarget among them."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkGetPhysicalDeviceSurfaceCapabilitiesKHR, SurfaceFormats and SurfacePresentModes"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the flip model's formats, CheckColorSpaceSupport and DXGI_FEATURE_PRESENT_ALLOW_TEARING"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "CAMetalLayer's pixel formats and color spaces"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "getPreferredCanvasFormat and the formats configure accepts"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -8850,7 +9378,25 @@
               "pointer": "mutable",
               "doc": "The HWND."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateWin32SurfaceKHR"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CreateSwapChainForHwnd's window"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "no windows but CAMetalLayer"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "a canvas only in browsers"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -8870,7 +9416,25 @@
               "pointer": "mutable",
               "doc": "The struct wl_surface*."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateWaylandSurfaceKHR"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Windows only"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Apple platforms only"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "a canvas only in browsers"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -8889,7 +9453,25 @@
               "type": "uint32",
               "doc": "The xcb_window_t."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateXcbSurfaceKHR"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Windows only"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Apple platforms only"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "a canvas only in browsers"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -8903,7 +9485,25 @@
               "pointer": "mutable",
               "doc": "The ANativeWindow*."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateAndroidSurfaceKHR"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Windows only"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Apple platforms only"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "a canvas only in browsers"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -8917,7 +9517,25 @@
               "pointer": "mutable",
               "doc": "The CAMetalLayer*."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "restricted",
+              "note": "vkCreateMetalSurfaceEXT, with a Vulkan implementation on Apple platforms"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Windows only"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the CAMetalLayer itself"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "a canvas only in browsers"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -8936,7 +9554,25 @@
               "type": "size",
               "doc": "The selector's bytes."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "absent_rejected",
+              "note": "no browser API"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "no browser API"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "no browser API"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "canvas.getContext('webgpu')"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -8955,7 +9591,25 @@
               "type": "size",
               "doc": "The label's bytes."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "the source's vkCreate*SurfaceKHR"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the window, kept until a device configures it"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the layer, kept until a device configures it"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "the canvas's context"
+            }
+          }
         },
         {
           "kind": "function",
@@ -8968,7 +9622,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -9001,6 +9656,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the instance"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "the source's vkCreate*SurfaceKHR"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the window kept; the swapchain comes with configuring"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the layer kept; its device comes with configuring"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "canvas.getContext('webgpu')"
+            }
           }
         },
         {
@@ -9028,6 +9701,24 @@
             "class": "any_exclusive",
             "object": "the instance and the device that configured the surface",
             "plural": true
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkDestroySurfaceKHR after its swapchain"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the window released"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the layer released"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "context.unconfigure, the context dropped"
+            }
           }
         },
         {
@@ -9065,6 +9756,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the instance"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "the surface capability, format and present mode queries for the adapter"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the factory's and output's support queries"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the layer's supported formats for the device"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "getPreferredCanvasFormat, and the adapter's formats"
+            }
           }
         },
         {
@@ -9272,7 +9981,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a config with the library's defaults"
         },
         {
           "kind": "function",
@@ -9300,6 +10010,24 @@
             "class": "any_exclusive",
             "object": "the device and its instance",
             "plural": true
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateSwapchainKHR, the old swapchain retired"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CreateSwapChainForHwnd, or ResizeBuffers when only the size changes"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the layer's device, pixelFormat, colorspace, drawableSize and displaySyncEnabled set"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUCanvasContext.configure"
+            }
           }
         },
         {
@@ -9327,9 +10055,28 @@
             "class": "any_exclusive",
             "object": "the device and its instance",
             "plural": true
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkDestroySwapchainKHR once the frames that used it finish"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the swapchain released once those frames finish"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the layer's device cleared"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUCanvasContext.unconfigure"
+            }
           }
         }
-      ]
+      ],
+      "classed": true
     },
     {
       "name": "frame",
@@ -9756,7 +10503,8 @@
                 },
                 "web_gpu": {
                   "class": "emulated",
-                  "note": "the queue, in order"
+                  "note": "the queue, in order",
+                  "cost": "no overlap: the pass runs in order with the graphics work"
                 }
               }
             },
@@ -10119,7 +10867,8 @@
                 },
                 "web_gpu": {
                   "class": "emulated",
-                  "note": "clear, as WebGPU has no discard"
+                  "note": "clear, as WebGPU has no discard",
+                  "cost": "a clear's writes, which a discard would skip on tile GPUs"
                 }
               }
             }
@@ -12214,7 +12963,8 @@
                 },
                 "d3d12": {
                   "class": "emulated",
-                  "note": "a variant or root constant"
+                  "note": "a variant or root constant",
+                  "cost": "a pipeline variant per value, or a root constant read in the shader"
                 },
                 "metal": {
                   "class": "direct",
@@ -12237,7 +12987,8 @@
                 },
                 "d3d12": {
                   "class": "emulated",
-                  "note": "a variant or root constant"
+                  "note": "a variant or root constant",
+                  "cost": "a pipeline variant per value, or a root constant read in the shader"
                 },
                 "metal": {
                   "class": "direct",
@@ -12260,7 +13011,8 @@
                 },
                 "d3d12": {
                   "class": "emulated",
-                  "note": "a variant or root constant"
+                  "note": "a variant or root constant",
+                  "cost": "a pipeline variant per value, or a root constant read in the shader"
                 },
                 "metal": {
                   "class": "direct",
@@ -12283,7 +13035,8 @@
                 },
                 "d3d12": {
                   "class": "emulated",
-                  "note": "a variant or root constant"
+                  "note": "a variant or root constant",
+                  "cost": "a pipeline variant per value, or a root constant read in the shader"
                 },
                 "metal": {
                   "class": "direct",

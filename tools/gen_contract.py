@@ -224,7 +224,8 @@ def check_struct(errors, where, item, kind_of):
 
 
 def check_mapping(errors, where, mapping):
-    """A concept's four rows: each with a class and a note on how."""
+    """A concept's four rows: each with a class and a note on how, and an
+    emulated one with its cost."""
     if not isinstance(mapping, dict):
         errors.append(f"{where}: needs a mapping row for each API")
         return
@@ -232,8 +233,30 @@ def check_mapping(errors, where, mapping):
         row = mapping.get(api)
         if not isinstance(row, dict) or row.get("class") not in CLASSES or not row.get("note"):
             errors.append(f"{where}: the {api} row needs a class ({', '.join(CLASSES)}) and a note")
+        elif row["class"] == "emulated" and not row.get("cost"):
+            errors.append(f"{where}: the {api} row is emulated and needs its cost")
     if set(mapping) - {api for api, _ in APIS}:
         errors.append(f"{where}: a mapping row for an unknown API")
+
+
+# The kinds of concept that are mapped onto the APIs or declared the
+# library's own (R57's rule, in mrhi-0002).
+CLASSED_KINDS = ("function", "struct", "enum", "bitflags")
+
+
+def check_classed(errors, where, item, enforced):
+    """A concept mapped by value or member, taken whole with one row per
+    API, or declared the library's own with the reason; one of them only,
+    and one at least where the header is enforced."""
+    ways = [bool(item.get("mapped")), "mapping" in item, "library" in item]
+    if sum(ways) > 1:
+        errors.append(f"{where}: mapped, mapped whole or the library's own, only one")
+    if "library" in item and not (isinstance(item["library"], str) and item["library"]):
+        errors.append(f"{where}: the library's own needs the reason")
+    if "mapping" in item:
+        check_mapping(errors, where, item["mapping"])
+    if enforced and not any(ways):
+        errors.append(f"{where}: needs mapping rows or the library's own reason")
 
 
 def check_function(errors, where, item, kind_of):
@@ -270,6 +293,12 @@ def validate(contract):
         kind_of[item.get("name")] = item.get("kind")
     checks = {"result": check_values, "enum": check_values, "bitflags": check_values,
               "constant": check_constant}
+    everywhere = bool(contract.get("classed"))
+    for header in contract["headers"]:
+        for item in header["items"]:
+            if item["kind"] in CLASSED_KINDS:
+                check_classed(errors, f"{item['kind']} '{item['name']}'", item,
+                              everywhere or bool(header.get("classed")))
     for item in items:
         where = f"{item['kind']} '{item['name']}'"
         if item["kind"] in checks:
@@ -512,11 +541,36 @@ def emit_mappings(contract):
             for entry in item["values"] if is_enum else item["members"]:
                 if entry.get("unmapped"):
                     continue
-                cells = [f"{row['class'].replace('_', '-')}: {row['note']}"
-                         for row in (entry["mapping"][api] for api, _ in APIS)]
+                cells = [cell(entry["mapping"][api]) for api, _ in APIS]
                 label = names.value(entry["name"]) if is_enum else camel(entry["name"])
                 lines.append(f"| `{label}` | " + " | ".join(cells) + " |")
+    for header in contract["headers"]:
+        whole = [item for item in header["items"] if "mapping" in item]
+        own = [item for item in header["items"] if "library" in item]
+        if whole:
+            lines += ["", f"## {header['name']}: operations and structures", ""]
+            lines.append("| Concept | " + " | ".join(title for _, title in APIS) + " |")
+            lines.append("| --- " * (len(APIS) + 1) + "|")
+            for item in whole:
+                label = names.function(item["name"]) if item["kind"] == "function" \
+                    else names.type(item["name"])
+                cells = [cell(item["mapping"][api]) for api, _ in APIS]
+                lines.append(f"| `{label}` | " + " | ".join(cells) + " |")
+        if own:
+            lines += ["", f"## {header['name']}: the library's own", ""]
+            lines += ["| Concept | Why no API maps it |", "| --- | --- |"]
+            for item in own:
+                label = names.function(item["name"]) if item["kind"] == "function" \
+                    else names.type(item["name"])
+                lines.append(f"| `{label}` | {item['library']} |")
     return "\n".join(lines) + "\n"
+
+
+def cell(row):
+    """A mapping row as an appendix cell: its class, how, and an emulated
+    row's cost."""
+    text = f"{row['class'].replace('_', '-')}: {row['note']}"
+    return text + (f" (cost: {row['cost']})" if row.get("cost") else "")
 
 
 def emit_defaults(contract):

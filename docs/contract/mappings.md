@@ -21,7 +21,7 @@ restricted or absent-rejected, with how.
 | `subgroups` | direct: subgroup operations (1.1), the stages queried | direct: wave operations (SM 6.0) | direct: SIMD-group functions | restricted: subgroups |
 | `shaderInt64` | restricted: shaderInt64 | restricted: Int64ShaderOps | direct: long | absent-rejected: no 64-bit integers in WGSL |
 | `indirectFirstInstance` | restricted: drawIndirectFirstInstance | direct: indirect arguments | direct: indirect arguments | restricted: indirect-first-instance |
-| `multiDrawIndirectCount` | direct: drawIndirectCount (1.2) | direct: ExecuteIndirect with a count buffer | emulated: an indirect command buffer filled by a compute pass | absent-rejected: no multi-draw indirect |
+| `multiDrawIndirectCount` | direct: drawIndirectCount (1.2) | direct: ExecuteIndirect with a count buffer | emulated: an indirect command buffer filled by a compute pass (cost: a compute dispatch per multi-draw, and an indirect command buffer of the largest count) | absent-rejected: no multi-draw indirect |
 | `multiview` | direct: multiview (1.1) | restricted: view instancing tiers | restricted: vertex amplification | absent-rejected: no multiview |
 | `bindlessSampling` | restricted: descriptor indexing or descriptor heaps | restricted: resource binding tier 2 | restricted: argument buffers tier 2 | absent-rejected: until the resource table draft ships (sampling-resource-table) |
 | `bindlessHeterogeneous` | restricted: descriptor heaps, or descriptor indexing over the storage types | restricted: resource binding tier 3 | restricted: argument buffers tier 2 | absent-rejected: until heterogeneous-resource-table ships |
@@ -59,10 +59,10 @@ restricted or absent-rejected, with how.
 | `workgroupSizeY` | direct: maxComputeWorkGroupSize[1] | direct: 1024 | direct: maxThreadsPerThreadgroup | direct: maxComputeWorkgroupSizeY |
 | `workgroupSizeZ` | direct: maxComputeWorkGroupSize[2] | direct: 64 | direct: maxThreadsPerThreadgroup | direct: maxComputeWorkgroupSizeZ |
 | `workgroupsPerDimension` | direct: maxComputeWorkGroupCount | direct: 65535 | direct: no lower bound | direct: maxComputeWorkgroupsPerDimension |
-| `rootBlockBytes` | direct: push constants (at least 128) | direct: root constants | direct: argument table bytes | emulated: a dynamic-offset uniform buffer where immediates are missing, maxImmediateSize where present |
+| `rootBlockBytes` | direct: push constants (at least 128) | direct: root constants | direct: argument table bytes | emulated: a dynamic-offset uniform buffer where immediates are missing, maxImmediateSize where present (cost: where immediates are missing, a 256-byte slot of a per-frame uniform buffer per change and a bind group set with its offset) |
 | `heapSize` | restricted: descriptor indexing counts or the heap's size | restricted: 1000000 at tier 2 | restricted: argument buffers tier 2 | absent-rejected: until resource tables ship |
 | `samplerHeapSize` | restricted: maxDescriptorSetUpdateAfterBindSamplers | restricted: 2048, or the queried maximum | restricted: argument buffer samplers | absent-rejected: until resource tables ship |
-| `framesInFlight` | direct: the core's timeline semaphores | direct: the core's fences | direct: command buffer completion | emulated: submitted-work-done promises |
+| `framesInFlight` | direct: the core's timeline semaphores | direct: the core's fences | direct: command buffer completion | emulated: submitted-work-done promises (cost: a promise per frame, settled only when the browser runs its event loop) |
 
 ## mrhiFormat
 
@@ -244,7 +244,7 @@ restricted or absent-rejected, with how.
 | `mrhi_textureSampled` | direct: SAMPLED_BIT | direct: a shader resource view | direct: ShaderRead | direct: TEXTURE_BINDING |
 | `mrhi_textureStorage` | direct: STORAGE_BIT | direct: ALLOW_UNORDERED_ACCESS | direct: ShaderWrite | direct: STORAGE_BINDING |
 | `mrhi_textureRenderTarget` | direct: COLOR_ATTACHMENT_BIT or DEPTH_STENCIL_ATTACHMENT_BIT | direct: ALLOW_RENDER_TARGET or ALLOW_DEPTH_STENCIL | direct: RenderTarget | direct: RENDER_ATTACHMENT |
-| `mrhi_textureTransient` | direct: TRANSIENT_ATTACHMENT_BIT in lazily allocated memory | emulated: an ordinary render target | direct: MTLStorageModeMemoryless | direct: TRANSIENT_ATTACHMENT |
+| `mrhi_textureTransient` | direct: TRANSIENT_ATTACHMENT_BIT in lazily allocated memory | emulated: an ordinary render target (cost: the texture's memory: nothing is kept on chip) | direct: MTLStorageModeMemoryless | direct: TRANSIENT_ATTACHMENT |
 | `mrhi_textureCopySource` | direct: TRANSFER_SRC_BIT | direct: a copy source | direct: a blit source | direct: COPY_SRC |
 | `mrhi_textureCopyDestination` | direct: TRANSFER_DST_BIT | direct: a copy destination | direct: a blit destination | direct: COPY_DST |
 
@@ -369,7 +369,7 @@ restricted or absent-rejected, with how.
 | Value | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
 | `mrhi_passGraphics` | direct: a graphics queue | direct: a direct command list | direct: a render or compute encoder | direct: the queue |
-| `mrhi_passAsyncCompute` | restricted: a compute-only queue family, where there is one | direct: a compute queue | direct: a second command queue | emulated: the queue, in order |
+| `mrhi_passAsyncCompute` | restricted: a compute-only queue family, where there is one | direct: a compute queue | direct: a second command queue | emulated: the queue, in order (cost: no overlap: the pass runs in order with the graphics work) |
 | `mrhi_passTransfer` | restricted: a transfer-only queue family, where there is one | direct: a copy queue | direct: a blit encoder | direct: the queue's copies |
 
 ## mrhiAccessKind
@@ -394,7 +394,7 @@ restricted or absent-rejected, with how.
 | --- | --- | --- | --- | --- |
 | `mrhi_loadKeep` | direct: LOAD | direct: PRESERVE | direct: MTLLoadActionLoad | direct: load |
 | `mrhi_loadClear` | direct: CLEAR | direct: CLEAR | direct: MTLLoadActionClear | direct: clear |
-| `mrhi_loadDiscard` | direct: DONT_CARE | direct: DISCARD | direct: MTLLoadActionDontCare | emulated: clear, as WebGPU has no discard |
+| `mrhi_loadDiscard` | direct: DONT_CARE | direct: DISCARD | direct: MTLLoadActionDontCare | emulated: clear, as WebGPU has no discard (cost: a clear's writes, which a discard would skip on tile GPUs) |
 
 ## mrhiStoreOp
 
@@ -512,10 +512,10 @@ restricted or absent-rejected, with how.
 
 | Value | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
-| `mrhi_constantBool` | direct: OpSpecConstantTrue | emulated: a variant or root constant | direct: a function constant | direct: override bool |
-| `mrhi_constantInt32` | direct: OpSpecConstant | emulated: a variant or root constant | direct: a function constant | direct: override i32 |
-| `mrhi_constantUint32` | direct: OpSpecConstant | emulated: a variant or root constant | direct: a function constant | direct: override u32 |
-| `mrhi_constantFloat32` | direct: OpSpecConstant | emulated: a variant or root constant | direct: a function constant | direct: override f32 |
+| `mrhi_constantBool` | direct: OpSpecConstantTrue | emulated: a variant or root constant (cost: a pipeline variant per value, or a root constant read in the shader) | direct: a function constant | direct: override bool |
+| `mrhi_constantInt32` | direct: OpSpecConstant | emulated: a variant or root constant (cost: a pipeline variant per value, or a root constant read in the shader) | direct: a function constant | direct: override i32 |
+| `mrhi_constantUint32` | direct: OpSpecConstant | emulated: a variant or root constant (cost: a pipeline variant per value, or a root constant read in the shader) | direct: a function constant | direct: override u32 |
+| `mrhi_constantFloat32` | direct: OpSpecConstant | emulated: a variant or root constant (cost: a pipeline variant per value, or a root constant read in the shader) | direct: a function constant | direct: override f32 |
 
 ## mrhiVertexFormat
 
@@ -651,3 +651,129 @@ restricted or absent-rejected, with how.
 | `mrhi_writeGreen` | direct: VK_COLOR_COMPONENT_G_BIT | direct: D3D12_COLOR_WRITE_ENABLE_GREEN | direct: MTLColorWriteMaskGreen | direct: GREEN |
 | `mrhi_writeBlue` | direct: VK_COLOR_COMPONENT_B_BIT | direct: D3D12_COLOR_WRITE_ENABLE_BLUE | direct: MTLColorWriteMaskBlue | direct: BLUE |
 | `mrhi_writeAlpha` | direct: VK_COLOR_COMPONENT_A_BIT | direct: D3D12_COLOR_WRITE_ENABLE_ALPHA | direct: MTLColorWriteMaskAlpha | direct: ALPHA |
+
+## base: the library's own
+
+| Concept | Why no API maps it |
+| --- | --- |
+| `mrhiVersion` | the library's own version numbers |
+| `mrhiAllocator` | the program's memory for the library's own tables; GPU memory is the driver's |
+| `mrhiStructType` | tags of the library's extension chain |
+| `mrhiChain` | the library's extension chain |
+| `mrhiGetVersion` | reads the library's version |
+| `mrhiResultName` | names the library's result codes |
+
+## instance: operations and structures
+
+| Concept | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhiAdapterKind` | direct: VkPhysicalDeviceType: discrete, integrated, virtual, CPU | restricted: D3D12_FEATURE_DATA_ARCHITECTURE's UMA for integrated, DXGI_ADAPTER_FLAG_SOFTWARE; no virtual | restricted: lowPower and hasUnifiedMemory for integrated; no virtual or software | restricted: isFallbackAdapter for software; the rest unknown |
+| `mrhiPowerPreference` | emulated: the adapters sorted by kind: discrete first for high, integrated for low (cost: a sort of the adapters) | direct: DXGI_GPU_PREFERENCE_MINIMUM_POWER, HIGH_PERFORMANCE | emulated: the devices sorted by lowPower (cost: a sort of the devices) | direct: powerPreference: low-power, high-performance |
+| `mrhiAdapterInfo` | direct: VkPhysicalDeviceProperties: vendorID, deviceID, deviceName, deviceType | direct: DXGI_ADAPTER_DESC1: VendorId, DeviceId, Description, the software flag | direct: MTLDevice: name, registryID, lowPower and removable | direct: GPUAdapterInfo: vendor, architecture, device, description |
+| `mrhiAdapterRequestDef` | direct: vkEnumeratePhysicalDevices, sorted by the preference | direct: IDXGIFactory6::EnumAdapterByGpuPreference | direct: MTLCopyAllDevices, sorted by the preference | direct: navigator.gpu.requestAdapter with powerPreference |
+| `mrhiInstanceDef` | direct: VkInstanceCreateInfo | direct: the DXGI factory's flags | direct: nothing: devices are found directly | direct: the navigator.gpu object |
+| `mrhiCreateInstance` | direct: vkCreateInstance | direct: CreateDXGIFactory2 | direct: nothing to make: the driver keeps its own state | direct: navigator.gpu, checked present |
+| `mrhiDestroyInstance` | direct: vkDestroyInstance | direct: releasing the factory | direct: releasing the driver's state | direct: dropping the references |
+| `mrhiRequestAdapters` | direct: vkEnumeratePhysicalDevices at the next poll | direct: EnumAdapterByGpuPreference at the next poll | direct: MTLCopyAllDevices at the next poll | direct: requestAdapter, answered when its promise settles |
+
+## instance: the library's own
+
+| Concept | Why no API maps it |
+| --- | --- |
+| `mrhiDriverKind` | names the library's drivers, one per API |
+| `mrhiInstanceNotificationKind` | kinds of the library's own notification queue |
+| `mrhiInstanceNotification` | a record of the library's own notification queue |
+| `mrhiInstanceLimits` | sizes of the library's own tables |
+| `mrhiDefaultInstanceDef` | fills a def with the library's defaults |
+| `mrhiGetInstanceMisuse` | reads the library's misuse count |
+| `mrhiDefaultAdapterRequestDef` | fills a def with the library's defaults |
+| `mrhiNextInstanceNotification` | reads the library's own notification queue |
+| `mrhiGetAdapters` | reads the adapters the library found |
+| `mrhiGetAdapterInfo` | reads what the library kept of an adapter |
+
+## capabilities: operations and structures
+
+| Concept | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhiGetAdapterFeatures` | direct: vkGetPhysicalDeviceFeatures2 and the extensions, read when adapters are found | direct: CheckFeatureSupport, read when adapters are found | direct: supportsFamily and the device's properties, read when adapters are found | direct: GPUAdapter.features |
+| `mrhiGetAdapterLimits` | direct: VkPhysicalDeviceLimits, read when adapters are found | direct: the D3D12 limits of the feature level and tiers | direct: the Metal feature set tables, by GPU family | direct: GPUAdapter.limits |
+| `mrhiGetFormatCaps` | direct: vkGetPhysicalDeviceFormatProperties2 | direct: CheckFeatureSupport with D3D12_FEATURE_FORMAT_SUPPORT | direct: the Metal feature set tables' format capabilities, by GPU family | direct: the WebGPU format capability tables and the granted features |
+
+## capabilities: the library's own
+
+| Concept | Why no API maps it |
+| --- | --- |
+| `mrhiDefaultLimits` | returns the floor the library promises, WebGPU's defaults |
+
+## device: operations and structures
+
+| Concept | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhiDeviceDef` | direct: VkDeviceCreateInfo with the features and queues | direct: D3D12CreateDevice at the minimum feature level, then a direct queue | direct: the MTLDevice and a new command queue | direct: GPUDeviceDescriptor: requiredFeatures, requiredLimits |
+| `mrhiCreateDevice` | direct: vkCreateDevice at the next poll | direct: D3D12CreateDevice and CreateCommandQueue at the next poll | direct: newCommandQueue on the device at the next poll | direct: adapter.requestDevice, answered when its promise settles |
+| `mrhiDestroyDevice` | direct: vkDeviceWaitIdle, then vkDestroyDevice | direct: waiting on the queue's fence, then releasing the device | direct: waiting on the last command buffer, then releasing the queue | direct: device.destroy() |
+| `mrhiGetDeviceTimestampPeriod` | direct: VkPhysicalDeviceLimits::timestampPeriod | direct: ID3D12CommandQueue::GetTimestampFrequency, as nanoseconds per tick | emulated: sampleTimestamps pairs, CPU against GPU time (cost: two timestamp samples when the device opens) | direct: 1: timestamps are nanoseconds already |
+| `mrhiDeviceLossReport` | restricted: VK_EXT_device_fault's fault info, where present | direct: the DRED breadcrumbs and page fault data | direct: the command buffer's error and its encoders' information | direct: GPUDeviceLostInfo: reason and message |
+
+## device: the library's own
+
+| Concept | Why no API maps it |
+| --- | --- |
+| `mrhiDeviceState` | the library's lifecycle of a device: opening, ready, failed, lost |
+| `mrhiDeviceLimits` | sizes of the library's own tables and rings |
+| `mrhiDefaultDeviceDef` | fills a def with the library's defaults |
+| `mrhiGetDeviceState` | reads the library's lifecycle of the device |
+| `mrhiGetDeviceFeatures` | reads what the library granted |
+| `mrhiGetDeviceLimits` | reads what the library granted |
+| `mrhiGetDeviceMisuse` | reads the library's misuse count |
+| `mrhiGetDeviceLossReport` | reads what the library kept of the loss |
+
+## resources: operations and structures
+
+| Concept | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhiCreateSampler` | direct: vkCreateSampler | direct: a sampler descriptor, written into the shader-visible sampler heap when bound | direct: newSamplerStateWithDescriptor | direct: createSampler |
+| `mrhiDestroySampler` | direct: vkDestroySampler once the frames that used it finish | direct: its descriptor freed once those frames finish | direct: released once those frames finish | direct: the reference dropped |
+| `mrhiCreateBuffer` | direct: vkCreateBuffer, bound to a block of device memory | direct: CreatePlacedResource in a heap, or a committed resource | direct: newBufferWithLength in private storage | direct: createBuffer |
+| `mrhiDestroyBuffer` | direct: vkDestroyBuffer and its memory freed once the frames that used it finish | direct: released once those frames finish | direct: released once those frames finish | direct: GPUBuffer.destroy |
+| `mrhiCreateTexture` | direct: vkCreateImage, bound to a block of device memory | direct: CreatePlacedResource in a heap, or a committed resource | direct: newTextureWithDescriptor | direct: createTexture |
+| `mrhiDestroyTexture` | direct: vkDestroyImage and its memory freed once the frames that used it finish | direct: released once those frames finish | direct: released once those frames finish | direct: GPUTexture.destroy |
+| `mrhiCreateView` | direct: vkCreateImageView | direct: the SRV, UAV, RTV or DSV descriptors its uses need | direct: newTextureViewWithPixelFormat:textureType:levels:slices: | direct: createView |
+| `mrhiDestroyView` | direct: vkDestroyImageView once the frames that used it finish | direct: its descriptors freed once those frames finish | direct: released once those frames finish | direct: the reference dropped |
+| `mrhiCreateQuerySet` | direct: vkCreateQueryPool | direct: CreateQueryHeap | direct: a visibility result buffer of 8 bytes a query, or newCounterSampleBufferWithDescriptor for timestamps | direct: createQuerySet |
+| `mrhiDestroyQuerySet` | direct: vkDestroyQueryPool once the frames that used it finish | direct: released once those frames finish | direct: released once those frames finish | direct: GPUQuerySet.destroy |
+
+## resources: the library's own
+
+| Concept | Why no API maps it |
+| --- | --- |
+| `mrhiDefaultSamplerDef` | fills a def with the library's defaults |
+| `mrhiDefaultBufferDef` | fills a def with the library's defaults |
+| `mrhiDefaultTextureDef` | fills a def with the library's defaults |
+| `mrhiDefaultViewDef` | fills a def with the library's defaults |
+| `mrhiDefaultQuerySetDef` | fills a def with the library's defaults |
+
+## surface: operations and structures
+
+| Concept | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhiSurfaceCaps` | direct: vkGetPhysicalDeviceSurfaceCapabilitiesKHR, SurfaceFormats and SurfacePresentModes | direct: the flip model's formats, CheckColorSpaceSupport and DXGI_FEATURE_PRESENT_ALLOW_TEARING | direct: CAMetalLayer's pixel formats and color spaces | direct: getPreferredCanvasFormat and the formats configure accepts |
+| `mrhiSurfaceSourceWin32` | direct: vkCreateWin32SurfaceKHR | direct: CreateSwapChainForHwnd's window | absent-rejected: no windows but CAMetalLayer | absent-rejected: a canvas only in browsers |
+| `mrhiSurfaceSourceWayland` | direct: vkCreateWaylandSurfaceKHR | absent-rejected: Windows only | absent-rejected: Apple platforms only | absent-rejected: a canvas only in browsers |
+| `mrhiSurfaceSourceXcb` | direct: vkCreateXcbSurfaceKHR | absent-rejected: Windows only | absent-rejected: Apple platforms only | absent-rejected: a canvas only in browsers |
+| `mrhiSurfaceSourceAndroid` | direct: vkCreateAndroidSurfaceKHR | absent-rejected: Windows only | absent-rejected: Apple platforms only | absent-rejected: a canvas only in browsers |
+| `mrhiSurfaceSourceMetalLayer` | restricted: vkCreateMetalSurfaceEXT, with a Vulkan implementation on Apple platforms | absent-rejected: Windows only | direct: the CAMetalLayer itself | absent-rejected: a canvas only in browsers |
+| `mrhiSurfaceSourceCanvas` | absent-rejected: no browser API | absent-rejected: no browser API | absent-rejected: no browser API | direct: canvas.getContext('webgpu') |
+| `mrhiSurfaceDef` | direct: the source's vkCreate*SurfaceKHR | direct: the window, kept until a device configures it | direct: the layer, kept until a device configures it | direct: the canvas's context |
+| `mrhiCreateSurface` | direct: the source's vkCreate*SurfaceKHR | direct: the window kept; the swapchain comes with configuring | direct: the layer kept; its device comes with configuring | direct: canvas.getContext('webgpu') |
+| `mrhiDestroySurface` | direct: vkDestroySurfaceKHR after its swapchain | direct: the window released | direct: the layer released | direct: context.unconfigure, the context dropped |
+| `mrhiGetSurfaceCaps` | direct: the surface capability, format and present mode queries for the adapter | direct: the factory's and output's support queries | direct: the layer's supported formats for the device | direct: getPreferredCanvasFormat, and the adapter's formats |
+| `mrhiConfigureSurface` | direct: vkCreateSwapchainKHR, the old swapchain retired | direct: CreateSwapChainForHwnd, or ResizeBuffers when only the size changes | direct: the layer's device, pixelFormat, colorspace, drawableSize and displaySyncEnabled set | direct: GPUCanvasContext.configure |
+| `mrhiUnconfigureSurface` | direct: vkDestroySwapchainKHR once the frames that used it finish | direct: the swapchain released once those frames finish | direct: the layer's device cleared | direct: GPUCanvasContext.unconfigure |
+
+## surface: the library's own
+
+| Concept | Why no API maps it |
+| --- | --- |
+| `mrhiDefaultSurfaceDef` | fills a def with the library's defaults |
+| `mrhiDefaultSurfaceConfig` | fills a config with the library's defaults |

@@ -23,6 +23,15 @@ the tools within Python's standard library.
   style and pass the format, documentation and source checks like
   hand-written code. Unlike `src/generated/` (conventions section 6), no
   rule is waived for them, because they are the API programs read.
+- **Mappings:** every function, struct, enum and bitflags is either
+  mapped onto Vulkan, D3D12, Metal and WebGPU or declared the library's
+  own with the reason (`"library"`). Enums, bitflags and structs map
+  per value or member, or whole; a function maps whole, one row per
+  API. Each row is classed direct, emulated, restricted or
+  absent-rejected with a note, and an emulated row states its cost.
+  `docs/contract/mappings.md` shows them all. The generator refuses an
+  unclassed concept in a header marked classed, and everywhere once the
+  contract is.
 - **Drift:** the gate and CI run `tools/gen_contract.py --check`, which
   fails on any generated file that differs from what the contract
   makes, including a hand edit.

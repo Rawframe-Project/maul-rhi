@@ -248,3 +248,7 @@ format.
   fixed-size `mrhiDeviceLossReport` (`mrhiGetDeviceLossReport`); one
   notification record is kept for the notice, so devices hold at least
   2; the test adapter's `loseDevice` and `lossReason` inject a loss.
+- Mapping appendix (mrhi-0002): every function, struct, enum and
+  bitflags is mapped onto the four APIs or declared the library's own
+  with the reason, and emulated rows state their cost; the generator
+  refuses an unclassed concept in a classed header.
