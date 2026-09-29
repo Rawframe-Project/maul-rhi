@@ -59,8 +59,17 @@ thread.
     uses leave;
   - transients aliased by lifetime (pooled on WebGPU);
   - transient load and store operations derived.
-- **The plan is readable** after the compile (`mrhiGetFrameBarriers`,
-  `mrhiGetResourcePlan`), for conformance tests and graph tools.
+- **Memory:** declared resources are placed in one frame memory by
+  lifetime, first fit in first-use order, with sizes and alignments
+  the driver reports (none for a transient texture a tile GPU keeps on
+  chip). A target's store is kept only when a later kept pass reads it
+  or the texture is imported.
+- **The plan is readable** after the compile, for conformance tests
+  and graph tools:
+  - `mrhiGetFrameBarriers`;
+  - `mrhiGetResourcePlan`;
+  - `mrhiGetPassPlan`;
+  - `mrhiGetFrameMemory`.
 - **Imported state:** an imported object carries one state between
   frames. Parts left in other states are unified at the frame's end.
 - **One state per pass:** within a pass, a texture's part is in one

@@ -63,6 +63,12 @@ mrhiResult mrhiCompile(mrhiDevice* device)
             return status;
         }
     }
+    status = mrhiPlace(device);
+    if (status != mrhi_success)
+    {
+        return status;
+    }
+    mrhiDeriveStores(device);
     device->frameCompiled = true;
     return mrhi_success;
 }

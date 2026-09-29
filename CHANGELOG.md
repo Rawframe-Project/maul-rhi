@@ -128,3 +128,9 @@ format.
   usages, transience (targets that live only inside their passes) and
   first and last kept passes; a texture's part is in one state per pass;
   the device's `frameBarriers` limit.
+- Transient memory and stores: declared resources placed by lifetime in
+  one frame memory, first fit in first-use order with the driver's sizes
+  and alignments (`memoryOffset` and `memoryBytes` in the resource plan,
+  `mrhiGetFrameMemory`), transient textures taking none where the GPU
+  keeps them on chip; each target's store kept only when a later kept
+  pass reads it or it is imported (`mrhiGetPassPlan`).

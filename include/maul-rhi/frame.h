@@ -525,6 +525,12 @@ extern "C"
         mrhiPassId firstPass;
         // The last kept pass using it, or a null id when none does.
         mrhiPassId lastPass;
+        // Where it lives in the frame's memory for declared resources, shared
+        // with those whose kept passes it never meets.
+        uint64_t memoryOffset;
+        // The bytes it takes there; 0 for an imported object, an unused
+        // resource, or a transient texture the GPU keeps on chip.
+        uint64_t memoryBytes;
     } mrhiResourcePlan;
 
     /// Copies the barriers of the compiled frame, in the order they run.
@@ -556,6 +562,44 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiGetResourcePlan(mrhiDevice* device,
                                                            mrhiResourceId resource,
                                                            mrhiResourcePlan* planOut);
+
+    // What a compiled frame does with a pass.
+    typedef struct mrhiPassPlan
+    {
+        // Whether it runs; a culled pass is never recorded.
+        bool kept;
+        // What each color target keeps: its own store, made a discard when
+        // nothing later reads it and it is not imported.
+        mrhiStoreOp colorStores[MRHI_COLOR_TARGETS];
+        // What the depth target's depth keeps, likewise.
+        mrhiStoreOp depthStore;
+        // What its stencil keeps, likewise.
+        mrhiStoreOp stencilStore;
+    } mrhiPassPlan;
+
+    /// Reads what the compiled frame does with a pass.
+    ///
+    /// @param device   The device.
+    /// @param pass     The pass.
+    /// @param planOut  Receives the plan.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
+    /// `mrhi_errorStale` for a pass of another frame; `mrhi_errorState` for a
+    /// frame not compiled.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetPassPlan(mrhiDevice* device, mrhiPassId pass,
+                                                       mrhiPassPlan* planOut);
+
+    /// Reads the bytes the compiled frame's declared resources take together,
+    /// aliased by lifetime.
+    ///
+    /// @param device    The device.
+    /// @param bytesOut  Receives the bytes.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
+    /// `mrhi_errorState` for a frame not compiled.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetFrameMemory(mrhiDevice* device, uint64_t* bytesOut);
 
 #ifdef __cplusplus
 }

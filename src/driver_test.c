@@ -328,6 +328,27 @@ static void UnconfigureSurface(void* self, uint64_t swapchain)
     --device->swapchains;
 }
 
+// A texture's bytes: 4 per texel and sample, doubled for mips; none for
+// a transient texture, as a tile GPU keeps it on chip.
+static void TextureMemory(const void* self, const mrhiTextureDef* def, uint64_t* bytesOut,
+                          uint64_t* alignmentOut)
+{
+    (void)self;
+    uint64_t texels = (uint64_t)def->width * def->height * def->depthOrLayers * def->sampleCount;
+    bool transient = (def->usage & mrhi_textureTransient) != 0;
+    *bytesOut = transient ? 0 : texels * 4 * (def->mipLevels > 1 ? 2 : 1);
+    *alignmentOut = 256;
+}
+
+// A buffer's bytes, rounded up to its alignment of 256.
+static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* bytesOut,
+                         uint64_t* alignmentOut)
+{
+    (void)self;
+    *bytesOut = (def->size + 255) & ~(uint64_t)255;
+    *alignmentOut = 256;
+}
+
 static mrhiResult SubmitFrame(void* self, uint64_t tag)
 {
     TestDevice* device = self;
@@ -402,6 +423,8 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .destroyView = DestroyView,
     .configureSurface = ConfigureSurface,
     .unconfigureSurface = UnconfigureSurface,
+    .textureMemory = TextureMemory,
+    .bufferMemory = BufferMemory,
     .submitFrame = SubmitFrame,
     .poll = PollFrames,
     .waitFrame = WaitFrame,

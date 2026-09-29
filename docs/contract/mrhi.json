@@ -9748,6 +9748,16 @@
               "name": "last_pass",
               "type": "id.pass_id",
               "doc": "The last kept pass using it, or a null id when none does."
+            },
+            {
+              "name": "memory_offset",
+              "type": "uint64",
+              "doc": "Where it lives in the frame's memory for declared resources, shared with those whose kept passes it never meets."
+            },
+            {
+              "name": "memory_bytes",
+              "type": "uint64",
+              "doc": "The bytes it takes there; 0 for an imported object, an unused resource, or a transient texture the GPU keeps on chip."
             }
           ]
         },
@@ -9814,6 +9824,93 @@
               "type": "struct.resource_plan",
               "pointer": "mutable",
               "doc": "Receives the plan."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "struct",
+          "name": "pass_plan",
+          "doc": "What a compiled frame does with a pass.",
+          "members": [
+            {
+              "name": "kept",
+              "type": "bool",
+              "doc": "Whether it runs; a culled pass is never recorded."
+            },
+            {
+              "name": "color_stores",
+              "type": "enum.store_op",
+              "array": "color_targets",
+              "doc": "What each color target keeps: its own store, made a discard when nothing later reads it and it is not imported."
+            },
+            {
+              "name": "depth_store",
+              "type": "enum.store_op",
+              "doc": "What the depth target's depth keeps, likewise."
+            },
+            {
+              "name": "stencil_store",
+              "type": "enum.store_op",
+              "doc": "What its stencil keeps, likewise."
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "get_pass_plan",
+          "doc": "Reads what the compiled frame does with a pass.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorStale` for a pass of another frame; `mrhi_errorState` for a frame not compiled."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass."
+            },
+            {
+              "name": "plan_out",
+              "type": "struct.pass_plan",
+              "pointer": "mutable",
+              "doc": "Receives the plan."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_frame_memory",
+          "doc": "Reads the bytes the compiled frame's declared resources take together, aliased by lifetime.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorState` for a frame not compiled."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "bytes_out",
+              "type": "uint64",
+              "pointer": "mutable",
+              "doc": "Receives the bytes."
             }
           ],
           "thread_safety": {

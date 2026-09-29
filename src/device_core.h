@@ -86,6 +86,10 @@ typedef struct mrhiFrameResource
     uint32_t firstPass;
     uint32_t lastPass;
     mrhiResourceState finalState;
+    // Where the compile placed a declared resource in the frame's memory.
+    bool placed;
+    uint64_t memoryOffset;
+    uint64_t memoryBytes;
 } mrhiFrameResource;
 
 // A part of a resource in one state, in the compile's map of it.
@@ -138,6 +142,10 @@ typedef struct mrhiFramePass
     mrhiColorTarget colorTargets[MRHI_COLOR_TARGETS];
     uint32_t colorTargetCount;
     mrhiDepthTarget depthTarget;
+    // The stores the compile derived for its targets.
+    mrhiStoreOp colorStores[MRHI_COLOR_TARGETS];
+    mrhiStoreOp depthStore;
+    mrhiStoreOp stencilStore;
 } mrhiFramePass;
 
 // A surface as the device that configured it keeps it: the surface, the
@@ -199,6 +207,10 @@ struct mrhiDevice
     uint32_t* frameCounts;
     mrhiBox* frameBoxes;
     uint32_t frameBoxLimit;
+    // The bytes the placed resources take together, and room to order
+    // the placed resources a new one meets.
+    uint64_t frameMemory;
+    uint32_t* frameOrder;
     uint32_t lastToken;
     uint32_t* running;
     uint32_t runningCount;
@@ -272,6 +284,14 @@ uint8_t mrhiFormatPlanes(mrhiFormat format);
 // Plans the kept passes' barriers and each resource's lifetime,
 // transience and final state: success, or mrhi_errorCapacity.
 mrhiResult mrhiPlan(mrhiDevice* device);
+
+// Derives the stores of the kept passes' targets.
+void mrhiDeriveStores(mrhiDevice* device);
+
+// Places the declared resources the kept passes use in the frame's
+// memory by lifetime: success, or mrhi_errorCapacity when the offsets
+// overflow.
+mrhiResult mrhiPlace(mrhiDevice* device);
 
 // Leaves each imported object in the state the submitted frame left it.
 void mrhiApplyFinalStates(mrhiDevice* device);

@@ -60,6 +60,15 @@ typedef struct mrhiDeviceDriverVtable
     mrhiResult (*configureSurface)(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
                                    uint64_t oldSwapchain, uint64_t* swapchainOut);
     void (*unconfigureSurface)(void* self, uint64_t swapchain);
+    // The bytes a declared texture with its derived usages takes, and
+    // their alignment, a power of two; 0 bytes when the GPU keeps it on
+    // chip.
+    void (*textureMemory)(const void* self, const mrhiTextureDef* def, uint64_t* bytesOut,
+                          uint64_t* alignmentOut);
+    // The bytes a declared buffer with its derived usages takes, and their
+    // alignment, a power of two.
+    void (*bufferMemory)(const void* self, const mrhiBufferDef* def, uint64_t* bytesOut,
+                         uint64_t* alignmentOut);
     // Runs a frame on the GPU; finished, it is reported by poll with the
     // tag.
     mrhiResult (*submitFrame)(void* self, uint64_t tag);

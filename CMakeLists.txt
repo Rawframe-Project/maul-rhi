@@ -55,6 +55,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/generated/result_names.c
     src/instance.c
     src/label.c
+    src/memory.c
     src/notify.c
     src/pass.c
     src/plan.c
@@ -93,6 +94,7 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(frame_resource)
         maul_add_test(pass)
         maul_add_test(plan)
+        maul_add_test(memory)
     endif()
     maul_add_header_tests()
 endif()

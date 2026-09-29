@@ -62,3 +62,5 @@ edit the contract, not this file.
 | `mrhiIsPassKept` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiGetFrameBarriers` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiGetResourcePlan` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiGetPassPlan` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiGetFrameMemory` | Safe from any thread; the device is used by one thread at a time. |

@@ -136,6 +136,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
                                     alignof(uint32_t));
     size_t boxLimit = (size_t)limits->frameAccesses * 4 + 16;
     size_t boxesAt = mrhiLayoutAdd(&layout, boxLimit, sizeof(mrhiBox), alignof(mrhiBox));
+    size_t orderAt =
+        mrhiLayoutAdd(&layout, limits->frameResources, sizeof(uint32_t), alignof(uint32_t));
     size_t queueAt = mrhiLayoutAdd(&layout, limits->notifications, sizeof(mrhiDeviceNotification),
                                    alignof(mrhiDeviceNotification));
     unsigned char* block =
@@ -161,6 +163,7 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     device->frameCounts = (uint32_t*)(block + countsAt);
     device->frameBoxes = (mrhiBox*)(block + boxesAt);
     device->frameBoxLimit = (uint32_t)boxLimit;
+    device->frameOrder = (uint32_t*)(block + orderAt);
     return device;
 }
 

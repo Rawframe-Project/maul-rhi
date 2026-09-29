@@ -383,6 +383,8 @@ mrhiResult mrhiGetResourcePlan(mrhiDevice* device, mrhiResourceId resource,
         .transient = planned->transient,
         .firstPass = {planned->firstPass, planned->firstPass == 0 ? 0 : serial},
         .lastPass = {planned->lastPass, planned->lastPass == 0 ? 0 : serial},
+        .memoryOffset = planned->memoryOffset,
+        .memoryBytes = planned->memoryBytes,
     };
     return mrhi_success;
 }

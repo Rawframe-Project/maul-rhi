@@ -25,3 +25,4 @@ frame_resource: device_core
 pass: capabilities_core device_core
 compile: device_core
 plan: device_core
+memory: device_core
