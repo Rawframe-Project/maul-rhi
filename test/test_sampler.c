@@ -77,17 +77,20 @@ static void TestInvalidDefs(void)
     def.cookie = 0;
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorInvalid, "no cookie");
     def = mrhiDefaultSamplerDef();
+    def.labelLength = 1;
+    CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorInvalid, "a length, no label");
+    def = mrhiDefaultSamplerDef();
     CHECK(mrhiCreateSampler(device, nullptr, &sampler) == mrhi_errorInvalid, "no def");
     CHECK(mrhiCreateSampler(device, &def, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiCreateSampler(nullptr, &def, &sampler) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetDeviceMisuse(device) == 12, "each counted on the device");
+    CHECK(mrhiGetDeviceMisuse(device) == 13, "each counted on the device");
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def.next = &critical;
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorUnsupported, "an extension");
     mrhiChain untyped = {.next = nullptr, .type = mrhi_structNone};
     def.next = &untyped;
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorInvalid, "an untyped node");
-    CHECK(mrhiGetDeviceMisuse(device) == 13, "the untyped node counted");
+    CHECK(mrhiGetDeviceMisuse(device) == 14, "the untyped node counted");
     Close(device);
 }
 

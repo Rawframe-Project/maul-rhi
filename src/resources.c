@@ -57,7 +57,7 @@ mrhiResult mrhiCreateSampler(mrhiDevice* device, const mrhiSamplerDef* def,
     {
         return mrhiDeviceMisuse(device);
     }
-    mrhiResult status = mrhiCheckObjectDef(device, def->cookie, SAMPLER_DEF_COOKIE, def->next);
+    mrhiResult status = mrhiCheckObjectDef(device, MRHI_DEF_HEAD(def), SAMPLER_DEF_COOKIE);
     if (status != mrhi_success)
     {
         return status;
@@ -122,7 +122,7 @@ mrhiResult mrhiCreateBuffer(mrhiDevice* device, const mrhiBufferDef* def, mrhiBu
     {
         return mrhiDeviceMisuse(device);
     }
-    mrhiResult status = mrhiCheckObjectDef(device, def->cookie, BUFFER_DEF_COOKIE, def->next);
+    mrhiResult status = mrhiCheckObjectDef(device, MRHI_DEF_HEAD(def), BUFFER_DEF_COOKIE);
     if (status != mrhi_success)
     {
         return status;

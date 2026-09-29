@@ -85,11 +85,26 @@ typedef struct TestDevice
     uint32_t buffers;
     uint64_t bufferBytes;
     uint32_t textures;
+    // The last label an object was given, copied as a real driver would.
+    char label[MRHI_LABEL_BYTES + 1];
     // The live views and their textures, so that a texture destroyed
     // before its views traps.
     TestView views[TEST_VIEWS];
     uint32_t viewCount;
 } TestDevice;
+
+// Copies a label into the fixed, terminated buffer the core's checks
+// allow.
+static void Name(TestDevice* device, const char* label, size_t length)
+{
+    MRHI_ASSERT(length <= MRHI_LABEL_BYTES && (label != nullptr || length == 0));
+    for (size_t i = 0; i < length; ++i)
+    {
+        MRHI_ASSERT(label[i] != '\0');
+        device->label[i] = label[i];
+    }
+    device->label[length] = '\0';
+}
 
 // A new object's handle, or mrhi_errorPlatform once the adapter's
 // object budget is spent.
@@ -106,8 +121,8 @@ static mrhiResult MakeObject(TestDevice* device, uint64_t* handleOut)
 
 static mrhiResult CreateSampler(void* self, const mrhiSamplerDef* def, uint64_t* handleOut)
 {
-    (void)def;
     TestDevice* device = self;
+    Name(device, def->label, def->labelLength);
     mrhiResult status = MakeObject(device, handleOut);
     device->samplers += status == mrhi_success ? 1 : 0;
     return status;
@@ -116,6 +131,7 @@ static mrhiResult CreateSampler(void* self, const mrhiSamplerDef* def, uint64_t*
 static mrhiResult CreateBuffer(void* self, const mrhiBufferDef* def, uint64_t* handleOut)
 {
     TestDevice* device = self;
+    Name(device, def->label, def->labelLength);
     mrhiResult status = MakeObject(device, handleOut);
     if (status == mrhi_success)
     {
@@ -134,8 +150,8 @@ static void DestroyBuffer(void* self, uint64_t handle)
 
 static mrhiResult CreateTexture(void* self, const mrhiTextureDef* def, uint64_t* handleOut)
 {
-    (void)def;
     TestDevice* device = self;
+    Name(device, def->label, def->labelLength);
     mrhiResult status = MakeObject(device, handleOut);
     device->textures += status == mrhi_success ? 1 : 0;
     return status;
@@ -155,8 +171,8 @@ static void DestroyTexture(void* self, uint64_t handle)
 static mrhiResult CreateView(void* self, uint64_t texture, const mrhiViewDef* def,
                              uint64_t* handleOut)
 {
-    (void)def;
     TestDevice* device = self;
+    Name(device, def->label, def->labelLength);
     MRHI_ASSERT(texture != 0 && texture <= device->nextHandle);
     if (device->viewCount == TEST_VIEWS)
     {
@@ -210,11 +226,9 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .destroyView = DestroyView,
 };
 
-static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiFeatures* features,
-                               const mrhiLimits* limits, uint64_t tag, mrhiDeviceDriver* deviceOut)
+static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef* def, uint64_t tag,
+                               mrhiDeviceDriver* deviceOut)
 {
-    (void)features;
-    (void)limits;
     TestDriver* driver = self;
     if (driver->pendingCount == driver->pendingLimit)
     {
@@ -229,6 +243,7 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiFeatures*
         .allocator = driver->allocator,
         .madeBeforeFailure = driver->adapters[adapter - 1].objectsBeforeFailure,
     };
+    Name(device, def->label, def->labelLength);
     driver->pending[driver->pendingCount++] = (mrhiDriverEvent){
         .tag = tag,
         .outcome = driver->adapters[adapter - 1].openOutcome,

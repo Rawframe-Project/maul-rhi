@@ -186,6 +186,12 @@ static void TestRefusalsStateAndLimit(void)
     def.cookie = 0;
     CHECK(mrhiCreateTexture(s_device, &def, &texture) == mrhi_errorInvalid, "no cookie");
     def = Def(mrhi_texture2d, mrhi_formatRgba8Unorm, 16, 16, 1, kSampled);
+    def.label = "albedo\0";
+    def.labelLength = 7;
+    CHECK(mrhiCreateTexture(s_device, &def, &texture) == mrhi_errorInvalid, "a NUL in the label");
+    def.labelLength = 6;
+    CHECK(Make(def) == mrhi_success, "a label");
+    def = Def(mrhi_texture2d, mrhi_formatRgba8Unorm, 16, 16, 1, kSampled);
     CHECK(mrhiCreateTexture(s_device, nullptr, &texture) == mrhi_errorInvalid, "no def");
     CHECK(mrhiCreateTexture(s_device, &def, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiCreateTexture(nullptr, &def, &texture) == mrhi_errorInvalid, "no device");

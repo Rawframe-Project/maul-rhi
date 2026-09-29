@@ -61,6 +61,12 @@ extern "C"
         uint32_t cookie;
         // Extensions, or NULL.
         const mrhiChain* next;
+        // A name for debugging tools: UTF-8 without NUL, labelLength bytes, at
+        // most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during
+        // the call.
+        const char* label;
+        // The label's bytes.
+        size_t labelLength;
         // The adapter to open, from mrhiGetAdapters.
         mrhiAdapterId adapter;
         // The optional features asked for.
@@ -89,8 +95,9 @@ extern "C"
     /// @param deviceOut   Receives the device; set to NULL on failure.
     /// @param requestOut  Receives the id its ready record answers.
     /// @return `mrhi_success` with the device opening; `mrhi_errorInvalid` for
-    /// a NULL argument, a def without its cookie, a zero limit, limits below
-    /// the floor or an allocator with one function; `mrhi_errorStale` for an
+    /// a NULL argument, a def without its cookie, a label that is not UTF-8
+    /// without NUL within MRHI_LABEL_BYTES, a zero limit, limits below the
+    /// floor or an allocator with one function; `mrhi_errorStale` for an
     /// adapter the instance no longer has; `mrhi_errorUnsupported` for features
     /// or limits beyond the adapter's, or a critical extension the library does
     /// not know; `mrhi_errorCapacity` when the instance's queue has no room for

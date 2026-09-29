@@ -125,7 +125,7 @@ static bool Resolve(const mrhiTextureDef* texture, const mrhiViewDef* def, mrhiV
 // refusal.
 static mrhiResult CheckView(mrhiDevice* device, const mrhiViewDef* def, mrhiViewDef* resolvedOut)
 {
-    mrhiResult status = mrhiCheckObjectDef(device, def->cookie, VIEW_DEF_COOKIE, def->next);
+    mrhiResult status = mrhiCheckObjectDef(device, MRHI_DEF_HEAD(def), VIEW_DEF_COOKIE);
     if (status != mrhi_success)
     {
         return status;
@@ -189,6 +189,8 @@ mrhiResult mrhiCreateView(mrhiDevice* device, const mrhiViewDef* def, mrhiViewId
         .texture = def->texture.index1,
         .next = texture->firstView,
     };
+    device->viewSlots[index1 - 1].def.label = nullptr;
+    device->viewSlots[index1 - 1].def.labelLength = 0;
     if (texture->firstView != 0)
     {
         device->viewSlots[texture->firstView - 1].previous = index1;

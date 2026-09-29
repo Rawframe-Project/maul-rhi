@@ -58,17 +58,21 @@ static void TestInvalidDefs(void)
     def.cookie = 0;
     CHECK(mrhiCreateBuffer(device, &def, &buffer) == mrhi_errorInvalid, "no cookie");
     def = Def(64, mrhi_bufferIndex);
+    def.label = "\xED\xA0\x80";
+    def.labelLength = 3;
+    CHECK(mrhiCreateBuffer(device, &def, &buffer) == mrhi_errorInvalid, "a surrogate label");
+    def = Def(64, mrhi_bufferIndex);
     CHECK(mrhiCreateBuffer(device, nullptr, &buffer) == mrhi_errorInvalid, "no def");
     CHECK(mrhiCreateBuffer(device, &def, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiCreateBuffer(nullptr, &def, &buffer) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetDeviceMisuse(device) == 7, "each counted");
+    CHECK(mrhiGetDeviceMisuse(device) == 8, "each counted");
     def = Def(mrhiDefaultLimits().bufferBytes + 4, mrhi_bufferStorage);
     CHECK(mrhiCreateBuffer(device, &def, &buffer) == mrhi_errorUnsupported, "past the limit");
     def = Def(64, mrhi_bufferIndex);
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def.next = &critical;
     CHECK(mrhiCreateBuffer(device, &def, &buffer) == mrhi_errorUnsupported, "an extension");
-    CHECK(mrhiGetDeviceMisuse(device) == 7, "unsupported asks are not misuse");
+    CHECK(mrhiGetDeviceMisuse(device) == 8, "unsupported asks are not misuse");
     Close(device);
 }
 

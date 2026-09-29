@@ -79,10 +79,22 @@ mrhiResult mrhiDeviceUsable(const mrhiDevice* device);
 // Counts one misuse on the device and returns mrhi_errorInvalid.
 mrhiResult mrhiDeviceMisuse(mrhiDevice* device);
 
-// Checks an object def's cookie and extension chain on a live device:
-// success, or the refusal (invalid input counted as misuse).
-mrhiResult mrhiCheckObjectDef(mrhiDevice* device, uint32_t cookie, uint32_t expected,
-                              const mrhiChain* next);
+// The head every object def opens with.
+typedef struct mrhiDefHead
+{
+    uint32_t cookie;
+    const mrhiChain* next;
+    const char* label;
+    size_t labelLength;
+} mrhiDefHead;
+
+// The head of a def pointer.
+#define MRHI_DEF_HEAD(def)                                                                         \
+    ((mrhiDefHead){(def)->cookie, (def)->next, (def)->label, (def)->labelLength})
+
+// Checks an object def's cookie, extension chain and label on a live
+// device: success, or the refusal (invalid input counted as misuse).
+mrhiResult mrhiCheckObjectDef(mrhiDevice* device, mrhiDefHead head, uint32_t expected);
 
 // Whether a format can take the usages on the device.
 bool mrhiFormatTakes(const mrhiDevice* device, mrhiFormat format, mrhiTextureUsage usage);

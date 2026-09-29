@@ -11,6 +11,7 @@
 #include "device_core.h"
 #include "instance_core.h"
 #include "invariant.h"
+#include "label.h"
 
 #include <stdalign.h>
 
@@ -39,8 +40,8 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
     if (def->cookie != DEVICE_DEF_COOKIE || def->deviceLimits.notifications == 0 ||
         def->deviceLimits.samplers == 0 || def->deviceLimits.buffers == 0 ||
         def->deviceLimits.textures == 0 || def->deviceLimits.views == 0 ||
-        !mrhiIsAllocatorValid(&def->allocator) || !mrhiLimitsWithin(&floor, &def->limits) ||
-        chain == mrhi_errorInvalid)
+        !mrhiIsLabelValid(def->label, def->labelLength) || !mrhiIsAllocatorValid(&def->allocator) ||
+        !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
     {
         *statusOut = mrhiMisuse(instance);
         return nullptr;
@@ -167,8 +168,7 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     }
     // An adapter was found, so the instance has a driver.
     MRHI_ASSERT(instance->driver.vtable != nullptr);
-    status = instance->driver.vtable->createDevice(instance->driver.self, adapter->handle,
-                                                   &device->features, &device->limits,
+    status = instance->driver.vtable->createDevice(instance->driver.self, adapter->handle, def,
                                                    device->request, &device->driver);
     if (status != mrhi_success)
     {
@@ -253,11 +253,11 @@ uint64_t mrhiGetDeviceMisuse(mrhiDevice* device)
     return device == nullptr ? 0 : device->misuse;
 }
 
-mrhiResult mrhiCheckObjectDef(mrhiDevice* device, uint32_t cookie, uint32_t expected,
-                              const mrhiChain* next)
+mrhiResult mrhiCheckObjectDef(mrhiDevice* device, mrhiDefHead head, uint32_t expected)
 {
-    mrhiResult chain = mrhiCheckChain(next, nullptr, 0, device->instance->limits.chainDepth);
-    if (cookie != expected || chain == mrhi_errorInvalid)
+    mrhiResult chain = mrhiCheckChain(head.next, nullptr, 0, device->instance->limits.chainDepth);
+    if (head.cookie != expected || chain == mrhi_errorInvalid ||
+        !mrhiIsLabelValid(head.label, head.labelLength))
     {
         return mrhiDeviceMisuse(device);
     }

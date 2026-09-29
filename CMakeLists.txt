@@ -51,6 +51,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/generated/defaults.c
     src/generated/result_names.c
     src/instance.c
+    src/label.c
     src/notify.c
     src/pool.c
     src/resources.c
@@ -69,6 +70,7 @@ if(MAUL_RHI_BUILD_TESTS)
     maul_add_test(layout WHITEBOX)
     maul_add_test(notify WHITEBOX)
     maul_add_test(pool WHITEBOX)
+    maul_add_test(label WHITEBOX)
     maul_add_test(instance)
     if(MAUL_RHI_TEST_DRIVER)
         maul_add_test(adapter)

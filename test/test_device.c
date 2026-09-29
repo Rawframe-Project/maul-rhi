@@ -222,6 +222,11 @@ static void TestInvalidDefs(void)
     def.cookie = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no cookie");
     def = Def(adapter);
+    def.label = "\xC0\xAF";
+    def.labelLength = 2;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
+          "an overlong label");
+    def = Def(adapter);
     def.deviceLimits.notifications = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "zero");
     def = Def(adapter);
@@ -248,7 +253,7 @@ static void TestInvalidDefs(void)
     def.allocator.free = CountingFree;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
           "an allocator with one function");
-    CHECK(mrhiGetInstanceMisuse(instance) == 11, "each invalid call counted");
+    CHECK(mrhiGetInstanceMisuse(instance) == 12, "each invalid call counted");
     mrhiDestroyInstance(instance);
 }
 

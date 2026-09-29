@@ -125,6 +125,9 @@ extern "C"
         mrhiStructType type;
     } mrhiChain;
 
+// The bytes a debug label may take, in UTF-8.
+#define MRHI_LABEL_BYTES 256
+
     // A request, answered by exactly one notification in its owner's queue.
     typedef struct mrhiRequestId
     {

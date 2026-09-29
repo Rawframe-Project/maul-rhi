@@ -85,6 +85,12 @@ extern "C"
         uint32_t cookie;
         // Extensions, or NULL.
         const mrhiChain* next;
+        // A name for debugging tools: UTF-8 without NUL, labelLength bytes, at
+        // most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during
+        // the call.
+        const char* label;
+        // The label's bytes.
+        size_t labelLength;
         // Filtering when magnified.
         mrhiFilter magFilter;
         // Filtering when minified.
@@ -118,7 +124,8 @@ extern "C"
     /// @param def         The sampler to make.
     /// @param samplerOut  Receives the sampler.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
-    /// without its cookie, a value out of range, anisotropy with a nearest
+    /// without its cookie, a label that is not UTF-8 without NUL within
+    /// MRHI_LABEL_BYTES, a value out of range, anisotropy with a nearest
     /// filter, or levels of detail out of order; `mrhi_errorState` for a device
     /// that is not ready; `mrhi_errorUnsupported` for a critical extension the
     /// library does not know; `mrhi_errorCapacity` when the device's sampler
@@ -178,6 +185,12 @@ extern "C"
         uint32_t cookie;
         // Extensions, or NULL.
         const mrhiChain* next;
+        // A name for debugging tools: UTF-8 without NUL, labelLength bytes, at
+        // most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during
+        // the call.
+        const char* label;
+        // The label's bytes.
+        size_t labelLength;
         // Bytes, a multiple of 4, at most the device's bufferBytes limit.
         uint64_t size;
         // Its uses, at least one.
@@ -198,8 +211,9 @@ extern "C"
     /// @param def        The buffer to make.
     /// @param bufferOut  Receives the buffer.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
-    /// without its cookie, a size of 0 or not a multiple of 4, or no usage or
-    /// an unknown one; `mrhi_errorUnsupported` for a size beyond the device's
+    /// without its cookie, a label that is not UTF-8 without NUL within
+    /// MRHI_LABEL_BYTES, a size of 0 or not a multiple of 4, or no usage or an
+    /// unknown one; `mrhi_errorUnsupported` for a size beyond the device's
     /// bufferBytes limit or a critical extension the library does not know;
     /// `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity`
     /// when the device's buffer limit is reached; `mrhi_errorPlatform` when the
@@ -277,6 +291,12 @@ extern "C"
         uint32_t cookie;
         // Extensions, or NULL.
         const mrhiChain* next;
+        // A name for debugging tools: UTF-8 without NUL, labelLength bytes, at
+        // most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during
+        // the call.
+        const char* label;
+        // The label's bytes.
+        size_t labelLength;
         // Its shape.
         mrhiTextureKind kind;
         // Its format; a compressed one needs its family's feature on the
@@ -316,15 +336,16 @@ extern "C"
     /// @param def         The texture to make.
     /// @param textureOut  Receives the texture.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
-    /// without its cookie, an unknown kind, format, usage or view format, a
-    /// zero size, a size or layer count that does not fit the kind or the
-    /// format's block, too many mips, an unusable sample count, or a transient
-    /// texture that is not only a render target; `mrhi_errorUnsupported` for a
-    /// size past the device's limits, a usage or sample count the format cannot
-    /// take on the device, a compressed format without its feature, or a
-    /// critical extension the library does not know; `mrhi_errorState` for a
-    /// device that is not ready; `mrhi_errorCapacity` when the device's texture
-    /// limit is reached; `mrhi_errorPlatform` when the driver fails.
+    /// without its cookie, a label that is not UTF-8 without NUL within
+    /// MRHI_LABEL_BYTES, an unknown kind, format, usage or view format, a zero
+    /// size, a size or layer count that does not fit the kind or the format's
+    /// block, too many mips, an unusable sample count, or a transient texture
+    /// that is not only a render target; `mrhi_errorUnsupported` for a size
+    /// past the device's limits, a usage or sample count the format cannot take
+    /// on the device, a compressed format without its feature, or a critical
+    /// extension the library does not know; `mrhi_errorState` for a device that
+    /// is not ready; `mrhi_errorCapacity` when the device's texture limit is
+    /// reached; `mrhi_errorPlatform` when the driver fails.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateTexture(mrhiDevice* device,
@@ -374,6 +395,12 @@ extern "C"
         uint32_t cookie;
         // Extensions, or NULL.
         const mrhiChain* next;
+        // A name for debugging tools: UTF-8 without NUL, labelLength bytes, at
+        // most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during
+        // the call.
+        const char* label;
+        // The label's bytes.
+        size_t labelLength;
         // The texture it views.
         mrhiTextureId texture;
         // Its shape: 2D or 2D array on any texture but a 3D one, a cube or cube
@@ -412,7 +439,8 @@ extern "C"
     /// @param def      The view to make.
     /// @param viewOut  Receives the view.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
-    /// without its cookie, an unknown kind, usage or aspect, a kind the texture
+    /// without its cookie, a label that is not UTF-8 without NUL within
+    /// MRHI_LABEL_BYTES, an unknown kind, usage or aspect, a kind the texture
     /// cannot be seen as, a format the texture was not given, uses the texture
     /// lacks, an aspect its format lacks, or a mip or layer range that is
     /// empty, past the texture's end or wrong for the kind; `mrhi_errorStale`

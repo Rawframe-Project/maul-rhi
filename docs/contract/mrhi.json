@@ -184,6 +184,12 @@
           ]
         },
         {
+          "kind": "constant",
+          "name": "label_bytes",
+          "value": 256,
+          "doc": "The bytes a debug label may take, in UTF-8."
+        },
+        {
           "kind": "id",
           "name": "request_id",
           "doc": "A request, answered by exactly one notification in its owner's queue."
@@ -4809,6 +4815,17 @@
           "doc": "How a device is made. Build it with mrhiDefaultDeviceDef and set the adapter.",
           "members": [
             {
+              "name": "label",
+              "type": "char",
+              "pointer": "const",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
+            },
+            {
+              "name": "label_length",
+              "type": "size",
+              "doc": "The label's bytes."
+            },
+            {
               "name": "adapter",
               "type": "id.adapter_id",
               "doc": "The adapter to open, from mrhiGetAdapters."
@@ -4852,7 +4869,7 @@
           "doc": "Makes a device on an adapter. It returns at once with the device opening, and the instance's queue answers the request with mrhi_instanceDeviceReady.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` with the device opening; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a zero limit, limits below the floor or an allocator with one function; `mrhi_errorStale` for an adapter the instance no longer has; `mrhi_errorUnsupported` for features or limits beyond the adapter's, or a critical extension the library does not know; `mrhi_errorCapacity` when the instance's queue has no room for the answer or an allocator fails."
+            "doc": "`mrhi_success` with the device opening; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a zero limit, limits below the floor or an allocator with one function; `mrhi_errorStale` for an adapter the instance no longer has; `mrhi_errorUnsupported` for features or limits beyond the adapter's, or a critical extension the library does not know; `mrhi_errorCapacity` when the instance's queue has no room for the answer or an allocator fails."
           },
           "args": [
             {
@@ -5353,6 +5370,53 @@
           "doc": "How a sampler is made. Build it with mrhiDefaultSamplerDef.",
           "members": [
             {
+              "name": "label",
+              "type": "char",
+              "pointer": "const",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "vkSetDebugUtilsObjectNameEXT, with VK_EXT_debug_utils"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetName, as UTF-16"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "label"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "label"
+                }
+              }
+            },
+            {
+              "name": "label_length",
+              "type": "size",
+              "doc": "The label's bytes.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "vkSetDebugUtilsObjectNameEXT's length, with VK_EXT_debug_utils"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetName's length, as UTF-16"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "label's length"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "label's length"
+                }
+              }
+            },
+            {
               "name": "mag_filter",
               "type": "enum.filter",
               "doc": "Filtering when magnified.",
@@ -5600,7 +5664,7 @@
           "doc": "Makes a sampler on a ready device.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a value out of range, anisotropy with a nearest filter, or levels of detail out of order; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the device's sampler limit is reached."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a value out of range, anisotropy with a nearest filter, or levels of detail out of order; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the device's sampler limit is reached."
           },
           "args": [
             {
@@ -5859,6 +5923,53 @@
           "doc": "How a buffer is made. Build it with mrhiDefaultBufferDef and set its size and usage. A buffer is never mapped: the frame graph fills and reads it.",
           "members": [
             {
+              "name": "label",
+              "type": "char",
+              "pointer": "const",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "vkSetDebugUtilsObjectNameEXT, with VK_EXT_debug_utils"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetName, as UTF-16"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "label"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "label"
+                }
+              }
+            },
+            {
+              "name": "label_length",
+              "type": "size",
+              "doc": "The label's bytes.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "vkSetDebugUtilsObjectNameEXT's length, with VK_EXT_debug_utils"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetName's length, as UTF-16"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "label's length"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "label's length"
+                }
+              }
+            },
+            {
               "name": "size",
               "type": "uint64",
               "doc": "Bytes, a multiple of 4, at most the device's bufferBytes limit.",
@@ -5925,7 +6036,7 @@
           "doc": "Makes a buffer on a ready device. Its contents are undefined until the frame graph writes them.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a size of 0 or not a multiple of 4, or no usage or an unknown one; `mrhi_errorUnsupported` for a size beyond the device's bufferBytes limit or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's buffer limit is reached; `mrhi_errorPlatform` when the driver fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a size of 0 or not a multiple of 4, or no usage or an unknown one; `mrhi_errorUnsupported` for a size beyond the device's bufferBytes limit or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's buffer limit is reached; `mrhi_errorPlatform` when the driver fails."
           },
           "args": [
             {
@@ -6268,6 +6379,53 @@
           "doc": "How a texture is made. Build it with mrhiDefaultTextureDef and set its format, size and usage. Its contents are undefined until the frame graph writes them.",
           "members": [
             {
+              "name": "label",
+              "type": "char",
+              "pointer": "const",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "vkSetDebugUtilsObjectNameEXT, with VK_EXT_debug_utils"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetName, as UTF-16"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "label"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "label"
+                }
+              }
+            },
+            {
+              "name": "label_length",
+              "type": "size",
+              "doc": "The label's bytes.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "vkSetDebugUtilsObjectNameEXT's length, with VK_EXT_debug_utils"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetName's length, as UTF-16"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "label's length"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "label's length"
+                }
+              }
+            },
+            {
               "name": "kind",
               "type": "enum.texture_kind",
               "doc": "Its shape.",
@@ -6496,7 +6654,7 @@
           "doc": "Makes a texture on a ready device.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, an unknown kind, format, usage or view format, a zero size, a size or layer count that does not fit the kind or the format's block, too many mips, an unusable sample count, or a transient texture that is not only a render target; `mrhi_errorUnsupported` for a size past the device's limits, a usage or sample count the format cannot take on the device, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's texture limit is reached; `mrhi_errorPlatform` when the driver fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, an unknown kind, format, usage or view format, a zero size, a size or layer count that does not fit the kind or the format's block, too many mips, an unusable sample count, or a transient texture that is not only a render target; `mrhi_errorUnsupported` for a size past the device's limits, a usage or sample count the format cannot take on the device, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's texture limit is reached; `mrhi_errorPlatform` when the driver fails."
           },
           "args": [
             {
@@ -6645,6 +6803,53 @@
           "mapped": true,
           "doc": "How a view is made: a subrange of a texture's mips and layers, seen with a shape, a format, uses and an aspect. Build it with mrhiDefaultViewDef and set its texture.",
           "members": [
+            {
+              "name": "label",
+              "type": "char",
+              "pointer": "const",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "vkSetDebugUtilsObjectNameEXT, with VK_EXT_debug_utils"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetName, as UTF-16"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "label"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "label"
+                }
+              }
+            },
+            {
+              "name": "label_length",
+              "type": "size",
+              "doc": "The label's bytes.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "vkSetDebugUtilsObjectNameEXT's length, with VK_EXT_debug_utils"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetName's length, as UTF-16"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "label's length"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "label's length"
+                }
+              }
+            },
             {
               "name": "texture",
               "type": "id.texture_id",
@@ -6873,7 +7078,7 @@
           "doc": "Makes a view of a texture on a ready device.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, an unknown kind, usage or aspect, a kind the texture cannot be seen as, a format the texture was not given, uses the texture lacks, an aspect its format lacks, or a mip or layer range that is empty, past the texture's end or wrong for the kind; `mrhi_errorStale` for a texture the device no longer has; `mrhi_errorUnsupported` for a use the view's format cannot take on the device, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's view limit is reached; `mrhi_errorPlatform` when the driver fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, an unknown kind, usage or aspect, a kind the texture cannot be seen as, a format the texture was not given, uses the texture lacks, an aspect its format lacks, or a mip or layer range that is empty, past the texture's end or wrong for the kind; `mrhi_errorStale` for a texture the device no longer has; `mrhi_errorUnsupported` for a use the view's format cannot take on the device, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's view limit is reached; `mrhi_errorPlatform` when the driver fails."
           },
           "args": [
             {

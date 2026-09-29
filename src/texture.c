@@ -139,7 +139,7 @@ static bool IsGranted(const mrhiDevice* device, const mrhiTextureDef* def)
 // Checks a def on a live device: success, or the refusal.
 static mrhiResult CheckTexture(mrhiDevice* device, const mrhiTextureDef* def)
 {
-    mrhiResult status = mrhiCheckObjectDef(device, def->cookie, TEXTURE_DEF_COOKIE, def->next);
+    mrhiResult status = mrhiCheckObjectDef(device, MRHI_DEF_HEAD(def), TEXTURE_DEF_COOKIE);
     if (status != mrhi_success)
     {
         return status;
@@ -188,6 +188,8 @@ mrhiResult mrhiCreateTexture(mrhiDevice* device, const mrhiTextureDef* def,
     mrhiTextureSlot* slot = &device->textureSlots[index1 - 1];
     *slot = (mrhiTextureSlot){.handle = handle, .def = *def};
     slot->def.next = nullptr;
+    slot->def.label = nullptr;
+    slot->def.labelLength = 0;
     *textureOut = (mrhiTextureId){index1, generation};
     return mrhi_success;
 }

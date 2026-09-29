@@ -77,3 +77,7 @@ format.
   (0 for all) that the view's format can take on the device, and an
   aspect (`mrhiTextureAspect`) its format has; each mapped onto the four
   APIs. Destroying a texture ends its views; the device's `views` limit.
+- Debug labels: every device, sampler, buffer, texture and view def
+  takes a `label` and `labelLength`, well-formed UTF-8 without NUL of at
+  most `MRHI_LABEL_BYTES`, handed to the driver during the call and
+  never kept; each mapped onto the four APIs' object names.

@@ -32,7 +32,8 @@ typedef struct mrhiDriverEvent
 
 // The driver side of a device: its vtable and pointer. A device driver
 // is made at once and opens in the background; its instance driver
-// answers the opening through a poll event.
+// answers the opening through a poll event. A def's label is valid
+// (label.h) and read only during the call that passes it.
 typedef struct mrhiDeviceDriverVtable
 {
     uint32_t spiVersion;
@@ -76,11 +77,12 @@ typedef struct mrhiInstanceDriverVtable
     // Fills what a format can do on an adapter.
     void (*getFormatCaps)(const void* self, uint64_t adapter, mrhiFormat format,
                           mrhiFormatCaps* capsOut);
-    // Makes a device on an adapter with the features and limits granted,
-    // opening it in the background: the open is answered by an event
-    // with the tag. An immediate failure is returned instead.
-    mrhiResult (*createDevice)(void* self, uint64_t adapter, const mrhiFeatures* features,
-                               const mrhiLimits* limits, uint64_t tag, mrhiDeviceDriver* deviceOut);
+    // Makes a device on an adapter from a def the core has checked (its
+    // features and limits are the grant, its label read only during the
+    // call), opening it in the background: the open is answered by an
+    // event with the tag. An immediate failure is returned instead.
+    mrhiResult (*createDevice)(void* self, uint64_t adapter, const mrhiDeviceDef* def, uint64_t tag,
+                               mrhiDeviceDriver* deviceOut);
     void (*destroy)(void* self);
 } mrhiInstanceDriverVtable;
 

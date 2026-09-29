@@ -182,6 +182,8 @@ restricted or absent-rejected, with how.
 
 | Member | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
+| `label` | restricted: vkSetDebugUtilsObjectNameEXT, with VK_EXT_debug_utils | direct: SetName, as UTF-16 | direct: label | direct: label |
+| `labelLength` | restricted: vkSetDebugUtilsObjectNameEXT's length, with VK_EXT_debug_utils | direct: SetName's length, as UTF-16 | direct: label's length | direct: label's length |
 | `magFilter` | direct: magFilter | direct: the filter's magnification bits | direct: magFilter | direct: magFilter |
 | `minFilter` | direct: minFilter | direct: the filter's minification bits | direct: minFilter | direct: minFilter |
 | `mipFilter` | direct: mipmapMode | direct: the filter's mip bits | direct: mipFilter | direct: mipmapFilter |
@@ -210,6 +212,8 @@ restricted or absent-rejected, with how.
 
 | Member | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
+| `label` | restricted: vkSetDebugUtilsObjectNameEXT, with VK_EXT_debug_utils | direct: SetName, as UTF-16 | direct: label | direct: label |
+| `labelLength` | restricted: vkSetDebugUtilsObjectNameEXT's length, with VK_EXT_debug_utils | direct: SetName's length, as UTF-16 | direct: label's length | direct: label's length |
 | `size` | direct: size | direct: the resource's Width | direct: length | direct: size |
 | `usage` | direct: usage | direct: the resource's flags and the views made of it | direct: the storage mode | direct: usage |
 
@@ -238,6 +242,8 @@ restricted or absent-rejected, with how.
 
 | Member | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
+| `label` | restricted: vkSetDebugUtilsObjectNameEXT, with VK_EXT_debug_utils | direct: SetName, as UTF-16 | direct: label | direct: label |
+| `labelLength` | restricted: vkSetDebugUtilsObjectNameEXT's length, with VK_EXT_debug_utils | direct: SetName's length, as UTF-16 | direct: label's length | direct: label's length |
 | `kind` | direct: imageType and CUBE_COMPATIBLE | direct: Dimension | direct: textureType | direct: dimension |
 | `format` | direct: format | direct: Format | direct: pixelFormat | direct: format |
 | `width` | direct: extent.width | direct: Width | direct: width | direct: size.width |
@@ -260,6 +266,8 @@ restricted or absent-rejected, with how.
 
 | Member | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
+| `label` | restricted: vkSetDebugUtilsObjectNameEXT, with VK_EXT_debug_utils | direct: SetName, as UTF-16 | direct: label | direct: label |
+| `labelLength` | restricted: vkSetDebugUtilsObjectNameEXT's length, with VK_EXT_debug_utils | direct: SetName's length, as UTF-16 | direct: label's length | direct: label's length |
 | `texture` | direct: image | direct: the resource | direct: the texture newTextureView is sent to | direct: the texture createView is called on |
 | `kind` | direct: viewType | direct: ViewDimension | direct: textureType | direct: dimension |
 | `format` | direct: format | direct: Format | direct: pixelFormat | direct: format |

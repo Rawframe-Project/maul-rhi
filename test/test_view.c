@@ -10,6 +10,7 @@
 #include "maul-rhi/resources.h"
 
 #include <stdint.h>
+#include <string.h>
 
 static mrhiDevice* s_device;
 
@@ -268,6 +269,14 @@ static void TestRefusalsAndState(void)
     CHECK(mrhiDestroyView(s_device, (mrhiViewId){0, 0}) == mrhi_errorStale, "null");
     def.cookie = 0;
     CHECK(Make(def) == mrhi_errorInvalid, "no cookie");
+    def = Def(texture, mrhi_texture2d);
+    char label[MRHI_LABEL_BYTES + 1];
+    memset(label, 'v', sizeof(label));
+    def.label = label;
+    def.labelLength = MRHI_LABEL_BYTES;
+    CHECK(Make(def) == mrhi_success, "a label at the bound");
+    def.labelLength = MRHI_LABEL_BYTES + 1;
+    CHECK(Make(def) == mrhi_errorInvalid, "a label past the bound");
     def = Def((mrhiTextureId){0, 0}, mrhi_texture2d);
     CHECK(Make(def) == mrhi_errorStale, "no texture");
     CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "done");
@@ -290,7 +299,10 @@ static void TestRefusalsAndState(void)
 int main(void)
 {
     ResetAdapter();
-    s_device = OpenWith(mrhiDefaultDeviceDef(), true);
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.label = "views";
+    deviceDef.labelLength = 5;
+    s_device = OpenWith(deviceDef, true);
     mrhiInstance* instance = s_instance;
     TestRanges();
     TestKinds();
