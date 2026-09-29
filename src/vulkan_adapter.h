@@ -18,9 +18,10 @@
 #define MRHI_VULKAN_VERTEX_ATTRIBUTES 64
 
 // Describes a physical device as an adapter whose handle is the device:
-// false, with nothing written, for a device below the floor.
-bool mrhiDescribeVulkanAdapter(const mrhiVulkan* vulkan, VkPhysicalDevice device,
-                               mrhiDriverAdapter* adapterOut);
+// false, with nothing written, for a device below the floor. The
+// allocator lends room to read its extensions.
+bool mrhiDescribeVulkanAdapter(const mrhiVulkan* vulkan, const mrhiAllocator* allocator,
+                               VkPhysicalDevice device, mrhiDriverAdapter* adapterOut);
 
 // The depth and stencil format a device uses: the first of D24S8 and
 // D32S8 it renders to.

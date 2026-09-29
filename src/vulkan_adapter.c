@@ -25,6 +25,12 @@
      VK_SUBGROUP_FEATURE_QUAD_BIT)
 #define SUBGROUP_STAGES (VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
 
+// What four full binding tables may take of a stage's samplers, and of
+// its resources with the color targets: the heaps have the rest, since
+// per-stage limits count every set of a pipeline.
+#define TABLES_RESERVE    (4u * MRHI_TABLE_BINDINGS)
+#define RESOURCES_RESERVE (TABLES_RESERVE + MRHI_COLOR_TARGETS)
+
 // Each contract format's Vulkan format, as its mapping row names it;
 // the depth and stencil format's first choice. The formats run from 1
 // to MRHI_KNOWN_FORMATS.
@@ -107,11 +113,14 @@ typedef struct DeviceFacts
 {
     VkPhysicalDeviceProperties2 properties;
     VkPhysicalDeviceVulkan11Properties properties11;
+    VkPhysicalDeviceVulkan12Properties properties12;
     VkPhysicalDeviceVulkan13Properties properties13;
     VkPhysicalDeviceFeatures2 features;
     VkPhysicalDeviceVulkan11Features features11;
     VkPhysicalDeviceVulkan12Features features12;
     VkPhysicalDeviceVulkan13Features features13;
+    // Read only when the device offers VK_EXT_mutable_descriptor_type.
+    VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutableType;
     // The queue family with graphics and compute, or UINT32_MAX.
     uint32_t family;
     uint32_t familyTimestampBits;
@@ -138,16 +147,20 @@ static void FindFamily(const mrhiVulkan* vulkan, VkPhysicalDevice device, Device
 
 // Reads the device's properties, and its features when it is Vulkan
 // 1.3, whose structs a 1.2 device may not fill: false below 1.3.
-static bool ReadFacts(const mrhiVulkan* vulkan, VkPhysicalDevice device, DeviceFacts* facts)
+static bool ReadFacts(const mrhiVulkan* vulkan, const mrhiAllocator* allocator,
+                      VkPhysicalDevice device, DeviceFacts* facts)
 {
     *facts = (DeviceFacts){
         .properties = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2},
         .properties11 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES},
+        .properties12 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES},
         .properties13 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES},
         .features = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2},
         .features11 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES},
         .features12 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES},
         .features13 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES},
+        .mutableType = {.sType =
+                            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MUTABLE_DESCRIPTOR_TYPE_FEATURES_EXT},
     };
     VkPhysicalDeviceProperties2 core = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
     vulkan->vkGetPhysicalDeviceProperties2(device, &core);
@@ -156,11 +169,17 @@ static bool ReadFacts(const mrhiVulkan* vulkan, VkPhysicalDevice device, DeviceF
         return false;
     }
     facts->properties.pNext = &facts->properties11;
-    facts->properties11.pNext = &facts->properties13;
+    facts->properties11.pNext = &facts->properties12;
+    facts->properties12.pNext = &facts->properties13;
     vulkan->vkGetPhysicalDeviceProperties2(device, &facts->properties);
     facts->features.pNext = &facts->features11;
     facts->features11.pNext = &facts->features12;
     facts->features12.pNext = &facts->features13;
+    const char* mutableName = VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME;
+    if (mrhiVulkanExtensions(vulkan, allocator, device, &mutableName, 1) != 0)
+    {
+        facts->features13.pNext = &facts->mutableType;
+    }
     vulkan->vkGetPhysicalDeviceFeatures2(device, &facts->features);
     FindFamily(vulkan, device, facts);
     return true;
@@ -240,6 +259,35 @@ static bool AllHave(const mrhiVulkan* vulkan, VkPhysicalDevice device, const VkF
     return true;
 }
 
+// Whether a device has what a heap of sampled images and samplers
+// needs: runtime arrays, partially bound and update after bind bindings
+// updatable while pending, non-uniform indexing, and a set after the
+// four tables.
+static bool HasBindlessSampling(const DeviceFacts* facts)
+{
+    const VkPhysicalDeviceVulkan12Features* indexing = &facts->features12;
+    return indexing->runtimeDescriptorArray && indexing->descriptorBindingPartiallyBound &&
+           indexing->descriptorBindingUpdateUnusedWhilePending &&
+           indexing->descriptorBindingSampledImageUpdateAfterBind &&
+           indexing->shaderSampledImageArrayNonUniformIndexing &&
+           facts->properties.properties.limits.maxBoundDescriptorSets >= 5;
+}
+
+// Whether a device can also hold storage images and buffers in the
+// resource heap: their update after bind and non-uniform indexing,
+// storage images without a format, and mutable descriptors.
+static bool HasBindlessHeterogeneous(const DeviceFacts* facts)
+{
+    const VkPhysicalDeviceVulkan12Features* indexing = &facts->features12;
+    const VkPhysicalDeviceFeatures* core = &facts->features.features;
+    return HasBindlessSampling(facts) && indexing->descriptorBindingStorageImageUpdateAfterBind &&
+           indexing->descriptorBindingStorageBufferUpdateAfterBind &&
+           indexing->shaderStorageImageArrayNonUniformIndexing &&
+           indexing->shaderStorageBufferArrayNonUniformIndexing &&
+           core->shaderStorageImageReadWithoutFormat &&
+           core->shaderStorageImageWriteWithoutFormat && facts->mutableType.mutableDescriptorType;
+}
+
 static mrhiFeatures FeaturesOf(const mrhiVulkan* vulkan, VkPhysicalDevice device,
                                const DeviceFacts* facts)
 {
@@ -272,6 +320,8 @@ static mrhiFeatures FeaturesOf(const mrhiVulkan* vulkan, VkPhysicalDevice device
         .indirectFirstInstance = core->drawIndirectFirstInstance,
         .multiDrawIndirectCount = core->multiDrawIndirect && facts->features12.drawIndirectCount,
         .multiview = facts->features11.multiview,
+        .bindlessSampling = HasBindlessSampling(facts),
+        .bindlessHeterogeneous = HasBindlessHeterogeneous(facts),
     };
 }
 
@@ -283,6 +333,50 @@ static uint32_t Smaller(uint32_t a, uint32_t b)
 static uint32_t Clamp32(uint64_t value)
 {
     return value < UINT32_MAX ? (uint32_t)value : UINT32_MAX;
+}
+
+// A limit less a reserve, not below 0.
+static uint32_t Net(uint32_t limit, uint32_t reserve)
+{
+    return limit > reserve ? limit - reserve : 0;
+}
+
+// The entries of the resource heap: the smaller of the update after bind
+// limits of each type it may hold, per stage and per set, less what the
+// tables and targets may take; 0 without bindless sampling.
+static uint32_t HeapSize(const DeviceFacts* facts)
+{
+    if (!HasBindlessSampling(facts))
+    {
+        return 0;
+    }
+    const VkPhysicalDeviceVulkan12Properties* bind = &facts->properties12;
+    uint32_t size = Smaller(bind->maxPerStageDescriptorUpdateAfterBindSampledImages,
+                            bind->maxDescriptorSetUpdateAfterBindSampledImages);
+    size = Smaller(size, bind->maxPerStageUpdateAfterBindResources);
+    size = Smaller(size, bind->maxUpdateAfterBindDescriptorsInAllPools);
+    if (HasBindlessHeterogeneous(facts))
+    {
+        size = Smaller(size, Smaller(bind->maxPerStageDescriptorUpdateAfterBindStorageImages,
+                                     bind->maxDescriptorSetUpdateAfterBindStorageImages));
+        size = Smaller(size, Smaller(bind->maxPerStageDescriptorUpdateAfterBindStorageBuffers,
+                                     bind->maxDescriptorSetUpdateAfterBindStorageBuffers));
+    }
+    return Net(size, RESOURCES_RESERVE);
+}
+
+// The entries of the sampler heap, the same way.
+static uint32_t SamplerHeapSize(const DeviceFacts* facts)
+{
+    if (!HasBindlessSampling(facts))
+    {
+        return 0;
+    }
+    const VkPhysicalDeviceVulkan12Properties* bind = &facts->properties12;
+    uint32_t size = Smaller(bind->maxPerStageDescriptorUpdateAfterBindSamplers,
+                            bind->maxDescriptorSetUpdateAfterBindSamplers);
+    size = Smaller(size, bind->maxUpdateAfterBindDescriptorsInAllPools);
+    return Net(size, TABLES_RESERVE);
 }
 
 static mrhiLimits LimitsOf(const DeviceFacts* facts)
@@ -327,14 +421,16 @@ static mrhiLimits LimitsOf(const DeviceFacts* facts)
             limits->maxComputeWorkGroupCount[2]),
         .rootBlockBytes = limits->maxPushConstantsSize,
         .framesInFlight = VULKAN_FRAMES_IN_FLIGHT,
+        .heapSize = HeapSize(facts),
+        .samplerHeapSize = SamplerHeapSize(facts),
     };
 }
 
-bool mrhiDescribeVulkanAdapter(const mrhiVulkan* vulkan, VkPhysicalDevice device,
-                               mrhiDriverAdapter* adapterOut)
+bool mrhiDescribeVulkanAdapter(const mrhiVulkan* vulkan, const mrhiAllocator* allocator,
+                               VkPhysicalDevice device, mrhiDriverAdapter* adapterOut)
 {
     DeviceFacts facts;
-    if (!ReadFacts(vulkan, device, &facts) || !MeetsFloor(&facts))
+    if (!ReadFacts(vulkan, allocator, device, &facts) || !MeetsFloor(&facts))
     {
         return false;
     }

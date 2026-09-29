@@ -159,6 +159,9 @@ static void Retire(mrhiVulkanFrames* frames, const mrhiVulkanRetire* retired)
     case mrhiVulkanRetiredQuerySet:
         mrhiVulkanDestroyQuerySet(frames->objects, retired->handle);
         break;
+    case mrhiVulkanRetiredHeap:
+        mrhiVulkanDestroyHeap(frames->heaps, retired->handle);
+        break;
     default:
         mrhiVulkanDestroyPipeline(frames->pipelines, retired->handle);
         break;

@@ -72,11 +72,26 @@ barriers.
   accepts them (`createHeap`, `destroyHeap`, `writeHeapEntry`,
   `writeHeapSampler`; SPI version 2). The test driver checks every
   handle it is given.
+- **Vulkan** grants `bindless_sampling` with descriptor indexing over
+  sampled images and samplers (runtime arrays, partially bound and
+  update after bind bindings updatable while pending, non-uniform
+  indexing) and five bound sets, and `bindless_heterogeneous` with the
+  storage types' equivalents, storage images without a format and
+  `VK_EXT_mutable_descriptor_type`. The heap sizes are the update after
+  bind limits less what four full tables and the color targets may
+  take, since per-stage limits count every set. A device has one set
+  layout at set 4: binding 0 holds `heapSize` sampled images, or
+  mutable descriptors that may also be storage images and buffers, and
+  binding 1 `samplerHeapSize` samplers; only a set's last binding may
+  vary in count, so every heap takes the device's counts. Each heap is
+  a set from its own pool; pipelines from containers reading heaps
+  have the layout at set 4 and bind the pass's heap after each
+  pipeline, since other table layouts disturb it.
 
 ## Consequences
 
 Content picks resources by index while the graph keeps exact barriers.
 Freeing an index only after earlier frames finish lets every API write
 entries in place, without copies. Sealed resources give
-streamed assets reads without barriers. The Vulkan heap path follows in
-its slice.
+streamed assets reads without barriers. Lavapipe runs the Vulkan path in
+CI.

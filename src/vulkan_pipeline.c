@@ -154,7 +154,11 @@ mrhiResult mrhiVulkanMakeLayout(mrhiVulkanPipelines* pipelines, const mrhiReflec
                                 VkShaderStageFlags rootStages, mrhiVulkanPipeline* pipelineOut)
 {
     *pipelineOut = (mrhiVulkanPipeline){0};
-    uint32_t tables = 0;
+    // A container reading heaps has the heap's set after every table's,
+    // empty layouts standing for the tables it lacks.
+    bool heap = reflection->heapUses != 0;
+    MRHI_ASSERT(!heap || pipelines->heapLayout != VK_NULL_HANDLE);
+    uint32_t tables = heap ? MRHI_VULKAN_TABLES : 0;
     for (uint32_t i = 0; i < reflection->bindingCount; ++i)
     {
         uint32_t table = reflection->bindings[i].table + 1u;
@@ -166,6 +170,8 @@ mrhiResult mrhiVulkanMakeLayout(mrhiVulkanPipelines* pipelines, const mrhiReflec
         result = MakeSet(pipelines, reflection, t, &pipelineOut->sets[t]);
         pipelineOut->setCount += result == VK_SUCCESS ? 1 : 0;
     }
+    pipelineOut->heap = heap;
+    pipelineOut->sets[MRHI_VULKAN_TABLES] = pipelines->heapLayout;
     pipelineOut->rootStages = reflection->rootBlockBytes > 0 ? rootStages : 0;
     const VkPushConstantRange root = {
         .stageFlags = rootStages,
@@ -173,7 +179,7 @@ mrhiResult mrhiVulkanMakeLayout(mrhiVulkanPipelines* pipelines, const mrhiReflec
     };
     const VkPipelineLayoutCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = pipelineOut->setCount,
+        .setLayoutCount = pipelineOut->setCount + (heap ? 1u : 0u),
         .pSetLayouts = pipelineOut->sets,
         .pushConstantRangeCount = reflection->rootBlockBytes > 0 ? 1 : 0,
         .pPushConstantRanges = &root,

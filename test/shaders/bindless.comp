@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// The bindless container's compute entry "cs": samples a texture from
+// the resource heap with a sampler from the sampler heap, past the
+// texture's right edge so that the sampler's addressing shows, and
+// writes the texel, packed, to a storage buffer from the same heap, all
+// three named by index in the root block (mrhi-0015).
+
+#version 450
+#extension GL_EXT_nonuniform_qualifier : require
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(push_constant) uniform Root
+{
+    uint image;
+    uint sampling;
+    uint target;
+} root;
+
+layout(set = 4, binding = 0) uniform texture2D textures[];
+layout(set = 4, binding = 0) buffer Data
+{
+    uint values[];
+} buffers[];
+layout(set = 4, binding = 1) uniform sampler samplers[];
+
+void main()
+{
+    vec4 texel =
+        textureLod(sampler2D(textures[root.image], samplers[root.sampling]), vec2(1.25, 0.25), 0.0);
+    buffers[root.target].values[0] = packUnorm4x8(texel);
+}

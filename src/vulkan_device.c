@@ -16,6 +16,7 @@
 #include "invariant.h"
 #include "vulkan_adapter.h"
 #include "vulkan_frame.h"
+#include "vulkan_heap.h"
 #include "vulkan_label.h"
 #include "vulkan_object.h"
 #include "vulkan_pipeline.h"
@@ -51,6 +52,7 @@ typedef struct VulkanDevice
     mrhiVulkanMemory memory;
     mrhiVulkanObjects objects;
     mrhiVulkanPipelines pipelines;
+    mrhiVulkanHeaps heaps;
     mrhiVulkanFrames frames;
     mrhiVulkanSwapchains swapchains;
 } VulkanDevice;
@@ -62,6 +64,7 @@ typedef struct Enabled
     VkPhysicalDeviceVulkan11Features features11;
     VkPhysicalDeviceVulkan12Features features12;
     VkPhysicalDeviceVulkan13Features features13;
+    VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutableType;
 } Enabled;
 
 // The floor's features, and the granted ones as the contract's Vulkan
@@ -73,6 +76,8 @@ static void Enable(const mrhiFeatures* granted, Enabled* enabled)
         .features11 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES},
         .features12 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES},
         .features13 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES},
+        .mutableType = {.sType =
+                            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MUTABLE_DESCRIPTOR_TYPE_FEATURES_EXT},
     };
     enabled->features.pNext = &enabled->features11;
     enabled->features11.pNext = &enabled->features12;
@@ -105,6 +110,24 @@ static void Enable(const mrhiFeatures* granted, Enabled* enabled)
     enabled->features12.descriptorIndexing = VK_TRUE;
     enabled->features13.dynamicRendering = VK_TRUE;
     enabled->features13.synchronization2 = VK_TRUE;
+    // Heaps (mrhi-0015): descriptor indexing over sampled images and samplers,
+    // and over storage images and buffers through mutable descriptors.
+    VkPhysicalDeviceVulkan12Features* indexing = &enabled->features12;
+    bool sampling = granted->bindlessSampling;
+    bool heterogeneous = granted->bindlessHeterogeneous;
+    indexing->runtimeDescriptorArray = sampling;
+    indexing->descriptorBindingPartiallyBound = sampling;
+    indexing->descriptorBindingUpdateUnusedWhilePending = sampling;
+    indexing->descriptorBindingSampledImageUpdateAfterBind = sampling;
+    indexing->shaderSampledImageArrayNonUniformIndexing = sampling;
+    indexing->descriptorBindingStorageImageUpdateAfterBind = heterogeneous;
+    indexing->descriptorBindingStorageBufferUpdateAfterBind = heterogeneous;
+    indexing->shaderStorageImageArrayNonUniformIndexing = heterogeneous;
+    indexing->shaderStorageBufferArrayNonUniformIndexing = heterogeneous;
+    core->shaderStorageImageReadWithoutFormat = heterogeneous;
+    core->shaderStorageImageWriteWithoutFormat = heterogeneous;
+    enabled->mutableType.mutableDescriptorType = heterogeneous;
+    enabled->features13.pNext = heterogeneous ? &enabled->mutableType : nullptr;
 }
 
 static mrhiResult StatusOf(VkResult result)
@@ -157,6 +180,7 @@ static void Destroy(void* self)
     mrhiVulkanSwapchainsDestroy(&device->swapchains);
     mrhiVulkanFramesDestroy(&device->frames);
     mrhiVulkanPipelinesDestroy(&device->pipelines);
+    mrhiVulkanHeapsEnd(&device->heaps);
     DestroyObjects(&device->objects);
     mrhiVulkanMemoryDestroy(&device->memory);
     device->api.vkDestroySemaphore(device->device, device->timeline, nullptr);
@@ -177,39 +201,36 @@ static void DestroySampler(void* self, uint64_t handle)
     mrhiVulkanRetireLater(&device->frames, mrhiVulkanRetiredSampler, handle);
 }
 
-// Heaps come with the bindless slice: the adapter grants no bindless
-// feature yet, so the core never makes one here.
-static mrhiResult RefuseHeap(void* self, const mrhiHeapDef* def, uint64_t* handleOut)
+static mrhiResult CreateHeap(void* self, const mrhiHeapDef* def, uint64_t* handleOut)
 {
-    (void)self;
-    (void)def;
-    (void)handleOut;
-    return mrhi_errorUnsupported;
+    VulkanDevice* device = self;
+    mrhiResult status = mrhiVulkanCreateHeap(&device->heaps, handleOut);
+    if (status == mrhi_success)
+    {
+        mrhiVulkanName(&device->api, device->device, VK_OBJECT_TYPE_DESCRIPTOR_SET,
+                       MRHI_VULKAN_HANDLE(mrhiVulkanHeapSet(&device->heaps, *handleOut)),
+                       def->label, def->labelLength);
+    }
+    return status;
 }
 
-static void NeverHeap(void* self, uint64_t handle)
+static void DestroyHeap(void* self, uint64_t handle)
 {
-    (void)self;
-    (void)handle;
-    MRHI_ASSERT(false);
+    VulkanDevice* device = self;
+    mrhiVulkanRetireLater(&device->frames, mrhiVulkanRetiredHeap, handle);
 }
 
-static void NeverEntry(void* self, uint64_t heap, uint32_t index, const mrhiDriverHeapEntry* entry)
+static void WriteHeapEntry(void* self, uint64_t heap, uint32_t index,
+                           const mrhiDriverHeapEntry* entry)
 {
-    (void)self;
-    (void)heap;
-    (void)index;
-    (void)entry;
-    MRHI_ASSERT(false);
+    const VulkanDevice* device = self;
+    mrhiVulkanWriteHeapEntry(&device->heaps, heap, index, entry);
 }
 
-static void NeverSampler(void* self, uint64_t heap, uint32_t index, uint64_t sampler)
+static void WriteHeapSampler(void* self, uint64_t heap, uint32_t index, uint64_t sampler)
 {
-    (void)self;
-    (void)heap;
-    (void)index;
-    (void)sampler;
-    MRHI_ASSERT(false);
+    const VulkanDevice* device = self;
+    mrhiVulkanWriteHeapSampler(&device->heaps, heap, index, sampler);
 }
 
 static mrhiResult CreateQuerySet(void* self, const mrhiQuerySetDef* def, uint64_t* handleOut)
@@ -431,10 +452,10 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .releaseImage = ReleaseImage,
     .createQuerySet = CreateQuerySet,
     .destroyQuerySet = DestroyQuerySet,
-    .createHeap = RefuseHeap,
-    .destroyHeap = NeverHeap,
-    .writeHeapEntry = NeverEntry,
-    .writeHeapSampler = NeverSampler,
+    .createHeap = CreateHeap,
+    .destroyHeap = DestroyHeap,
+    .writeHeapEntry = WriteHeapEntry,
+    .writeHeapSampler = WriteHeapSampler,
     .timestampPeriod = TimestampPeriod,
     .importPipelineCache = ImportPipelineCache,
     .exportPipelineCache = ExportPipelineCache,
@@ -492,7 +513,7 @@ static VkResult Open(VulkanDevice* device, const mrhiDeviceDef* def)
         mrhiVulkanExtensions(device->vulkan, &device->allocator, device->physical, s_wanted, 2);
     // The mutable format extension needs the swapchain.
     offered = (offered & 1u) != 0 ? offered : 0;
-    const char* names[2];
+    const char* names[3];
     uint32_t count = 0;
     for (uint32_t i = 0; i < 2; ++i)
     {
@@ -500,6 +521,12 @@ static VkResult Open(VulkanDevice* device, const mrhiDeviceDef* def)
         {
             names[count++] = s_wanted[i];
         }
+    }
+    // Heterogeneous heaps are granted only where mutable descriptors are
+    // offered.
+    if (def->features.bindlessHeterogeneous)
+    {
+        names[count++] = VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME;
     }
     device->swapchains.mutableFormat = (offered & 2u) != 0;
     const VkDeviceCreateInfo info = {
@@ -558,6 +585,7 @@ typedef struct Layout
     size_t querySets;
     size_t shaders;
     size_t pipelines;
+    size_t heaps;
     size_t pending;
     size_t pendingHandles;
     size_t constants;
@@ -611,6 +639,8 @@ static Layout LayoutOf(const mrhiDeviceDef* def)
         mrhiLayoutAdd(layout, limits->shaders, sizeof(VkShaderModule), alignof(VkShaderModule));
     at.pipelines = mrhiLayoutAdd(layout, limits->pipelines, sizeof(mrhiVulkanPipeline),
                                  alignof(mrhiVulkanPipeline));
+    at.heaps =
+        mrhiLayoutAdd(layout, limits->heaps, sizeof(mrhiVulkanHeap), alignof(mrhiVulkanHeap));
     at.pending =
         mrhiLayoutAdd(layout, limits->pipelines, sizeof(mrhiDriverEvent), alignof(mrhiDriverEvent));
     at.pendingHandles =
@@ -618,7 +648,7 @@ static Layout LayoutOf(const mrhiDeviceDef* def)
     at.constants =
         mrhiLayoutAdd(layout, 1, sizeof(mrhiVulkanConstants), alignof(mrhiVulkanConstants));
     size_t links = (size_t)limits->buffers + limits->textures + limits->views + limits->samplers +
-                   limits->querySets + limits->shaders + limits->pipelines;
+                   limits->querySets + limits->shaders + limits->pipelines + limits->heaps;
     at.slots = mrhiLayoutAdd(layout, links, sizeof(uint32_t), alignof(uint32_t));
     at.frames = mrhiLayoutAdd(layout, slots, sizeof(mrhiVulkanSlot), alignof(mrhiVulkanSlot));
     size_t transients = (size_t)slots * limits->frameResources;
@@ -634,7 +664,7 @@ static Layout LayoutOf(const mrhiDeviceDef* def)
     at.readbacks = mrhiLayoutAdd(layout, (size_t)slots * limits->readbacks, sizeof(mrhiVulkanRange),
                                  alignof(mrhiVulkanRange));
     at.retireCount = limits->buffers + limits->textures + limits->views + limits->samplers +
-                     limits->querySets + limits->pipelines;
+                     limits->querySets + limits->pipelines + limits->heaps;
     at.retire =
         mrhiLayoutAdd(layout, at.retireCount, sizeof(mrhiVulkanRetire), alignof(mrhiVulkanRetire));
     uint32_t surfaces = limits->surfaces;
@@ -697,6 +727,13 @@ static void PlaceTables(VulkanDevice* device, const Layout* at, const mrhiDevice
     mrhiVulkanSlotsInit(&pipelines->shaderSlots, slots, limits->shaders);
     slots += limits->shaders;
     mrhiVulkanSlotsInit(&pipelines->pipelineSlots, slots, limits->pipelines);
+    slots += limits->pipelines;
+    mrhiVulkanHeaps* heaps = &device->heaps;
+    heaps->api = &device->api;
+    heaps->device = device->device;
+    heaps->objects = objects;
+    heaps->heaps = (mrhiVulkanHeap*)(block + at->heaps);
+    mrhiVulkanSlotsInit(&heaps->heapSlots, slots, limits->heaps);
 }
 
 // Sets up the swapchains over their tables in the device's block.
@@ -740,6 +777,7 @@ static void PlaceFrames(VulkanDevice* device, const Layout* at, const mrhiDevice
         .memory = &device->memory.properties,
         .objects = &device->objects,
         .pipelines = &device->pipelines,
+        .heaps = &device->heaps,
         .swapchains = &device->swapchains,
         .slots = (mrhiVulkanSlot*)(block + at->frames),
         .slotCount = def->limits.framesInFlight,
@@ -814,7 +852,17 @@ mrhiResult mrhiCreateVulkanDevice(const mrhiAllocator* allocator, const mrhiVulk
     PlaceTables(device, &at, &def->deviceLimits, &properties);
     PlaceSwapchains(device, &at, def->deviceLimits.surfaces);
     PlaceFrames(device, &at, def);
-    mrhiResult status = mrhiVulkanPipelinesInit(&device->pipelines);
+    // A device without bindless sampling has no heap layout.
+    bool sampling = def->features.bindlessSampling;
+    device->heaps.entries = sampling ? def->limits.heapSize : 0;
+    device->heaps.samplers = sampling ? def->limits.samplerHeapSize : 0;
+    device->heaps.heterogeneous = def->features.bindlessHeterogeneous;
+    mrhiResult status = mrhiVulkanHeapsInit(&device->heaps);
+    device->pipelines.heapLayout = device->heaps.layout;
+    if (status == mrhi_success)
+    {
+        status = mrhiVulkanPipelinesInit(&device->pipelines);
+    }
     if (status == mrhi_success)
     {
         status = mrhiVulkanFramesInit(&device->frames, device->family, &def->deviceLimits);

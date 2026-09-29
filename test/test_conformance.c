@@ -16,12 +16,14 @@
 #include "maul-rhi/device.h"
 #include "maul-rhi/encoder.h"
 #include "maul-rhi/frame.h"
+#include "maul-rhi/heap.h"
 #include "maul-rhi/instance.h"
 #include "maul-rhi/pipeline.h"
 #include "maul-rhi/resources.h"
 #include "maul-rhi/shader.h"
 #include "maul-rhi/surface.h"
 #include "maul-rhi/test.h"
+#include "shaders/bindless_container.h"
 #include "shaders/conformance_container.h"
 
 #include <stdlib.h>
@@ -559,6 +561,153 @@ static mrhiTextureId MakeImage(mrhiDevice* device, uint32_t size, mrhiTextureUsa
     return texture;
 }
 
+// Where the heap check's objects sit in its heap: the clamping sampler
+// it reads, and a repeating one it must not.
+enum
+{
+    HEAP_TEXTURE = 3,
+    HEAP_SAMPLER = 2,
+    HEAP_OTHER_SAMPLER = 0,
+    HEAP_BUFFER = 7,
+};
+
+// Makes the heap check's heap with its entries: the texture's view, the
+// buffer and two samplers.
+static mrhiHeapId MakeHeap(mrhiDevice* device, mrhiTextureId texture, mrhiBufferId buffer)
+{
+    mrhiViewDef viewDef = mrhiDefaultViewDef();
+    viewDef.texture = texture;
+    mrhiViewId view = {0};
+    mrhiSamplerDef repeatDef = mrhiDefaultSamplerDef();
+    repeatDef.addressU = mrhi_addressRepeat;
+    mrhiSamplerId repeat = {0};
+    mrhiSamplerDef clampDef = mrhiDefaultSamplerDef();
+    mrhiSamplerId clamp = {0};
+    mrhiHeapDef heapDef = mrhiDefaultHeapDef();
+    heapDef.entries = 16;
+    heapDef.samplers = 4;
+    LABEL(heapDef, "heap");
+    mrhiHeapId heap = {0};
+    CHECK(mrhiCreateView(device, &viewDef, &view) == mrhi_success &&
+              mrhiCreateSampler(device, &repeatDef, &repeat) == mrhi_success &&
+              mrhiCreateSampler(device, &clampDef, &clamp) == mrhi_success &&
+              mrhiCreateHeap(device, &heapDef, &heap) == mrhi_success,
+          "a view, two samplers and a heap");
+    const mrhiHeapEntry sampled = {.kind = mrhi_heapSampledTexture, .view = view};
+    const mrhiHeapEntry storage = {
+        .kind = mrhi_heapStorageBuffer,
+        .buffer = buffer,
+        .size = MRHI_WHOLE_SIZE,
+        .writable = true,
+    };
+    CHECK(mrhiSetHeapEntry(device, heap, HEAP_TEXTURE, &sampled) == mrhi_success &&
+              mrhiSetHeapEntry(device, heap, HEAP_BUFFER, &storage) == mrhi_success &&
+              mrhiSetHeapSampler(device, heap, HEAP_SAMPLER, clamp) == mrhi_success &&
+              mrhiSetHeapSampler(device, heap, HEAP_OTHER_SAMPLER, repeat) == mrhi_success,
+          "the entries");
+    return heap;
+}
+
+// Texels uploaded to a texture sealed in the same frame, then sampled
+// past its right edge through a heap with a clamping sampler from it by
+// a compute pipeline that writes the texel to a buffer from the heap,
+// all named by index: the sealed texture undeclared, the buffer
+// declared. Needs heterogeneous heaps, which MAUL_RHI_REQUIRE_BINDLESS
+// requires of every native adapter.
+static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool native)
+{
+    mrhiFeatures features;
+    CHECK(mrhiGetAdapterFeatures(instance, adapter, &features) == mrhi_success, "features");
+    if (!features.bindlessHeterogeneous)
+    {
+        const char* required = getenv("MAUL_RHI_REQUIRE_BINDLESS");
+        CHECK(!native || required == nullptr || required[0] == '\0', "bindless heaps, required");
+        return;
+    }
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.adapter = adapter;
+    def.features.bindlessSampling = true;
+    def.features.bindlessHeterogeneous = true;
+    def.limits.heapSize = 16;
+    def.limits.samplerHeapSize = 4;
+    LABEL(def, "heaps");
+    mrhiDevice* device = nullptr;
+    mrhiRequestId request;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "a device");
+    mrhiInstanceNotification record;
+    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+              record.outcome == mrhi_success,
+          "ready");
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_bindlessContainer;
+    shaderDef.byteCount = sizeof(s_bindlessContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "the bindless shader");
+    mrhiComputePipelineDef computeDef = mrhiDefaultComputePipelineDef();
+    computeDef.shader = shader;
+    computeDef.entry = "cs";
+    computeDef.entryLength = 2;
+    mrhiComputePipelineId pipeline = {0};
+    CHECK(mrhiCreateComputePipeline(device, &computeDef, &pipeline, &request) == mrhi_success,
+          "a pipeline reading the heap");
+    AwaitPipelines(device, 1, 0);
+    mrhiTextureId texture = MakeImage(device, 2, mrhi_textureSampled | mrhi_textureCopyDestination);
+    mrhiBufferId buffer = MakeBuffer(device, 256);
+    mrhiHeapId heap = MakeHeap(device, texture, buffer);
+    // Each row the texel a repeating sampler would read, then the one the
+    // clamping sampler reads.
+    static const uint8_t pixels[16] = {10, 20, 30, 255, 255, 51, 153, 255,
+                                       10, 20, 30, 255, 255, 51, 153, 255};
+    const uint8_t* clamped = pixels + 4;
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId t = {0};
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportTexture(device, texture, &t) == mrhi_success,
+          "an upload frame");
+    mrhiAccess upload = Whole(t, mrhi_accessCopyDestination);
+    mrhiPassId copy = CopyPass(device, &upload, 1);
+    const mrhiTextureCopy texels = {.resource = t};
+    const mrhiTexelLayout layout = {.bytesPerRow = 8, .rowsPerImage = 2};
+    const mrhiExtent3d extent = {2, 2, 1};
+    CHECK(mrhiSealResource(device, t) == mrhi_success && mrhiCompileFrame(device) == mrhi_success &&
+              mrhiBeginPass(device, copy) == mrhi_success &&
+              mrhiWriteTexture(device, copy, &texels, pixels, sizeof(pixels), &layout, &extent) ==
+                  mrhi_success &&
+              mrhiEndPass(device, copy) == mrhi_success,
+          "uploaded and sealed");
+    Finish(device, 0);
+    mrhiResourceId b = {0};
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportBuffer(device, buffer, &b) == mrhi_success,
+          "a frame reading the heap");
+    mrhiPassDef passDef = mrhiDefaultPassDef();
+    mrhiAccess write = Whole(b, mrhi_accessStorageWrite);
+    passDef.accesses = &write;
+    passDef.accessCount = 1;
+    passDef.heap = heap;
+    LABEL(passDef, "bindless");
+    mrhiPassId dispatch = {0};
+    CHECK(mrhiAddPass(device, &passDef, &dispatch) == mrhi_success, "a pass naming the heap");
+    mrhiAccess read = Whole(b, mrhi_accessCopySource);
+    mrhiPassId readPass = CopyPass(device, &read, 1);
+    const uint32_t indices[4] = {HEAP_TEXTURE, HEAP_SAMPLER, HEAP_BUFFER, 0};
+    mrhiRequestId written = {0};
+    CHECK(mrhiCompileFrame(device) == mrhi_success &&
+              mrhiBeginPass(device, dispatch) == mrhi_success &&
+              mrhiSetComputePipeline(device, dispatch, pipeline) == mrhi_success &&
+              mrhiSetRootBlock(device, dispatch, 0, indices, sizeof(indices)) == mrhi_success &&
+              mrhiDispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
+              mrhiEndPass(device, dispatch) == mrhi_success &&
+              mrhiBeginPass(device, readPass) == mrhi_success &&
+              mrhiReadBuffer(device, readPass, b, 0, 4, &written) == mrhi_success &&
+              mrhiEndPass(device, readPass) == mrhi_success,
+          "dispatched and read");
+    Finish(device, 1);
+    CHECK(Taken(device, written, clamped, 4), "the clamped texel, through the heaps");
+    CHECK(mrhiDestroyHeap(device, heap) == mrhi_success, "the heap destroyed");
+    mrhiDestroyDevice(device);
+}
+
 static void MakeScene(Scene* scene)
 {
     mrhiDevice* device = scene->device;
@@ -1029,6 +1178,7 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         CheckDevice(instance, ids[i], &all);
         CheckCacheImport(instance, ids[i]);
         CheckRetirement(instance, ids[i]);
+        CheckHeaps(instance, ids[i], driver != mrhi_driverTest);
     }
     mrhiAdapterId again[16];
     CHECK(Search(instance, again, 16) == count && memcmp(ids, again, count * sizeof(ids[0])) == 0,

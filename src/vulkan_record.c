@@ -11,6 +11,7 @@
 #include "capabilities_core.h"
 #include "invariant.h"
 #include "vulkan_adapter.h"
+#include "vulkan_heap.h"
 #include "vulkan_label.h"
 #include "vulkan_pass.h"
 #include "vulkan_query.h"
@@ -337,6 +338,16 @@ static void SetPipeline(mrhiVulkanRecording* recording, const mrhiCommand* comma
     recording->pipeline = pipeline;
     recording->frames->api->vkCmdBindPipeline(recording->slot->commands, pipeline->bindPoint,
                                               pipeline->pipeline);
+    // The pass's heap, bound again with each pipeline reading heaps,
+    // since pipelines of other table layouts disturb it (mrhi-0015).
+    uint64_t heap = recording->pass->heap;
+    if (pipeline->heap && heap != 0)
+    {
+        VkDescriptorSet set = mrhiVulkanHeapSet(recording->frames->heaps, heap);
+        recording->frames->api->vkCmdBindDescriptorSets(recording->slot->commands,
+                                                        pipeline->bindPoint, pipeline->layout,
+                                                        MRHI_VULKAN_TABLES, 1, &set, 0, nullptr);
+    }
 }
 
 // Sets dynamic state from a command and the payload that follows it.

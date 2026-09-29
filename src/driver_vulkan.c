@@ -80,7 +80,8 @@ static size_t GetAdapters(const void* self, mrhiDriverAdapter* adapters, size_t 
     for (uint32_t i = 0; i < read; ++i)
     {
         mrhiDriverAdapter adapter;
-        if (mrhiDescribeVulkanAdapter(&driver->vulkan, driver->devices[i], &adapter))
+        if (mrhiDescribeVulkanAdapter(&driver->vulkan, &driver->allocator, driver->devices[i],
+                                      &adapter))
         {
             if (found < capacity)
             {

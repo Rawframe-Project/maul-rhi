@@ -11,10 +11,11 @@ driver: command reflection
 driver_test: allocator capabilities_core command driver driver_test_frame invariant
 driver_test_frame: command driver label
 driver_vulkan: allocator driver invariant vulkan_adapter vulkan_api vulkan_device vulkan_surface
-vulkan_device: allocator command driver invariant tlsf vulkan_adapter vulkan_api vulkan_frame vulkan_label vulkan_memory vulkan_object vulkan_pipeline vulkan_resource vulkan_swapchain
-vulkan_frame: invariant vulkan_api vulkan_memory vulkan_object vulkan_pipeline vulkan_resource vulkan_swapchain
+vulkan_device: allocator command driver invariant tlsf vulkan_adapter vulkan_api vulkan_frame vulkan_heap vulkan_label vulkan_memory vulkan_object vulkan_pipeline vulkan_resource vulkan_swapchain
+vulkan_frame: invariant vulkan_api vulkan_heap vulkan_memory vulkan_object vulkan_pipeline vulkan_resource vulkan_swapchain
+vulkan_heap: driver invariant vulkan_api vulkan_object vulkan_pipeline
 vulkan_swapchain: capabilities_core driver invariant vulkan_adapter vulkan_api vulkan_resource vulkan_surface
-vulkan_record: capabilities_core command invariant vulkan_adapter vulkan_frame vulkan_label vulkan_pass vulkan_query
+vulkan_record: capabilities_core command invariant vulkan_adapter vulkan_frame vulkan_heap vulkan_label vulkan_pass vulkan_query
 vulkan_pass: capabilities_core command invariant vulkan_adapter vulkan_frame vulkan_swapchain
 vulkan_query: command invariant vulkan_frame vulkan_pass
 vulkan_pipeline: container driver invariant reflection vulkan_api vulkan_label vulkan_object

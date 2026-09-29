@@ -297,6 +297,12 @@ format.
   for no WGSL.
 - A pipeline whose entry points read a heap is set only in a pass
   naming one (mrhi-0015).
+- Heaps on Vulkan (mrhi-0015): the bindless features from descriptor
+  indexing and `VK_EXT_mutable_descriptor_type`, heap sizes net of the
+  binding tables, one set layout per device at set 4, a pool and set
+  per heap, pipelines reading heaps binding the pass's; conformance
+  samples a sealed texture and writes a buffer through heaps on
+  lavapipe (`MAUL_RHI_REQUIRE_BINDLESS`).
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

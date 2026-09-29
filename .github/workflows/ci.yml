@@ -76,11 +76,12 @@ jobs:
         run: cmake --build build -j 4
       - name: Test
         # Linux runs Vulkan on lavapipe, which must be found, under the
-        # validation layer, whose errors in a test's output fail it, and
-        # presents to an XCB window on Xvfb (mrhi-0003).
+        # validation layer, whose errors in a test's output fail it,
+        # presents to an XCB window on Xvfb, and reads heaps (mrhi-0003).
         env:
           MAUL_RHI_REQUIRE_VULKAN: ${{ runner.os == 'Linux' && '1' || '' }}
           MAUL_RHI_REQUIRE_SURFACE: ${{ runner.os == 'Linux' && '1' || '' }}
+          MAUL_RHI_REQUIRE_BINDLESS: ${{ runner.os == 'Linux' && '1' || '' }}
           VK_INSTANCE_LAYERS: ${{ runner.os == 'Linux' && 'VK_LAYER_KHRONOS_validation' || '' }}
           # Synchronization validation checks the barriers the graph makes.
           VK_KHRONOS_VALIDATION_VALIDATE_SYNC: "true"

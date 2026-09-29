@@ -128,7 +128,10 @@ ids, requests, the frame graph) can be tested without a GPU.
   CTest fails any test whose output reports a validation error.
   Where the XCB client library is installed, the suite makes a window
   and checks surfaces on it; Linux CI runs the tests under Xvfb and
-  sets `MAUL_RHI_REQUIRE_SURFACE`, so a missing X server fails.
+  sets `MAUL_RHI_REQUIRE_SURFACE`, so a missing X server fails. A second
+  container (`test/shaders/bindless.*`, without WGSL) reads heaps on
+  adapters with heterogeneous heaps; Linux CI sets
+  `MAUL_RHI_REQUIRE_BINDLESS`, so lavapipe must grant them.
   ThreadSanitizer skips the threads and locks of lavapipe, LLVM and
   the XCB client library (`test/tsan.supp`), which it cannot see
   ordered.

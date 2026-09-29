@@ -3,9 +3,10 @@
 //
 // A Vulkan device's shaders and pipelines (mrhi-0003): shader modules
 // from the container's SPIR-V, pipeline layouts from the reflection
-// (a descriptor set per binding table, the root block as push
-// constants), pipelines made at the call and answered at the next poll,
-// and the device's pipeline cache.
+// (a descriptor set per binding table, the device's heap layout after
+// them for containers reading heaps, the root block as push constants),
+// pipelines made at the call and answered at the next poll, and the
+// device's pipeline cache.
 
 #ifndef MAUL_RHI_SRC_VULKAN_PIPELINE_H
 #define MAUL_RHI_SRC_VULKAN_PIPELINE_H
@@ -13,7 +14,8 @@
 #include "driver.h"
 #include "vulkan_object.h"
 
-// The binding tables a pipeline layout has at most.
+// The binding tables a pipeline layout has at most; a heap's set follows
+// them, at set MRHI_VULKAN_TABLES.
 #define MRHI_VULKAN_TABLES 4
 
 // The constants one pipeline sets at most, a container's record bound.
@@ -23,8 +25,11 @@ typedef struct mrhiVulkanPipeline
 {
     VkPipeline pipeline;
     VkPipelineLayout layout;
-    VkDescriptorSetLayout sets[MRHI_VULKAN_TABLES];
+    // The tables' set layouts, which it owns, and the device's heap
+    // layout after them when it reads heaps.
+    VkDescriptorSetLayout sets[MRHI_VULKAN_TABLES + 1];
     uint32_t setCount;
+    bool heap;
     // The stages its push constants reach; 0 without a root block.
     VkShaderStageFlags rootStages;
     VkPipelineBindPoint bindPoint;
@@ -42,6 +47,8 @@ typedef struct mrhiVulkanPipelines
     const mrhiVulkanDevice* api;
     VkDevice device;
     VkFormat depthStencil;
+    // The device's heap layout, VK_NULL_HANDLE without bindless sampling.
+    VkDescriptorSetLayout heapLayout;
     VkPipelineCache cache;
     // What a cache blob must name to be this device's.
     VkPhysicalDeviceProperties properties;

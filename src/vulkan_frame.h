@@ -11,6 +11,7 @@
 #ifndef MAUL_RHI_SRC_VULKAN_FRAME_H
 #define MAUL_RHI_SRC_VULKAN_FRAME_H
 
+#include "vulkan_heap.h"
 #include "vulkan_pipeline.h"
 #include "vulkan_swapchain.h"
 
@@ -31,6 +32,7 @@ typedef enum mrhiVulkanRetired
     mrhiVulkanRetiredSampler,
     mrhiVulkanRetiredQuerySet,
     mrhiVulkanRetiredPipeline,
+    mrhiVulkanRetiredHeap,
 } mrhiVulkanRetired;
 
 typedef struct mrhiVulkanRetire
@@ -94,6 +96,7 @@ typedef struct mrhiVulkanFrames
     const VkPhysicalDeviceMemoryProperties* memory;
     mrhiVulkanObjects* objects;
     mrhiVulkanPipelines* pipelines;
+    mrhiVulkanHeaps* heaps;
     mrhiVulkanSwapchains* swapchains;
     mrhiVulkanSlot* slots;
     uint32_t slotCount;
