@@ -8,17 +8,19 @@
 #ifndef MAUL_RHI_SRC_DRIVER_H
 #define MAUL_RHI_SRC_DRIVER_H
 
-#include "maul-rhi/instance.h"
+#include "maul-rhi/capabilities.h"
 
 // The SPI version a driver's vtable must carry.
 #define MRHI_SPI_VERSION 1
 
-// An adapter as a driver reports it: its handle, never zero, and its
-// facts.
+// An adapter as a driver reports it: its handle, never zero, its facts,
+// and the features and limits it can grant.
 typedef struct mrhiDriverAdapter
 {
     uint64_t handle;
     mrhiAdapterInfo info;
+    mrhiFeatures features;
+    mrhiLimits limits;
 } mrhiDriverAdapter;
 
 // Finished work: the tag the core gave the request, and its outcome.

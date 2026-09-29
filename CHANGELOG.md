@@ -32,3 +32,9 @@ format.
   the instance's notification and adapter limits.
 - The test driver (`MAUL_RHI_TEST_DRIVER`, `mrhiTestDriverDef`): no
   GPU, the adapters a test describes.
+- Capabilities (`capabilities.h`): the optional features
+  (`mrhiFeatures`) and the limits (`mrhiLimits`, `mrhiDefaultLimits`,
+  WebGPU's floor), read per adapter (`mrhiGetAdapterFeatures`,
+  `mrhiGetAdapterLimits`). Each maps onto Vulkan, D3D12, Metal and
+  WebGPU in `docs/contract/mappings.md`; adapters below the floor are
+  left out, and features an API cannot grant are never reported.

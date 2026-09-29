@@ -665,12 +665,1318 @@
       ]
     },
     {
-      "name": "test",
-      "doc": "The test driver (MAUL_RHI_TEST_DRIVER): a driver without a GPU whose adapters a test describes, for the library's tests and a program's own.",
+      "name": "capabilities",
+      "doc": "What an adapter can do: the optional features and the limits, each mapped onto the four APIs in docs/contract/mappings.md.",
       "includes": [
         "instance"
       ],
       "items": [
+        {
+          "kind": "struct",
+          "name": "features",
+          "mapped": true,
+          "doc": "The optional features (record R18). The floor (compute, indirect draws, instancing, the texture kinds, independent blend, occlusion queries) needs no request.",
+          "members": [
+            {
+              "name": "timestamp_query",
+              "type": "bool",
+              "doc": "Timestamps at pass boundaries (record R20).",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "timestampComputeAndGraphics and the queue's valid bits"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "timestamp queries"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "counter sampling at stage boundaries"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "timestamp-query, pass boundaries only"
+                }
+              }
+            },
+            {
+              "name": "pipeline_statistics_query",
+              "type": "bool",
+              "doc": "Pipeline statistics queries.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "pipelineStatisticsQuery"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "pipeline statistics queries"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "a statistic counter set on some Macs, none on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "no pipeline statistics"
+                }
+              }
+            },
+            {
+              "name": "texture_compression_bc",
+              "type": "bool",
+              "doc": "BC1 to BC7 textures.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "supportsBCTextureCompression (Macs; Apple9 and later)"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "texture-compression-bc"
+                }
+              }
+            },
+            {
+              "name": "texture_compression_etc2",
+              "type": "bool",
+              "doc": "ETC2 and EAC textures.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "textureCompressionETC2"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ETC2 formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "Apple GPU families"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "texture-compression-etc2"
+                }
+              }
+            },
+            {
+              "name": "texture_compression_astc",
+              "type": "bool",
+              "doc": "ASTC LDR textures.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "Apple GPU families"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "texture-compression-astc"
+                }
+              }
+            },
+            {
+              "name": "float32_filterable",
+              "type": "bool",
+              "doc": "Filtering of 32-bit float textures.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "format features of the 32-bit float formats"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "filterable 32-bit floats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "supports32BitFloatFiltering"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "float32-filterable"
+                }
+              }
+            },
+            {
+              "name": "rg11b10_renderable",
+              "type": "bool",
+              "doc": "Rendering to rg11b10ufloat.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "format features of B10G11R11 ufloat"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R11G11B10_FLOAT render targets"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "RG11B10Float render targets"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "rg11b10ufloat-renderable"
+                }
+              }
+            },
+            {
+              "name": "dual_source_blending",
+              "type": "bool",
+              "doc": "Blending with a second fragment output.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "dualSrcBlend"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "dual-source blending"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "blend with output index 1"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "dual-source-blending"
+                }
+              }
+            },
+            {
+              "name": "unclipped_depth",
+              "type": "bool",
+              "doc": "Depth clamped instead of clipped, for shadow pancaking.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "depthClamp"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DepthClipEnable off"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "depthClipMode clamp"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "depth-clip-control"
+                }
+              }
+            },
+            {
+              "name": "shader_f16",
+              "type": "bool",
+              "doc": "16-bit floats in shaders.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "shaderFloat16 and 16-bit storage"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "native 16-bit operations (SM 6.2 and a cap)"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "half"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "shader-f16"
+                }
+              }
+            },
+            {
+              "name": "subgroups",
+              "type": "bool",
+              "doc": "Subgroup operations.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "subgroup operations (1.1), the stages queried"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "wave operations (SM 6.0)"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "SIMD-group functions"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "subgroups"
+                }
+              }
+            },
+            {
+              "name": "shader_int64",
+              "type": "bool",
+              "doc": "64-bit integers in shaders.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "shaderInt64"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "Int64ShaderOps"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "long"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "no 64-bit integers in WGSL"
+                }
+              }
+            },
+            {
+              "name": "indirect_first_instance",
+              "type": "bool",
+              "doc": "A first instance other than zero in indirect draws.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "drawIndirectFirstInstance"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "indirect arguments"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "indirect arguments"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "indirect-first-instance"
+                }
+              }
+            },
+            {
+              "name": "multi_draw_indirect_count",
+              "type": "bool",
+              "doc": "Multi-draw indirect with a GPU-written count.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "drawIndirectCount (1.2)"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "ExecuteIndirect with a count buffer"
+                },
+                "metal": {
+                  "class": "emulated",
+                  "note": "an indirect command buffer filled by a compute pass"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "no multi-draw indirect"
+                }
+              }
+            },
+            {
+              "name": "multiview",
+              "type": "bool",
+              "doc": "Rendering several views in one pass.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "multiview (1.1)"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "view instancing tiers"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "vertex amplification"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "no multiview"
+                }
+              }
+            },
+            {
+              "name": "bindless_sampling",
+              "type": "bool",
+              "doc": "A heap of sampled textures and samplers (record R1).",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "descriptor indexing or descriptor heaps"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "resource binding tier 2"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "argument buffers tier 2"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until the resource table draft ships (sampling-resource-table)"
+                }
+              }
+            },
+            {
+              "name": "bindless_heterogeneous",
+              "type": "bool",
+              "doc": "A heap of every resource kind but uniform buffers (record R1).",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "descriptor heaps, or descriptor indexing over the storage types"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "resource binding tier 3"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "argument buffers tier 2"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until heterogeneous-resource-table ships"
+                }
+              }
+            },
+            {
+              "name": "present_timing",
+              "type": "bool",
+              "doc": "Presentation timestamps and a target present time.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "VK_EXT_present_timing"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DXGI frame statistics"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a drawable's presented time"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "the browser paces presentation"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "limits",
+          "mapped": true,
+          "defaults": true,
+          "doc": "The limits (record R19): WebGPU's floor in the contract's terms. An adapter reports its values; a device def requests values, the defaults being the floor.",
+          "members": [
+            {
+              "name": "texture_dimension_2d",
+              "type": "uint32",
+              "default": 8192,
+              "doc": "The width and height of a 2D or cube texture.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxImageDimension2D"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "16384"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "16384 on current families"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxTextureDimension2D"
+                }
+              }
+            },
+            {
+              "name": "texture_dimension_3d",
+              "type": "uint32",
+              "default": 2048,
+              "doc": "Each dimension of a 3D texture.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxImageDimension3D"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "2048"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "2048"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxTextureDimension3D"
+                }
+              }
+            },
+            {
+              "name": "texture_array_layers",
+              "type": "uint32",
+              "default": 256,
+              "doc": "The layers of an array texture.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxImageArrayLayers"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "2048"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "2048"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxTextureArrayLayers"
+                }
+              }
+            },
+            {
+              "name": "binding_tables",
+              "type": "uint32",
+              "default": 4,
+              "doc": "Binding tables a pipeline declares (record R1).",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "descriptor sets, or heap indices in the root block"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "heap indices in root constants"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "argument tables"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxBindGroups"
+                }
+              }
+            },
+            {
+              "name": "bindings_per_table",
+              "type": "uint32",
+              "default": 1000,
+              "doc": "Slots in one binding table.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "bounded by maxPerStageResources"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "heap indices, no lower bound"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "argument buffer entries"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxBindingsPerBindGroup"
+                }
+              }
+            },
+            {
+              "name": "sampled_textures_per_stage",
+              "type": "uint32",
+              "default": 16,
+              "doc": "Sampled textures one shader stage binds.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxPerStageDescriptorSampledImages"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "heap indices (tier 2 and above)"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "argument buffers"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxSampledTexturesPerShaderStage"
+                }
+              }
+            },
+            {
+              "name": "samplers_per_stage",
+              "type": "uint32",
+              "default": 16,
+              "doc": "Samplers one shader stage binds.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxPerStageDescriptorSamplers"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the sampler heap"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "16 per stage"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxSamplersPerShaderStage"
+                }
+              }
+            },
+            {
+              "name": "storage_buffers_per_stage",
+              "type": "uint32",
+              "default": 8,
+              "doc": "Storage buffers one shader stage binds.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxPerStageDescriptorStorageBuffers"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "UAVs through the heap"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "argument buffers"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxStorageBuffersPerShaderStage"
+                }
+              }
+            },
+            {
+              "name": "storage_textures_per_stage",
+              "type": "uint32",
+              "default": 4,
+              "doc": "Storage textures one shader stage binds.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxPerStageDescriptorStorageImages"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "UAVs through the heap"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "read-write textures"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxStorageTexturesPerShaderStage"
+                }
+              }
+            },
+            {
+              "name": "uniform_buffers_per_stage",
+              "type": "uint32",
+              "default": 12,
+              "doc": "Uniform buffers one shader stage binds.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxPerStageDescriptorUniformBuffers"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "14 constant buffers per stage"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "argument buffers"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxUniformBuffersPerShaderStage"
+                }
+              }
+            },
+            {
+              "name": "uniform_binding_bytes",
+              "type": "uint32",
+              "default": 65536,
+              "doc": "The bytes of one uniform buffer binding.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxUniformBufferRange"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "65536"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "constant address space"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxUniformBufferBindingSize"
+                }
+              }
+            },
+            {
+              "name": "storage_binding_bytes",
+              "type": "uint64",
+              "default": 134217728,
+              "doc": "The bytes of one storage buffer binding.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxStorageBufferRange"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the buffer's size"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the buffer's size"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxStorageBufferBindingSize"
+                }
+              }
+            },
+            {
+              "name": "uniform_offset_alignment",
+              "type": "uint32",
+              "default": 256,
+              "doc": "The alignment of a uniform binding's offset; lower is better.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "minUniformBufferOffsetAlignment"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "256"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "256 covers every family"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "minUniformBufferOffsetAlignment"
+                }
+              },
+              "better": "lower"
+            },
+            {
+              "name": "storage_offset_alignment",
+              "type": "uint32",
+              "default": 256,
+              "doc": "The alignment of a storage binding's offset; lower is better.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "minStorageBufferOffsetAlignment"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "16 for raw buffers"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "16 or less"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "minStorageBufferOffsetAlignment"
+                }
+              },
+              "better": "lower"
+            },
+            {
+              "name": "vertex_buffers",
+              "type": "uint32",
+              "default": 8,
+              "doc": "Vertex buffers a pipeline reads.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxVertexInputBindings"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "32 input slots"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "31 buffer slots, shared with argument tables"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxVertexBuffers"
+                }
+              }
+            },
+            {
+              "name": "tables_plus_vertex_buffers",
+              "type": "uint32",
+              "default": 24,
+              "doc": "Binding tables and vertex buffers together.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "no shared bound"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "no shared bound"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "31 buffer slots"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxBindGroupsPlusVertexBuffers"
+                }
+              }
+            },
+            {
+              "name": "buffer_bytes",
+              "type": "uint64",
+              "default": 268435456,
+              "doc": "The bytes of one buffer.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxBufferSize"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the resource size limit"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "maxBufferLength"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxBufferSize"
+                }
+              }
+            },
+            {
+              "name": "vertex_attributes",
+              "type": "uint32",
+              "default": 16,
+              "doc": "Vertex attributes a pipeline reads.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxVertexInputAttributes"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "32"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "31"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxVertexAttributes"
+                }
+              }
+            },
+            {
+              "name": "vertex_stride",
+              "type": "uint32",
+              "default": 2048,
+              "doc": "The stride of one vertex buffer.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxVertexInputBindingStride"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "2048"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "no lower bound"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxVertexBufferArrayStride"
+                }
+              }
+            },
+            {
+              "name": "inter_stage_variables",
+              "type": "uint32",
+              "default": 16,
+              "doc": "Four-component variables passed between shader stages.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxVertexOutputComponents divided by 4"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "32 registers"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "32"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxInterStageShaderVariables"
+                }
+              }
+            },
+            {
+              "name": "color_attachments",
+              "type": "uint32",
+              "default": 8,
+              "doc": "Color targets of one render pass.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxColorAttachments"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "8"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "8"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxColorAttachments"
+                }
+              }
+            },
+            {
+              "name": "color_bytes_per_sample",
+              "type": "uint32",
+              "default": 32,
+              "doc": "The bytes of all color targets in one sample.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "no such bound"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "no such bound"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tile memory per sample"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxColorAttachmentBytesPerSample"
+                }
+              }
+            },
+            {
+              "name": "workgroup_storage_bytes",
+              "type": "uint32",
+              "default": 16384,
+              "doc": "The workgroup memory of one compute pipeline.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxComputeSharedMemorySize"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "32768"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "maxThreadgroupMemoryLength"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxComputeWorkgroupStorageSize"
+                }
+              }
+            },
+            {
+              "name": "workgroup_invocations",
+              "type": "uint32",
+              "default": 256,
+              "doc": "The invocations of one workgroup.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxComputeWorkGroupInvocations"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "1024"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "maxTotalThreadsPerThreadgroup"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxComputeInvocationsPerWorkgroup"
+                }
+              }
+            },
+            {
+              "name": "workgroup_size_x",
+              "type": "uint32",
+              "default": 256,
+              "doc": "A workgroup's size in x.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxComputeWorkGroupSize[0]"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "1024"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "maxThreadsPerThreadgroup"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxComputeWorkgroupSizeX"
+                }
+              }
+            },
+            {
+              "name": "workgroup_size_y",
+              "type": "uint32",
+              "default": 256,
+              "doc": "A workgroup's size in y.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxComputeWorkGroupSize[1]"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "1024"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "maxThreadsPerThreadgroup"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxComputeWorkgroupSizeY"
+                }
+              }
+            },
+            {
+              "name": "workgroup_size_z",
+              "type": "uint32",
+              "default": 64,
+              "doc": "A workgroup's size in z.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxComputeWorkGroupSize[2]"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "64"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "maxThreadsPerThreadgroup"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxComputeWorkgroupSizeZ"
+                }
+              }
+            },
+            {
+              "name": "workgroups_per_dimension",
+              "type": "uint32",
+              "default": 65535,
+              "doc": "Workgroups one dispatch has in each dimension.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxComputeWorkGroupCount"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "65535"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "no lower bound"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxComputeWorkgroupsPerDimension"
+                }
+              }
+            },
+            {
+              "name": "root_block_bytes",
+              "type": "uint32",
+              "default": 64,
+              "doc": "The bytes of the root block each draw or dispatch sets (record R1).",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "push constants (at least 128)"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "root constants"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "argument table bytes"
+                },
+                "web_gpu": {
+                  "class": "emulated",
+                  "note": "a dynamic-offset uniform buffer where immediates are missing, maxImmediateSize where present"
+                }
+              }
+            },
+            {
+              "name": "heap_size",
+              "type": "uint32",
+              "default": 0,
+              "doc": "Entries of the resource heap; 0 without a bindless feature, at most 65536 portably.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "descriptor indexing counts or the heap's size"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "1000000 at tier 2"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "argument buffers tier 2"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until resource tables ship"
+                }
+              }
+            },
+            {
+              "name": "sampler_heap_size",
+              "type": "uint32",
+              "default": 0,
+              "doc": "Entries of the sampler heap; 0 without a bindless feature.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "maxDescriptorSetUpdateAfterBindSamplers"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "2048, or the queried maximum"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "argument buffer samplers"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until resource tables ship"
+                }
+              }
+            },
+            {
+              "name": "frames_in_flight",
+              "type": "uint32",
+              "default": 2,
+              "doc": "Frames recorded while earlier ones still run on the GPU.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "the core's timeline semaphores"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the core's fences"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "command buffer completion"
+                },
+                "web_gpu": {
+                  "class": "emulated",
+                  "note": "submitted-work-done promises"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_limits",
+          "doc": "Returns the floor limits, which every adapter of every driver meets: WebGPU's defaults, 64 root block bytes, no heaps and 2 frames in flight.",
+          "returns": {
+            "type": "struct.limits",
+            "doc": "The floor."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_adapter_features",
+          "doc": "Reads the optional features an adapter can grant.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorStale` for an adapter the instance no longer has."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "const",
+              "doc": "The instance."
+            },
+            {
+              "name": "adapter",
+              "type": "id.adapter_id",
+              "doc": "The adapter."
+            },
+            {
+              "name": "features_out",
+              "type": "struct.features",
+              "pointer": "mutable",
+              "doc": "Receives the features."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_adapter_limits",
+          "doc": "Reads the limits an adapter can grant, each at least the floor.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorStale` for an adapter the instance no longer has."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "const",
+              "doc": "The instance."
+            },
+            {
+              "name": "adapter",
+              "type": "id.adapter_id",
+              "doc": "The adapter."
+            },
+            {
+              "name": "limits_out",
+              "type": "struct.limits",
+              "pointer": "mutable",
+              "doc": "Receives the limits."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          }
+        }
+      ]
+    },
+    {
+      "name": "test",
+      "doc": "The test driver (MAUL_RHI_TEST_DRIVER): a driver without a GPU whose adapters a test describes, for the library's tests and a program's own.",
+      "includes": [
+        "capabilities"
+      ],
+      "items": [
+        {
+          "kind": "struct",
+          "name": "test_adapter",
+          "doc": "An adapter the test driver finds: its facts, features and limits.",
+          "members": [
+            {
+              "name": "info",
+              "type": "struct.adapter_info"
+            },
+            {
+              "name": "features",
+              "type": "struct.features"
+            },
+            {
+              "name": "limits",
+              "type": "struct.limits"
+            }
+          ]
+        },
         {
           "kind": "struct",
           "name": "test_driver_def",
@@ -679,7 +1985,7 @@
           "members": [
             {
               "name": "adapters",
-              "type": "struct.adapter_info",
+              "type": "struct.test_adapter",
               "pointer": "const",
               "doc": "The adapters the driver finds, in its own order. May be NULL when adapterCount is 0."
             },

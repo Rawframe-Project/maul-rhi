@@ -15,7 +15,7 @@ typedef struct TestDriver
 {
     mrhiAllocator allocator;
     size_t bytes;
-    mrhiAdapterInfo* adapters;
+    mrhiTestAdapter* adapters;
     uint32_t adapterCount;
     uint64_t* pending;
     uint32_t pendingCount;
@@ -52,7 +52,13 @@ static size_t GetAdapters(const void* self, mrhiDriverAdapter* adapters, size_t 
     const TestDriver* driver = self;
     for (size_t i = 0; i < driver->adapterCount && i < capacity; ++i)
     {
-        adapters[i] = (mrhiDriverAdapter){.handle = i + 1, .info = driver->adapters[i]};
+        const mrhiTestAdapter* adapter = &driver->adapters[i];
+        adapters[i] = (mrhiDriverAdapter){
+            .handle = i + 1,
+            .info = adapter->info,
+            .features = adapter->features,
+            .limits = adapter->limits,
+        };
     }
     return driver->adapterCount;
 }
@@ -81,8 +87,8 @@ mrhiResult mrhiCreateTestDriver(const mrhiAllocator* allocator, const mrhiTestDr
         return mrhi_errorInvalid;
     }
     mrhiLayout layout = {.size = sizeof(TestDriver)};
-    size_t adaptersAt = mrhiLayoutAdd(&layout, def->adapterCount, sizeof(mrhiAdapterInfo),
-                                      alignof(mrhiAdapterInfo));
+    size_t adaptersAt = mrhiLayoutAdd(&layout, def->adapterCount, sizeof(mrhiTestAdapter),
+                                      alignof(mrhiTestAdapter));
     size_t pendingAt = mrhiLayoutAdd(&layout, pendingLimit, sizeof(uint64_t), alignof(uint64_t));
     TestDriver* driver =
         layout.overflow ? nullptr : mrhiAllocate(allocator, layout.size, alignof(TestDriver));
@@ -94,12 +100,12 @@ mrhiResult mrhiCreateTestDriver(const mrhiAllocator* allocator, const mrhiTestDr
     *driver = (TestDriver){
         .allocator = *allocator,
         .bytes = layout.size,
-        .adapters = (mrhiAdapterInfo*)(block + adaptersAt),
+        .adapters = (mrhiTestAdapter*)(block + adaptersAt),
         .adapterCount = def->adapterCount,
         .pending = (uint64_t*)(block + pendingAt),
         .pendingLimit = pendingLimit,
     };
-    size_t adapterBytes = def->adapterCount * sizeof(mrhiAdapterInfo);
+    size_t adapterBytes = def->adapterCount * sizeof(mrhiTestAdapter);
     if (adapterBytes > 0)
     {
         memcpy(driver->adapters, def->adapters, adapterBytes);

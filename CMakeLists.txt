@@ -46,6 +46,8 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/base.c
     src/chain.c
     src/driver.c
+    src/generated/capabilities.c
+    src/generated/defaults.c
     src/generated/result_names.c
     src/instance.c)
 maul_configure_library(maul-rhi)

@@ -10,16 +10,19 @@
 
 #include <string.h>
 
-static mrhiAdapterInfo Adapter(mrhiAdapterKind kind, const char* name)
+static mrhiTestAdapter Adapter(mrhiAdapterKind kind, const char* name)
 {
-    mrhiAdapterInfo info = {.driver = mrhi_driverTest, .kind = kind, .vendorId = 0x1234};
-    info.nameLength = (uint32_t)strlen(name);
-    memcpy(info.name, name, info.nameLength);
-    return info;
+    mrhiTestAdapter adapter = {
+        .info = {.driver = mrhi_driverTest, .kind = kind, .vendorId = 0x1234},
+        .limits = mrhiDefaultLimits(),
+    };
+    adapter.info.nameLength = (uint32_t)strlen(name);
+    memcpy(adapter.info.name, name, adapter.info.nameLength);
+    return adapter;
 }
 
 // A software, an integrated and a discrete adapter, in that order.
-static mrhiAdapterInfo s_adapters[3];
+static mrhiTestAdapter s_adapters[3];
 static mrhiTestDriverDef s_driver;
 
 static mrhiInstance* Create(uint32_t notifications, uint32_t adapters, bool testDriver)
@@ -172,6 +175,71 @@ static void TestManyRequestsAtOnce(void)
     mrhiDestroyInstance(instance);
 }
 
+static void TestTheFloor(void)
+{
+    mrhiInstance* instance = Create(64, 16, true);
+    s_adapters[0].limits.textureDimension2d = 4096;
+    s_adapters[1].limits.uniformOffsetAlignment = 512;
+    s_adapters[2].limits.uniformOffsetAlignment = 64;
+    s_adapters[2].limits.textureDimension2d = 16384;
+    mrhiInstance* again = nullptr;
+    mrhiInstanceDef def = mrhiDefaultInstanceDef();
+    def.next = &s_driver.chain;
+    CHECK(mrhiCreateInstance(&def, &again) == mrhi_success, "an instance of weak adapters");
+    CHECK(Find(again, mrhi_powerDefault, true) == mrhi_success, "found");
+    char letters[5];
+    Listing(again, letters);
+    CHECK(strcmp(letters, "d") == 0, "only the adapter at or above the floor");
+    mrhiAdapterId id;
+    size_t count = 0;
+    mrhiLimits limits;
+    CHECK(mrhiGetAdapters(again, &id, 1, &count) == mrhi_success && count == 1, "one");
+    CHECK(mrhiGetAdapterLimits(again, id, &limits) == mrhi_success &&
+              limits.textureDimension2d == 16384 && limits.uniformOffsetAlignment == 64,
+          "its own limits");
+    mrhiDestroyInstance(again);
+    mrhiDestroyInstance(instance);
+}
+
+static void TestFeaturesAreMaskedByTheApi(void)
+{
+    mrhiInstance* instance = Create(64, 16, true);
+    mrhiDestroyInstance(instance);
+    s_adapters[2].info.driver = mrhi_driverWebGpu;
+    s_adapters[2].features = (mrhiFeatures){.shaderInt64 = true, .timestampQuery = true};
+    s_adapters[1].info.driver = mrhi_driverD3d12;
+    s_adapters[1].features = (mrhiFeatures){.textureCompressionAstc = true, .multiview = true};
+    mrhiInstanceDef def = mrhiDefaultInstanceDef();
+    def.next = &s_driver.chain;
+    CHECK(mrhiCreateInstance(&def, &instance) == mrhi_success, "the instance");
+    CHECK(Find(instance, mrhi_powerHigh, false) == mrhi_success, "found");
+    mrhiAdapterId ids[2];
+    size_t count = 0;
+    CHECK(mrhiGetAdapters(instance, ids, 2, &count) == mrhi_success && count == 2, "two");
+    mrhiFeatures features;
+    CHECK(mrhiGetAdapterFeatures(instance, ids[0], &features) == mrhi_success, "web features");
+    CHECK(!features.shaderInt64 && features.timestampQuery, "no 64-bit integers in WGSL");
+    CHECK(mrhiGetAdapterFeatures(instance, ids[1], &features) == mrhi_success, "d3d12 features");
+    CHECK(!features.textureCompressionAstc && features.multiview, "no ASTC on D3D12");
+    CHECK(mrhiGetAdapterFeatures(instance, (mrhiAdapterId){0, 0}, &features) == mrhi_errorStale,
+          "a null id");
+    CHECK(mrhiGetAdapterFeatures(instance, ids[0], nullptr) == mrhi_errorInvalid, "no out");
+    mrhiLimits limits;
+    CHECK(mrhiGetAdapterLimits(instance, (mrhiAdapterId){0, 0}, &limits) == mrhi_errorStale,
+          "a null id's limits");
+    CHECK(mrhiGetAdapterLimits(nullptr, ids[0], &limits) == mrhi_errorInvalid, "no instance");
+    mrhiDestroyInstance(instance);
+}
+
+static void TestDefaultLimits(void)
+{
+    mrhiLimits floor = mrhiDefaultLimits();
+    CHECK(floor.textureDimension2d == 8192 && floor.bindingTables == 4, "WebGPU's defaults");
+    CHECK(floor.rootBlockBytes == 64 && floor.heapSize == 0 && floor.framesInFlight == 2,
+          "the contract's own");
+    CHECK(floor.storageBindingBytes == 134217728 && floor.bufferBytes == 268435456, "64-bit");
+}
+
 static void TestLimits(void)
 {
     mrhiInstance* instance = Create(2, 2, true);
@@ -247,6 +315,9 @@ int main(void)
     TestAnswerComesAtTheDrain();
     TestManyRequestsAtOnce();
     TestLimits();
+    TestTheFloor();
+    TestFeaturesAreMaskedByTheApi();
+    TestDefaultLimits();
     TestWithoutADriver();
     TestInvalidRequests();
     TestTestDriverDef();

@@ -64,3 +64,15 @@ which the generator needs on the path.
 | `any_exclusive` | Safe from any thread; `object` is used by one thread at a time. |
 | `main` | Main thread only. |
 | `realtime` | Real-time safe: no allocation, lock or wait. |
+
+## Mappings, defaults and limits
+
+A struct with `mapped` gives every member a `mapping`: a row for each
+of `vulkan`, `d3d12`, `metal` and `web_gpu`, with a `class` (`direct`,
+`emulated`, `restricted`, `absent_rejected`) and a `note` on how. They
+make `docs/contract/mappings.md`, and the core masks off the features a
+driver's API has classed absent-rejected.
+
+A struct with `defaults` gives every member a `default`, which makes its
+Default function, generated in `src/generated/defaults.c`. A member may
+add `better: lower` (the alignments); the others are better higher.

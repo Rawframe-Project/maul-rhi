@@ -12,15 +12,14 @@
 
 #include "maul-rhi/instance.h"
 
-// An adapter id's slot: its generation, and, in use, the driver's
-// handle and facts. seen marks the slots a refresh found again.
+// An adapter id's slot: its generation, and, in use, what the driver
+// reported. seen marks the slots a refresh found again.
 typedef struct mrhiAdapterSlot
 {
     uint32_t generation;
     bool inUse;
     bool seen;
-    uint64_t handle;
-    mrhiAdapterInfo info;
+    mrhiDriverAdapter adapter;
 } mrhiAdapterSlot;
 
 // An adapter request waiting for its driver's answer. Its request id's

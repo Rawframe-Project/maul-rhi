@@ -10,7 +10,7 @@
 #ifndef MAUL_RHI_TEST_H
 #define MAUL_RHI_TEST_H
 
-#include "maul-rhi/instance.h"
+#include "maul-rhi/capabilities.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -21,6 +21,14 @@ extern "C"
 {
 #endif
 
+    // An adapter the test driver finds: its facts, features and limits.
+    typedef struct mrhiTestAdapter
+    {
+        mrhiAdapterInfo info;
+        mrhiFeatures features;
+        mrhiLimits limits;
+    } mrhiTestAdapter;
+
     // Turns the test driver on for an instance, chained on its def with the
     // type mrhi_structTestDriver. The test driver is the only driver of such an
     // instance.
@@ -29,7 +37,7 @@ extern "C"
         mrhiChain chain;
         // The adapters the driver finds, in its own order. May be NULL when
         // adapterCount is 0.
-        const mrhiAdapterInfo* adapters;
+        const mrhiTestAdapter* adapters;
         uint32_t adapterCount;
     } mrhiTestDriverDef;
 

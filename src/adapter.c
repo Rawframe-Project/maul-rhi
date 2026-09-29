@@ -5,6 +5,7 @@
 // adapter table keeps the ids of adapters found again and retires the
 // others, and the listing orders them by the request's preference.
 
+#include "capabilities_core.h"
 #include "chain.h"
 #include "instance_core.h"
 
@@ -46,9 +47,9 @@ static void SortListing(mrhiInstance* instance, mrhiPowerPreference preference)
     for (uint32_t i = 1; i < instance->listed; ++i)
     {
         uint32_t slot = listing[i];
-        int rank = Rank(instance->slots[slot].info.kind, preference);
+        int rank = Rank(instance->slots[slot].adapter.info.kind, preference);
         uint32_t j = i;
-        while (j > 0 && Rank(instance->slots[listing[j - 1]].info.kind, preference) > rank)
+        while (j > 0 && Rank(instance->slots[listing[j - 1]].adapter.info.kind, preference) > rank)
         {
             listing[j] = listing[j - 1];
             --j;
@@ -62,7 +63,7 @@ static uint32_t SlotFor(mrhiInstance* instance, uint64_t handle)
     uint32_t free = instance->limits.adapters;
     for (uint32_t i = 0; i < instance->limits.adapters; ++i)
     {
-        if (instance->slots[i].inUse && instance->slots[i].handle == handle)
+        if (instance->slots[i].inUse && instance->slots[i].adapter.handle == handle)
         {
             return i;
         }
@@ -74,9 +75,11 @@ static uint32_t SlotFor(mrhiInstance* instance, uint64_t handle)
     return free;
 }
 
-// Rebuilds the table and the listing from what the driver found. The
-// driver's order is kept for equal ranks; more adapters than the limit
-// is a capacity outcome, with the first ones kept.
+// Rebuilds the table and the listing from what the driver found. An
+// adapter below the floor limits is left out, and its features are
+// masked to what its API can grant. The driver's order is kept for
+// equal ranks; more adapters than the limit is a capacity outcome, with
+// the first ones kept.
 static mrhiResult Refresh(mrhiInstance* instance, const mrhiAdapterQuery* query)
 {
     size_t total = 0;
@@ -86,6 +89,7 @@ static mrhiResult Refresh(mrhiInstance* instance, const mrhiAdapterQuery* query)
                                                      instance->limits.adapters);
     }
     size_t count = total < instance->limits.adapters ? total : instance->limits.adapters;
+    mrhiLimits floor = mrhiDefaultLimits();
     for (uint32_t i = 0; i < instance->limits.adapters; ++i)
     {
         instance->slots[i].seen = false;
@@ -93,16 +97,17 @@ static mrhiResult Refresh(mrhiInstance* instance, const mrhiAdapterQuery* query)
     instance->listed = 0;
     for (size_t i = 0; i < count; ++i)
     {
-        const mrhiDriverAdapter* adapter = &instance->found[i];
-        if (!query->allowSoftware && adapter->info.kind == mrhi_adapterSoftware)
+        mrhiDriverAdapter* adapter = &instance->found[i];
+        if ((!query->allowSoftware && adapter->info.kind == mrhi_adapterSoftware) ||
+            !mrhiLimitsWithin(&floor, &adapter->limits))
         {
             continue;
         }
+        mrhiMaskFeatures(&adapter->features, adapter->info.driver);
         uint32_t slot = SlotFor(instance, adapter->handle);
         instance->slots[slot].inUse = true;
         instance->slots[slot].seen = true;
-        instance->slots[slot].handle = adapter->handle;
-        instance->slots[slot].info = adapter->info;
+        instance->slots[slot].adapter = *adapter;
         instance->listing[instance->listed++] = slot;
     }
     for (uint32_t i = 0; i < instance->limits.adapters; ++i)
@@ -230,6 +235,18 @@ mrhiResult mrhiGetAdapters(const mrhiInstance* instance, mrhiAdapterId* adapters
     return mrhi_success;
 }
 
+// The slot an adapter id names, or NULL for a stale or null id.
+static const mrhiAdapterSlot* FindSlot(const mrhiInstance* instance, mrhiAdapterId adapter)
+{
+    uint32_t slot = adapter.index1 - 1;
+    if (adapter.index1 == 0 || slot >= instance->limits.adapters || !instance->slots[slot].inUse ||
+        instance->slots[slot].generation != adapter.generation)
+    {
+        return nullptr;
+    }
+    return &instance->slots[slot];
+}
+
 mrhiResult mrhiGetAdapterInfo(const mrhiInstance* instance, mrhiAdapterId adapter,
                               mrhiAdapterInfo* infoOut)
 {
@@ -237,12 +254,43 @@ mrhiResult mrhiGetAdapterInfo(const mrhiInstance* instance, mrhiAdapterId adapte
     {
         return mrhi_errorInvalid;
     }
-    uint32_t slot = adapter.index1 - 1;
-    if (adapter.index1 == 0 || slot >= instance->limits.adapters || !instance->slots[slot].inUse ||
-        instance->slots[slot].generation != adapter.generation)
+    const mrhiAdapterSlot* slot = FindSlot(instance, adapter);
+    if (slot == nullptr)
     {
         return mrhi_errorStale;
     }
-    *infoOut = instance->slots[slot].info;
+    *infoOut = slot->adapter.info;
+    return mrhi_success;
+}
+
+mrhiResult mrhiGetAdapterFeatures(const mrhiInstance* instance, mrhiAdapterId adapter,
+                                  mrhiFeatures* featuresOut)
+{
+    if (instance == nullptr || featuresOut == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    const mrhiAdapterSlot* slot = FindSlot(instance, adapter);
+    if (slot == nullptr)
+    {
+        return mrhi_errorStale;
+    }
+    *featuresOut = slot->adapter.features;
+    return mrhi_success;
+}
+
+mrhiResult mrhiGetAdapterLimits(const mrhiInstance* instance, mrhiAdapterId adapter,
+                                mrhiLimits* limitsOut)
+{
+    if (instance == nullptr || limitsOut == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    const mrhiAdapterSlot* slot = FindSlot(instance, adapter);
+    if (slot == nullptr)
+    {
+        return mrhi_errorStale;
+    }
+    *limitsOut = slot->adapter.limits;
     return mrhi_success;
 }

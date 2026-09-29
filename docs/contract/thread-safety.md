@@ -15,3 +15,6 @@ edit the contract, not this file.
 | `mrhiNextInstanceNotification` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiGetAdapters` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiGetAdapterInfo` | Safe from any thread; the instance is used by one thread at a time. |
+| `mrhiDefaultLimits` | Safe from any thread. |
+| `mrhiGetAdapterFeatures` | Safe from any thread; the instance is used by one thread at a time. |
+| `mrhiGetAdapterLimits` | Safe from any thread; the instance is used by one thread at a time. |
