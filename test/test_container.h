@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SECTION_ROOM   1024
+#define SECTION_ROOM   4096
 #define CONTAINER_ROOM 65536
 
 enum

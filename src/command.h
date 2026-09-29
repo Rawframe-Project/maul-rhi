@@ -30,6 +30,9 @@ typedef enum mrhiCommandType
     mrhiCommandPushDebugGroup,
     mrhiCommandPopDebugGroup,
     mrhiCommandDebugMarker,
+    // a: the table; b: the bindings, an mrhiCommandBinding each, which
+    // follow.
+    mrhiCommandBindings,
 } mrhiCommandType;
 
 typedef struct mrhiCommand
@@ -43,8 +46,27 @@ typedef struct mrhiCommand
     uint64_t d;
 } mrhiCommand;
 
+// One binding of a table as recorded: its slot and object (a frame
+// resource's slot, or a sampler's, plus one); a buffer's offset and
+// resolved size, or a texture view's first layer and layers; and a
+// texture view's format, kind, aspect, first mip and mips.
+typedef struct mrhiCommandBinding
+{
+    uint32_t slot;
+    uint32_t object;
+    uint64_t offset;
+    uint64_t size;
+    uint16_t viewFormat;
+    uint8_t viewKind;
+    uint8_t aspect;
+    uint8_t baseMip;
+    uint8_t mipCount;
+    uint16_t reserved;
+} mrhiCommandBinding;
+
+// A chunk's bytes, and the records after its 32-byte header.
 #define MRHI_CHUNK_BYTES    4096
-#define MRHI_CHUNK_COMMANDS ((MRHI_CHUNK_BYTES - 32) / sizeof(mrhiCommand))
+#define MRHI_CHUNK_COMMANDS 127
 
 // A chunk: the next chunk of its pass (its index plus one, 0 for none),
 // its records in use, and the records.
@@ -57,6 +79,7 @@ typedef struct mrhiCommandChunk
 } mrhiCommandChunk;
 
 static_assert(sizeof(mrhiCommand) == 32, "a command is one record");
+static_assert(sizeof(mrhiCommandBinding) == 32, "a binding is one record");
 static_assert(sizeof(mrhiCommandChunk) == MRHI_CHUNK_BYTES, "a chunk is 4 KiB");
 
 #endif // MAUL_RHI_SRC_COMMAND_H

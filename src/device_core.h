@@ -23,6 +23,16 @@ typedef struct mrhiImport
     uint32_t resource;
 } mrhiImport;
 
+// A sampler as its device keeps it: its driver handle, and what binding
+// it takes.
+typedef struct mrhiSamplerSlot
+{
+    uint64_t handle;
+    // Whether it compares, and whether any of its filters is linear.
+    bool comparison;
+    bool filtering;
+} mrhiSamplerSlot;
+
 // A buffer as its device keeps it.
 typedef struct mrhiBufferSlot
 {
@@ -171,8 +181,9 @@ typedef struct mrhiFramePass
     mrhiStoreOp stencilStore;
     // Its recording: an mrhiRecording, claimed atomically by the thread
     // that begins it; its chunks (indices plus one, 0 for none); its open
-    // debug groups; whether a command found the arena full; and, for a
-    // render pass, its targets' layout and size.
+    // debug groups; whether a command found the arena full; for a render
+    // pass, its targets' layout and size; and the pipeline last set (a
+    // slot plus one and its generation, 0 for none).
     _Atomic uint32_t recording;
     uint32_t firstChunk;
     uint32_t lastChunk;
@@ -181,6 +192,8 @@ typedef struct mrhiFramePass
     mrhiRenderLayout layout;
     uint32_t width;
     uint32_t height;
+    uint32_t pipeline;
+    uint32_t pipelineGeneration;
 } mrhiFramePass;
 
 // A surface as the device that configured it keeps it: the surface, the
@@ -254,7 +267,7 @@ struct mrhiDevice
     size_t bytes;
     // Samplers: ids, and each slot's driver handle.
     mrhiPool samplers;
-    uint64_t* samplerHandles;
+    mrhiSamplerSlot* samplerSlots;
     // Buffers: ids, and each slot's driver handle and def.
     mrhiPool buffers;
     mrhiBufferSlot* bufferSlots;
@@ -364,6 +377,15 @@ bool mrhiIsRangeValid(uint32_t base, uint32_t count, uint32_t total);
 // texture's.
 const mrhiTextureDef* mrhiFrameTextureOf(const mrhiDevice* device,
                                          const mrhiFrameResource* resource);
+
+// Finds a resource of the open frame whose imported object still lives:
+// its slot, or 0.
+uint32_t mrhiFindFrameResource(const mrhiDevice* device, mrhiResourceId id);
+
+// Resolves a view def against its texture into resolvedOut (its format,
+// usage and counts made explicit) and returns whether it is valid there.
+bool mrhiResolveView(const mrhiTextureDef* texture, const mrhiViewDef* def,
+                     mrhiViewDef* resolvedOut);
 
 // Whether a frame resource is an imported device object.
 bool mrhiIsImported(const mrhiFrameResource* resource);

@@ -852,6 +852,23 @@ static mrhiResult WithBindings(mrhiDevice* device, mrhiBindingKind kind, uint32_
     return Made(device);
 }
 
+// A table of more bindings than a chunk of commands holds with its
+// command, on a device whose stage limits allow them.
+static void TestTableSize(void)
+{
+    s_adapter.limits.samplersPerStage = 256;
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.limits.samplersPerStage = 256;
+    mrhiDevice* device = OpenWith(def, true);
+    CHECK(WithBindings(device, mrhi_bindingSampler, MRHI_TABLE_BINDINGS, mrhi_stageFragment) ==
+              mrhi_success,
+          "a table of MRHI_TABLE_BINDINGS");
+    CHECK(WithBindings(device, mrhi_bindingSampler, MRHI_TABLE_BINDINGS + 1, mrhi_stageFragment) ==
+              mrhi_errorUnsupported,
+          "a table of more");
+    Close(device);
+}
+
 static void TestLimits(void)
 {
     mrhiDevice* device = Open(4, true);
@@ -1097,6 +1114,7 @@ int main(int argc, char** argv)
     TestRefusals();
     TestFeatures();
     TestLimits();
+    TestTableSize();
     TestEntryLimits();
     TestStateAndFailure();
     return s_failures == 0 ? 0 : 1;

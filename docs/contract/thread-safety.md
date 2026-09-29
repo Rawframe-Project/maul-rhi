@@ -80,6 +80,7 @@ edit the contract, not this file.
 | `mrhiEndPass` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiSetGraphicsPipeline` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiSetComputePipeline` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiSetBindings` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiSetRootBlock` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiSetViewport` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiSetScissor` | Safe from any thread; the pass is used by one thread at a time. |

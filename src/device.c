@@ -118,7 +118,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
 {
     const mrhiDeviceLimits* limits = &def->deviceLimits;
     mrhiLayout layout = {.size = sizeof(mrhiDevice)};
-    TableParts samplers = AddTable(&layout, limits->samplers, sizeof(uint64_t), alignof(uint64_t));
+    TableParts samplers =
+        AddTable(&layout, limits->samplers, sizeof(mrhiSamplerSlot), alignof(mrhiSamplerSlot));
     TableParts buffers =
         AddTable(&layout, limits->buffers, sizeof(mrhiBufferSlot), alignof(mrhiBufferSlot));
     TableParts textures =
@@ -162,7 +163,7 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     }
     mrhiDevice* device = (mrhiDevice*)block;
     *device = (mrhiDevice){.bytes = layout.size};
-    device->samplerHandles = InitTable(block, samplers, &device->samplers, limits->samplers);
+    device->samplerSlots = InitTable(block, samplers, &device->samplers, limits->samplers);
     device->bufferSlots = InitTable(block, buffers, &device->buffers, limits->buffers);
     device->textureSlots = InitTable(block, textures, &device->textures, limits->textures);
     device->viewSlots = InitTable(block, views, &device->views, limits->views);

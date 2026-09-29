@@ -6,32 +6,22 @@
 // arena, which it takes with one atomic counter, and is ended before
 // the frame is submitted. Every command is checked against its pass.
 
-#include "maul-rhi/encoder.h"
-
-#include "device_core.h"
+#include "encoder_core.h"
+#include "invariant.h"
 #include "label.h"
 
 #include <math.h>
 #include <stdatomic.h>
 #include <string.h>
 
-// What a pass records: a render pass draws, a pass without targets
-// dispatches, a transfer pass copies.
-typedef enum Work
-{
-    WORK_RENDER,
-    WORK_COMPUTE,
-    WORK_TRANSFER,
-} Work;
-
-static Work WorkOf(const mrhiFramePass* pass)
+mrhiPassWork mrhiWorkOf(const mrhiFramePass* pass)
 {
     if (pass->passClass == mrhi_passTransfer)
     {
-        return WORK_TRANSFER;
+        return mrhiWorkTransfer;
     }
     bool targets = pass->colorTargetCount > 0 || pass->depthTarget.resource.index1 != 0;
-    return targets ? WORK_RENDER : WORK_COMPUTE;
+    return targets ? mrhiWorkRender : mrhiWorkCompute;
 }
 
 // The pass an id names in the open, compiled frame: or NULL with the
@@ -52,8 +42,7 @@ static mrhiFramePass* Find(mrhiDevice* device, mrhiPassId id, mrhiResult* status
     return &device->framePasses[id.index1 - 1];
 }
 
-// The pass, recording: or NULL with the refusal.
-static mrhiFramePass* Recording(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
+mrhiFramePass* mrhiRecordingPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
 {
     mrhiFramePass* pass = Find(device, id, statusOut);
     if (pass != nullptr &&
@@ -65,11 +54,9 @@ static mrhiFramePass* Recording(mrhiDevice* device, mrhiPassId id, mrhiResult* s
     return pass;
 }
 
-// Takes count records in the pass's last chunk, or in a new one: the
-// records, or NULL when the arena is full, which marks the pass so that
-// its frame is never submitted without the command.
-static mrhiCommand* Take(mrhiDevice* device, mrhiFramePass* pass, uint32_t count)
+mrhiCommand* mrhiTakeCommands(mrhiDevice* device, mrhiFramePass* pass, uint32_t count)
 {
+    MRHI_ASSERT(count <= MRHI_CHUNK_COMMANDS);
     if (pass->overflowed)
     {
         return nullptr;
@@ -110,7 +97,7 @@ static mrhiResult Record(mrhiDevice* device, mrhiFramePass* pass, mrhiCommand co
                          const void* payload, size_t bytes)
 {
     uint32_t records = (uint32_t)((bytes + sizeof(mrhiCommand) - 1) / sizeof(mrhiCommand));
-    mrhiCommand* at = Take(device, pass, 1 + records);
+    mrhiCommand* at = mrhiTakeCommands(device, pass, 1 + records);
     if (at == nullptr)
     {
         return mrhi_errorCapacity;
@@ -180,7 +167,7 @@ mrhiResult mrhiEndPass(mrhiDevice* device, mrhiPassId id)
         return mrhi_errorInvalid;
     }
     mrhiResult status = mrhi_success;
-    mrhiFramePass* pass = Recording(device, id, &status);
+    mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);
     if (pass == nullptr)
     {
         return status;
@@ -236,12 +223,12 @@ mrhiResult mrhiSetGraphicsPipeline(mrhiDevice* device, mrhiPassId id,
         return mrhi_errorInvalid;
     }
     mrhiResult status = mrhi_success;
-    mrhiFramePass* pass = Recording(device, id, &status);
+    mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);
     if (pass == nullptr)
     {
         return status;
     }
-    if (WorkOf(pass) != WORK_RENDER)
+    if (mrhiWorkOf(pass) != mrhiWorkRender)
     {
         return mrhiDeviceMisuse(device);
     }
@@ -257,6 +244,8 @@ mrhiResult mrhiSetGraphicsPipeline(mrhiDevice* device, mrhiPassId id,
     {
         return mrhiDeviceMisuse(device);
     }
+    pass->pipeline = pipeline.index1;
+    pass->pipelineGeneration = pipeline.generation;
     mrhiCommand command = {.type = mrhiCommandGraphicsPipeline, .a = pipeline.index1};
     return Record(device, pass, command, nullptr, 0);
 }
@@ -268,12 +257,12 @@ mrhiResult mrhiSetComputePipeline(mrhiDevice* device, mrhiPassId id, mrhiCompute
         return mrhi_errorInvalid;
     }
     mrhiResult status = mrhi_success;
-    mrhiFramePass* pass = Recording(device, id, &status);
+    mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);
     if (pass == nullptr)
     {
         return status;
     }
-    if (WorkOf(pass) != WORK_COMPUTE)
+    if (mrhiWorkOf(pass) != mrhiWorkCompute)
     {
         return mrhiDeviceMisuse(device);
     }
@@ -282,6 +271,8 @@ mrhiResult mrhiSetComputePipeline(mrhiDevice* device, mrhiPassId id, mrhiCompute
     {
         return status;
     }
+    pass->pipeline = pipeline.index1;
+    pass->pipelineGeneration = pipeline.generation;
     mrhiCommand command = {.type = mrhiCommandComputePipeline, .a = pipeline.index1};
     return Record(device, pass, command, nullptr, 0);
 }
@@ -298,12 +289,12 @@ mrhiResult mrhiSetRootBlock(mrhiDevice* device, mrhiPassId id, uint32_t offset, 
         return mrhiDeviceMisuse(device);
     }
     mrhiResult status = mrhi_success;
-    mrhiFramePass* pass = Recording(device, id, &status);
+    mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);
     if (pass == nullptr)
     {
         return status;
     }
-    if (WorkOf(pass) == WORK_TRANSFER || offset % 4 != 0 || size % 4 != 0 || size == 0)
+    if (mrhiWorkOf(pass) == mrhiWorkTransfer || offset % 4 != 0 || size % 4 != 0 || size == 0)
     {
         return mrhiDeviceMisuse(device);
     }
@@ -319,8 +310,8 @@ mrhiResult mrhiSetRootBlock(mrhiDevice* device, mrhiPassId id, uint32_t offset, 
 // refusal, a pass without targets counted as misuse.
 static mrhiFramePass* RenderPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
 {
-    mrhiFramePass* pass = Recording(device, id, statusOut);
-    if (pass != nullptr && WorkOf(pass) != WORK_RENDER)
+    mrhiFramePass* pass = mrhiRecordingPass(device, id, statusOut);
+    if (pass != nullptr && mrhiWorkOf(pass) != mrhiWorkRender)
     {
         *statusOut = mrhiDeviceMisuse(device);
         return nullptr;
@@ -453,7 +444,7 @@ static mrhiResult Label(mrhiDevice* device, mrhiPassId id, mrhiCommandType type,
         return mrhiDeviceMisuse(device);
     }
     mrhiResult status = mrhi_success;
-    mrhiFramePass* pass = Recording(device, id, &status);
+    mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);
     if (pass == nullptr)
     {
         return status;
@@ -485,7 +476,7 @@ mrhiResult mrhiPopDebugGroup(mrhiDevice* device, mrhiPassId id)
         return mrhi_errorInvalid;
     }
     mrhiResult status = mrhi_success;
-    mrhiFramePass* pass = Recording(device, id, &status);
+    mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);
     if (pass == nullptr)
     {
         return status;

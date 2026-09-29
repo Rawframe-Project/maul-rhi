@@ -97,9 +97,8 @@ bool mrhiFormatHasAspect(mrhiFormat format, mrhiTextureAspect aspect)
     }
 }
 
-// Resolves a def against its texture into resolvedOut and returns
-// whether it is valid there.
-static bool Resolve(const mrhiTextureDef* texture, const mrhiViewDef* def, mrhiViewDef* resolvedOut)
+bool mrhiResolveView(const mrhiTextureDef* texture, const mrhiViewDef* def,
+                     mrhiViewDef* resolvedOut)
 {
     mrhiViewDef view = *def;
     view.next = nullptr;
@@ -141,7 +140,7 @@ static mrhiResult CheckView(mrhiDevice* device, const mrhiViewDef* def, mrhiView
         return mrhi_errorStale;
     }
     const mrhiTextureDef* texture = &device->textureSlots[def->texture.index1 - 1].def;
-    if (!Resolve(texture, def, resolvedOut))
+    if (!mrhiResolveView(texture, def, resolvedOut))
     {
         return mrhiDeviceMisuse(device);
     }

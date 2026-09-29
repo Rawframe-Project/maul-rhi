@@ -177,3 +177,8 @@ format.
   groups and markers, each checked against its pass as WebGPU checks it
   and recorded into the frame's arena, the device's `frameCommandBytes`
   limit. A full arena refuses the command and the frame's submission.
+- Binding tables: `mrhiSetBindings` sets a whole table (`mrhiBinding`:
+  a buffer range with `MRHI_WHOLE_SIZE`, a texture view, or a sampler),
+  checked against the slots of the pass's pipeline as WebGPU checks a
+  bind group, and against the pass's declared accesses. Shaders whose
+  tables hold more than `MRHI_TABLE_BINDINGS` bindings are unsupported.

@@ -84,7 +84,12 @@ mrhiResult mrhiCreateSampler(mrhiDevice* device, const mrhiSamplerDef* def,
         mrhiPoolRelease(&device->samplers, index1);
         return status;
     }
-    device->samplerHandles[index1 - 1] = handle;
+    device->samplerSlots[index1 - 1] = (mrhiSamplerSlot){
+        .handle = handle,
+        .comparison = def->compare != mrhi_compareNone,
+        .filtering = def->magFilter == mrhi_filterLinear || def->minFilter == mrhi_filterLinear ||
+                     def->mipFilter == mrhi_filterLinear,
+    };
     *samplerOut = (mrhiSamplerId){index1, generation};
     return mrhi_success;
 }
@@ -100,7 +105,7 @@ mrhiResult mrhiDestroySampler(mrhiDevice* device, mrhiSamplerId sampler)
         return mrhi_errorStale;
     }
     device->driver.vtable->destroySampler(device->driver.self,
-                                          device->samplerHandles[sampler.index1 - 1]);
+                                          device->samplerSlots[sampler.index1 - 1].handle);
     mrhiPoolRelease(&device->samplers, sampler.index1);
     return mrhi_success;
 }

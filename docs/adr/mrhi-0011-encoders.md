@@ -42,6 +42,16 @@ them at submission.
   - viewports, scissors, blend constants, root block writes (4-byte
     aligned, within `rootBlockBytes`, else unsupported) and debug labels
     are checked before they are recorded.
+- **Binding tables:** `mrhiSetBindings` sets one whole table: exactly
+  its slots in the reflection of the pass's pipeline, which is set first
+  and looked up by id again on each call. A binding is a buffer range, a
+  texture of the frame seen through an inline view, or a sampler, each
+  checked as WebGPU checks a bind group entry (alignment, size limits
+  and minimums; view kind, format, sample type and multisampling;
+  sampler kind). Each resource also needs a declared access of the pass
+  covering it, of the kind the slot needs: the declarations stay the
+  only source of hazards. A table fits one chunk with its command, so a
+  shader's table holds at most `MRHI_TABLE_BINDINGS` bindings.
 - **Debug groups** balance by the pass's end. A push or pop refused for
   capacity still counts, so a pass that found the arena full still
   ends.

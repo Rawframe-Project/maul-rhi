@@ -28,7 +28,9 @@ plan: device_core
 memory: device_core
 sha256:
 command:
-encoder: device_core label
+encoder: encoder_core invariant label
+encoder_core: device_core
+binding: capabilities_core encoder_core
 cache: bytes device_core sha256
 bytes:
 container: bytes capabilities_core label sha256

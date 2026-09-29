@@ -54,6 +54,37 @@ extern "C"
         uint32_t height;
     } mrhiScissorRect;
 
+// A buffer binding's size that reaches the buffer's end.
+#define MRHI_WHOLE_SIZE 0xFFFFFFFFFFFFFFFFu
+
+    // One slot of a binding table: a buffer range, a texture view or a sampler,
+    // as the slot's kind in the shader needs.
+    typedef struct mrhiBinding
+    {
+        // The slot, one of the table's in the pipeline's shader.
+        uint32_t slot;
+        // A buffer or texture of the open frame; a null id for a sampler.
+        mrhiResourceId resource;
+        // A buffer's first byte, aligned to the device's uniformOffsetAlignment
+        // or storageOffsetAlignment.
+        uint64_t offset;
+        // A buffer's bytes from the offset, or MRHI_WHOLE_SIZE for the rest;
+        // within the device's uniformBindingBytes or storageBindingBytes, at
+        // least the shader's minimum, and a multiple of 4 for storage.
+        uint64_t size;
+        // A texture's shape as the shader sees it, as a view's kind: 2D or 2D
+        // array on any texture but a 3D one, a cube or cube array on a cube or
+        // cube array texture, 3D on a 3D texture.
+        mrhiTextureKind viewKind;
+        // The texture's format or one of its view formats; mrhi_formatNone for
+        // the texture's.
+        mrhiFormat viewFormat;
+        // A texture's mips, layers and aspect; one mip for a storage texture.
+        mrhiTextureRange range;
+        // A sampler, for a sampler slot.
+        mrhiSamplerId sampler;
+    } mrhiBinding;
+
     /// Begins recording a kept pass of the compiled open frame. It records
     /// until mrhiEndPass; a kept pass never begun records nothing.
     ///
@@ -111,6 +142,32 @@ extern "C"
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiSetComputePipeline(mrhiDevice* device, mrhiPassId pass,
                                                               mrhiComputePipelineId pipeline);
+
+    /// Sets every slot of one binding table for later draws or dispatches,
+    /// checked against the pass's pipeline and its declared accesses.
+    ///
+    /// @param device    The device.
+    /// @param pass      The pass, recording, with a pipeline set.
+    /// @param table     The table, one the pipeline's shader declares.
+    /// @param bindings  The bindings, one per slot of the table in any order;
+    ///                  NULL when count is 0. Only read during the call.
+    /// @param count     How many.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or
+    /// bindings with a count, a pass that copies, a table past the device's
+    /// bindingTables, bindings that are not exactly the table's slots in the
+    /// shader, a binding its slot's kind does not take (a range out of bounds
+    /// or unaligned, a view invalid for its texture or of another kind, format
+    /// or sample type, a sampler of another kind), or a resource the pass
+    /// declares no covering access of the needed kind for; `mrhi_errorStale`
+    /// for a pass of another frame, a destroyed pipeline, or a resource or
+    /// sampler that is not live; `mrhi_errorState` for a pass that is not
+    /// recording or has no pipeline set; `mrhi_errorCapacity` when the frame's
+    /// commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiSetBindings(mrhiDevice* device, mrhiPassId pass,
+                                                       uint32_t table, const mrhiBinding* bindings,
+                                                       uint32_t count);
 
     /// Writes bytes of the root block later draws or dispatches read.
     ///

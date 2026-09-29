@@ -40,9 +40,7 @@ const mrhiTextureDef* mrhiFrameTextureOf(const mrhiDevice* device,
     return &resource->texture;
 }
 
-// Finds a resource of the open frame whose imported object still lives:
-// its slot, or 0.
-static uint32_t Find(const mrhiDevice* device, mrhiResourceId id)
+uint32_t mrhiFindFrameResource(const mrhiDevice* device, mrhiResourceId id)
 {
     if (id.generation != device->frameSerial || id.index1 == 0 ||
         id.index1 > device->frameResourceCount)
@@ -144,7 +142,7 @@ static uint32_t LayersAt(const mrhiTextureDef* def, uint32_t mip)
 static mrhiResult UseOfAccess(const mrhiDevice* device, const mrhiAccess* access,
                               mrhiPassClass passClass, mrhiFrameUse* useOut)
 {
-    uint32_t slot = Find(device, access->resource);
+    uint32_t slot = mrhiFindFrameResource(device, access->resource);
     if (slot == 0)
     {
         return mrhi_errorStale;
@@ -218,7 +216,7 @@ static bool Agrees(TargetShape* shape, const mrhiTextureDef* def, uint32_t mip)
 static uint32_t FindTarget(const mrhiDevice* device, mrhiResourceId id, uint32_t mip,
                            uint32_t layer, uint8_t use, mrhiResult* statusOut)
 {
-    uint32_t slot = Find(device, id);
+    uint32_t slot = mrhiFindFrameResource(device, id);
     if (slot == 0)
     {
         *statusOut = mrhi_errorStale;

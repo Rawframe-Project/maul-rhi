@@ -10286,6 +10286,12 @@
           ]
         },
         {
+          "kind": "constant",
+          "name": "table_bindings",
+          "value": 126,
+          "doc": "The bindings one table of a container holds at most: a table set while recording fits one chunk of the frame's commands."
+        },
+        {
           "kind": "enum",
           "name": "sampler_binding",
           "width": "uint8",
@@ -11246,7 +11252,7 @@
           "doc": "Loads a shader container on a ready device, checking every byte of it as hostile input.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, or a container that is malformed, damaged, misaligned or contradicts itself; `mrhi_errorVersion` for a container of another version; `mrhi_errorUnsupported` for a root block, bindings, a workgroup or interface variables past the device's limits, 16-bit floats on a device without shaderF16, the primitive index builtin, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's shader limit is reached or its allocator fails; `mrhi_errorPlatform` when the driver refuses the code."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, or a container that is malformed, damaged, misaligned or contradicts itself; `mrhi_errorVersion` for a container of another version; `mrhi_errorUnsupported` for a root block, bindings, a workgroup or interface variables past the device's limits, a table of more than MRHI_TABLE_BINDINGS bindings, 16-bit floats on a device without shaderF16, the primitive index builtin, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's shader limit is reached or its allocator fails; `mrhi_errorPlatform` when the driver refuses the code."
           },
           "args": [
             {
@@ -14269,6 +14275,59 @@
           ]
         },
         {
+          "kind": "constant",
+          "name": "whole_size",
+          "value": 18446744073709551615,
+          "doc": "A buffer binding's size that reaches the buffer's end."
+        },
+        {
+          "kind": "struct",
+          "name": "binding",
+          "doc": "One slot of a binding table: a buffer range, a texture view or a sampler, as the slot's kind in the shader needs.",
+          "members": [
+            {
+              "name": "slot",
+              "type": "uint32",
+              "doc": "The slot, one of the table's in the pipeline's shader."
+            },
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "A buffer or texture of the open frame; a null id for a sampler."
+            },
+            {
+              "name": "offset",
+              "type": "uint64",
+              "doc": "A buffer's first byte, aligned to the device's uniformOffsetAlignment or storageOffsetAlignment."
+            },
+            {
+              "name": "size",
+              "type": "uint64",
+              "doc": "A buffer's bytes from the offset, or MRHI_WHOLE_SIZE for the rest; within the device's uniformBindingBytes or storageBindingBytes, at least the shader's minimum, and a multiple of 4 for storage."
+            },
+            {
+              "name": "view_kind",
+              "type": "enum.texture_kind",
+              "doc": "A texture's shape as the shader sees it, as a view's kind: 2D or 2D array on any texture but a 3D one, a cube or cube array on a cube or cube array texture, 3D on a 3D texture."
+            },
+            {
+              "name": "view_format",
+              "type": "enum.format",
+              "doc": "The texture's format or one of its view formats; mrhi_formatNone for the texture's."
+            },
+            {
+              "name": "range",
+              "type": "struct.texture_range",
+              "doc": "A texture's mips, layers and aspect; one mip for a storage texture."
+            },
+            {
+              "name": "sampler",
+              "type": "id.sampler_id",
+              "doc": "A sampler, for a sampler slot."
+            }
+          ]
+        },
+        {
           "kind": "function",
           "name": "begin_pass",
           "doc": "Begins recording a kept pass of the compiled open frame. It records until mrhiEndPass; a kept pass never begun records nothing.",
@@ -14375,6 +14434,48 @@
               "name": "pipeline",
               "type": "id.compute_pipeline_id",
               "doc": "The pipeline."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "set_bindings",
+          "doc": "Sets every slot of one binding table for later draws or dispatches, checked against the pass's pipeline and its declared accesses.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or bindings with a count, a pass that copies, a table past the device's bindingTables, bindings that are not exactly the table's slots in the shader, a binding its slot's kind does not take (a range out of bounds or unaligned, a view invalid for its texture or of another kind, format or sample type, a sampler of another kind), or a resource the pass declares no covering access of the needed kind for; `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or a resource or sampler that is not live; `mrhi_errorState` for a pass that is not recording or has no pipeline set; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, with a pipeline set."
+            },
+            {
+              "name": "table",
+              "type": "uint32",
+              "doc": "The table, one the pipeline's shader declares."
+            },
+            {
+              "name": "bindings",
+              "type": "struct.binding",
+              "pointer": "const",
+              "doc": "The bindings, one per slot of the table in any order; NULL when count is 0. Only read during the call."
+            },
+            {
+              "name": "count",
+              "type": "uint32",
+              "doc": "How many."
             }
           ],
           "thread_safety": {
