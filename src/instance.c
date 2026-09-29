@@ -13,8 +13,10 @@
 #ifdef MAUL_RHI_TEST_DRIVER
 #include "driver_test.h"
 #endif
-#ifdef MAUL_RHI_VULKAN_DRIVER
+#ifdef MAUL_RHI_METAL_DRIVER
 #include "driver_metal.h"
+#endif
+#ifdef MAUL_RHI_VULKAN_DRIVER
 #include "driver_vulkan.h"
 #endif
 #ifdef MAUL_RHI_WEBGPU_DRIVER

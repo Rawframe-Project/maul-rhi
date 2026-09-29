@@ -37,8 +37,8 @@ family rulebook (family record 0005).
   budgets checked at release (family record 0013), since the web build
   is where size costs most.
 - **Commit areas:** `api`, `build`, `ci`, `container`, `conformance`,
-  `docs`, `graph`, `samples`, `schema`, `tests`, `tools`, `vulkan`,
-  `webgpu`.
+  `docs`, `graph`, `metal`, `samples`, `schema`, `tests`, `tools`,
+  `vulkan`, `webgpu`.
 
 ## Consequences
 
