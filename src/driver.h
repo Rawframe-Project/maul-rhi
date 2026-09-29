@@ -8,7 +8,7 @@
 #ifndef MAUL_RHI_SRC_DRIVER_H
 #define MAUL_RHI_SRC_DRIVER_H
 
-#include "maul-rhi/capabilities.h"
+#include "maul-rhi/resources.h"
 
 // The SPI version a driver's vtable must carry.
 #define MRHI_SPI_VERSION 1
@@ -38,6 +38,9 @@ typedef struct mrhiDeviceDriverVtable
     uint32_t spiVersion;
     uint32_t size;
     void (*destroy)(void* self);
+    // Makes a sampler the core has checked; its handle, never zero.
+    mrhiResult (*createSampler)(void* self, const mrhiSamplerDef* def, uint64_t* handleOut);
+    void (*destroySampler)(void* self, uint64_t handle);
 } mrhiDeviceDriverVtable;
 
 typedef struct mrhiDeviceDriver

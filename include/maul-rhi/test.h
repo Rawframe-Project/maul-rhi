@@ -36,6 +36,9 @@ extern "C"
         // none.
         mrhiFormat limitedFormat;
         mrhiFormatCaps limitedCaps;
+        // Objects a device on the adapter makes before every further one fails
+        // with mrhi_errorPlatform; 0 for no failure.
+        uint32_t objectsBeforeFailure;
     } mrhiTestAdapter;
 
     // Turns the test driver on for an instance, chained on its def with the

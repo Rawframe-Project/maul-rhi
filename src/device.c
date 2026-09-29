@@ -10,6 +10,7 @@
 #include "chain.h"
 #include "device_core.h"
 #include "instance_core.h"
+#include "invariant.h"
 
 #include <stdalign.h>
 
@@ -21,6 +22,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.cookie = DEVICE_DEF_COOKIE;
     def.limits = mrhiDefaultLimits();
     def.deviceLimits.notifications = 256;
+    def.deviceLimits.samplers = 256;
     return def;
 }
 
@@ -32,8 +34,8 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
     mrhiLimits floor = mrhiDefaultLimits();
     mrhiResult chain = mrhiCheckChain(def->next, nullptr, 0, instance->limits.chainDepth);
     if (def->cookie != DEVICE_DEF_COOKIE || def->deviceLimits.notifications == 0 ||
-        !mrhiIsAllocatorValid(&def->allocator) || !mrhiLimitsWithin(&floor, &def->limits) ||
-        chain == mrhi_errorInvalid)
+        def->deviceLimits.samplers == 0 || !mrhiIsAllocatorValid(&def->allocator) ||
+        !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
     {
         *statusOut = mrhiMisuse(instance);
         return nullptr;
@@ -63,16 +65,26 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
     return nullptr;
 }
 
-// Starts the device's driver side; without an instance driver, the
-// device opens at once.
-static mrhiResult OpenDriver(mrhiInstance* instance, mrhiDevice* device, uint64_t adapter)
+// The device's block: the struct, then its tables, sized by its limits.
+static mrhiDevice* Allocate(const mrhiDeviceDef* def)
 {
-    if (instance->driver.vtable == nullptr)
+    uint32_t samplers = def->deviceLimits.samplers;
+    mrhiLayout layout = {.size = sizeof(mrhiDevice)};
+    size_t generationsAt = mrhiLayoutAdd(&layout, samplers, sizeof(uint32_t), alignof(uint32_t));
+    size_t nextAt = mrhiLayoutAdd(&layout, samplers, sizeof(uint32_t), alignof(uint32_t));
+    size_t handlesAt = mrhiLayoutAdd(&layout, samplers, sizeof(uint64_t), alignof(uint64_t));
+    unsigned char* block =
+        layout.overflow ? nullptr : mrhiAllocate(&def->allocator, layout.size, alignof(mrhiDevice));
+    if (block == nullptr)
     {
-        return mrhi_success;
+        return nullptr;
     }
-    return instance->driver.vtable->createDevice(instance->driver.self, adapter, &device->features,
-                                                 &device->limits, device->request, &device->driver);
+    mrhiDevice* device = (mrhiDevice*)block;
+    *device = (mrhiDevice){.bytes = layout.size};
+    mrhiPoolInit(&device->samplers, samplers, (uint32_t*)(block + generationsAt),
+                 (uint32_t*)(block + nextAt));
+    device->samplerHandles = (uint64_t*)(block + handlesAt);
+    return device;
 }
 
 mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
@@ -97,24 +109,26 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     {
         return status;
     }
-    mrhiDevice* device = mrhiAllocate(&def->allocator, sizeof(mrhiDevice), alignof(mrhiDevice));
+    mrhiDevice* device = Allocate(def);
     if (device == nullptr)
     {
         return mrhi_errorCapacity;
     }
-    *device = (mrhiDevice){
-        .instance = instance,
-        .allocator = def->allocator,
-        .features = def->features,
-        .limits = def->limits,
-        .deviceLimits = def->deviceLimits,
-        .state = mrhi_deviceOpening,
-        .request = mrhiNextRequest(instance),
-    };
-    status = OpenDriver(instance, device, adapter->handle);
+    device->instance = instance;
+    device->allocator = def->allocator;
+    device->features = def->features;
+    device->limits = def->limits;
+    device->deviceLimits = def->deviceLimits;
+    device->state = mrhi_deviceOpening;
+    device->request = mrhiNextRequest(instance);
+    // An adapter was found, so the instance has a driver.
+    MRHI_ASSERT(instance->driver.vtable != nullptr);
+    status = instance->driver.vtable->createDevice(instance->driver.self, adapter->handle,
+                                                   &device->features, &device->limits,
+                                                   device->request, &device->driver);
     if (status != mrhi_success)
     {
-        mrhiRelease(&device->allocator, device, sizeof(mrhiDevice), alignof(mrhiDevice));
+        mrhiRelease(&device->allocator, device, device->bytes, alignof(mrhiDevice));
         return status;
     }
     ++instance->deviceCount;
@@ -123,10 +137,6 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
                                  .kind = mrhiPendingDevice,
                                  .device = device,
                              });
-    if (instance->driver.vtable == nullptr)
-    {
-        mrhiAnswerNow(instance, device->request, mrhi_success);
-    }
     *deviceOut = device;
     *requestOut = (mrhiRequestId){device->request, 1};
     return mrhi_success;
@@ -155,7 +165,7 @@ void mrhiDestroyDevice(mrhiDevice* device)
     }
     --instance->deviceCount;
     mrhiAllocator allocator = device->allocator;
-    mrhiRelease(&allocator, device, sizeof(mrhiDevice), alignof(mrhiDevice));
+    mrhiRelease(&allocator, device, device->bytes, alignof(mrhiDevice));
 }
 
 mrhiDeviceState mrhiGetDeviceState(mrhiDevice* device)
@@ -163,18 +173,22 @@ mrhiDeviceState mrhiGetDeviceState(mrhiDevice* device)
     return device == nullptr ? mrhi_deviceFailed : device->state;
 }
 
-// Counts one misuse and returns mrhi_errorInvalid.
-static mrhiResult Misuse(mrhiDevice* device)
+mrhiResult mrhiDeviceMisuse(mrhiDevice* device)
 {
     ++device->misuse;
     return mrhi_errorInvalid;
+}
+
+mrhiResult mrhiDeviceUsable(const mrhiDevice* device)
+{
+    return device->state == mrhi_deviceReady ? mrhi_success : mrhi_errorState;
 }
 
 mrhiResult mrhiGetDeviceFeatures(mrhiDevice* device, mrhiFeatures* featuresOut)
 {
     if (device == nullptr || featuresOut == nullptr)
     {
-        return device == nullptr ? mrhi_errorInvalid : Misuse(device);
+        return device == nullptr ? mrhi_errorInvalid : mrhiDeviceMisuse(device);
     }
     *featuresOut = device->features;
     return mrhi_success;
@@ -184,7 +198,7 @@ mrhiResult mrhiGetDeviceLimits(mrhiDevice* device, mrhiLimits* limitsOut)
 {
     if (device == nullptr || limitsOut == nullptr)
     {
-        return device == nullptr ? mrhi_errorInvalid : Misuse(device);
+        return device == nullptr ? mrhi_errorInvalid : mrhiDeviceMisuse(device);
     }
     *limitsOut = device->limits;
     return mrhi_success;

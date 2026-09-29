@@ -8,6 +8,7 @@
 #define MAUL_RHI_SRC_DEVICE_CORE_H
 
 #include "driver.h"
+#include "pool.h"
 
 #include "maul-rhi/device.h"
 
@@ -24,6 +25,17 @@ struct mrhiDevice
     // Calls refused as invalid input.
     uint64_t misuse;
     mrhiDeviceDriver driver;
+    // The block the device and its tables live in.
+    size_t bytes;
+    // Samplers: ids, and each slot's driver handle.
+    mrhiPool samplers;
+    uint64_t* samplerHandles;
 };
+
+// mrhi_success for a ready device, mrhi_errorState for one that is not.
+mrhiResult mrhiDeviceUsable(const mrhiDevice* device);
+
+// Counts one misuse on the device and returns mrhi_errorInvalid.
+mrhiResult mrhiDeviceMisuse(mrhiDevice* device);
 
 #endif // MAUL_RHI_SRC_DEVICE_CORE_H

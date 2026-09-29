@@ -51,3 +51,11 @@ format.
   the BC, ETC2 and ASTC families behind their features, each mapped
   onto the four APIs; `mrhiGetFormatCaps` per adapter, with WebGPU's
   guaranteed capabilities as the floor every listed adapter meets.
+- Samplers (`resources.h`): `mrhiCreateSampler` and
+  `mrhiDestroySampler` with WebGPU's defaults (`mrhiDefaultSamplerDef`),
+  no border colors, anisotropy only with linear filtering; filters,
+  address modes and comparisons mapped onto the four APIs. Every device
+  object is a generation-checked id over a table sized by the device's
+  limits (`samplers`), and a destroyed one's id ends at once.
+- The test driver fails a device's objects after a set number
+  (`objectsBeforeFailure`), to test platform failures.

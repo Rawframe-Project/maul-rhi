@@ -149,3 +149,46 @@ restricted or absent-rejected, with how.
 | `blending` | direct: COLOR_ATTACHMENT_BLEND | direct: BLENDABLE | direct: Blend capability | direct: blendable |
 | `storage` | direct: STORAGE_IMAGE | direct: TYPED_UNORDERED_ACCESS_VIEW | direct: Write capability | direct: STORAGE_BINDING |
 | `sampleCounts` | direct: sampleCounts of the format's image properties | direct: CheckMultisampleQualityLevels | direct: supportsTextureSampleCount | restricted: 1 and 4 only |
+
+## mrhiFilter
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_filterNearest` | direct: NEAREST | direct: POINT | direct: nearest | direct: nearest |
+| `mrhi_filterLinear` | direct: LINEAR | direct: LINEAR | direct: linear | direct: linear |
+
+## mrhiAddressMode
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_addressClampToEdge` | direct: CLAMP_TO_EDGE | direct: CLAMP | direct: clampToEdge | direct: clamp-to-edge |
+| `mrhi_addressRepeat` | direct: REPEAT | direct: WRAP | direct: repeat | direct: repeat |
+| `mrhi_addressMirrorRepeat` | direct: MIRRORED_REPEAT | direct: MIRROR | direct: mirrorRepeat | direct: mirror-repeat |
+
+## mrhiCompareFunction
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_compareNever` | direct: NEVER | direct: NEVER | direct: never | direct: never |
+| `mrhi_compareLess` | direct: LESS | direct: LESS | direct: less | direct: less |
+| `mrhi_compareEqual` | direct: EQUAL | direct: EQUAL | direct: equal | direct: equal |
+| `mrhi_compareLessEqual` | direct: LESS_OR_EQUAL | direct: LESS_EQUAL | direct: lessEqual | direct: less-equal |
+| `mrhi_compareGreater` | direct: GREATER | direct: GREATER | direct: greater | direct: greater |
+| `mrhi_compareNotEqual` | direct: NOT_EQUAL | direct: NOT_EQUAL | direct: notEqual | direct: not-equal |
+| `mrhi_compareGreaterEqual` | direct: GREATER_OR_EQUAL | direct: GREATER_EQUAL | direct: greaterEqual | direct: greater-equal |
+| `mrhi_compareAlways` | direct: ALWAYS | direct: ALWAYS | direct: always | direct: always |
+
+## mrhiSamplerDef
+
+| Member | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `magFilter` | direct: magFilter | direct: the filter's magnification bits | direct: magFilter | direct: magFilter |
+| `minFilter` | direct: minFilter | direct: the filter's minification bits | direct: minFilter | direct: minFilter |
+| `mipFilter` | direct: mipmapMode | direct: the filter's mip bits | direct: mipFilter | direct: mipmapFilter |
+| `addressU` | direct: addressModeU | direct: AddressU | direct: sAddressMode | direct: addressModeU |
+| `addressV` | direct: addressModeV | direct: AddressV | direct: tAddressMode | direct: addressModeV |
+| `addressW` | direct: addressModeW | direct: AddressW | direct: rAddressMode | direct: addressModeW |
+| `lodMin` | direct: minLod | direct: MinLOD | direct: lodMinClamp | direct: lodMinClamp |
+| `lodMax` | direct: maxLod | direct: MaxLOD | direct: lodMaxClamp | direct: lodMaxClamp |
+| `maxAnisotropy` | restricted: maxAnisotropy with samplerAnisotropy, clamped to maxSamplerAnisotropy | direct: MaxAnisotropy with an anisotropic filter | direct: maxAnisotropy | direct: maxAnisotropy, clamped by the implementation |
+| `compare` | direct: compareEnable and compareOp | direct: ComparisonFunc with a comparison filter | direct: compareFunction | direct: compare |

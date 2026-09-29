@@ -11,7 +11,8 @@
 #define MAUL_RHI_SRC_INVARIANT_H
 
 #if defined(NDEBUG)
-#define MRHI_ASSERT(cond) ((void)0)
+// sizeof keeps the operands used without evaluating them.
+#define MRHI_ASSERT(cond) ((void)sizeof(cond))
 #else
 #define MRHI_ASSERT(cond) ((cond) ? (void)0 : __builtin_trap())
 #endif

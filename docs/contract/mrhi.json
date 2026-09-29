@@ -4446,6 +4446,11 @@
               "name": "notifications",
               "type": "uint32",
               "doc": "Records the device's notification queue holds; 256 by default."
+            },
+            {
+              "name": "samplers",
+              "type": "uint32",
+              "doc": "Samplers the device holds at once; 256 by default."
             }
           ]
         },
@@ -4483,7 +4488,7 @@
         {
           "kind": "function",
           "name": "default_device_def",
-          "doc": "Returns the default device def: no adapter, no optional features, the floor limits, 256 notifications and the C library's allocator.",
+          "doc": "Returns the default device def: no adapter, no optional features, the floor limits, 256 notifications, 256 samplers and the C library's allocator.",
           "returns": {
             "type": "struct.device_def",
             "doc": "The def, with a valid cookie."
@@ -4649,6 +4654,660 @@
       ]
     },
     {
+      "name": "resources",
+      "doc": "The objects a device owns: samplers, buffers, textures and views, each a generation-checked id.",
+      "includes": [
+        "device"
+      ],
+      "items": [
+        {
+          "kind": "enum",
+          "name": "filter",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "How texels are filtered.",
+          "values": [
+            {
+              "name": "filter_nearest",
+              "value": 0,
+              "doc": "The nearest texel.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "NEAREST"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "POINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "nearest"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "nearest"
+                }
+              }
+            },
+            {
+              "name": "filter_linear",
+              "value": 1,
+              "doc": "A weighted average of the nearest texels.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "LINEAR"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "LINEAR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "linear"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "linear"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "address_mode",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "How coordinates outside a texture are treated. Clamp to border is absent: WebGPU has no border colors.",
+          "values": [
+            {
+              "name": "address_clamp_to_edge",
+              "value": 0,
+              "doc": "The edge texel.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "CLAMP_TO_EDGE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "CLAMP"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "clampToEdge"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "clamp-to-edge"
+                }
+              }
+            },
+            {
+              "name": "address_repeat",
+              "value": 1,
+              "doc": "The texture repeats.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "REPEAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "WRAP"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "repeat"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "repeat"
+                }
+              }
+            },
+            {
+              "name": "address_mirror_repeat",
+              "value": 2,
+              "doc": "The texture repeats, mirrored every other time.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "MIRRORED_REPEAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "MIRROR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "mirrorRepeat"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "mirror-repeat"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "compare_function",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "A comparison of a new value with a stored one: for comparison samplers, and for depth and stencil tests.",
+          "values": [
+            {
+              "name": "compare_none",
+              "value": 0,
+              "doc": "No comparison: a plain sampler.",
+              "unmapped": true
+            },
+            {
+              "name": "compare_never",
+              "value": 1,
+              "doc": "Never passes.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "NEVER"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "NEVER"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "never"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "never"
+                }
+              }
+            },
+            {
+              "name": "compare_less",
+              "value": 2,
+              "doc": "Passes when less.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "LESS"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "LESS"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "less"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "less"
+                }
+              }
+            },
+            {
+              "name": "compare_equal",
+              "value": 3,
+              "doc": "Passes when equal.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "EQUAL"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "EQUAL"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "equal"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "equal"
+                }
+              }
+            },
+            {
+              "name": "compare_less_equal",
+              "value": 4,
+              "doc": "Passes when less or equal.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "LESS_OR_EQUAL"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "LESS_EQUAL"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "lessEqual"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "less-equal"
+                }
+              }
+            },
+            {
+              "name": "compare_greater",
+              "value": 5,
+              "doc": "Passes when greater: reversed-Z depth.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "GREATER"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "GREATER"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "greater"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "greater"
+                }
+              }
+            },
+            {
+              "name": "compare_not_equal",
+              "value": 6,
+              "doc": "Passes when different.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "NOT_EQUAL"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "NOT_EQUAL"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "notEqual"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "not-equal"
+                }
+              }
+            },
+            {
+              "name": "compare_greater_equal",
+              "value": 7,
+              "doc": "Passes when greater or equal.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "GREATER_OR_EQUAL"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "GREATER_EQUAL"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "greaterEqual"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "greater-equal"
+                }
+              }
+            },
+            {
+              "name": "compare_always",
+              "value": 8,
+              "doc": "Always passes.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "ALWAYS"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "ALWAYS"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "always"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "always"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "id",
+          "name": "sampler_id",
+          "doc": "A sampler of a device."
+        },
+        {
+          "kind": "struct",
+          "name": "sampler_def",
+          "def": true,
+          "mapped": true,
+          "doc": "How a sampler is made. Build it with mrhiDefaultSamplerDef.",
+          "members": [
+            {
+              "name": "mag_filter",
+              "type": "enum.filter",
+              "doc": "Filtering when magnified.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "magFilter"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the filter's magnification bits"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "magFilter"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "magFilter"
+                }
+              }
+            },
+            {
+              "name": "min_filter",
+              "type": "enum.filter",
+              "doc": "Filtering when minified.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "minFilter"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the filter's minification bits"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "minFilter"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "minFilter"
+                }
+              }
+            },
+            {
+              "name": "mip_filter",
+              "type": "enum.filter",
+              "doc": "Filtering between mip levels.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "mipmapMode"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the filter's mip bits"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "mipFilter"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "mipmapFilter"
+                }
+              }
+            },
+            {
+              "name": "address_u",
+              "type": "enum.address_mode",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "addressModeU"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "AddressU"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "sAddressMode"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "addressModeU"
+                }
+              }
+            },
+            {
+              "name": "address_v",
+              "type": "enum.address_mode",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "addressModeV"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "AddressV"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "tAddressMode"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "addressModeV"
+                }
+              }
+            },
+            {
+              "name": "address_w",
+              "type": "enum.address_mode",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "addressModeW"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "AddressW"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "rAddressMode"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "addressModeW"
+                }
+              }
+            },
+            {
+              "name": "lod_min",
+              "type": "float32",
+              "doc": "The lowest level of detail sampled, at least 0.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "minLod"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "MinLOD"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "lodMinClamp"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "lodMinClamp"
+                }
+              }
+            },
+            {
+              "name": "lod_max",
+              "type": "float32",
+              "doc": "The highest level of detail sampled, at least lodMin.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxLod"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "MaxLOD"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "lodMaxClamp"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "lodMaxClamp"
+                }
+              }
+            },
+            {
+              "name": "max_anisotropy",
+              "type": "uint16",
+              "doc": "1 to 16; above 1, every filter must be linear.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "maxAnisotropy with samplerAnisotropy, clamped to maxSamplerAnisotropy"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "MaxAnisotropy with an anisotropic filter"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "maxAnisotropy"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "maxAnisotropy, clamped by the implementation"
+                }
+              }
+            },
+            {
+              "name": "compare",
+              "type": "enum.compare_function",
+              "doc": "A comparison for shadow maps, or mrhi_compareNone.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "compareEnable and compareOp"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "ComparisonFunc with a comparison filter"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "compareFunction"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "compare"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_sampler_def",
+          "doc": "Returns the default sampler def: nearest filtering, clamp to edge, levels of detail 0 to 32, no anisotropy and no comparison.",
+          "returns": {
+            "type": "struct.sampler_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "create_sampler",
+          "doc": "Makes a sampler on a ready device.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a value out of range, anisotropy with a nearest filter, or levels of detail out of order; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the device's sampler limit is reached."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "def",
+              "type": "struct.sampler_def",
+              "pointer": "const",
+              "doc": "The sampler to make."
+            },
+            {
+              "name": "sampler_out",
+              "type": "id.sampler_id",
+              "pointer": "mutable",
+              "doc": "Receives the sampler."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "destroy_sampler",
+          "doc": "Destroys a sampler. Its id ends at once; the device retires it after the frames that used it.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device; `mrhi_errorStale` for a sampler the device no longer has."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "sampler",
+              "type": "id.sampler_id",
+              "doc": "The sampler."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        }
+      ]
+    },
+    {
       "name": "test",
       "doc": "The test driver (MAUL_RHI_TEST_DRIVER): a driver without a GPU whose adapters a test describes, for the library's tests and a program's own.",
       "includes": [
@@ -4685,6 +5344,11 @@
             {
               "name": "limited_caps",
               "type": "struct.format_caps"
+            },
+            {
+              "name": "objects_before_failure",
+              "type": "uint32",
+              "doc": "Objects a device on the adapter makes before every further one fails with mrhi_errorPlatform; 0 for no failure."
             }
           ]
         },

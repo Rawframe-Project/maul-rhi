@@ -8,6 +8,7 @@
 
 #include "allocator.h"
 #include "capabilities_core.h"
+#include "invariant.h"
 
 #include <stdalign.h>
 #include <string.h>
@@ -65,7 +66,42 @@ static size_t GetAdapters(const void* self, mrhiDriverAdapter* adapters, size_t 
 typedef struct TestDevice
 {
     mrhiAllocator allocator;
+    uint64_t nextHandle;
+    // Objects made so far, and the count after which making fails; 0
+    // for no failure.
+    uint32_t made;
+    uint32_t madeBeforeFailure;
+    uint32_t samplers;
 } TestDevice;
+
+// A new object's handle, or mrhi_errorPlatform once the adapter's
+// object budget is spent.
+static mrhiResult MakeObject(TestDevice* device, uint64_t* handleOut)
+{
+    if (device->madeBeforeFailure != 0 && device->made == device->madeBeforeFailure)
+    {
+        return mrhi_errorPlatform;
+    }
+    ++device->made;
+    *handleOut = ++device->nextHandle;
+    return mrhi_success;
+}
+
+static mrhiResult CreateSampler(void* self, const mrhiSamplerDef* def, uint64_t* handleOut)
+{
+    (void)def;
+    TestDevice* device = self;
+    mrhiResult status = MakeObject(device, handleOut);
+    device->samplers += status == mrhi_success ? 1 : 0;
+    return status;
+}
+
+static void DestroySampler(void* self, uint64_t handle)
+{
+    TestDevice* device = self;
+    MRHI_ASSERT(handle != 0 && handle <= device->nextHandle && device->samplers > 0);
+    --device->samplers;
+}
 
 static void DestroyDevice(void* self)
 {
@@ -78,6 +114,8 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .spiVersion = MRHI_SPI_VERSION,
     .size = sizeof(mrhiDeviceDriverVtable),
     .destroy = DestroyDevice,
+    .createSampler = CreateSampler,
+    .destroySampler = DestroySampler,
 };
 
 static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiFeatures* features,
@@ -95,7 +133,10 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiFeatures*
     {
         return mrhi_errorCapacity;
     }
-    device->allocator = driver->allocator;
+    *device = (TestDevice){
+        .allocator = driver->allocator,
+        .madeBeforeFailure = driver->adapters[adapter - 1].objectsBeforeFailure,
+    };
     driver->pending[driver->pendingCount++] = (mrhiDriverEvent){
         .tag = tag,
         .outcome = driver->adapters[adapter - 1].openOutcome,
