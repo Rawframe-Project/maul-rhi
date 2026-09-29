@@ -62,12 +62,12 @@ jobs:
           - { name: macos-clang,         os: macos-15,     cc: clang,    cxx: clang++,    config: Release, extra: "" }
     steps:
       - uses: actions/checkout@v4
-      - name: Install compilers, lavapipe and the validation layer
+      - name: Install compilers, lavapipe, the validation layer and Xvfb
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q gcc-14 g++-14 clang-20 ninja-build \
-            mesa-vulkan-drivers vulkan-validationlayers
+            mesa-vulkan-drivers vulkan-validationlayers libxcb1-dev xvfb
       - name: Configure
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -D${PREFIX}_WERROR=ON \
@@ -76,14 +76,17 @@ jobs:
         run: cmake --build build -j 4
       - name: Test
         # Linux runs Vulkan on lavapipe, which must be found, under the
-        # validation layer, whose errors in a test's output fail it
-        # (mrhi-0003).
+        # validation layer, whose errors in a test's output fail it, and
+        # presents to an XCB window on Xvfb (mrhi-0003).
         env:
           MAUL_RHI_REQUIRE_VULKAN: ${{ runner.os == 'Linux' && '1' || '' }}
+          MAUL_RHI_REQUIRE_SURFACE: ${{ runner.os == 'Linux' && '1' || '' }}
           VK_INSTANCE_LAYERS: ${{ runner.os == 'Linux' && 'VK_LAYER_KHRONOS_validation' || '' }}
           # Synchronization validation checks the barriers the graph makes.
           VK_KHRONOS_VALIDATION_VALIDATE_SYNC: "true"
-        run: ctest --test-dir build --output-on-failure
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then run="xvfb-run -a"; else run=""; fi
+          $run ctest --test-dir build --output-on-failure
 
   windows-clang-cl:
     name: windows-clang-cl

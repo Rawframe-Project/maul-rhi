@@ -98,7 +98,7 @@ if(MAUL_RHI_VULKAN_DRIVER)
                                    src/vulkan_device.c src/vulkan_frame.c src/vulkan_graphics.c
                                    src/vulkan_memory.c src/vulkan_object.c src/vulkan_pass.c
                                    src/vulkan_pipeline.c src/vulkan_query.c src/vulkan_record.c
-                                   src/vulkan_resource.c)
+                                   src/vulkan_resource.c src/vulkan_surface.c)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_VULKAN_DRIVER)
     # The Khronos headers, kept as published (khronos/README.md).
     target_include_directories(maul-rhi SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/khronos)
@@ -154,7 +154,17 @@ if(MAUL_RHI_BUILD_TESTS)
         endif()
     endif()
     # Every driver the build has, through the public API (mrhi-0003).
+    # Where the XCB client library is installed, the suite also makes a
+    # window to check surfaces on; only the test links it.
     maul_add_test(conformance)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND AND MAUL_RHI_VULKAN_DRIVER)
+        pkg_check_modules(MAUL_RHI_XCB QUIET IMPORTED_TARGET xcb)
+        if(MAUL_RHI_XCB_FOUND)
+            target_link_libraries(test_conformance PRIVATE PkgConfig::MAUL_RHI_XCB)
+            target_compile_definitions(test_conformance PRIVATE MRHI_TEST_XCB)
+        endif()
+    endif()
     maul_add_header_tests()
     # The Vulkan loader keeps drivers loaded after an instance ends, so
     # that LeakSanitizer reads their memory as held, not lost. Where the

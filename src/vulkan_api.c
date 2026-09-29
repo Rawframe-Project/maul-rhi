@@ -70,6 +70,7 @@ typedef struct Function
 
 static const Function s_global[] = {MRHI_VULKAN_GLOBAL(MRHI_VULKAN_LOADER_ENTRY)};
 static const Function s_instance[] = {MRHI_VULKAN_INSTANCE(MRHI_VULKAN_LOADER_ENTRY)};
+static const Function s_surface[] = {MRHI_VULKAN_SURFACE(MRHI_VULKAN_LOADER_ENTRY)};
 static const Function s_device[] = {MRHI_VULKAN_DEVICE(MRHI_VULKAN_DEVICE_ENTRY)};
 
 // Stores a function in its table's typed field: every Vulkan function
@@ -120,6 +121,11 @@ bool mrhiOpenVulkan(mrhiVulkan* vulkan)
 bool mrhiLoadVulkanInstance(mrhiVulkan* vulkan, VkInstance instance)
 {
     return ReadInstance(vulkan, instance, s_instance, sizeof(s_instance) / sizeof(s_instance[0]));
+}
+
+bool mrhiLoadVulkanSurface(mrhiVulkan* vulkan, VkInstance instance)
+{
+    return ReadInstance(vulkan, instance, s_surface, sizeof(s_surface) / sizeof(s_surface[0]));
 }
 
 bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, mrhiVulkanDevice* functions)

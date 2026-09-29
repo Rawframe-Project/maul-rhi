@@ -15,12 +15,14 @@
 // The functions reached without an instance.
 #define MRHI_VULKAN_GLOBAL(X)                                                                      \
     X(vkCreateInstance)                                                                            \
-    X(vkEnumerateInstanceVersion)
+    X(vkEnumerateInstanceVersion)                                                                  \
+    X(vkEnumerateInstanceExtensionProperties)
 
 // The functions reached through an instance.
 #define MRHI_VULKAN_INSTANCE(X)                                                                    \
     X(vkDestroyInstance)                                                                           \
     X(vkEnumeratePhysicalDevices)                                                                  \
+    X(vkEnumerateDeviceExtensionProperties)                                                        \
     X(vkGetPhysicalDeviceProperties2)                                                              \
     X(vkGetPhysicalDeviceFeatures2)                                                                \
     X(vkGetPhysicalDeviceQueueFamilyProperties)                                                    \
@@ -112,6 +114,14 @@
     X(vkCmdCopyQueryPoolResults)                                                                   \
     X(vkCmdFillBuffer)
 
+// The functions of VK_KHR_surface, read when the instance has it.
+#define MRHI_VULKAN_SURFACE(X)                                                                     \
+    X(vkDestroySurfaceKHR)                                                                         \
+    X(vkGetPhysicalDeviceSurfaceSupportKHR)                                                        \
+    X(vkGetPhysicalDeviceSurfaceCapabilitiesKHR)                                                   \
+    X(vkGetPhysicalDeviceSurfaceFormatsKHR)                                                        \
+    X(vkGetPhysicalDeviceSurfacePresentModesKHR)
+
 #define MRHI_VULKAN_FIELD(name) PFN_##name name;
 
 // The loader's library and the functions read from it.
@@ -121,6 +131,9 @@ typedef struct mrhiVulkan
     PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
     MRHI_VULKAN_GLOBAL(MRHI_VULKAN_FIELD)
     MRHI_VULKAN_INSTANCE(MRHI_VULKAN_FIELD)
+    // Whether the instance has VK_KHR_surface, and its functions.
+    bool surfaces;
+    MRHI_VULKAN_SURFACE(MRHI_VULKAN_FIELD)
 } mrhiVulkan;
 
 // A device's functions.
@@ -135,6 +148,10 @@ bool mrhiOpenVulkan(mrhiVulkan* vulkan);
 
 // Reads the instance's functions: false when one is missing.
 bool mrhiLoadVulkanInstance(mrhiVulkan* vulkan, VkInstance instance);
+
+// Reads the functions of VK_KHR_surface, which the instance has: false
+// when one is missing.
+bool mrhiLoadVulkanSurface(mrhiVulkan* vulkan, VkInstance instance);
 
 // Reads a device's functions: false when one is missing.
 bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, mrhiVulkanDevice* functions);

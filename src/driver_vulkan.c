@@ -2,8 +2,9 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The Vulkan driver's instance (mrhi-0003): a Vulkan 1.3 instance on the
-// loader opened at run time, adapter searches answered at the next
-// poll from the physical devices then present.
+// loader opened at run time, with the surface extensions it offers;
+// adapter searches answered at the next poll from the physical devices
+// then present; and surfaces (vulkan_surface.c).
 
 #include "driver_vulkan.h"
 
@@ -11,6 +12,7 @@
 #include "invariant.h"
 #include "vulkan_adapter.h"
 #include "vulkan_device.h"
+#include "vulkan_surface.h"
 
 #include <stdalign.h>
 #include <string.h>
@@ -21,6 +23,9 @@ typedef struct VulkanDriver
     size_t bytes;
     mrhiVulkan vulkan;
     VkInstance instance;
+    // The surface extensions the instance enabled, a bit each in
+    // mrhiVulkanSurfaceExtensions's order.
+    uint32_t surfaceExtensions;
     mrhiDriverEvent* pending;
     uint32_t pendingCount;
     uint32_t pendingLimit;
@@ -104,31 +109,45 @@ static void GetFormatCaps(const void* self, uint64_t adapter, mrhiFormat format,
     mrhiGetVulkanFormatCaps(&driver->vulkan, DeviceOf(adapter), format, capsOut);
 }
 
-// Surfaces come with the window system's headers.
+// A surface's handle is the VkSurfaceKHR, never zero.
+static VkSurfaceKHR SurfaceOf(uint64_t handle)
+{
+    static_assert(sizeof(VkSurfaceKHR) == sizeof(uint64_t), "a handle holds a surface");
+    VkSurfaceKHR surface;
+    memcpy((void*)&surface, &handle, sizeof(handle));
+    return surface;
+}
+
 static mrhiResult CreateSurface(void* self, const mrhiChain* source, const mrhiSurfaceDef* def,
                                 uint64_t* handleOut)
 {
-    (void)self;
-    (void)source;
     (void)def;
-    (void)handleOut;
-    return mrhi_errorUnsupported;
+    VulkanDriver* driver = self;
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
+    mrhiResult status = mrhiVulkanCreateSurface(&driver->vulkan, driver->instance,
+                                                driver->surfaceExtensions, source, &surface);
+    if (status == mrhi_success)
+    {
+        memcpy(handleOut, (const void*)&surface, sizeof(*handleOut));
+    }
+    return status;
 }
 
 static void DestroySurface(void* self, uint64_t handle)
 {
-    (void)self;
-    (void)handle;
-    MRHI_ASSERT(false);
+    VulkanDriver* driver = self;
+    driver->vulkan.vkDestroySurfaceKHR(driver->instance, SurfaceOf(handle), nullptr);
 }
 
 static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
                            mrhiSurfaceCaps* capsOut)
 {
-    (void)self;
-    (void)surface;
-    (void)adapter;
-    *capsOut = (mrhiSurfaceCaps){0};
+    const VulkanDriver* driver = self;
+    const char* const swapchain = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+    VkPhysicalDevice device = DeviceOf(adapter);
+    bool presents =
+        mrhiVulkanExtensions(&driver->vulkan, &driver->allocator, device, &swapchain, 1) != 0;
+    mrhiVulkanSurfaceCaps(&driver->vulkan, device, presents, SurfaceOf(surface), capsOut);
 }
 
 // Opens the device at once and answers the opening at the next poll.
@@ -173,11 +192,13 @@ static const mrhiInstanceDriverVtable s_vtable = {
     .destroy = Destroy,
 };
 
-// Makes a Vulkan 1.3 instance with its functions read: VK_NULL_HANDLE
-// where the loader is older or refuses. Vulkan's own allocations stay
-// the platform's: its callbacks free without a size, which the
-// program's allocator needs.
-static VkInstance CreateInstance(mrhiVulkan* vulkan)
+// Makes a Vulkan 1.3 instance with its functions read and the surface
+// extensions the loader offers enabled (their bits in enabledOut):
+// VK_NULL_HANDLE where the loader is older or refuses. Vulkan's own
+// allocations stay the platform's: its callbacks free without a size,
+// which the program's allocator needs.
+static VkInstance CreateInstance(mrhiVulkan* vulkan, const mrhiAllocator* allocator,
+                                 uint32_t* enabledOut)
 {
     uint32_t version = 0;
     if (vulkan->vkEnumerateInstanceVersion(&version) != VK_SUCCESS || version < VK_API_VERSION_1_3)
@@ -191,16 +212,32 @@ static VkInstance CreateInstance(mrhiVulkan* vulkan)
             VK_MAKE_API_VERSION(0, MRHI_VERSION_MAJOR, MRHI_VERSION_MINOR, MRHI_VERSION_PATCH),
         .apiVersion = VK_API_VERSION_1_3,
     };
+    const char* const* wanted = nullptr;
+    uint32_t wantedCount = (uint32_t)mrhiVulkanSurfaceExtensions(&wanted);
+    uint32_t offered = mrhiVulkanExtensions(vulkan, allocator, VK_NULL_HANDLE, wanted, wantedCount);
+    const char* names[32];
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < wantedCount; ++i)
+    {
+        if ((offered >> i & 1u) != 0)
+        {
+            names[count++] = wanted[i];
+        }
+    }
     const VkInstanceCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pApplicationInfo = &application,
+        .enabledExtensionCount = count,
+        .ppEnabledExtensionNames = names,
     };
     VkInstance instance = VK_NULL_HANDLE;
     if (vulkan->vkCreateInstance(&info, nullptr, &instance) != VK_SUCCESS)
     {
         return VK_NULL_HANDLE;
     }
-    if (!mrhiLoadVulkanInstance(vulkan, instance))
+    vulkan->surfaces = (offered & 1u) != 0;
+    if (!mrhiLoadVulkanInstance(vulkan, instance) ||
+        (vulkan->surfaces && !mrhiLoadVulkanSurface(vulkan, instance)))
     {
         if (vulkan->vkDestroyInstance != nullptr)
         {
@@ -208,6 +245,7 @@ static VkInstance CreateInstance(mrhiVulkan* vulkan)
         }
         return VK_NULL_HANDLE;
     }
+    *enabledOut = offered;
     return instance;
 }
 
@@ -232,7 +270,8 @@ mrhiResult mrhiCreateVulkanDriver(const mrhiAllocator* allocator, uint32_t pendi
         mrhiCloseVulkan(&vulkan);
         return mrhi_errorCapacity;
     }
-    VkInstance instance = CreateInstance(&vulkan);
+    uint32_t surfaceExtensions = 0;
+    VkInstance instance = CreateInstance(&vulkan, allocator, &surfaceExtensions);
     if (instance == VK_NULL_HANDLE)
     {
         mrhiRelease(allocator, driver, layout.size, alignof(VulkanDriver));
@@ -245,6 +284,7 @@ mrhiResult mrhiCreateVulkanDriver(const mrhiAllocator* allocator, uint32_t pendi
         .bytes = layout.size,
         .vulkan = vulkan,
         .instance = instance,
+        .surfaceExtensions = surfaceExtensions,
         .pending = (mrhiDriverEvent*)(block + pendingAt),
         .pendingLimit = pendingLimit,
         .devices = (VkPhysicalDevice*)(block + devicesAt),

@@ -7,7 +7,7 @@
 // (Vulkan 1.3's device memory requirements). Buffers, textures, views
 // and samplers are made in device-local memory, query sets as query
 // pools; shader modules and pipelines are made at the call. Frames run;
-// surfaces are refused as unsupported until their slice lands.
+// configuring a surface is refused as unsupported until swapchains land.
 
 #include "vulkan_device.h"
 

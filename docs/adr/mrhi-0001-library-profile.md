@@ -25,7 +25,9 @@ family rulebook (family record 0005).
   the Vulkan driver, which compiles against the Khronos C headers kept
   as published in `khronos/`; `webgpu.h` through Emscripten's WebGPU port on the
   web; Metal and Direct3D 12 later. Window handles come in as opaque
-  pointers from the program; no window library is linked.
+  pointers from the program; no window library is linked. The
+  conformance suite links the XCB client library where it is
+  installed, to make a window of its own.
 - **Commit areas:** `api`, `build`, `ci`, `container`, `conformance`,
   `docs`, `graph`, `schema`, `tests`, `tools`, `vulkan`, `webgpu`.
 

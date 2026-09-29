@@ -8,6 +8,7 @@
 #ifndef MAUL_RHI_SRC_VULKAN_ADAPTER_H
 #define MAUL_RHI_SRC_VULKAN_ADAPTER_H
 
+#include "allocator.h"
 #include "driver.h"
 #include "vulkan_api.h"
 
@@ -31,6 +32,12 @@ VkFormat mrhiVulkanFormat(mrhiFormat format, VkFormat depthStencil);
 
 // The queue family with graphics and compute a listed device has.
 uint32_t mrhiVulkanQueueFamily(const mrhiVulkan* vulkan, VkPhysicalDevice device);
+
+// Which of the named extensions the instance (device VK_NULL_HANDLE) or
+// a physical device offers, one bit each in the names' order, at most
+// 32; 0 when the list cannot be read.
+uint32_t mrhiVulkanExtensions(const mrhiVulkan* vulkan, const mrhiAllocator* allocator,
+                              VkPhysicalDevice device, const char* const* names, uint32_t count);
 
 // Fills what a format can do on a device.
 void mrhiGetVulkanFormatCaps(const mrhiVulkan* vulkan, VkPhysicalDevice device, mrhiFormat format,

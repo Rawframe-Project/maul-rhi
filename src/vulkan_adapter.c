@@ -8,6 +8,7 @@
 #include "vulkan_adapter.h"
 
 #include "capabilities_core.h"
+#include "invariant.h"
 
 #include <string.h>
 
@@ -406,4 +407,59 @@ void mrhiGetVulkanFormatCaps(const mrhiVulkan* vulkan, VkPhysicalDevice device, 
     usage |= color ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : 0;
     usage |= depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : 0;
     capsOut->sampleCounts = usage != 0 ? SampleCounts(vulkan, device, vulkanFormat, usage) : 0;
+}
+
+// Reads the instance's or a device's extensions into a list of the
+// exact count: its length, or 0 with nothing allocated.
+static uint32_t ReadExtensions(const mrhiVulkan* vulkan, const mrhiAllocator* allocator,
+                               VkPhysicalDevice device, VkExtensionProperties** listOut)
+{
+    uint32_t count = 0;
+    VkResult result =
+        device == VK_NULL_HANDLE
+            ? vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr)
+            : vulkan->vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr);
+    VkExtensionProperties* list =
+        result == VK_SUCCESS && count > 0
+            ? mrhiAllocate(allocator, count * sizeof(VkExtensionProperties),
+                           alignof(VkExtensionProperties))
+            : nullptr;
+    if (list == nullptr)
+    {
+        return 0;
+    }
+    uint32_t read = count;
+    result = device == VK_NULL_HANDLE
+                 ? vulkan->vkEnumerateInstanceExtensionProperties(nullptr, &read, list)
+                 : vulkan->vkEnumerateDeviceExtensionProperties(device, nullptr, &read, list);
+    if (result != VK_SUCCESS && result != VK_INCOMPLETE)
+    {
+        mrhiRelease(allocator, list, count * sizeof(VkExtensionProperties),
+                    alignof(VkExtensionProperties));
+        return 0;
+    }
+    *listOut = list;
+    return count;
+}
+
+uint32_t mrhiVulkanExtensions(const mrhiVulkan* vulkan, const mrhiAllocator* allocator,
+                              VkPhysicalDevice device, const char* const* names, uint32_t count)
+{
+    MRHI_ASSERT(count <= 32);
+    VkExtensionProperties* list = nullptr;
+    uint32_t listed = ReadExtensions(vulkan, allocator, device, &list);
+    uint32_t found = 0;
+    for (uint32_t i = 0; i < listed; ++i)
+    {
+        for (uint32_t n = 0; n < count; ++n)
+        {
+            found |= strcmp(list[i].extensionName, names[n]) == 0 ? 1u << n : 0u;
+        }
+    }
+    if (list != nullptr)
+    {
+        mrhiRelease(allocator, list, listed * sizeof(VkExtensionProperties),
+                    alignof(VkExtensionProperties));
+    }
+    return found;
 }

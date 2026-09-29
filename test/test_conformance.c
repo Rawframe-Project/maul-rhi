@@ -20,11 +20,16 @@
 #include "maul-rhi/pipeline.h"
 #include "maul-rhi/resources.h"
 #include "maul-rhi/shader.h"
+#include "maul-rhi/surface.h"
 #include "maul-rhi/test.h"
 #include "shaders/conformance_container.h"
 
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef MRHI_TEST_XCB
+#include <xcb/xcb.h>
+#endif
 
 // The limits every adapter reaches at least, as the floor has them.
 #define AT_LEAST(X)                                                                                \
@@ -1034,6 +1039,116 @@ static void TestTestDriver(void)
     mrhiDestroyInstance(instance);
 }
 
+static bool IsSet(const char* name)
+{
+    const char* value = getenv(name);
+    return value != nullptr && value[0] != '\0';
+}
+
+static mrhiResult MakeSurface(mrhiInstance* instance, const mrhiChain* source,
+                              mrhiSurfaceId* surfaceOut)
+{
+    mrhiSurfaceDef def = mrhiDefaultSurfaceDef();
+    def.next = source;
+    return mrhiCreateSurface(instance, &def, surfaceOut);
+}
+
+// A canvas is never a native surface, nor a window of another platform.
+static void CheckForeignSources(mrhiInstance* instance)
+{
+    const mrhiSurfaceSourceCanvas canvas = {
+        .chain = {.type = mrhi_structSurfaceSourceCanvas},
+        .selector = "#c",
+        .selectorLength = 2,
+    };
+    mrhiSurfaceId surface = {0};
+    CHECK(MakeSurface(instance, &canvas.chain, &surface) == mrhi_errorUnsupported,
+          "no canvas natively");
+#ifndef _WIN32
+    int window = 0;
+    const mrhiSurfaceSourceWin32 win32 = {
+        .chain = {.type = mrhi_structSurfaceSourceWin32},
+        .hinstance = &window,
+        .hwnd = &window,
+    };
+    CHECK(MakeSurface(instance, &win32.chain, &surface) == mrhi_errorUnsupported,
+          "no Win32 window elsewhere");
+#endif
+}
+
+// Whether caps meet the floors and offer 8-bit sRGB in Rec. 709.
+static bool MeetsFloors(const mrhiSurfaceCaps* caps)
+{
+    bool srgb = false;
+    for (uint32_t i = 0; i < caps->colorCount; ++i)
+    {
+        const mrhiSurfaceColor* color = &caps->colors[i];
+        srgb =
+            srgb ||
+            ((color->format == mrhi_formatBgra8Unorm || color->format == mrhi_formatRgba8Unorm) &&
+             color->primaries == mrhi_primariesBt709 && color->transfer == mrhi_transferSrgb &&
+             color->range == mrhi_rangeStandard);
+    }
+    return caps->colorCount >= 1 && caps->colorCount <= MRHI_SURFACE_COLORS && srgb &&
+           (caps->presentModes & mrhi_presentFifo) != 0 &&
+           (caps->alphaModes & mrhi_alphaOpaque) != 0 &&
+           (caps->usages & mrhi_textureRenderTarget) != 0;
+}
+
+#ifdef MRHI_TEST_XCB
+// A window of the X server the environment names, where there is one.
+static void CheckXcbSurface(mrhiInstance* instance, const mrhiAdapterId* ids, size_t count)
+{
+    xcb_connection_t* connection = xcb_connect(nullptr, nullptr);
+    if (xcb_connection_has_error(connection) != 0)
+    {
+        xcb_disconnect(connection);
+        CHECK(!IsSet("MAUL_RHI_REQUIRE_SURFACE"), "an X server where required");
+        printf("skip: no X server for surfaces\n");
+        return;
+    }
+    xcb_screen_t* screen = xcb_setup_roots_iterator(xcb_get_setup(connection)).data;
+    xcb_window_t window = xcb_generate_id(connection);
+    xcb_create_window(connection, XCB_COPY_FROM_PARENT, window, screen->root, 0, 0, 64, 48, 0,
+                      XCB_WINDOW_CLASS_INPUT_OUTPUT, screen->root_visual, 0, nullptr);
+    xcb_map_window(connection, window);
+    xcb_flush(connection);
+    const mrhiSurfaceSourceXcb source = {
+        .chain = {.type = mrhi_structSurfaceSourceXcb},
+        .connection = connection,
+        .window = window,
+    };
+    mrhiSurfaceId surface = {0};
+    CHECK(MakeSurface(instance, &source.chain, &surface) == mrhi_success, "an XCB surface");
+    size_t presenting = 0;
+    for (size_t i = 0; i < count; ++i)
+    {
+        mrhiSurfaceCaps caps;
+        CHECK(mrhiGetSurfaceCaps(instance, surface, ids[i], &caps) == mrhi_success, "caps");
+        CHECK(!caps.presentable || MeetsFloors(&caps), "the floors where it presents");
+        presenting += caps.presentable ? 1 : 0;
+    }
+    CHECK(presenting > 0 || !IsSet("MAUL_RHI_REQUIRE_SURFACE"), "an adapter presents there");
+    CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "the surface destroyed");
+    xcb_destroy_window(connection, window);
+    xcb_disconnect(connection);
+}
+#endif
+
+// Surfaces on the native driver's adapters.
+static void CheckSurfaces(mrhiInstance* instance)
+{
+    CheckForeignSources(instance);
+    mrhiAdapterId ids[16];
+    size_t count = Search(instance, ids, 16);
+#ifdef MRHI_TEST_XCB
+    CheckXcbSurface(instance, ids, count);
+#else
+    (void)count;
+    CHECK(!IsSet("MAUL_RHI_REQUIRE_SURFACE"), "a window system where required");
+#endif
+}
+
 static void TestNativeDriver(void)
 {
     mrhiInstance* instance = Create(nullptr);
@@ -1048,6 +1163,10 @@ static void TestNativeDriver(void)
         const char* required = getenv("MAUL_RHI_REQUIRE_VULKAN");
         CHECK(required == nullptr || required[0] == '\0', "a Vulkan adapter where required");
         printf("skip: no native adapter on this host\n");
+    }
+    else
+    {
+        CheckSurfaces(instance);
     }
     mrhiDestroyInstance(instance);
 }

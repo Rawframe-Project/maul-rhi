@@ -11,7 +11,9 @@ not code of this project.
 - **Licence:** `Apache-2.0 OR MIT`, as each file's SPDX line says; the
   texts are in `LICENSES/`.
 - **Files:** `include/vulkan/vk_platform.h`,
-  `include/vulkan/vulkan_core.h` and `include/vk_video/*.h`, under
+  `include/vulkan/vulkan_core.h`, the platform headers of the surface
+  sources (`vulkan_android.h`, `vulkan_metal.h`, `vulkan_wayland.h`,
+  `vulkan_win32.h`, `vulkan_xcb.h`) and `include/vk_video/*.h`, under
   `vulkan/` and `vk_video/`; `LICENSES/` from the repository's root.
 
 An update replaces the files from a newer tag and this list.
@@ -33,4 +35,9 @@ An update replaces the files from a newer tag and this list.
 | `vk_video/vulkan_video_codec_vp9std_decode.h` | `1ceb1a8d0e3370e508cf688a6e57dc314cd82186b60f3cef420ea4b1b483865d` |
 | `vk_video/vulkan_video_codec_vp9std.h` | `0a47125865376a3fe7014b69ff6db9d04e30ebf8c4d15664f1d894649ad5c09d` |
 | `vulkan/vk_platform.h` | `a2cd9085c66776845d2524c3b0e73ccf4827ba046aa6f676c4b8ddbed47d6552` |
+| `vulkan/vulkan_android.h` | `9dcce545a790b5b1ce00e103ade95c8efa4c8a0bf2ff39865d76a7d2f987aef2` |
 | `vulkan/vulkan_core.h` | `2f64fd6c7c3f342b0e44f039f1c359b7f0e6cfcb71a7dca1cc5156282faa3b51` |
+| `vulkan/vulkan_metal.h` | `d5fe0caf881cc9c72ea2ba31ca86c684e97cdec6741d6e6298ecbd8f58dc8c5e` |
+| `vulkan/vulkan_wayland.h` | `6c4146149d45bcbb5a22c7540feaa396ee9a49f077737c7a343c62de5199fbc7` |
+| `vulkan/vulkan_win32.h` | `72f0b6de71287d3b04d12235e4f2fef8f343126f85be4963c516d31d5bb4c099` |
+| `vulkan/vulkan_xcb.h` | `3d49f5eb52090e72e1cf7cde545088225ac524a2ff1d1f35737e7d944474c1b7` |

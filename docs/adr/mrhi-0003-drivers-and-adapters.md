@@ -82,6 +82,18 @@ ids, requests, the frame graph) can be tested without a GPU.
   is reused, and each recorded binding carries its slot's kind so the
   driver knows the descriptor type without the reflection. The root
   block is pushed as constants to the pipeline's stages.
+- **Vulkan surfaces:** the platform headers of the same Khronos tag
+  are kept beside `vulkan_core.h` and compiled on their platform only
+  (XCB and Wayland on Linux and the BSDs, Win32, Android, Metal); the
+  driver declares the three XCB types the XCB header names, so no
+  window library is needed to build. The instance enables
+  `VK_KHR_surface`, the platform surface extensions and
+  `VK_EXT_swapchain_colorspace` its loader offers; a source without
+  its extension, and a canvas, are unsupported. An adapter presents to
+  a surface when it offers `VK_KHR_swapchain` and its queue family
+  presents there; its colors are the surface's format and color space
+  pairs the contract's rows map, an sRGB format standing for its unorm
+  twin.
 - **Vulkan queries:** a query set is a query pool. Each set a frame
   names is reset once before its first pass; a pass's timestamps are
   written before and after it, and occlusion queries bracket draws. As
@@ -98,8 +110,12 @@ ids, requests, the frame graph) can be tested without a GPU.
   CI sets it, runs lavapipe, and enables the Khronos validation layer
   with synchronization validation, which logs to each test's output;
   CTest fails any test whose output reports a validation error.
-  ThreadSanitizer skips lavapipe's and LLVM's own threads and locks
-  (`test/tsan.supp`), which it cannot see ordered.
+  Where the XCB client library is installed, the suite makes a window
+  and checks surfaces on it; Linux CI runs the tests under Xvfb and
+  sets `MAUL_RHI_REQUIRE_SURFACE`, so a missing X server fails.
+  ThreadSanitizer skips the threads and locks of lavapipe, LLVM and
+  the XCB client library (`test/tsan.supp`), which it cannot see
+  ordered.
 
 ## Consequences
 
