@@ -4,8 +4,9 @@
 #
 # Builds the conformance suite's shader containers the way a program's
 # cook would, offline: test/shaders/conformance.{vert,frag,comp,wgsl,json}
-# and test/shaders/bindless.{comp,json}, whose entry reads heaps and so
-# has no WGSL. glslangValidator compiles each stage under its entry name,
+# with conformance.{placed.vert,root.frag,add.comp}, and
+# test/shaders/bindless.{comp,json}, whose entry reads heaps and so has
+# no WGSL. glslangValidator compiles each stage under its entry name,
 # spirv-link joins them into one module, spirv-val checks it for Vulkan
 # 1.3, and tools/mrhi_container.py writes the container, which lands in
 # test/shaders/NAME_container.h as bytes. CI runs none of these tools;
@@ -24,7 +25,8 @@ SHADERS = os.path.join(ROOT, "test", "shaders")
 # Each container: its name, its stages' sources and entries, and whether
 # it has WGSL.
 CONTAINERS = (
-    ("conformance", (("vert", "vs"), ("frag", "fs"), ("comp", "cs")), True),
+    ("conformance", (("vert", "vs"), ("frag", "fs"), ("comp", "cs"), ("placed.vert", "vp"),
+                     ("root.frag", "fr"), ("add.comp", "ca")), True),
     ("bindless", (("comp", "cs"),), False),
 )
 

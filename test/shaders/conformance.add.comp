@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// The conformance container's compute entry "ca": adds the root block's
+// first value to each of the storage buffer's.
+
+#version 450
+
+layout(push_constant) uniform Root
+{
+    vec4 tint;
+} root;
+
+layout(local_size_x = 8, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 1) buffer Data
+{
+    uint values[];
+} data;
+
+void main()
+{
+    data.values[gl_GlobalInvocationID.x] += uint(root.tint.x);
+}

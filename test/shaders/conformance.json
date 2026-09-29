@@ -4,7 +4,12 @@
     {"name": "vs", "stage": "vertex"},
     {"name": "fs", "stage": "fragment",
      "outputs": [{"location": 0, "type": "float32", "components": 4}]},
-    {"name": "cs", "stage": "compute", "workgroup": [8, 1, 1]}
+    {"name": "cs", "stage": "compute", "workgroup": [8, 1, 1]},
+    {"name": "vp", "stage": "vertex",
+     "inputs": [{"location": 0, "type": "float32", "components": 4}]},
+    {"name": "fr", "stage": "fragment",
+     "outputs": [{"location": 0, "type": "float32", "components": 4}]},
+    {"name": "ca", "stage": "compute", "workgroup": [8, 1, 1]}
   ],
   "bindings": [
     {"table": 0, "slot": 0, "kind": "uniform_buffer", "stages": ["fragment"], "min_size": 16},

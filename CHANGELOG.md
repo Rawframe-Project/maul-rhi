@@ -319,6 +319,11 @@ format.
   readbacks mapped into the ring, declared resources pooled across
   frames, queries the frame did not write resolved to 0; the
   conformance suite's frames run in headless Chrome.
+- Conformance covers render state on every driver: vertex and index
+  buffers, a base vertex, indirect draws at an offset, viewport,
+  scissor, stencil reference and blend constant, depth and stencil kept
+  from one pass for the next; and a compute pass split around an upload,
+  its root block and timestamps.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

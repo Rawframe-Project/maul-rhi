@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The conformance container's WGSL: the entries of conformance.vert,
-// .frag and .comp.
+// .frag, .comp, .placed.vert, .root.frag and .add.comp.
 
 struct Root {
     tint: vec4f,
@@ -36,4 +36,19 @@ fn fs() -> @location(0) vec4f {
 @compute @workgroup_size(8)
 fn cs(@builtin(global_invocation_id) id: vec3u) {
     data[id.x] *= scale;
+}
+
+@vertex
+fn vp(@location(0) position: vec4f) -> @builtin(position) vec4f {
+    return position;
+}
+
+@fragment
+fn fr() -> @location(0) vec4f {
+    return root.tint;
+}
+
+@compute @workgroup_size(8)
+fn ca(@builtin(global_invocation_id) id: vec3u) {
+    data[id.x] += u32(root.tint.x);
 }

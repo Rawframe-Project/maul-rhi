@@ -614,13 +614,18 @@ static void CheckPipelines(mrhiDevice* device)
 
 // What the drawing checks use: the conformance shader's pipelines, a
 // uniform color, a white texel, a sampler, an 8 by 8 target and a
-// storage buffer.
+// storage buffer. The placed pipelines draw vertices from a buffer in
+// the root block's color with depth and stencil: one writes both, the
+// other tests them and blends with the blend constant.
 typedef struct Scene
 {
     mrhiDevice* device;
     mrhiGraphicsPipelineId draw;
     mrhiGraphicsPipelineId culled;
     mrhiComputePipelineId compute;
+    mrhiGraphicsPipelineId placed;
+    mrhiGraphicsPipelineId tested;
+    mrhiComputePipelineId adding;
     mrhiBufferId uniform;
     mrhiTextureId white;
     mrhiSamplerId sampler;
@@ -794,6 +799,43 @@ static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool nativ
     mrhiDestroyDevice(device);
 }
 
+// The placed pipelines: vertices of four floats each, depth and stencil
+// written, then tested.
+static void MakePlaced(Scene* scene, mrhiShaderId shader)
+{
+    static const mrhiVertexBufferLayout buffer = {.stride = 16};
+    static const mrhiVertexAttribute position = {.format = mrhi_vertexFloat32x4};
+    mrhiGraphicsPipelineDef def = GraphicsDef(shader);
+    def.vertexEntry = "vp";
+    def.fragmentEntry = "fr";
+    def.vertexBuffers = &buffer;
+    def.vertexBufferCount = 1;
+    def.vertexAttributes = &position;
+    def.vertexAttributeCount = 1;
+    def.depthStencilFormat = mrhi_formatDepthStencil;
+    def.depthWrite = true;
+    def.depthCompare = mrhi_compareLess;
+    def.stencilFront =
+        (mrhiStencilFace){.compare = mrhi_compareAlways, .passOp = mrhi_stencilReplace};
+    def.stencilBack = def.stencilFront;
+    LABEL(def, "placed");
+    mrhiRequestId request = {0};
+    CHECK(mrhiCreateGraphicsPipeline(scene->device, &def, &scene->placed, &request) == mrhi_success,
+          "a pipeline writing depth and stencil");
+    def.depthWrite = false;
+    def.stencilFront = (mrhiStencilFace){.compare = mrhi_compareEqual};
+    def.stencilBack = def.stencilFront;
+    def.colorTargets[0].blend = true;
+    def.colorTargets[0].color = (mrhiBlendComponent){
+        .srcFactor = mrhi_blendConstant,
+        .dstFactor = mrhi_blendZero,
+        .operation = mrhi_blendAdd,
+    };
+    LABEL(def, "tested");
+    CHECK(mrhiCreateGraphicsPipeline(scene->device, &def, &scene->tested, &request) == mrhi_success,
+          "a pipeline testing depth and stencil");
+}
+
 static void MakeScene(Scene* scene)
 {
     mrhiDevice* device = scene->device;
@@ -822,7 +864,12 @@ static void MakeScene(Scene* scene)
     compute.constantCount = 1;
     CHECK(mrhiCreateComputePipeline(device, &compute, &scene->compute, &request) == mrhi_success,
           "a compute pipeline");
-    AwaitPipelines(device, 3, 0);
+    compute.entry = "ca";
+    compute.constantCount = 0;
+    CHECK(mrhiCreateComputePipeline(device, &compute, &scene->adding, &request) == mrhi_success,
+          "an adding pipeline");
+    MakePlaced(scene, shader);
+    AwaitPipelines(device, 6, 0);
     CHECK(mrhiDestroyShader(device, shader) == mrhi_success, "the shader destroyed");
     mrhiBufferDef uniform = mrhiDefaultBufferDef();
     uniform.size = 16;
@@ -906,9 +953,9 @@ static mrhiRequestId ReadTarget(const Scene* scene, mrhiPassId pass)
     return request;
 }
 
-static bool IsColor(const uint8_t* pixel)
+// Whether a pixel is a color, within one step.
+static bool IsNear(const uint8_t* pixel, const uint8_t* expected)
 {
-    const int expected[4] = {255, 51, 153, 255};
     for (int i = 0; i < 4; ++i)
     {
         int difference = pixel[i] - expected[i];
@@ -918,6 +965,12 @@ static bool IsColor(const uint8_t* pixel)
         }
     }
     return true;
+}
+
+static bool IsColor(const uint8_t* pixel)
+{
+    static const uint8_t kExpected[4] = {255, 51, 153, 255};
+    return IsNear(pixel, kExpected);
 }
 
 static bool IsBlack(const uint8_t* pixel)
@@ -1183,6 +1236,247 @@ static void CheckQueries(Scene* scene, bool timestamps)
           "destroyed");
 }
 
+// The placed checks' vertices: a spare, a quad at depth 0.5 drawn
+// indexed from vertex 1, and triangles over the target at 0.75 and 0.4.
+static const float kPlaced[11][4] = {
+    {0.0f, 0.0f, 0.0f, 1.0f},   {-1.0f, -1.0f, 0.5f, 1.0f}, {1.0f, -1.0f, 0.5f, 1.0f},
+    {-1.0f, 1.0f, 0.5f, 1.0f},  {1.0f, 1.0f, 0.5f, 1.0f},   {-1.0f, -1.0f, 0.75f, 1.0f},
+    {3.0f, -1.0f, 0.75f, 1.0f}, {-1.0f, 3.0f, 0.75f, 1.0f}, {-1.0f, -1.0f, 0.4f, 1.0f},
+    {3.0f, -1.0f, 0.4f, 1.0f},  {-1.0f, 3.0f, 0.4f, 1.0f},
+};
+
+static mrhiResourceId Declared(mrhiDevice* device, uint64_t size)
+{
+    mrhiBufferDef def = mrhiDefaultBufferDef();
+    def.size = size;
+    mrhiResourceId buffer = {0};
+    CHECK(mrhiDeclareBuffer(device, &def, &buffer) == mrhi_success, "a declared buffer");
+    return buffer;
+}
+
+// A pass drawing the target and a declared depth and stencil texture,
+// loading both or clearing them, with the scene's accesses and a vertex
+// buffer and one other.
+static mrhiPassId PlacedPass(const Scene* scene, mrhiResourceId depth, bool load,
+                             mrhiAccess vertices, mrhiAccess other)
+{
+    const mrhiAccess accesses[5] = {Whole(scene->u, mrhi_accessUniform),
+                                    Whole(scene->d, mrhi_accessStorageReadWrite),
+                                    Whole(scene->w, mrhi_accessSampled), vertices, other};
+    mrhiPassDef def = mrhiDefaultPassDef();
+    mrhiLoadOp op = load ? mrhi_loadKeep : mrhi_loadClear;
+    def.colorTargets[0] = (mrhiColorTarget){
+        .resource = scene->t,
+        .load = op,
+        .clear = {0.0f, 0.0f, 0.0f, 1.0f},
+    };
+    def.colorTargetCount = 1;
+    def.depthTarget = (mrhiDepthTarget){
+        .resource = depth,
+        .depthLoad = op,
+        .clearDepth = 1.0f,
+        .stencilLoad = op,
+    };
+    def.accesses = accesses;
+    def.accessCount = 5;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(scene->device, &def, &pass) == mrhi_success, "a placed pass");
+    return pass;
+}
+
+// The first placed pass: red where the indexed quad covers the left half
+// through the viewport, stencil 1 there; then green over the upper half
+// through the scissor, farther, so only the upper right passes the
+// depth test and takes stencil 2.
+static void DrawPlaced(const Scene* scene, mrhiPassId pass, mrhiResourceId vertices,
+                       mrhiResourceId indices)
+{
+    mrhiDevice* device = scene->device;
+    const float red[4] = {1.0f, 0.0f, 0.0f, 1.0f};
+    const float green[4] = {0.0f, 1.0f, 0.0f, 1.0f};
+    const mrhiViewport left = {0.0f, 0.0f, 4.0f, 8.0f, 0.0f, 1.0f};
+    const mrhiViewport whole = {0.0f, 0.0f, 8.0f, 8.0f, 0.0f, 1.0f};
+    const mrhiScissorRect upper = {0, 0, 8, 4};
+    CHECK(mrhiBeginPass(device, pass) == mrhi_success &&
+              mrhiSetGraphicsPipeline(device, pass, scene->placed) == mrhi_success,
+          "a placed pipeline");
+    BindScene(scene, pass);
+    CHECK(mrhiSetVertexBuffer(device, pass, 0, vertices, 0, sizeof(kPlaced)) == mrhi_success &&
+              mrhiSetIndexBuffer(device, pass, indices, mrhi_indexUint16, 0, 12) == mrhi_success &&
+              mrhiSetViewport(device, pass, &left) == mrhi_success &&
+              mrhiSetStencilReference(device, pass, 1) == mrhi_success &&
+              mrhiSetRootBlock(device, pass, 0, red, sizeof(red)) == mrhi_success &&
+              mrhiDrawIndexed(device, pass, 6, 1, 0, 1, 0) == mrhi_success &&
+              mrhiSetViewport(device, pass, &whole) == mrhi_success &&
+              mrhiSetScissor(device, pass, &upper) == mrhi_success &&
+              mrhiSetStencilReference(device, pass, 2) == mrhi_success &&
+              mrhiSetRootBlock(device, pass, 0, green, sizeof(green)) == mrhi_success &&
+              mrhiDraw(device, pass, 3, 1, 5, 0) == mrhi_success &&
+              mrhiEndPass(device, pass) == mrhi_success,
+          "placed");
+}
+
+// Render state on the target: a first pass writes depth and stencil,
+// kept for a second that loads them and draws, from indirect arguments
+// past a draw of nothing, blue scaled by the blend constant only where
+// both tests pass, which is the upper right: the left half stays red,
+// the lower right black.
+static void CheckRenderState(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    BeginScene(scene);
+    const uint16_t quad[6] = {0, 1, 2, 2, 1, 3};
+    const uint32_t arguments[8] = {0, 0, 0, 0, 3, 1, 8, 0};
+    mrhiResourceId v = Declared(device, sizeof(kPlaced));
+    mrhiResourceId i = Declared(device, sizeof(quad));
+    mrhiResourceId a = Declared(device, sizeof(arguments));
+    mrhiTextureDef depthDef = mrhiDefaultTextureDef();
+    depthDef.format = mrhi_formatDepthStencil;
+    depthDef.width = 8;
+    depthDef.height = 8;
+    mrhiResourceId z = {0};
+    CHECK(mrhiDeclareTexture(device, &depthDef, &z) == mrhi_success, "a depth target");
+    mrhiAccess writes[3] = {Whole(v, mrhi_accessCopyDestination),
+                            Whole(i, mrhi_accessCopyDestination),
+                            Whole(a, mrhi_accessCopyDestination)};
+    mrhiPassId upload = CopyPass(device, writes, 3);
+    mrhiPassId placed =
+        PlacedPass(scene, z, false, Whole(v, mrhi_accessVertex), Whole(i, mrhi_accessIndex));
+    mrhiPassId tested =
+        PlacedPass(scene, z, true, Whole(v, mrhi_accessVertex), Whole(a, mrhi_accessIndirect));
+    mrhiAccess read = Whole(scene->t, mrhi_accessCopySource);
+    mrhiPassId reading = CopyPass(device, &read, 1);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiBeginPass(device, upload) == mrhi_success &&
+              mrhiWriteBuffer(device, upload, v, 0, kPlaced, sizeof(kPlaced)) == mrhi_success &&
+              mrhiWriteBuffer(device, upload, i, 0, quad, sizeof(quad)) == mrhi_success &&
+              mrhiWriteBuffer(device, upload, a, 0, arguments, sizeof(arguments)) == mrhi_success &&
+              mrhiEndPass(device, upload) == mrhi_success,
+          "uploaded");
+    DrawPlaced(scene, placed, v, i);
+    const float blue[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+    const mrhiClearColor constant = {1.0f, 1.0f, 0.6f, 1.0f};
+    CHECK(mrhiBeginPass(device, tested) == mrhi_success &&
+              mrhiSetGraphicsPipeline(device, tested, scene->tested) == mrhi_success,
+          "a tested pipeline");
+    BindScene(scene, tested);
+    CHECK(mrhiSetVertexBuffer(device, tested, 0, v, 0, sizeof(kPlaced)) == mrhi_success &&
+              mrhiSetStencilReference(device, tested, 2) == mrhi_success &&
+              mrhiSetBlendConstant(device, tested, &constant) == mrhi_success &&
+              mrhiSetRootBlock(device, tested, 0, blue, sizeof(blue)) == mrhi_success &&
+              mrhiDrawIndirect(device, tested, a, 16) == mrhi_success &&
+              mrhiEndPass(device, tested) == mrhi_success,
+          "tested");
+    CHECK(mrhiBeginPass(device, reading) == mrhi_success, "reading");
+    mrhiRequestId pixels = ReadTarget(scene, reading);
+    CHECK(mrhiEndPass(device, reading) == mrhi_success, "read");
+    Finish(device, 1);
+    uint8_t image[256];
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success &&
+              size == sizeof(image),
+          "the pixels");
+    static const uint8_t kRed[4] = {255, 0, 0, 255};
+    static const uint8_t kBlue[4] = {0, 0, 153, 255};
+    bool right = true;
+    for (int y = 0; y < 8 && s_runs; ++y)
+    {
+        for (int x = 0; x < 8; ++x)
+        {
+            const uint8_t* pixel = &image[(y * 8 + x) * 4];
+            right = right &&
+                    (x < 4 ? IsNear(pixel, kRed) : (y < 4 ? IsNear(pixel, kBlue) : IsBlack(pixel)));
+        }
+    }
+    CHECK(right, "red left, blended blue upper right, black lower right");
+}
+
+// A compute pass that leaves its GPU compute pass for an upload between
+// two dispatches adding the root block's 5, and must set its pipeline,
+// tables and root block again after; its timestamps, when the device
+// has them, span both.
+static void CheckComputeSplit(Scene* scene, bool timestamps)
+{
+    mrhiDevice* device = scene->device;
+    mrhiQuerySetId times = {0};
+    if (timestamps)
+    {
+        times = MakeQuerySet(device, mrhi_queryTimestamp, 2);
+    }
+    BeginScene(scene);
+    mrhiBufferDef def = mrhiDefaultBufferDef();
+    def.size = 256;
+    mrhiResourceId e = {0};
+    mrhiResourceId r = {0};
+    CHECK(mrhiDeclareBuffer(device, &def, &e) == mrhi_success &&
+              mrhiDeclareBuffer(device, &def, &r) == mrhi_success,
+          "declared buffers");
+    mrhiAccess fill = Whole(scene->d, mrhi_accessCopyDestination);
+    mrhiPassId filled = CopyPass(device, &fill, 1);
+    mrhiAccess uses[4] = {
+        Whole(scene->u, mrhi_accessUniform), Whole(scene->d, mrhi_accessStorageReadWrite),
+        Whole(scene->w, mrhi_accessSampled), Whole(e, mrhi_accessCopyDestination)};
+    mrhiPassDef passDef = mrhiDefaultPassDef();
+    passDef.accesses = uses;
+    passDef.accessCount = 4;
+    if (timestamps)
+    {
+        passDef.timestampQuerySet = times;
+        passDef.timestampBegin = 0;
+        passDef.timestampEnd = 1;
+    }
+    LABEL(passDef, "split");
+    mrhiPassId split = {0};
+    CHECK(mrhiAddPass(device, &passDef, &split) == mrhi_success, "a compute pass");
+    mrhiAccess resolves = Whole(r, mrhi_accessQueryResolve);
+    mrhiPassId resolve = CopyPass(device, &resolves, 1);
+    mrhiAccess reads[3] = {Whole(scene->d, mrhi_accessCopySource), Whole(e, mrhi_accessCopySource),
+                           Whole(r, mrhi_accessCopySource)};
+    mrhiPassId read = CopyPass(device, reads, 3);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    const uint32_t values[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    const uint32_t marks[4] = {9, 8, 7, 6};
+    const float five[4] = {5.0f, 0.0f, 0.0f, 0.0f};
+    CHECK(mrhiBeginPass(device, filled) == mrhi_success &&
+              mrhiWriteBuffer(device, filled, scene->d, 0, values, sizeof(values)) ==
+                  mrhi_success &&
+              mrhiEndPass(device, filled) == mrhi_success &&
+              mrhiBeginPass(device, split) == mrhi_success &&
+              mrhiSetComputePipeline(device, split, scene->adding) == mrhi_success &&
+              mrhiSetRootBlock(device, split, 0, five, sizeof(five)) == mrhi_success,
+          "an adding pipeline set");
+    BindScene(scene, split);
+    CHECK(mrhiDispatch(device, split, 1, 1, 1) == mrhi_success &&
+              mrhiWriteBuffer(device, split, e, 0, marks, sizeof(marks)) == mrhi_success &&
+              mrhiDispatch(device, split, 1, 1, 1) == mrhi_success &&
+              mrhiEndPass(device, split) == mrhi_success,
+          "dispatched around an upload");
+    mrhiRequestId sums = {0};
+    mrhiRequestId marked = {0};
+    mrhiRequestId stamps = {0};
+    CHECK(mrhiBeginPass(device, resolve) == mrhi_success &&
+              (!timestamps ||
+               mrhiResolveQueries(device, resolve, times, 0, 2, r, 0) == mrhi_success) &&
+              mrhiEndPass(device, resolve) == mrhi_success &&
+              mrhiBeginPass(device, read) == mrhi_success &&
+              mrhiReadBuffer(device, read, scene->d, 0, sizeof(values), &sums) == mrhi_success &&
+              mrhiReadBuffer(device, read, e, 0, sizeof(marks), &marked) == mrhi_success &&
+              mrhiReadBuffer(device, read, r, 0, 16, &stamps) == mrhi_success &&
+              mrhiEndPass(device, read) == mrhi_success,
+          "read");
+    Finish(device, 3);
+    const uint32_t expected[8] = {11, 12, 13, 14, 15, 16, 17, 18};
+    CHECK(Taken(device, sums, (const uint8_t*)expected, sizeof(expected)),
+          "both dispatches added the root block");
+    CHECK(Taken(device, marked, (const uint8_t*)marks, sizeof(marks)), "the upload between");
+    uint64_t ticks[2] = {0};
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, stamps, ticks, sizeof(ticks), &size) == mrhi_success &&
+              (!s_runs || !timestamps || (ticks[0] != 0 && ticks[1] >= ticks[0])),
+          "the pass's timestamps");
+    CHECK(!timestamps || mrhiDestroyQuerySet(device, times) == mrhi_success, "destroyed");
+}
+
 static void CheckDrawing(mrhiDevice* device, bool timestamps)
 {
     Scene scene = {.device = device};
@@ -1190,6 +1484,8 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     CheckDrawFrame(&scene);
     CheckCulling(&scene);
     CheckQueries(&scene, timestamps);
+    CheckRenderState(&scene);
+    CheckComputeSplit(&scene, timestamps);
 }
 
 // A device made with the cache the last one exported takes it.
