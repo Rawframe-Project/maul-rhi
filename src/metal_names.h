@@ -29,7 +29,8 @@ MTLCompareFunction mrhiMetalCompare(mrhiCompareFunction compare);
 
 MTLSamplerAddressMode mrhiMetalAddress(mrhiAddressMode mode);
 
-// A label as a string the caller's autorelease pool owns; nil for none.
+// A label as a string the caller's autorelease pool owns; nil for none,
+// which Metal's validation refuses as a label: set one only when given.
 NSString* mrhiMetalLabel(const char* label, size_t length);
 
 #endif // MAUL_RHI_SRC_METAL_NAMES_H

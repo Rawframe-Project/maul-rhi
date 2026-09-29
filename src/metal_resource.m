@@ -41,7 +41,10 @@ mrhiResult mrhiMetalCreateBuffer(id<MTLDevice> device, const mrhiBufferDef* def,
         {
             return mrhi_errorCapacity;
         }
-        buffer.label = mrhiMetalLabel(def->label, def->labelLength);
+        if (def->labelLength > 0)
+        {
+            buffer.label = mrhiMetalLabel(def->label, def->labelLength);
+        }
     }
     return mrhi_success;
 }
@@ -105,7 +108,10 @@ mrhiResult mrhiMetalCreateTexture(id<MTLDevice> device, const mrhiTextureDef* de
         {
             return mrhi_errorCapacity;
         }
-        texture.label = mrhiMetalLabel(def->label, def->labelLength);
+        if (def->labelLength > 0)
+        {
+            texture.label = mrhiMetalLabel(def->label, def->labelLength);
+        }
     }
     return mrhi_success;
 }
@@ -127,7 +133,10 @@ mrhiResult mrhiMetalCreateView(uint64_t texture, const mrhiViewDef* def, uint64_
         {
             return mrhi_errorCapacity;
         }
-        view.label = mrhiMetalLabel(def->label, def->labelLength);
+        if (def->labelLength > 0)
+        {
+            view.label = mrhiMetalLabel(def->label, def->labelLength);
+        }
     }
     return mrhi_success;
 }
@@ -155,7 +164,10 @@ mrhiResult mrhiMetalCreateSampler(id<MTLDevice> device, const mrhiSamplerDef* de
             descriptor.compareFunction = mrhiMetalCompare(def->compare);
         }
         descriptor.supportArgumentBuffers = YES;
-        descriptor.label = mrhiMetalLabel(def->label, def->labelLength);
+        if (def->labelLength > 0)
+        {
+            descriptor.label = mrhiMetalLabel(def->label, def->labelLength);
+        }
         id<MTLSamplerState> sampler = [device newSamplerStateWithDescriptor:descriptor];
         *handleOut = HandleOf(sampler);
         if (sampler == nil)
@@ -179,7 +191,10 @@ mrhiResult mrhiMetalCreateQuerySet(id<MTLDevice> device, const mrhiQuerySetDef* 
         {
             return mrhi_errorCapacity;
         }
-        results.label = mrhiMetalLabel(def->label, def->labelLength);
+        if (def->labelLength > 0)
+        {
+            results.label = mrhiMetalLabel(def->label, def->labelLength);
+        }
     }
     return mrhi_success;
 }
