@@ -279,6 +279,9 @@ format.
 - A table's bindings record their count as the command's payload, so a
   driver steps over them; before, a driver read the bindings as
   commands.
+- `fuzz_container` fuzzes the shader container reader from a seed
+  (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
+  every push.
 - The conformance suite (`test_conformance`): the same checks through
   the public API on the test driver and every native adapter, run on
   lavapipe under the Khronos validation layer in Linux CI.

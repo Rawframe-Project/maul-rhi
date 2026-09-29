@@ -22,6 +22,7 @@ option(MAUL_RHI_WERROR "Treat compiler warnings as errors" OFF)
 option(MAUL_RHI_SANITIZE "Instrument with AddressSanitizer and UBSan" OFF)
 option(MAUL_RHI_TSAN "Instrument with ThreadSanitizer" OFF)
 option(MAUL_RHI_COVERAGE "Instrument for gcov coverage" OFF)
+option(MAUL_RHI_FUZZ "Build the libFuzzer targets (Clang)" OFF)
 option(MAUL_RHI_TEST_DRIVER "Build the test driver (mrhiTestDriverDef)" ${MAUL_RHI_BUILD_TESTS})
 # The Vulkan driver (mrhi-0003): every native build; the web has no Vulkan.
 if(EMSCRIPTEN)
@@ -188,6 +189,25 @@ if(MAUL_RHI_BUILD_TESTS)
     set_tests_properties(${maul_rhi_tests} PROPERTIES
                          ENVIRONMENT "${maul_rhi_test_env}"
                          FAIL_REGULAR_EXPRESSION "Validation Error")
+endif()
+
+# The fuzz targets: test/fuzz_<area>.c, run as fuzz_<area> <corpus dir>,
+# over the bytes programs load from disk and hand the library.
+# tools/container_seed.py writes fuzz_container's seed.
+if(MAUL_RHI_FUZZ)
+    # The library is instrumented too: its coverage guides libFuzzer, and
+    # the sanitizers watch its code, not only the targets'.
+    target_compile_options(maul-rhi PRIVATE -fsanitize=fuzzer-no-link,address,undefined)
+    target_link_options(maul-rhi PUBLIC -fsanitize=address,undefined)
+    foreach(area container)
+        add_executable(fuzz_${area} test/fuzz_${area}.c)
+        target_link_libraries(fuzz_${area} PRIVATE maul-rhi)
+        # The targets reach the library's own functions.
+        target_include_directories(fuzz_${area} PRIVATE ${PROJECT_SOURCE_DIR}/src)
+        maul_apply_flags(fuzz_${area})
+        target_compile_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined)
+        target_link_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined)
+    endforeach()
 endif()
 
 if(MAUL_RHI_BUILD_BENCH AND EXISTS ${PROJECT_SOURCE_DIR}/bench/bench_main.c)

@@ -46,6 +46,14 @@ they are untrusted.
   floats need the device's `shaderF16`. It reads byte by byte, so nothing
   depends on the host's byte order. The device keeps the decoded
   reflection in one allocation. Drivers check the code itself.
+  `fuzz_container` (built with `MAUL_RHI_FUZZ`) fuzzes the reader from
+  the conformance suite's container, which `tools/container_seed.py`
+  writes out. It sets each input's size field and digest before the
+  parse, so that mutations reach the sections and records, and also
+  parses each input cut short at its end; a container that parses
+  must keep its parts inside its bytes and apart, and decode into a
+  reflection that finds every entry and frees what it took. CI runs it
+  for a minute on every push.
 - **Native codes:** the D3D12 and Metal drivers read DXIL and metallib
   sections, made offline beside the SPIR-V and added as new section
   types when those drivers land; readers already skip section types
