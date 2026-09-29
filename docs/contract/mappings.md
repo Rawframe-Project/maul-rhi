@@ -324,3 +324,16 @@ restricted or absent-rejected, with how.
 | --- | --- | --- | --- | --- |
 | `mrhi_alphaOpaque` | restricted: OPAQUE, or INHERIT with an opaque window | direct: DXGI_ALPHA_MODE_IGNORE | direct: opaque | direct: opaque |
 | `mrhi_alphaPremultiplied` | restricted: PRE_MULTIPLIED, where offered | restricted: PREMULTIPLIED, on a composition swapchain | direct: opaque off | direct: premultiplied |
+
+## mrhiSurfaceConfig
+
+| Member | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `surface` | direct: surface | direct: the swapchain's HWND | direct: the layer | direct: the surface |
+| `color` | direct: imageFormat and imageColorSpace | direct: Format and SetColorSpace1 | direct: pixelFormat and colorspace | direct: format, colorSpace and toneMapping |
+| `viewFormats` | direct: MUTABLE_FORMAT and a format list | direct: an sRGB render target view of the buffers | direct: pixelFormatView | direct: viewFormats |
+| `usage` | direct: imageUsage | direct: BufferUsage | direct: framebufferOnly off for uses past rendering | direct: usage |
+| `width` | direct: imageExtent, met with currentExtent where it is fixed | direct: the buffer Width | direct: drawableSize | direct: the canvas's width |
+| `height` | direct: imageExtent, met with currentExtent where it is fixed | direct: the buffer Height | direct: drawableSize | direct: the canvas's height |
+| `presentMode` | direct: presentMode | direct: the sync interval and ALLOW_TEARING | direct: displaySyncEnabled | direct: the browser's fifo |
+| `alphaMode` | direct: compositeAlpha | direct: AlphaMode | direct: opaque | direct: alphaMode |

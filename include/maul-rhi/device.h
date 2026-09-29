@@ -52,6 +52,8 @@ extern "C"
         uint32_t textures;
         // Views the device holds at once; 8192 by default.
         uint32_t views;
+        // Surfaces the device configures at once; 8 by default.
+        uint32_t surfaces;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the
@@ -109,8 +111,9 @@ extern "C"
                                                         mrhiDevice** deviceOut,
                                                         mrhiRequestId* requestOut);
 
-    /// Destroys a device in any state. A device still opening answers its
-    /// request with mrhi_errorStale.
+    /// Destroys a device in any state, and ends the configurations of the
+    /// surfaces it configured. A device still opening answers its request with
+    /// mrhi_errorStale.
     ///
     /// @param device  The device, or NULL for nothing.
     /// @par Thread safety

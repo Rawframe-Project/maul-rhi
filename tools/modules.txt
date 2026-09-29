@@ -18,4 +18,5 @@ pool:
 resources: capabilities_core device_core
 texture: capabilities_core device_core
 view: capabilities_core device_core
-surface: chain instance_core invariant label
+surface: chain device_core instance_core invariant label
+swapchain: capabilities_core device_core instance_core

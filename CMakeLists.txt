@@ -56,6 +56,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/pool.c
     src/resources.c
     src/surface.c
+    src/swapchain.c
     src/texture.c
     src/view.c)
 maul_configure_library(maul-rhi)
@@ -82,6 +83,7 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(texture)
         maul_add_test(view)
         maul_add_test(surface)
+        maul_add_test(swapchain)
     endif()
     maul_add_header_tests()
 endif()

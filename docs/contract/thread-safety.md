@@ -41,5 +41,8 @@ edit the contract, not this file.
 | `mrhiDestroyView` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDefaultSurfaceDef` | Safe from any thread. |
 | `mrhiCreateSurface` | Safe from any thread; the instance is used by one thread at a time. |
-| `mrhiDestroySurface` | Safe from any thread; the instance is used by one thread at a time. |
+| `mrhiDestroySurface` | Safe from any thread; the instance and the device that configured the surface are used by one thread at a time. |
 | `mrhiGetSurfaceCaps` | Safe from any thread; the instance is used by one thread at a time. |
+| `mrhiDefaultSurfaceConfig` | Safe from any thread. |
+| `mrhiConfigureSurface` | Safe from any thread; the device and its instance are used by one thread at a time. |
+| `mrhiUnconfigureSurface` | Safe from any thread; the device and its instance are used by one thread at a time. |

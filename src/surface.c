@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Surfaces (R28, R29): instance ids made from exactly one chained
+// Surfaces (mrhi-0007): instance ids made from exactly one chained
 // native source, which the instance's driver turns into its surface,
 // and what each adapter can do with them.
 
 #include "chain.h"
+#include "device_core.h"
 #include "instance_core.h"
 #include "invariant.h"
 #include "label.h"
@@ -124,7 +125,7 @@ mrhiResult mrhiCreateSurface(mrhiInstance* instance, const mrhiSurfaceDef* def,
         mrhiPoolRelease(&instance->surfaces, index1);
         return status;
     }
-    instance->surfaceHandles[index1 - 1] = handle;
+    instance->surfaceSlots[index1 - 1] = (mrhiSurfaceSlot){.handle = handle};
     *surfaceOut = (mrhiSurfaceId){index1, generation};
     return mrhi_success;
 }
@@ -135,14 +136,19 @@ uint64_t mrhiFindSurface(const mrhiInstance* instance, mrhiSurfaceId surface)
     {
         return 0;
     }
-    return instance->surfaceHandles[surface.index1 - 1];
+    return instance->surfaceSlots[surface.index1 - 1].handle;
 }
 
-// Ends a live surface: the driver's surface and the id.
+// Ends a live surface: its configuration, the driver's surface and the
+// id.
 static void EndSurface(mrhiInstance* instance, uint32_t index1)
 {
-    instance->driver.vtable->destroySurface(instance->driver.self,
-                                            instance->surfaceHandles[index1 - 1]);
+    const mrhiSurfaceSlot* slot = &instance->surfaceSlots[index1 - 1];
+    if (slot->device != nullptr)
+    {
+        mrhiEndConfiguration(slot->device, slot->swapchain);
+    }
+    instance->driver.vtable->destroySurface(instance->driver.self, slot->handle);
     mrhiPoolRelease(&instance->surfaces, index1);
 }
 

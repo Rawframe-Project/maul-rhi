@@ -42,9 +42,20 @@ typedef struct mrhiViewSlot
     uint32_t next;
 } mrhiViewSlot;
 
+// A surface as the device that configured it keeps it: the surface, the
+// driver's swapchain handle, and the configuration (without its chain).
+typedef struct mrhiSwapchainSlot
+{
+    mrhiSurfaceId surface;
+    uint64_t handle;
+    mrhiSurfaceConfig config;
+} mrhiSwapchainSlot;
+
 struct mrhiDevice
 {
     mrhiInstance* instance;
+    // The driver handle of the adapter it was opened on.
+    uint64_t adapter;
     mrhiAllocator allocator;
     mrhiFeatures features;
     mrhiLimits limits;
@@ -67,6 +78,9 @@ struct mrhiDevice
     mrhiTextureSlot* textureSlots;
     mrhiPool views;
     mrhiViewSlot* viewSlots;
+    // The surfaces it configured.
+    mrhiPool swapchains;
+    mrhiSwapchainSlot* swapchainSlots;
     // What each known format can do on this device: the adapter's
     // capabilities, with the compressed families the device was not
     // granted cleared.
@@ -101,5 +115,12 @@ bool mrhiFormatTakes(const mrhiDevice* device, mrhiFormat format, mrhiTextureUsa
 
 // Destroys a texture's views and ends their ids.
 void mrhiDestroyViewsOf(mrhiDevice* device, mrhiTextureSlot* texture);
+
+// Ends the configuration in a live swapchain slot: the driver's
+// swapchain, the surface's record of it, and the slot.
+void mrhiEndConfiguration(mrhiDevice* device, uint32_t swapchain);
+
+// Ends every configuration the device holds.
+void mrhiEndConfigurations(mrhiDevice* device);
 
 #endif // MAUL_RHI_SRC_DEVICE_CORE_H

@@ -60,7 +60,8 @@ extern "C"
         mrhi_rangeExtended = 1,
     };
 
-    // A combination of format and color a surface can show (R5's typed fields).
+    // A combination of format and color a surface can show: a format, its
+    // primaries, its transfer and its range.
     typedef struct mrhiSurfaceColor
     {
         // A unorm or float format; sRGB is rendered through the format's twin
@@ -223,14 +224,16 @@ extern "C"
                                                          const mrhiSurfaceDef* def,
                                                          mrhiSurfaceId* surfaceOut);
 
-    /// Destroys a surface. Its id ends at once.
+    /// Destroys a surface, first ending its configuration on a device if it has
+    /// one. Its id ends at once.
     ///
     /// @param instance  The instance.
     /// @param surface   The surface.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL instance;
     /// `mrhi_errorStale` for a surface the instance no longer has.
     /// @par Thread safety
-    /// Safe from any thread; the instance is used by one thread at a time.
+    /// Safe from any thread; the instance and the device that configured the
+    /// surface are used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroySurface(mrhiInstance* instance,
                                                           mrhiSurfaceId surface);
 
@@ -249,6 +252,78 @@ extern "C"
                                                           mrhiSurfaceId surface,
                                                           mrhiAdapterId adapter,
                                                           mrhiSurfaceCaps* capsOut);
+
+    // How a device configures a surface. Build it with mrhiDefaultSurfaceConfig
+    // and set its surface, color and size.
+    typedef struct mrhiSurfaceConfig
+    {
+        uint32_t cookie;
+        // Extensions, or NULL.
+        const mrhiChain* next;
+        // The surface, of the device's instance.
+        mrhiSurfaceId surface;
+        // One of the colors the surface reports on the device's adapter.
+        mrhiSurfaceColor color;
+        // The formats its images' views may take besides its own: the format's
+        // sRGB twin. Unused entries are mrhi_formatNone.
+        mrhiFormat viewFormats[MRHI_VIEW_FORMATS];
+        // Its images' uses, among the surface's usages and those the format
+        // takes on the device; never transient.
+        mrhiTextureUsage usage;
+        // Texels across, not zero, at most the device's textureDimension2d.
+        uint32_t width;
+        // Texels down, not zero, at most the device's textureDimension2d.
+        uint32_t height;
+        // One present mode the surface reports.
+        mrhiPresentModes presentMode;
+        // One alpha mode the surface reports.
+        mrhiAlphaModes alphaMode;
+    } mrhiSurfaceConfig;
+
+    /// Returns the default surface config: fifo, opaque alpha and render
+    /// targets, with no surface, color or size, which must be set.
+    ///
+    /// @return The config, with a valid cookie.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MRHI_API mrhiSurfaceConfig mrhiDefaultSurfaceConfig(void);
+
+    /// Configures a surface on a ready device, or reconfigures one the device
+    /// holds. A failed reconfiguration leaves the surface unconfigured.
+    ///
+    /// @param device  The device.
+    /// @param config  The configuration.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a
+    /// config without its cookie, an unknown color field or usage, a transient
+    /// usage, a view format that is not the color format's twin, a zero size,
+    /// or other than one present mode and one alpha mode; `mrhi_errorStale` for
+    /// a surface the instance no longer has; `mrhi_errorUnsupported` for a
+    /// surface the device's adapter cannot present to, a color, usage, present
+    /// mode or alpha mode it does not report, a usage the format cannot take on
+    /// the device, a size past the device's limits, or a critical extension the
+    /// library does not know; `mrhi_errorState` for a device that is not ready,
+    /// or a surface configured on another device; `mrhi_errorCapacity` when the
+    /// device's surface limit is reached; `mrhi_errorPlatform` when the driver
+    /// fails.
+    /// @par Thread safety
+    /// Safe from any thread; the device and its instance are used by one thread
+    /// at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiConfigureSurface(mrhiDevice* device,
+                                                            const mrhiSurfaceConfig* config);
+
+    /// Ends a surface's configuration on a device. Its images are retired after
+    /// the frames that used them.
+    ///
+    /// @param device   The device.
+    /// @param surface  The surface.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
+    /// `mrhi_errorStale` for a surface the instance no longer has;
+    /// `mrhi_errorState` for a surface the device has not configured.
+    /// @par Thread safety
+    /// Safe from any thread; the device and its instance are used by one thread
+    /// at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiUnconfigureSurface(mrhiDevice* device,
+                                                              mrhiSurfaceId surface);
 
 #ifdef __cplusplus
 }

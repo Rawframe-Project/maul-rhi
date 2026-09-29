@@ -54,6 +54,12 @@ typedef struct mrhiDeviceDriverVtable
     mrhiResult (*createView)(void* self, uint64_t texture, const mrhiViewDef* def,
                              uint64_t* handleOut);
     void (*destroyView)(void* self, uint64_t handle);
+    // Configures a surface, by its instance driver's handle, from a
+    // config the core has checked; its swapchain handle, never zero.
+    // oldSwapchain, 0 for none, is retired whether or not this succeeds.
+    mrhiResult (*configureSurface)(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
+                                   uint64_t oldSwapchain, uint64_t* swapchainOut);
+    void (*unconfigureSurface)(void* self, uint64_t swapchain);
 } mrhiDeviceDriverVtable;
 
 typedef struct mrhiDeviceDriver

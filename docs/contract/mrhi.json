@@ -4855,6 +4855,11 @@
               "name": "views",
               "type": "uint32",
               "doc": "Views the device holds at once; 8192 by default."
+            },
+            {
+              "name": "surfaces",
+              "type": "uint32",
+              "doc": "Surfaces the device configures at once; 8 by default."
             }
           ]
         },
@@ -4955,7 +4960,7 @@
         {
           "kind": "function",
           "name": "destroy_device",
-          "doc": "Destroys a device in any state. A device still opening answers its request with mrhi_errorStale.",
+          "doc": "Destroys a device in any state, and ends the configurations of the surfaces it configured. A device still opening answers its request with mrhi_errorStale.",
           "args": [
             {
               "name": "device",
@@ -7405,7 +7410,7 @@
           "kind": "struct",
           "name": "surface_color",
           "mapped": true,
-          "doc": "A combination of format and color a surface can show (R5's typed fields).",
+          "doc": "A combination of format and color a surface can show: a format, its primaries, its transfer and its range.",
           "members": [
             {
               "name": "format",
@@ -7852,7 +7857,7 @@
         {
           "kind": "function",
           "name": "destroy_surface",
-          "doc": "Destroys a surface. Its id ends at once.",
+          "doc": "Destroys a surface, first ending its configuration on a device if it has one. Its id ends at once.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL instance; `mrhi_errorStale` for a surface the instance no longer has."
@@ -7872,7 +7877,8 @@
           ],
           "thread_safety": {
             "class": "any_exclusive",
-            "object": "the instance"
+            "object": "the instance and the device that configured the surface",
+            "plural": true
           }
         },
         {
@@ -7910,6 +7916,268 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the instance"
+          }
+        },
+        {
+          "kind": "struct",
+          "name": "surface_config",
+          "def": true,
+          "mapped": true,
+          "doc": "How a device configures a surface. Build it with mrhiDefaultSurfaceConfig and set its surface, color and size.",
+          "members": [
+            {
+              "name": "surface",
+              "type": "id.surface_id",
+              "doc": "The surface, of the device's instance.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "surface"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the swapchain's HWND"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the layer"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "the surface"
+                }
+              }
+            },
+            {
+              "name": "color",
+              "type": "struct.surface_color",
+              "doc": "One of the colors the surface reports on the device's adapter.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "imageFormat and imageColorSpace"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "Format and SetColorSpace1"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "pixelFormat and colorspace"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "format, colorSpace and toneMapping"
+                }
+              }
+            },
+            {
+              "name": "view_formats",
+              "type": "enum.format",
+              "array": "view_formats",
+              "doc": "The formats its images' views may take besides its own: the format's sRGB twin. Unused entries are mrhi_formatNone.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "MUTABLE_FORMAT and a format list"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "an sRGB render target view of the buffers"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "pixelFormatView"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "viewFormats"
+                }
+              }
+            },
+            {
+              "name": "usage",
+              "type": "bitflags.texture_usage",
+              "doc": "Its images' uses, among the surface's usages and those the format takes on the device; never transient.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "imageUsage"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BufferUsage"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "framebufferOnly off for uses past rendering"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "usage"
+                }
+              }
+            },
+            {
+              "name": "width",
+              "type": "uint32",
+              "doc": "Texels across, not zero, at most the device's textureDimension2d.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "imageExtent, met with currentExtent where it is fixed"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the buffer Width"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "drawableSize"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "the canvas's width"
+                }
+              }
+            },
+            {
+              "name": "height",
+              "type": "uint32",
+              "doc": "Texels down, not zero, at most the device's textureDimension2d.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "imageExtent, met with currentExtent where it is fixed"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the buffer Height"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "drawableSize"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "the canvas's height"
+                }
+              }
+            },
+            {
+              "name": "present_mode",
+              "type": "bitflags.present_modes",
+              "doc": "One present mode the surface reports.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "presentMode"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the sync interval and ALLOW_TEARING"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "displaySyncEnabled"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "the browser's fifo"
+                }
+              }
+            },
+            {
+              "name": "alpha_mode",
+              "type": "bitflags.alpha_modes",
+              "doc": "One alpha mode the surface reports.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "compositeAlpha"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "AlphaMode"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "opaque"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "alphaMode"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_surface_config",
+          "doc": "Returns the default surface config: fifo, opaque alpha and render targets, with no surface, color or size, which must be set.",
+          "returns": {
+            "type": "struct.surface_config",
+            "doc": "The config, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "configure_surface",
+          "doc": "Configures a surface on a ready device, or reconfigures one the device holds. A failed reconfiguration leaves the surface unconfigured.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a config without its cookie, an unknown color field or usage, a transient usage, a view format that is not the color format's twin, a zero size, or other than one present mode and one alpha mode; `mrhi_errorStale` for a surface the instance no longer has; `mrhi_errorUnsupported` for a surface the device's adapter cannot present to, a color, usage, present mode or alpha mode it does not report, a usage the format cannot take on the device, a size past the device's limits, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready, or a surface configured on another device; `mrhi_errorCapacity` when the device's surface limit is reached; `mrhi_errorPlatform` when the driver fails."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "config",
+              "type": "struct.surface_config",
+              "pointer": "const",
+              "doc": "The configuration."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device and its instance",
+            "plural": true
+          }
+        },
+        {
+          "kind": "function",
+          "name": "unconfigure_surface",
+          "doc": "Ends a surface's configuration on a device. Its images are retired after the frames that used them.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device; `mrhi_errorStale` for a surface the instance no longer has; `mrhi_errorState` for a surface the device has not configured."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "surface",
+              "type": "id.surface_id",
+              "doc": "The surface."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device and its instance",
+            "plural": true
           }
         }
       ]

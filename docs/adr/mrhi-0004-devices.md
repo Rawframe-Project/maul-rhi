@@ -6,8 +6,8 @@ Status: Accepted
 
 WebGPU gives a device only through a promise, while native APIs make
 one at once. The family keeps roots as pointers the caller holds from
-creation (F17) and answers every request with exactly one record in
-its owner's queue (F19).
+creation (family record 0016) and answers every request with exactly
+one record in its owner's queue (family record 0018).
 
 ## Decision
 

@@ -74,8 +74,8 @@ static mrhiInstance* Allocate(const mrhiInstanceDef* def)
         mrhiLayoutAdd(&layout, limits->surfaces, sizeof(uint32_t), alignof(uint32_t));
     size_t nextFreeAt =
         mrhiLayoutAdd(&layout, limits->surfaces, sizeof(uint32_t), alignof(uint32_t));
-    size_t handlesAt =
-        mrhiLayoutAdd(&layout, limits->surfaces, sizeof(uint64_t), alignof(uint64_t));
+    size_t surfaceSlotsAt =
+        mrhiLayoutAdd(&layout, limits->surfaces, sizeof(mrhiSurfaceSlot), alignof(mrhiSurfaceSlot));
     unsigned char* block = layout.overflow
                                ? nullptr
                                : mrhiAllocate(&def->allocator, layout.size, alignof(mrhiInstance));
@@ -93,7 +93,7 @@ static mrhiInstance* Allocate(const mrhiInstanceDef* def)
         .slots = (mrhiAdapterSlot*)(block + slotsAt),
         .listing = (uint32_t*)(block + listingAt),
         .found = (mrhiDriverAdapter*)(block + foundAt),
-        .surfaceHandles = (uint64_t*)(block + handlesAt),
+        .surfaceSlots = (mrhiSurfaceSlot*)(block + surfaceSlotsAt),
     };
     mrhiPoolInit(&instance->surfaces, limits->surfaces, (uint32_t*)(block + generationsAt),
                  (uint32_t*)(block + nextFreeAt));

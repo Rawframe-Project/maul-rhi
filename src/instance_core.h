@@ -24,6 +24,16 @@ typedef struct mrhiAdapterSlot
     mrhiDriverAdapter adapter;
 } mrhiAdapterSlot;
 
+// A surface as its instance keeps it: its driver handle, and the device
+// that configured it with that device's swapchain slot, NULL and 0 when
+// it is not configured.
+typedef struct mrhiSurfaceSlot
+{
+    uint64_t handle;
+    mrhiDevice* device;
+    uint32_t swapchain;
+} mrhiSurfaceSlot;
+
 // What a pending request waits for.
 typedef enum mrhiPendingKind
 {
@@ -68,9 +78,9 @@ struct mrhiInstance
     uint32_t* listing;
     uint32_t listed;
     mrhiDriverAdapter* found;
-    // Surfaces: ids, and each slot's driver handle.
+    // Surfaces: ids, and each slot's driver handle and configuration.
     mrhiPool surfaces;
-    uint64_t* surfaceHandles;
+    mrhiSurfaceSlot* surfaceSlots;
 };
 
 // Counts one misuse and returns mrhi_errorInvalid, for a refusal of

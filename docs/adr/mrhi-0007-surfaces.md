@@ -41,11 +41,20 @@ must not make one a dependency.
 - **Searches:** an adapter request may name a compatible surface, and
   only the adapters that present to it are listed. The search answers
   `mrhi_errorStale` if the surface ends first.
-- **Configuration** (next): a device configures a surface with a
-  supported color, size, present mode, alpha mode and usages. Anything
-  unsupported is refused, never replaced. A surface is configured on
-  one device at a time.
-- **Lifetimes:** destroying an instance destroys the surfaces left.
+- **Configuration** (`mrhiConfigureSurface`, `mrhiUnconfigureSurface`):
+  a device configures a surface with a reported color, view formats
+  (the twin), usages the surface reports and the format takes on the
+  device, a nonzero size within its limits, one present mode and one
+  alpha mode. Anything unsupported is refused, never replaced.
+  - A surface is configured on one device at a time; another device
+    finds it in `mrhi_errorState`.
+  - Configuring again reconfigures, and a failed reconfiguration
+    leaves the surface unconfigured (Vulkan retires the old swapchain
+    either way).
+- **Lifetimes:**
+  - destroying a surface first ends its configuration;
+  - destroying a device ends every configuration it holds;
+  - destroying an instance destroys the surfaces left.
 
 ## Consequences
 

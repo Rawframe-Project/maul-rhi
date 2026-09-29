@@ -170,6 +170,8 @@ typedef struct TestDevice
     uint32_t textures;
     // The last label an object was given, copied as a real driver would.
     char label[MRHI_LABEL_BYTES + 1];
+    // Configured surfaces; the core ends each before the device.
+    uint32_t swapchains;
     // The live views and their textures, so that a texture destroyed
     // before its views traps.
     TestView views[TEST_VIEWS];
@@ -288,9 +290,33 @@ static void DestroySampler(void* self, uint64_t handle)
     --device->samplers;
 }
 
+static mrhiResult ConfigureSurface(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
+                                   uint64_t oldSwapchain, uint64_t* swapchainOut)
+{
+    (void)config;
+    TestDevice* device = self;
+    MRHI_ASSERT(surface != 0);
+    if (oldSwapchain != 0)
+    {
+        MRHI_ASSERT(device->swapchains > 0);
+        --device->swapchains;
+    }
+    mrhiResult status = MakeObject(device, swapchainOut);
+    device->swapchains += status == mrhi_success ? 1 : 0;
+    return status;
+}
+
+static void UnconfigureSurface(void* self, uint64_t swapchain)
+{
+    TestDevice* device = self;
+    MRHI_ASSERT(swapchain != 0 && swapchain <= device->nextHandle && device->swapchains > 0);
+    --device->swapchains;
+}
+
 static void DestroyDevice(void* self)
 {
     TestDevice* device = self;
+    MRHI_ASSERT(device->swapchains == 0);
     mrhiAllocator allocator = device->allocator;
     mrhiRelease(&allocator, device, sizeof(TestDevice), alignof(TestDevice));
 }
@@ -307,6 +333,8 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .destroyTexture = DestroyTexture,
     .createView = CreateView,
     .destroyView = DestroyView,
+    .configureSurface = ConfigureSurface,
+    .unconfigureSurface = UnconfigureSurface,
 };
 
 static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef* def, uint64_t tag,

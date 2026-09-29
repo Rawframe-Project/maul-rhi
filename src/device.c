@@ -27,6 +27,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.buffers = 4096;
     def.deviceLimits.textures = 4096;
     def.deviceLimits.views = 8192;
+    def.deviceLimits.surfaces = 8;
     return def;
 }
 
@@ -40,8 +41,9 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
     if (def->cookie != DEVICE_DEF_COOKIE || def->deviceLimits.notifications == 0 ||
         def->deviceLimits.samplers == 0 || def->deviceLimits.buffers == 0 ||
         def->deviceLimits.textures == 0 || def->deviceLimits.views == 0 ||
-        !mrhiIsLabelValid(def->label, def->labelLength) || !mrhiIsAllocatorValid(&def->allocator) ||
-        !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
+        def->deviceLimits.surfaces == 0 || !mrhiIsLabelValid(def->label, def->labelLength) ||
+        !mrhiIsAllocatorValid(&def->allocator) || !mrhiLimitsWithin(&floor, &def->limits) ||
+        chain == mrhi_errorInvalid)
     {
         *statusOut = mrhiMisuse(instance);
         return nullptr;
@@ -110,6 +112,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
         AddTable(&layout, limits->textures, sizeof(mrhiTextureSlot), alignof(mrhiTextureSlot));
     TableParts views =
         AddTable(&layout, limits->views, sizeof(mrhiViewSlot), alignof(mrhiViewSlot));
+    TableParts swapchains =
+        AddTable(&layout, limits->surfaces, sizeof(mrhiSwapchainSlot), alignof(mrhiSwapchainSlot));
     unsigned char* block =
         layout.overflow ? nullptr : mrhiAllocate(&def->allocator, layout.size, alignof(mrhiDevice));
     if (block == nullptr)
@@ -122,6 +126,7 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     device->bufferSlots = InitTable(block, buffers, &device->buffers, limits->buffers);
     device->textureSlots = InitTable(block, textures, &device->textures, limits->textures);
     device->viewSlots = InitTable(block, views, &device->views, limits->views);
+    device->swapchainSlots = InitTable(block, swapchains, &device->swapchains, limits->surfaces);
     return device;
 }
 
@@ -153,6 +158,7 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
         return mrhi_errorCapacity;
     }
     device->instance = instance;
+    device->adapter = adapter->handle;
     device->allocator = def->allocator;
     device->features = def->features;
     device->limits = def->limits;
@@ -205,6 +211,7 @@ void mrhiDestroyDevice(mrhiDevice* device)
     }
     if (device->driver.vtable != nullptr)
     {
+        mrhiEndConfigurations(device);
         device->driver.vtable->destroy(device->driver.self);
     }
     --instance->deviceCount;

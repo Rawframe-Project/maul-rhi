@@ -35,9 +35,13 @@ MARKERS = re.compile(
     r"|\bR\d+-\d+\b|\bS-\d+[a-z]?\b|\btopic-\d+|\bslice \d+|\brev \d+|\btask \d+"
     r"|\bADR-\d+|\bRT\d-[A-Z]+|\bF-T\d+|\bV-[A-Z]{3,}\b|\bD\d\b|\bv\d{2}\b|\bpre-\d+\b"
     r"|(?<![\w{])#\d{3}\b(?!\d)|(?<![\w/.'])[ABDMS]\d{1,2}(?![\w.'])"
-    r"|\([FRUW]\d{1,2}\)|\b(?:decisions?|records?|items?) [FRUW]\d{1,2}\b"
+    r"|\([FRUW]\d{1,2}\b|\b[FRUW]\d{1,2}'s\b|\b(?:decisions?|records?|items?) [FRUW]\d{1,2}\b"
     r"|\bregistry [A-Z]\d|\b[Pp]hase \d\b|\b[Rr]ound \d+\b"
     r"|\bintegration audit|\baudit [A-Z]\d|\bred[- ]team|\blesson\b|\bledger\b"
+)
+# The private decision ids, which public Markdown must not cite either.
+PRIVATE_IDS = re.compile(
+    r"\([FRUW]\d{1,2}\b|\b[FRUW]\d{1,2}'s\b|\b(?:decisions?|records?|items?) [FRUW]\d{1,2}\b"
 )
 TODO = re.compile(r"\b(TODO|FIXME|XXX)\b")
 EM_DASH = "\u2014"
@@ -188,6 +192,8 @@ def main():
         for number, line in enumerate(open(path, encoding="utf-8", errors="replace"), 1):
             if EM_DASH in line:
                 findings.append(f"{rel}:{number}: em dash")
+            if path.endswith(".md") and PRIVATE_IDS.search(line):
+                findings.append(f"{rel}:{number}: private decision id: {line.strip()}")
     for finding in findings:
         print(finding)
     if findings:

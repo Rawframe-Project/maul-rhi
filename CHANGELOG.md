@@ -90,3 +90,9 @@ format.
   targets as the floors; each mapped onto the four APIs. Adapter
   searches may name a `compatibleSurface`; the instance's `surfaces`
   limit; the test driver's `mrhiSurfaceSourceTest`.
+- Surface configuration: `mrhiConfigureSurface` (`mrhiSurfaceConfig`:
+  a reported color, the twin as a view format, usages, a size, one
+  present mode and one alpha mode, each mapped onto the four APIs) and
+  `mrhiUnconfigureSurface`; one device at a time, reconfiguring in
+  place, and configurations ended with their surface or device; the
+  device's `surfaces` limit.

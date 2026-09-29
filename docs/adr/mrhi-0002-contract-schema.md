@@ -6,9 +6,8 @@ Status: Accepted
 
 The requirements make a machine-readable contract the source of truth
 for the public headers, the driver SPI, the thread safety tables and
-the mapping appendix skeletons, with drift a build failure. The RHI
-decision R7 chose JSON so that the tools stay within Python's standard
-library.
+the mapping appendix skeletons, with drift a build failure. JSON keeps
+the tools within Python's standard library.
 
 ## Decision
 
