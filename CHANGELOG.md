@@ -261,9 +261,10 @@ format.
   is a software adapter. The Khronos C headers are kept as published in
   `khronos/`. Devices open with the floor's features and the granted
   ones, one queue and a timeline semaphore; buffers, textures, views
-  and samplers are made in device-local memory suballocated with TLSF.
-  Surfaces, shaders, pipelines, queries and frames on it are refused as
-  unsupported until they land.
+  and samplers are made in device-local memory suballocated with TLSF;
+  shaders and compute and graphics pipelines are made, answered at the
+  next poll, with a pipeline cache. Surfaces, queries and frames on it
+  are refused as unsupported until they land.
 - The conformance suite (`test_conformance`): the same checks through
   the public API on the test driver and every native adapter, run on
   lavapipe under the Khronos validation layer in Linux CI.

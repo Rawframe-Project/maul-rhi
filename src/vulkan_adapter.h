@@ -11,6 +11,11 @@
 #include "driver.h"
 #include "vulkan_api.h"
 
+// The vertex buffers and attributes a pipeline has at most on this
+// driver: the adapter's limits are reported no higher.
+#define MRHI_VULKAN_VERTEX_BUFFERS    64
+#define MRHI_VULKAN_VERTEX_ATTRIBUTES 64
+
 // Describes a physical device as an adapter whose handle is the device:
 // false, with nothing written, for a device below the floor.
 bool mrhiDescribeVulkanAdapter(const mrhiVulkan* vulkan, VkPhysicalDevice device,

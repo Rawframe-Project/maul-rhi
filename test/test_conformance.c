@@ -16,8 +16,11 @@
 #include "maul-rhi/device.h"
 #include "maul-rhi/frame.h"
 #include "maul-rhi/instance.h"
+#include "maul-rhi/pipeline.h"
 #include "maul-rhi/resources.h"
+#include "maul-rhi/shader.h"
 #include "maul-rhi/test.h"
+#include "shaders/conformance_container.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -259,6 +262,115 @@ static void CheckFrameMemory(mrhiDevice* device)
     CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
 }
 
+// A pipeline cache a device exported, for the next device to import.
+static uint8_t s_cache[1u << 20];
+static size_t s_cacheBytes;
+
+// Takes the device's pipeline answers: ready ones, and stale ones for
+// pipelines destroyed before their answer.
+static void AwaitPipelines(mrhiDevice* device, uint32_t ready, uint32_t stale)
+{
+    mrhiDeviceNotification record;
+    uint32_t counts[2] = {0};
+    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    {
+        CHECK(record.kind == mrhi_devicePipelineReady &&
+                  (record.outcome == mrhi_success || record.outcome == mrhi_errorStale),
+              "a pipeline answered");
+        ++counts[record.outcome == mrhi_success ? 0 : 1];
+    }
+    CHECK(counts[0] == ready && counts[1] == stale, "every pipeline answered once");
+}
+
+static mrhiGraphicsPipelineDef GraphicsDef(mrhiShaderId shader)
+{
+    mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+    def.shader = shader;
+    def.vertexEntry = "vs";
+    def.vertexEntryLength = 2;
+    def.fragmentEntry = "fs";
+    def.fragmentEntryLength = 2;
+    def.colorTargetCount = 1;
+    def.colorTargets[0].format = mrhi_formatRgba8Unorm;
+    return def;
+}
+
+// A shader from the conformance container, a specialized compute
+// pipeline, graphics pipelines of two shapes, and one destroyed before
+// its answer, which the core answers stale; then the device's pipeline
+// cache.
+static void CheckPipelines(mrhiDevice* device)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_conformanceContainer;
+    shaderDef.byteCount = sizeof(s_conformanceContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "a shader");
+    mrhiComputePipelineDef compute = mrhiDefaultComputePipelineDef();
+    compute.shader = shader;
+    compute.entry = "cs";
+    compute.entryLength = 2;
+    const mrhiConstantValue scale = {.id = 0, .value = 3.0};
+    compute.constants = &scale;
+    compute.constantCount = 1;
+    mrhiComputePipelineId computeId = {0};
+    mrhiRequestId request = {0};
+    CHECK(mrhiCreateComputePipeline(device, &compute, &computeId, &request) == mrhi_success,
+          "a compute pipeline");
+    mrhiGraphicsPipelineDef blended = GraphicsDef(shader);
+    blended.colorTargets[0].blend = true;
+    blended.colorTargets[0].color = (mrhiBlendComponent){
+        .srcFactor = mrhi_blendSrcAlpha,
+        .dstFactor = mrhi_blendOneMinusSrcAlpha,
+        .operation = mrhi_blendAdd,
+    };
+    blended.depthStencilFormat = mrhi_formatDepth32Float;
+    blended.depthWrite = true;
+    blended.depthCompare = mrhi_compareLess;
+    blended.cullMode = mrhi_cullBack;
+    mrhiGraphicsPipelineId graphics[3];
+    CHECK(mrhiCreateGraphicsPipeline(device, &blended, &graphics[0], &request) == mrhi_success,
+          "a blended pipeline with depth");
+    mrhiGraphicsPipelineDef stenciled = GraphicsDef(shader);
+    stenciled.topology = mrhi_topologyTriangleStrip;
+    stenciled.stripIndexFormat = mrhi_indexUint32;
+    stenciled.sampleCount = 4;
+    stenciled.alphaToCoverage = true;
+    stenciled.depthStencilFormat = mrhi_formatDepthStencil;
+    stenciled.depthCompare = mrhi_compareGreaterEqual;
+    stenciled.stencilFront.compare = mrhi_compareEqual;
+    stenciled.stencilFront.passOp = mrhi_stencilIncrementWrap;
+    stenciled.depthBias = 2;
+    stenciled.depthBiasSlopeScale = 1.5f;
+    CHECK(mrhiCreateGraphicsPipeline(device, &stenciled, &graphics[1], &request) == mrhi_success,
+          "a stenciled multisampled strip");
+    CHECK(mrhiCreateGraphicsPipeline(device, &blended, &graphics[2], &request) == mrhi_success,
+          "one more");
+    CHECK(mrhiDestroyGraphicsPipeline(device, graphics[2]) == mrhi_success,
+          "destroyed while pending");
+    AwaitPipelines(device, 3, 1);
+    CHECK(mrhiDestroyShader(device, shader) == mrhi_success, "the shader destroyed");
+    CHECK(mrhiDestroyComputePipeline(device, computeId) == mrhi_success, "outlived its shader");
+    CHECK(mrhiGetPipelineCache(device, s_cache, sizeof(s_cache), &s_cacheBytes) == mrhi_success,
+          "the cache exported");
+}
+
+// A device made with the cache the last one exported takes it.
+static void CheckCacheImport(mrhiInstance* instance, mrhiAdapterId adapter)
+{
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.adapter = adapter;
+    def.pipelineCache = s_cache;
+    def.pipelineCacheBytes = s_cacheBytes;
+    mrhiDevice* device = nullptr;
+    mrhiRequestId request;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "a device");
+    mrhiInstanceNotification record;
+    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success, "ready");
+    CHECK(mrhiGetPipelineCacheOutcome(device) == mrhi_success, "its own cache taken");
+    mrhiDestroyDevice(device);
+}
+
 // Opens a device on an adapter with the features asked for, which it
 // answers ready at the next poll with them granted.
 static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrhiFeatures* asked)
@@ -285,6 +397,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
           "a timestamp period with timestamps");
     CheckObjects(device);
     CheckFrameMemory(device);
+    CheckPipelines(device);
     mrhiDestroyDevice(device);
 }
 
@@ -308,6 +421,7 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         mrhiFeatures all;
         CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
         CheckDevice(instance, ids[i], &all);
+        CheckCacheImport(instance, ids[i]);
     }
     mrhiAdapterId again[16];
     CHECK(Search(instance, again, 16) == count && memcmp(ids, again, count * sizeof(ids[0])) == 0,

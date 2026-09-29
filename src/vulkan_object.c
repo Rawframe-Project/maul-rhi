@@ -21,8 +21,7 @@ void mrhiVulkanSlotsInit(mrhiVulkanSlots* slots, uint32_t* next, uint32_t capaci
     *slots = (mrhiVulkanSlots){.next = next, .head = capacity > 0 ? 1 : 0, .capacity = capacity};
 }
 
-// A free slot's handle, or 0 for none.
-static uint32_t Take(mrhiVulkanSlots* slots)
+uint32_t mrhiVulkanTakeSlot(mrhiVulkanSlots* slots)
 {
     uint32_t handle = slots->head;
     if (handle != 0)
@@ -32,7 +31,7 @@ static uint32_t Take(mrhiVulkanSlots* slots)
     return handle;
 }
 
-static void Give(mrhiVulkanSlots* slots, uint64_t handle)
+void mrhiVulkanGiveSlot(mrhiVulkanSlots* slots, uint64_t handle)
 {
     MRHI_ASSERT(handle != 0 && handle <= slots->capacity);
     slots->next[handle - 1] = slots->head;
@@ -49,7 +48,7 @@ static mrhiResult StatusOf(VkResult result)
 mrhiResult mrhiVulkanCreateBuffer(mrhiVulkanObjects* objects, const mrhiBufferDef* def,
                                   uint64_t* handleOut)
 {
-    uint32_t handle = Take(&objects->bufferSlots);
+    uint32_t handle = mrhiVulkanTakeSlot(&objects->bufferSlots);
     if (handle == 0)
     {
         return mrhi_errorCapacity;
@@ -66,7 +65,7 @@ mrhiResult mrhiVulkanCreateBuffer(mrhiVulkanObjects* objects, const mrhiBufferDe
         {
             objects->api->vkDestroyBuffer(objects->device, made->buffer, nullptr);
         }
-        Give(&objects->bufferSlots, handle);
+        mrhiVulkanGiveSlot(&objects->bufferSlots, handle);
         return status;
     }
     *handleOut = handle;
@@ -79,13 +78,13 @@ void mrhiVulkanDestroyBuffer(mrhiVulkanObjects* objects, uint64_t handle)
     objects->api->vkDestroyBuffer(objects->device, buffer->buffer, nullptr);
     mrhiVulkanRelease(objects->memory, &buffer->allocation);
     *buffer = (mrhiVulkanBuffer){0};
-    Give(&objects->bufferSlots, handle);
+    mrhiVulkanGiveSlot(&objects->bufferSlots, handle);
 }
 
 mrhiResult mrhiVulkanCreateTexture(mrhiVulkanObjects* objects, const mrhiTextureDef* def,
                                    uint64_t* handleOut)
 {
-    uint32_t handle = Take(&objects->textureSlots);
+    uint32_t handle = mrhiVulkanTakeSlot(&objects->textureSlots);
     if (handle == 0)
     {
         return mrhi_errorCapacity;
@@ -104,7 +103,7 @@ mrhiResult mrhiVulkanCreateTexture(mrhiVulkanObjects* objects, const mrhiTexture
         {
             objects->api->vkDestroyImage(objects->device, made->image, nullptr);
         }
-        Give(&objects->textureSlots, handle);
+        mrhiVulkanGiveSlot(&objects->textureSlots, handle);
         return status;
     }
     *handleOut = handle;
@@ -117,7 +116,7 @@ void mrhiVulkanDestroyTexture(mrhiVulkanObjects* objects, uint64_t handle)
     objects->api->vkDestroyImage(objects->device, texture->image, nullptr);
     mrhiVulkanRelease(objects->memory, &texture->allocation);
     *texture = (mrhiVulkanTexture){0};
-    Give(&objects->textureSlots, handle);
+    mrhiVulkanGiveSlot(&objects->textureSlots, handle);
 }
 
 static VkImageViewType ViewTypeOf(mrhiTextureKind kind)
@@ -153,7 +152,7 @@ static VkImageAspectFlags AspectOf(mrhiTextureAspect aspect, mrhiFormat format)
 mrhiResult mrhiVulkanCreateView(mrhiVulkanObjects* objects, uint64_t texture,
                                 const mrhiViewDef* def, uint64_t* handleOut)
 {
-    uint32_t handle = Take(&objects->viewSlots);
+    uint32_t handle = mrhiVulkanTakeSlot(&objects->viewSlots);
     if (handle == 0)
     {
         return mrhi_errorCapacity;
@@ -181,7 +180,7 @@ mrhiResult mrhiVulkanCreateView(mrhiVulkanObjects* objects, uint64_t texture,
                                                       &objects->views[handle - 1]);
     if (result != VK_SUCCESS)
     {
-        Give(&objects->viewSlots, handle);
+        mrhiVulkanGiveSlot(&objects->viewSlots, handle);
         return StatusOf(result);
     }
     *handleOut = handle;
@@ -192,7 +191,7 @@ void mrhiVulkanDestroyView(mrhiVulkanObjects* objects, uint64_t handle)
 {
     objects->api->vkDestroyImageView(objects->device, objects->views[handle - 1], nullptr);
     objects->views[handle - 1] = VK_NULL_HANDLE;
-    Give(&objects->viewSlots, handle);
+    mrhiVulkanGiveSlot(&objects->viewSlots, handle);
 }
 
 static VkSamplerAddressMode AddressOf(mrhiAddressMode mode)
@@ -209,7 +208,7 @@ static VkSamplerAddressMode AddressOf(mrhiAddressMode mode)
 mrhiResult mrhiVulkanCreateSampler(mrhiVulkanObjects* objects, const mrhiSamplerDef* def,
                                    uint64_t* handleOut)
 {
-    uint32_t handle = Take(&objects->samplerSlots);
+    uint32_t handle = mrhiVulkanTakeSlot(&objects->samplerSlots);
     if (handle == 0)
     {
         return mrhi_errorCapacity;
@@ -242,7 +241,7 @@ mrhiResult mrhiVulkanCreateSampler(mrhiVulkanObjects* objects, const mrhiSampler
                                                     &objects->samplers[handle - 1]);
     if (result != VK_SUCCESS)
     {
-        Give(&objects->samplerSlots, handle);
+        mrhiVulkanGiveSlot(&objects->samplerSlots, handle);
         return StatusOf(result);
     }
     *handleOut = handle;
@@ -253,5 +252,5 @@ void mrhiVulkanDestroySampler(mrhiVulkanObjects* objects, uint64_t handle)
 {
     objects->api->vkDestroySampler(objects->device, objects->samplers[handle - 1], nullptr);
     objects->samplers[handle - 1] = VK_NULL_HANDLE;
-    Give(&objects->samplerSlots, handle);
+    mrhiVulkanGiveSlot(&objects->samplerSlots, handle);
 }

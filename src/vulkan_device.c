@@ -5,9 +5,9 @@
 // granted ones, one queue, and a timeline semaphore for the frames. The
 // memory a declared resource takes is read from the create info alone
 // (Vulkan 1.3's device memory requirements). Buffers, textures, views
-// and samplers are made in device-local memory; shaders, pipelines,
-// queries, frames and surfaces are refused as unsupported until their
-// slices land.
+// and samplers are made in device-local memory; shader modules and
+// pipelines are made at the call. Queries, frames and surfaces are
+// refused as unsupported until their slices land.
 
 #include "vulkan_device.h"
 
@@ -15,6 +15,7 @@
 #include "invariant.h"
 #include "vulkan_adapter.h"
 #include "vulkan_object.h"
+#include "vulkan_pipeline.h"
 #include "vulkan_resource.h"
 
 #include <stdalign.h>
@@ -41,6 +42,7 @@ typedef struct VulkanDevice
     size_t bytes;
     mrhiVulkanMemory memory;
     mrhiVulkanObjects objects;
+    mrhiVulkanPipelines pipelines;
 } VulkanDevice;
 
 // The features a device enables, chained.
@@ -138,6 +140,7 @@ static void Destroy(void* self)
     // Nothing runs once a device is destroyed; a lost device answers at
     // once.
     (void)device->api.vkDeviceWaitIdle(device->device);
+    mrhiVulkanPipelinesDestroy(&device->pipelines);
     DestroyObjects(&device->objects);
     mrhiVulkanMemoryDestroy(&device->memory);
     device->api.vkDestroySemaphore(device->device, device->timeline, nullptr);
@@ -244,31 +247,6 @@ static void LossReport(void* self, mrhiDeviceLossReport* reportOut)
     memcpy(reportOut->message, message, sizeof(message) - 1);
 }
 
-// Finished frames and pipelines come with their slices.
-static size_t Poll(void* self, mrhiDriverEvent* events, size_t capacity)
-{
-    (void)self;
-    (void)events;
-    (void)capacity;
-    return 0;
-}
-
-static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
-{
-    (void)self;
-    (void)bytes;
-    (void)size;
-    return false;
-}
-
-static size_t ExportPipelineCache(void* self, void* bytes, size_t capacity)
-{
-    (void)self;
-    (void)bytes;
-    (void)capacity;
-    return 0;
-}
-
 // The entries of later slices: making refuses as unsupported, so the
 // core never destroys, acquires or waits on anything of theirs.
 static mrhiResult RefuseSurface(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
@@ -279,36 +257,6 @@ static mrhiResult RefuseSurface(void* self, uint64_t surface, const mrhiSurfaceC
     (void)config;
     (void)swapchainOut;
     MRHI_ASSERT(oldSwapchain == 0);
-    return mrhi_errorUnsupported;
-}
-
-static mrhiResult RefuseShader(void* self, const mrhiShaderDef* def, const mrhiContainer* container,
-                               uint64_t* handleOut)
-{
-    (void)self;
-    (void)def;
-    (void)container;
-    (void)handleOut;
-    return mrhi_errorUnsupported;
-}
-
-static mrhiResult RefuseCompute(void* self, const mrhiDriverComputePipeline* pipeline, uint64_t tag,
-                                uint64_t* handleOut)
-{
-    (void)self;
-    (void)pipeline;
-    (void)tag;
-    (void)handleOut;
-    return mrhi_errorUnsupported;
-}
-
-static mrhiResult RefuseGraphics(void* self, const mrhiDriverGraphicsPipeline* pipeline,
-                                 uint64_t tag, uint64_t* handleOut)
-{
-    (void)self;
-    (void)pipeline;
-    (void)tag;
-    (void)handleOut;
     return mrhi_errorUnsupported;
 }
 
@@ -361,6 +309,59 @@ static bool NeverWaited(void* self, uint64_t tag, uint64_t timeoutNs)
     return false;
 }
 
+static mrhiResult CreateShader(void* self, const mrhiShaderDef* def, const mrhiContainer* container,
+                               uint64_t* handleOut)
+{
+    (void)def;
+    VulkanDevice* device = self;
+    return mrhiVulkanCreateShader(&device->pipelines, container, handleOut);
+}
+
+static void DestroyShader(void* self, uint64_t handle)
+{
+    VulkanDevice* device = self;
+    mrhiVulkanDestroyShader(&device->pipelines, handle);
+}
+
+static mrhiResult CreateCompute(void* self, const mrhiDriverComputePipeline* pipeline, uint64_t tag,
+                                uint64_t* handleOut)
+{
+    VulkanDevice* device = self;
+    return mrhiVulkanCreateCompute(&device->pipelines, pipeline, tag, handleOut);
+}
+
+static mrhiResult CreateGraphics(void* self, const mrhiDriverGraphicsPipeline* pipeline,
+                                 uint64_t tag, uint64_t* handleOut)
+{
+    VulkanDevice* device = self;
+    return mrhiVulkanCreateGraphics(&device->pipelines, pipeline, tag, handleOut);
+}
+
+static void DestroyPipeline(void* self, uint64_t handle)
+{
+    VulkanDevice* device = self;
+    mrhiVulkanDestroyPipeline(&device->pipelines, handle);
+}
+
+static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
+{
+    VulkanDevice* device = self;
+    return mrhiVulkanImportCache(&device->pipelines, bytes, size);
+}
+
+static size_t ExportPipelineCache(void* self, void* bytes, size_t capacity)
+{
+    VulkanDevice* device = self;
+    return mrhiVulkanExportCache(&device->pipelines, bytes, capacity);
+}
+
+// Finished pipelines; finished frames come with submission.
+static size_t Poll(void* self, mrhiDriverEvent* events, size_t capacity)
+{
+    VulkanDevice* device = self;
+    return mrhiVulkanPollPipelines(&device->pipelines, events, capacity);
+}
+
 static const mrhiDeviceDriverVtable s_vtable = {
     .spiVersion = MRHI_SPI_VERSION,
     .size = sizeof(mrhiDeviceDriverVtable),
@@ -375,11 +376,11 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .destroyView = DestroyView,
     .configureSurface = RefuseSurface,
     .unconfigureSurface = NeverDestroyed,
-    .createShader = RefuseShader,
-    .destroyShader = NeverDestroyed,
-    .createComputePipeline = RefuseCompute,
-    .createGraphicsPipeline = RefuseGraphics,
-    .destroyPipeline = NeverDestroyed,
+    .createShader = CreateShader,
+    .destroyShader = DestroyShader,
+    .createComputePipeline = CreateCompute,
+    .createGraphicsPipeline = CreateGraphics,
+    .destroyPipeline = DestroyPipeline,
     .lossReport = LossReport,
     .acquireImage = NeverAcquired,
     .releaseImage = NeverReleased,
@@ -407,6 +408,7 @@ static void ReadPhysical(VulkanDevice* device, VkPhysicalDeviceMemoryProperties*
     device->timestampPeriod = (double)properties.properties.limits.timestampPeriod;
     device->granularity = properties.properties.limits.bufferImageGranularity;
     device->objects.maxAnisotropy = properties.properties.limits.maxSamplerAnisotropy;
+    device->pipelines.properties = properties.properties;
     *memoryOut = (VkPhysicalDeviceMemoryProperties){0};
     vulkan->vkGetPhysicalDeviceMemoryProperties(device->physical, memoryOut);
     for (uint32_t i = 0; i < memoryOut->memoryTypeCount; ++i)
@@ -480,7 +482,12 @@ typedef struct Layout
     size_t textures;
     size_t views;
     size_t samplers;
-    // The four tables' free slot links, one after another.
+    size_t shaders;
+    size_t pipelines;
+    size_t pending;
+    size_t pendingHandles;
+    size_t constants;
+    // The tables' free slot links, one after another.
     size_t slots;
     uint32_t blockCount;
     uint32_t nodeCount;
@@ -502,7 +509,18 @@ static Layout LayoutOf(const mrhiDeviceLimits* limits)
                                 alignof(mrhiVulkanTexture));
     at.views = mrhiLayoutAdd(layout, limits->views, sizeof(VkImageView), alignof(VkImageView));
     at.samplers = mrhiLayoutAdd(layout, limits->samplers, sizeof(VkSampler), alignof(VkSampler));
-    size_t slots = (size_t)limits->buffers + limits->textures + limits->views + limits->samplers;
+    at.shaders =
+        mrhiLayoutAdd(layout, limits->shaders, sizeof(VkShaderModule), alignof(VkShaderModule));
+    at.pipelines = mrhiLayoutAdd(layout, limits->pipelines, sizeof(mrhiVulkanPipeline),
+                                 alignof(mrhiVulkanPipeline));
+    at.pending =
+        mrhiLayoutAdd(layout, limits->pipelines, sizeof(mrhiDriverEvent), alignof(mrhiDriverEvent));
+    at.pendingHandles =
+        mrhiLayoutAdd(layout, limits->pipelines, sizeof(uint64_t), alignof(uint64_t));
+    at.constants =
+        mrhiLayoutAdd(layout, 1, sizeof(mrhiVulkanConstants), alignof(mrhiVulkanConstants));
+    size_t slots = (size_t)limits->buffers + limits->textures + limits->views + limits->samplers +
+                   limits->shaders + limits->pipelines;
     at.slots = mrhiLayoutAdd(layout, slots, sizeof(uint32_t), alignof(uint32_t));
     return at;
 }
@@ -535,6 +553,19 @@ static void PlaceTables(VulkanDevice* device, const Layout* at, const mrhiDevice
     mrhiVulkanSlotsInit(&objects->viewSlots, slots, limits->views);
     slots += limits->views;
     mrhiVulkanSlotsInit(&objects->samplerSlots, slots, limits->samplers);
+    slots += limits->samplers;
+    mrhiVulkanPipelines* pipelines = &device->pipelines;
+    pipelines->api = &device->api;
+    pipelines->device = device->device;
+    pipelines->depthStencil = device->depthStencil;
+    pipelines->shaders = (VkShaderModule*)(block + at->shaders);
+    pipelines->pipelines = (mrhiVulkanPipeline*)(block + at->pipelines);
+    pipelines->pending = (mrhiDriverEvent*)(block + at->pending);
+    pipelines->pendingHandles = (uint64_t*)(block + at->pendingHandles);
+    pipelines->constants = (mrhiVulkanConstants*)(block + at->constants);
+    mrhiVulkanSlotsInit(&pipelines->shaderSlots, slots, limits->shaders);
+    slots += limits->shaders;
+    mrhiVulkanSlotsInit(&pipelines->pipelineSlots, slots, limits->pipelines);
 }
 
 mrhiResult mrhiCreateVulkanDevice(const mrhiAllocator* allocator, const mrhiVulkan* vulkan,
@@ -565,6 +596,12 @@ mrhiResult mrhiCreateVulkanDevice(const mrhiAllocator* allocator, const mrhiVulk
         return status == mrhi_errorDeviceLost ? mrhi_errorPlatform : status;
     }
     PlaceTables(device, &at, &def->deviceLimits, &properties);
+    mrhiResult status = mrhiVulkanPipelinesInit(&device->pipelines);
+    if (status != mrhi_success)
+    {
+        Destroy(device);
+        return status;
+    }
     *deviceOut = (mrhiDeviceDriver){.vtable = &s_vtable, .self = device};
     return mrhi_success;
 }

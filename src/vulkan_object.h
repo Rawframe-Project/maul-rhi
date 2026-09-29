@@ -52,6 +52,10 @@ typedef struct mrhiVulkanObjects
 // Sets up a table's free slots over an array of capacity entries.
 void mrhiVulkanSlotsInit(mrhiVulkanSlots* slots, uint32_t* next, uint32_t capacity);
 
+// A free slot's handle, or 0 for none; and a slot given back.
+uint32_t mrhiVulkanTakeSlot(mrhiVulkanSlots* slots);
+void mrhiVulkanGiveSlot(mrhiVulkanSlots* slots, uint64_t handle);
+
 // Makes an object from a def the core has checked: its handle, never
 // zero; mrhi_errorCapacity when memory or the table runs out, or
 // mrhi_errorPlatform.

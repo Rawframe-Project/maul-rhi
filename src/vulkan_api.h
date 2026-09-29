@@ -54,7 +54,19 @@
     X(vkCreateImageView)                                                                           \
     X(vkDestroyImageView)                                                                          \
     X(vkCreateSampler)                                                                             \
-    X(vkDestroySampler)
+    X(vkDestroySampler)                                                                            \
+    X(vkCreateShaderModule)                                                                        \
+    X(vkDestroyShaderModule)                                                                       \
+    X(vkCreateDescriptorSetLayout)                                                                 \
+    X(vkDestroyDescriptorSetLayout)                                                                \
+    X(vkCreatePipelineLayout)                                                                      \
+    X(vkDestroyPipelineLayout)                                                                     \
+    X(vkCreateComputePipelines)                                                                    \
+    X(vkCreateGraphicsPipelines)                                                                   \
+    X(vkDestroyPipeline)                                                                           \
+    X(vkCreatePipelineCache)                                                                       \
+    X(vkDestroyPipelineCache)                                                                      \
+    X(vkGetPipelineCacheData)
 
 #define MRHI_VULKAN_FIELD(name) PFN_##name name;
 

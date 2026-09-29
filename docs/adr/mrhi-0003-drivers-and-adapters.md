@@ -51,8 +51,20 @@ ids, requests, the frame graph) can be tested without a GPU.
   The bookkeeping is sized from the device limits when the device is
   made. Each frame slot will keep one block for its transients, and
   mapped staging and readback memory come with the device.
+- **Vulkan pipelines:** a shader is a module over the container's
+  SPIR-V. A pipeline's layout comes from the reflection: a descriptor
+  set per binding table up to the last one used, each slot a binding,
+  and the root block as one push constant range for the pipeline's
+  stages. Graphics pipelines use dynamic rendering, with the viewport,
+  scissor, blend constant and stencil reference dynamic. Pipelines are
+  made at the call, with no thread, and answered at the next poll; the
+  device keeps one pipeline cache, which takes a blob only when
+  Vulkan's own header names the device and its cache UUID.
 - **Conformance:** `test_conformance` runs the same checks through the
-  public API on the test driver and on every native adapter. A host
+  public API on the test driver and on every native adapter, with a
+  shader container made offline from `test/shaders/` by
+  `tools/gen_test_shaders.py` (glslang, spirv-link, spirv-val and the
+  container writer), committed as bytes so CI needs no shader tools. A host
   without one skips it unless `MAUL_RHI_REQUIRE_VULKAN` is set; Linux
   CI sets it, runs lavapipe, and enables the Khronos validation layer,
   which logs to each test's output; CTest fails any test whose output

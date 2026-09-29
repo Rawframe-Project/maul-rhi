@@ -45,10 +45,10 @@ restricted or absent-rejected, with how.
 | `storageBindingBytes` | direct: maxStorageBufferRange | direct: the buffer's size | direct: the buffer's size | direct: maxStorageBufferBindingSize |
 | `uniformOffsetAlignment` | direct: minUniformBufferOffsetAlignment | direct: 256 | direct: 256 covers every family | direct: minUniformBufferOffsetAlignment |
 | `storageOffsetAlignment` | direct: minStorageBufferOffsetAlignment | direct: 16 for raw buffers | direct: 16 or less | direct: minStorageBufferOffsetAlignment |
-| `vertexBuffers` | direct: maxVertexInputBindings | direct: 32 input slots | direct: 31 buffer slots, shared with argument tables | direct: maxVertexBuffers |
+| `vertexBuffers` | direct: maxVertexInputBindings, at most 64 | direct: 32 input slots | direct: 31 buffer slots, shared with argument tables | direct: maxVertexBuffers |
 | `tablesPlusVertexBuffers` | direct: no shared bound | direct: no shared bound | direct: 31 buffer slots | direct: maxBindGroupsPlusVertexBuffers |
 | `bufferBytes` | direct: maxBufferSize | direct: the resource size limit | direct: maxBufferLength | direct: maxBufferSize |
-| `vertexAttributes` | direct: maxVertexInputAttributes | direct: 32 | direct: 31 | direct: maxVertexAttributes |
+| `vertexAttributes` | direct: maxVertexInputAttributes, at most 64 | direct: 32 | direct: 31 | direct: maxVertexAttributes |
 | `vertexStride` | direct: maxVertexInputBindingStride | direct: 2048 | direct: no lower bound | direct: maxVertexBufferArrayStride |
 | `interStageVariables` | direct: the smaller of maxVertexOutputComponents and maxFragmentInputComponents, divided by 4 | direct: 32 registers | direct: 32 | direct: maxInterStageShaderVariables |
 | `colorAttachments` | direct: maxColorAttachments | direct: 8 | direct: 8 | direct: maxColorAttachments |

@@ -57,9 +57,43 @@ static PFN_vkGetInstanceProcAddr FindEntry(void* library)
     return entry;
 }
 
-#define MRHI_VULKAN_READ(name)                                                                     \
-    vulkan->name = (PFN_##name)vulkan->vkGetInstanceProcAddr(instance, #name);                     \
-    found = found && vulkan->name != nullptr;
+// A function the driver reads: its name, and where its pointer lies in
+// its table.
+typedef struct Function
+{
+    const char* name;
+    size_t offset;
+} Function;
+
+#define MRHI_VULKAN_LOADER_ENTRY(name) {#name, offsetof(mrhiVulkan, name)},
+#define MRHI_VULKAN_DEVICE_ENTRY(name) {#name, offsetof(mrhiVulkanDevice, name)},
+
+static const Function s_global[] = {MRHI_VULKAN_GLOBAL(MRHI_VULKAN_LOADER_ENTRY)};
+static const Function s_instance[] = {MRHI_VULKAN_INSTANCE(MRHI_VULKAN_LOADER_ENTRY)};
+static const Function s_device[] = {MRHI_VULKAN_DEVICE(MRHI_VULKAN_DEVICE_ENTRY)};
+
+// Stores a function in its table's typed field: every Vulkan function
+// pointer has the one representation.
+static void Store(void* table, size_t offset, PFN_vkVoidFunction function)
+{
+    static_assert(sizeof(PFN_vkVoidFunction) == sizeof(PFN_vkCreateInstance), "one size");
+    memcpy((unsigned char*)table + offset, (const void*)&function, sizeof(function));
+}
+
+// Reads functions through vkGetInstanceProcAddr: false when one is
+// missing.
+static bool ReadInstance(mrhiVulkan* vulkan, VkInstance instance, const Function* functions,
+                         size_t count)
+{
+    bool found = true;
+    for (size_t i = 0; i < count; ++i)
+    {
+        PFN_vkVoidFunction function = vulkan->vkGetInstanceProcAddr(instance, functions[i].name);
+        found = found && function != nullptr;
+        Store(vulkan, functions[i].offset, function);
+    }
+    return found;
+}
 
 bool mrhiOpenVulkan(mrhiVulkan* vulkan)
 {
@@ -73,12 +107,9 @@ bool mrhiOpenVulkan(mrhiVulkan* vulkan)
         return false;
     }
     vulkan->vkGetInstanceProcAddr = FindEntry(vulkan->library);
-    bool found = vulkan->vkGetInstanceProcAddr != nullptr;
-    if (found)
-    {
-        VkInstance instance = VK_NULL_HANDLE;
-        MRHI_VULKAN_GLOBAL(MRHI_VULKAN_READ)
-    }
+    bool found =
+        vulkan->vkGetInstanceProcAddr != nullptr &&
+        ReadInstance(vulkan, VK_NULL_HANDLE, s_global, sizeof(s_global) / sizeof(s_global[0]));
     if (!found)
     {
         mrhiCloseVulkan(vulkan);
@@ -88,19 +119,18 @@ bool mrhiOpenVulkan(mrhiVulkan* vulkan)
 
 bool mrhiLoadVulkanInstance(mrhiVulkan* vulkan, VkInstance instance)
 {
-    bool found = true;
-    MRHI_VULKAN_INSTANCE(MRHI_VULKAN_READ)
-    return found;
+    return ReadInstance(vulkan, instance, s_instance, sizeof(s_instance) / sizeof(s_instance[0]));
 }
-
-#define MRHI_VULKAN_READ_DEVICE(name)                                                              \
-    functions->name = (PFN_##name)vulkan->vkGetDeviceProcAddr(device, #name);                      \
-    found = found && functions->name != nullptr;
 
 bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, mrhiVulkanDevice* functions)
 {
     bool found = true;
-    MRHI_VULKAN_DEVICE(MRHI_VULKAN_READ_DEVICE)
+    for (size_t i = 0; i < sizeof(s_device) / sizeof(s_device[0]); ++i)
+    {
+        PFN_vkVoidFunction function = vulkan->vkGetDeviceProcAddr(device, s_device[i].name);
+        found = found && function != nullptr;
+        Store(functions, s_device[i].offset, function);
+    }
     return found;
 }
 

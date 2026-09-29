@@ -288,7 +288,7 @@ static mrhiLimits LimitsOf(const DeviceFacts* facts)
 {
     const VkPhysicalDeviceLimits* limits = &facts->properties.properties.limits;
     uint32_t tables = limits->maxBoundDescriptorSets;
-    uint32_t vertexBuffers = limits->maxVertexInputBindings;
+    uint32_t vertexBuffers = Smaller(limits->maxVertexInputBindings, MRHI_VULKAN_VERTEX_BUFFERS);
     return (mrhiLimits){
         .textureDimension2d = limits->maxImageDimension2D,
         .textureDimension3d = limits->maxImageDimension3D,
@@ -308,7 +308,8 @@ static mrhiLimits LimitsOf(const DeviceFacts* facts)
         // Vulkan bounds the two apart, never together.
         .tablesPlusVertexBuffers = Clamp32((uint64_t)tables + vertexBuffers),
         .bufferBytes = facts->properties13.maxBufferSize,
-        .vertexAttributes = limits->maxVertexInputAttributes,
+        .vertexAttributes =
+            Smaller(limits->maxVertexInputAttributes, MRHI_VULKAN_VERTEX_ATTRIBUTES),
         .vertexStride = limits->maxVertexInputBindingStride,
         .interStageVariables =
             Smaller(limits->maxVertexOutputComponents, limits->maxFragmentInputComponents) / 4,

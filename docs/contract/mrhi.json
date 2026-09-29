@@ -1716,7 +1716,7 @@
               "mapping": {
                 "vulkan": {
                   "class": "direct",
-                  "note": "maxVertexInputBindings"
+                  "note": "maxVertexInputBindings, at most 64"
                 },
                 "d3d12": {
                   "class": "direct",
@@ -1788,7 +1788,7 @@
               "mapping": {
                 "vulkan": {
                   "class": "direct",
-                  "note": "maxVertexInputAttributes"
+                  "note": "maxVertexInputAttributes, at most 64"
                 },
                 "d3d12": {
                   "class": "direct",
