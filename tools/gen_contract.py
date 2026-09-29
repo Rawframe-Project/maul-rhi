@@ -150,6 +150,13 @@ def check_values(errors, where, item):
         errors.append(f"{where}: a result needs success as zero")
     if item["kind"] == "enum" and item.get("width") not in WIDTHS:
         errors.append(f"{where}: an enum needs a width, one of {', '.join(WIDTHS)}")
+    if item.get("mapped"):
+        for value in item.get("values", []):
+            if not value.get("unmapped"):
+                check_mapping(errors, f"{where} '{value.get('name')}'", value.get("mapping"))
+    for value in item.get("values", []):
+        if "floor" in value and not isinstance(value["floor"], dict):
+            errors.append(f"{where}: '{value.get('name')}' has a floor that is not an object")
 
 
 def check_constant(errors, where, item):
@@ -451,13 +458,18 @@ def emit_mappings(contract):
         for item in header["items"]:
             if not item.get("mapped"):
                 continue
+            is_enum = item["kind"] == "enum"
             lines += ["", f"## {names.type(item['name'])}", ""]
-            lines.append("| Member | " + " | ".join(title for _, title in APIS) + " |")
+            lines.append(f"| {'Value' if is_enum else 'Member'} | "
+                         + " | ".join(title for _, title in APIS) + " |")
             lines.append("| --- " * (len(APIS) + 1) + "|")
-            for member in item["members"]:
+            for entry in item["values"] if is_enum else item["members"]:
+                if entry.get("unmapped"):
+                    continue
                 cells = [f"{row['class'].replace('_', '-')}: {row['note']}"
-                         for row in (member["mapping"][api] for api, _ in APIS)]
-                lines.append(f"| `{camel(member['name'])}` | " + " | ".join(cells) + " |")
+                         for row in (entry["mapping"][api] for api, _ in APIS)]
+                label = names.value(entry["name"]) if is_enum else camel(entry["name"])
+                lines.append(f"| `{label}` | " + " | ".join(cells) + " |")
     return "\n".join(lines) + "\n"
 
 
@@ -537,7 +549,47 @@ def emit_capability_checks(contract):
                 lines.append(f"        features->{camel(member['name'])} = false;")
         lines.append("        break;")
     lines += ["    default:", "        break;", "    }", "}"]
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines + format_checks(contract)) + "\n"
+
+
+def format_checks(contract):
+    """The format functions: the floor capabilities of each format, the
+    feature its family needs, whether a value is listed, and a
+    capability set within another."""
+    names = Names(contract)
+    formats, caps = find_item(contract, "format"), find_item(contract, "format_caps")
+    listed = [value for value in formats["values"] if "floor" in value]
+    lines = ["", f"const mrhiFormat mrhiKnownFormats[{len(listed)}] = {{"]
+    lines += [f"    {names.value(value['name'])}," for value in listed]
+    lines += ["};", "", "bool mrhiIsFormatKnown(mrhiFormat format)", "{", "    switch (format)",
+              "    {"]
+    lines += [f"    case {names.value(value['name'])}:" for value in listed]
+    lines += ["        return true;", "    default:", "        return false;", "    }", "}"]
+    lines += ["", "mrhiFormatCaps mrhiFloorFormatCaps(mrhiFormat format)", "{",
+              "    switch (format)", "    {"]
+    for value in listed:
+        fields = ", ".join(f".{camel(key)} = {str(v).lower() if isinstance(v, bool) else v}"
+                           for key, v in value["floor"].items())
+        lines += [f"    case {names.value(value['name'])}:",
+                  f"        return (mrhiFormatCaps){{{fields}}};"]
+    lines += ["    default:", "        return (mrhiFormatCaps){0};", "    }", "}"]
+    lines += ["", "bool mrhiFormatFamilyGranted(mrhiFormat format, const mrhiFeatures* features)",
+              "{", "    switch (format)", "    {"]
+    for value in listed:
+        if value.get("family"):
+            lines += [f"    case {names.value(value['name'])}:",
+                      f"        return features->{camel(value['family'])};"]
+    lines += ["    default:", "        return true;", "    }", "}"]
+    lines += ["", "bool mrhiFormatCapsWithin(const mrhiFormatCaps* asked, "
+              "const mrhiFormatCaps* granted)", "{", "    return true"]
+    for member in caps["members"]:
+        name = camel(member["name"])
+        if member["type"] == "bool":
+            lines.append(f"        && (!asked->{name} || granted->{name})")
+        else:
+            lines.append(f"        && (asked->{name} & ~granted->{name}) == 0")
+    lines[-1] += ";"
+    return lines + ["}"]
 
 
 def emit_thread_table(contract):

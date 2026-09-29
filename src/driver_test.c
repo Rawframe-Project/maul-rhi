@@ -7,6 +7,7 @@
 #include "driver_test.h"
 
 #include "allocator.h"
+#include "capabilities_core.h"
 
 #include <stdalign.h>
 #include <string.h>
@@ -103,6 +104,35 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiFeatures*
     return mrhi_success;
 }
 
+// The floor, and what the adapter's features add: filtering of 32-bit
+// floats, rendering to rg11b10, and sampling of a granted compressed
+// family.
+static void GetFormatCaps(const void* self, uint64_t adapter, mrhiFormat format,
+                          mrhiFormatCaps* capsOut)
+{
+    const TestDriver* driver = self;
+    const mrhiTestAdapter* described = &driver->adapters[adapter - 1];
+    const mrhiFeatures* features = &described->features;
+    if (format == described->limitedFormat)
+    {
+        *capsOut = described->limitedCaps;
+        return;
+    }
+    mrhiFormatCaps caps = mrhiFloorFormatCaps(format);
+    bool float32 = format == mrhi_formatR32Float || format == mrhi_formatRg32Float ||
+                   format == mrhi_formatRgba32Float;
+    caps.filtering = caps.filtering || (float32 && features->float32Filterable);
+    caps.rendering =
+        caps.rendering || (format == mrhi_formatRg11b10Ufloat && features->rg11b10Renderable);
+    if (!caps.sampling && mrhiIsFormatKnown(format) && mrhiFormatFamilyGranted(format, features))
+    {
+        caps.sampling = true;
+        caps.filtering = true;
+        caps.sampleCounts = 1;
+    }
+    *capsOut = caps;
+}
+
 static void Destroy(void* self)
 {
     TestDriver* driver = self;
@@ -116,6 +146,7 @@ static const mrhiInstanceDriverVtable s_vtable = {
     .requestAdapters = RequestAdapters,
     .poll = Poll,
     .getAdapters = GetAdapters,
+    .getFormatCaps = GetFormatCaps,
     .createDevice = CreateDevice,
     .destroy = Destroy,
 };

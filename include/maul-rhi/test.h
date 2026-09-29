@@ -31,6 +31,11 @@ extern "C"
         // The outcome of a device opening on the adapter: mrhi_success, or the
         // error the device fails with.
         mrhiResult openOutcome;
+        // A format the adapter reports limitedCaps for instead of its usual
+        // capabilities, to test adapters below the floor; mrhi_formatNone for
+        // none.
+        mrhiFormat limitedFormat;
+        mrhiFormatCaps limitedCaps;
     } mrhiTestAdapter;
 
     // Turns the test driver on for an instance, chained on its def with the

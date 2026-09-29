@@ -71,6 +71,41 @@ static uint32_t SlotFor(mrhiInstance* instance, uint64_t handle)
 // masked to what its API can grant. The driver's order is kept for
 // equal ranks; more adapters than the limit is a capacity outcome, with
 // the first ones kept.
+// What a format can do on an adapter: the driver's answer, nothing for
+// a compressed family whose feature the adapter lacks.
+static mrhiFormatCaps FormatCaps(const mrhiInstance* instance, const mrhiDriverAdapter* adapter,
+                                 mrhiFormat format)
+{
+    mrhiFormatCaps caps = {0};
+    if (instance->driver.vtable != nullptr && mrhiFormatFamilyGranted(format, &adapter->features))
+    {
+        instance->driver.vtable->getFormatCaps(instance->driver.self, adapter->handle, format,
+                                               &caps);
+    }
+    return caps;
+}
+
+// Whether an adapter meets the floor: the floor limits, and the floor
+// capabilities of every format.
+static bool MeetsFloor(const mrhiInstance* instance, const mrhiDriverAdapter* adapter)
+{
+    mrhiLimits floor = mrhiDefaultLimits();
+    if (!mrhiLimitsWithin(&floor, &adapter->limits))
+    {
+        return false;
+    }
+    for (size_t i = 0; i < MRHI_KNOWN_FORMATS; ++i)
+    {
+        mrhiFormatCaps least = mrhiFloorFormatCaps(mrhiKnownFormats[i]);
+        mrhiFormatCaps caps = FormatCaps(instance, adapter, mrhiKnownFormats[i]);
+        if (!mrhiFormatCapsWithin(&least, &caps))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search)
 {
     size_t total = 0;
@@ -80,7 +115,6 @@ mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search
                                                      instance->limits.adapters);
     }
     size_t count = total < instance->limits.adapters ? total : instance->limits.adapters;
-    mrhiLimits floor = mrhiDefaultLimits();
     for (uint32_t i = 0; i < instance->limits.adapters; ++i)
     {
         instance->slots[i].seen = false;
@@ -89,12 +123,12 @@ mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search
     for (size_t i = 0; i < count; ++i)
     {
         mrhiDriverAdapter* adapter = &instance->found[i];
+        mrhiMaskFeatures(&adapter->features, adapter->info.driver);
         if ((!search->allowSoftware && adapter->info.kind == mrhi_adapterSoftware) ||
-            !mrhiLimitsWithin(&floor, &adapter->limits))
+            !MeetsFloor(instance, adapter))
         {
             continue;
         }
-        mrhiMaskFeatures(&adapter->features, adapter->info.driver);
         uint32_t slot = SlotFor(instance, adapter->handle);
         instance->slots[slot].inUse = true;
         instance->slots[slot].seen = true;
@@ -230,5 +264,21 @@ mrhiResult mrhiGetAdapterLimits(mrhiInstance* instance, mrhiAdapterId adapter,
         return mrhi_errorStale;
     }
     *limitsOut = found->limits;
+    return mrhi_success;
+}
+
+mrhiResult mrhiGetFormatCaps(mrhiInstance* instance, mrhiAdapterId adapter, mrhiFormat format,
+                             mrhiFormatCaps* capsOut)
+{
+    if (instance == nullptr || capsOut == nullptr || !mrhiIsFormatKnown(format))
+    {
+        return instance == nullptr ? mrhi_errorInvalid : mrhiMisuse(instance);
+    }
+    const mrhiDriverAdapter* found = mrhiFindAdapter(instance, adapter);
+    if (found == nullptr)
+    {
+        return mrhi_errorStale;
+    }
+    *capsOut = FormatCaps(instance, found, format);
     return mrhi_success;
 }

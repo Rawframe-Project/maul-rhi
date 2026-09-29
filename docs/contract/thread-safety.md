@@ -19,6 +19,7 @@ edit the contract, not this file.
 | `mrhiDefaultLimits` | Safe from any thread. |
 | `mrhiGetAdapterFeatures` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiGetAdapterLimits` | Safe from any thread; the instance is used by one thread at a time. |
+| `mrhiGetFormatCaps` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiDefaultDeviceDef` | Safe from any thread. |
 | `mrhiCreateDevice` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiDestroyDevice` | Safe from any thread; the device and its instance are used by one thread at a time. |

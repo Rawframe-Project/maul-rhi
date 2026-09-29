@@ -10,5 +10,6 @@ bool mrhiIsDriverVtableValid(const mrhiInstanceDriverVtable* vtable)
     return vtable != nullptr && vtable->spiVersion == MRHI_SPI_VERSION &&
            vtable->size >= sizeof(mrhiInstanceDriverVtable) && vtable->requestAdapters != nullptr &&
            vtable->poll != nullptr && vtable->getAdapters != nullptr &&
-           vtable->createDevice != nullptr && vtable->destroy != nullptr;
+           vtable->getFormatCaps != nullptr && vtable->createDevice != nullptr &&
+           vtable->destroy != nullptr;
 }

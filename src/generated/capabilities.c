@@ -93,3 +93,429 @@ void mrhiMaskFeatures(mrhiFeatures* features, mrhiDriverKind driver)
         break;
     }
 }
+
+const mrhiFormat mrhiKnownFormats[70] = {
+    mrhi_formatRgba8Unorm,
+    mrhi_formatRgba8UnormSrgb,
+    mrhi_formatBgra8Unorm,
+    mrhi_formatBgra8UnormSrgb,
+    mrhi_formatR8Unorm,
+    mrhi_formatRg8Unorm,
+    mrhi_formatR16Float,
+    mrhi_formatRg16Float,
+    mrhi_formatRgba16Float,
+    mrhi_formatR32Float,
+    mrhi_formatRg32Float,
+    mrhi_formatRgba32Float,
+    mrhi_formatR32Uint,
+    mrhi_formatR32Sint,
+    mrhi_formatRgb10a2Unorm,
+    mrhi_formatRg11b10Ufloat,
+    mrhi_formatDepth32Float,
+    mrhi_formatDepthStencil,
+    mrhi_formatBc1RgbaUnorm,
+    mrhi_formatBc1RgbaUnormSrgb,
+    mrhi_formatBc2RgbaUnorm,
+    mrhi_formatBc2RgbaUnormSrgb,
+    mrhi_formatBc3RgbaUnorm,
+    mrhi_formatBc3RgbaUnormSrgb,
+    mrhi_formatBc4RUnorm,
+    mrhi_formatBc4RSnorm,
+    mrhi_formatBc5RgUnorm,
+    mrhi_formatBc5RgSnorm,
+    mrhi_formatBc6hRgbUfloat,
+    mrhi_formatBc6hRgbFloat,
+    mrhi_formatBc7RgbaUnorm,
+    mrhi_formatBc7RgbaUnormSrgb,
+    mrhi_formatEtc2Rgb8Unorm,
+    mrhi_formatEtc2Rgb8UnormSrgb,
+    mrhi_formatEtc2Rgb8a1Unorm,
+    mrhi_formatEtc2Rgb8a1UnormSrgb,
+    mrhi_formatEtc2Rgba8Unorm,
+    mrhi_formatEtc2Rgba8UnormSrgb,
+    mrhi_formatEacR11Unorm,
+    mrhi_formatEacR11Snorm,
+    mrhi_formatEacRg11Unorm,
+    mrhi_formatEacRg11Snorm,
+    mrhi_formatAstc4x4Unorm,
+    mrhi_formatAstc4x4UnormSrgb,
+    mrhi_formatAstc5x4Unorm,
+    mrhi_formatAstc5x4UnormSrgb,
+    mrhi_formatAstc5x5Unorm,
+    mrhi_formatAstc5x5UnormSrgb,
+    mrhi_formatAstc6x5Unorm,
+    mrhi_formatAstc6x5UnormSrgb,
+    mrhi_formatAstc6x6Unorm,
+    mrhi_formatAstc6x6UnormSrgb,
+    mrhi_formatAstc8x5Unorm,
+    mrhi_formatAstc8x5UnormSrgb,
+    mrhi_formatAstc8x6Unorm,
+    mrhi_formatAstc8x6UnormSrgb,
+    mrhi_formatAstc8x8Unorm,
+    mrhi_formatAstc8x8UnormSrgb,
+    mrhi_formatAstc10x5Unorm,
+    mrhi_formatAstc10x5UnormSrgb,
+    mrhi_formatAstc10x6Unorm,
+    mrhi_formatAstc10x6UnormSrgb,
+    mrhi_formatAstc10x8Unorm,
+    mrhi_formatAstc10x8UnormSrgb,
+    mrhi_formatAstc10x10Unorm,
+    mrhi_formatAstc10x10UnormSrgb,
+    mrhi_formatAstc12x10Unorm,
+    mrhi_formatAstc12x10UnormSrgb,
+    mrhi_formatAstc12x12Unorm,
+    mrhi_formatAstc12x12UnormSrgb,
+};
+
+bool mrhiIsFormatKnown(mrhiFormat format)
+{
+    switch (format)
+    {
+    case mrhi_formatRgba8Unorm:
+    case mrhi_formatRgba8UnormSrgb:
+    case mrhi_formatBgra8Unorm:
+    case mrhi_formatBgra8UnormSrgb:
+    case mrhi_formatR8Unorm:
+    case mrhi_formatRg8Unorm:
+    case mrhi_formatR16Float:
+    case mrhi_formatRg16Float:
+    case mrhi_formatRgba16Float:
+    case mrhi_formatR32Float:
+    case mrhi_formatRg32Float:
+    case mrhi_formatRgba32Float:
+    case mrhi_formatR32Uint:
+    case mrhi_formatR32Sint:
+    case mrhi_formatRgb10a2Unorm:
+    case mrhi_formatRg11b10Ufloat:
+    case mrhi_formatDepth32Float:
+    case mrhi_formatDepthStencil:
+    case mrhi_formatBc1RgbaUnorm:
+    case mrhi_formatBc1RgbaUnormSrgb:
+    case mrhi_formatBc2RgbaUnorm:
+    case mrhi_formatBc2RgbaUnormSrgb:
+    case mrhi_formatBc3RgbaUnorm:
+    case mrhi_formatBc3RgbaUnormSrgb:
+    case mrhi_formatBc4RUnorm:
+    case mrhi_formatBc4RSnorm:
+    case mrhi_formatBc5RgUnorm:
+    case mrhi_formatBc5RgSnorm:
+    case mrhi_formatBc6hRgbUfloat:
+    case mrhi_formatBc6hRgbFloat:
+    case mrhi_formatBc7RgbaUnorm:
+    case mrhi_formatBc7RgbaUnormSrgb:
+    case mrhi_formatEtc2Rgb8Unorm:
+    case mrhi_formatEtc2Rgb8UnormSrgb:
+    case mrhi_formatEtc2Rgb8a1Unorm:
+    case mrhi_formatEtc2Rgb8a1UnormSrgb:
+    case mrhi_formatEtc2Rgba8Unorm:
+    case mrhi_formatEtc2Rgba8UnormSrgb:
+    case mrhi_formatEacR11Unorm:
+    case mrhi_formatEacR11Snorm:
+    case mrhi_formatEacRg11Unorm:
+    case mrhi_formatEacRg11Snorm:
+    case mrhi_formatAstc4x4Unorm:
+    case mrhi_formatAstc4x4UnormSrgb:
+    case mrhi_formatAstc5x4Unorm:
+    case mrhi_formatAstc5x4UnormSrgb:
+    case mrhi_formatAstc5x5Unorm:
+    case mrhi_formatAstc5x5UnormSrgb:
+    case mrhi_formatAstc6x5Unorm:
+    case mrhi_formatAstc6x5UnormSrgb:
+    case mrhi_formatAstc6x6Unorm:
+    case mrhi_formatAstc6x6UnormSrgb:
+    case mrhi_formatAstc8x5Unorm:
+    case mrhi_formatAstc8x5UnormSrgb:
+    case mrhi_formatAstc8x6Unorm:
+    case mrhi_formatAstc8x6UnormSrgb:
+    case mrhi_formatAstc8x8Unorm:
+    case mrhi_formatAstc8x8UnormSrgb:
+    case mrhi_formatAstc10x5Unorm:
+    case mrhi_formatAstc10x5UnormSrgb:
+    case mrhi_formatAstc10x6Unorm:
+    case mrhi_formatAstc10x6UnormSrgb:
+    case mrhi_formatAstc10x8Unorm:
+    case mrhi_formatAstc10x8UnormSrgb:
+    case mrhi_formatAstc10x10Unorm:
+    case mrhi_formatAstc10x10UnormSrgb:
+    case mrhi_formatAstc12x10Unorm:
+    case mrhi_formatAstc12x10UnormSrgb:
+    case mrhi_formatAstc12x12Unorm:
+    case mrhi_formatAstc12x12UnormSrgb:
+        return true;
+    default:
+        return false;
+    }
+}
+
+mrhiFormatCaps mrhiFloorFormatCaps(mrhiFormat format)
+{
+    switch (format)
+    {
+    case mrhi_formatRgba8Unorm:
+        return (mrhiFormatCaps){.sampling = true, .filtering = true, .rendering = true, .blending = true, .storage = true, .sampleCounts = 5};
+    case mrhi_formatRgba8UnormSrgb:
+        return (mrhiFormatCaps){.sampling = true, .filtering = true, .rendering = true, .blending = true, .storage = false, .sampleCounts = 5};
+    case mrhi_formatBgra8Unorm:
+        return (mrhiFormatCaps){.sampling = true, .filtering = true, .rendering = true, .blending = true, .storage = false, .sampleCounts = 5};
+    case mrhi_formatBgra8UnormSrgb:
+        return (mrhiFormatCaps){.sampling = true, .filtering = true, .rendering = true, .blending = true, .storage = false, .sampleCounts = 5};
+    case mrhi_formatR8Unorm:
+        return (mrhiFormatCaps){.sampling = true, .filtering = true, .rendering = true, .blending = true, .storage = false, .sampleCounts = 5};
+    case mrhi_formatRg8Unorm:
+        return (mrhiFormatCaps){.sampling = true, .filtering = true, .rendering = true, .blending = true, .storage = false, .sampleCounts = 5};
+    case mrhi_formatR16Float:
+        return (mrhiFormatCaps){.sampling = true, .filtering = true, .rendering = true, .blending = true, .storage = false, .sampleCounts = 5};
+    case mrhi_formatRg16Float:
+        return (mrhiFormatCaps){.sampling = true, .filtering = true, .rendering = true, .blending = true, .storage = false, .sampleCounts = 5};
+    case mrhi_formatRgba16Float:
+        return (mrhiFormatCaps){.sampling = true, .filtering = true, .rendering = true, .blending = true, .storage = true, .sampleCounts = 5};
+    case mrhi_formatR32Float:
+        return (mrhiFormatCaps){.sampling = true, .filtering = false, .rendering = true, .blending = false, .storage = true, .sampleCounts = 1};
+    case mrhi_formatRg32Float:
+        return (mrhiFormatCaps){.sampling = true, .filtering = false, .rendering = true, .blending = false, .storage = true, .sampleCounts = 1};
+    case mrhi_formatRgba32Float:
+        return (mrhiFormatCaps){.sampling = true, .filtering = false, .rendering = true, .blending = false, .storage = true, .sampleCounts = 1};
+    case mrhi_formatR32Uint:
+        return (mrhiFormatCaps){.sampling = true, .filtering = false, .rendering = true, .blending = false, .storage = true, .sampleCounts = 1};
+    case mrhi_formatR32Sint:
+        return (mrhiFormatCaps){.sampling = true, .filtering = false, .rendering = true, .blending = false, .storage = true, .sampleCounts = 1};
+    case mrhi_formatRgb10a2Unorm:
+        return (mrhiFormatCaps){.sampling = true, .filtering = true, .rendering = true, .blending = true, .storage = false, .sampleCounts = 5};
+    case mrhi_formatRg11b10Ufloat:
+        return (mrhiFormatCaps){.sampling = true, .filtering = true, .rendering = false, .blending = false, .storage = false, .sampleCounts = 1};
+    case mrhi_formatDepth32Float:
+        return (mrhiFormatCaps){.sampling = true, .filtering = false, .rendering = true, .blending = false, .storage = false, .sampleCounts = 5};
+    case mrhi_formatDepthStencil:
+        return (mrhiFormatCaps){.sampling = true, .filtering = false, .rendering = true, .blending = false, .storage = false, .sampleCounts = 5};
+    case mrhi_formatBc1RgbaUnorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatBc1RgbaUnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatBc2RgbaUnorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatBc2RgbaUnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatBc3RgbaUnorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatBc3RgbaUnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatBc4RUnorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatBc4RSnorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatBc5RgUnorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatBc5RgSnorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatBc6hRgbUfloat:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatBc6hRgbFloat:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatBc7RgbaUnorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatBc7RgbaUnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatEtc2Rgb8Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatEtc2Rgb8UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatEtc2Rgb8a1Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatEtc2Rgb8a1UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatEtc2Rgba8Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatEtc2Rgba8UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatEacR11Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatEacR11Snorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatEacRg11Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatEacRg11Snorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc4x4Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc4x4UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc5x4Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc5x4UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc5x5Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc5x5UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc6x5Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc6x5UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc6x6Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc6x6UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc8x5Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc8x5UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc8x6Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc8x6UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc8x8Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc8x8UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc10x5Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc10x5UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc10x6Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc10x6UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc10x8Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc10x8UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc10x10Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc10x10UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc12x10Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc12x10UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc12x12Unorm:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    case mrhi_formatAstc12x12UnormSrgb:
+        return (mrhiFormatCaps){.sampling = false, .filtering = false, .rendering = false, .blending = false, .storage = false, .sampleCounts = 0};
+    default:
+        return (mrhiFormatCaps){0};
+    }
+}
+
+bool mrhiFormatFamilyGranted(mrhiFormat format, const mrhiFeatures* features)
+{
+    switch (format)
+    {
+    case mrhi_formatBc1RgbaUnorm:
+        return features->textureCompressionBc;
+    case mrhi_formatBc1RgbaUnormSrgb:
+        return features->textureCompressionBc;
+    case mrhi_formatBc2RgbaUnorm:
+        return features->textureCompressionBc;
+    case mrhi_formatBc2RgbaUnormSrgb:
+        return features->textureCompressionBc;
+    case mrhi_formatBc3RgbaUnorm:
+        return features->textureCompressionBc;
+    case mrhi_formatBc3RgbaUnormSrgb:
+        return features->textureCompressionBc;
+    case mrhi_formatBc4RUnorm:
+        return features->textureCompressionBc;
+    case mrhi_formatBc4RSnorm:
+        return features->textureCompressionBc;
+    case mrhi_formatBc5RgUnorm:
+        return features->textureCompressionBc;
+    case mrhi_formatBc5RgSnorm:
+        return features->textureCompressionBc;
+    case mrhi_formatBc6hRgbUfloat:
+        return features->textureCompressionBc;
+    case mrhi_formatBc6hRgbFloat:
+        return features->textureCompressionBc;
+    case mrhi_formatBc7RgbaUnorm:
+        return features->textureCompressionBc;
+    case mrhi_formatBc7RgbaUnormSrgb:
+        return features->textureCompressionBc;
+    case mrhi_formatEtc2Rgb8Unorm:
+        return features->textureCompressionEtc2;
+    case mrhi_formatEtc2Rgb8UnormSrgb:
+        return features->textureCompressionEtc2;
+    case mrhi_formatEtc2Rgb8a1Unorm:
+        return features->textureCompressionEtc2;
+    case mrhi_formatEtc2Rgb8a1UnormSrgb:
+        return features->textureCompressionEtc2;
+    case mrhi_formatEtc2Rgba8Unorm:
+        return features->textureCompressionEtc2;
+    case mrhi_formatEtc2Rgba8UnormSrgb:
+        return features->textureCompressionEtc2;
+    case mrhi_formatEacR11Unorm:
+        return features->textureCompressionEtc2;
+    case mrhi_formatEacR11Snorm:
+        return features->textureCompressionEtc2;
+    case mrhi_formatEacRg11Unorm:
+        return features->textureCompressionEtc2;
+    case mrhi_formatEacRg11Snorm:
+        return features->textureCompressionEtc2;
+    case mrhi_formatAstc4x4Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc4x4UnormSrgb:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc5x4Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc5x4UnormSrgb:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc5x5Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc5x5UnormSrgb:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc6x5Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc6x5UnormSrgb:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc6x6Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc6x6UnormSrgb:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc8x5Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc8x5UnormSrgb:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc8x6Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc8x6UnormSrgb:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc8x8Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc8x8UnormSrgb:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc10x5Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc10x5UnormSrgb:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc10x6Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc10x6UnormSrgb:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc10x8Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc10x8UnormSrgb:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc10x10Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc10x10UnormSrgb:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc12x10Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc12x10UnormSrgb:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc12x12Unorm:
+        return features->textureCompressionAstc;
+    case mrhi_formatAstc12x12UnormSrgb:
+        return features->textureCompressionAstc;
+    default:
+        return true;
+    }
+}
+
+bool mrhiFormatCapsWithin(const mrhiFormatCaps* asked, const mrhiFormatCaps* granted)
+{
+    return true
+        && (!asked->sampling || granted->sampling)
+        && (!asked->filtering || granted->filtering)
+        && (!asked->rendering || granted->rendering)
+        && (!asked->blending || granted->blending)
+        && (!asked->storage || granted->storage)
+        && (asked->sampleCounts & ~granted->sampleCounts) == 0;
+}

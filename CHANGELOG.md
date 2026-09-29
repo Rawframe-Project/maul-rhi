@@ -46,3 +46,8 @@ format.
   `mrhiGetDeviceState`, the granted `mrhiGetDeviceFeatures` and
   `mrhiGetDeviceLimits`, and `mrhiGetDeviceMisuse`. The test driver
   opens devices with the outcome its adapter describes.
+- Formats (`mrhiFormat`): the requirements' color formats, 32-bit
+  integers for atomics, `depth32Float`, an abstract `depthStencil`, and
+  the BC, ETC2 and ASTC families behind their features, each mapped
+  onto the four APIs; `mrhiGetFormatCaps` per adapter, with WebGPU's
+  guaranteed capabilities as the floor every listed adapter meets.

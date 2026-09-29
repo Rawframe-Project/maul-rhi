@@ -1899,6 +1899,2389 @@
           ]
         },
         {
+          "kind": "enum",
+          "name": "format",
+          "width": "uint16",
+          "mapped": true,
+          "doc": "A texel format. The compressed families need their feature; `format_caps` says what each format can do on an adapter.",
+          "values": [
+            {
+              "name": "format_none",
+              "value": 0,
+              "doc": "No format: never valid on a resource.",
+              "unmapped": true
+            },
+            {
+              "name": "format_rgba8_unorm",
+              "value": 1,
+              "doc": "RGBA, 8 bits each, normalized.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8G8B8A8_UNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R8G8B8A8_UNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "RGBA8Unorm"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "rgba8unorm"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": true,
+                "rendering": true,
+                "blending": true,
+                "storage": true,
+                "sample_counts": 5
+              }
+            },
+            {
+              "name": "format_rgba8_unorm_srgb",
+              "value": 2,
+              "doc": "RGBA, 8 bits each, sRGB-encoded color.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8G8B8A8_SRGB"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R8G8B8A8_UNORM_SRGB"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "RGBA8Unorm_sRGB"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "rgba8unorm-srgb"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": true,
+                "rendering": true,
+                "blending": true,
+                "storage": false,
+                "sample_counts": 5
+              }
+            },
+            {
+              "name": "format_bgra8_unorm",
+              "value": 3,
+              "doc": "BGRA, 8 bits each, normalized: a swapchain format.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "B8G8R8A8_UNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "B8G8R8A8_UNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "BGRA8Unorm"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "bgra8unorm"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": true,
+                "rendering": true,
+                "blending": true,
+                "storage": false,
+                "sample_counts": 5
+              }
+            },
+            {
+              "name": "format_bgra8_unorm_srgb",
+              "value": 4,
+              "doc": "BGRA, 8 bits each, sRGB-encoded color.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "B8G8R8A8_SRGB"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "B8G8R8A8_UNORM_SRGB"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "BGRA8Unorm_sRGB"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "bgra8unorm-srgb"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": true,
+                "rendering": true,
+                "blending": true,
+                "storage": false,
+                "sample_counts": 5
+              }
+            },
+            {
+              "name": "format_r8_unorm",
+              "value": 5,
+              "doc": "One 8-bit normalized channel.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8_UNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R8_UNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "R8Unorm"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "r8unorm"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": true,
+                "rendering": true,
+                "blending": true,
+                "storage": false,
+                "sample_counts": 5
+              }
+            },
+            {
+              "name": "format_rg8_unorm",
+              "value": 6,
+              "doc": "Two 8-bit normalized channels.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R8G8_UNORM"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R8G8_UNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "RG8Unorm"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "rg8unorm"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": true,
+                "rendering": true,
+                "blending": true,
+                "storage": false,
+                "sample_counts": 5
+              }
+            },
+            {
+              "name": "format_r16_float",
+              "value": 7,
+              "doc": "One 16-bit float channel.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R16_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "R16Float"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "r16float"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": true,
+                "rendering": true,
+                "blending": true,
+                "storage": false,
+                "sample_counts": 5
+              }
+            },
+            {
+              "name": "format_rg16_float",
+              "value": 8,
+              "doc": "Two 16-bit float channels: motion vectors.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16G16_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R16G16_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "RG16Float"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "rg16float"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": true,
+                "rendering": true,
+                "blending": true,
+                "storage": false,
+                "sample_counts": 5
+              }
+            },
+            {
+              "name": "format_rgba16_float",
+              "value": 9,
+              "doc": "RGBA, 16-bit floats: HDR color.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R16G16B16A16_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R16G16B16A16_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "RGBA16Float"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "rgba16float"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": true,
+                "rendering": true,
+                "blending": true,
+                "storage": true,
+                "sample_counts": 5
+              }
+            },
+            {
+              "name": "format_r32_float",
+              "value": 10,
+              "doc": "One 32-bit float channel.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R32_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "R32Float"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "r32float"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": false,
+                "rendering": true,
+                "blending": false,
+                "storage": true,
+                "sample_counts": 1
+              }
+            },
+            {
+              "name": "format_rg32_float",
+              "value": 11,
+              "doc": "Two 32-bit float channels.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32G32_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R32G32_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "RG32Float"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "rg32float"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": false,
+                "rendering": true,
+                "blending": false,
+                "storage": true,
+                "sample_counts": 1
+              }
+            },
+            {
+              "name": "format_rgba32_float",
+              "value": 12,
+              "doc": "RGBA, 32-bit floats.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32G32B32A32_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R32G32B32A32_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "RGBA32Float"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "rgba32float"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": false,
+                "rendering": true,
+                "blending": false,
+                "storage": true,
+                "sample_counts": 1
+              }
+            },
+            {
+              "name": "format_r32_uint",
+              "value": 13,
+              "doc": "One 32-bit unsigned integer channel, for storage atomics.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32_UINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R32_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "R32Uint"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "r32uint"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": false,
+                "rendering": true,
+                "blending": false,
+                "storage": true,
+                "sample_counts": 1
+              }
+            },
+            {
+              "name": "format_r32_sint",
+              "value": 14,
+              "doc": "One 32-bit signed integer channel, for storage atomics.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "R32_SINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R32_SINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "R32Sint"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "r32sint"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": false,
+                "rendering": true,
+                "blending": false,
+                "storage": true,
+                "sample_counts": 1
+              }
+            },
+            {
+              "name": "format_rgb10a2_unorm",
+              "value": 15,
+              "doc": "RGB 10 bits each, alpha 2, normalized.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "A2B10G10R10_UNORM_PACK32"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R10G10B10A2_UNORM"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "RGB10A2Unorm"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "rgb10a2unorm"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": true,
+                "rendering": true,
+                "blending": true,
+                "storage": false,
+                "sample_counts": 5
+              }
+            },
+            {
+              "name": "format_rg11b10_ufloat",
+              "value": 16,
+              "doc": "Unsigned floats, 11, 11 and 10 bits: compact HDR color.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "B10G11R11_UFLOAT_PACK32"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "R11G11B10_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "RG11B10Float"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "rg11b10ufloat"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": true,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 1
+              }
+            },
+            {
+              "name": "format_depth32_float",
+              "value": 17,
+              "doc": "32-bit float depth.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "D32_SFLOAT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D32_FLOAT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "Depth32Float"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "depth32float"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": false,
+                "rendering": true,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 5
+              }
+            },
+            {
+              "name": "format_depth_stencil",
+              "value": 18,
+              "doc": "At least 24 bits of depth and 8 of stencil, in the format the driver picks.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "D24_UNORM_S8_UINT, else D32_SFLOAT_S8_UINT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D24_UNORM_S8_UINT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "Depth32Float_Stencil8 (Apple GPUs), Depth24Unorm_Stencil8 where supported"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "depth24plus-stencil8"
+                }
+              },
+              "floor": {
+                "sampling": true,
+                "filtering": false,
+                "rendering": true,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 5
+              }
+            },
+            {
+              "name": "format_bc1_rgba_unorm",
+              "value": 19,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC1_RGBA_UNORM_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC1_UNORM"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC1_RGBA, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc1-rgba-unorm, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_bc1_rgba_unorm_srgb",
+              "value": 20,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC1_RGBA_SRGB_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC1_UNORM_SRGB"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC1_RGBA_sRGB, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc1-rgba-unorm-srgb, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_bc2_rgba_unorm",
+              "value": 21,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC2_UNORM_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC2_UNORM"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC2_RGBA, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc2-rgba-unorm, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_bc2_rgba_unorm_srgb",
+              "value": 22,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC2_SRGB_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC2_UNORM_SRGB"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC2_RGBA_sRGB, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc2-rgba-unorm-srgb, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_bc3_rgba_unorm",
+              "value": 23,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC3_UNORM_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC3_UNORM"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC3_RGBA, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc3-rgba-unorm, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_bc3_rgba_unorm_srgb",
+              "value": 24,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC3_SRGB_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC3_UNORM_SRGB"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC3_RGBA_sRGB, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc3-rgba-unorm-srgb, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_bc4_r_unorm",
+              "value": 25,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC4_UNORM_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC4_UNORM"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC4_RUnorm, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc4-r-unorm, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_bc4_r_snorm",
+              "value": 26,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC4_SNORM_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC4_SNORM"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC4_RSnorm, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc4-r-snorm, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_bc5_rg_unorm",
+              "value": 27,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC5_UNORM_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC5_UNORM"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC5_RGUnorm, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc5-rg-unorm, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_bc5_rg_snorm",
+              "value": 28,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC5_SNORM_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC5_SNORM"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC5_RGSnorm, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc5-rg-snorm, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_bc6h_rgb_ufloat",
+              "value": 29,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC6H_UFLOAT_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC6H_UF16"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC6H_RGBUfloat, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc6h-rgb-ufloat, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_bc6h_rgb_float",
+              "value": 30,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC6H_SFLOAT_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC6H_SF16"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC6H_RGBFloat, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc6h-rgb-float, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_bc7_rgba_unorm",
+              "value": 31,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC7_UNORM_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC7_UNORM"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC7_RGBAUnorm, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc7-rgba-unorm, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_bc7_rgba_unorm_srgb",
+              "value": 32,
+              "doc": "A BC block format, with texture_compression_bc.",
+              "family": "texture_compression_bc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "BC7_SRGB_BLOCK, with textureCompressionBC"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BC7_UNORM_SRGB"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "BC7_RGBAUnorm_sRGB, with supportsBCTextureCompression"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "bc7-rgba-unorm-srgb, with texture-compression-bc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_etc2_rgb8_unorm",
+              "value": 33,
+              "doc": "An ETC2 or EAC block format, with texture_compression_etc2.",
+              "family": "texture_compression_etc2",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ETC2_R8G8B8_UNORM_BLOCK, with textureCompressionETC2"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ETC2 formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ETC2_RGB8 on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "etc2-rgb8unorm, with texture-compression-etc2"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_etc2_rgb8_unorm_srgb",
+              "value": 34,
+              "doc": "An ETC2 or EAC block format, with texture_compression_etc2.",
+              "family": "texture_compression_etc2",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ETC2_R8G8B8_SRGB_BLOCK, with textureCompressionETC2"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ETC2 formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ETC2_RGB8_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "etc2-rgb8unorm-srgb, with texture-compression-etc2"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_etc2_rgb8a1_unorm",
+              "value": 35,
+              "doc": "An ETC2 or EAC block format, with texture_compression_etc2.",
+              "family": "texture_compression_etc2",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ETC2_R8G8B8A1_UNORM_BLOCK, with textureCompressionETC2"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ETC2 formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ETC2_RGB8A1 on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "etc2-rgb8a1unorm, with texture-compression-etc2"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_etc2_rgb8a1_unorm_srgb",
+              "value": 36,
+              "doc": "An ETC2 or EAC block format, with texture_compression_etc2.",
+              "family": "texture_compression_etc2",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ETC2_R8G8B8A1_SRGB_BLOCK, with textureCompressionETC2"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ETC2 formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ETC2_RGB8A1_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "etc2-rgb8a1unorm-srgb, with texture-compression-etc2"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_etc2_rgba8_unorm",
+              "value": 37,
+              "doc": "An ETC2 or EAC block format, with texture_compression_etc2.",
+              "family": "texture_compression_etc2",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ETC2_R8G8B8A8_UNORM_BLOCK, with textureCompressionETC2"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ETC2 formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "EAC_RGBA8 on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "etc2-rgba8unorm, with texture-compression-etc2"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_etc2_rgba8_unorm_srgb",
+              "value": 38,
+              "doc": "An ETC2 or EAC block format, with texture_compression_etc2.",
+              "family": "texture_compression_etc2",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ETC2_R8G8B8A8_SRGB_BLOCK, with textureCompressionETC2"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ETC2 formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "EAC_RGBA8_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "etc2-rgba8unorm-srgb, with texture-compression-etc2"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_eac_r11_unorm",
+              "value": 39,
+              "doc": "An ETC2 or EAC block format, with texture_compression_etc2.",
+              "family": "texture_compression_etc2",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "EAC_R11_UNORM_BLOCK, with textureCompressionETC2"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ETC2 formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "EAC_R11Unorm on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "eac-r11unorm, with texture-compression-etc2"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_eac_r11_snorm",
+              "value": 40,
+              "doc": "An ETC2 or EAC block format, with texture_compression_etc2.",
+              "family": "texture_compression_etc2",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "EAC_R11_SNORM_BLOCK, with textureCompressionETC2"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ETC2 formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "EAC_R11Snorm on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "eac-r11snorm, with texture-compression-etc2"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_eac_rg11_unorm",
+              "value": 41,
+              "doc": "An ETC2 or EAC block format, with texture_compression_etc2.",
+              "family": "texture_compression_etc2",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "EAC_R11G11_UNORM_BLOCK, with textureCompressionETC2"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ETC2 formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "EAC_RG11Unorm on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "eac-rg11unorm, with texture-compression-etc2"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_eac_rg11_snorm",
+              "value": 42,
+              "doc": "An ETC2 or EAC block format, with texture_compression_etc2.",
+              "family": "texture_compression_etc2",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "EAC_R11G11_SNORM_BLOCK, with textureCompressionETC2"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ETC2 formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "EAC_RG11Snorm on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "eac-rg11snorm, with texture-compression-etc2"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_4x4_unorm",
+              "value": 43,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_4X4_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_4x4_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-4x4-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_4x4_unorm_srgb",
+              "value": 44,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_4X4_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_4x4_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-4x4-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_5x4_unorm",
+              "value": 45,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_5X4_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_5x4_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-5x4-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_5x4_unorm_srgb",
+              "value": 46,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_5X4_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_5x4_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-5x4-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_5x5_unorm",
+              "value": 47,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_5X5_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_5x5_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-5x5-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_5x5_unorm_srgb",
+              "value": 48,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_5X5_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_5x5_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-5x5-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_6x5_unorm",
+              "value": 49,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_6X5_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_6x5_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-6x5-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_6x5_unorm_srgb",
+              "value": 50,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_6X5_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_6x5_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-6x5-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_6x6_unorm",
+              "value": 51,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_6X6_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_6x6_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-6x6-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_6x6_unorm_srgb",
+              "value": 52,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_6X6_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_6x6_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-6x6-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_8x5_unorm",
+              "value": 53,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_8X5_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_8x5_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-8x5-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_8x5_unorm_srgb",
+              "value": 54,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_8X5_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_8x5_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-8x5-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_8x6_unorm",
+              "value": 55,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_8X6_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_8x6_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-8x6-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_8x6_unorm_srgb",
+              "value": 56,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_8X6_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_8x6_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-8x6-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_8x8_unorm",
+              "value": 57,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_8X8_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_8x8_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-8x8-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_8x8_unorm_srgb",
+              "value": 58,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_8X8_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_8x8_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-8x8-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_10x5_unorm",
+              "value": 59,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_10X5_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_10x5_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-10x5-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_10x5_unorm_srgb",
+              "value": 60,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_10X5_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_10x5_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-10x5-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_10x6_unorm",
+              "value": 61,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_10X6_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_10x6_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-10x6-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_10x6_unorm_srgb",
+              "value": 62,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_10X6_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_10x6_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-10x6-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_10x8_unorm",
+              "value": 63,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_10X8_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_10x8_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-10x8-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_10x8_unorm_srgb",
+              "value": 64,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_10X8_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_10x8_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-10x8-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_10x10_unorm",
+              "value": 65,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_10X10_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_10x10_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-10x10-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_10x10_unorm_srgb",
+              "value": 66,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_10X10_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_10x10_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-10x10-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_12x10_unorm",
+              "value": 67,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_12X10_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_12x10_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-12x10-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_12x10_unorm_srgb",
+              "value": 68,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_12X10_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_12x10_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-12x10-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_12x12_unorm",
+              "value": 69,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_12X12_UNORM_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_12x12_LDR on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-12x12-unorm, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            },
+            {
+              "name": "format_astc_12x12_unorm_srgb",
+              "value": 70,
+              "doc": "An ASTC LDR block format, with texture_compression_astc.",
+              "family": "texture_compression_astc",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ASTC_12X12_SRGB_BLOCK, with textureCompressionASTC_LDR"
+                },
+                "d3d12": {
+                  "class": "absent_rejected",
+                  "note": "no ASTC formats"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "ASTC_12x12_sRGB on Apple GPUs"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "astc-12x12-unorm-srgb, with texture-compression-astc"
+                }
+              },
+              "floor": {
+                "sampling": false,
+                "filtering": false,
+                "rendering": false,
+                "blending": false,
+                "storage": false,
+                "sample_counts": 0
+              }
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "format_caps",
+          "mapped": true,
+          "doc": "What a format can do on an adapter. Every adapter meets the floor mrhiFloorFormatCaps would give; the compressed families need their feature.",
+          "members": [
+            {
+              "name": "sampling",
+              "type": "bool",
+              "doc": "Sampled in shaders.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SAMPLED_IMAGE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the format's capability table"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "TEXTURE_BINDING"
+                }
+              }
+            },
+            {
+              "name": "filtering",
+              "type": "bool",
+              "doc": "Sampled with linear filtering.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SAMPLED_IMAGE_FILTER_LINEAR"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SHADER_SAMPLE with a linear filter"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "Filter capability"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "the float sample type"
+                }
+              }
+            },
+            {
+              "name": "rendering",
+              "type": "bool",
+              "doc": "A render target.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "COLOR_ATTACHMENT or DEPTH_STENCIL_ATTACHMENT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "RENDER_TARGET or DEPTH_STENCIL"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "Color or depth capability"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "RENDER_ATTACHMENT"
+                }
+              }
+            },
+            {
+              "name": "blending",
+              "type": "bool",
+              "doc": "Blended as a render target.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "COLOR_ATTACHMENT_BLEND"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "BLENDABLE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "Blend capability"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "blendable"
+                }
+              }
+            },
+            {
+              "name": "storage",
+              "type": "bool",
+              "doc": "A storage texture.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "STORAGE_IMAGE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "TYPED_UNORDERED_ACCESS_VIEW"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "Write capability"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "STORAGE_BINDING"
+                }
+              }
+            },
+            {
+              "name": "sample_counts",
+              "type": "uint8",
+              "doc": "The multisample counts as a mask: the bit worth n is set when n samples are supported (1, 2, 4).",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "sampleCounts of the format's image properties"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "CheckMultisampleQualityLevels"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "supportsTextureSampleCount"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "1 and 4 only"
+                }
+              }
+            }
+          ]
+        },
+        {
           "kind": "function",
           "name": "default_limits",
           "doc": "Returns the floor limits, which every adapter of every driver meets: WebGPU's defaults, 64 root block bytes, no heaps and 2 frames in flight.",
@@ -1968,6 +4351,43 @@
               "type": "struct.limits",
               "pointer": "mutable",
               "doc": "Receives the limits."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_format_caps",
+          "doc": "Reads what a format can do on an adapter. A compressed format whose feature the adapter lacks can do nothing.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument or a format the contract does not list; `mrhi_errorStale` for an adapter the instance no longer has."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "mutable",
+              "doc": "The instance."
+            },
+            {
+              "name": "adapter",
+              "type": "id.adapter_id",
+              "doc": "The adapter."
+            },
+            {
+              "name": "format",
+              "type": "enum.format",
+              "doc": "The format."
+            },
+            {
+              "name": "caps_out",
+              "type": "struct.format_caps",
+              "pointer": "mutable",
+              "doc": "Receives the capabilities."
             }
           ],
           "thread_safety": {
@@ -2256,6 +4676,15 @@
               "name": "open_outcome",
               "type": "result",
               "doc": "The outcome of a device opening on the adapter: mrhi_success, or the error the device fails with."
+            },
+            {
+              "name": "limited_format",
+              "type": "enum.format",
+              "doc": "A format the adapter reports limitedCaps for instead of its usual capabilities, to test adapters below the floor; mrhi_formatNone for none."
+            },
+            {
+              "name": "limited_caps",
+              "type": "struct.format_caps"
             }
           ]
         },

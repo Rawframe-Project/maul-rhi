@@ -58,6 +58,9 @@ typedef struct mrhiInstanceDriverVtable
     // Copies up to capacity adapters the last finished search found and
     // returns how many it found.
     size_t (*getAdapters)(const void* self, mrhiDriverAdapter* adapters, size_t capacity);
+    // Fills what a format can do on an adapter.
+    void (*getFormatCaps)(const void* self, uint64_t adapter, mrhiFormat format,
+                          mrhiFormatCaps* capsOut);
     // Makes a device on an adapter with the features and limits granted,
     // opening it in the background: the open is answered by an event
     // with the tag. An immediate failure is returned instead.

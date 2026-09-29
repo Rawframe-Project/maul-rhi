@@ -136,6 +136,177 @@ extern "C"
         uint32_t framesInFlight;
     } mrhiLimits;
 
+    // A texel format. The compressed families need their feature; `format_caps`
+    // says what each format can do on an adapter.
+    typedef uint16_t mrhiFormat;
+
+    enum
+    {
+        // No format: never valid on a resource.
+        mrhi_formatNone = 0,
+        // RGBA, 8 bits each, normalized.
+        mrhi_formatRgba8Unorm = 1,
+        // RGBA, 8 bits each, sRGB-encoded color.
+        mrhi_formatRgba8UnormSrgb = 2,
+        // BGRA, 8 bits each, normalized: a swapchain format.
+        mrhi_formatBgra8Unorm = 3,
+        // BGRA, 8 bits each, sRGB-encoded color.
+        mrhi_formatBgra8UnormSrgb = 4,
+        // One 8-bit normalized channel.
+        mrhi_formatR8Unorm = 5,
+        // Two 8-bit normalized channels.
+        mrhi_formatRg8Unorm = 6,
+        // One 16-bit float channel.
+        mrhi_formatR16Float = 7,
+        // Two 16-bit float channels: motion vectors.
+        mrhi_formatRg16Float = 8,
+        // RGBA, 16-bit floats: HDR color.
+        mrhi_formatRgba16Float = 9,
+        // One 32-bit float channel.
+        mrhi_formatR32Float = 10,
+        // Two 32-bit float channels.
+        mrhi_formatRg32Float = 11,
+        // RGBA, 32-bit floats.
+        mrhi_formatRgba32Float = 12,
+        // One 32-bit unsigned integer channel, for storage atomics.
+        mrhi_formatR32Uint = 13,
+        // One 32-bit signed integer channel, for storage atomics.
+        mrhi_formatR32Sint = 14,
+        // RGB 10 bits each, alpha 2, normalized.
+        mrhi_formatRgb10a2Unorm = 15,
+        // Unsigned floats, 11, 11 and 10 bits: compact HDR color.
+        mrhi_formatRg11b10Ufloat = 16,
+        // 32-bit float depth.
+        mrhi_formatDepth32Float = 17,
+        // At least 24 bits of depth and 8 of stencil, in the format the driver
+        // picks.
+        mrhi_formatDepthStencil = 18,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc1RgbaUnorm = 19,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc1RgbaUnormSrgb = 20,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc2RgbaUnorm = 21,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc2RgbaUnormSrgb = 22,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc3RgbaUnorm = 23,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc3RgbaUnormSrgb = 24,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc4RUnorm = 25,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc4RSnorm = 26,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc5RgUnorm = 27,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc5RgSnorm = 28,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc6hRgbUfloat = 29,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc6hRgbFloat = 30,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc7RgbaUnorm = 31,
+        // A BC block format, with texture_compression_bc.
+        mrhi_formatBc7RgbaUnormSrgb = 32,
+        // An ETC2 or EAC block format, with texture_compression_etc2.
+        mrhi_formatEtc2Rgb8Unorm = 33,
+        // An ETC2 or EAC block format, with texture_compression_etc2.
+        mrhi_formatEtc2Rgb8UnormSrgb = 34,
+        // An ETC2 or EAC block format, with texture_compression_etc2.
+        mrhi_formatEtc2Rgb8a1Unorm = 35,
+        // An ETC2 or EAC block format, with texture_compression_etc2.
+        mrhi_formatEtc2Rgb8a1UnormSrgb = 36,
+        // An ETC2 or EAC block format, with texture_compression_etc2.
+        mrhi_formatEtc2Rgba8Unorm = 37,
+        // An ETC2 or EAC block format, with texture_compression_etc2.
+        mrhi_formatEtc2Rgba8UnormSrgb = 38,
+        // An ETC2 or EAC block format, with texture_compression_etc2.
+        mrhi_formatEacR11Unorm = 39,
+        // An ETC2 or EAC block format, with texture_compression_etc2.
+        mrhi_formatEacR11Snorm = 40,
+        // An ETC2 or EAC block format, with texture_compression_etc2.
+        mrhi_formatEacRg11Unorm = 41,
+        // An ETC2 or EAC block format, with texture_compression_etc2.
+        mrhi_formatEacRg11Snorm = 42,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc4x4Unorm = 43,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc4x4UnormSrgb = 44,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc5x4Unorm = 45,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc5x4UnormSrgb = 46,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc5x5Unorm = 47,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc5x5UnormSrgb = 48,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc6x5Unorm = 49,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc6x5UnormSrgb = 50,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc6x6Unorm = 51,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc6x6UnormSrgb = 52,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc8x5Unorm = 53,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc8x5UnormSrgb = 54,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc8x6Unorm = 55,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc8x6UnormSrgb = 56,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc8x8Unorm = 57,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc8x8UnormSrgb = 58,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc10x5Unorm = 59,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc10x5UnormSrgb = 60,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc10x6Unorm = 61,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc10x6UnormSrgb = 62,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc10x8Unorm = 63,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc10x8UnormSrgb = 64,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc10x10Unorm = 65,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc10x10UnormSrgb = 66,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc12x10Unorm = 67,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc12x10UnormSrgb = 68,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc12x12Unorm = 69,
+        // An ASTC LDR block format, with texture_compression_astc.
+        mrhi_formatAstc12x12UnormSrgb = 70,
+    };
+
+    // What a format can do on an adapter. Every adapter meets the floor
+    // mrhiFloorFormatCaps would give; the compressed families need their
+    // feature.
+    typedef struct mrhiFormatCaps
+    {
+        // Sampled in shaders.
+        bool sampling;
+        // Sampled with linear filtering.
+        bool filtering;
+        // A render target.
+        bool rendering;
+        // Blended as a render target.
+        bool blending;
+        // A storage texture.
+        bool storage;
+        // The multisample counts as a mask: the bit worth n is set when n
+        // samples are supported (1, 2, 4).
+        uint8_t sampleCounts;
+    } mrhiFormatCaps;
+
     /// Returns the floor limits, which every adapter of every driver meets:
     /// WebGPU's defaults, 64 root block bytes, no heaps and 2 frames in flight.
     ///
@@ -169,6 +340,22 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiGetAdapterLimits(mrhiInstance* instance,
                                                             mrhiAdapterId adapter,
                                                             mrhiLimits* limitsOut);
+
+    /// Reads what a format can do on an adapter. A compressed format whose
+    /// feature the adapter lacks can do nothing.
+    ///
+    /// @param instance  The instance.
+    /// @param adapter   The adapter.
+    /// @param format    The format.
+    /// @param capsOut   Receives the capabilities.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument or a
+    /// format the contract does not list; `mrhi_errorStale` for an adapter the
+    /// instance no longer has.
+    /// @par Thread safety
+    /// Safe from any thread; the instance is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetFormatCaps(mrhiInstance* instance,
+                                                         mrhiAdapterId adapter, mrhiFormat format,
+                                                         mrhiFormatCaps* capsOut);
 
 #ifdef __cplusplus
 }

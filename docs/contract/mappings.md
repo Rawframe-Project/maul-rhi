@@ -63,3 +63,89 @@ restricted or absent-rejected, with how.
 | `heapSize` | restricted: descriptor indexing counts or the heap's size | restricted: 1000000 at tier 2 | restricted: argument buffers tier 2 | absent-rejected: until resource tables ship |
 | `samplerHeapSize` | restricted: maxDescriptorSetUpdateAfterBindSamplers | restricted: 2048, or the queried maximum | restricted: argument buffer samplers | absent-rejected: until resource tables ship |
 | `framesInFlight` | direct: the core's timeline semaphores | direct: the core's fences | direct: command buffer completion | emulated: submitted-work-done promises |
+
+## mrhiFormat
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_formatRgba8Unorm` | direct: R8G8B8A8_UNORM | direct: R8G8B8A8_UNORM | direct: RGBA8Unorm | direct: rgba8unorm |
+| `mrhi_formatRgba8UnormSrgb` | direct: R8G8B8A8_SRGB | direct: R8G8B8A8_UNORM_SRGB | direct: RGBA8Unorm_sRGB | direct: rgba8unorm-srgb |
+| `mrhi_formatBgra8Unorm` | direct: B8G8R8A8_UNORM | direct: B8G8R8A8_UNORM | direct: BGRA8Unorm | direct: bgra8unorm |
+| `mrhi_formatBgra8UnormSrgb` | direct: B8G8R8A8_SRGB | direct: B8G8R8A8_UNORM_SRGB | direct: BGRA8Unorm_sRGB | direct: bgra8unorm-srgb |
+| `mrhi_formatR8Unorm` | direct: R8_UNORM | direct: R8_UNORM | direct: R8Unorm | direct: r8unorm |
+| `mrhi_formatRg8Unorm` | direct: R8G8_UNORM | direct: R8G8_UNORM | direct: RG8Unorm | direct: rg8unorm |
+| `mrhi_formatR16Float` | direct: R16_SFLOAT | direct: R16_FLOAT | direct: R16Float | direct: r16float |
+| `mrhi_formatRg16Float` | direct: R16G16_SFLOAT | direct: R16G16_FLOAT | direct: RG16Float | direct: rg16float |
+| `mrhi_formatRgba16Float` | direct: R16G16B16A16_SFLOAT | direct: R16G16B16A16_FLOAT | direct: RGBA16Float | direct: rgba16float |
+| `mrhi_formatR32Float` | direct: R32_SFLOAT | direct: R32_FLOAT | direct: R32Float | direct: r32float |
+| `mrhi_formatRg32Float` | direct: R32G32_SFLOAT | direct: R32G32_FLOAT | direct: RG32Float | direct: rg32float |
+| `mrhi_formatRgba32Float` | direct: R32G32B32A32_SFLOAT | direct: R32G32B32A32_FLOAT | direct: RGBA32Float | direct: rgba32float |
+| `mrhi_formatR32Uint` | direct: R32_UINT | direct: R32_UINT | direct: R32Uint | direct: r32uint |
+| `mrhi_formatR32Sint` | direct: R32_SINT | direct: R32_SINT | direct: R32Sint | direct: r32sint |
+| `mrhi_formatRgb10a2Unorm` | direct: A2B10G10R10_UNORM_PACK32 | direct: R10G10B10A2_UNORM | direct: RGB10A2Unorm | direct: rgb10a2unorm |
+| `mrhi_formatRg11b10Ufloat` | direct: B10G11R11_UFLOAT_PACK32 | direct: R11G11B10_FLOAT | direct: RG11B10Float | direct: rg11b10ufloat |
+| `mrhi_formatDepth32Float` | direct: D32_SFLOAT | direct: D32_FLOAT | direct: Depth32Float | direct: depth32float |
+| `mrhi_formatDepthStencil` | direct: D24_UNORM_S8_UINT, else D32_SFLOAT_S8_UINT | direct: D24_UNORM_S8_UINT | direct: Depth32Float_Stencil8 (Apple GPUs), Depth24Unorm_Stencil8 where supported | direct: depth24plus-stencil8 |
+| `mrhi_formatBc1RgbaUnorm` | restricted: BC1_RGBA_UNORM_BLOCK, with textureCompressionBC | direct: BC1_UNORM | restricted: BC1_RGBA, with supportsBCTextureCompression | restricted: bc1-rgba-unorm, with texture-compression-bc |
+| `mrhi_formatBc1RgbaUnormSrgb` | restricted: BC1_RGBA_SRGB_BLOCK, with textureCompressionBC | direct: BC1_UNORM_SRGB | restricted: BC1_RGBA_sRGB, with supportsBCTextureCompression | restricted: bc1-rgba-unorm-srgb, with texture-compression-bc |
+| `mrhi_formatBc2RgbaUnorm` | restricted: BC2_UNORM_BLOCK, with textureCompressionBC | direct: BC2_UNORM | restricted: BC2_RGBA, with supportsBCTextureCompression | restricted: bc2-rgba-unorm, with texture-compression-bc |
+| `mrhi_formatBc2RgbaUnormSrgb` | restricted: BC2_SRGB_BLOCK, with textureCompressionBC | direct: BC2_UNORM_SRGB | restricted: BC2_RGBA_sRGB, with supportsBCTextureCompression | restricted: bc2-rgba-unorm-srgb, with texture-compression-bc |
+| `mrhi_formatBc3RgbaUnorm` | restricted: BC3_UNORM_BLOCK, with textureCompressionBC | direct: BC3_UNORM | restricted: BC3_RGBA, with supportsBCTextureCompression | restricted: bc3-rgba-unorm, with texture-compression-bc |
+| `mrhi_formatBc3RgbaUnormSrgb` | restricted: BC3_SRGB_BLOCK, with textureCompressionBC | direct: BC3_UNORM_SRGB | restricted: BC3_RGBA_sRGB, with supportsBCTextureCompression | restricted: bc3-rgba-unorm-srgb, with texture-compression-bc |
+| `mrhi_formatBc4RUnorm` | restricted: BC4_UNORM_BLOCK, with textureCompressionBC | direct: BC4_UNORM | restricted: BC4_RUnorm, with supportsBCTextureCompression | restricted: bc4-r-unorm, with texture-compression-bc |
+| `mrhi_formatBc4RSnorm` | restricted: BC4_SNORM_BLOCK, with textureCompressionBC | direct: BC4_SNORM | restricted: BC4_RSnorm, with supportsBCTextureCompression | restricted: bc4-r-snorm, with texture-compression-bc |
+| `mrhi_formatBc5RgUnorm` | restricted: BC5_UNORM_BLOCK, with textureCompressionBC | direct: BC5_UNORM | restricted: BC5_RGUnorm, with supportsBCTextureCompression | restricted: bc5-rg-unorm, with texture-compression-bc |
+| `mrhi_formatBc5RgSnorm` | restricted: BC5_SNORM_BLOCK, with textureCompressionBC | direct: BC5_SNORM | restricted: BC5_RGSnorm, with supportsBCTextureCompression | restricted: bc5-rg-snorm, with texture-compression-bc |
+| `mrhi_formatBc6hRgbUfloat` | restricted: BC6H_UFLOAT_BLOCK, with textureCompressionBC | direct: BC6H_UF16 | restricted: BC6H_RGBUfloat, with supportsBCTextureCompression | restricted: bc6h-rgb-ufloat, with texture-compression-bc |
+| `mrhi_formatBc6hRgbFloat` | restricted: BC6H_SFLOAT_BLOCK, with textureCompressionBC | direct: BC6H_SF16 | restricted: BC6H_RGBFloat, with supportsBCTextureCompression | restricted: bc6h-rgb-float, with texture-compression-bc |
+| `mrhi_formatBc7RgbaUnorm` | restricted: BC7_UNORM_BLOCK, with textureCompressionBC | direct: BC7_UNORM | restricted: BC7_RGBAUnorm, with supportsBCTextureCompression | restricted: bc7-rgba-unorm, with texture-compression-bc |
+| `mrhi_formatBc7RgbaUnormSrgb` | restricted: BC7_SRGB_BLOCK, with textureCompressionBC | direct: BC7_UNORM_SRGB | restricted: BC7_RGBAUnorm_sRGB, with supportsBCTextureCompression | restricted: bc7-rgba-unorm-srgb, with texture-compression-bc |
+| `mrhi_formatEtc2Rgb8Unorm` | restricted: ETC2_R8G8B8_UNORM_BLOCK, with textureCompressionETC2 | absent-rejected: no ETC2 formats | restricted: ETC2_RGB8 on Apple GPUs | restricted: etc2-rgb8unorm, with texture-compression-etc2 |
+| `mrhi_formatEtc2Rgb8UnormSrgb` | restricted: ETC2_R8G8B8_SRGB_BLOCK, with textureCompressionETC2 | absent-rejected: no ETC2 formats | restricted: ETC2_RGB8_sRGB on Apple GPUs | restricted: etc2-rgb8unorm-srgb, with texture-compression-etc2 |
+| `mrhi_formatEtc2Rgb8a1Unorm` | restricted: ETC2_R8G8B8A1_UNORM_BLOCK, with textureCompressionETC2 | absent-rejected: no ETC2 formats | restricted: ETC2_RGB8A1 on Apple GPUs | restricted: etc2-rgb8a1unorm, with texture-compression-etc2 |
+| `mrhi_formatEtc2Rgb8a1UnormSrgb` | restricted: ETC2_R8G8B8A1_SRGB_BLOCK, with textureCompressionETC2 | absent-rejected: no ETC2 formats | restricted: ETC2_RGB8A1_sRGB on Apple GPUs | restricted: etc2-rgb8a1unorm-srgb, with texture-compression-etc2 |
+| `mrhi_formatEtc2Rgba8Unorm` | restricted: ETC2_R8G8B8A8_UNORM_BLOCK, with textureCompressionETC2 | absent-rejected: no ETC2 formats | restricted: EAC_RGBA8 on Apple GPUs | restricted: etc2-rgba8unorm, with texture-compression-etc2 |
+| `mrhi_formatEtc2Rgba8UnormSrgb` | restricted: ETC2_R8G8B8A8_SRGB_BLOCK, with textureCompressionETC2 | absent-rejected: no ETC2 formats | restricted: EAC_RGBA8_sRGB on Apple GPUs | restricted: etc2-rgba8unorm-srgb, with texture-compression-etc2 |
+| `mrhi_formatEacR11Unorm` | restricted: EAC_R11_UNORM_BLOCK, with textureCompressionETC2 | absent-rejected: no ETC2 formats | restricted: EAC_R11Unorm on Apple GPUs | restricted: eac-r11unorm, with texture-compression-etc2 |
+| `mrhi_formatEacR11Snorm` | restricted: EAC_R11_SNORM_BLOCK, with textureCompressionETC2 | absent-rejected: no ETC2 formats | restricted: EAC_R11Snorm on Apple GPUs | restricted: eac-r11snorm, with texture-compression-etc2 |
+| `mrhi_formatEacRg11Unorm` | restricted: EAC_R11G11_UNORM_BLOCK, with textureCompressionETC2 | absent-rejected: no ETC2 formats | restricted: EAC_RG11Unorm on Apple GPUs | restricted: eac-rg11unorm, with texture-compression-etc2 |
+| `mrhi_formatEacRg11Snorm` | restricted: EAC_R11G11_SNORM_BLOCK, with textureCompressionETC2 | absent-rejected: no ETC2 formats | restricted: EAC_RG11Snorm on Apple GPUs | restricted: eac-rg11snorm, with texture-compression-etc2 |
+| `mrhi_formatAstc4x4Unorm` | restricted: ASTC_4X4_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_4x4_LDR on Apple GPUs | restricted: astc-4x4-unorm, with texture-compression-astc |
+| `mrhi_formatAstc4x4UnormSrgb` | restricted: ASTC_4X4_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_4x4_sRGB on Apple GPUs | restricted: astc-4x4-unorm-srgb, with texture-compression-astc |
+| `mrhi_formatAstc5x4Unorm` | restricted: ASTC_5X4_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_5x4_LDR on Apple GPUs | restricted: astc-5x4-unorm, with texture-compression-astc |
+| `mrhi_formatAstc5x4UnormSrgb` | restricted: ASTC_5X4_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_5x4_sRGB on Apple GPUs | restricted: astc-5x4-unorm-srgb, with texture-compression-astc |
+| `mrhi_formatAstc5x5Unorm` | restricted: ASTC_5X5_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_5x5_LDR on Apple GPUs | restricted: astc-5x5-unorm, with texture-compression-astc |
+| `mrhi_formatAstc5x5UnormSrgb` | restricted: ASTC_5X5_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_5x5_sRGB on Apple GPUs | restricted: astc-5x5-unorm-srgb, with texture-compression-astc |
+| `mrhi_formatAstc6x5Unorm` | restricted: ASTC_6X5_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_6x5_LDR on Apple GPUs | restricted: astc-6x5-unorm, with texture-compression-astc |
+| `mrhi_formatAstc6x5UnormSrgb` | restricted: ASTC_6X5_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_6x5_sRGB on Apple GPUs | restricted: astc-6x5-unorm-srgb, with texture-compression-astc |
+| `mrhi_formatAstc6x6Unorm` | restricted: ASTC_6X6_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_6x6_LDR on Apple GPUs | restricted: astc-6x6-unorm, with texture-compression-astc |
+| `mrhi_formatAstc6x6UnormSrgb` | restricted: ASTC_6X6_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_6x6_sRGB on Apple GPUs | restricted: astc-6x6-unorm-srgb, with texture-compression-astc |
+| `mrhi_formatAstc8x5Unorm` | restricted: ASTC_8X5_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_8x5_LDR on Apple GPUs | restricted: astc-8x5-unorm, with texture-compression-astc |
+| `mrhi_formatAstc8x5UnormSrgb` | restricted: ASTC_8X5_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_8x5_sRGB on Apple GPUs | restricted: astc-8x5-unorm-srgb, with texture-compression-astc |
+| `mrhi_formatAstc8x6Unorm` | restricted: ASTC_8X6_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_8x6_LDR on Apple GPUs | restricted: astc-8x6-unorm, with texture-compression-astc |
+| `mrhi_formatAstc8x6UnormSrgb` | restricted: ASTC_8X6_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_8x6_sRGB on Apple GPUs | restricted: astc-8x6-unorm-srgb, with texture-compression-astc |
+| `mrhi_formatAstc8x8Unorm` | restricted: ASTC_8X8_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_8x8_LDR on Apple GPUs | restricted: astc-8x8-unorm, with texture-compression-astc |
+| `mrhi_formatAstc8x8UnormSrgb` | restricted: ASTC_8X8_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_8x8_sRGB on Apple GPUs | restricted: astc-8x8-unorm-srgb, with texture-compression-astc |
+| `mrhi_formatAstc10x5Unorm` | restricted: ASTC_10X5_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_10x5_LDR on Apple GPUs | restricted: astc-10x5-unorm, with texture-compression-astc |
+| `mrhi_formatAstc10x5UnormSrgb` | restricted: ASTC_10X5_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_10x5_sRGB on Apple GPUs | restricted: astc-10x5-unorm-srgb, with texture-compression-astc |
+| `mrhi_formatAstc10x6Unorm` | restricted: ASTC_10X6_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_10x6_LDR on Apple GPUs | restricted: astc-10x6-unorm, with texture-compression-astc |
+| `mrhi_formatAstc10x6UnormSrgb` | restricted: ASTC_10X6_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_10x6_sRGB on Apple GPUs | restricted: astc-10x6-unorm-srgb, with texture-compression-astc |
+| `mrhi_formatAstc10x8Unorm` | restricted: ASTC_10X8_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_10x8_LDR on Apple GPUs | restricted: astc-10x8-unorm, with texture-compression-astc |
+| `mrhi_formatAstc10x8UnormSrgb` | restricted: ASTC_10X8_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_10x8_sRGB on Apple GPUs | restricted: astc-10x8-unorm-srgb, with texture-compression-astc |
+| `mrhi_formatAstc10x10Unorm` | restricted: ASTC_10X10_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_10x10_LDR on Apple GPUs | restricted: astc-10x10-unorm, with texture-compression-astc |
+| `mrhi_formatAstc10x10UnormSrgb` | restricted: ASTC_10X10_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_10x10_sRGB on Apple GPUs | restricted: astc-10x10-unorm-srgb, with texture-compression-astc |
+| `mrhi_formatAstc12x10Unorm` | restricted: ASTC_12X10_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_12x10_LDR on Apple GPUs | restricted: astc-12x10-unorm, with texture-compression-astc |
+| `mrhi_formatAstc12x10UnormSrgb` | restricted: ASTC_12X10_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_12x10_sRGB on Apple GPUs | restricted: astc-12x10-unorm-srgb, with texture-compression-astc |
+| `mrhi_formatAstc12x12Unorm` | restricted: ASTC_12X12_UNORM_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_12x12_LDR on Apple GPUs | restricted: astc-12x12-unorm, with texture-compression-astc |
+| `mrhi_formatAstc12x12UnormSrgb` | restricted: ASTC_12X12_SRGB_BLOCK, with textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: ASTC_12x12_sRGB on Apple GPUs | restricted: astc-12x12-unorm-srgb, with texture-compression-astc |
+
+## mrhiFormatCaps
+
+| Member | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `sampling` | direct: SAMPLED_IMAGE | direct: D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE | direct: the format's capability table | direct: TEXTURE_BINDING |
+| `filtering` | direct: SAMPLED_IMAGE_FILTER_LINEAR | direct: SHADER_SAMPLE with a linear filter | direct: Filter capability | direct: the float sample type |
+| `rendering` | direct: COLOR_ATTACHMENT or DEPTH_STENCIL_ATTACHMENT | direct: RENDER_TARGET or DEPTH_STENCIL | direct: Color or depth capability | direct: RENDER_ATTACHMENT |
+| `blending` | direct: COLOR_ATTACHMENT_BLEND | direct: BLENDABLE | direct: Blend capability | direct: blendable |
+| `storage` | direct: STORAGE_IMAGE | direct: TYPED_UNORDERED_ACCESS_VIEW | direct: Write capability | direct: STORAGE_BINDING |
+| `sampleCounts` | direct: sampleCounts of the format's image properties | direct: CheckMultisampleQualityLevels | direct: supportsTextureSampleCount | restricted: 1 and 4 only |

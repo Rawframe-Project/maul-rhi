@@ -8,7 +8,7 @@ chain:
 device: allocator capabilities_core chain device_core driver instance_core
 device_core: driver
 driver:
-driver_test: allocator driver
+driver_test: allocator capabilities_core driver
 instance: allocator chain driver driver_test instance_core invariant
 instance_core: driver
 invariant:
