@@ -27,7 +27,8 @@ library thread runs, and no callback delivers a result.
 
 Not released. The contract, the Vulkan, WebGPU and Metal drivers, the
 conformance suite and the samples are in place; the Direct3D 12 driver
-is being built (`MAUL_RHI_D3D12_DRIVER`, which opens devices so far).
+is being built (`MAUL_RHI_D3D12_DRIVER`, which runs frames of copies so
+far).
 Each build has one native driver: Metal on Apple systems, Vulkan on the
 others, WebGPU on the web.
 

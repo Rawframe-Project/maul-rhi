@@ -368,12 +368,14 @@ format.
   shader model 6.0, WARP among them, under their LUIDs, and devices
   with a direct queue, and their buffers, textures, views, samplers,
   occlusion query sets, shaders (from the container's DXIL, with a root
-  signature from its D3D12 map) and compute and graphics pipelines;
+  signature from its D3D12 map) and compute and graphics pipelines, and
+  frames of copies, uploads, readbacks, target clears and resolves;
   everything else answers
   `mrhi_errorUnsupported` until the driver's later slices. It compiles
   against the DirectX headers kept as published in `directx/` and opens
   `d3d12.dll` and `dxgi.dll` at run time. Windows CI makes devices,
-  objects and pipelines on WARP under the Agility SDK's debug layer.
+  objects, pipelines and frames on WARP under the Agility SDK's debug
+  layer.
 - D3D12 code in shader containers: a D3D12 map and each entry's DXIL
   (sections 14 and 15), checked by the reader;
   `tools/mrhi_container.py --dxil` writes them, checking each entry's

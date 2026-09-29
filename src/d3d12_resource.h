@@ -52,6 +52,8 @@ typedef enum mrhiD3d12Kind
     mrhiD3d12KindView,
     mrhiD3d12KindSampler,
     mrhiD3d12KindQuerySet,
+    // A pipeline (d3d12_pipeline.h), which the frames retire too.
+    mrhiD3d12KindPipeline,
 } mrhiD3d12Kind;
 
 // A device's objects: tables of each kind in the device's block, and
@@ -111,6 +113,10 @@ mrhiResult mrhiD3d12CreateSampler(mrhiD3d12Objects* objects, const mrhiSamplerDe
                                   uint64_t* handleOut);
 mrhiResult mrhiD3d12CreateQuerySet(mrhiD3d12Objects* objects, const mrhiQuerySetDef* def,
                                    uint64_t* handleOut);
+// A frame's transient, committed in the common state without a table
+// slot: nullptr when D3D12 makes none.
+ID3D12Resource* mrhiD3d12CommitBuffer(const mrhiD3d12Objects* objects, const mrhiBufferDef* def);
+ID3D12Resource* mrhiD3d12CommitTexture(const mrhiD3d12Objects* objects, const mrhiTextureDef* def);
 void mrhiD3d12ReleaseObject(mrhiD3d12Objects* objects, mrhiD3d12Kind kind, uint64_t handle);
 
 // The CPU descriptors of a view (its shader resource view, or its

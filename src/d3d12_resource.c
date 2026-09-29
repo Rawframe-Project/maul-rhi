@@ -218,6 +218,18 @@ mrhiResult mrhiD3d12CreateTexture(mrhiD3d12Objects* objects, const mrhiTextureDe
     return mrhi_success;
 }
 
+ID3D12Resource* mrhiD3d12CommitBuffer(const mrhiD3d12Objects* objects, const mrhiBufferDef* def)
+{
+    D3D12_RESOURCE_DESC desc = DescribeBuffer(def);
+    return Commit(objects, &desc, def->label, def->labelLength);
+}
+
+ID3D12Resource* mrhiD3d12CommitTexture(const mrhiD3d12Objects* objects, const mrhiTextureDef* def)
+{
+    D3D12_RESOURCE_DESC desc = DescribeTexture(def);
+    return Commit(objects, &desc, def->label, def->labelLength);
+}
+
 mrhiResult mrhiD3d12CreateQuerySet(mrhiD3d12Objects* objects, const mrhiQuerySetDef* def,
                                    uint64_t* handleOut)
 {

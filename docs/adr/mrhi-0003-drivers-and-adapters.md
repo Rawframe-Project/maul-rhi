@@ -211,8 +211,7 @@ ids, requests, the frame graph) can be tested without a GPU.
   view of a later layer is a one-layer or one-cube array, since only
   arrays name their first layer, and a stencil view reads the second
   plane. An occlusion query set is a query heap. A resource's memory is
-  what `GetResourceAllocationInfo` says. A destroyed object waits until
-  no frame can name it.
+  what `GetResourceAllocationInfo` says.
 - **D3D12 pipelines:** a shader keeps a copy of each entry's DXIL and
   makes one root signature (version 1.1) for every pipeline of the
   container: root constants for the root block, the constants (in rows
@@ -230,6 +229,31 @@ ids, requests, the frame graph) can be tested without a GPU.
   the TEXCOORD semantic of their location, as SPIRV-Cross names vertex
   inputs; alpha blend factors read alpha, and minimum and maximum blend
   with factors of one. The pipeline cache is empty for now.
+- **D3D12 frames:** three frames run at once, each slot holding a
+  command allocator and list, an upload buffer for its staging, which
+  stays in the generic read state, and CPU-only heaps of render target
+  and depth stencil views that its passes' targets take; one readback
+  buffer, which stays in the copy destination state, takes every
+  readback at its offset in the ring, and each finished frame copies
+  its readbacks' ranges out. Frames signal one fence with their serial,
+  so a poll reads one value; a removed device reads all ones, and its
+  removal reason becomes the loss report's reason and message. A
+  frame's transients are committed resources of their own, made at its
+  submit and released when it finishes, until transients alias. The
+  core's barriers move textures, per subresource, between the classic
+  states their plan states map to, a transition between two unordered
+  access uses being a UAV barrier. Buffers are the driver's to track:
+  the plan gives no barrier between two reads, which D3D12's states
+  tell apart, so each copy moves its buffer to the state it needs,
+  gathering read states, and a plan's barrier after a write on a buffer
+  in the unordered access state is a UAV barrier. Every buffer starts a
+  frame in the common state, which D3D12 decays buffers to when a list
+  finishes. A copy with a buffer offset off D3D12's 512-byte placement
+  is split into one copy per row of blocks. Clears are the targets'
+  loads; discarding loads and stores keep the contents. A pass's
+  multisampled targets resolve at its end. A destroyed object waits
+  until the next frame submitted finishes. Draws, dispatches, bindings
+  and queries land in the driver's next slice.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`
