@@ -69,19 +69,23 @@ typedef enum mrhiDriverResourceKind
     // A device texture or buffer, by its handle.
     mrhiDriverDeviceTexture,
     mrhiDriverDeviceBuffer,
+    // An image acquired from a swapchain, by the swapchain's handle and
+    // the image, presented after the frame's work.
+    mrhiDriverSurfaceImage,
 } mrhiDriverResourceKind;
 
 // A resource of a submitted frame: its kind; whether a kept pass uses it
-// (the driver makes nothing for one no pass does); a device object's
-// handle (0 for a transient); a texture's def, whose usage is the
-// usage field for a transient; a buffer's bytes; its usage, a
-// transient's the one its passes derive; and where a transient lives in
-// the frame's memory.
+// (the driver makes nothing for one no pass does); a device object's or
+// swapchain's handle (0 for a transient); a surface image's image; a
+// texture's def, whose usage is the usage field for a transient; a
+// buffer's bytes; its usage, a transient's the one its passes derive;
+// and where a transient lives in the frame's memory.
 typedef struct mrhiDriverResource
 {
     mrhiDriverResourceKind kind;
     bool needed;
     uint64_t handle;
+    uint64_t image;
     const mrhiTextureDef* texture;
     uint64_t size;
     uint32_t usage;
@@ -197,6 +201,13 @@ typedef struct mrhiDeviceDriverVtable
     // Destroys a pipeline, pending or not; a pending one is never
     // reported.
     void (*destroyPipeline)(void* self, uint64_t handle);
+    // Acquires a swapchain's next image: mrhi_success or mrhi_suboptimal
+    // with the image, never zero; mrhi_occluded or mrhi_errorOutOfDate
+    // without one; or mrhi_errorDeviceLost.
+    mrhiResult (*acquireImage)(void* self, uint64_t swapchain, uint64_t* imageOut);
+    // Takes back an image a frame acquired and will not present, to hand
+    // out again; its swapchain may have been unconfigured since.
+    void (*releaseImage)(void* self, uint64_t swapchain, uint64_t image);
     // Makes a query set the core has checked; its handle, never zero.
     mrhiResult (*createQuerySet)(void* self, const mrhiQuerySetDef* def, uint64_t* handleOut);
     void (*destroyQuerySet)(void* self, uint64_t handle);

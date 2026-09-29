@@ -29,12 +29,18 @@ static bool NeedsBarrier(mrhiResourceState before, mrhiResourceState after, bool
     return mrhiStateWrites(before) || mrhiStateWrites(after) || (texture && before != after);
 }
 
+static bool IsTexture(const mrhiFrameResource* resource)
+{
+    return resource->kind == mrhiFrameTexture || resource->kind == mrhiImportedTexture ||
+           resource->kind == mrhiSurfaceImage;
+}
+
 // The box a whole resource covers.
 static mrhiBox WholeOf(const mrhiFrameResource* resource)
 {
     mrhiBox box = {.mipCount = 1, .layerCount = 1, .planes = 1};
     const mrhiTextureDef* def = &resource->texture;
-    if (resource->kind == mrhiFrameTexture || resource->kind == mrhiImportedTexture)
+    if (IsTexture(resource))
     {
         box.mipCount = def->mipLevels;
         box.layerCount = def->kind == mrhi_texture3d ? 1 : def->depthOrLayers;
@@ -225,7 +231,7 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
         .device = device,
         .resource = slot,
         .planes = whole.planes,
-        .texture = resource->kind == mrhiFrameTexture || resource->kind == mrhiImportedTexture,
+        .texture = IsTexture(resource),
         .boxes = device->frameBoxes,
         .next = device->frameBoxes + half,
         .count = 1,
@@ -258,7 +264,13 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
     }
     resource->transient =
         resource->kind == mrhiFrameTexture && resource->firstPass != 0 && targetsOnly;
-    if (mrhiIsImported(resource))
+    // A surface image ends ready to present, an imported object in its
+    // last use's state.
+    if (resource->kind == mrhiSurfaceImage)
+    {
+        resource->finalState = mrhi_statePresent;
+    }
+    if (mrhiOutlivesFrame(resource))
     {
         whole.state = resource->finalState;
         Move(&map, 0, whole);

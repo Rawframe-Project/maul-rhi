@@ -236,3 +236,9 @@ format.
   object that takes its slot. The test driver walks every submitted
   frame's commands and reports them in `mrhiTestFrameLog`
   (`mrhiTestAdapter.frameLog`).
+- Surface images (mrhi-0013): `mrhiAcquireSurfaceImage` brings a
+  configured surface's next image into the open frame as a texture that
+  ends in the new `mrhi_statePresent` and is presented at submission;
+  new results `mrhi_suboptimal`, `mrhi_occluded`, `mrhi_errorOutOfDate`
+  and `mrhi_errorDeviceLost`; the test adapter's `acquireOutcome` picks
+  what acquiring answers.

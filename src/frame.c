@@ -167,6 +167,7 @@ mrhiResult mrhiDropFrame(mrhiDevice* device)
     }
     device->frameOpen = false;
     mrhiDropReadbacks(device);
+    mrhiReleaseImages(device);
     return mrhi_success;
 }
 
@@ -213,6 +214,7 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     if (status != mrhi_success)
     {
         mrhiDropReadbacks(device);
+        mrhiReleaseImages(device);
         return status;
     }
     mrhiApplyFinalStates(device);

@@ -102,6 +102,13 @@ static mrhiResult CheckNames(mrhiDevice* device, const mrhiSurfaceConfig* config
     return *handleOut == 0 ? mrhi_errorStale : mrhi_success;
 }
 
+// Whether the open frame holds an image of a swapchain.
+static bool HoldsImage(const mrhiDevice* device, uint32_t swapchain)
+{
+    const mrhiImport* acquired = &device->swapchainSlots[swapchain - 1].acquired;
+    return device->frameOpen && acquired->frame == device->frameSerial && acquired->resource != 0;
+}
+
 // Checks a config on a live device and returns the surface's slot; NULL
 // with the refusal in statusOut.
 static mrhiSurfaceSlot* CheckConfig(mrhiDevice* device, const mrhiSurfaceConfig* config,
@@ -115,7 +122,8 @@ static mrhiSurfaceSlot* CheckConfig(mrhiDevice* device, const mrhiSurfaceConfig*
     }
     mrhiInstance* instance = device->instance;
     mrhiSurfaceSlot* slot = &instance->surfaceSlots[config->surface.index1 - 1];
-    if (slot->device != nullptr && slot->device != device)
+    if ((slot->device != nullptr && slot->device != device) ||
+        (slot->device == device && HoldsImage(device, slot->swapchain)))
     {
         *statusOut = mrhi_errorState;
         return nullptr;
@@ -203,7 +211,7 @@ mrhiResult mrhiUnconfigureSurface(mrhiDevice* device, mrhiSurfaceId surface)
         return mrhi_errorStale;
     }
     const mrhiSurfaceSlot* slot = &device->instance->surfaceSlots[surface.index1 - 1];
-    if (slot->device != device)
+    if (slot->device != device || HoldsImage(device, slot->swapchain))
     {
         return mrhi_errorState;
     }

@@ -413,6 +413,7 @@ restricted or absent-rejected, with how.
 | `mrhi_stateDepthTarget` | direct: DEPTH_STENCIL_ATTACHMENT_OPTIMAL | direct: DEPTH_STENCIL_WRITE | direct: tracked by Metal on the resource | direct: implicit between passes |
 | `mrhi_stateDepthRead` | direct: DEPTH_STENCIL_READ_ONLY_OPTIMAL | direct: DEPTH_STENCIL_READ | direct: tracked by Metal on the resource | direct: implicit between passes |
 | `mrhi_stateQueryResolve` | direct: TRANSFER_WRITE | direct: COPY_DEST | direct: tracked by Metal on the resource | direct: implicit between passes |
+| `mrhi_statePresent` | direct: PRESENT_SRC_KHR | direct: PRESENT | direct: presentDrawable, tracked by Metal | direct: implicit at the frame's end |
 
 ## mrhiShaderStages
 

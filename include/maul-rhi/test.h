@@ -45,6 +45,8 @@ extern "C"
         uint32_t needed;
         // Its resources the frame makes.
         uint32_t transients;
+        // Its surface images, presented after its work.
+        uint32_t presented;
         // Its command chunks walked.
         uint32_t chunks;
         // Its commands.
@@ -92,6 +94,10 @@ extern "C"
         // walking every command of each; NULL for nowhere. It must outlive the
         // adapter's devices.
         mrhiTestFrameLog* frameLog;
+        // What acquiring a surface image on the adapter's devices answers, read
+        // at each acquire: mrhi_success, mrhi_suboptimal, mrhi_occluded,
+        // mrhi_errorOutOfDate or mrhi_errorDeviceLost; NULL for mrhi_success.
+        const mrhiResult* acquireOutcome;
     } mrhiTestAdapter;
 
     // Turns the test driver on for an instance, chained on its def with the

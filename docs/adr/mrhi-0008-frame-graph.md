@@ -51,9 +51,10 @@ thread.
     web.
   - `framesInFlight` refuses a new frame (`mrhi_errorCapacity`)
     rather than blocking.
-  - Acquiring a surface returns `success`, `suboptimal`,
-    `out_of_date`, `occluded_skip` or `device_lost`, and surfaces
-    present at submit.
+  - Acquiring a surface (`mrhiAcquireSurfaceImage`) returns
+    `mrhi_success`, `mrhi_suboptimal`, `mrhi_errorOutOfDate`,
+    `mrhi_occluded` or `mrhi_errorDeviceLost`, and surfaces present at
+    submit (mrhi-0013).
 - **Obligations:**
   - barriers synthesized per mip, layer and plane, from the states
     uses leave;

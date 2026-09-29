@@ -117,7 +117,8 @@ mrhiResult mrhiPlace(mrhiDevice* device)
         for (uint32_t i = 0; i < device->frameResourceCount; ++i)
         {
             mrhiFrameResource* resource = &device->frameResources[i];
-            if (resource->firstPass != pass || mrhiIsImported(resource))
+            bool declared = resource->kind == mrhiFrameTexture || resource->kind == mrhiFrameBuffer;
+            if (resource->firstPass != pass || !declared)
             {
                 continue;
             }
@@ -164,7 +165,7 @@ static mrhiStoreOp Store(const mrhiDevice* device, uint32_t pass, const mrhiFram
                          mrhiStoreOp asked, uint8_t planes)
 {
     const mrhiFrameResource* resource = &device->frameResources[use->resource - 1];
-    bool kept = mrhiIsImported(resource) || ReadLater(device, pass, use, planes);
+    bool kept = mrhiOutlivesFrame(resource) || ReadLater(device, pass, use, planes);
     return asked == mrhi_storeKeep && kept ? mrhi_storeKeep : mrhi_storeDiscard;
 }
 

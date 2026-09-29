@@ -13,8 +13,8 @@
 #include "maul-rhi/test.h"
 
 // Walks a frame whose device's handles run from firstHandle to
-// lastHandle, trapping on a malformed view, and reports it into log
-// unless log is NULL.
+// lastHandle, trapping on a malformed view, and reports it into log,
+// all but the frames counted, unless log is NULL.
 void mrhiWalkTestFrame(const mrhiDriverFrame* frame, uint64_t firstHandle, uint64_t lastHandle,
                        mrhiTestFrameLog* log);
 

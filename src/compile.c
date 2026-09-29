@@ -27,7 +27,7 @@ static void Cull(mrhiDevice* device)
         for (uint32_t i = 0; i < pass->useCount; ++i)
         {
             const mrhiFrameResource* resource = &device->frameResources[uses[i].resource - 1];
-            kept = kept || (uses[i].writes && (mrhiIsImported(resource) || resource->needed));
+            kept = kept || (uses[i].writes && (mrhiOutlivesFrame(resource) || resource->needed));
         }
         pass->kept = kept;
         for (uint32_t i = 0; i < pass->useCount && kept; ++i)

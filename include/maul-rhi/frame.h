@@ -211,6 +211,30 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer,
                                                         mrhiResourceId* resourceOut);
 
+    /// Acquires the next image of a surface configured on the device into the
+    /// open frame, as a texture of the configured format, size, usages and view
+    /// formats that begins undefined and is presented when the frame is
+    /// submitted. Acquiring it again in the frame gives the same answer and
+    /// image.
+    ///
+    /// @param device    The device.
+    /// @param surface   A surface configured on the device.
+    /// @param imageOut  Receives the frame's id for the image, or a null id
+    ///                  without one.
+    /// @return `mrhi_success` or `mrhi_suboptimal` with an image;
+    /// `mrhi_occluded` without one, the window hidden or without size;
+    /// `mrhi_errorOutOfDate` without one, the surface to be configured again
+    /// first; `mrhi_errorDeviceLost`; `mrhi_errorInvalid` for a NULL argument;
+    /// `mrhi_errorStale` for a surface the instance no longer has;
+    /// `mrhi_errorState` for a device without an open frame, a frame already
+    /// compiled, or a surface not configured on the device;
+    /// `mrhi_errorCapacity` when the device's frameResources limit is reached.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiAcquireSurfaceImage(mrhiDevice* device,
+                                                               mrhiSurfaceId surface,
+                                                               mrhiResourceId* imageOut);
+
     // Where a pass runs: a hint drivers without the queue ignore, running it on
     // the graphics queue.
     typedef uint8_t mrhiPassClass;
@@ -523,6 +547,8 @@ extern "C"
         mrhi_stateDepthRead = 14,
         // Written with query results.
         mrhi_stateQueryResolve = 15,
+        // Ready to present: a surface image at the end of its frame.
+        mrhi_statePresent = 16,
     };
 
     // A transition a compiled frame makes: a part of a resource, from one state

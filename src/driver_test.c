@@ -203,8 +203,12 @@ typedef struct TestDevice
     mrhiResult pipelineOutcome;
     // Nanoseconds per timestamp tick.
     double timestampPeriod;
-    // Where walked frames are reported, or NULL.
+    // Where walked frames are reported, or NULL; what acquiring answers,
+    // or NULL for success; and the images acquired and not yet presented
+    // or given back.
     mrhiTestFrameLog* frameLog;
+    const mrhiResult* acquireOutcome;
+    uint32_t imagesOut;
     // Pipelines made, and those a pipeline cache said earlier devices made.
     uint64_t pipelinesMade;
     uint64_t pipelinesCached;
@@ -489,6 +493,29 @@ static mrhiResult ConfigureSurface(void* self, uint64_t surface, const mrhiSurfa
     return status;
 }
 
+// Acquires an image as the adapter's test says: a new handle each time,
+// or none.
+static mrhiResult AcquireImage(void* self, uint64_t swapchain, uint64_t* imageOut)
+{
+    TestDevice* device = self;
+    MRHI_ASSERT(swapchain > HANDLE_BASE && swapchain <= device->nextHandle);
+    mrhiResult outcome = device->acquireOutcome == nullptr ? mrhi_success : *device->acquireOutcome;
+    if (outcome != mrhi_success && outcome != mrhi_suboptimal)
+    {
+        return outcome;
+    }
+    mrhiResult status = MakeObject(device, imageOut);
+    device->imagesOut += status == mrhi_success ? 1 : 0;
+    return status == mrhi_success ? outcome : status;
+}
+
+static void ReleaseImage(void* self, uint64_t swapchain, uint64_t image)
+{
+    TestDevice* device = self;
+    MRHI_ASSERT(swapchain > HANDLE_BASE && image > HANDLE_BASE && device->imagesOut > 0);
+    --device->imagesOut;
+}
+
 static void UnconfigureSurface(void* self, uint64_t swapchain)
 {
     TestDevice* device = self;
@@ -522,7 +549,16 @@ static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t
 {
     TestDevice* device = self;
     MRHI_ASSERT(tag != 0 && device->frameCount < TEST_FRAMES);
-    mrhiWalkTestFrame(frame, HANDLE_BASE + 1, device->nextHandle, device->frameLog);
+    mrhiTestFrameLog log = {0};
+    mrhiWalkTestFrame(frame, HANDLE_BASE + 1, device->nextHandle, &log);
+    // Every image the frame acquired is presented.
+    MRHI_ASSERT(log.presented <= device->imagesOut);
+    device->imagesOut -= log.presented;
+    if (device->frameLog != nullptr)
+    {
+        log.frames = device->frameLog->frames + 1;
+        *device->frameLog = log;
+    }
     uint64_t handle = 0;
     mrhiResult status = MakeObject(device, &handle);
     if (status == mrhi_success)
@@ -579,7 +615,8 @@ static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
 static void DestroyDevice(void* self)
 {
     TestDevice* device = self;
-    MRHI_ASSERT(device->swapchains == 0 && device->shaders == 0 && device->pipelines == 0);
+    MRHI_ASSERT(device->swapchains == 0 && device->shaders == 0 && device->pipelines == 0 &&
+                device->imagesOut == 0);
     mrhiAllocator allocator = device->allocator;
     mrhiRelease(&allocator, device, sizeof(TestDevice), alignof(TestDevice));
 }
@@ -605,6 +642,8 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .destroyPipeline = DestroyPipeline,
     .createQuerySet = CreateQuerySet,
     .destroyQuerySet = DestroyQuerySet,
+    .acquireImage = AcquireImage,
+    .releaseImage = ReleaseImage,
     .timestampPeriod = TimestampPeriod,
     .importPipelineCache = ImportPipelineCache,
     .exportPipelineCache = ExportPipelineCache,
@@ -636,6 +675,7 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
         .frameOutcome = driver->adapters[adapter - 1].frameOutcome,
         .pipelineOutcome = driver->adapters[adapter - 1].pipelineOutcome,
         .frameLog = driver->adapters[adapter - 1].frameLog,
+        .acquireOutcome = driver->adapters[adapter - 1].acquireOutcome,
         .timestampPeriod = driver->adapters[adapter - 1].timestampPeriod > 0.0
                                ? driver->adapters[adapter - 1].timestampPeriod
                                : 1.0,

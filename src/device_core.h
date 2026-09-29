@@ -116,6 +116,8 @@ typedef enum mrhiFrameResourceKind
     mrhiFrameBuffer,
     mrhiImportedTexture,
     mrhiImportedBuffer,
+    // An image acquired from a surface, presented at submission.
+    mrhiSurfaceImage,
 } mrhiFrameResourceKind;
 
 // A resource of the open frame: a texture's def or a buffer's size
@@ -132,6 +134,8 @@ typedef struct mrhiFrameResource
     uint32_t index1;
     uint32_t generation;
     mrhiResourceState initialState;
+    // A surface image's driver image; its handle is its swapchain's.
+    uint64_t image;
     // Whether a pass declared so far writes it; imports count as written.
     bool written;
     // Whether a kept pass needs it, and the usages kept passes make of
@@ -265,12 +269,16 @@ typedef struct mrhiFramePass
 } mrhiFramePass;
 
 // A surface as the device that configured it keeps it: the surface, the
-// driver's swapchain handle, and the configuration (without its chain).
+// driver's swapchain handle, the configuration (without its chain), and
+// the last frame that acquired its image, with the answer and the
+// frame's slot for the image (0 for none).
 typedef struct mrhiSwapchainSlot
 {
     mrhiSurfaceId surface;
     uint64_t handle;
     mrhiSurfaceConfig config;
+    mrhiImport acquired;
+    mrhiResult acquireOutcome;
 } mrhiSwapchainSlot;
 
 // A shader container as its device keeps it: its driver handle and its
@@ -509,6 +517,14 @@ bool mrhiResolveView(const mrhiTextureDef* texture, const mrhiViewDef* def,
 
 // Whether a frame resource is an imported device object.
 bool mrhiIsImported(const mrhiFrameResource* resource);
+
+// Whether what the frame writes to a resource is seen after it: an
+// imported object's or a surface image's.
+bool mrhiOutlivesFrame(const mrhiFrameResource* resource);
+
+// Gives the driver back the images the open frame acquired, for a frame
+// dropped or whose submission failed.
+void mrhiReleaseImages(mrhiDevice* device);
 
 // The usage bit of a texture or buffer a use needs.
 uint32_t mrhiUsageOf(const mrhiFrameResource* resource, uint8_t use);

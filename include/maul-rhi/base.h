@@ -68,6 +68,12 @@ extern "C"
         mrhi_empty = 1,
         // A wait's deadline passed first; what it waited for is still running.
         mrhi_timeout = 2,
+        // A surface image was acquired and is usable, but the surface no longer
+        // matches its window as it could: configure it again soon.
+        mrhi_suboptimal = 3,
+        // No surface image, since its window is hidden or has no size; the
+        // frame goes on without it.
+        mrhi_occluded = 4,
         // An argument is invalid: a null pointer where one is required, a value
         // out of range, a def without its cookie.
         mrhi_errorInvalid = -1,
@@ -85,6 +91,11 @@ extern "C"
         mrhi_errorState = -6,
         // The program was built against another contract version.
         mrhi_errorVersion = -7,
+        // A surface no longer matches its window: configure it again before
+        // acquiring.
+        mrhi_errorOutOfDate = -8,
+        // The device is lost: the GPU was reset, removed or its driver failed.
+        mrhi_errorDeviceLost = -9,
     };
 
     // A library version: major, minor and patch.

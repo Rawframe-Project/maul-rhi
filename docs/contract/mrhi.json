@@ -40,6 +40,16 @@
               "doc": "A wait's deadline passed first; what it waited for is still running."
             },
             {
+              "name": "suboptimal",
+              "value": 3,
+              "doc": "A surface image was acquired and is usable, but the surface no longer matches its window as it could: configure it again soon."
+            },
+            {
+              "name": "occluded",
+              "value": 4,
+              "doc": "No surface image, since its window is hidden or has no size; the frame goes on without it."
+            },
+            {
               "name": "error_invalid",
               "value": -1,
               "doc": "An argument is invalid: a null pointer where one is required, a value out of range, a def without its cookie."
@@ -73,6 +83,16 @@
               "name": "error_version",
               "value": -7,
               "doc": "The program was built against another contract version."
+            },
+            {
+              "name": "error_out_of_date",
+              "value": -8,
+              "doc": "A surface no longer matches its window: configure it again before acquiring."
+            },
+            {
+              "name": "error_device_lost",
+              "value": -9,
+              "doc": "The device is lost: the GPU was reset, removed or its driver failed."
             }
           ]
         },
@@ -9451,6 +9471,38 @@
           }
         },
         {
+          "kind": "function",
+          "name": "acquire_surface_image",
+          "doc": "Acquires the next image of a surface configured on the device into the open frame, as a texture of the configured format, size, usages and view formats that begins undefined and is presented when the frame is submitted. Acquiring it again in the frame gives the same answer and image.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` or `mrhi_suboptimal` with an image; `mrhi_occluded` without one, the window hidden or without size; `mrhi_errorOutOfDate` without one, the surface to be configured again first; `mrhi_errorDeviceLost`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorStale` for a surface the instance no longer has; `mrhi_errorState` for a device without an open frame, a frame already compiled, or a surface not configured on the device; `mrhi_errorCapacity` when the device's frameResources limit is reached."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "surface",
+              "type": "id.surface_id",
+              "doc": "A surface configured on the device."
+            },
+            {
+              "name": "image_out",
+              "type": "id.resource_id",
+              "pointer": "mutable",
+              "doc": "Receives the frame's id for the image, or a null id without one."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
           "kind": "enum",
           "name": "pass_class",
           "width": "uint8",
@@ -10667,6 +10719,29 @@
                 "web_gpu": {
                   "class": "direct",
                   "note": "implicit between passes"
+                }
+              }
+            },
+            {
+              "name": "state_present",
+              "value": 16,
+              "doc": "Ready to present: a surface image at the end of its frame.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "PRESENT_SRC_KHR"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "PRESENT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "presentDrawable, tracked by Metal"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "implicit at the frame's end"
                 }
               }
             }
@@ -16643,6 +16718,11 @@
               "doc": "Its resources the frame makes."
             },
             {
+              "name": "presented",
+              "type": "uint32",
+              "doc": "Its surface images, presented after its work."
+            },
+            {
               "name": "chunks",
               "type": "uint32",
               "doc": "Its command chunks walked."
@@ -16735,6 +16815,12 @@
               "type": "struct.test_frame_log",
               "pointer": "mutable",
               "doc": "Where the test driver reports the frames its devices are submitted, walking every command of each; NULL for nowhere. It must outlive the adapter's devices."
+            },
+            {
+              "name": "acquire_outcome",
+              "type": "result",
+              "pointer": "const",
+              "doc": "What acquiring a surface image on the adapter's devices answers, read at each acquire: mrhi_success, mrhi_suboptimal, mrhi_occluded, mrhi_errorOutOfDate or mrhi_errorDeviceLost; NULL for mrhi_success."
             }
           ]
         },

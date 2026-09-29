@@ -29,6 +29,11 @@ bool mrhiIsImported(const mrhiFrameResource* resource)
     return resource->kind == mrhiImportedTexture || resource->kind == mrhiImportedBuffer;
 }
 
+bool mrhiOutlivesFrame(const mrhiFrameResource* resource)
+{
+    return mrhiIsImported(resource) || resource->kind == mrhiSurfaceImage;
+}
+
 static bool IsBuffer(const mrhiFrameResource* resource)
 {
     return resource->kind == mrhiFrameBuffer || resource->kind == mrhiImportedBuffer;
@@ -99,13 +104,14 @@ uint32_t mrhiUsageOf(const mrhiFrameResource* resource, uint8_t use)
     return UsageOf(use, IsBuffer(resource));
 }
 
-// Whether an imported object was made with the usage a use needs.
+// Whether an imported object or a surface's image was made with the
+// usage a use needs; a declared resource takes any.
 static bool IsUsageMade(const mrhiDevice* device, const mrhiFrameResource* resource, uint8_t use)
 {
     uint32_t usage = UsageOf(use, IsBuffer(resource));
-    if (resource->kind == mrhiImportedTexture)
+    if (resource->kind == mrhiImportedTexture || resource->kind == mrhiSurfaceImage)
     {
-        return (device->textureSlots[resource->index1 - 1].def.usage & usage) != 0;
+        return (resource->texture.usage & usage) != 0;
     }
     if (resource->kind == mrhiImportedBuffer)
     {

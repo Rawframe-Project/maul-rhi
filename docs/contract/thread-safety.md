@@ -60,6 +60,7 @@ edit the contract, not this file.
 | `mrhiDeclareBuffer` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiImportTexture` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiImportBuffer` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiAcquireSurfaceImage` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDefaultPassDef` | Safe from any thread. |
 | `mrhiAddPass` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiCompileFrame` | Safe from any thread; the device is used by one thread at a time. |

@@ -402,6 +402,11 @@ void mrhiDestroyDevice(mrhiDevice* device)
     }
     if (device->driver.vtable != nullptr)
     {
+        // An open frame is dropped with the device: its images go back.
+        if (device->frameOpen)
+        {
+            mrhiReleaseImages(device);
+        }
         mrhiEndConfigurations(device);
         mrhiDestroyPipelines(device);
         mrhiDestroyShaders(device);

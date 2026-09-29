@@ -37,6 +37,17 @@ again by new objects.
   destroyed while the frame is open keeps its handle in the frame, and
   its final state is carried back only while it is still live, so an
   object that takes its slot is never touched.
+- **Surface images:** `mrhiAcquireSurfaceImage`, while the frame is
+  declared, answers `mrhi_success` or `mrhi_suboptimal` with an image,
+  or `mrhi_occluded`, `mrhi_errorOutOfDate` or `mrhi_errorDeviceLost`
+  without one, the same answer again for the rest of the frame. The
+  image is a texture of the surface's configuration, tracked and never
+  aliased; it begins undefined, so it is written before it is read, a
+  pass that writes it is kept with its store, and it ends the frame in
+  `mrhi_statePresent`. The driver presents every image of a submitted
+  frame after its work; a dropped frame, one whose submission fails,
+  and one open when its device is destroyed give their images back.
+  A surface whose image the open frame holds is not configured again.
 - **Handles in streams:** commands name pipelines, samplers and query
   sets by driver handle; a driver retires a destroyed object only once
   the next frame submitted after the destruction has finished.

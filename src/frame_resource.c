@@ -2,11 +2,12 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The open frame's resources (mrhi-0008): textures and buffers the graph
-// makes, whose usages its passes will decide, and device textures and
-// buffers imported once per frame. Their ids carry the frame's serial, so
-// they end with it.
+// makes, whose usages its passes will decide, device textures and
+// buffers imported once per frame, and images acquired from surfaces.
+// Their ids carry the frame's serial, so they end with it.
 
 #include "device_core.h"
+#include "instance_core.h"
 
 // Adds a resource to the open frame: success with its id, or the refusal.
 static mrhiResult Add(mrhiDevice* device, mrhiFrameResource resource, mrhiResourceId* resourceOut)
@@ -143,4 +144,85 @@ mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer, mrhiResourc
         .initialState = slot->state,
     };
     return Import(device, &device->bufferSlots[buffer.index1 - 1].import, resource, resourceOut);
+}
+
+// The texture a surface's images are: its configured format, size,
+// usages and view formats, with one mip and one layer.
+static mrhiTextureDef ImageDef(const mrhiSurfaceConfig* config)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = config->color.format;
+    def.width = config->width;
+    def.height = config->height;
+    def.usage = config->usage;
+    for (uint32_t i = 0; i < MRHI_VIEW_FORMATS; ++i)
+    {
+        def.viewFormats[i] = config->viewFormats[i];
+    }
+    return def;
+}
+
+mrhiResult mrhiAcquireSurfaceImage(mrhiDevice* device, mrhiSurfaceId surface,
+                                   mrhiResourceId* imageOut)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (imageOut == nullptr)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    *imageOut = (mrhiResourceId){0};
+    if (mrhiFindSurface(device->instance, surface) == 0)
+    {
+        return mrhi_errorStale;
+    }
+    const mrhiSurfaceSlot* found = &device->instance->surfaceSlots[surface.index1 - 1];
+    if (found->device != device || !device->frameOpen || device->frameCompiled)
+    {
+        return mrhi_errorState;
+    }
+    mrhiSwapchainSlot* swapchain = &device->swapchainSlots[found->swapchain - 1];
+    if (swapchain->acquired.frame == device->frameSerial)
+    {
+        uint32_t held = swapchain->acquired.resource;
+        *imageOut = held == 0 ? (mrhiResourceId){0} : (mrhiResourceId){held, device->frameSerial};
+        return swapchain->acquireOutcome;
+    }
+    // Room first, so that an image is never acquired and then lost.
+    if (device->frameResourceCount == device->deviceLimits.frameResources)
+    {
+        return mrhi_errorCapacity;
+    }
+    uint64_t image = 0;
+    mrhiResult outcome =
+        device->driver.vtable->acquireImage(device->driver.self, swapchain->handle, &image);
+    if (outcome == mrhi_success || outcome == mrhi_suboptimal)
+    {
+        mrhiFrameResource resource = {
+            .kind = mrhiSurfaceImage,
+            .texture = ImageDef(&swapchain->config),
+            .handle = swapchain->handle,
+            .image = image,
+        };
+        // The frame is open, not compiled, and has room: checked above.
+        (void)Add(device, resource, imageOut);
+    }
+    swapchain->acquired = (mrhiImport){device->frameSerial, imageOut->index1};
+    swapchain->acquireOutcome = outcome;
+    return outcome;
+}
+
+void mrhiReleaseImages(mrhiDevice* device)
+{
+    for (uint32_t i = 0; i < device->frameResourceCount; ++i)
+    {
+        const mrhiFrameResource* resource = &device->frameResources[i];
+        if (resource->kind == mrhiSurfaceImage)
+        {
+            device->driver.vtable->releaseImage(device->driver.self, resource->handle,
+                                                resource->image);
+        }
+    }
 }

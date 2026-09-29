@@ -123,6 +123,7 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(query WHITEBOX)
         maul_add_test(readback WHITEBOX)
         maul_add_test(submit WHITEBOX)
+        maul_add_test(acquire WHITEBOX)
         # The container writer against the reader, where Python runs.
         find_package(Python3 COMPONENTS Interpreter)
         if(TARGET test_shader AND Python3_Interpreter_FOUND AND NOT CMAKE_CROSSCOMPILING)

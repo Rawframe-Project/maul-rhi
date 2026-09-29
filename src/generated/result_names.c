@@ -18,6 +18,10 @@ const char* mrhiResultName(mrhiResult result)
         return "mrhi_empty";
     case mrhi_timeout:
         return "mrhi_timeout";
+    case mrhi_suboptimal:
+        return "mrhi_suboptimal";
+    case mrhi_occluded:
+        return "mrhi_occluded";
     case mrhi_errorInvalid:
         return "mrhi_errorInvalid";
     case mrhi_errorCapacity:
@@ -32,6 +36,10 @@ const char* mrhiResultName(mrhiResult result)
         return "mrhi_errorState";
     case mrhi_errorVersion:
         return "mrhi_errorVersion";
+    case mrhi_errorOutOfDate:
+        return "mrhi_errorOutOfDate";
+    case mrhi_errorDeviceLost:
+        return "mrhi_errorDeviceLost";
     default:
         return "unknown result";
     }

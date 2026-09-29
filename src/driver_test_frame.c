@@ -197,13 +197,15 @@ static void WalkPass(Walk* walk, const mrhiDriverPass* pass)
     WalkCommands(walk, pass);
 }
 
-// Checks a resource: a device object's handle, or a transient's place in
-// the frame's memory.
+// Checks a resource: a device object's or swapchain's handle, a surface
+// image's image, or a transient's place in the frame's memory.
 static void CheckResource(Walk* walk, const mrhiDriverResource* resource)
 {
     bool transient =
         resource->kind == mrhiDriverTransientTexture || resource->kind == mrhiDriverTransientBuffer;
-    WALK_CHECK(resource->kind <= mrhiDriverDeviceBuffer &&
+    bool image = resource->kind == mrhiDriverSurfaceImage;
+    WALK_CHECK(resource->kind <= mrhiDriverSurfaceImage &&
+               (image ? IsHandle(walk, resource->image) : resource->image == 0) &&
                (resource->texture != nullptr) == !IsBuffer(resource->kind) &&
                (resource->size > 0) == IsBuffer(resource->kind));
     if (transient)
@@ -217,6 +219,7 @@ static void CheckResource(Walk* walk, const mrhiDriverResource* resource)
     }
     walk->counts.needed += resource->needed ? 1 : 0;
     walk->counts.transients += transient ? 1 : 0;
+    walk->counts.presented += image ? 1 : 0;
 }
 
 void mrhiWalkTestFrame(const mrhiDriverFrame* frame, uint64_t firstHandle, uint64_t lastHandle,
@@ -240,7 +243,6 @@ void mrhiWalkTestFrame(const mrhiDriverFrame* frame, uint64_t firstHandle, uint6
     }
     if (log != nullptr)
     {
-        walk.counts.frames = log->frames + 1;
         walk.counts.passes = frame->passCount;
         walk.counts.barriers = (uint32_t)frame->barrierCount;
         walk.counts.resources = frame->resourceCount;

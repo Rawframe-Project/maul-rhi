@@ -37,6 +37,11 @@ static mrhiDriverResource ViewResource(const mrhiFrameResource* resource)
     case mrhiImportedBuffer:
         view.kind = mrhiDriverDeviceBuffer;
         break;
+    case mrhiSurfaceImage:
+        view.kind = mrhiDriverSurfaceImage;
+        view.texture = &resource->texture;
+        view.image = resource->image;
+        break;
     }
     return view;
 }
