@@ -127,8 +127,23 @@ record:
 - Locations are unique within an entry's inputs, its outputs and its
   variables.
 
-A container with 16-bit floats needs a device with `shaderF16`; one
-whose entries use `mrhi_builtinPrimitiveIndex` is unsupported.
+## On a device
+
+`mrhiCreateShader` refuses as unsupported a container that exceeds the
+device:
+- its root block, a binding's slot or minimum size, or a stage's count
+  of any binding kind (read-only storage buffers count as storage
+  buffers) past the limits;
+- a compute entry's workgroup size in any dimension, invocations or
+  workgroup storage past the limits;
+- a vertex input location, or an inter-stage variable location, past
+  the limits, or a fragment entry reading more inter-stage variables,
+  with the builtins `front_facing`, `sample_index`, `sample_mask` and
+  `primitive_index` counted, than the limit;
+- 16-bit floats without `shaderF16`, or `mrhi_builtinPrimitiveIndex`.
+
+A pipeline's binding layout is the whole container's, so these are the
+same for every pipeline made from it.
 
 ## Constants
 
@@ -157,7 +172,8 @@ comment shows the reflection's form, whose enum names are the
 contract's without their prefixes. It applies the rules above, and
 refuses code that disagrees with the reflection:
 - both modules hold exactly the reflection's entry points, with their
-  stages, and a WGSL compute entry's literal workgroup size matches;
+  stages; a WGSL compute entry's workgroup size is literal, since no
+  override may change the reflection's, and matches;
 - every binding either module declares is in the reflection, and a
   WGSL binding's kind, texture dimension, depth, multisampling and
   sampler comparison match it.

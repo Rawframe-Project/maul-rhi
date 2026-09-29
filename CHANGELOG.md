@@ -140,7 +140,7 @@ format.
   `mrhiScalarType`, `mrhiInterpolation` and `mrhiSampling`,
   `mrhiShaderBuiltins`, workgroup storage, required constants),
   identified by a SHA-256 digest; `mrhiCreateShader` checks every byte
-  as hostile input, `mrhiDestroyShader` and `mrhiGetShaderInfo`; the
+  as hostile input and the container against the device's limits, `mrhiDestroyShader` and `mrhiGetShaderInfo`; the
   device's `shaders` limit. `tools/mrhi_container.py` writes them from
   the two modules and a JSON reflection, refusing code that disagrees
   with it.

@@ -128,6 +128,117 @@ static void ReleaseReflection(const mrhiAllocator* allocator, mrhiShaderSlot* sl
     *slot = (mrhiShaderSlot){0};
 }
 
+// Whether a container's bindings fit the device's limits: slots, binding
+// sizes, and each stage's count of each kind. Tables and color outputs
+// need no check: the floor's four tables and eight color attachments
+// are the container's own bounds.
+static bool AreBindingsWithin(const mrhiLimits* limits, const mrhiContainer* container)
+{
+    for (uint32_t stage = mrhi_stageVertex; stage <= mrhi_stageCompute; stage <<= 1)
+    {
+        uint32_t counts[mrhi_bindingStorageTexture + 1] = {0};
+        for (uint32_t i = 0; i < container->bindingCount; ++i)
+        {
+            mrhiShaderBinding binding = mrhiContainerBinding(container, i);
+            counts[binding.kind] += (binding.stages & stage) != 0 ? 1 : 0;
+        }
+        if (counts[mrhi_bindingUniformBuffer] > limits->uniformBuffersPerStage ||
+            counts[mrhi_bindingStorageBuffer] + counts[mrhi_bindingReadOnlyStorageBuffer] >
+                limits->storageBuffersPerStage ||
+            counts[mrhi_bindingSampler] > limits->samplersPerStage ||
+            counts[mrhi_bindingSampledTexture] > limits->sampledTexturesPerStage ||
+            counts[mrhi_bindingStorageTexture] > limits->storageTexturesPerStage)
+        {
+            return false;
+        }
+    }
+    for (uint32_t i = 0; i < container->bindingCount; ++i)
+    {
+        mrhiShaderBinding binding = mrhiContainerBinding(container, i);
+        uint64_t bytes = binding.kind == mrhi_bindingUniformBuffer ? limits->uniformBindingBytes
+                                                                   : limits->storageBindingBytes;
+        if (binding.slot >= limits->bindingsPerTable || binding.minSize > bytes)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+// The fragment builtins an entry reads that count as inter-stage
+// variables.
+static uint32_t StageBuiltins(mrhiShaderBuiltins builtins)
+{
+    const mrhiShaderBuiltins counted[] = {mrhi_builtinFrontFacing, mrhi_builtinSampleIndex,
+                                          mrhi_builtinSampleMaskIn, mrhi_builtinPrimitiveIndex};
+    uint32_t count = 0;
+    for (size_t i = 0; i < sizeof(counted) / sizeof(counted[0]); ++i)
+    {
+        count += (builtins & counted[i]) != 0 ? 1 : 0;
+    }
+    return count;
+}
+
+// Whether an entry fits the device's limits: a compute entry's
+// workgroup, and the vertex inputs and inter-stage variables of the
+// others, with the fragment builtins that count as variables.
+static bool IsEntryWithin(const mrhiLimits* limits, const mrhiContainer* container,
+                          mrhiShaderEntry entry)
+{
+    if (entry.stage == mrhi_stageCompute)
+    {
+        uint64_t invocations = (uint64_t)entry.workgroup[0] * entry.workgroup[1];
+        return entry.workgroup[0] <= limits->workgroupSizeX &&
+               entry.workgroup[1] <= limits->workgroupSizeY &&
+               entry.workgroup[2] <= limits->workgroupSizeZ &&
+               invocations * entry.workgroup[2] <= limits->workgroupInvocations &&
+               entry.workgroupStorageBytes <= limits->workgroupStorageBytes;
+    }
+    // Unique input locations below the limit keep their count within it.
+    if (entry.variableCount + StageBuiltins(entry.builtins) > limits->interStageVariables)
+    {
+        return false;
+    }
+    for (uint32_t i = 0; i < entry.inputCount; ++i)
+    {
+        if (mrhiContainerInput(container, entry.firstInput + i).location >=
+            limits->vertexAttributes)
+        {
+            return false;
+        }
+    }
+    for (uint32_t i = 0; i < entry.variableCount; ++i)
+    {
+        if (mrhiContainerVariable(container, entry.firstVariable + i).location >=
+            limits->interStageVariables)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Whether a container fits the device: its root block, bindings and
+// entries within the limits, and the features its code needs.
+static bool IsWithin(const mrhiDevice* device, const mrhiContainer* container)
+{
+    if (container->rootBlockBytes > device->limits.rootBlockBytes ||
+        (container->float16 && !device->features.shaderF16) ||
+        (container->builtins & mrhi_builtinPrimitiveIndex) != 0 ||
+        !AreBindingsWithin(&device->limits, container))
+    {
+        return false;
+    }
+    for (uint32_t i = 0; i < container->entryCount; ++i)
+    {
+        if (!IsEntryWithin(&device->limits, container, mrhiContainerEntry(container, i)))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 // Checks a def and its container: success with the container, or the
 // refusal, invalid input counted as misuse.
 static mrhiResult CheckShaderDef(mrhiDevice* device, const mrhiShaderDef* def,
@@ -147,10 +258,8 @@ static mrhiResult CheckShaderDef(mrhiDevice* device, const mrhiShaderDef* def,
     {
         return mrhiDeviceMisuse(device);
     }
-    bool beyond = containerOut->rootBlockBytes > device->limits.rootBlockBytes ||
-                  (containerOut->float16 && !device->features.shaderF16) ||
-                  (containerOut->builtins & mrhi_builtinPrimitiveIndex) != 0;
-    return status == mrhi_success && beyond ? mrhi_errorUnsupported : status;
+    return status == mrhi_success && !IsWithin(device, containerOut) ? mrhi_errorUnsupported
+                                                                     : status;
 }
 
 mrhiResult mrhiCreateShader(mrhiDevice* device, const mrhiShaderDef* def, mrhiShaderId* shaderOut)

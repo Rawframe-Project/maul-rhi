@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SECTION_ROOM   512
+#define SECTION_ROOM   1024
 #define CONTAINER_ROOM 65536
 
 enum
@@ -72,6 +72,11 @@ static void Put64(uint8_t* at, uint64_t value)
 static uint8_t* Record(uint32_t section, uint32_t index, size_t bytes)
 {
     size_t end = (index + 1) * bytes;
+    if (end > SECTION_ROOM)
+    {
+        printf("FAIL: a record past the section's room\n");
+        abort();
+    }
     if (s_sections[section].size < end)
     {
         s_sections[section].size = end;
@@ -992,6 +997,205 @@ static void TestFeatures(void)
     Close(device);
 }
 
+// Appends count bindings of a kind used by stages, in table 2 from slot
+// first, with the details the kind needs.
+static void AddBindings(mrhiBindingKind kind, uint32_t count, mrhiShaderStages stages,
+                        uint32_t first)
+{
+    uint32_t at = (uint32_t)(s_sections[BINDINGS].size / 24);
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        uint8_t* binding = Binding(at + i, 2, (uint16_t)(first + i), kind, stages);
+        binding[8] = kind == mrhi_bindingSampler ? mrhi_samplerFiltering : 0;
+        binding[9] = kind == mrhi_bindingSampledTexture ? mrhi_sampleFloat : 0;
+        binding[11] = kind == mrhi_bindingStorageTexture ? mrhi_storageWriteOnly : 0;
+        Put16(binding + 12, kind == mrhi_bindingStorageTexture ? mrhi_formatRgba8Unorm : 0);
+    }
+}
+
+// Makes a shader of the sections on a device, destroying it again.
+static mrhiResult Made(mrhiDevice* device)
+{
+    Assemble();
+    mrhiShaderDef def = Def();
+    mrhiShaderId shader;
+    mrhiResult status = mrhiCreateShader(device, &def, &shader);
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiDestroyShader(device, shader) == mrhi_success, "destroyed");
+    }
+    return status;
+}
+
+// Makes a shader with count more bindings of a kind than the default
+// container's; the device's limit for them is allowed.
+static mrhiResult WithBindings(mrhiDevice* device, mrhiBindingKind kind, uint32_t count,
+                               mrhiShaderStages stages)
+{
+    Reset();
+    AddBindings(kind, count, stages, 0);
+    return Made(device);
+}
+
+static void TestLimits(void)
+{
+    mrhiDevice* device = Open(4, true);
+    mrhiLimits limits = mrhiDefaultLimits();
+    // The default container binds, in the fragment stage, a uniform buffer,
+    // a sampler and a sampled texture; in the compute stage a storage buffer
+    // and a storage texture.
+    CHECK(WithBindings(device, mrhi_bindingSampledTexture, limits.sampledTexturesPerStage - 1,
+                       mrhi_stageFragment) == mrhi_success,
+          "as many sampled textures as the limit");
+    CHECK(WithBindings(device, mrhi_bindingSampledTexture, limits.sampledTexturesPerStage,
+                       mrhi_stageFragment) == mrhi_errorUnsupported,
+          "a sampled texture past the limit");
+    CHECK(WithBindings(device, mrhi_bindingSampledTexture, limits.sampledTexturesPerStage,
+                       mrhi_stageVertex) == mrhi_success,
+          "the limit counted per stage");
+    CHECK(WithBindings(device, mrhi_bindingSampler, limits.samplersPerStage - 1,
+                       mrhi_stageFragment) == mrhi_success,
+          "as many samplers as the limit");
+    CHECK(WithBindings(device, mrhi_bindingSampler, limits.samplersPerStage, mrhi_stageFragment) ==
+              mrhi_errorUnsupported,
+          "a sampler past the limit");
+    CHECK(WithBindings(device, mrhi_bindingUniformBuffer, limits.uniformBuffersPerStage - 1,
+                       mrhi_stageFragment) == mrhi_success,
+          "as many uniform buffers as the limit");
+    CHECK(WithBindings(device, mrhi_bindingUniformBuffer, limits.uniformBuffersPerStage,
+                       mrhi_stageFragment) == mrhi_errorUnsupported,
+          "a uniform buffer past the limit");
+    CHECK(WithBindings(device, mrhi_bindingReadOnlyStorageBuffer, limits.storageBuffersPerStage - 1,
+                       mrhi_stageCompute) == mrhi_success,
+          "as many storage buffers as the limit");
+    CHECK(WithBindings(device, mrhi_bindingReadOnlyStorageBuffer, limits.storageBuffersPerStage,
+                       mrhi_stageCompute) == mrhi_errorUnsupported,
+          "a read-only storage buffer past the limit, counted with the others");
+    CHECK(WithBindings(device, mrhi_bindingStorageTexture, limits.storageTexturesPerStage - 1,
+                       mrhi_stageCompute) == mrhi_success,
+          "as many storage textures as the limit");
+    CHECK(WithBindings(device, mrhi_bindingStorageTexture, limits.storageTexturesPerStage,
+                       mrhi_stageCompute) == mrhi_errorUnsupported,
+          "a storage texture past the limit");
+    Reset();
+    AddBindings(mrhi_bindingSampler, 1, mrhi_stageCompute, limits.bindingsPerTable - 1);
+    CHECK(Made(device) == mrhi_success, "the last slot");
+    Reset();
+    AddBindings(mrhi_bindingSampler, 1, mrhi_stageCompute, limits.bindingsPerTable);
+    CHECK(Made(device) == mrhi_errorUnsupported, "a slot past the limit");
+    Reset();
+    Put64(Record(BINDINGS, 0, 24) + 16, limits.uniformBindingBytes);
+    CHECK(Made(device) == mrhi_success, "a uniform buffer as large as the limit");
+    Put64(Record(BINDINGS, 0, 24) + 16, limits.uniformBindingBytes + 1);
+    CHECK(Made(device) == mrhi_errorUnsupported, "a uniform buffer past the limit");
+    Reset();
+    Put64(Record(BINDINGS, 1, 24) + 16, limits.storageBindingBytes);
+    CHECK(Made(device) == mrhi_success, "a storage buffer as large as the limit");
+    Put64(Record(BINDINGS, 1, 24) + 16, limits.storageBindingBytes + 1);
+    CHECK(Made(device) == mrhi_errorUnsupported, "a storage buffer past the limit");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "limits are not misuse");
+    Close(device);
+}
+
+// Makes a shader whose compute entry has a workgroup and its storage.
+static mrhiResult WithWorkgroup(mrhiDevice* device, uint32_t x, uint32_t y, uint32_t z,
+                                uint32_t storage)
+{
+    Reset();
+    uint8_t* compute = Record(ENTRIES, 2, 48);
+    Put32(compute + 12, x);
+    Put32(compute + 16, y);
+    Put32(compute + 20, z);
+    Put32(compute + 40, storage);
+    return Made(device);
+}
+
+static void TestEntryLimits(void)
+{
+    mrhiDevice* device = Open(4, true);
+    mrhiLimits limits = mrhiDefaultLimits();
+    CHECK(WithWorkgroup(device, limits.workgroupSizeX, 1, 1, limits.workgroupStorageBytes) ==
+              mrhi_success,
+          "a workgroup at the limits");
+    CHECK(WithWorkgroup(device, limits.workgroupSizeX + 1, 1, 1, 0) == mrhi_errorUnsupported,
+          "a workgroup past x");
+    CHECK(WithWorkgroup(device, 1, limits.workgroupSizeY + 1, 1, 0) == mrhi_errorUnsupported,
+          "a workgroup past y");
+    CHECK(WithWorkgroup(device, 1, 1, limits.workgroupSizeZ + 1, 0) == mrhi_errorUnsupported,
+          "a workgroup past z");
+    CHECK(WithWorkgroup(device, 16, 16, 1, 0) == mrhi_success, "256 invocations");
+    CHECK(WithWorkgroup(device, 16, 4, 8, 0) == mrhi_errorUnsupported, "512 invocations");
+    CHECK(WithWorkgroup(device, 16, 16, 2, 0) == mrhi_errorUnsupported,
+          "512 invocations, z counted");
+    CHECK(WithWorkgroup(device, 256, 256, 64, 0) == mrhi_errorUnsupported,
+          "every size at its limit");
+    CHECK(WithWorkgroup(device, 1, 1, 1, limits.workgroupStorageBytes + 1) == mrhi_errorUnsupported,
+          "workgroup storage past the limit");
+
+    Reset();
+    for (uint32_t i = 0; i < limits.vertexAttributes; ++i)
+    {
+        Variable(INPUTS, i, i, mrhi_scalarFloat32, 4, 0, 0);
+    }
+    Put16(Record(ENTRIES, 0, 48) + 26, (uint16_t)limits.vertexAttributes);
+    CHECK(Made(device) == mrhi_success, "as many vertex inputs as the limit");
+    Put32(Record(INPUTS, 0, 8), limits.vertexAttributes);
+    CHECK(Made(device) == mrhi_errorUnsupported, "a vertex input location past the limit");
+    Put32(Record(INPUTS, 0, 8), limits.vertexAttributes + 1);
+    Variable(INPUTS, limits.vertexAttributes, 0, mrhi_scalarFloat32, 4, 0, 0);
+    Put16(Record(ENTRIES, 0, 48) + 26, (uint16_t)(limits.vertexAttributes + 1));
+    CHECK(Made(device) == mrhi_errorUnsupported, "a vertex input past the limit");
+
+    Reset();
+    uint32_t count = limits.interStageVariables;
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        Variable(VARIABLES, i, i, mrhi_scalarFloat32, 4, mrhi_interpolationPerspective,
+                 mrhi_samplingCenter);
+    }
+    // Both entries read and write every variable; the fragment entry's
+    // front_facing makes one too many.
+    uint8_t* vertex = Record(ENTRIES, 0, 48);
+    uint8_t* fragment = Record(ENTRIES, 1, 48);
+    Put16(vertex + 34, (uint16_t)count);
+    Put16(fragment + 32, 0);
+    Put16(fragment + 34, (uint16_t)count);
+    CHECK(Made(device) == mrhi_errorUnsupported, "a fragment builtin past the limit");
+    Put32(fragment + 36, 0);
+    CHECK(Made(device) == mrhi_success, "as many variables as the limit");
+    Put16(fragment + 34, (uint16_t)(count - 1));
+    Put32(fragment + 36,
+          mrhi_builtinFrontFacing | mrhi_builtinFragDepth | mrhi_builtinSampleMaskOut);
+    CHECK(Made(device) == mrhi_success, "outputs are not counted");
+    Put32(fragment + 36, mrhi_builtinFrontFacing | mrhi_builtinSampleIndex);
+    CHECK(Made(device) == mrhi_errorUnsupported, "two builtins counted");
+    Put32(fragment + 36, mrhi_builtinSampleMaskIn);
+    Put16(fragment + 34, (uint16_t)count);
+    CHECK(Made(device) == mrhi_errorUnsupported, "the sample mask counted");
+    Put32(fragment + 36, 0);
+    Put32(Record(VARIABLES, 0, 8), count);
+    CHECK(Made(device) == mrhi_errorUnsupported, "a variable location past the limit");
+    Put16(fragment + 34, 0);
+    CHECK(Made(device) == mrhi_errorUnsupported, "a vertex output location past the limit");
+    Variable(VARIABLES, count, 0, mrhi_scalarFloat32, 4, mrhi_interpolationPerspective,
+             mrhi_samplingCenter);
+    Put16(vertex + 34, (uint16_t)(count + 1));
+    CHECK(Made(device) == mrhi_errorUnsupported, "vertex outputs past the limit");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "limits are not misuse");
+    Close(device);
+    // With more invocations than any one size, each size is checked.
+    s_adapter.limits.workgroupInvocations = 1024;
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.limits.workgroupInvocations = 1024;
+    device = OpenWith(def, true);
+    CHECK(WithWorkgroup(device, 256, 4, 1, 0) == mrhi_success, "1024 invocations granted");
+    CHECK(WithWorkgroup(device, limits.workgroupSizeX + 1, 1, 1, 0) == mrhi_errorUnsupported,
+          "x past its own limit");
+    CHECK(WithWorkgroup(device, 1, limits.workgroupSizeY + 1, 1, 0) == mrhi_errorUnsupported,
+          "y past its own limit");
+    Close(device);
+}
+
 static void TestStateAndFailure(void)
 {
     Reset();
@@ -1077,6 +1281,8 @@ int main(int argc, char** argv)
     TestCreate();
     TestRefusals();
     TestFeatures();
+    TestLimits();
+    TestEntryLimits();
     TestStateAndFailure();
     return s_failures == 0 ? 0 : 1;
 }

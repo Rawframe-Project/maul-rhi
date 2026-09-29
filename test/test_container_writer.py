@@ -36,7 +36,7 @@ override scale: f32 = 1.0;
 @fragment fn fs(@location(0) uv: vec2f) -> @location(0) vec4f {
     return textureSample(albedo, linear, uv);
 }
-@compute @workgroup_size(8, 8) fn cs(@builtin(global_invocation_id) id: vec3u) {
+@compute @workgroup_size(8u, 8) fn cs(@builtin(global_invocation_id) id: vec3u) {
     counts[id.x] += 1u;
     textureStore(image, id.xy, vec4f(1.0));
 }
@@ -173,7 +173,10 @@ def main():
 
         refused("a WGSL entry the reflection lacks", text=WGSL + "@fragment fn extra() {}")
         refused("a WGSL entry of another stage", text=WGSL.replace("@fragment fn fs", "@vertex fn fs"))
-        refused("a WGSL workgroup size", text=WGSL.replace("(8, 8)", "(8, 4)"))
+        refused("a WGSL workgroup size", text=WGSL.replace("(8u, 8)", "(8u, 4)"))
+        refused("a WGSL workgroup size from an override",
+                text=WGSL.replace("@workgroup_size(8u, 8)", "@workgroup_size(8u, 8, side)")
+                .replace("override scale", "override side: u32 = 8;\noverride scale"))
         refused("a WGSL binding the reflection lacks",
                 text=WGSL + "@group(3) @binding(0) var extra: sampler;")
         refused("a WGSL binding of another kind",

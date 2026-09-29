@@ -327,12 +327,13 @@ extern "C"
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a bad label, or a container that is malformed,
     /// damaged, misaligned or contradicts itself; `mrhi_errorVersion` for a
-    /// container of another version; `mrhi_errorUnsupported` for a root block
-    /// past the device's limit, 16-bit floats on a device without shaderF16,
-    /// the primitive index builtin, or a critical extension the library does
-    /// not know; `mrhi_errorState` for a device that is not ready;
-    /// `mrhi_errorCapacity` when the device's shader limit is reached or its
-    /// allocator fails; `mrhi_errorPlatform` when the driver refuses the code.
+    /// container of another version; `mrhi_errorUnsupported` for a root block,
+    /// bindings, a workgroup or interface variables past the device's limits,
+    /// 16-bit floats on a device without shaderF16, the primitive index
+    /// builtin, or a critical extension the library does not know;
+    /// `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity`
+    /// when the device's shader limit is reached or its allocator fails;
+    /// `mrhi_errorPlatform` when the driver refuses the code.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateShader(mrhiDevice* device,

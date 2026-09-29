@@ -346,8 +346,10 @@ def check_wgsl(text, reflection, bindings):
          f"WGSL entry points {sorted(entries)} differ from the reflection's {sorted(wanted)}")
     for name, (stage, size) in entries.items():
         need(stage == wanted[name]["stage"], f"WGSL: entry {name} is a {stage} entry")
-        literal = size is not None and re.fullmatch(r"\d+(\s*,\s*\d+){0,2}\s*,?", size)
-        if stage == "compute" and literal:
+        literal = size is not None and re.fullmatch(r"\d+[iu]?(\s*,\s*\d+[iu]?){0,2}\s*,?", size)
+        # The reflection's size is fixed, so no override may change it.
+        need(stage != "compute" or literal, f"WGSL: entry {name}'s workgroup size is not literal")
+        if stage == "compute":
             sizes = [int(s) for s in re.findall(r"\d+", size)] + [1, 1]
             need(sizes[:3] == wanted[name]["workgroup"], f"WGSL: entry {name}'s workgroup size")
     for match in WGSL_VAR.finditer(text):
