@@ -66,6 +66,14 @@ ids, requests, the frame graph) can be tested without a GPU.
   declared resource's bytes are an estimate for the frame's report.
   Each device holds a validation error scope for its life, read as it
   closes, so that the web test runner fails on any WebGPU error.
+- **WebGPU pipelines:** a shader is a module over the container's WGSL.
+  A pipeline's layout is the whole container's: a bind group layout per
+  table up to the last one used, empty for a table without bindings,
+  and the root block's bytes as immediates. Pipelines are made with the
+  browser's asynchronous calls and answered by the poll after they
+  settle; one refused is reported as a platform failure and kept with
+  the device's errors, since the core has checked it. The driver's
+  pipeline cache is empty, and it takes back only its own.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`

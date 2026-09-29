@@ -111,7 +111,8 @@ if(MAUL_RHI_VULKAN_DRIVER)
     target_link_libraries(maul-rhi PRIVATE ${CMAKE_DL_LIBS})
 endif()
 if(MAUL_RHI_WEBGPU_DRIVER)
-    target_sources(maul-rhi PRIVATE src/driver_webgpu.c src/webgpu_device.c src/webgpu_names.c)
+    target_sources(maul-rhi PRIVATE src/driver_webgpu.c src/webgpu_device.c src/webgpu_names.c
+                                   src/webgpu_pipeline.c)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_WEBGPU_DRIVER)
 endif()
 

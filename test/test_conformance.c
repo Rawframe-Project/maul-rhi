@@ -89,6 +89,21 @@ static mrhiResult NextInstance(mrhiInstance* instance, mrhiInstanceNotification*
     return status;
 }
 
+// The next device notification, waited for on the web as NextInstance
+// waits.
+static mrhiResult NextDevice(mrhiDevice* device, mrhiDeviceNotification* recordOut)
+{
+    mrhiResult status = mrhiNextDeviceNotification(device, recordOut);
+#ifdef __EMSCRIPTEN__
+    for (int slept = 0; status == mrhi_empty && slept < 10000; ++slept)
+    {
+        emscripten_sleep(1);
+        status = mrhiNextDeviceNotification(device, recordOut);
+    }
+#endif
+    return status;
+}
+
 static mrhiInstance* Create(const mrhiChain* driver)
 {
     mrhiInstanceDef def = mrhiDefaultInstanceDef();
@@ -491,6 +506,14 @@ static void AwaitPipelines(mrhiDevice* device, uint32_t ready, uint32_t stale)
 {
     mrhiDeviceNotification record;
     uint32_t counts[2] = {0};
+    // The answers expected, waited for on the web; then any more.
+    while (counts[0] + counts[1] < ready + stale && NextDevice(device, &record) == mrhi_success)
+    {
+        CHECK(record.kind == mrhi_devicePipelineReady &&
+                  (record.outcome == mrhi_success || record.outcome == mrhi_errorStale),
+              "a pipeline answered");
+        ++counts[record.outcome == mrhi_success ? 0 : 1];
+    }
     while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
     {
         CHECK(record.kind == mrhi_devicePipelineReady &&
@@ -1197,6 +1220,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
           "a timestamp period with timestamps");
     CheckObjects(device, asked->timestampQuery);
     CheckFrameMemory(device);
+    CheckPipelines(device);
     mrhiAdapterInfo info;
     CHECK(mrhiGetAdapterInfo(instance, adapter, &info) == mrhi_success, "info");
     if (info.driver == mrhi_driverWebGpu)
@@ -1204,7 +1228,6 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
         mrhiDestroyDevice(device);
         return;
     }
-    CheckPipelines(device);
     CheckRoundTrip(device);
     CheckDrawing(device, asked->timestampQuery);
     mrhiDestroyDevice(device);
@@ -1231,13 +1254,13 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         mrhiFeatures all;
         CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
         CheckDevice(instance, ids[i], &all);
-        // The WebGPU driver makes no shaders or frames yet: they are the
-        // next parts of its work.
+        CheckCacheImport(instance, ids[i]);
+        // The WebGPU driver runs no frames yet: they are the next part of
+        // its work.
         if (driver == mrhi_driverWebGpu)
         {
             continue;
         }
-        CheckCacheImport(instance, ids[i]);
         CheckRetirement(instance, ids[i]);
         CheckHeaps(instance, ids[i], driver != mrhi_driverTest);
     }

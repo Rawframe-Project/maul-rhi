@@ -16,17 +16,30 @@
 #include "capabilities_core.h"
 #include "invariant.h"
 #include "webgpu_names.h"
+#include "webgpu_pipeline.h"
 
 #include <emscripten/em_js.h>
 #include <stdalign.h>
 #include <string.h>
 
+// A pipeline waiting for the browser: its handle and its tag.
+typedef struct Pending
+{
+    uint64_t handle;
+    uint64_t tag;
+} Pending;
+
 typedef struct WebGpuDevice
 {
     mrhiAllocator allocator;
+    size_t bytes;
     // Its state on the JavaScript side.
     int state;
     bool lossTold;
+    // The pipelines waiting, at most the device's pipelines.
+    Pending* pending;
+    uint32_t pendingCount;
+    uint32_t pendingLimit;
     // Frames submitted and finished.
     uint64_t submitted;
     uint64_t finished;
@@ -35,7 +48,7 @@ typedef struct WebGpuDevice
 // clang-format off
 EM_JS(int, JsCreateDeviceState, (void), {
     return Module.mrhiGpu.add({device: null, objects: [null], free: [], retiring: [], lost: null,
-                               features: [], limits: {}});
+                               features: [], limits: {}, pipelines: []});
 });
 
 EM_JS(void, JsWantFeature, (int state, const char* feature), {
@@ -253,7 +266,7 @@ static void Destroy(void* self)
     WebGpuDevice* device = self;
     JsCloseDevice(device->state);
     mrhiAllocator allocator = device->allocator;
-    mrhiRelease(&allocator, device, sizeof(WebGpuDevice), alignof(WebGpuDevice));
+    mrhiRelease(&allocator, device, device->bytes, alignof(WebGpuDevice));
 }
 
 static const char* AddressOf(mrhiAddressMode mode)
@@ -369,13 +382,13 @@ static double TimestampPeriod(void* self)
     return 1.0;
 }
 
-// The browser keeps its own pipeline cache.
+// The browser keeps its own pipeline cache: the driver's is empty, so it
+// takes an empty one, its own, and declines any other.
 static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
 {
     (void)self;
     (void)bytes;
-    (void)size;
-    return false;
+    return size == 0;
 }
 
 static size_t ExportPipelineCache(void* self, void* bytes, size_t capacity)
@@ -424,17 +437,33 @@ static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* b
     *alignmentOut = 256;
 }
 
-// Reports the device's loss once.
+// Reports settled pipelines, then the device's loss once. A pipeline
+// destroyed while it waited is not reported.
 static size_t Poll(void* self, mrhiDriverEvent* events, size_t capacity)
 {
     WebGpuDevice* device = self;
-    if (capacity == 0 || device->lossTold || !JsIsLost(device->state))
+    size_t moved = 0;
+    uint64_t handle = 0;
+    mrhiResult outcome = mrhi_success;
+    while (moved < capacity && mrhiWebGpuTakePipeline(device->state, &handle, &outcome))
     {
-        return 0;
+        for (uint32_t i = 0; i < device->pendingCount; ++i)
+        {
+            if (device->pending[i].handle == handle)
+            {
+                events[moved++] =
+                    (mrhiDriverEvent){.tag = device->pending[i].tag, .outcome = outcome};
+                device->pending[i] = device->pending[--device->pendingCount];
+                break;
+            }
+        }
     }
-    device->lossTold = true;
-    events[0] = (mrhiDriverEvent){.tag = 0, .outcome = mrhi_errorDeviceLost};
-    return 1;
+    if (moved < capacity && !device->lossTold && JsIsLost(device->state))
+    {
+        device->lossTold = true;
+        events[moved++] = (mrhiDriverEvent){.tag = 0, .outcome = mrhi_errorDeviceLost};
+    }
+    return moved;
 }
 
 // A browser never blocks: a frame not yet finished is not waited for.
@@ -445,9 +474,7 @@ static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
     return tag <= device->finished;
 }
 
-// Shaders, pipelines, frames and canvases come with the driver's next
-// parts; the core never reaches these before then on a device that
-// cannot make shaders or submit frames.
+// Frames and canvases come with the driver's next parts.
 static mrhiResult Unsupported(void)
 {
     return mrhi_errorUnsupported;
@@ -456,31 +483,48 @@ static mrhiResult Unsupported(void)
 static mrhiResult CreateShader(void* self, const mrhiShaderDef* def, const mrhiContainer* container,
                                uint64_t* handleOut)
 {
-    (void)self;
-    (void)def;
-    (void)container;
-    (void)handleOut;
-    return Unsupported();
+    const WebGpuDevice* device = self;
+    *handleOut = mrhiWebGpuCreateShader(device->state, def, container);
+    return mrhi_success;
+}
+
+// Keeps a started pipeline's tag for its answer.
+static void Wait(WebGpuDevice* device, uint64_t handle, uint64_t tag)
+{
+    MRHI_ASSERT(device->pendingCount < device->pendingLimit);
+    device->pending[device->pendingCount++] = (Pending){handle, tag};
 }
 
 static mrhiResult CreateComputePipeline(void* self, const mrhiDriverComputePipeline* pipeline,
                                         uint64_t tag, uint64_t* handleOut)
 {
-    (void)self;
-    (void)pipeline;
-    (void)tag;
-    (void)handleOut;
-    return Unsupported();
+    WebGpuDevice* device = self;
+    *handleOut = mrhiWebGpuStartComputePipeline(device->state, pipeline);
+    Wait(device, *handleOut, tag);
+    return mrhi_success;
 }
 
 static mrhiResult CreateGraphicsPipeline(void* self, const mrhiDriverGraphicsPipeline* pipeline,
                                          uint64_t tag, uint64_t* handleOut)
 {
-    (void)self;
-    (void)pipeline;
-    (void)tag;
-    (void)handleOut;
-    return Unsupported();
+    WebGpuDevice* device = self;
+    *handleOut = mrhiWebGpuStartGraphicsPipeline(device->state, pipeline);
+    Wait(device, *handleOut, tag);
+    return mrhi_success;
+}
+
+static void DestroyPipeline(void* self, uint64_t handle)
+{
+    WebGpuDevice* device = self;
+    for (uint32_t i = 0; i < device->pendingCount; ++i)
+    {
+        if (device->pending[i].handle == handle)
+        {
+            device->pending[i] = device->pending[--device->pendingCount];
+            break;
+        }
+    }
+    Retire(device, handle);
 }
 
 static void Never(void* self, uint64_t handle)
@@ -567,10 +611,10 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .configureSurface = ConfigureSurface,
     .unconfigureSurface = Never,
     .createShader = CreateShader,
-    .destroyShader = Never,
+    .destroyShader = DestroyObject,
     .createComputePipeline = CreateComputePipeline,
     .createGraphicsPipeline = CreateGraphicsPipeline,
-    .destroyPipeline = Never,
+    .destroyPipeline = DestroyPipeline,
     .lossReport = LossReport,
     .acquireImage = AcquireImage,
     .releaseImage = ReleaseImage,
@@ -593,12 +637,22 @@ static const mrhiDeviceDriverVtable s_vtable = {
 mrhiResult mrhiCreateWebGpuDevice(const mrhiAllocator* allocator, int instanceState, uint32_t slot,
                                   const mrhiDeviceDef* def, mrhiDeviceDriver* deviceOut)
 {
-    WebGpuDevice* device = mrhiAllocate(allocator, sizeof(WebGpuDevice), alignof(WebGpuDevice));
+    uint32_t pipelines = def->deviceLimits.pipelines;
+    mrhiLayout layout = {.size = sizeof(WebGpuDevice)};
+    size_t pendingAt = mrhiLayoutAdd(&layout, pipelines, sizeof(Pending), alignof(Pending));
+    WebGpuDevice* device =
+        layout.overflow ? nullptr : mrhiAllocate(allocator, layout.size, alignof(WebGpuDevice));
     if (device == nullptr)
     {
         return mrhi_errorCapacity;
     }
-    *device = (WebGpuDevice){.allocator = *allocator, .state = JsCreateDeviceState()};
+    *device = (WebGpuDevice){
+        .allocator = *allocator,
+        .bytes = layout.size,
+        .state = JsCreateDeviceState(),
+        .pending = (Pending*)((unsigned char*)device + pendingAt),
+        .pendingLimit = pipelines,
+    };
     for (size_t i = 0; i < mrhiWebGpuFeatureCount; ++i)
     {
         bool wanted = false;
