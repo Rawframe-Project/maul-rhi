@@ -1,0 +1,8 @@
+{
+  "root_block_bytes": 4,
+  "entries": [{"name": "plan", "stage": "compute", "workgroup": [1, 1, 1]}],
+  "bindings": [
+    {"table": 0, "slot": 0, "kind": "storage_buffer", "stages": ["compute"], "min_size": 12}
+  ],
+  "constants": []
+}

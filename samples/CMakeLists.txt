@@ -26,3 +26,5 @@ endfunction()
 
 maul_rhi_add_sample(triangle)
 maul_rhi_add_sample(upload_readback)
+maul_rhi_add_sample(textured)
+maul_rhi_add_sample(compute_indirect)

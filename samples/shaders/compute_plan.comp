@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// The compute sample's planning entry "plan": one invocation writes the
+// dispatch that covers the root block's count in groups of 64.
+
+#version 450
+
+layout(push_constant) uniform Root
+{
+    uint count;
+} root;
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) buffer Dispatch
+{
+    uint groups[3];
+} dispatch;
+
+void main()
+{
+    dispatch.groups[0] = (root.count + 63u) / 64u;
+    dispatch.groups[1] = 1u;
+    dispatch.groups[2] = 1u;
+}

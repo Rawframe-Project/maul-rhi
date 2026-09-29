@@ -30,6 +30,9 @@ CONTAINERS = (
                                      ("add.comp", "ca")), True),
     ("test/shaders", "bindless", (("comp", "cs"),), False),
     ("samples/shaders", "triangle", (("vert", "vs"), ("frag", "fs")), True),
+    ("samples/shaders", "textured", (("vert", "vs"), ("frag", "fs")), True),
+    ("samples/shaders", "compute_plan", (("comp", "plan"),), True),
+    ("samples/shaders", "compute_square", (("comp", "square"),), True),
 )
 
 
