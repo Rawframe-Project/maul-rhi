@@ -9,6 +9,8 @@
 
 #include "maul-rhi/test.h"
 
+#include <string.h>
+
 static mrhiTestAdapter s_adapters[2];
 static mrhiTestDriverDef s_driver;
 
@@ -227,6 +229,57 @@ static void TestInstanceEnds(void)
     mrhiDestroyInstance(instance);
 }
 
+// The fallback order over caps built by hand: the color asked for, then
+// linear half floats of extended range, then the first 8-bit sRGB color;
+// none of the three is unsupported, and caps past their array invalid.
+static void TestSuggestion(void)
+{
+    const mrhiSurfaceColor bgra = {mrhi_formatBgra8Unorm, mrhi_primariesBt709, mrhi_transferSrgb,
+                                   mrhi_rangeStandard};
+    const mrhiSurfaceColor rgba = {mrhi_formatRgba8Unorm, mrhi_primariesBt709, mrhi_transferSrgb,
+                                   mrhi_rangeStandard};
+    const mrhiSurfaceColor hdr = {mrhi_formatRgba16Float, mrhi_primariesBt709, mrhi_transferLinear,
+                                  mrhi_rangeExtended};
+    const mrhiSurfaceColor p3 = {mrhi_formatRgba16Float, mrhi_primariesDisplayP3,
+                                 mrhi_transferLinear, mrhi_rangeExtended};
+    const mrhiSurfaceColor pq = {mrhi_formatRgba16Float, mrhi_primariesBt2020, mrhi_transferPq,
+                                 mrhi_rangeStandard};
+    const mrhiSurfaceColor linear = {mrhi_formatRgba16Float, mrhi_primariesBt709,
+                                     mrhi_transferLinear, mrhi_rangeStandard};
+    mrhiSurfaceCaps caps = {.presentable = true, .colorCount = 5};
+    caps.colors[0] = p3;
+    caps.colors[1] = bgra;
+    caps.colors[2] = linear;
+    caps.colors[3] = hdr;
+    caps.colors[4] = rgba;
+    mrhiSurfaceColor color = {0};
+    CHECK(mrhiSuggestSurfaceColor(&caps, &p3, &color) == mrhi_success &&
+              memcmp(&color, &p3, sizeof(color)) == 0,
+          "the color asked for");
+    CHECK(mrhiSuggestSurfaceColor(&caps, &pq, &color) == mrhi_success &&
+              memcmp(&color, &hdr, sizeof(color)) == 0,
+          "linear half floats of extended range next, not of standard range");
+    caps.colors[3] = p3;
+    CHECK(mrhiSuggestSurfaceColor(&caps, &pq, &color) == mrhi_success &&
+              memcmp(&color, &bgra, sizeof(color)) == 0,
+          "then the first 8-bit sRGB color");
+    caps.colors[1] = pq;
+    CHECK(mrhiSuggestSurfaceColor(&caps, &hdr, &color) == mrhi_success &&
+              memcmp(&color, &rgba, sizeof(color)) == 0,
+          "any 8-bit sRGB format");
+    caps.colorCount = 4;
+    CHECK(mrhiSuggestSurfaceColor(&caps, &hdr, &color) == mrhi_errorUnsupported,
+          "none of the three");
+    caps.colorCount = MRHI_SURFACE_COLORS + 1;
+    CHECK(mrhiSuggestSurfaceColor(&caps, &hdr, &color) == mrhi_errorInvalid,
+          "caps past their array");
+    caps.colorCount = 1;
+    CHECK(mrhiSuggestSurfaceColor(nullptr, &hdr, &color) == mrhi_errorInvalid &&
+              mrhiSuggestSurfaceColor(&caps, nullptr, &color) == mrhi_errorInvalid &&
+              mrhiSuggestSurfaceColor(&caps, &hdr, nullptr) == mrhi_errorInvalid,
+          "no NULL arguments");
+}
+
 int main(void)
 {
     TestSources();
@@ -234,5 +287,6 @@ int main(void)
     TestCaps();
     TestCompatibleSurface();
     TestInstanceEnds();
+    TestSuggestion();
     return s_failures == 0 ? 0 : 1;
 }

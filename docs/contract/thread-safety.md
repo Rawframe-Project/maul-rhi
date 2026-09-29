@@ -55,6 +55,7 @@ edit the contract, not this file.
 | `mrhiCreateSurface` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiDestroySurface` | Safe from any thread; the instance and the device that configured the surface are used by one thread at a time. |
 | `mrhiGetSurfaceCaps` | Safe from any thread; the instance is used by one thread at a time. |
+| `mrhiSuggestSurfaceColor` | Safe from any thread. |
 | `mrhiDefaultSurfaceConfig` | Safe from any thread. |
 | `mrhiConfigureSurface` | Safe from any thread; the device and its instance are used by one thread at a time. |
 | `mrhiUnconfigureSurface` | Safe from any thread; the device and its instance are used by one thread at a time. |

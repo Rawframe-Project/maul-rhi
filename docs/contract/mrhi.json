@@ -10399,6 +10399,39 @@
           }
         },
         {
+          "kind": "function",
+          "name": "suggest_surface_color",
+          "doc": "Suggests the color to configure a surface with, from what its caps report, in the library's fallback order: the color asked for, then half floats in linear Rec. 709 of extended range, then 8-bit sRGB in Rec. 709 of standard range, the caps' first such format. The program applies the suggestion or chooses otherwise; configuring never replaces a color.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` with the color; `mrhi_errorInvalid` for a NULL argument, or caps reporting more than MRHI_SURFACE_COLORS colors; `mrhi_errorUnsupported` when the caps report none of the three, which a surface that presents always does."
+          },
+          "args": [
+            {
+              "name": "caps",
+              "type": "struct.surface_caps",
+              "pointer": "const",
+              "doc": "The caps the surface reported."
+            },
+            {
+              "name": "asked",
+              "type": "struct.surface_color",
+              "pointer": "const",
+              "doc": "The color the program wants first."
+            },
+            {
+              "name": "color_out",
+              "type": "struct.surface_color",
+              "pointer": "mutable",
+              "doc": "Receives the color to configure."
+            }
+          ],
+          "thread_safety": {
+            "class": "any"
+          },
+          "library": "picks among the reported colors in the library's fallback order"
+        },
+        {
           "kind": "struct",
           "name": "surface_config",
           "def": true,

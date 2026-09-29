@@ -832,6 +832,7 @@ restricted or absent-rejected, with how.
 | Concept | Why no API maps it |
 | --- | --- |
 | `mrhiDefaultSurfaceDef` | fills a def with the library's defaults |
+| `mrhiSuggestSurfaceColor` | picks among the reported colors in the library's fallback order |
 | `mrhiDefaultSurfaceConfig` | fills a config with the library's defaults |
 
 ## frame: operations and structures

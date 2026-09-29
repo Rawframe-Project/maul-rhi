@@ -331,6 +331,8 @@ format.
 - The wasm budget (mrhi-0001): `tools/wasm_size.py` links the web
   library at `-Oz` with every public function exported, and CI fails
   past 128 KiB of wasm.
+- `mrhiSuggestSurfaceColor` (mrhi-0007): the surface color fallback
+  order, from what a surface's caps report.
 - Samples that test themselves (`samples/`, `MAUL_RHI_BUILD_SAMPLES`): a
   harness, a triangle, an upload and readback, a textured scene under
   the binding model, compute with an indirect dispatch, MSAA with a

@@ -36,8 +36,13 @@ must not make one a dependency.
   - the alpha modes;
   - the usages.
 
-  The floors are `fifo`, opaque alpha and the render target usage.
-  Formats are unorm, and sRGB is rendered through the twin view.
+  The floors are `fifo`, opaque alpha, the render target usage and
+  8-bit sRGB in Rec. 709. Formats are unorm, and sRGB is rendered
+  through the twin view.
+- **The fallback order** (`mrhiSuggestSurfaceColor`): from the caps,
+  the library suggests the color asked for, then half floats in linear
+  Rec. 709 of extended range, then the first 8-bit sRGB color. The
+  program applies the suggestion or chooses otherwise.
 - **Searches:** an adapter request may name a compatible surface, and
   only the adapters that present to it are listed. The search answers
   `mrhi_errorStale` if the surface ends first.
