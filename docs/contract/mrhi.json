@@ -6206,6 +6206,33 @@
                   "note": "\"unknown\" with its message"
                 }
               }
+            },
+            {
+              "name": "loss_simulated",
+              "value": 5,
+              "doc": "The program lost the device through mrhiSimulateDeviceLoss; the GPU is fine.",
+              "mapping": {
+                "vulkan": {
+                  "class": "emulated",
+                  "note": "lost by mrhiSimulateDeviceLoss, the API told nothing",
+                  "cost": "none: a flag in the core"
+                },
+                "d3d12": {
+                  "class": "emulated",
+                  "note": "lost by mrhiSimulateDeviceLoss, the API told nothing",
+                  "cost": "none: a flag in the core"
+                },
+                "metal": {
+                  "class": "emulated",
+                  "note": "lost by mrhiSimulateDeviceLoss, the API told nothing",
+                  "cost": "none: a flag in the core"
+                },
+                "web_gpu": {
+                  "class": "emulated",
+                  "note": "lost by mrhiSimulateDeviceLoss, the API told nothing",
+                  "cost": "none: a flag in the core"
+                }
+              }
             }
           ]
         },
@@ -6303,6 +6330,28 @@
             "object": "the device"
           },
           "library": "reads what the library kept of the loss"
+        },
+        {
+          "kind": "function",
+          "name": "simulate_device_loss",
+          "doc": "Loses a ready device as a driver's report of a loss would: the notice, then every running frame, its readbacks and every pending pipeline answered `mrhi_errorDeviceLost`, which every call that needs the GPU answers afterwards. The driver is told nothing; its work finishes unseen. The report's reason is `mrhi_lossSimulated`. For testing a program's recovery.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device; `mrhi_errorState` for a device still opening; `mrhi_errorDeviceLost` for a device already lost."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "library": "the core loses the device as a driver's report would"
         }
       ]
     },

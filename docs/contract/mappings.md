@@ -159,6 +159,7 @@ restricted or absent-rejected, with how.
 | `mrhi_lossReset` | restricted: VK_ERROR_DEVICE_LOST after a reset | direct: DXGI_ERROR_DEVICE_RESET | direct: MTLCommandBufferErrorBlacklisted or a reset | restricted: "unknown" with its message |
 | `mrhi_lossRemoved` | restricted: VK_ERROR_DEVICE_LOST with the adapter gone | direct: DXGI_ERROR_DEVICE_REMOVED | direct: MTLCommandBufferErrorDeviceRemoved | direct: "destroyed" by the browser |
 | `mrhi_lossDriverFault` | restricted: VK_EXT_device_fault's vendor data | direct: DXGI_ERROR_DRIVER_INTERNAL_ERROR | direct: MTLCommandBufferErrorInternal | restricted: "unknown" with its message |
+| `mrhi_lossSimulated` | emulated: lost by mrhiSimulateDeviceLoss, the API told nothing (cost: none: a flag in the core) | emulated: lost by mrhiSimulateDeviceLoss, the API told nothing (cost: none: a flag in the core) | emulated: lost by mrhiSimulateDeviceLoss, the API told nothing (cost: none: a flag in the core) | emulated: lost by mrhiSimulateDeviceLoss, the API told nothing (cost: none: a flag in the core) |
 
 ## mrhiFilter
 
@@ -766,6 +767,7 @@ restricted or absent-rejected, with how.
 | `mrhiGetDeviceLimits` | reads what the library granted |
 | `mrhiGetDeviceMisuse` | reads the library's misuse count |
 | `mrhiGetDeviceLossReport` | reads what the library kept of the loss |
+| `mrhiSimulateDeviceLoss` | the core loses the device as a driver's report would |
 
 ## resources: operations and structures
 

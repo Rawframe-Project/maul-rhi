@@ -2,7 +2,8 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Device loss on a test driver device: the driver's flag loses it at a
-// poll, a submission, an acquire or a creation; the device answers
+// poll, a submission, an acquire or a creation, and the program by
+// mrhiSimulateDeviceLoss; the device answers
 // everything it owed, in order, with mrhi_errorDeviceLost; its report;
 // and what still works afterwards.
 
@@ -254,6 +255,49 @@ static void TestLostAtAcquire(void)
     CloseDevice();
 }
 
+// Lost by the program with a frame running and a pipeline compiling:
+// at once, the same answers in the same order as a driver's loss, and a
+// report that says it was simulated; the driver is told nothing.
+static void TestSimulated(void)
+{
+    CHECK(mrhiSimulateDeviceLoss(nullptr) == mrhi_errorInvalid, "no device");
+    mrhiDevice* opening = OpenWith(mrhiDefaultDeviceDef(), false);
+    CHECK(mrhiSimulateDeviceLoss(opening) == mrhi_errorState, "not while opening");
+    Close(opening);
+    Open();
+    mrhiRequestId readback = {0};
+    BeginReading(&readback);
+    mrhiRequestId token = {0};
+    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "a frame running");
+    mrhiComputePipelineId compiling;
+    mrhiRequestId pipeline = StartPipeline(&compiling);
+    CHECK(mrhiSimulateDeviceLoss(s_device) == mrhi_success &&
+              mrhiGetDeviceState(s_device) == mrhi_deviceLost,
+          "lost at once");
+    CHECK(Next(mrhi_deviceLostNotice, 0), "the notice first");
+    CHECK(Next(mrhi_deviceFrameDone, token.index1) &&
+              Next(mrhi_deviceReadbackReady, readback.index1),
+          "the frame, then its readback");
+    CHECK(Next(mrhi_devicePipelineReady, pipeline.index1), "the pipeline");
+    mrhiDeviceNotification record;
+    CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_empty, "nothing else");
+    mrhiDeviceLossReport report;
+    static const char message[] = "Lost through mrhiSimulateDeviceLoss";
+    CHECK(mrhiGetDeviceLossReport(s_device, &report) == mrhi_success &&
+              report.reason == mrhi_lossSimulated && report.lastSubmitted.index1 == token.index1 &&
+              report.lastFinished.index1 == 0 && report.faultingFrame.index1 == 0 &&
+              report.faultingPass == 0 && report.messageLength == sizeof(message) - 1 &&
+              memcmp(report.message, message, sizeof(message) - 1) == 0,
+          "the report says it was simulated");
+    CHECK(mrhiSimulateDeviceLoss(s_device) == mrhi_errorDeviceLost, "not lost twice");
+    mrhiFrameDef frameDef = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_errorDeviceLost, "no frame begun");
+    CHECK(mrhiDestroyComputePipeline(s_device, compiling) == mrhi_success &&
+              mrhiDestroyBuffer(s_device, s_buffer) == mrhi_success,
+          "still destroyed");
+    CloseDevice();
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -261,5 +305,6 @@ int main(void)
     TestLostAtSubmit();
     TestLostWhileOpen();
     TestLostAtAcquire();
+    TestSimulated();
     return s_failures == 0 ? 0 : 1;
 }

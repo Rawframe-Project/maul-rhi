@@ -331,14 +331,17 @@ format.
 - The wasm budget (mrhi-0001): `tools/wasm_size.py` links the web
   library at `-Oz` with every public function exported, and CI fails
   past 128 KiB of wasm.
+- `mrhiSimulateDeviceLoss` and `mrhi_lossSimulated` (mrhi-0014): a
+  device lost on purpose, on any driver, as a driver's report would lose
+  it.
 - `mrhiSuggestSurfaceColor` (mrhi-0007): the surface color fallback
   order, from what a surface's caps report.
 - Samples that test themselves (`samples/`, `MAUL_RHI_BUILD_SAMPLES`): a
   harness, a triangle, an upload and readback, a textured scene under
   the binding model, compute with an indirect dispatch, MSAA with a
   resolve, reversed-Z depth with a shadow map, an HDR surface, two
-  windows and the present state machine, run by CTest on the native
-  driver and in headless Chrome.
+  windows, the present state machine, and device loss and recovery, run
+  by CTest on the native driver and in headless Chrome.
 - The web test runner's page has a second canvas, and ends a run at
   once when a file it loads is missing.
 - `fuzz_container` fuzzes the shader container reader from a seed

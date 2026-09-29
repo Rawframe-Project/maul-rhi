@@ -42,6 +42,10 @@ typedef struct Sample
 // (none when NULL): 0, SAMPLE_SKIPPED, or 1 after printing why.
 int SampleOpen(Sample* sample, const mrhiFeatures* features);
 
+// Destroys the device and makes a new one without features on the same
+// adapter, as a program recovering from a loss does: whether it opened.
+bool SampleReopen(Sample* sample);
+
 // Destroys the device and the instance and returns the exit status.
 int SampleClose(Sample* sample);
 

@@ -50,7 +50,8 @@ tables set, `compute_indirect.c` plans a dispatch on the GPU and runs
 it indirectly, `msaa.c` resolves a four-sample target, and `shadow.c`
 draws with reversed-Z depth and a shadow map. `hdr_surface.c`,
 `two_windows.c` and `present_states.c` present, to X windows through
-XCB (`samples/window.c`) or to the web runner's canvases. Each checks
+XCB (`samples/window.c`) or to the web runner's canvases, and
+`device_loss.c` loses its device on purpose and recovers. Each checks
 its own result, so CTest runs them as tests on the build's native
 driver, and in headless Chrome on the web. They are built unless
 `MAUL_RHI_BUILD_SAMPLES` is off; their shader containers are made by

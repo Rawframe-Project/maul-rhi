@@ -77,6 +77,31 @@ static bool FindAdapter(Sample* sample)
            count > 0;
 }
 
+// Makes a device on the sample's adapter and waits until it opens.
+static bool OpenDevice(Sample* sample, const mrhiFeatures* features)
+{
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.adapter = sample->adapter;
+    if (features != nullptr)
+    {
+        def.features = *features;
+    }
+    mrhiRequestId request = {0};
+    mrhiInstanceNotification record;
+    sample->device = nullptr;
+    if (mrhiCreateDevice(sample->instance, &def, &sample->device, &request) != mrhi_success)
+    {
+        return false;
+    }
+    if (NextInstance(sample->instance, &record) != mrhi_success || record.outcome != mrhi_success)
+    {
+        mrhiDestroyDevice(sample->device);
+        sample->device = nullptr;
+        return false;
+    }
+    return true;
+}
+
 int SampleOpen(Sample* sample, const mrhiFeatures* features)
 {
     *sample = (Sample){0};
@@ -89,31 +114,27 @@ int SampleOpen(Sample* sample, const mrhiFeatures* features)
         printf("%s: no adapter\n", IsRequired() ? "FAIL" : "skip");
         return IsRequired() ? 1 : SAMPLE_SKIPPED;
     }
-    mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.adapter = sample->adapter;
-    if (features != nullptr)
-    {
-        def.features = *features;
-    }
-    mrhiRequestId request = {0};
-    mrhiInstanceNotification record;
-    if (mrhiCreateDevice(sample->instance, &def, &sample->device, &request) != mrhi_success ||
-        NextInstance(sample->instance, &record) != mrhi_success || record.outcome != mrhi_success)
+    if (!OpenDevice(sample, features))
     {
         printf("FAIL: no device\n");
-        if (sample->device != nullptr)
-        {
-            mrhiDestroyDevice(sample->device);
-        }
         mrhiDestroyInstance(sample->instance);
         return 1;
     }
     return 0;
 }
 
-int SampleClose(Sample* sample)
+bool SampleReopen(Sample* sample)
 {
     mrhiDestroyDevice(sample->device);
+    return SampleCheck(sample, OpenDevice(sample, nullptr), "a new device");
+}
+
+int SampleClose(Sample* sample)
+{
+    if (sample->device != nullptr)
+    {
+        mrhiDestroyDevice(sample->device);
+    }
     mrhiDestroyInstance(sample->instance);
     return sample->failures == 0 ? 0 : 1;
 }

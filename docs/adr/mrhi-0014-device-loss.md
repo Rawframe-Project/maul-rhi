@@ -41,6 +41,11 @@ account of what happened.
   `mrhiTestAdapter.lossReason`, for the conformance suite's device-loss
   category. It traps if the core asks it for work after it said the
   device was lost.
+- **Simulation:** `mrhiSimulateDeviceLoss` loses a ready device on any
+  driver as a driver's report would, answering everything owed at once,
+  with the reason `mrhi_lossSimulated` and the library's message. The
+  driver is told nothing; its work finishes unseen and is destroyed with
+  the device. Programs test their recovery with it.
 
 ## Consequences
 
