@@ -28,7 +28,7 @@ ids, requests, the frame graph) can be tested without a GPU.
   by `mrhiTestDriverDef` on an instance def. It has no GPU, finds the
   adapters the test describes and answers at the next poll.
 - **The Vulkan driver:** built with `MAUL_RHI_VULKAN_DRIVER`, on in
-  every native build, and started by an instance with no test driver
+  every native build but Apple's, and started by an instance with no test driver
   chained. It compiles against the Khronos C headers, kept exactly as
   published in `khronos/`, and opens the loader when the instance
   starts (`libvulkan.so.1`, `vulkan-1.dll`, `libvulkan.1.dylib`),
@@ -104,9 +104,9 @@ ids, requests, the frame graph) can be tested without a GPU.
   current texture, out of date once the page resizes the drawing
   buffer, and the browser presents it when the page returns to its
   event loop, so an image given back is only forgotten.
-- **The Metal driver:** built with `MAUL_RHI_METAL_DRIVER` on Apple
-  systems, off by default until it runs everything the core records,
-  and never beside the Vulkan driver: a build has one native driver.
+- **The Metal driver:** built with `MAUL_RHI_METAL_DRIVER`, on in
+  every Apple build, where the Vulkan driver is off, since a build has
+  one native driver; the other builds have no Metal driver.
   It speaks Metal's classic API (command queues, command buffers and
   encoders), which every Metal device runs, the virtual one of hosted
   macOS runners included; a path through Metal 4's argument tables may
@@ -121,9 +121,8 @@ ids, requests, the frame graph) can be tested without a GPU.
   reports its own; features are granted as the driver comes to run
   them. MoltenVK and KosmicKrisp stay usable under the Vulkan driver
   where a program builds it and loads one, but are neither tested nor
-  promised. CI runs the conformance suite on the macOS runner's device
-  under `MTL_DEBUG_LAYER` and `MTL_SHADER_VALIDATION`; until the
-  driver runs frames, it checks objects and pipelines only.
+  promised. CI runs the conformance suite and the samples on the macOS
+  runner's device under `MTL_DEBUG_LAYER` and `MTL_SHADER_VALIDATION`.
 - **Metal objects:** buffers, textures, views, samplers and query sets
   are Metal objects whose retained pointers are their handles, released
   as soon as the core destroys them, since command buffers retain what

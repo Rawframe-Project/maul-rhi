@@ -25,17 +25,16 @@ option(MAUL_RHI_TSAN "Instrument with ThreadSanitizer" OFF)
 option(MAUL_RHI_COVERAGE "Instrument for gcov coverage" OFF)
 option(MAUL_RHI_FUZZ "Build the libFuzzer targets (Clang)" OFF)
 option(MAUL_RHI_TEST_DRIVER "Build the test driver (mrhiTestDriverDef)" ${MAUL_RHI_BUILD_TESTS})
-# The Vulkan driver (mrhi-0003): every native build; the web has no Vulkan.
-if(EMSCRIPTEN)
+# The native driver (mrhi-0003), one per build: Metal on Apple systems,
+# Vulkan on the others; the web has neither.
+if(EMSCRIPTEN OR APPLE)
     set(maul_rhi_vulkan_default OFF)
 else()
     set(maul_rhi_vulkan_default ON)
 endif()
 option(MAUL_RHI_VULKAN_DRIVER "Build the Vulkan driver" ${maul_rhi_vulkan_default})
-# The Metal driver (mrhi-0003), in Objective-C on Apple systems: off by
-# default until it runs everything the core records. A build has one
-# native driver.
-option(MAUL_RHI_METAL_DRIVER "Build the Metal driver" OFF)
+# The Metal driver, in Objective-C.
+option(MAUL_RHI_METAL_DRIVER "Build the Metal driver" ${APPLE})
 if(MAUL_RHI_METAL_DRIVER AND NOT APPLE)
     message(FATAL_ERROR "The Metal driver builds on Apple systems only")
 endif()

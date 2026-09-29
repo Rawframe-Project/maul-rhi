@@ -25,9 +25,10 @@ library thread runs, and no callback delivers a result.
 
 ## Status
 
-Not released. The contract, the Vulkan and WebGPU drivers and the
-conformance suite are in place; the samples are being written, then
-Metal and Direct3D 12 follow.
+Not released. The contract, the Vulkan, WebGPU and Metal drivers, the
+conformance suite and the samples are in place; Direct3D 12 follows.
+Each build has one native driver: Metal on Apple systems, Vulkan on the
+others, WebGPU on the web.
 
 ## Building
 
@@ -50,7 +51,8 @@ tables set, `compute_indirect.c` plans a dispatch on the GPU and runs
 it indirectly, `msaa.c` resolves a four-sample target, and `shadow.c`
 draws with reversed-Z depth and a shadow map. `hdr_surface.c`,
 `two_windows.c` and `present_states.c` present, to X windows through
-XCB (`samples/window.c`) or to the web runner's canvases, and
+XCB (`samples/window.c`), to the web runner's canvases, or to
+CAMetalLayers outside any window on Metal, and
 `device_loss.c` loses its device on purpose and recovers. Each checks
 its own result, so CTest runs them as tests on the build's native
 driver, and in headless Chrome on the web. They are built unless
