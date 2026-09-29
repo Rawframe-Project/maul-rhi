@@ -42,6 +42,18 @@ ids, requests, the frame graph) can be tested without a GPU.
   `depthBiasClamp`, `fragmentStoresAndAtomics`, `samplerAnisotropy`,
   `shaderStorageImageExtendedFormats`), keyed by the physical device,
   so a device found again keeps its id.
+- **The WebGPU driver:** built with `MAUL_RHI_WEBGPU_DRIVER`, on in
+  every web build, and started by an instance with no test driver
+  chained. It calls the browser's WebGPU through `EM_JS` functions
+  compiled into its objects, each instance keeping its GPU objects and
+  its waiting requests on the JavaScript side; a promise settles into a
+  queue the driver's poll drains, so nothing blocks, and a program
+  returns to the page's event loop to see answers. A search lists the
+  browser's adapter under one handle, so it keeps its id; one without
+  WebGPU's core features, or without immediates, which carry the root
+  block, falls below the floor. Its features and limits follow the
+  contract's WebGPU rows, and its format capabilities are the floor and
+  what its features add.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`
@@ -132,6 +144,11 @@ ids, requests, the frame graph) can be tested without a GPU.
   container (`test/shaders/bindless.*`, without WGSL) reads heaps on
   adapters with heterogeneous heaps; Linux CI sets
   `MAUL_RHI_REQUIRE_BINDLESS`, so lavapipe must grant them.
+  On the web the suite runs in headless Chrome with WebGPU
+  (`test/web_runner.cjs`, Puppeteer from `MRHI_NODE_MODULES`), built
+  with JSPI so that it sleeps while the browser settles its promises;
+  an error the browser logs fails it, and CI sets
+  `MAUL_RHI_REQUIRE_WEBGPU`.
   ThreadSanitizer skips the threads and locks of lavapipe, LLVM and
   the XCB client library (`test/tsan.supp`), which it cannot see
   ordered.

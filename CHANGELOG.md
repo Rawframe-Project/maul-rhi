@@ -303,6 +303,11 @@ format.
   per heap, pipelines reading heaps binding the pass's; conformance
   samples a sealed texture and writes a buffer through heaps on
   lavapipe (`MAUL_RHI_REQUIRE_BINDLESS`).
+- The WebGPU driver's instance (mrhi-0003, `MAUL_RHI_WEBGPU_DRIVER`, on
+  for the web): `EM_JS` glue to the browser, promises polled, the
+  browser's adapter listed with the contract's WebGPU features and
+  limits, the root block as immediates. The conformance suite runs in
+  headless Chrome on the web (`test/web_runner.cjs`).
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

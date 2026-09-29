@@ -16,6 +16,9 @@
 #ifdef MAUL_RHI_VULKAN_DRIVER
 #include "driver_vulkan.h"
 #endif
+#ifdef MAUL_RHI_WEBGPU_DRIVER
+#include "driver_webgpu.h"
+#endif
 
 #include <stdalign.h>
 
@@ -130,6 +133,9 @@ static mrhiResult StartDriver(mrhiInstance* instance, const mrhiInstanceDef* def
     MRHI_ASSERT(instance->driver.vtable == nullptr ||
                 mrhiIsDriverVtableValid(instance->driver.vtable));
     return status;
+#elif defined(MAUL_RHI_WEBGPU_DRIVER)
+    return mrhiCreateWebGpuDriver(&instance->allocator, def->limits.notifications,
+                                  &instance->driver);
 #else
     (void)instance;
     return mrhi_success;

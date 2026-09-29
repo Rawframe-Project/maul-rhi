@@ -31,6 +31,8 @@ else()
     set(maul_rhi_vulkan_default ON)
 endif()
 option(MAUL_RHI_VULKAN_DRIVER "Build the Vulkan driver" ${maul_rhi_vulkan_default})
+# The WebGPU driver (mrhi-0003): every web build.
+option(MAUL_RHI_WEBGPU_DRIVER "Build the WebGPU driver" ${EMSCRIPTEN})
 
 # Every executable (tests, benchmarks, tools) lands in the top of the
 # build tree, so scripts and CI find them in one place.
@@ -67,6 +69,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/draw.c
     src/encoder.c
     src/frame.c
+    src/format_caps.c
     src/frame_resource.c
     src/driver.c
     src/generated/capabilities.c
@@ -106,6 +109,10 @@ if(MAUL_RHI_VULKAN_DRIVER)
     # The Khronos headers, kept as published (khronos/README.md).
     target_include_directories(maul-rhi SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/khronos)
     target_link_libraries(maul-rhi PRIVATE ${CMAKE_DL_LIBS})
+endif()
+if(MAUL_RHI_WEBGPU_DRIVER)
+    target_sources(maul-rhi PRIVATE src/driver_webgpu.c)
+    target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_WEBGPU_DRIVER)
 endif()
 
 if(MAUL_RHI_BUILD_TESTS)
@@ -167,8 +174,20 @@ if(MAUL_RHI_BUILD_TESTS)
     endif()
     # Every driver the build has, through the public API (mrhi-0003).
     # Where the XCB client library is installed, the suite also makes a
-    # window to check surfaces on; only the test links it.
-    maul_add_test(conformance)
+    # window to check surfaces on; only the test links it. On the web it
+    # runs in headless Chrome (test/web_runner.cjs), sleeping through
+    # JSPI while the browser settles its promises.
+    if(EMSCRIPTEN)
+        maul_add_test(conformance MANUAL)
+        target_link_options(test_conformance PRIVATE -sJSPI -sEXIT_RUNTIME
+                            -sEXPORTED_RUNTIME_METHODS=ENV)
+        add_test(NAME conformance
+                 COMMAND node ${PROJECT_SOURCE_DIR}/test/web_runner.cjs
+                         $<TARGET_FILE:test_conformance>)
+        set_tests_properties(conformance PROPERTIES SKIP_RETURN_CODE 77)
+    else()
+        maul_add_test(conformance)
+    endif()
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND AND MAUL_RHI_VULKAN_DRIVER)
         pkg_check_modules(MAUL_RHI_XCB QUIET IMPORTED_TARGET xcb)

@@ -2063,9 +2063,9 @@
                   "note": "argument table bytes"
                 },
                 "web_gpu": {
-                  "class": "emulated",
-                  "note": "a dynamic-offset uniform buffer where immediates are missing, maxImmediateSize where present",
-                  "cost": "where immediates are missing, a 256-byte slot of a per-frame uniform buffer per change and a bind group set with its offset"
+                  "class": "restricted",
+                  "note": "maxImmediateSize (64) through setImmediates and WGSL var<immediate>; a browser without immediates lists no adapter",
+                  "cost": "no adapter on browsers that have not shipped immediates"
                 }
               }
             },
@@ -19323,9 +19323,8 @@
               "note": "setVertexBytes, setFragmentBytes or setBytes"
             },
             "web_gpu": {
-              "class": "emulated",
-              "note": "setImmediates where the browser has immediates; else a dynamic offset into a uniform buffer",
-              "cost": "without immediates, the bytes written to a per-frame uniform buffer and a dynamic offset per draw"
+              "class": "direct",
+              "note": "setImmediates"
             }
           }
         },

@@ -4,11 +4,12 @@ adapter: capabilities_core chain driver instance_core
 allocator:
 base:
 capabilities_core:
+format_caps: capabilities_core
 chain:
 device: allocator capabilities_core chain device_core driver heap_core instance_core invariant label pool
 device_core: capabilities_core command driver pool reflection
 driver: command reflection
-driver_test: allocator capabilities_core command driver driver_test_frame invariant
+driver_test: allocator capabilities_core command driver driver_test_frame format_caps invariant
 driver_test_frame: command driver label
 driver_vulkan: allocator driver invariant vulkan_adapter vulkan_api vulkan_device vulkan_surface
 vulkan_device: allocator command driver invariant tlsf vulkan_adapter vulkan_api vulkan_frame vulkan_heap vulkan_label vulkan_memory vulkan_object vulkan_pipeline vulkan_resource vulkan_swapchain
@@ -27,7 +28,8 @@ vulkan_adapter: allocator capabilities_core driver invariant vulkan_api
 vulkan_surface: vulkan_adapter vulkan_api
 vulkan_label: invariant vulkan_api
 vulkan_api:
-instance: allocator chain driver driver_test driver_vulkan instance_core invariant
+instance: allocator chain driver driver_test driver_vulkan driver_webgpu instance_core invariant
+driver_webgpu: allocator driver format_caps invariant
 instance_core: driver pool
 invariant:
 label:

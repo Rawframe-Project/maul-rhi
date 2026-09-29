@@ -9,6 +9,7 @@
 #include "allocator.h"
 #include "capabilities_core.h"
 #include "driver_test_frame.h"
+#include "format_caps.h"
 #include "invariant.h"
 
 #include <stdalign.h>
@@ -825,25 +826,12 @@ static void GetFormatCaps(const void* self, uint64_t adapter, mrhiFormat format,
 {
     const TestDriver* driver = self;
     const mrhiTestAdapter* described = &driver->adapters[adapter - 1];
-    const mrhiFeatures* features = &described->features;
     if (format == described->limitedFormat)
     {
         *capsOut = described->limitedCaps;
         return;
     }
-    mrhiFormatCaps caps = mrhiFloorFormatCaps(format);
-    bool float32 = format == mrhi_formatR32Float || format == mrhi_formatRg32Float ||
-                   format == mrhi_formatRgba32Float;
-    caps.filtering = caps.filtering || (float32 && features->float32Filterable);
-    caps.rendering =
-        caps.rendering || (format == mrhi_formatRg11b10Ufloat && features->rg11b10Renderable);
-    if (!caps.sampling && mrhiIsFormatKnown(format) && mrhiFormatFamilyGranted(format, features))
-    {
-        caps.sampling = true;
-        caps.filtering = true;
-        caps.sampleCounts = 1;
-    }
-    *capsOut = caps;
+    *capsOut = mrhiGrantedFormatCaps(format, &described->features);
 }
 
 static void Destroy(void* self)

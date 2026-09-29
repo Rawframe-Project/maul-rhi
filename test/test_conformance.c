@@ -29,6 +29,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 #ifdef MRHI_TEST_XCB
 #include <xcb/xcb.h>
 #endif
@@ -69,6 +73,22 @@
 
 #define CHECK_AT_LEAST(field) CHECK(limits.field >= floor.field, "the floor's " #field);
 
+// The next instance notification. Native drivers answer at the next
+// poll; a browser settles its promises only when the page runs its event
+// loop, so on the web the suite sleeps (JSPI) until one arrives.
+static mrhiResult NextInstance(mrhiInstance* instance, mrhiInstanceNotification* recordOut)
+{
+    mrhiResult status = mrhiNextInstanceNotification(instance, recordOut);
+#ifdef __EMSCRIPTEN__
+    for (int slept = 0; status == mrhi_empty && slept < 10000; ++slept)
+    {
+        emscripten_sleep(1);
+        status = mrhiNextInstanceNotification(instance, recordOut);
+    }
+#endif
+    return status;
+}
+
 static mrhiInstance* Create(const mrhiChain* driver)
 {
     mrhiInstanceDef def = mrhiDefaultInstanceDef();
@@ -85,7 +105,7 @@ static size_t Search(mrhiInstance* instance, mrhiAdapterId* ids, size_t capacity
     mrhiRequestId id;
     CHECK(mrhiRequestAdapters(instance, &request, &id) == mrhi_success, "a search");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+    CHECK(NextInstance(instance, &record) == mrhi_success &&
               record.kind == mrhi_instanceAdaptersFound && record.outcome == mrhi_success,
           "answered at the next poll");
     size_t count = 0;
@@ -418,7 +438,7 @@ static void CheckRetirement(mrhiInstance* instance, mrhiAdapterId adapter)
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "a device");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success, "ready");
+    CHECK(NextInstance(instance, &record) == mrhi_success, "ready");
     for (int i = 0; i < 4; ++i)
     {
         mrhiBufferId buffer = MakeBuffer(device, 256);
@@ -635,8 +655,7 @@ static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool nativ
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "a device");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
-              record.outcome == mrhi_success,
+    CHECK(NextInstance(instance, &record) == mrhi_success && record.outcome == mrhi_success,
           "ready");
     mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
     shaderDef.bytes = s_bindlessContainer;
@@ -1117,7 +1136,7 @@ static void CheckCacheImport(mrhiInstance* instance, mrhiAdapterId adapter)
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "a device");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success, "ready");
+    CHECK(NextInstance(instance, &record) == mrhi_success, "ready");
     CHECK(mrhiGetPipelineCacheOutcome(device) == mrhi_success, "its own cache taken");
     mrhiDestroyDevice(device);
 }
@@ -1134,7 +1153,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "a device");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+    CHECK(NextInstance(instance, &record) == mrhi_success &&
               record.kind == mrhi_instanceDeviceReady && record.outcome == mrhi_success,
           "ready at the next poll");
     CHECK(mrhiGetDeviceState(device) == mrhi_deviceReady, "ready");
@@ -1171,6 +1190,12 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         CHECK(info.nameLength > 0 && info.nameLength <= MRHI_ADAPTER_NAME_BYTES, "a name");
         CheckLimits(instance, ids[i]);
         CheckFormats(instance, ids[i]);
+        // The WebGPU driver opens no device yet: its devices are the
+        // next part of the driver's work.
+        if (driver == mrhi_driverWebGpu)
+        {
+            continue;
+        }
         mrhiFeatures none = {0};
         CheckDevice(instance, ids[i], &none);
         mrhiFeatures all;
@@ -1432,7 +1457,7 @@ static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiS
     mrhiRequestId request;
     mrhiInstanceNotification record;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success &&
-              mrhiNextInstanceNotification(instance, &record) == mrhi_success,
+              NextInstance(instance, &record) == mrhi_success,
           "a device");
     CHECK(Configure(device, surface, caps, 64, 48) == mrhi_success, "configured");
     bool read = (caps->usages & mrhi_textureCopySource) != 0;
@@ -1526,11 +1551,17 @@ static void TestNativeDriver(void)
     {
         return;
     }
+    // The build's native driver: WebGPU on the web, Vulkan elsewhere.
+#ifdef __EMSCRIPTEN__
+    size_t count = CheckDriver(instance, mrhi_driverWebGpu);
+    const char* required = getenv("MAUL_RHI_REQUIRE_WEBGPU");
+#else
     size_t count = CheckDriver(instance, mrhi_driverVulkan);
+    const char* required = getenv("MAUL_RHI_REQUIRE_VULKAN");
+#endif
     if (count == 0)
     {
-        const char* required = getenv("MAUL_RHI_REQUIRE_VULKAN");
-        CHECK(required == nullptr || required[0] == '\0', "a Vulkan adapter where required");
+        CHECK(required == nullptr || required[0] == '\0', "a native adapter where required");
         printf("skip: no native adapter on this host\n");
     }
     else
