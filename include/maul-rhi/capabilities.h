@@ -21,12 +21,12 @@ extern "C"
 {
 #endif
 
-    // The optional features (record R18). The floor (compute, indirect draws,
+    // The optional features (mrhi-0006). The floor (compute, indirect draws,
     // instancing, the texture kinds, independent blend, occlusion queries)
     // needs no request.
     typedef struct mrhiFeatures
     {
-        // Timestamps at pass boundaries (record R20).
+        // Timestamps at pass boundaries (mrhi-0006).
         bool timestampQuery;
         // Pipeline statistics queries.
         bool pipelineStatisticsQuery;
@@ -56,15 +56,15 @@ extern "C"
         bool multiDrawIndirectCount;
         // Rendering several views in one pass.
         bool multiview;
-        // A heap of sampled textures and samplers (record R1).
+        // A heap of sampled textures and samplers.
         bool bindlessSampling;
-        // A heap of every resource kind but uniform buffers (record R1).
+        // A heap of every resource kind but uniform buffers.
         bool bindlessHeterogeneous;
         // Presentation timestamps and a target present time.
         bool presentTiming;
     } mrhiFeatures;
 
-    // The limits (record R19): WebGPU's floor in the contract's terms. An
+    // The limits (mrhi-0006): WebGPU's floor in the contract's terms. An
     // adapter reports its values; a device def requests values, the defaults
     // being the floor.
     typedef struct mrhiLimits
@@ -75,7 +75,7 @@ extern "C"
         uint32_t textureDimension3d;
         // The layers of an array texture.
         uint32_t textureArrayLayers;
-        // Binding tables a pipeline declares (record R1).
+        // Binding tables a pipeline declares.
         uint32_t bindingTables;
         // Slots in one binding table.
         uint32_t bindingsPerTable;
@@ -125,7 +125,7 @@ extern "C"
         uint32_t workgroupSizeZ;
         // Workgroups one dispatch has in each dimension.
         uint32_t workgroupsPerDimension;
-        // The bytes of the root block each draw or dispatch sets (record R1).
+        // The bytes of the root block each draw or dispatch sets.
         uint32_t rootBlockBytes;
         // Entries of the resource heap; 0 without a bindless feature, at most
         // 65536 portably.

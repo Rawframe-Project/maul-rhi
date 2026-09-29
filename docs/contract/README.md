@@ -28,8 +28,8 @@ Every item has a `kind`, a snake_case `name` and a `doc`.
 | `enum` | `width` (`uint8`, `uint16`, `uint32`, `int32`), `values` | a fixed-width type and its values |
 | `constant` | `value`, a non-negative integer | a macro, `MRHI_` and the name in capitals |
 | `opaque` | none | a typed opaque pointer's struct, for a root object |
-| `id` | none | a generation-checked id, `{ index1, generation }` (family record F17) |
-| `struct` | `members`: `name`, `type`, optional `doc`, `pointer`; optional `def` or `chained` | a typedef struct; a def opens with `cookie` and `next` (record R13), a chained struct with `mrhiChain chain` |
+| `id` | none | a generation-checked id, `{ index1, generation }` (family record 0016) |
+| `struct` | `members`: `name`, `type`, optional `doc`, `pointer`; optional `def` or `chained` | a typedef struct; a def opens with `cookie` and `next` (mrhi-0005), a chained struct with `mrhiChain chain` |
 | `function` | `args` (`name`, `type`, `doc`), optional `returns` (`type`, `doc`), `thread_safety` | a documented declaration; one returning `result` is nodiscard |
 
 C names follow `docs/conventions.md` section 4: `get_version` becomes
@@ -55,8 +55,8 @@ which the generator needs on the path.
 
 ## Thread safety
 
-`thread_safety` has a `class` and, where it applies, an `object` and a
-`note`:
+`thread_safety` has a `class` and, where it applies, an `object`
+(with `plural` when it names several) and a `note`:
 
 | Class | Opening |
 |---|---|

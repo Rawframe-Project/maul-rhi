@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The extension chain a def carries (record R13): critical structs the
+// The extension chain a def carries (mrhi-0005): critical structs the
 // library does not know are refused, hints it does not know are
 // skipped, and the chain's depth is bounded, which also stops a cycle.
 

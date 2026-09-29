@@ -8,6 +8,7 @@
 #include "allocator.h"
 #include "chain.h"
 #include "instance_core.h"
+#include "invariant.h"
 
 #ifdef MAUL_RHI_TEST_DRIVER
 #include "driver_test.h"
@@ -60,8 +61,8 @@ static mrhiInstance* Allocate(const mrhiInstanceDef* def)
     mrhiLayout layout = {.size = sizeof(mrhiInstance)};
     size_t queueAt = mrhiLayoutAdd(&layout, limits->notifications, sizeof(mrhiInstanceNotification),
                                    alignof(mrhiInstanceNotification));
-    size_t queriesAt = mrhiLayoutAdd(&layout, limits->notifications, sizeof(mrhiAdapterQuery),
-                                     alignof(mrhiAdapterQuery));
+    size_t pendingAt =
+        mrhiLayoutAdd(&layout, limits->notifications, sizeof(mrhiPending), alignof(mrhiPending));
     size_t slotsAt =
         mrhiLayoutAdd(&layout, limits->adapters, sizeof(mrhiAdapterSlot), alignof(mrhiAdapterSlot));
     size_t listingAt =
@@ -81,7 +82,7 @@ static mrhiInstance* Allocate(const mrhiInstanceDef* def)
         .limits = def->limits,
         .bytes = layout.size,
         .queue = (mrhiInstanceNotification*)(block + queueAt),
-        .queries = (mrhiAdapterQuery*)(block + queriesAt),
+        .pending = (mrhiPending*)(block + pendingAt),
         .slots = (mrhiAdapterSlot*)(block + slotsAt),
         .listing = (uint32_t*)(block + listingAt),
         .found = (mrhiDriverAdapter*)(block + foundAt),
@@ -101,8 +102,11 @@ static mrhiResult StartDriver(mrhiInstance* instance, const mrhiInstanceDef* def
 #ifdef MAUL_RHI_TEST_DRIVER
         if (node->type == mrhi_structTestDriver)
         {
-            return mrhiCreateTestDriver(&instance->allocator, (const mrhiTestDriverDef*)node,
-                                        def->limits.notifications, &instance->driver);
+            mrhiResult status =
+                mrhiCreateTestDriver(&instance->allocator, (const mrhiTestDriverDef*)node,
+                                     def->limits.notifications, &instance->driver);
+            MRHI_ASSERT(status != mrhi_success || mrhiIsDriverVtableValid(instance->driver.vtable));
+            return status;
         }
 #endif
     }
@@ -145,6 +149,11 @@ void mrhiDestroyInstance(mrhiInstance* instance)
 {
     if (instance == nullptr)
     {
+        return;
+    }
+    if (instance->deviceCount > 0)
+    {
+        mrhiMisuse(instance);
         return;
     }
     if (instance->driver.vtable != nullptr)

@@ -22,7 +22,7 @@ library.
 - **Its outputs** are the public headers in `include/maul-rhi/` and
   `docs/contract/thread-safety.md`. They are written in the family's
   style and pass the format, documentation and source checks like
-  hand-written code. Unlike `src/generated/` (family record F15), no
+  hand-written code. Unlike `src/generated/` (conventions section 6), no
   rule is waived for them, because they are the API programs read.
 - **Drift:** the gate and CI run `tools/gen_contract.py --check`, which
   fails on any generated file that differs from what the contract

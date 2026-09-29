@@ -2,15 +2,16 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The instance as the core sees it: its limits, its driver, the
-// notification queue and the adapter table. Everything is laid out in
-// one block when the instance is made, so nothing allocates later.
+// notification queue, the work its driver has not answered yet, and the
+// adapter table. Everything is laid out in one block when the instance
+// is made, so nothing allocates later.
 
 #ifndef MAUL_RHI_SRC_INSTANCE_CORE_H
 #define MAUL_RHI_SRC_INSTANCE_CORE_H
 
 #include "driver.h"
 
-#include "maul-rhi/instance.h"
+#include "maul-rhi/device.h"
 
 // An adapter id's slot: its generation, and, in use, what the driver
 // reported. seen marks the slots a refresh found again.
@@ -22,14 +23,23 @@ typedef struct mrhiAdapterSlot
     mrhiDriverAdapter adapter;
 } mrhiAdapterSlot;
 
-// An adapter request waiting for its driver's answer. Its request id's
-// index is also the tag the driver answers with.
-typedef struct mrhiAdapterQuery
+// What a pending request waits for.
+typedef enum mrhiPendingKind
+{
+    mrhiPendingAdapters,
+    mrhiPendingDevice,
+} mrhiPendingKind;
+
+// A request its driver has not answered. Its request id's index is also
+// the tag the driver answers with.
+typedef struct mrhiPending
 {
     uint32_t request;
+    mrhiPendingKind kind;
     mrhiPowerPreference preference;
     bool allowSoftware;
-} mrhiAdapterQuery;
+    mrhiDevice* device;
+} mrhiPending;
 
 struct mrhiInstance
 {
@@ -41,14 +51,15 @@ struct mrhiInstance
     // No driver when its vtable is NULL.
     mrhiInstanceDriver driver;
     uint32_t nextRequest;
+    uint32_t deviceCount;
     // A ring of limits.notifications records.
     mrhiInstanceNotification* queue;
     uint32_t queueHead;
     uint32_t queueCount;
-    // Requests without an answer; with the queue, at most
-    // limits.notifications, so every answer has room.
-    mrhiAdapterQuery* queries;
-    uint32_t queryCount;
+    // With the queue, at most limits.notifications, so every answer has
+    // room.
+    mrhiPending* pending;
+    uint32_t pendingCount;
     // limits.adapters slots, the listing of their indices in the last
     // answer's order, and room for what the driver reports.
     mrhiAdapterSlot* slots;
@@ -63,5 +74,29 @@ mrhiResult mrhiMisuse(mrhiInstance* instance);
 
 // Appends a record; the caller has made sure there is room.
 void mrhiPushInstanceNotification(mrhiInstance* instance, mrhiInstanceNotification notification);
+
+// Whether the queue has room for one more answer.
+bool mrhiHasRoomForAnswer(const mrhiInstance* instance);
+
+// A new request id's index, never zero.
+uint32_t mrhiNextRequest(mrhiInstance* instance);
+
+// Records work a driver will answer; the caller has checked the room.
+void mrhiAddPending(mrhiInstance* instance, mrhiPending pending);
+
+// Answers a pending request at once with an outcome, without its
+// driver: a device destroyed while opening, or work without a driver.
+void mrhiAnswerNow(mrhiInstance* instance, uint32_t request, mrhiResult outcome);
+
+// The adapter an id names, or NULL for a stale or null id.
+const mrhiDriverAdapter* mrhiFindAdapter(const mrhiInstance* instance, mrhiAdapterId adapter);
+
+// Rebuilds the adapter table for an answered search and returns the
+// search's outcome.
+mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search);
+
+// Moves an opening device to ready, or to failed, and returns the
+// outcome.
+mrhiResult mrhiFinishOpening(mrhiDevice* device, mrhiResult outcome);
 
 #endif // MAUL_RHI_SRC_INSTANCE_CORE_H

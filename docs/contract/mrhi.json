@@ -396,6 +396,11 @@
               "name": "instance_adapters_found",
               "value": 0,
               "doc": "An adapter request is answered: its outcome is mrhi_success, and mrhiGetAdapters lists the adapters, or an error."
+            },
+            {
+              "name": "instance_device_ready",
+              "value": 1,
+              "doc": "A device finished opening: its outcome is mrhi_success and the device is ready, or an error and the device failed. A device destroyed while opening answers mrhi_errorStale."
             }
           ]
         },
@@ -505,7 +510,7 @@
         {
           "kind": "function",
           "name": "destroy_instance",
-          "doc": "Destroys an instance. Its devices must be destroyed first.",
+          "doc": "Destroys an instance. While any of its devices exists it refuses, counting the call as misuse and destroying nothing.",
           "args": [
             {
               "name": "instance",
@@ -696,12 +701,12 @@
           "kind": "struct",
           "name": "features",
           "mapped": true,
-          "doc": "The optional features (record R18). The floor (compute, indirect draws, instancing, the texture kinds, independent blend, occlusion queries) needs no request.",
+          "doc": "The optional features (mrhi-0006). The floor (compute, indirect draws, instancing, the texture kinds, independent blend, occlusion queries) needs no request.",
           "members": [
             {
               "name": "timestamp_query",
               "type": "bool",
-              "doc": "Timestamps at pass boundaries (record R20).",
+              "doc": "Timestamps at pass boundaries (mrhi-0006).",
               "mapping": {
                 "vulkan": {
                   "class": "restricted",
@@ -1046,7 +1051,7 @@
             {
               "name": "bindless_sampling",
               "type": "bool",
-              "doc": "A heap of sampled textures and samplers (record R1).",
+              "doc": "A heap of sampled textures and samplers.",
               "mapping": {
                 "vulkan": {
                   "class": "restricted",
@@ -1069,7 +1074,7 @@
             {
               "name": "bindless_heterogeneous",
               "type": "bool",
-              "doc": "A heap of every resource kind but uniform buffers (record R1).",
+              "doc": "A heap of every resource kind but uniform buffers.",
               "mapping": {
                 "vulkan": {
                   "class": "restricted",
@@ -1119,7 +1124,7 @@
           "name": "limits",
           "mapped": true,
           "defaults": true,
-          "doc": "The limits (record R19): WebGPU's floor in the contract's terms. An adapter reports its values; a device def requests values, the defaults being the floor.",
+          "doc": "The limits (mrhi-0006): WebGPU's floor in the contract's terms. An adapter reports its values; a device def requests values, the defaults being the floor.",
           "members": [
             {
               "name": "texture_dimension_2d",
@@ -1197,7 +1202,7 @@
               "name": "binding_tables",
               "type": "uint32",
               "default": 4,
-              "doc": "Binding tables a pipeline declares (record R1).",
+              "doc": "Binding tables a pipeline declares.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -1799,7 +1804,7 @@
               "name": "root_block_bytes",
               "type": "uint32",
               "default": 64,
-              "doc": "The bytes of the root block each draw or dispatch sets (record R1).",
+              "doc": "The bytes of the root block each draw or dispatch sets.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -1973,16 +1978,267 @@
       ]
     },
     {
-      "name": "test",
-      "doc": "The test driver (MAUL_RHI_TEST_DRIVER): a driver without a GPU whose adapters a test describes, for the library's tests and a program's own.",
+      "name": "device",
+      "doc": "The device: the second root of Maul RHI, opened on an adapter with the features and limits a program asks for, and the owner of every GPU object.",
       "includes": [
         "capabilities"
       ],
       "items": [
         {
+          "kind": "opaque",
+          "name": "device",
+          "doc": "A device, made by mrhiCreateDevice."
+        },
+        {
+          "kind": "enum",
+          "name": "device_state",
+          "width": "uint8",
+          "doc": "Where a device is in its life.",
+          "values": [
+            {
+              "name": "device_opening",
+              "value": 0,
+              "doc": "Made, not yet ready: calls answer mrhi_errorState."
+            },
+            {
+              "name": "device_ready",
+              "value": 1,
+              "doc": "Ready for use."
+            },
+            {
+              "name": "device_failed",
+              "value": 2,
+              "doc": "Opening failed; only destroying it remains."
+            },
+            {
+              "name": "device_lost",
+              "value": 3,
+              "doc": "The GPU or its driver was lost; only destroying it remains."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "device_limits",
+          "doc": "The named limits of a device's own bookkeeping.",
+          "members": [
+            {
+              "name": "notifications",
+              "type": "uint32",
+              "doc": "Records the device's notification queue holds; 256 by default."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "device_def",
+          "def": true,
+          "doc": "How a device is made. Build it with mrhiDefaultDeviceDef and set the adapter.",
+          "members": [
+            {
+              "name": "adapter",
+              "type": "id.adapter_id",
+              "doc": "The adapter to open, from mrhiGetAdapters."
+            },
+            {
+              "name": "features",
+              "type": "struct.features",
+              "doc": "The optional features asked for."
+            },
+            {
+              "name": "limits",
+              "type": "struct.limits",
+              "doc": "The limits asked for, at least the floor."
+            },
+            {
+              "name": "device_limits",
+              "type": "struct.device_limits"
+            },
+            {
+              "name": "allocator",
+              "type": "struct.allocator"
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_device_def",
+          "doc": "Returns the default device def: no adapter, no optional features, the floor limits, 256 notifications and the C library's allocator.",
+          "returns": {
+            "type": "struct.device_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "create_device",
+          "doc": "Makes a device on an adapter. It returns at once with the device opening, and the instance's queue answers the request with mrhi_instanceDeviceReady.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` with the device opening; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a zero limit, limits below the floor or an allocator with one function; `mrhi_errorStale` for an adapter the instance no longer has; `mrhi_errorUnsupported` for features or limits beyond the adapter's, or a critical extension the library does not know; `mrhi_errorCapacity` when the instance's queue has no room for the answer or an allocator fails."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "mutable",
+              "doc": "The instance that found the adapter."
+            },
+            {
+              "name": "def",
+              "type": "struct.device_def",
+              "pointer": "const",
+              "doc": "The device to make."
+            },
+            {
+              "name": "device_out",
+              "type": "opaque.device",
+              "pointer": "out",
+              "doc": "Receives the device; set to NULL on failure."
+            },
+            {
+              "name": "request_out",
+              "type": "id.request_id",
+              "pointer": "mutable",
+              "doc": "Receives the id its ready record answers."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "destroy_device",
+          "doc": "Destroys a device in any state. A device still opening answers its request with mrhi_errorStale.",
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device, or NULL for nothing."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device and its instance",
+            "plural": true
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_device_state",
+          "doc": "Returns where a device is in its life. Draining the instance's queue is what moves an opening device on.",
+          "returns": {
+            "type": "enum.device_state",
+            "doc": "The state; mrhi_deviceFailed for a NULL device."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_device_features",
+          "doc": "Reads the optional features a device was granted.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "features_out",
+              "type": "struct.features",
+              "pointer": "mutable",
+              "doc": "Receives the features."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_device_limits",
+          "doc": "Reads the limits a device was granted.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "limits_out",
+              "type": "struct.limits",
+              "pointer": "mutable",
+              "doc": "Receives the limits."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_device_misuse",
+          "doc": "Returns how many calls the device has refused as invalid input (mrhi_errorInvalid).",
+          "returns": {
+            "type": "uint64",
+            "doc": "The count; 0 for a NULL device."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        }
+      ]
+    },
+    {
+      "name": "test",
+      "doc": "The test driver (MAUL_RHI_TEST_DRIVER): a driver without a GPU whose adapters a test describes, for the library's tests and a program's own.",
+      "includes": [
+        "device"
+      ],
+      "items": [
+        {
           "kind": "struct",
           "name": "test_adapter",
-          "doc": "An adapter the test driver finds: its facts, features and limits.",
+          "doc": "An adapter the test driver finds: its facts, features and limits, and how a device opening on it ends.",
           "members": [
             {
               "name": "info",
@@ -1995,6 +2251,11 @@
             {
               "name": "limits",
               "type": "struct.limits"
+            },
+            {
+              "name": "open_outcome",
+              "type": "result",
+              "doc": "The outcome of a device opening on the adapter: mrhi_success, or the error the device fails with."
             }
           ]
         },

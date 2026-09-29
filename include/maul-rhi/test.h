@@ -10,7 +10,7 @@
 #ifndef MAUL_RHI_TEST_H
 #define MAUL_RHI_TEST_H
 
-#include "maul-rhi/capabilities.h"
+#include "maul-rhi/device.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -21,12 +21,16 @@ extern "C"
 {
 #endif
 
-    // An adapter the test driver finds: its facts, features and limits.
+    // An adapter the test driver finds: its facts, features and limits, and how
+    // a device opening on it ends.
     typedef struct mrhiTestAdapter
     {
         mrhiAdapterInfo info;
         mrhiFeatures features;
         mrhiLimits limits;
+        // The outcome of a device opening on the adapter: mrhi_success, or the
+        // error the device fails with.
+        mrhiResult openOutcome;
     } mrhiTestAdapter;
 
     // Turns the test driver on for an instance, chained on its def with the

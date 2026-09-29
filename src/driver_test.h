@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The test driver (record R16): adapters a test describes, and requests
+// The test driver (mrhi-0003): adapters a test describes, and requests
 // answered at the next poll.
 
 #ifndef MAUL_RHI_SRC_DRIVER_TEST_H

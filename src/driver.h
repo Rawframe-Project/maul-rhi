@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The driver SPI at the instance level (record R15), as the core calls
+// The driver SPI at the instance level (mrhi-0003), as the core calls
 // it. A driver reports finished work only when the core polls it, and
 // never calls the core.
 
@@ -30,6 +30,22 @@ typedef struct mrhiDriverEvent
     mrhiResult outcome;
 } mrhiDriverEvent;
 
+// The driver side of a device: its vtable and pointer. A device driver
+// is made at once and opens in the background; its instance driver
+// answers the opening through a poll event.
+typedef struct mrhiDeviceDriverVtable
+{
+    uint32_t spiVersion;
+    uint32_t size;
+    void (*destroy)(void* self);
+} mrhiDeviceDriverVtable;
+
+typedef struct mrhiDeviceDriver
+{
+    const mrhiDeviceDriverVtable* vtable;
+    void* self;
+} mrhiDeviceDriver;
+
 typedef struct mrhiInstanceDriverVtable
 {
     uint32_t spiVersion;
@@ -42,6 +58,11 @@ typedef struct mrhiInstanceDriverVtable
     // Copies up to capacity adapters the last finished search found and
     // returns how many it found.
     size_t (*getAdapters)(const void* self, mrhiDriverAdapter* adapters, size_t capacity);
+    // Makes a device on an adapter with the features and limits granted,
+    // opening it in the background: the open is answered by an event
+    // with the tag. An immediate failure is returned instead.
+    mrhiResult (*createDevice)(void* self, uint64_t adapter, const mrhiFeatures* features,
+                               const mrhiLimits* limits, uint64_t tag, mrhiDeviceDriver* deviceOut);
     void (*destroy)(void* self);
 } mrhiInstanceDriverVtable;
 

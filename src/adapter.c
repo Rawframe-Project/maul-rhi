@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Adapter requests (record R17): each is answered by one record, the
-// adapter table keeps the ids of adapters found again and retires the
-// others, and the listing orders them by the request's preference.
+// Adapter requests (mrhi-0003): the adapter table keeps the ids of
+// adapters found again and retires the others, and the listing orders
+// them by the request's preference.
 
 #include "capabilities_core.h"
 #include "chain.h"
 #include "instance_core.h"
 
 #define ADAPTER_REQUEST_DEF_COOKIE 0x6D726172u
-// Driver events a poll moves at a time.
-#define POLL_BATCH 8
 
 mrhiAdapterRequestDef mrhiDefaultAdapterRequestDef(void)
 {
@@ -20,13 +18,6 @@ mrhiAdapterRequestDef mrhiDefaultAdapterRequestDef(void)
     def.preference = mrhi_powerDefault;
     def.allowSoftware = true;
     return def;
-}
-
-void mrhiPushInstanceNotification(mrhiInstance* instance, mrhiInstanceNotification notification)
-{
-    uint32_t tail = (instance->queueHead + instance->queueCount) % instance->limits.notifications;
-    instance->queue[tail] = notification;
-    ++instance->queueCount;
 }
 
 // Where an adapter kind ranks under a preference; lower is better.
@@ -80,7 +71,7 @@ static uint32_t SlotFor(mrhiInstance* instance, uint64_t handle)
 // masked to what its API can grant. The driver's order is kept for
 // equal ranks; more adapters than the limit is a capacity outcome, with
 // the first ones kept.
-static mrhiResult Refresh(mrhiInstance* instance, const mrhiAdapterQuery* query)
+mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search)
 {
     size_t total = 0;
     if (instance->driver.vtable != nullptr)
@@ -98,7 +89,7 @@ static mrhiResult Refresh(mrhiInstance* instance, const mrhiAdapterQuery* query)
     for (size_t i = 0; i < count; ++i)
     {
         mrhiDriverAdapter* adapter = &instance->found[i];
-        if ((!query->allowSoftware && adapter->info.kind == mrhi_adapterSoftware) ||
+        if ((!search->allowSoftware && adapter->info.kind == mrhi_adapterSoftware) ||
             !mrhiLimitsWithin(&floor, &adapter->limits))
         {
             continue;
@@ -118,47 +109,8 @@ static mrhiResult Refresh(mrhiInstance* instance, const mrhiAdapterQuery* query)
             ++instance->slots[i].generation;
         }
     }
-    SortListing(instance, query->preference);
+    SortListing(instance, search->preference);
     return total > count ? mrhi_errorCapacity : mrhi_success;
-}
-
-static void Answer(mrhiInstance* instance, uint32_t queryIndex, mrhiResult outcome)
-{
-    mrhiAdapterQuery query = instance->queries[queryIndex];
-    instance->queries[queryIndex] = instance->queries[--instance->queryCount];
-    if (outcome == mrhi_success)
-    {
-        outcome = Refresh(instance, &query);
-    }
-    mrhiPushInstanceNotification(instance, (mrhiInstanceNotification){
-                                               .kind = mrhi_instanceAdaptersFound,
-                                               .requestId = {query.request, 1},
-                                               .outcome = outcome,
-                                           });
-}
-
-static void PollDriver(mrhiInstance* instance)
-{
-    if (instance->driver.vtable == nullptr)
-    {
-        return;
-    }
-    mrhiDriverEvent events[POLL_BATCH];
-    size_t moved;
-    while ((moved = instance->driver.vtable->poll(instance->driver.self, events, POLL_BATCH)) > 0)
-    {
-        for (size_t i = 0; i < moved; ++i)
-        {
-            for (uint32_t q = 0; q < instance->queryCount; ++q)
-            {
-                if (instance->queries[q].request == events[i].tag)
-                {
-                    Answer(instance, q, events[i].outcome);
-                    break;
-                }
-            }
-        }
-    }
 }
 
 mrhiResult mrhiRequestAdapters(mrhiInstance* instance, const mrhiAdapterRequestDef* def,
@@ -178,11 +130,11 @@ mrhiResult mrhiRequestAdapters(mrhiInstance* instance, const mrhiAdapterRequestD
     {
         return chain == mrhi_errorInvalid ? mrhiMisuse(instance) : chain;
     }
-    if (instance->queueCount + instance->queryCount == instance->limits.notifications)
+    if (!mrhiHasRoomForAnswer(instance))
     {
         return mrhi_errorCapacity;
     }
-    uint32_t request = ++instance->nextRequest;
+    uint32_t request = mrhiNextRequest(instance);
     if (instance->driver.vtable != nullptr)
     {
         mrhiResult status =
@@ -192,34 +144,17 @@ mrhiResult mrhiRequestAdapters(mrhiInstance* instance, const mrhiAdapterRequestD
             return status;
         }
     }
-    instance->queries[instance->queryCount++] = (mrhiAdapterQuery){
-        .request = request, .preference = def->preference, .allowSoftware = def->allowSoftware};
+    mrhiAddPending(instance, (mrhiPending){
+                                 .request = request,
+                                 .kind = mrhiPendingAdapters,
+                                 .preference = def->preference,
+                                 .allowSoftware = def->allowSoftware,
+                             });
     if (instance->driver.vtable == nullptr)
     {
-        Answer(instance, instance->queryCount - 1, mrhi_success);
+        mrhiAnswerNow(instance, request, mrhi_success);
     }
     *requestOut = (mrhiRequestId){request, 1};
-    return mrhi_success;
-}
-
-mrhiResult mrhiNextInstanceNotification(mrhiInstance* instance,
-                                        mrhiInstanceNotification* notificationOut)
-{
-    if (instance == nullptr || notificationOut == nullptr)
-    {
-        return instance == nullptr ? mrhi_errorInvalid : mrhiMisuse(instance);
-    }
-    if (instance->queueCount == 0)
-    {
-        PollDriver(instance);
-    }
-    if (instance->queueCount == 0)
-    {
-        return mrhi_empty;
-    }
-    *notificationOut = instance->queue[instance->queueHead];
-    instance->queueHead = (instance->queueHead + 1) % instance->limits.notifications;
-    --instance->queueCount;
     return mrhi_success;
 }
 
@@ -239,8 +174,7 @@ mrhiResult mrhiGetAdapters(mrhiInstance* instance, mrhiAdapterId* adapters, size
     return mrhi_success;
 }
 
-// The slot an adapter id names, or NULL for a stale or null id.
-static const mrhiAdapterSlot* FindSlot(const mrhiInstance* instance, mrhiAdapterId adapter)
+const mrhiDriverAdapter* mrhiFindAdapter(const mrhiInstance* instance, mrhiAdapterId adapter)
 {
     uint32_t slot = adapter.index1 - 1;
     if (adapter.index1 == 0 || slot >= instance->limits.adapters || !instance->slots[slot].inUse ||
@@ -248,7 +182,7 @@ static const mrhiAdapterSlot* FindSlot(const mrhiInstance* instance, mrhiAdapter
     {
         return nullptr;
     }
-    return &instance->slots[slot];
+    return &instance->slots[slot].adapter;
 }
 
 mrhiResult mrhiGetAdapterInfo(mrhiInstance* instance, mrhiAdapterId adapter,
@@ -258,12 +192,12 @@ mrhiResult mrhiGetAdapterInfo(mrhiInstance* instance, mrhiAdapterId adapter,
     {
         return instance == nullptr ? mrhi_errorInvalid : mrhiMisuse(instance);
     }
-    const mrhiAdapterSlot* slot = FindSlot(instance, adapter);
-    if (slot == nullptr)
+    const mrhiDriverAdapter* found = mrhiFindAdapter(instance, adapter);
+    if (found == nullptr)
     {
         return mrhi_errorStale;
     }
-    *infoOut = slot->adapter.info;
+    *infoOut = found->info;
     return mrhi_success;
 }
 
@@ -274,12 +208,12 @@ mrhiResult mrhiGetAdapterFeatures(mrhiInstance* instance, mrhiAdapterId adapter,
     {
         return instance == nullptr ? mrhi_errorInvalid : mrhiMisuse(instance);
     }
-    const mrhiAdapterSlot* slot = FindSlot(instance, adapter);
-    if (slot == nullptr)
+    const mrhiDriverAdapter* found = mrhiFindAdapter(instance, adapter);
+    if (found == nullptr)
     {
         return mrhi_errorStale;
     }
-    *featuresOut = slot->adapter.features;
+    *featuresOut = found->features;
     return mrhi_success;
 }
 
@@ -290,11 +224,11 @@ mrhiResult mrhiGetAdapterLimits(mrhiInstance* instance, mrhiAdapterId adapter,
     {
         return instance == nullptr ? mrhi_errorInvalid : mrhiMisuse(instance);
     }
-    const mrhiAdapterSlot* slot = FindSlot(instance, adapter);
-    if (slot == nullptr)
+    const mrhiDriverAdapter* found = mrhiFindAdapter(instance, adapter);
+    if (found == nullptr)
     {
         return mrhi_errorStale;
     }
-    *limitsOut = slot->adapter.limits;
+    *limitsOut = found->limits;
     return mrhi_success;
 }

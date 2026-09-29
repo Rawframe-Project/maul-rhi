@@ -45,11 +45,13 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/allocator.c
     src/base.c
     src/chain.c
+    src/device.c
     src/driver.c
     src/generated/capabilities.c
     src/generated/defaults.c
     src/generated/result_names.c
-    src/instance.c)
+    src/instance.c
+    src/notify.c)
 maul_configure_library(maul-rhi)
 if(MAUL_RHI_TEST_DRIVER)
     target_sources(maul-rhi PRIVATE src/driver_test.c)
@@ -61,9 +63,11 @@ if(MAUL_RHI_BUILD_TESTS)
     maul_add_test(base)
     maul_add_test(chain WHITEBOX)
     maul_add_test(layout WHITEBOX)
+    maul_add_test(notify WHITEBOX)
     maul_add_test(instance)
     if(MAUL_RHI_TEST_DRIVER)
         maul_add_test(adapter)
+        maul_add_test(device)
     endif()
     maul_add_header_tests()
 endif()

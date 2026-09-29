@@ -55,10 +55,16 @@ CLASSES = ("direct", "emulated", "restricted", "absent_rejected")
 # section 10), by class.
 THREAD_SAFETY = {
     "any": "Safe from any thread.",
-    "any_exclusive": "Safe from any thread; {object} is used by one thread at a time.",
+    "any_exclusive": "Safe from any thread; {object} {verb} used by one thread at a time.",
     "main": "Main thread only.",
     "realtime": "Real-time safe: no allocation, lock or wait.",
 }
+
+
+def opening_of(safety):
+    """The opening sentence of a thread safety paragraph."""
+    verb = "are" if safety.get("plural") else "is"
+    return THREAD_SAFETY[safety["class"]].format(object=safety.get("object", ""), verb=verb)
 
 
 def pascal(name):
@@ -391,7 +397,7 @@ def emit_function(names, item):
     if item.get("returns"):
         lines += comment("@return " + item["returns"]["doc"], 4, "///")
     safety = item["thread_safety"]
-    opening = THREAD_SAFETY[safety["class"]].format(object=safety.get("object", ""))
+    opening = opening_of(safety)
     lines.append("    /// @par Thread safety")
     lines += comment(" ".join([opening] + ([safety["note"]] if safety.get("note") else [])), 4,
                      "///")
@@ -545,7 +551,7 @@ def emit_thread_table(contract):
             if item["kind"] != "function":
                 continue
             safety = item["thread_safety"]
-            text = THREAD_SAFETY[safety["class"]].format(object=safety.get("object", ""))
+            text = opening_of(safety)
             lines.append(f"| `{names.function(item['name'])}` | {text} |")
     return "\n".join(lines) + "\n"
 

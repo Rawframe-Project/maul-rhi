@@ -115,6 +115,10 @@ extern "C"
         // An adapter request is answered: its outcome is mrhi_success, and
         // mrhiGetAdapters lists the adapters, or an error.
         mrhi_instanceAdaptersFound = 0,
+        // A device finished opening: its outcome is mrhi_success and the device
+        // is ready, or an error and the device failed. A device destroyed while
+        // opening answers mrhi_errorStale.
+        mrhi_instanceDeviceReady = 1,
     };
 
     // A record from an instance's notification queue.
@@ -175,7 +179,8 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateInstance(const mrhiInstanceDef* def,
                                                           mrhiInstance** instanceOut);
 
-    /// Destroys an instance. Its devices must be destroyed first.
+    /// Destroys an instance. While any of its devices exists it refuses,
+    /// counting the call as misuse and destroying nothing.
     ///
     /// @param instance  The instance, or NULL for nothing.
     /// @par Thread safety

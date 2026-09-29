@@ -35,7 +35,7 @@ MARKERS = re.compile(
     r"|\bR\d+-\d+\b|\bS-\d+[a-z]?\b|\btopic-\d+|\bslice \d+|\brev \d+|\btask \d+"
     r"|\bADR-\d+|\bRT\d-[A-Z]+|\bF-T\d+|\bV-[A-Z]{3,}\b|\bD\d\b|\bv\d{2}\b|\bpre-\d+\b"
     r"|(?<![\w{])#\d{3}\b(?!\d)|(?<![\w/.'])[ABDMS]\d{1,2}(?![\w.'])"
-    r"|\([FU]\d{1,2}\)|\b(?:decision|record|item) [FU]\d{1,2}\b"
+    r"|\([FRUW]\d{1,2}\)|\b(?:decisions?|records?|items?) [FRUW]\d{1,2}\b"
     r"|\bregistry [A-Z]\d|\b[Pp]hase \d\b|\b[Rr]ound \d+\b"
     r"|\bintegration audit|\baudit [A-Z]\d|\bred[- ]team|\blesson\b|\bledger\b"
 )

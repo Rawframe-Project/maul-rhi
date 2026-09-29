@@ -40,3 +40,9 @@ format.
   left out, and features an API cannot grant are never reported.
 - The instance's misuse count (`mrhiGetInstanceMisuse`): each call
   refused as invalid input on a live instance counts once.
+- Devices (mrhi-0004, `device.h`): `mrhiCreateDevice` on an adapter
+  with the features and limits asked for, returning at once and ready
+  after `mrhi_instanceDeviceReady`; `mrhiDestroyDevice`,
+  `mrhiGetDeviceState`, the granted `mrhiGetDeviceFeatures` and
+  `mrhiGetDeviceLimits`, and `mrhiGetDeviceMisuse`. The test driver
+  opens devices with the outcome its adapter describes.
