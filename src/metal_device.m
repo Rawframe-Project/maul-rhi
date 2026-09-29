@@ -2,15 +2,17 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The Metal driver's devices (mrhi-0003): a retained Metal device and
-// its command queue, released when the device is destroyed, and its
-// objects (metal_resource.m). Shaders, pipelines, frames, surfaces and
-// heaps are not made yet: those calls answer mrhi_errorUnsupported, and
-// the conformance suite checks only the objects on Metal devices.
+// its command queue, released when the device is destroyed, its objects
+// (metal_resource.m), and its shaders and pipelines (metal_pipeline.m).
+// Frames, surfaces and heaps are not made yet: those calls answer
+// mrhi_errorUnsupported, and the conformance suite checks objects and
+// pipelines only on Metal devices.
 
 #include "metal_device.h"
 
 #include "allocator.h"
 #include "invariant.h"
+#include "metal_pipeline.h"
 #include "metal_resource.h"
 
 #include <stdalign.h>
@@ -19,8 +21,10 @@
 typedef struct MetalDevice
 {
     mrhiAllocator allocator;
+    size_t bytes;
     id<MTLDevice> device;
     id<MTLCommandQueue> queue;
+    mrhiMetalPipelines pipelines;
 } MetalDevice;
 
 static void Destroy(void* self)
@@ -29,7 +33,7 @@ static void Destroy(void* self)
     [device->queue release];
     [device->device release];
     mrhiAllocator allocator = device->allocator;
-    mrhiRelease(&allocator, device, sizeof(MetalDevice), alignof(MetalDevice));
+    mrhiRelease(&allocator, device, device->bytes, alignof(MetalDevice));
 }
 
 static mrhiResult CreateSampler(void* self, const mrhiSamplerDef* def, uint64_t* handleOut)
@@ -71,8 +75,7 @@ static void DestroyObject(void* self, uint64_t handle)
     mrhiMetalRelease(handle);
 }
 
-// Shaders, pipelines, swapchains and heaps are never made, so never
-// destroyed.
+// Swapchains and heaps are never made, so never destroyed.
 static void Never(void* self, uint64_t handle)
 {
     (void)self;
@@ -94,31 +97,34 @@ static mrhiResult ConfigureSurface(void* self, uint64_t surface, const mrhiSurfa
 static mrhiResult CreateShader(void* self, const mrhiShaderDef* def, const mrhiContainer* container,
                                uint64_t* handleOut)
 {
-    (void)self;
-    (void)def;
-    (void)container;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    const MetalDevice* device = self;
+    return mrhiMetalCreateShader(&device->pipelines, def, container, handleOut);
+}
+
+static void DestroyShader(void* self, uint64_t handle)
+{
+    const MetalDevice* device = self;
+    mrhiMetalDestroyShader(&device->pipelines, handle);
 }
 
 static mrhiResult CreateComputePipeline(void* self, const mrhiDriverComputePipeline* pipeline,
                                         uint64_t tag, uint64_t* handleOut)
 {
-    (void)self;
-    (void)pipeline;
-    (void)tag;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    MetalDevice* device = self;
+    return mrhiMetalCreateCompute(&device->pipelines, pipeline, tag, handleOut);
 }
 
 static mrhiResult CreateGraphicsPipeline(void* self, const mrhiDriverGraphicsPipeline* pipeline,
                                          uint64_t tag, uint64_t* handleOut)
 {
-    (void)self;
-    (void)pipeline;
-    (void)tag;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    MetalDevice* device = self;
+    return mrhiMetalCreateGraphics(&device->pipelines, pipeline, tag, handleOut);
+}
+
+static void DestroyPipeline(void* self, uint64_t handle)
+{
+    MetalDevice* device = self;
+    mrhiMetalDestroyPipeline(&device->pipelines, handle);
 }
 
 static void LossReport(void* self, mrhiDeviceLossReport* reportOut)
@@ -191,10 +197,8 @@ static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t
 
 static size_t Poll(void* self, mrhiDriverEvent* events, size_t capacity)
 {
-    (void)self;
-    (void)events;
-    (void)capacity;
-    return 0;
+    MetalDevice* device = self;
+    return mrhiMetalPollPipelines(&device->pipelines, events, capacity);
 }
 
 static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
@@ -247,10 +251,10 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .configureSurface = ConfigureSurface,
     .unconfigureSurface = Never,
     .createShader = CreateShader,
-    .destroyShader = Never,
+    .destroyShader = DestroyShader,
     .createComputePipeline = CreateComputePipeline,
     .createGraphicsPipeline = CreateGraphicsPipeline,
-    .destroyPipeline = Never,
+    .destroyPipeline = DestroyPipeline,
     .lossReport = LossReport,
     .acquireImage = AcquireImage,
     .releaseImage = ReleaseImage,
@@ -273,17 +277,24 @@ static const mrhiDeviceDriverVtable s_vtable = {
 mrhiResult mrhiCreateMetalDevice(const mrhiAllocator* allocator, id<MTLDevice> device,
                                  const mrhiDeviceDef* def, mrhiDeviceDriver* deviceOut)
 {
-    MetalDevice* made = mrhiAllocate(allocator, sizeof(MetalDevice), alignof(MetalDevice));
+    uint32_t pipelines = def->deviceLimits.pipelines;
+    mrhiLayout layout = {.size = sizeof(MetalDevice)};
+    size_t pendingAt =
+        mrhiLayoutAdd(&layout, pipelines, sizeof(mrhiDriverEvent), alignof(mrhiDriverEvent));
+    size_t handlesAt = mrhiLayoutAdd(&layout, pipelines, sizeof(uint64_t), alignof(uint64_t));
+    MetalDevice* made =
+        layout.overflow ? nullptr : mrhiAllocate(allocator, layout.size, alignof(MetalDevice));
     if (made == nullptr)
     {
         return mrhi_errorCapacity;
     }
+    unsigned char* block = (unsigned char*)made;
     @autoreleasepool
     {
         id<MTLCommandQueue> queue = [device newCommandQueue];
         if (queue == nil)
         {
-            mrhiRelease(allocator, made, sizeof(MetalDevice), alignof(MetalDevice));
+            mrhiRelease(allocator, made, layout.size, alignof(MetalDevice));
             return mrhi_errorPlatform;
         }
         if (def->labelLength > 0)
@@ -294,10 +305,18 @@ mrhiResult mrhiCreateMetalDevice(const mrhiAllocator* allocator, id<MTLDevice> d
         }
         *made = (MetalDevice){
             .allocator = *allocator,
+            .bytes = layout.size,
             .device = [device retain],
             .queue = queue,
         };
     }
+    made->pipelines = (mrhiMetalPipelines){
+        .allocator = &made->allocator,
+        .device = made->device,
+        .pending = (mrhiDriverEvent*)(block + pendingAt),
+        .pendingHandles = (uint64_t*)(block + handlesAt),
+        .pendingLimit = pipelines,
+    };
     *deviceOut = (mrhiDeviceDriver){.vtable = &s_vtable, .self = made};
     return mrhi_success;
 }

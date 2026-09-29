@@ -123,7 +123,7 @@ ids, requests, the frame graph) can be tested without a GPU.
   where a program builds it and loads one, but are neither tested nor
   promised. CI runs the conformance suite on the macOS runner's device
   under `MTL_DEBUG_LAYER` and `MTL_SHADER_VALIDATION`; until the
-  driver makes shaders, pipelines and frames, it checks objects only.
+  driver runs frames, it checks objects and pipelines only.
 - **Metal objects:** buffers, textures, views, samplers and query sets
   are Metal objects whose retained pointers are their handles, released
   as soon as the core destroys them, since command buffers retain what
@@ -135,6 +135,20 @@ ids, requests, the frame graph) can be tested without a GPU.
   passes' visibility results. Samplers are made to sit in argument
   buffers. A resource's memory is Metal's heap size and alignment for
   it.
+- **Metal pipelines:** a shader holds a library per entry point, made
+  from the container's metallib when it has one and otherwise compiled
+  from each entry's MSL without fast math, and a copy of the Metal map.
+  Each entry is the function of its own name, specialized with the
+  pipeline's constants as function constants of their ids. Pipelines
+  are made at the call and answered at the next poll, and keep what
+  their frames bind, so they outlive their shader. Vertex attributes
+  take their locations as attribute indices, and vertex buffer n lies
+  at buffer index 30 minus n; a pipeline whose vertex buffers reach an
+  index the container uses is refused as unsupported, as is a sample
+  mask that leaves samples out, since Metal has none, and a workgroup
+  larger than the pipeline's threads. A buffer of stride 0 takes
+  Metal's constant step. The driver's pipeline cache is empty, since
+  Metal keeps its own.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`

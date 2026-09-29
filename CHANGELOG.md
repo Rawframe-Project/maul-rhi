@@ -347,10 +347,12 @@ format.
 - The Metal driver's start (`MAUL_RHI_METAL_DRIVER`, off by default,
   Objective-C): adapters for the system's Metal devices under their
   registry ids, devices with a command queue, and their buffers,
-  textures, views, samplers and occlusion query sets; shaders,
-  pipelines, frames and surfaces answer `mrhi_errorUnsupported` for
-  now. A macOS CI cell runs the conformance suite's adapter, device and
-  object checks on the runner's Metal device under Metal's validation.
+  textures, views, samplers, occlusion query sets, shaders (from the
+  container's metallib or MSL) and compute and graphics pipelines;
+  frames and surfaces answer `mrhi_errorUnsupported` for now. A macOS
+  CI cell runs the conformance suite's adapter, device, object and
+  pipeline checks on the runner's Metal device under Metal's
+  validation.
 - Metal code in shader containers: a Metal map, each entry's MSL and
   a metallib (sections 11 to 13), checked by the reader;
   `tools/mrhi_container.py --msl --metallib` writes them and

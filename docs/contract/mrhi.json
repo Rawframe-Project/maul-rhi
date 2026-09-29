@@ -394,7 +394,7 @@
             },
             "metal": {
               "class": "restricted",
-              "note": "lowPower and hasUnifiedMemory for integrated; no virtual or software"
+              "note": "hasUnifiedMemory for integrated; Apple's paravirtual device, known by its name, as virtual; never software"
             },
             "web_gpu": {
               "class": "restricted",
@@ -17166,8 +17166,8 @@
               "note": "a pipeline state stream and its root signature"
             },
             "metal": {
-              "class": "direct",
-              "note": "MTLRenderPipelineDescriptor and an MTLDepthStencilState"
+              "class": "restricted",
+              "note": "MTLRenderPipelineDescriptor and an MTLDepthStencilState; Metal has no pipeline sample mask, so a mask leaving samples out waits on a mask output the MSL cook writes, and is refused with mrhi_errorUnsupported"
             },
             "web_gpu": {
               "class": "direct",
@@ -17238,7 +17238,7 @@
             },
             "metal": {
               "class": "direct",
-              "note": "newRenderPipelineStateWithDescriptor:completionHandler:, answered at the next poll"
+              "note": "newRenderPipelineStateWithDescriptor:error: at the call, answered at the next poll"
             },
             "web_gpu": {
               "class": "direct",
@@ -17422,7 +17422,7 @@
             },
             "metal": {
               "class": "direct",
-              "note": "newComputePipelineStateWithDescriptor:completionHandler:, answered at the next poll"
+              "note": "newComputePipelineStateWithDescriptor:options:reflection:error: at the call, answered at the next poll"
             },
             "web_gpu": {
               "class": "direct",
