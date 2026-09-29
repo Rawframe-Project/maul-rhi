@@ -163,9 +163,10 @@ extern "C"
     ///
     /// @param device  The device.
     /// @param pass    The pass, recording.
-    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or open
-    /// debug groups; `mrhi_errorStale` for a pass of another frame or none;
-    /// `mrhi_errorState` for a pass that is not recording.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, open
+    /// debug groups, or an open occlusion query; `mrhi_errorStale` for a pass
+    /// of another frame or none; `mrhi_errorState` for a pass that is not
+    /// recording.
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiEndPass(mrhiDevice* device, mrhiPassId pass);
@@ -417,6 +418,37 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDispatchIndirect(mrhiDevice* device, mrhiPassId pass,
                                                             mrhiResourceId resource,
                                                             uint64_t offset);
+
+    /// Begins an occlusion query of the pass's occlusion query set: the draws
+    /// until its end write whether any sample passed. A query is written at
+    /// most once in a frame.
+    ///
+    /// @param device  The device.
+    /// @param pass    The pass, recording, with an occlusion query set.
+    /// @param query   The query, below the set's count.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass
+    /// without an occlusion query set, a query past the set's count or already
+    /// written in this frame, or a query already open in the pass;
+    /// `mrhi_errorStale` for a pass of another frame or a destroyed query set;
+    /// `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity`
+    /// when the frame's commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiBeginOcclusionQuery(mrhiDevice* device, mrhiPassId pass,
+                                                               uint32_t query);
+
+    /// Ends the pass's open occlusion query. One refused for capacity still
+    /// ends it, so the pass can end.
+    ///
+    /// @param device  The device.
+    /// @param pass    The pass, recording, with an occlusion query open.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or a pass
+    /// without an open occlusion query; `mrhi_errorStale` for a pass of another
+    /// frame; `mrhi_errorState` for a pass that is not recording;
+    /// `mrhi_errorCapacity` when the frame's commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiEndOcclusionQuery(mrhiDevice* device, mrhiPassId pass);
 
     /// Copies bytes from one buffer of the frame to another.
     ///

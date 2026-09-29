@@ -34,7 +34,7 @@ binding: capabilities_core encoder_core
 draw: encoder_core
 copy: copy_core
 upload: copy_core
-query: device_core
+query: device_core encoder_core
 readback: copy_core
 copy_core: capabilities_core encoder_core
 cache: bytes device_core sha256

@@ -92,6 +92,8 @@ edit the contract, not this file.
 | `mrhiDrawIndirect` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiDrawIndexedIndirect` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiDispatchIndirect` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiBeginOcclusionQuery` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiEndOcclusionQuery` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiCopyBuffer` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiCopyBufferToTexture` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiCopyTextureToBuffer` | Safe from any thread; the pass is used by one thread at a time. |

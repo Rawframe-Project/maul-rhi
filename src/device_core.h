@@ -245,6 +245,11 @@ typedef struct mrhiFramePass
     uint8_t tableDigests[MRHI_TABLES][MRHI_DIGEST_BYTES];
     mrhiIndexFormat indexFormat;
     uint64_t indexBytes;
+    // Its occlusion query set (a slot plus one and its generation, 0 for
+    // none), and whether one of its queries is open.
+    uint32_t occlusionSet;
+    uint32_t occlusionGeneration;
+    bool occlusionOpen;
 } mrhiFramePass;
 
 // A surface as the device that configured it keeps it: the surface, the
@@ -361,6 +366,8 @@ struct mrhiDevice
     bool frameOpen;
     bool frameCompiled;
     uint32_t frameSerial;
+    // Frames begun, never 0 once one is: what query marks hold.
+    uint64_t frameNumber;
     mrhiFrameResource* frameResources;
     uint32_t frameResourceCount;
     mrhiFramePass* framePasses;

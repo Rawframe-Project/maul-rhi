@@ -5737,7 +5737,7 @@
     },
     {
       "name": "resources",
-      "doc": "The objects a device owns: samplers, buffers, textures and views, each a generation-checked id.",
+      "doc": "The objects a device owns: samplers, buffers, textures, views and query sets, each a generation-checked id.",
       "includes": [
         "device"
       ],
@@ -10117,6 +10117,11 @@
               "name": "depth_target",
               "type": "struct.depth_target",
               "doc": "Its depth target, if its resource is not null."
+            },
+            {
+              "name": "occlusion_query_set",
+              "type": "id.query_set_id",
+              "doc": "The occlusion query set the pass's occlusion queries write, for a pass with targets; a null id for none."
             }
           ]
         },
@@ -10139,7 +10144,7 @@
           "doc": "Declares a pass of the open frame, after the passes declared before it in its class.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an unknown class, kind, aspect or operation, an access or target its resource cannot take (a kind for the other resource type, a range outside the texture, a use an imported object was not made with, a target that does not render or depth-test), targets of different sizes or sample counts, a resolve that does not match, a subresource written and used otherwise in the pass, an access the class does not allow, or a declared resource read before any pass wrote it; `mrhi_errorStale` for a resource of another frame, or an imported object destroyed since; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorCapacity` when the device's framePasses or frameAccesses limit is reached."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an unknown class, kind, aspect or operation, an access or target its resource cannot take (a kind for the other resource type, a range outside the texture, a use an imported object was not made with, a target that does not render or depth-test), targets of different sizes or sample counts, a resolve that does not match, a subresource written and used otherwise in the pass, an access the class does not allow, a declared resource read before any pass wrote it, or an occlusion query set that is not one or is named by a pass without targets; `mrhi_errorStale` for a resource of another frame, an imported object destroyed since, or a query set the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorCapacity` when the device's framePasses or frameAccesses limit is reached."
           },
           "args": [
             {
@@ -15221,7 +15226,7 @@
           "doc": "Ends recording a pass. Its debug groups must be closed.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or open debug groups; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, open debug groups, or an open occlusion query; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording."
           },
           "args": [
             {
@@ -15676,6 +15681,63 @@
               "name": "offset",
               "type": "uint64",
               "doc": "The arguments' first byte, a multiple of 4, with 12 bytes after it in the buffer."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "begin_occlusion_query",
+          "doc": "Begins an occlusion query of the pass's occlusion query set: the draws until its end write whether any sample passed. A query is written at most once in a frame.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass without an occlusion query set, a query past the set's count or already written in this frame, or a query already open in the pass; `mrhi_errorStale` for a pass of another frame or a destroyed query set; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, with an occlusion query set."
+            },
+            {
+              "name": "query",
+              "type": "uint32",
+              "doc": "The query, below the set's count."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "end_occlusion_query",
+          "doc": "Ends the pass's open occlusion query. One refused for capacity still ends it, so the pass can end.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or a pass without an open occlusion query; `mrhi_errorStale` for a pass of another frame; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, with an occlusion query open."
             }
           ],
           "thread_safety": {

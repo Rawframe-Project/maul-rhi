@@ -50,6 +50,9 @@ typedef enum mrhiCommandType
     mrhiCommandDrawIndirect,
     mrhiCommandDrawIndexedIndirect,
     mrhiCommandDispatchIndirect,
+    // a: the query set's driver handle; b: the query.
+    mrhiCommandBeginOcclusionQuery,
+    mrhiCommandEndOcclusionQuery,
     // b, c, d: the width (the bytes of a copy between buffers), height
     // and depth or layers; the source's and destination's sides follow,
     // an mrhiCommandBufferSide or mrhiCommandTextureSide each.

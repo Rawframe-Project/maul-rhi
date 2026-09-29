@@ -119,7 +119,7 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(draw WHITEBOX)
         maul_add_test(copy WHITEBOX)
         maul_add_test(upload WHITEBOX)
-        maul_add_test(query)
+        maul_add_test(query WHITEBOX)
         maul_add_test(readback WHITEBOX)
         # The container writer against the reader, where Python runs.
         find_package(Python3 COMPONENTS Interpreter)

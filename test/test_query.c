@@ -3,11 +3,13 @@
 //
 // Query sets on a test driver device: the def's checks, the timestamp
 // feature, the device's state, and its two limits: sets, and runs of
-// queries.
+// queries. Occlusion queries in render passes: the pass's set, one open
+// query at a time, and each query written once a frame.
 
+#include "device_core.h"
 #include "test_device_setup.h"
 
-#include "maul-rhi/resources.h"
+#include "maul-rhi/encoder.h"
 
 // A ready device holding at most sets query sets of queries in all, or
 // an opening one; timestamps granted when asked.
@@ -179,6 +181,220 @@ static void TestDriverFailure(void)
     Close(device);
 }
 
+static mrhiDevice* s_device;
+static mrhiTextureId s_target;
+static mrhiPassId s_render;
+static mrhiPassId s_compute;
+
+// Opens a ready device with timestamps and a render target, its
+// commands limited to bytes.
+static void OpenFrames(uint32_t commandBytes)
+{
+    s_adapter.features.timestampQuery = true;
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.features.timestampQuery = true;
+    def.deviceLimits.frameCommandBytes = commandBytes;
+    s_device = OpenWith(def, true);
+    mrhiTextureDef textureDef = mrhiDefaultTextureDef();
+    textureDef.format = mrhi_formatRgba8Unorm;
+    textureDef.width = 16;
+    textureDef.height = 16;
+    textureDef.usage = mrhi_textureRenderTarget;
+    CHECK(mrhiCreateTexture(s_device, &textureDef, &s_target) == mrhi_success, "a target");
+}
+
+static mrhiQuerySetId MakeSet(mrhiQueryType type, uint32_t count)
+{
+    mrhiQuerySetDef def = Def(type, count);
+    mrhiQuerySetId set = {0};
+    CHECK(mrhiCreateQuerySet(s_device, &def, &set) == mrhi_success, "a set");
+    return set;
+}
+
+// A render pass def drawing into the target, naming a set.
+static mrhiPassDef RenderDef(mrhiResourceId target, mrhiQuerySetId set)
+{
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.colorTargets[0] = (mrhiColorTarget){.resource = target, .load = mrhi_loadClear};
+    def.colorTargetCount = 1;
+    def.occlusionQuerySet = set;
+    return def;
+}
+
+// Begins a frame and imports the target.
+static mrhiResourceId BeginFrame(void)
+{
+    mrhiFrameDef frameDef = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    mrhiResourceId target = {0};
+    CHECK(mrhiImportTexture(s_device, s_target, &target) == mrhi_success, "imported");
+    return target;
+}
+
+// Opens a frame of a render pass naming a set and a compute pass,
+// compiled and begun.
+static void Frame(mrhiQuerySetId set)
+{
+    mrhiPassDef def = RenderDef(BeginFrame(), set);
+    CHECK(mrhiAddPass(s_device, &def, &s_render) == mrhi_success, "the render pass");
+    def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    CHECK(mrhiAddPass(s_device, &def, &s_compute) == mrhi_success, "the compute pass");
+    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
+              mrhiBeginPass(s_device, s_compute) == mrhi_success,
+          "begun");
+}
+
+static void Drop(void)
+{
+    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+}
+
+// The n-th record of a pass, walking its chunks: or NULL past them.
+static const mrhiCommand* Nth(mrhiPassId id, uint32_t n)
+{
+    const mrhiFramePass* pass = &s_device->framePasses[id.index1 - 1];
+    for (uint32_t chunk = pass->firstChunk; chunk != 0;
+         chunk = s_device->frameChunks[chunk - 1].next)
+    {
+        const mrhiCommandChunk* at = &s_device->frameChunks[chunk - 1];
+        if (n < at->count)
+        {
+            return &at->commands[n];
+        }
+        n -= at->count;
+    }
+    return nullptr;
+}
+
+static void TestPassSets(void)
+{
+    OpenFrames(1u << 20);
+    mrhiQuerySetId occlusion = MakeSet(mrhi_queryOcclusion, 4);
+    mrhiQuerySetId timestamps = MakeSet(mrhi_queryTimestamp, 4);
+    mrhiQuerySetId gone = MakeSet(mrhi_queryOcclusion, 4);
+    CHECK(mrhiDestroyQuerySet(s_device, gone) == mrhi_success, "one destroyed");
+    mrhiResourceId target = BeginFrame();
+    mrhiPassId pass;
+    mrhiPassDef def = RenderDef(target, timestamps);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a timestamp set");
+    def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    def.occlusionQuerySet = occlusion;
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a pass without targets");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 2, "each counted");
+    def = RenderDef(target, gone);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorStale, "a destroyed set");
+    def.depthTarget.resource = target;
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorStale, "stale before the targets");
+    def = RenderDef(target, occlusion);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "an occlusion set");
+    CHECK(s_device->framePasses[pass.index1 - 1].occlusionSet == occlusion.index1 &&
+              s_device->framePasses[pass.index1 - 1].occlusionGeneration == occlusion.generation,
+          "kept by the pass");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 2, "the stale ones not counted");
+    Drop();
+    Close(s_device);
+}
+
+static void TestOcclusion(void)
+{
+    OpenFrames(1u << 20);
+    mrhiQuerySetId set = MakeSet(mrhi_queryOcclusion, 4);
+    Frame(set);
+    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 2) == mrhi_success, "begun");
+    const mrhiCommand* command = Nth(s_render, 0);
+    CHECK(command != nullptr && command->type == mrhiCommandBeginOcclusionQuery &&
+              command->a == s_device->querySetSlots[set.index1 - 1].handle && command->b == 2,
+          "recorded with the set's handle");
+    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 3) == mrhi_errorInvalid, "one open");
+    CHECK(mrhiEndPass(s_device, s_render) == mrhi_errorInvalid, "no end while open");
+    CHECK(mrhiEndOcclusionQuery(s_device, s_render) == mrhi_success, "ended");
+    command = Nth(s_render, 1);
+    CHECK(command != nullptr && command->type == mrhiCommandEndOcclusionQuery, "recorded");
+    CHECK(mrhiEndOcclusionQuery(s_device, s_render) == mrhi_errorInvalid, "none open");
+    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 2) == mrhi_errorInvalid,
+          "written this frame");
+    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 4) == mrhi_errorInvalid, "past the set");
+    CHECK(mrhiBeginOcclusionQuery(s_device, s_compute, 0) == mrhi_errorInvalid &&
+              mrhiEndOcclusionQuery(s_device, s_compute) == mrhi_errorInvalid,
+          "a pass without a set");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 7, "each counted");
+    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 3) == mrhi_success &&
+              mrhiEndOcclusionQuery(s_device, s_render) == mrhi_success,
+          "another query");
+    CHECK(Nth(s_render, 4) == nullptr, "the refused ones recorded nothing");
+    CHECK(mrhiBeginOcclusionQuery(nullptr, s_render, 0) == mrhi_errorInvalid &&
+              mrhiEndOcclusionQuery(nullptr, s_render) == mrhi_errorInvalid,
+          "no device");
+    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success, "the pass ended");
+    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 0) == mrhi_errorState &&
+              mrhiEndOcclusionQuery(s_device, s_render) == mrhi_errorState,
+          "not recording");
+    Drop();
+    Frame(set);
+    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 2) == mrhi_success &&
+              mrhiEndOcclusionQuery(s_device, s_render) == mrhi_success,
+          "written again in the next frame");
+    CHECK(mrhiDestroyQuerySet(s_device, set) == mrhi_success, "destroyed while recording");
+    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 0) == mrhi_errorStale, "stale");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 7, "neither counted");
+    Drop();
+    Close(s_device);
+}
+
+// Each set's queries have their own marks: two sets' first queries are
+// written in one frame.
+static void TestSetsApart(void)
+{
+    OpenFrames(1u << 20);
+    mrhiQuerySetId first = MakeSet(mrhi_queryOcclusion, 4);
+    mrhiQuerySetId second = MakeSet(mrhi_queryOcclusion, 4);
+    mrhiResourceId target = BeginFrame();
+    mrhiPassDef def = RenderDef(target, first);
+    mrhiPassId a;
+    mrhiPassId b;
+    CHECK(mrhiAddPass(s_device, &def, &a) == mrhi_success, "a pass on the first set");
+    def.occlusionQuerySet = second;
+    CHECK(mrhiAddPass(s_device, &def, &b) == mrhi_success, "one on the second");
+    CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
+              mrhiBeginPass(s_device, a) == mrhi_success &&
+              mrhiBeginPass(s_device, b) == mrhi_success,
+          "begun");
+    CHECK(mrhiBeginOcclusionQuery(s_device, b, 0) == mrhi_success &&
+              mrhiBeginOcclusionQuery(s_device, a, 0) == mrhi_success,
+          "query 0 of each");
+    CHECK(mrhiEndOcclusionQuery(s_device, a) == mrhi_success &&
+              mrhiEndOcclusionQuery(s_device, b) == mrhi_success,
+          "ended");
+    Drop();
+    Close(s_device);
+}
+
+// A query refused for capacity still opens and closes, so the pass ends.
+static void TestOcclusionCapacity(void)
+{
+    OpenFrames(MRHI_CHUNK_BYTES);
+    mrhiQuerySetId set = MakeSet(mrhi_queryOcclusion, 128);
+    Frame(set);
+    for (uint32_t i = 0; i < 63; ++i)
+    {
+        CHECK(mrhiBeginOcclusionQuery(s_device, s_render, i) == mrhi_success &&
+                  mrhiEndOcclusionQuery(s_device, s_render) == mrhi_success,
+              "fits");
+    }
+    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 63) == mrhi_success, "the last record");
+    CHECK(mrhiEndOcclusionQuery(s_device, s_render) == mrhi_errorCapacity, "full");
+    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 64) == mrhi_errorCapacity &&
+              mrhiEndOcclusionQuery(s_device, s_render) == mrhi_errorCapacity,
+          "still full");
+    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success, "the pass ends");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "no misuse");
+    Drop();
+    Close(s_device);
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -188,5 +404,9 @@ int main(void)
     TestRunOrder();
     TestNoQueries();
     TestDriverFailure();
+    TestPassSets();
+    TestOcclusion();
+    TestSetsApart();
+    TestOcclusionCapacity();
     return s_failures == 0 ? 0 : 1;
 }

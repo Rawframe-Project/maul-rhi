@@ -402,6 +402,9 @@ extern "C"
         uint32_t colorTargetCount;
         // Its depth target, if its resource is not null.
         mrhiDepthTarget depthTarget;
+        // The occlusion query set the pass's occlusion queries write, for a
+        // pass with targets; a null id for none.
+        mrhiQuerySetId occlusionQuerySet;
     } mrhiPassDef;
 
     /// Returns the default pass def: a graphics pass with no accesses or
@@ -425,12 +428,14 @@ extern "C"
     /// object was not made with, a target that does not render or depth-test),
     /// targets of different sizes or sample counts, a resolve that does not
     /// match, a subresource written and used otherwise in the pass, an access
-    /// the class does not allow, or a declared resource read before any pass
-    /// wrote it; `mrhi_errorStale` for a resource of another frame, or an
-    /// imported object destroyed since; `mrhi_errorUnsupported` for a critical
-    /// extension the library does not know; `mrhi_errorState` for a device
-    /// without an open frame, or a frame already compiled; `mrhi_errorCapacity`
-    /// when the device's framePasses or frameAccesses limit is reached.
+    /// the class does not allow, a declared resource read before any pass wrote
+    /// it, or an occlusion query set that is not one or is named by a pass
+    /// without targets; `mrhi_errorStale` for a resource of another frame, an
+    /// imported object destroyed since, or a query set the device no longer
+    /// has; `mrhi_errorUnsupported` for a critical extension the library does
+    /// not know; `mrhi_errorState` for a device without an open frame, or a
+    /// frame already compiled; `mrhi_errorCapacity` when the device's
+    /// framePasses or frameAccesses limit is reached.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def,

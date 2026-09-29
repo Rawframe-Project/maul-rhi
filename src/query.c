@@ -3,9 +3,12 @@
 //
 // Query sets (mrhi-0012): device objects of occlusion or timestamp
 // queries, each holding a run of the device's query marks, which record
-// the frame that last wrote each query.
+// the frame that last wrote each query; and the occlusion queries a
+// render pass brackets its draws with.
 
-#include "device_core.h"
+#include "encoder_core.h"
+
+#include <stdatomic.h>
 
 #define QUERY_SET_DEF_COOKIE 0x6D727173u
 // WebGPU's bound on a set's queries.
@@ -122,5 +125,77 @@ mrhiResult mrhiDestroyQuerySet(mrhiDevice* device, mrhiQuerySetId set)
     device->driver.vtable->destroyQuerySet(device->driver.self, slot->handle);
     *slot = (mrhiQuerySetSlot){0};
     mrhiPoolRelease(&device->querySets, set.index1);
+    return mrhi_success;
+}
+
+// Marks a query of a set as written in the open frame: false when the
+// frame already wrote it. Passes record in parallel, so the exchange is
+// atomic.
+static bool MarkWritten(mrhiDevice* device, const mrhiQuerySetSlot* set, uint32_t query)
+{
+    uint64_t frame = device->frameNumber;
+    return atomic_exchange_explicit(&device->queryMarks[set->first + query], frame,
+                                    memory_order_relaxed) != frame;
+}
+
+mrhiResult mrhiBeginOcclusionQuery(mrhiDevice* device, mrhiPassId id, uint32_t query)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (pass->occlusionSet == 0 || pass->occlusionOpen)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    if (!mrhiPoolIsLive(&device->querySets, pass->occlusionSet, pass->occlusionGeneration))
+    {
+        return mrhi_errorStale;
+    }
+    const mrhiQuerySetSlot* set = &device->querySetSlots[pass->occlusionSet - 1];
+    if (query >= set->count || !MarkWritten(device, set, query))
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    // Open even when refused for capacity, so that its end is not misuse.
+    pass->occlusionOpen = true;
+    mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
+    if (record == nullptr)
+    {
+        return mrhi_errorCapacity;
+    }
+    *record = (mrhiCommand){.type = mrhiCommandBeginOcclusionQuery, .a = set->handle, .b = query};
+    return mrhi_success;
+}
+
+mrhiResult mrhiEndOcclusionQuery(mrhiDevice* device, mrhiPassId id)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (!pass->occlusionOpen)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    pass->occlusionOpen = false;
+    mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
+    if (record == nullptr)
+    {
+        return mrhi_errorCapacity;
+    }
+    *record = (mrhiCommand){.type = mrhiCommandEndOcclusionQuery};
     return mrhi_success;
 }

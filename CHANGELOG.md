@@ -210,3 +210,7 @@ format.
   occlusion or timestamp sets of up to 4096 queries, timestamps with
   the `timestamp_query` feature, within the device's `querySets` and
   `queries` limits.
+- Occlusion queries: a render pass names an occlusion query set
+  (`occlusionQuerySet`), and `mrhiBeginOcclusionQuery` and
+  `mrhiEndOcclusionQuery` bracket its draws, one query open at a time
+  and each query written at most once a frame.
