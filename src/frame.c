@@ -7,6 +7,7 @@
 // driver; nothing here blocks unless the program waits.
 
 #include "device_core.h"
+#include "invariant.h"
 
 #include <stdatomic.h>
 
@@ -22,10 +23,18 @@ mrhiFrameDef mrhiDefaultFrameDef(void)
     return def;
 }
 
+uint32_t mrhiAnswerRoom(const mrhiDevice* device)
+{
+    uint64_t used = (uint64_t)device->queueCount + device->runningCount + device->pendingCount +
+                    device->readbackPending;
+    // Every answer is reserved before it is owed, so none overfills it.
+    MRHI_ASSERT(used <= device->deviceLimits.notifications);
+    return (uint32_t)(device->deviceLimits.notifications - used);
+}
+
 bool mrhiHasAnswerRoom(const mrhiDevice* device)
 {
-    return device->queueCount + device->runningCount + device->pendingCount <
-           device->deviceLimits.notifications;
+    return mrhiAnswerRoom(device) > 0;
 }
 
 void mrhiQueueAnswer(mrhiDevice* device, mrhiDeviceNotificationKind kind, uint32_t request,
@@ -67,10 +76,14 @@ static void Finish(mrhiDevice* device, uint64_t tag, mrhiResult outcome)
     {
         if (device->running[i] == tag)
         {
-            --device->runningCount;
-            device->running[i] = device->running[device->runningCount];
-            device->runningRegions[i] = device->runningRegions[device->runningCount];
             mrhiQueueAnswer(device, mrhi_deviceFrameDone, (uint32_t)tag, outcome);
+            mrhiAnswerReadbacks(device, device->runningReadbackFirst[i],
+                                device->runningReadbackCount[i], outcome);
+            uint32_t last = --device->runningCount;
+            device->running[i] = device->running[last];
+            device->runningRegions[i] = device->runningRegions[last];
+            device->runningReadbackFirst[i] = device->runningReadbackFirst[last];
+            device->runningReadbackCount[i] = device->runningReadbackCount[last];
             return;
         }
     }
@@ -130,6 +143,7 @@ mrhiResult mrhiBeginFrame(mrhiDevice* device, const mrhiFrameDef* def)
     }
     device->frameOpen = true;
     device->stagingRegion = FreeRegion(device);
+    mrhiMarkReadbacks(device);
     atomic_store_explicit(&device->stagingTaken, 0, memory_order_relaxed);
     device->frameSerial = device->frameSerial == UINT32_MAX ? 1 : device->frameSerial + 1;
     device->frameCompiled = false;
@@ -151,6 +165,7 @@ mrhiResult mrhiDropFrame(mrhiDevice* device)
         return mrhi_errorState;
     }
     device->frameOpen = false;
+    mrhiDropReadbacks(device);
     return mrhi_success;
 }
 
@@ -194,11 +209,15 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     mrhiResult status = device->driver.vtable->submitFrame(device->driver.self, token);
     if (status != mrhi_success)
     {
+        mrhiDropReadbacks(device);
         return status;
     }
     mrhiApplyFinalStates(device);
     device->lastRequest = token;
     device->runningRegions[device->runningCount] = device->stagingRegion;
+    device->runningReadbackFirst[device->runningCount] = device->frameReadbackFirst;
+    device->runningReadbackCount[device->runningCount] =
+        device->readbackHead - device->frameReadbackFirst;
     device->running[device->runningCount++] = token;
     *tokenOut = (mrhiRequestId){token, 1};
     return mrhi_success;

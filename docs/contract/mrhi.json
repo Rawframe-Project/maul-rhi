@@ -5491,6 +5491,16 @@
               "name": "frame_upload_bytes",
               "type": "uint32",
               "doc": "The bytes one frame's uploads take in all, each at a 512-byte boundary with a texture's rows at a 256-byte pitch; as many again for each frame in flight; 1 MiB by default, 0 for no uploads."
+            },
+            {
+              "name": "readback_bytes",
+              "type": "uint32",
+              "doc": "The bytes readbacks waiting to be taken hold in all, a multiple of 512: each at a 512-byte boundary with a texture's rows at a 256-byte pitch; 1 MiB by default, 0 for no readbacks."
+            },
+            {
+              "name": "readbacks",
+              "type": "uint32",
+              "doc": "The readbacks recorded and not yet taken at once; 64 by default, 0 for none."
             }
           ]
         },
@@ -8853,6 +8863,11 @@
               "name": "device_pipeline_ready",
               "value": 1,
               "doc": "A pipeline's creation finished: its outcome is mrhi_success, the error that ended it, or mrhi_errorStale when it was destroyed first."
+            },
+            {
+              "name": "device_readback_ready",
+              "value": 2,
+              "doc": "A readback's frame finished: its outcome is mrhi_success, and mrhiTakeReadback copies its bytes out, or the error that ended the frame."
             }
           ]
         },
@@ -8868,7 +8883,7 @@
             {
               "name": "request_id",
               "type": "id.request_id",
-              "doc": "The request the record answers: a frame's token or a pipeline's request, unique on the device."
+              "doc": "The request the record answers: a frame's token, a pipeline's request or a readback's, unique on the device."
             },
             {
               "name": "outcome",
@@ -15599,6 +15614,140 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "read_buffer",
+          "doc": "Reads bytes of a buffer of the frame back after the frame finishes.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or request out, a pass with targets, a resource that is not a buffer the pass declares with the copy source access, or an offset or size not a multiple of 4 or past the buffer; `mrhi_errorStale` for a pass of another frame or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the device's readbacks, readback bytes or notification room are full, or the frame's commands are."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, without targets."
+            },
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "The buffer read."
+            },
+            {
+              "name": "offset",
+              "type": "uint64",
+              "doc": "Its first byte read, a multiple of 4."
+            },
+            {
+              "name": "size",
+              "type": "uint64",
+              "doc": "How many, a multiple of 4."
+            },
+            {
+              "name": "request_out",
+              "type": "id.request_id",
+              "pointer": "mutable",
+              "doc": "The readback's request, answered by mrhi_deviceReadbackReady after the frame; untouched on failure."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "read_texture",
+          "doc": "Reads texels of a texture's mip back after the frame finishes, rows tightly packed.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass with targets, a region off the texture's blocks or past its mip, a multisampled texture, an aspect that cannot be copied from, or a texture the pass declares no covering copy source access of; `mrhi_errorStale` for a pass of another frame or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the device's readbacks, readback bytes or notification room are full, or the frame's commands are."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, without targets."
+            },
+            {
+              "name": "source",
+              "type": "struct.texture_copy",
+              "pointer": "const",
+              "doc": "The texture, mip, origin and aspect. Only read during the call."
+            },
+            {
+              "name": "size",
+              "type": "struct.extent3d",
+              "pointer": "const",
+              "doc": "The texels. Only read during the call."
+            },
+            {
+              "name": "request_out",
+              "type": "id.request_id",
+              "pointer": "mutable",
+              "doc": "The readback's request, answered by mrhi_deviceReadbackReady after the frame; untouched on failure."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "take_readback",
+          "doc": "Copies an answered readback's bytes out and frees them; with no array, reports their size only.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or size out, or an array NULL with a capacity; `mrhi_errorStale` for a request that is not a readback waiting to be taken; `mrhi_errorState` for a readback not yet answered; `mrhi_errorCapacity` for an array too small, with the size; the error that ended the readback's frame, which frees it."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "request",
+              "type": "id.request_id",
+              "doc": "The readback's request."
+            },
+            {
+              "name": "bytes",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "Where the bytes go, or NULL for the size only."
+            },
+            {
+              "name": "capacity",
+              "type": "size",
+              "doc": "The bytes there."
+            },
+            {
+              "name": "size_out",
+              "type": "size",
+              "pointer": "mutable",
+              "doc": "The readback's bytes."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
           }
         },
         {

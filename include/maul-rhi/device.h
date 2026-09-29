@@ -75,6 +75,13 @@ extern "C"
         // boundary with a texture's rows at a 256-byte pitch; as many again for
         // each frame in flight; 1 MiB by default, 0 for no uploads.
         uint32_t frameUploadBytes;
+        // The bytes readbacks waiting to be taken hold in all, a multiple of
+        // 512: each at a 512-byte boundary with a texture's rows at a 256-byte
+        // pitch; 1 MiB by default, 0 for no readbacks.
+        uint32_t readbackBytes;
+        // The readbacks recorded and not yet taken at once; 64 by default, 0
+        // for none.
+        uint32_t readbacks;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the

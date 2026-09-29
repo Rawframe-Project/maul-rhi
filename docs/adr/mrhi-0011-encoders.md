@@ -81,6 +81,19 @@ them at submission.
   full staging marks the pass as a full arena does. Each running frame
   keeps its own region, chosen free when a frame begins, whatever order
   frames finish in.
+- **Readbacks** (`mrhiReadBuffer`, `mrhiReadTexture`) copy into the
+  device's readback ring, `readbackBytes` at the same alignments as
+  staging, and each takes one of `readbacks` records and a request. A
+  readback wraps to the ring's start rather than splitting, and is
+  refused for capacity when the ring, the records, or answer room for
+  it and its frame run out, since the frame's finish queues
+  `mrhi_deviceReadbackReady` for each. The program takes the bytes
+  once with `mrhiTakeReadback`, rows packed tightly; taking frees the
+  ring in order from the oldest, so a readback left untaken holds the
+  ring. Readbacks are taken under a lock, the one lock the encoders
+  hold, as passes record in parallel and records must stay in order. A
+  dropped frame or a failed submission gives back the frame's records
+  and ring bytes.
 - **Debug groups** balance by the pass's end. A push or pop refused for
   capacity still counts, so a pass that found the arena full still
   ends.

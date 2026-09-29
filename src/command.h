@@ -57,6 +57,10 @@ typedef enum mrhiCommandType
     // texture's rows at a 256-byte pitch.
     mrhiCommandWriteBuffer,
     mrhiCommandWriteTexture,
+    // As a copy into a buffer, the destination's side naming the
+    // device's readback ring (object 0), placed and pitched as uploads.
+    mrhiCommandReadBuffer,
+    mrhiCommandReadTexture,
 } mrhiCommandType;
 
 typedef struct mrhiCommand

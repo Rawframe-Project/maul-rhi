@@ -15,6 +15,8 @@
 
 #include "maul-rhi/device.h"
 
+#include <stdatomic.h>
+
 // Where a device texture or buffer was imported: the frame's serial and
 // the frame's slot for it.
 typedef struct mrhiImport
@@ -22,6 +24,34 @@ typedef struct mrhiImport
     uint32_t frame;
     uint32_t resource;
 } mrhiImport;
+
+// Where a readback stands: free, recorded in a frame, answered, or
+// taken and waiting for the ring to pass it.
+typedef enum mrhiReadbackState
+{
+    mrhiReadbackFree,
+    mrhiReadbackRecorded,
+    mrhiReadbackAnswered,
+    mrhiReadbackTaken,
+} mrhiReadbackState;
+
+// A readback as its device keeps it: its request, state and answer; its
+// bytes in the ring (their position counted from the ring's start, so
+// that positions only grow, and the bytes they take); and the bytes the
+// program takes: a texture's rows of rowBytes at a pitch, rows to a
+// layer, or a buffer's bytes at pitch 0.
+typedef struct mrhiReadback
+{
+    uint32_t request;
+    mrhiReadbackState state;
+    mrhiResult outcome;
+    uint32_t pitch;
+    uint32_t rowBytes;
+    uint32_t rows;
+    uint64_t position;
+    uint64_t bytes;
+    uint64_t size;
+} mrhiReadback;
 
 // A sampler as its device keeps it: its driver handle, and what binding
 // it takes.
@@ -334,6 +364,23 @@ struct mrhiDevice
     uint64_t frameMemory;
     uint32_t* frameOrder;
     // The frame's command arena: its chunks, and those taken so far.
+    // Readbacks: their records and ring, both used in order and taken
+    // under the lock, since passes record in parallel; the records taken
+    // and freed (counts that only grow), the ring's positions likewise,
+    // the readbacks not yet answered, the open frame's first record and
+    // position, and each running frame's first record and count.
+    mrhiReadback* readbacks;
+    uint8_t* readbackRing;
+    atomic_flag readbackLock;
+    uint32_t readbackHead;
+    uint32_t readbackTail;
+    uint64_t ringHead;
+    uint64_t ringTail;
+    uint32_t readbackPending;
+    uint32_t frameReadbackFirst;
+    uint64_t frameRingFirst;
+    uint32_t* runningReadbackFirst;
+    uint32_t* runningReadbackCount;
     // The frames' staging: framesInFlight regions of frameUploadBytes,
     // the open frame's region, the bytes taken of it, and the region of
     // each running frame, beside its token in running.
@@ -475,8 +522,18 @@ mrhiResult mrhiImportPipelineCache(mrhiDevice* device, const void* bytes, size_t
 void mrhiDestroyPipelines(mrhiDevice* device);
 
 // Whether the queue has room for one more answer beside those it holds
-// and those running frames and pending pipelines will give.
+// and those running frames, pending pipelines and readbacks will give.
 bool mrhiHasAnswerRoom(const mrhiDevice* device);
+
+// The answers the queue still has room for.
+uint32_t mrhiAnswerRoom(const mrhiDevice* device);
+
+// Readbacks as frames begin, are dropped and finish: the open frame's
+// first record and position marked; its readbacks rolled back; a
+// finished frame's readbacks answered with its outcome.
+void mrhiMarkReadbacks(mrhiDevice* device);
+void mrhiDropReadbacks(mrhiDevice* device);
+void mrhiAnswerReadbacks(mrhiDevice* device, uint32_t first, uint32_t count, mrhiResult outcome);
 
 // Queues an answer the device made room for.
 void mrhiQueueAnswer(mrhiDevice* device, mrhiDeviceNotificationKind kind, uint32_t request,

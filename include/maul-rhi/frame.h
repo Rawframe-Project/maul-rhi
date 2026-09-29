@@ -42,14 +42,18 @@ extern "C"
         // A pipeline's creation finished: its outcome is mrhi_success, the
         // error that ended it, or mrhi_errorStale when it was destroyed first.
         mrhi_devicePipelineReady = 1,
+        // A readback's frame finished: its outcome is mrhi_success, and
+        // mrhiTakeReadback copies its bytes out, or the error that ended the
+        // frame.
+        mrhi_deviceReadbackReady = 2,
     };
 
     // A record from a device's notification queue.
     typedef struct mrhiDeviceNotification
     {
         mrhiDeviceNotificationKind kind;
-        // The request the record answers: a frame's token or a pipeline's
-        // request, unique on the device.
+        // The request the record answers: a frame's token, a pipeline's request
+        // or a readback's, unique on the device.
         mrhiRequestId requestId;
         // How the request ended.
         mrhiResult outcome;

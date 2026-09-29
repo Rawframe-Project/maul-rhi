@@ -38,6 +38,8 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.pipelines = 1024;
     def.deviceLimits.frameCommandBytes = 1u << 20;
     def.deviceLimits.frameUploadBytes = 1u << 20;
+    def.deviceLimits.readbackBytes = 1u << 20;
+    def.deviceLimits.readbacks = 64;
     return def;
 }
 
@@ -56,6 +58,7 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
         def->deviceLimits.frameBarriers == 0 || def->deviceLimits.shaders == 0 ||
         def->deviceLimits.pipelines == 0 ||
         def->deviceLimits.frameCommandBytes < MRHI_CHUNK_BYTES ||
+        def->deviceLimits.readbackBytes % 512 != 0 ||
         !mrhiIsLabelValid(def->label, def->labelLength) || !mrhiIsAllocatorValid(&def->allocator) ||
         (def->pipelineCache == nullptr && def->pipelineCacheBytes > 0) ||
         !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
@@ -205,6 +208,13 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
         mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
     size_t regionsAt =
         mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
+    size_t readbacksAt =
+        mrhiLayoutAdd(&layout, limits->readbacks, sizeof(mrhiReadback), alignof(mrhiReadback));
+    size_t ringAt = mrhiLayoutAdd(&layout, limits->readbackBytes, 1, alignof(max_align_t));
+    size_t firstsAt =
+        mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
+    size_t countsInFlightAt =
+        mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
     size_t stagingAt =
         mrhiLayoutAdd(&layout, (size_t)def->limits.framesInFlight * limits->frameUploadBytes, 1,
                       alignof(max_align_t));
@@ -238,6 +248,15 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     device->running = (uint32_t*)(block + runningAt);
     device->runningRegions = (uint32_t*)(block + regionsAt);
     device->frameStaging = block + stagingAt;
+    device->readbacks = (mrhiReadback*)(block + readbacksAt);
+    device->readbackRing = block + ringAt;
+    device->runningReadbackFirst = (uint32_t*)(block + firstsAt);
+    device->runningReadbackCount = (uint32_t*)(block + countsInFlightAt);
+    atomic_flag_clear(&device->readbackLock);
+    for (uint32_t i = 0; i < limits->readbacks; ++i)
+    {
+        device->readbacks[i] = (mrhiReadback){0};
+    }
     device->queue = (mrhiDeviceNotification*)(block + queueAt);
     PlaceFrameParts(device, block, &frame);
     return device;

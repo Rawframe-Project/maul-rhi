@@ -488,6 +488,76 @@ extern "C"
                                                         const mrhiTexelLayout* layout,
                                                         const mrhiExtent3d* size);
 
+    /// Reads bytes of a buffer of the frame back after the frame finishes.
+    ///
+    /// @param device      The device.
+    /// @param pass        The pass, recording, without targets.
+    /// @param resource    The buffer read.
+    /// @param offset      Its first byte read, a multiple of 4.
+    /// @param size        How many, a multiple of 4.
+    /// @param requestOut  The readback's request, answered by
+    ///                    mrhi_deviceReadbackReady after the frame; untouched
+    ///                    on failure.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or request
+    /// out, a pass with targets, a resource that is not a buffer the pass
+    /// declares with the copy source access, or an offset or size not a
+    /// multiple of 4 or past the buffer; `mrhi_errorStale` for a pass of
+    /// another frame or a resource that is not live; `mrhi_errorState` for a
+    /// pass that is not recording; `mrhi_errorCapacity` when the device's
+    /// readbacks, readback bytes or notification room are full, or the frame's
+    /// commands are.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiReadBuffer(mrhiDevice* device, mrhiPassId pass,
+                                                      mrhiResourceId resource, uint64_t offset,
+                                                      uint64_t size, mrhiRequestId* requestOut);
+
+    /// Reads texels of a texture's mip back after the frame finishes, rows
+    /// tightly packed.
+    ///
+    /// @param device      The device.
+    /// @param pass        The pass, recording, without targets.
+    /// @param source      The texture, mip, origin and aspect. Only read during
+    ///                    the call.
+    /// @param size        The texels. Only read during the call.
+    /// @param requestOut  The readback's request, answered by
+    ///                    mrhi_deviceReadbackReady after the frame; untouched
+    ///                    on failure.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass
+    /// with targets, a region off the texture's blocks or past its mip, a
+    /// multisampled texture, an aspect that cannot be copied from, or a texture
+    /// the pass declares no covering copy source access of; `mrhi_errorStale`
+    /// for a pass of another frame or a resource that is not live;
+    /// `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity`
+    /// when the device's readbacks, readback bytes or notification room are
+    /// full, or the frame's commands are.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiReadTexture(mrhiDevice* device, mrhiPassId pass,
+                                                       const mrhiTextureCopy* source,
+                                                       const mrhiExtent3d* size,
+                                                       mrhiRequestId* requestOut);
+
+    /// Copies an answered readback's bytes out and frees them; with no array,
+    /// reports their size only.
+    ///
+    /// @param device    The device.
+    /// @param request   The readback's request.
+    /// @param bytes     Where the bytes go, or NULL for the size only.
+    /// @param capacity  The bytes there.
+    /// @param sizeOut   The readback's bytes.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or size
+    /// out, or an array NULL with a capacity; `mrhi_errorStale` for a request
+    /// that is not a readback waiting to be taken; `mrhi_errorState` for a
+    /// readback not yet answered; `mrhi_errorCapacity` for an array too small,
+    /// with the size; the error that ended the readback's frame, which frees
+    /// it.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiTakeReadback(mrhiDevice* device, mrhiRequestId request,
+                                                        void* bytes, size_t capacity,
+                                                        size_t* sizeOut);
+
     /// Writes bytes of the root block later draws or dispatches read.
     ///
     /// @param device  The device.

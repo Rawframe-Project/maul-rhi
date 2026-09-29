@@ -195,3 +195,9 @@ format.
   copy the program's bytes at the call into the frame's staging, the
   device's `frameUploadBytes` limit per frame in flight, checked as
   WebGPU checks its queue writes; a full staging refuses the frame.
+- Readbacks: `mrhiReadBuffer` and `mrhiReadTexture` copy into the
+  device's readback ring (the `readbackBytes` and `readbacks` limits)
+  and return a request that the frame's finish answers with
+  `mrhi_deviceReadbackReady`; `mrhiTakeReadback` copies the bytes out
+  once, a texture's rows tightly packed, and frees them in order. A
+  dropped or failed frame gives its ring room back.

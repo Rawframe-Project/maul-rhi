@@ -92,6 +92,9 @@ edit the contract, not this file.
 | `mrhiCopyTexture` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiWriteBuffer` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiWriteTexture` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiReadBuffer` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiReadTexture` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiTakeReadback` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiSetRootBlock` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiSetViewport` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiSetScissor` | Safe from any thread; the pass is used by one thread at a time. |
