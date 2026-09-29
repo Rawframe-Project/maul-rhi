@@ -124,7 +124,8 @@ if(MAUL_RHI_VULKAN_DRIVER)
 endif()
 if(MAUL_RHI_METAL_DRIVER)
     enable_language(OBJC)
-    target_sources(maul-rhi PRIVATE src/driver_metal.m src/metal_device.m)
+    target_sources(maul-rhi PRIVATE src/driver_metal.m src/metal_device.m src/metal_names.m
+                                   src/metal_resource.m)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_METAL_DRIVER)
     # The family's C23 for Objective-C, with manual retain and release so
     # that Metal objects sit in plain C structs.

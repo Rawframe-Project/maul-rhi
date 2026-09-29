@@ -123,7 +123,18 @@ ids, requests, the frame graph) can be tested without a GPU.
   where a program builds it and loads one, but are neither tested nor
   promised. CI runs the conformance suite on the macOS runner's device
   under `MTL_DEBUG_LAYER` and `MTL_SHADER_VALIDATION`; until the
-  driver makes objects, it only opens and closes devices there.
+  driver makes shaders, pipelines and frames, it checks objects only.
+- **Metal objects:** buffers, textures, views, samplers and query sets
+  are Metal objects whose retained pointers are their handles, released
+  as soon as the core destroys them, since command buffers retain what
+  they use. Buffers and textures live in private memory, as the frame
+  graph fills and reads them; a transient render target is memoryless
+  on Apple family GPUs. The depth and stencil format is
+  Depth32Float_Stencil8, whose stencil a view sees as X32_Stencil8. An
+  occlusion query set is a buffer of 8 bytes per query, the render
+  passes' visibility results. Samplers are made to sit in argument
+  buffers. A resource's memory is Metal's heap size and alignment for
+  it.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`

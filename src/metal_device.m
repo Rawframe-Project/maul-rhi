@@ -2,15 +2,16 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The Metal driver's devices (mrhi-0003): a retained Metal device and
-// its command queue, released when the device is destroyed. Objects,
-// pipelines and frames land in the driver's later slices; until then
-// every call that makes one answers mrhi_errorUnsupported, and the
-// conformance suite only opens and closes Metal devices.
+// its command queue, released when the device is destroyed, and its
+// objects (metal_resource.m). Shaders, pipelines, frames, surfaces and
+// heaps are not made yet: those calls answer mrhi_errorUnsupported, and
+// the conformance suite checks only the objects on Metal devices.
 
 #include "metal_device.h"
 
 #include "allocator.h"
 #include "invariant.h"
+#include "metal_resource.h"
 
 #include <stdalign.h>
 #include <string.h>
@@ -33,39 +34,45 @@ static void Destroy(void* self)
 
 static mrhiResult CreateSampler(void* self, const mrhiSamplerDef* def, uint64_t* handleOut)
 {
-    (void)self;
-    (void)def;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    const MetalDevice* device = self;
+    return mrhiMetalCreateSampler(device->device, def, handleOut);
 }
 
 static mrhiResult CreateBuffer(void* self, const mrhiBufferDef* def, uint64_t* handleOut)
 {
-    (void)self;
-    (void)def;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    const MetalDevice* device = self;
+    return mrhiMetalCreateBuffer(device->device, def, handleOut);
 }
 
 static mrhiResult CreateTexture(void* self, const mrhiTextureDef* def, uint64_t* handleOut)
 {
-    (void)self;
-    (void)def;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    const MetalDevice* device = self;
+    return mrhiMetalCreateTexture(device->device, def, handleOut);
 }
 
 static mrhiResult CreateView(void* self, uint64_t texture, const mrhiViewDef* def,
                              uint64_t* handleOut)
 {
     (void)self;
-    (void)texture;
-    (void)def;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    return mrhiMetalCreateView(texture, def, handleOut);
 }
 
-// Nothing is made yet, so nothing is destroyed.
+static mrhiResult CreateQuerySet(void* self, const mrhiQuerySetDef* def, uint64_t* handleOut)
+{
+    const MetalDevice* device = self;
+    return mrhiMetalCreateQuerySet(device->device, def, handleOut);
+}
+
+// Every object is released at once: the command buffers using it hold
+// their own references.
+static void DestroyObject(void* self, uint64_t handle)
+{
+    (void)self;
+    mrhiMetalRelease(handle);
+}
+
+// Shaders, pipelines, swapchains and heaps are never made, so never
+// destroyed.
 static void Never(void* self, uint64_t handle)
 {
     (void)self;
@@ -136,14 +143,6 @@ static void ReleaseImage(void* self, uint64_t swapchain, uint64_t image)
     MRHI_ASSERT(false);
 }
 
-static mrhiResult CreateQuerySet(void* self, const mrhiQuerySetDef* def, uint64_t* handleOut)
-{
-    (void)self;
-    (void)def;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
-}
-
 // Timestamps are not granted yet, so the core never asks.
 static double TimestampPeriod(void* self)
 {
@@ -171,18 +170,15 @@ static size_t ExportPipelineCache(void* self, void* bytes, size_t capacity)
 static void TextureMemory(const void* self, const mrhiTextureDef* def, uint64_t* bytesOut,
                           uint64_t* alignmentOut)
 {
-    (void)self;
-    (void)def;
-    *bytesOut = 0;
-    *alignmentOut = 256;
+    const MetalDevice* device = self;
+    mrhiMetalTextureMemory(device->device, def, bytesOut, alignmentOut);
 }
 
 static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* bytesOut,
                          uint64_t* alignmentOut)
 {
-    (void)self;
-    *bytesOut = (def->size + 255) & ~(uint64_t)255;
-    *alignmentOut = 256;
+    const MetalDevice* device = self;
+    mrhiMetalBufferMemory(device->device, def, bytesOut, alignmentOut);
 }
 
 static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag)
@@ -241,13 +237,13 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .size = sizeof(mrhiDeviceDriverVtable),
     .destroy = Destroy,
     .createSampler = CreateSampler,
-    .destroySampler = Never,
+    .destroySampler = DestroyObject,
     .createBuffer = CreateBuffer,
-    .destroyBuffer = Never,
+    .destroyBuffer = DestroyObject,
     .createTexture = CreateTexture,
-    .destroyTexture = Never,
+    .destroyTexture = DestroyObject,
     .createView = CreateView,
-    .destroyView = Never,
+    .destroyView = DestroyObject,
     .configureSurface = ConfigureSurface,
     .unconfigureSurface = Never,
     .createShader = CreateShader,
@@ -259,7 +255,7 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .acquireImage = AcquireImage,
     .releaseImage = ReleaseImage,
     .createQuerySet = CreateQuerySet,
-    .destroyQuerySet = Never,
+    .destroyQuerySet = DestroyObject,
     .timestampPeriod = TimestampPeriod,
     .importPipelineCache = ImportPipelineCache,
     .exportPipelineCache = ExportPipelineCache,
