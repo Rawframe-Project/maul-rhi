@@ -777,3 +777,86 @@ restricted or absent-rejected, with how.
 | --- | --- |
 | `mrhiDefaultSurfaceDef` | fills a def with the library's defaults |
 | `mrhiDefaultSurfaceConfig` | fills a config with the library's defaults |
+
+## frame: operations and structures
+
+| Concept | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhiFrameDef` | direct: a command buffer and a fence for each frame in flight | direct: a command allocator, command lists and a fence value for each frame in flight | direct: a command buffer for each frame | direct: a command encoder, submitted to the queue |
+| `mrhiBeginFrame` | direct: the frame slot's fence checked, never waited on, and its command pool reset | direct: the frame slot's fence value checked and its allocator reset | direct: nothing until submission: a command buffer is made there | direct: nothing until submission: an encoder is made there |
+| `mrhiSubmitFrame` | direct: vkQueueSubmit2, waiting on acquired images' semaphores, then vkQueuePresentKHR | direct: ExecuteCommandLists, Signal on the frame's fence, then Present | direct: commit, with presentDrawable for each image and a completed handler | direct: queue.submit, onSubmittedWorkDone, and the canvas presented by the browser |
+| `mrhiWaitFrame` | direct: vkWaitForFences with the deadline | direct: SetEventOnCompletion and a wait on the event with the deadline | emulated: the completed handler signalling a semaphore waited on with the deadline (cost: a semaphore signal per frame) | restricted: onSubmittedWorkDone: a wait that would block returns mrhi_timeout at once |
+| `mrhiDeclareTexture` | direct: a VkImage bound into the frame's memory block, aliased by lifetime | direct: a placed resource in the frame's heap, aliased by lifetime | direct: a texture from the frame's heap, made aliasable after its last use | emulated: a texture from a pool kept across frames (cost: no aliasing: each transient keeps its own memory, reused by later frames) |
+| `mrhiDeclareBuffer` | direct: a VkBuffer bound into the frame's memory block, aliased by lifetime | direct: a placed resource in the frame's heap, aliased by lifetime | direct: a buffer from the frame's heap, made aliasable after its last use | emulated: a buffer from a pool kept across frames (cost: no aliasing: each transient keeps its own memory, reused by later frames) |
+| `mrhiAcquireSurfaceImage` | direct: vkAcquireNextImageKHR with a semaphore | direct: GetCurrentBackBufferIndex, and the swapchain's occlusion status | direct: the layer's nextDrawable | direct: GPUCanvasContext.getCurrentTexture |
+| `mrhiTextureRange` | direct: VkImageSubresourceRange | direct: subresource indices, as D3D12CalcSubresource makes them | direct: level and slice ranges | direct: GPUTextureViewDescriptor's mip and layer ranges and aspect |
+| `mrhiClearColor` | direct: VkClearColorValue | direct: D3D12_RENDER_PASS_BEGINNING_ACCESS_CLEAR_PARAMETERS | direct: MTLClearColor | direct: GPURenderPassColorAttachment.clearValue |
+| `mrhiColorTarget` | direct: VkRenderingAttachmentInfo, with its resolve | direct: D3D12_RENDER_PASS_RENDER_TARGET_DESC | direct: MTLRenderPassColorAttachmentDescriptor | direct: GPURenderPassColorAttachment |
+| `mrhiDepthTarget` | direct: VkRenderingAttachmentInfo for depth and for stencil | direct: D3D12_RENDER_PASS_DEPTH_STENCIL_DESC | direct: MTLRenderPassDepthAttachmentDescriptor and MTLRenderPassStencilAttachmentDescriptor | direct: GPURenderPassDepthStencilAttachment |
+| `mrhiPassDef` | direct: vkCmdBeginRendering for a pass with targets; none otherwise | direct: BeginRenderPass for a pass with targets; none otherwise | direct: a render, compute or blit encoder by the pass's work | direct: beginRenderPass or beginComputePass by the pass's work; copies on the encoder |
+| `mrhiBarrier` | direct: VkImageMemoryBarrier2 and VkBufferMemoryBarrier2 in vkCmdPipelineBarrier2 | direct: ResourceBarrier transitions, or enhanced barriers where present | direct: Metal's own tracking of the resources, with fences between encoders for heap resources | direct: implicit: the browser inserts them |
+
+## frame: the library's own
+
+| Concept | Why no API maps it |
+| --- | --- |
+| `mrhiDeviceNotificationKind` | kinds of the library's own notification queue |
+| `mrhiDeviceNotification` | a record of the library's own notification queue |
+| `mrhiDefaultFrameDef` | fills a def with the library's defaults |
+| `mrhiDropFrame` | discards what the library recorded; nothing reached the GPU |
+| `mrhiNextDeviceNotification` | reads the library's own notification queue |
+| `mrhiImportTexture` | brings a device texture into the library's tracking for the frame |
+| `mrhiImportBuffer` | brings a device buffer into the library's tracking for the frame |
+| `mrhiAccess` | a declaration the library plans barriers, culling and aliasing from; the access kinds map |
+| `mrhiDefaultPassDef` | fills a def with the library's defaults |
+| `mrhiAddPass` | declares a pass to the library's graph |
+| `mrhiCompileFrame` | the library plans the frame: order, culling, barriers, aliasing, stores |
+| `mrhiIsPassKept` | reads the library's plan |
+| `mrhiResourcePlan` | a record of the library's plan |
+| `mrhiGetFrameBarriers` | reads the library's plan |
+| `mrhiGetResourcePlan` | reads the library's plan |
+| `mrhiPassPlan` | a record of the library's plan |
+| `mrhiGetPassPlan` | reads the library's plan |
+| `mrhiGetFrameMemory` | reads the library's plan |
+
+## shader: operations and structures
+
+| Concept | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhiShaderDef` | direct: the container's SPIR-V | restricted: reads a DXIL section, made offline and added to the container beside the SPIR-V; the library never translates at run time | restricted: reads a metallib section, made offline and added to the container beside the SPIR-V; the library never translates at run time | direct: the container's WGSL |
+| `mrhiCreateShader` | direct: vkCreateShaderModule | restricted: the DXIL section kept for the pipelines; a container without one is refused with mrhi_errorUnsupported | restricted: newLibraryWithData from the metallib section; a container without one is refused with mrhi_errorUnsupported | direct: createShaderModule |
+| `mrhiDestroyShader` | direct: vkDestroyShaderModule | direct: the DXIL released | direct: the MTLLibrary released | direct: the module dropped |
+
+## shader: the library's own
+
+| Concept | Why no API maps it |
+| --- | --- |
+| `mrhiShaderInfo` | reads the container's reflection, which the library checked |
+| `mrhiDefaultShaderDef` | fills a def with the library's defaults |
+| `mrhiGetShaderInfo` | reads the container's reflection |
+
+## pipeline: operations and structures
+
+| Concept | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhiConstantValue` | direct: a VkSpecializationMapEntry and its bytes | emulated: a root constant the shader reads, or a variant made offline (cost: a root constant read in the shader, or one DXIL variant per value set) | direct: MTLFunctionConstantValues | direct: a pipeline-overridable constant |
+| `mrhiVertexBufferLayout` | direct: VkVertexInputBindingDescription | direct: the input slot class and the stride given with IASetVertexBuffers | direct: MTLVertexBufferLayoutDescriptor | direct: GPUVertexBufferLayout |
+| `mrhiVertexAttribute` | direct: VkVertexInputAttributeDescription | direct: D3D12_INPUT_ELEMENT_DESC | direct: MTLVertexAttributeDescriptor | direct: GPUVertexAttribute |
+| `mrhiStencilFace` | direct: VkStencilOpState | direct: D3D12_DEPTH_STENCILOP_DESC | direct: MTLStencilDescriptor | direct: GPUStencilFaceState |
+| `mrhiBlendComponent` | direct: the color or alpha half of VkPipelineColorBlendAttachmentState | direct: the color or alpha half of D3D12_RENDER_TARGET_BLEND_DESC | direct: the rgb or alpha half of MTLRenderPipelineColorAttachmentDescriptor | direct: GPUBlendComponent |
+| `mrhiColorTargetState` | direct: VkPipelineColorBlendAttachmentState and the rendering format | direct: D3D12_RENDER_TARGET_BLEND_DESC and RTVFormats | direct: MTLRenderPipelineColorAttachmentDescriptor | direct: GPUColorTargetState |
+| `mrhiGraphicsPipelineDef` | direct: VkGraphicsPipelineCreateInfo with dynamic rendering | direct: a pipeline state stream and its root signature | direct: MTLRenderPipelineDescriptor and an MTLDepthStencilState | direct: GPURenderPipelineDescriptor |
+| `mrhiCreateGraphicsPipeline` | direct: vkCreateGraphicsPipelines, answered at the next poll | direct: CreatePipelineState, answered at the next poll | direct: newRenderPipelineStateWithDescriptor:completionHandler:, answered at the next poll | direct: createRenderPipelineAsync, answered when its promise settles |
+| `mrhiDestroyGraphicsPipeline` | direct: vkDestroyPipeline once the frames that used it finish | direct: released once those frames finish | direct: released once those frames finish | direct: the pipeline dropped |
+| `mrhiComputePipelineDef` | direct: VkComputePipelineCreateInfo | direct: D3D12_COMPUTE_PIPELINE_STATE_DESC and its root signature | direct: MTLComputePipelineDescriptor | direct: GPUComputePipelineDescriptor |
+| `mrhiCreateComputePipeline` | direct: vkCreateComputePipelines, answered at the next poll | direct: CreateComputePipelineState, answered at the next poll | direct: newComputePipelineStateWithDescriptor:completionHandler:, answered at the next poll | direct: createComputePipelineAsync, answered when its promise settles |
+| `mrhiDestroyComputePipeline` | direct: vkDestroyPipeline once the frames that used it finish | direct: released once those frames finish | direct: released once those frames finish | direct: the pipeline dropped |
+| `mrhiGetPipelineCache` | direct: vkGetPipelineCacheData in the library's envelope | direct: ID3D12PipelineLibrary::Serialize in the library's envelope | direct: an MTLBinaryArchive serialized, in the library's envelope | restricted: an empty cache: the browser keeps its own |
+
+## pipeline: the library's own
+
+| Concept | Why no API maps it |
+| --- | --- |
+| `mrhiDefaultGraphicsPipelineDef` | fills a def with the library's defaults |
+| `mrhiDefaultComputePipelineDef` | fills a def with the library's defaults |
+| `mrhiGetPipelineCacheOutcome` | reads what the library did with the def's cache |

@@ -10090,7 +10090,25 @@
           "name": "frame_def",
           "def": true,
           "doc": "How a frame begins: its extensions. Build it with mrhiDefaultFrameDef.",
-          "members": []
+          "members": [],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "a command buffer and a fence for each frame in flight"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "a command allocator, command lists and a fence value for each frame in flight"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "a command buffer for each frame"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "a command encoder, submitted to the queue"
+            }
+          }
         },
         {
           "kind": "enum",
@@ -10118,7 +10136,8 @@
               "value": 3,
               "doc": "The device was lost; its request id is null and its outcome mrhi_errorDeviceLost. Every answer still owed follows with that outcome."
             }
-          ]
+          ],
+          "library": "kinds of the library's own notification queue"
         },
         {
           "kind": "struct",
@@ -10139,7 +10158,8 @@
               "type": "result",
               "doc": "How the request ended."
             }
-          ]
+          ],
+          "library": "a record of the library's own notification queue"
         },
         {
           "kind": "function",
@@ -10152,7 +10172,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -10179,6 +10200,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "the frame slot's fence checked, never waited on, and its command pool reset"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the frame slot's fence value checked and its allocator reset"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "nothing until submission: a command buffer is made there"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "nothing until submission: an encoder is made there"
+            }
           }
         },
         {
@@ -10200,7 +10239,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "discards what the library recorded; nothing reached the GPU"
         },
         {
           "kind": "function",
@@ -10227,6 +10267,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkQueueSubmit2, waiting on acquired images' semaphores, then vkQueuePresentKHR"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "ExecuteCommandLists, Signal on the frame's fence, then Present"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "commit, with presentDrawable for each image and a completed handler"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "queue.submit, onSubmittedWorkDone, and the canvas presented by the browser"
+            }
           }
         },
         {
@@ -10258,6 +10316,25 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkWaitForFences with the deadline"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "SetEventOnCompletion and a wait on the event with the deadline"
+            },
+            "metal": {
+              "class": "emulated",
+              "note": "the completed handler signalling a semaphore waited on with the deadline",
+              "cost": "a semaphore signal per frame"
+            },
+            "web_gpu": {
+              "class": "restricted",
+              "note": "onSubmittedWorkDone: a wait that would block returns mrhi_timeout at once"
+            }
           }
         },
         {
@@ -10285,7 +10362,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "reads the library's own notification queue"
         },
         {
           "kind": "id",
@@ -10323,6 +10401,25 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "a VkImage bound into the frame's memory block, aliased by lifetime"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "a placed resource in the frame's heap, aliased by lifetime"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "a texture from the frame's heap, made aliasable after its last use"
+            },
+            "web_gpu": {
+              "class": "emulated",
+              "note": "a texture from a pool kept across frames",
+              "cost": "no aliasing: each transient keeps its own memory, reused by later frames"
+            }
           }
         },
         {
@@ -10356,6 +10453,25 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "a VkBuffer bound into the frame's memory block, aliased by lifetime"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "a placed resource in the frame's heap, aliased by lifetime"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "a buffer from the frame's heap, made aliasable after its last use"
+            },
+            "web_gpu": {
+              "class": "emulated",
+              "note": "a buffer from a pool kept across frames",
+              "cost": "no aliasing: each transient keeps its own memory, reused by later frames"
+            }
           }
         },
         {
@@ -10388,7 +10504,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "brings a device texture into the library's tracking for the frame"
         },
         {
           "kind": "function",
@@ -10420,7 +10537,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "brings a device buffer into the library's tracking for the frame"
         },
         {
           "kind": "function",
@@ -10452,6 +10570,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkAcquireNextImageKHR with a semaphore"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "GetCurrentBackBufferIndex, and the swapchain's occlusion status"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the layer's nextDrawable"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUCanvasContext.getCurrentTexture"
+            }
           }
         },
         {
@@ -10959,7 +11095,25 @@
               "type": "enum.texture_aspect",
               "doc": "The aspect."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkImageSubresourceRange"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "subresource indices, as D3D12CalcSubresource makes them"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "level and slice ranges"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUTextureViewDescriptor's mip and layer ranges and aspect"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -10981,7 +11135,8 @@
               "type": "struct.texture_range",
               "doc": "The texture's part it uses; buffers are used whole, and ignore it."
             }
-          ]
+          ],
+          "library": "a declaration the library plans barriers, culling and aliasing from; the access kinds map"
         },
         {
           "kind": "constant",
@@ -11010,7 +11165,25 @@
               "name": "alpha",
               "type": "float32"
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkClearColorValue"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "D3D12_RENDER_PASS_BEGINNING_ACCESS_CLEAR_PARAMETERS"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLClearColor"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPURenderPassColorAttachment.clearValue"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -11062,7 +11235,25 @@
               "type": "uint32",
               "doc": "The resolve texture's layer."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkRenderingAttachmentInfo, with its resolve"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "D3D12_RENDER_PASS_RENDER_TARGET_DESC"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLRenderPassColorAttachmentDescriptor"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPURenderPassColorAttachment"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -11119,7 +11310,25 @@
               "type": "bool",
               "doc": "Tested but never written, so the pass may also sample it; its loads keep and its stores keep."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkRenderingAttachmentInfo for depth and for stencil"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "D3D12_RENDER_PASS_DEPTH_STENCIL_DESC"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLRenderPassDepthAttachmentDescriptor and MTLRenderPassStencilAttachmentDescriptor"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPURenderPassDepthStencilAttachment"
+            }
+          }
         },
         {
           "kind": "id",
@@ -11200,7 +11409,25 @@
               "type": "uint32",
               "doc": "The query written at the pass's end, or MRHI_NO_QUERY."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdBeginRendering for a pass with targets; none otherwise"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "BeginRenderPass for a pass with targets; none otherwise"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "a render, compute or blit encoder by the pass's work"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "beginRenderPass or beginComputePass by the pass's work; copies on the encoder"
+            }
+          }
         },
         {
           "kind": "function",
@@ -11213,7 +11440,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -11246,7 +11474,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "declares a pass to the library's graph"
         },
         {
           "kind": "function",
@@ -11267,7 +11496,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "the library plans the frame: order, culling, barriers, aliasing, stores"
         },
         {
           "kind": "function",
@@ -11299,7 +11529,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "reads the library's plan"
         },
         {
           "kind": "enum",
@@ -11731,7 +11962,25 @@
               "type": "enum.resource_state",
               "doc": "Its state from then."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkImageMemoryBarrier2 and VkBufferMemoryBarrier2 in vkCmdPipelineBarrier2"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "ResourceBarrier transitions, or enhanced barriers where present"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "Metal's own tracking of the resources, with fences between encoders for heap resources"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "implicit: the browser inserts them"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -11768,7 +12017,8 @@
               "type": "uint64",
               "doc": "The bytes it takes there; 0 for an imported object, an unused resource, or a transient texture the GPU keeps on chip."
             }
-          ]
+          ],
+          "library": "a record of the library's plan"
         },
         {
           "kind": "function",
@@ -11806,7 +12056,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "reads the library's plan"
         },
         {
           "kind": "function",
@@ -11838,7 +12089,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "reads the library's plan"
         },
         {
           "kind": "struct",
@@ -11866,7 +12118,8 @@
               "type": "enum.store_op",
               "doc": "What its stencil keeps, likewise."
             }
-          ]
+          ],
+          "library": "a record of the library's plan"
         },
         {
           "kind": "function",
@@ -11898,7 +12151,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "reads the library's plan"
         },
         {
           "kind": "function",
@@ -11925,9 +12179,11 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "reads the library's plan"
         }
-      ]
+      ],
+      "classed": true
     },
     {
       "name": "shader",
@@ -13089,7 +13345,25 @@
               "type": "size",
               "doc": "Its size."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "the container's SPIR-V"
+            },
+            "d3d12": {
+              "class": "restricted",
+              "note": "reads a DXIL section, made offline and added to the container beside the SPIR-V; the library never translates at run time"
+            },
+            "metal": {
+              "class": "restricted",
+              "note": "reads a metallib section, made offline and added to the container beside the SPIR-V; the library never translates at run time"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "the container's WGSL"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -13117,7 +13391,8 @@
               "type": "uint32",
               "doc": "The root block its entry points read."
             }
-          ]
+          ],
+          "library": "reads the container's reflection, which the library checked"
         },
         {
           "kind": "function",
@@ -13130,7 +13405,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -13163,6 +13439,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateShaderModule"
+            },
+            "d3d12": {
+              "class": "restricted",
+              "note": "the DXIL section kept for the pipelines; a container without one is refused with mrhi_errorUnsupported"
+            },
+            "metal": {
+              "class": "restricted",
+              "note": "newLibraryWithData from the metallib section; a container without one is refused with mrhi_errorUnsupported"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "createShaderModule"
+            }
           }
         },
         {
@@ -13189,6 +13483,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkDestroyShaderModule"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the DXIL released"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the MTLLibrary released"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "the module dropped"
+            }
           }
         },
         {
@@ -13221,9 +13533,11 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "reads the container's reflection"
         }
-      ]
+      ],
+      "classed": true
     },
     {
       "name": "pipeline",
@@ -14410,7 +14724,26 @@
               "type": "float64",
               "doc": "Its value."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "a VkSpecializationMapEntry and its bytes"
+            },
+            "d3d12": {
+              "class": "emulated",
+              "note": "a root constant the shader reads, or a variant made offline",
+              "cost": "a root constant read in the shader, or one DXIL variant per value set"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLFunctionConstantValues"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "a pipeline-overridable constant"
+            }
+          }
         },
         {
           "kind": "enum",
@@ -15526,7 +15859,25 @@
               "type": "enum.vertex_step_mode",
               "doc": "Whether it advances per vertex or per instance."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkVertexInputBindingDescription"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the input slot class and the stride given with IASetVertexBuffers"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLVertexBufferLayoutDescriptor"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUVertexBufferLayout"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -15553,7 +15904,25 @@
               "type": "uint32",
               "doc": "Its bytes from the element's start, a multiple of the lesser of 4 and its size."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkVertexInputAttributeDescription"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "D3D12_INPUT_ELEMENT_DESC"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLVertexAttributeDescriptor"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUVertexAttribute"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -15580,7 +15949,25 @@
               "type": "enum.stencil_operation",
               "doc": "What passing both tests does."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkStencilOpState"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "D3D12_DEPTH_STENCILOP_DESC"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLStencilDescriptor"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUStencilFaceState"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -15602,7 +15989,25 @@
               "type": "enum.blend_operation",
               "doc": "How the weighted two combine."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "the color or alpha half of VkPipelineColorBlendAttachmentState"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the color or alpha half of D3D12_RENDER_TARGET_BLEND_DESC"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "the rgb or alpha half of MTLRenderPipelineColorAttachmentDescriptor"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUBlendComponent"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -15634,7 +16039,25 @@
               "type": "bitflags.color_writes",
               "doc": "The channels it writes; a nonzero mask needs the fragment entry to write the location."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkPipelineColorBlendAttachmentState and the rendering format"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "D3D12_RENDER_TARGET_BLEND_DESC and RTVFormats"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLRenderPipelineColorAttachmentDescriptor"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUColorTargetState"
+            }
+          }
         },
         {
           "kind": "id",
@@ -15819,7 +16242,25 @@
               "type": "uint32",
               "doc": "The values."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkGraphicsPipelineCreateInfo with dynamic rendering"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "a pipeline state stream and its root signature"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLRenderPipelineDescriptor and an MTLDepthStencilState"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPURenderPipelineDescriptor"
+            }
+          }
         },
         {
           "kind": "function",
@@ -15832,7 +16273,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -15871,6 +16313,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateGraphicsPipelines, answered at the next poll"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CreatePipelineState, answered at the next poll"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "newRenderPipelineStateWithDescriptor:completionHandler:, answered at the next poll"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "createRenderPipelineAsync, answered when its promise settles"
+            }
           }
         },
         {
@@ -15897,6 +16357,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkDestroyPipeline once the frames that used it finish"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "released once those frames finish"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "released once those frames finish"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "the pipeline dropped"
+            }
           }
         },
         {
@@ -15948,7 +16426,25 @@
               "type": "uint32",
               "doc": "The values."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkComputePipelineCreateInfo"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "D3D12_COMPUTE_PIPELINE_STATE_DESC and its root signature"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLComputePipelineDescriptor"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUComputePipelineDescriptor"
+            }
+          }
         },
         {
           "kind": "function",
@@ -15961,7 +16457,8 @@
           "args": [],
           "thread_safety": {
             "class": "any"
-          }
+          },
+          "library": "fills a def with the library's defaults"
         },
         {
           "kind": "function",
@@ -16000,6 +16497,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCreateComputePipelines, answered at the next poll"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CreateComputePipelineState, answered at the next poll"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "newComputePipelineStateWithDescriptor:completionHandler:, answered at the next poll"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "createComputePipelineAsync, answered when its promise settles"
+            }
           }
         },
         {
@@ -16026,6 +16541,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkDestroyPipeline once the frames that used it finish"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "released once those frames finish"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "released once those frames finish"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "the pipeline dropped"
+            }
           }
         },
         {
@@ -16064,6 +16597,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkGetPipelineCacheData in the library's envelope"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "ID3D12PipelineLibrary::Serialize in the library's envelope"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "an MTLBinaryArchive serialized, in the library's envelope"
+            },
+            "web_gpu": {
+              "class": "restricted",
+              "note": "an empty cache: the browser keeps its own"
+            }
           }
         },
         {
@@ -16085,9 +16636,11 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "reads what the library did with the def's cache"
         }
-      ]
+      ],
+      "classed": true
     },
     {
       "name": "encoder",
