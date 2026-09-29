@@ -93,7 +93,8 @@ if(MAUL_RHI_TEST_DRIVER)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_TEST_DRIVER)
 endif()
 if(MAUL_RHI_VULKAN_DRIVER)
-    target_sources(maul-rhi PRIVATE src/driver_vulkan.c src/vulkan_adapter.c src/vulkan_api.c)
+    target_sources(maul-rhi PRIVATE src/driver_vulkan.c src/vulkan_adapter.c src/vulkan_api.c
+                                   src/vulkan_device.c src/vulkan_resource.c)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_VULKAN_DRIVER)
     # The Khronos headers, kept as published (khronos/README.md).
     target_include_directories(maul-rhi SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/khronos)
@@ -151,10 +152,13 @@ if(MAUL_RHI_BUILD_TESTS)
     maul_add_test(conformance)
     maul_add_header_tests()
     # The Vulkan loader keeps drivers loaded after an instance ends, so
-    # that LeakSanitizer reads their memory as held, not lost.
+    # that LeakSanitizer reads their memory as held, not lost. Where the
+    # validation layer runs, it logs to the test's output, and a
+    # validation error there fails the test (mrhi-0003).
     get_property(maul_rhi_tests DIRECTORY PROPERTY TESTS)
     set_tests_properties(${maul_rhi_tests} PROPERTIES
-                         ENVIRONMENT VK_LOADER_DISABLE_DYNAMIC_LIBRARY_UNLOADING=1)
+                         ENVIRONMENT VK_LOADER_DISABLE_DYNAMIC_LIBRARY_UNLOADING=1
+                         FAIL_REGULAR_EXPRESSION "Validation Error")
 endif()
 
 if(MAUL_RHI_BUILD_BENCH AND EXISTS ${PROJECT_SOURCE_DIR}/bench/bench_main.c)

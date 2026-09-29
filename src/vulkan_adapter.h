@@ -16,9 +16,16 @@
 bool mrhiDescribeVulkanAdapter(const mrhiVulkan* vulkan, VkPhysicalDevice device,
                                mrhiDriverAdapter* adapterOut);
 
-// The Vulkan format a format is on a device: the depth and stencil
-// format is the first of D24S8 and D32S8 the device renders to.
-VkFormat mrhiVulkanFormat(const mrhiVulkan* vulkan, VkPhysicalDevice device, mrhiFormat format);
+// The depth and stencil format a device uses: the first of D24S8 and
+// D32S8 it renders to.
+VkFormat mrhiVulkanDepthStencil(const mrhiVulkan* vulkan, VkPhysicalDevice device);
+
+// The Vulkan format of a format, given the device's depth and stencil
+// format; VK_FORMAT_UNDEFINED for one the contract does not list.
+VkFormat mrhiVulkanFormat(mrhiFormat format, VkFormat depthStencil);
+
+// The queue family with graphics and compute a listed device has.
+uint32_t mrhiVulkanQueueFamily(const mrhiVulkan* vulkan, VkPhysicalDevice device);
 
 // Fills what a format can do on a device.
 void mrhiGetVulkanFormatCaps(const mrhiVulkan* vulkan, VkPhysicalDevice device, mrhiFormat format,

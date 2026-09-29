@@ -25,7 +25,9 @@
 #define SUBGROUP_STAGES (VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
 
 // Each contract format's Vulkan format, as its mapping row names it;
-// the depth and stencil format's first choice.
+// the depth and stencil format's first choice. The formats run from 1
+// to MRHI_KNOWN_FORMATS.
+static_assert(mrhi_formatAstc12x12UnormSrgb == MRHI_KNOWN_FORMATS, "formats are dense");
 static const VkFormat s_formats[MRHI_KNOWN_FORMATS + 1] = {
     [mrhi_formatRgba8Unorm] = VK_FORMAT_R8G8B8A8_UNORM,
     [mrhi_formatRgba8UnormSrgb] = VK_FORMAT_R8G8B8A8_SRGB,
@@ -163,12 +165,22 @@ static bool ReadFacts(const mrhiVulkan* vulkan, VkPhysicalDevice device, DeviceF
     return true;
 }
 
+// Whether a device has the Vulkan 1.0 features the contract's floor
+// uses, which every device enables.
+static bool HasFloorFeatures(const VkPhysicalDeviceFeatures* core)
+{
+    return core->fullDrawIndexUint32 && core->imageCubeArray && core->independentBlend &&
+           core->sampleRateShading && core->depthBiasClamp && core->fragmentStoresAndAtomics &&
+           core->samplerAnisotropy && core->shaderStorageImageExtendedFormats;
+}
+
 // Whether a device meets the driver's floor beyond its version.
 static bool MeetsFloor(const DeviceFacts* facts)
 {
-    return facts->family != UINT32_MAX && facts->features13.dynamicRendering &&
-           facts->features13.synchronization2 && facts->features12.timelineSemaphore &&
-           facts->features12.bufferDeviceAddress && facts->features12.descriptorIndexing;
+    return facts->family != UINT32_MAX && HasFloorFeatures(&facts->features.features) &&
+           facts->features13.dynamicRendering && facts->features13.synchronization2 &&
+           facts->features12.timelineSemaphore && facts->features12.bufferDeviceAddress &&
+           facts->features12.descriptorIndexing;
 }
 
 static VkFormatFeatureFlags OptimalFeatures(const mrhiVulkan* vulkan, VkPhysicalDevice device,
@@ -333,19 +345,27 @@ bool mrhiDescribeVulkanAdapter(const mrhiVulkan* vulkan, VkPhysicalDevice device
     return true;
 }
 
-VkFormat mrhiVulkanFormat(const mrhiVulkan* vulkan, VkPhysicalDevice device, mrhiFormat format)
+VkFormat mrhiVulkanDepthStencil(const mrhiVulkan* vulkan, VkPhysicalDevice device)
+{
+    bool d24 = (OptimalFeatures(vulkan, device, VK_FORMAT_D24_UNORM_S8_UINT) &
+                VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0;
+    return d24 ? VK_FORMAT_D24_UNORM_S8_UINT : VK_FORMAT_D32_SFLOAT_S8_UINT;
+}
+
+VkFormat mrhiVulkanFormat(mrhiFormat format, VkFormat depthStencil)
 {
     if (!mrhiIsFormatKnown(format))
     {
         return VK_FORMAT_UNDEFINED;
     }
-    if (format == mrhi_formatDepthStencil &&
-        (OptimalFeatures(vulkan, device, VK_FORMAT_D24_UNORM_S8_UINT) &
-         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0)
-    {
-        return VK_FORMAT_D32_SFLOAT_S8_UINT;
-    }
-    return s_formats[format];
+    return format == mrhi_formatDepthStencil ? depthStencil : s_formats[format];
+}
+
+uint32_t mrhiVulkanQueueFamily(const mrhiVulkan* vulkan, VkPhysicalDevice device)
+{
+    DeviceFacts facts;
+    FindFamily(vulkan, device, &facts);
+    return facts.family;
 }
 
 // The sample counts an optimal 2D image of the format has for a usage,
@@ -368,7 +388,7 @@ void mrhiGetVulkanFormatCaps(const mrhiVulkan* vulkan, VkPhysicalDevice device, 
                              mrhiFormatCaps* capsOut)
 {
     *capsOut = (mrhiFormatCaps){0};
-    VkFormat vulkanFormat = mrhiVulkanFormat(vulkan, device, format);
+    VkFormat vulkanFormat = mrhiVulkanFormat(format, mrhiVulkanDepthStencil(vulkan, device));
     if (vulkanFormat == VK_FORMAT_UNDEFINED)
     {
         return;

@@ -10,6 +10,7 @@
 #include "allocator.h"
 #include "invariant.h"
 #include "vulkan_adapter.h"
+#include "vulkan_device.h"
 
 #include <stdalign.h>
 #include <string.h>
@@ -130,16 +131,23 @@ static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
     *capsOut = (mrhiSurfaceCaps){0};
 }
 
-// Devices come in the driver's next slice.
+// Opens the device at once and answers the opening at the next poll.
 static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef* def, uint64_t tag,
                                mrhiDeviceDriver* deviceOut)
 {
-    (void)self;
-    (void)adapter;
-    (void)def;
-    (void)tag;
-    (void)deviceOut;
-    return mrhi_errorUnsupported;
+    VulkanDriver* driver = self;
+    if (driver->pendingCount == driver->pendingLimit)
+    {
+        return mrhi_errorCapacity;
+    }
+    mrhiResult status = mrhiCreateVulkanDevice(&driver->allocator, &driver->vulkan,
+                                               DeviceOf(adapter), def, deviceOut);
+    if (status == mrhi_success)
+    {
+        driver->pending[driver->pendingCount++] =
+            (mrhiDriverEvent){.tag = tag, .outcome = mrhi_success};
+    }
+    return status;
 }
 
 static void Destroy(void* self)

@@ -93,6 +93,17 @@ bool mrhiLoadVulkanInstance(mrhiVulkan* vulkan, VkInstance instance)
     return found;
 }
 
+#define MRHI_VULKAN_READ_DEVICE(name)                                                              \
+    functions->name = (PFN_##name)vulkan->vkGetDeviceProcAddr(device, #name);                      \
+    found = found && functions->name != nullptr;
+
+bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, mrhiVulkanDevice* functions)
+{
+    bool found = true;
+    MRHI_VULKAN_DEVICE(MRHI_VULKAN_READ_DEVICE)
+    return found;
+}
+
 void mrhiCloseVulkan(mrhiVulkan* vulkan)
 {
     if (vulkan->library != nullptr)

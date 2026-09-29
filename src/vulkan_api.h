@@ -25,7 +25,22 @@
     X(vkGetPhysicalDeviceFeatures2)                                                                \
     X(vkGetPhysicalDeviceQueueFamilyProperties)                                                    \
     X(vkGetPhysicalDeviceFormatProperties)                                                         \
-    X(vkGetPhysicalDeviceImageFormatProperties)
+    X(vkGetPhysicalDeviceImageFormatProperties)                                                    \
+    X(vkGetPhysicalDeviceMemoryProperties)                                                         \
+    X(vkCreateDevice)                                                                              \
+    X(vkGetDeviceProcAddr)
+
+// The functions reached through a device, past the loader's dispatch.
+#define MRHI_VULKAN_DEVICE(X)                                                                      \
+    X(vkDestroyDevice)                                                                             \
+    X(vkDeviceWaitIdle)                                                                            \
+    X(vkGetDeviceQueue)                                                                            \
+    X(vkCreateSemaphore)                                                                           \
+    X(vkDestroySemaphore)                                                                          \
+    X(vkGetSemaphoreCounterValue)                                                                  \
+    X(vkWaitSemaphores)                                                                            \
+    X(vkGetDeviceBufferMemoryRequirements)                                                         \
+    X(vkGetDeviceImageMemoryRequirements)
 
 #define MRHI_VULKAN_FIELD(name) PFN_##name name;
 
@@ -38,12 +53,21 @@ typedef struct mrhiVulkan
     MRHI_VULKAN_INSTANCE(MRHI_VULKAN_FIELD)
 } mrhiVulkan;
 
+// A device's functions.
+typedef struct mrhiVulkanDevice
+{
+    MRHI_VULKAN_DEVICE(MRHI_VULKAN_FIELD)
+} mrhiVulkanDevice;
+
 // Opens the loader and reads the global functions: false, with nothing
 // open, when there is no loader or it lacks one of them.
 bool mrhiOpenVulkan(mrhiVulkan* vulkan);
 
 // Reads the instance's functions: false when one is missing.
 bool mrhiLoadVulkanInstance(mrhiVulkan* vulkan, VkInstance instance);
+
+// Reads a device's functions: false when one is missing.
+bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, mrhiVulkanDevice* functions);
 
 // Closes the loader.
 void mrhiCloseVulkan(mrhiVulkan* vulkan);

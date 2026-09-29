@@ -76,11 +76,11 @@ jobs:
         run: cmake --build build -j 4
       - name: Test
         # Linux runs Vulkan on lavapipe, which must be found, under the
-        # validation layer, which traps on any error (mrhi-0003).
+        # validation layer, whose errors in a test's output fail it
+        # (mrhi-0003).
         env:
           MAUL_RHI_REQUIRE_VULKAN: ${{ runner.os == 'Linux' && '1' || '' }}
           VK_INSTANCE_LAYERS: ${{ runner.os == 'Linux' && 'VK_LAYER_KHRONOS_validation' || '' }}
-          VK_KHRONOS_VALIDATION_DEBUG_ACTION: VK_DBG_LAYER_ACTION_LOG_MSG,VK_DBG_LAYER_ACTION_BREAK
         run: ctest --test-dir build --output-on-failure
 
   windows-clang-cl:

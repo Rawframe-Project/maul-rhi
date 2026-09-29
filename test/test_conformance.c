@@ -13,6 +13,7 @@
 #include "test_harness.h"
 
 #include "maul-rhi/capabilities.h"
+#include "maul-rhi/device.h"
 #include "maul-rhi/instance.h"
 #include "maul-rhi/test.h"
 
@@ -137,6 +138,33 @@ static void CheckFormats(mrhiInstance* instance, mrhiAdapterId adapter)
           "rg11b10Renderable renders");
 }
 
+// Opens a device on an adapter with the features asked for, which it
+// answers ready at the next poll with them granted.
+static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrhiFeatures* asked)
+{
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.adapter = adapter;
+    def.features = *asked;
+    mrhiDevice* device = nullptr;
+    mrhiRequestId request;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "a device");
+    mrhiInstanceNotification record;
+    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+              record.kind == mrhi_instanceDeviceReady && record.outcome == mrhi_success,
+          "ready at the next poll");
+    CHECK(mrhiGetDeviceState(device) == mrhi_deviceReady, "ready");
+    mrhiFeatures granted;
+    CHECK(mrhiGetDeviceFeatures(device, &granted) == mrhi_success &&
+              memcmp(&granted, asked, sizeof(granted)) == 0,
+          "granted as asked");
+    double period = 0.0;
+    mrhiResult status = mrhiGetDeviceTimestampPeriod(device, &period);
+    CHECK(asked->timestampQuery ? status == mrhi_success && period > 0.0
+                                : status == mrhi_errorUnsupported,
+          "a timestamp period with timestamps");
+    mrhiDestroyDevice(device);
+}
+
 // Checks every adapter an instance lists, and that a second search
 // lists the same ones: the count found.
 static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
@@ -152,6 +180,11 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         CHECK(info.nameLength > 0 && info.nameLength <= MRHI_ADAPTER_NAME_BYTES, "a name");
         CheckLimits(instance, ids[i]);
         CheckFormats(instance, ids[i]);
+        mrhiFeatures none = {0};
+        CheckDevice(instance, ids[i], &none);
+        mrhiFeatures all;
+        CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
+        CheckDevice(instance, ids[i], &all);
     }
     mrhiAdapterId again[16];
     CHECK(Search(instance, again, 16) == count && memcmp(ids, again, count * sizeof(ids[0])) == 0,
