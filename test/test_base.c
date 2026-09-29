@@ -19,9 +19,24 @@ static void TestVersionMatchesHeader(void)
 
 static void TestResultNames(void)
 {
-    CHECK(strcmp(mrhiResultName(mrhi_success), "mrhi_success") == 0, "success name");
-    CHECK(strcmp(mrhiResultName(mrhi_errorInvalid), "mrhi_errorInvalid") == 0, "invalid name");
-    CHECK(strcmp(mrhiResultName(mrhi_errorCapacity), "mrhi_errorCapacity") == 0, "capacity name");
+    static const struct
+    {
+        mrhiResult result;
+        const char* name;
+    } names[] = {
+        {mrhi_success, "mrhi_success"},
+        {mrhi_errorInvalid, "mrhi_errorInvalid"},
+        {mrhi_errorCapacity, "mrhi_errorCapacity"},
+        {mrhi_errorStale, "mrhi_errorStale"},
+        {mrhi_errorUnsupported, "mrhi_errorUnsupported"},
+        {mrhi_errorPlatform, "mrhi_errorPlatform"},
+        {mrhi_errorState, "mrhi_errorState"},
+        {mrhi_errorVersion, "mrhi_errorVersion"},
+    };
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i)
+    {
+        CHECK(strcmp(mrhiResultName(names[i].result), names[i].name) == 0, names[i].name);
+    }
     CHECK(strcmp(mrhiResultName(12345), "unknown result") == 0, "unknown name");
 }
 

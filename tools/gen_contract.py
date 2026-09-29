@@ -3,11 +3,12 @@
 # Copyright (c) 2026 Sirac Ozmen
 #
 # Writes the public headers and the thread safety table from the
-# contract, docs/contract/mrhi.json, which is their source of truth. The
-# contract's names are snake_case; this generator turns them into the
-# family's C names (docs/conventions.md, section 4). The output is in
-# the family's style, so the format, documentation and source checks
-# apply to it as to hand-written code.
+# contract, docs/contract/mrhi.json, which is their source of truth
+# (docs/contract/README.md describes it). The contract's names are
+# snake_case; this generator turns them into the family's C names
+# (docs/conventions.md, section 4). The output is in the family's style,
+# so the format, documentation and source checks apply to it as to
+# hand-written code.
 #
 # usage: gen_contract.py [--check]
 #   --check  writes nothing; fails naming each file that differs from
@@ -23,7 +24,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTRACT = os.path.join("docs", "contract", "mrhi.json")
 WIDTH = 80
 NAME = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
-KINDS = ("result", "struct", "function")
+KINDS = ("result", "enum", "opaque", "struct", "function")
+# The kinds a type reference may name, as kind.name.
+REFERABLE = ("enum", "opaque", "struct")
+WIDTHS = ("uint8", "uint16", "uint32", "int32")
+POINTERS = (None, "const", "mutable", "out")
 PRIMITIVES = {
     "bool": "bool",
     "int8": "int8_t",
@@ -77,20 +82,42 @@ class Names:
         return self.prefix + "_" + camel(name)
 
 
+# Validation: every message names where the contract is wrong.
+
+
 def check_name(errors, where, name):
     if not isinstance(name, str) or not NAME.match(name):
         errors.append(f"{where}: '{name}' is not a snake_case name")
 
 
-def check_type(errors, where, kind_of, type_name):
-    """Checks that a type reference names a primitive or a declaration."""
-    if type_name in PRIMITIVES:
+def check_type(errors, where, kind_of, spec):
+    """Checks a type spec: a type and, for members and arguments, a pointer."""
+    type_name, pointer = spec.get("type"), spec.get("pointer")
+    if pointer not in POINTERS:
+        errors.append(f"{where}: unknown pointer '{pointer}'")
+    if type_name == "function":
+        check_signature(errors, where, kind_of, spec)
         return
-    if type_name == "result" and "result" in kind_of.values():
+    if type_name in PRIMITIVES or (type_name == "result" and "result" in kind_of.values()):
         return
-    kind, _, name = type_name.partition(".")
-    if kind_of.get(name) != kind:
+    if type_name == "void" or kind_of.get(str(type_name).partition(".")[2]) == "opaque":
+        if pointer is None:
+            errors.append(f"{where}: '{type_name}' is only used through a pointer")
+        if type_name == "void":
+            return
+    kind, _, name = str(type_name).partition(".")
+    if kind not in REFERABLE or kind_of.get(name) != kind:
         errors.append(f"{where}: unknown type '{type_name}'")
+
+
+def check_signature(errors, where, kind_of, spec):
+    """Checks a function's or a function pointer's return and arguments."""
+    returns = spec.get("returns")
+    if returns is not None:
+        check_type(errors, where, kind_of, returns)
+    for arg in spec.get("args", []):
+        check_name(errors, where, arg.get("name"))
+        check_type(errors, where, kind_of, arg)
 
 
 def check_values(errors, where, item):
@@ -105,17 +132,25 @@ def check_values(errors, where, item):
             errors.append(f"{where}: '{value.get('name')}' needs an integer value and a doc")
     if item["kind"] == "result" and 0 not in seen_values:
         errors.append(f"{where}: a result needs success as zero")
+    if item["kind"] == "enum" and item.get("width") not in WIDTHS:
+        errors.append(f"{where}: an enum needs a width, one of {', '.join(WIDTHS)}")
+
+
+def check_struct(errors, where, item, kind_of):
+    if (item.get("def") or item.get("chained")) and kind_of.get("chain") != "struct":
+        errors.append(f"{where}: a def or chained struct needs the struct 'chain'")
+    if item.get("def") and item.get("chained"):
+        errors.append(f"{where}: a struct is a def or chained, not both")
+    for member in item.get("members", []):
+        check_name(errors, where, member.get("name"))
+        check_type(errors, where, kind_of, member)
 
 
 def check_function(errors, where, item, kind_of):
-    returns = item.get("returns")
-    if returns is not None:
-        check_type(errors, where, kind_of, returns.get("type"))
-        if not returns.get("doc"):
-            errors.append(f"{where}: the return value needs a doc")
+    check_signature(errors, where, kind_of, item)
+    if item.get("returns") is not None and not item["returns"].get("doc"):
+        errors.append(f"{where}: the return value needs a doc")
     for arg in item.get("args", []):
-        check_name(errors, where, arg.get("name"))
-        check_type(errors, where, kind_of, arg.get("type"))
         if not arg.get("doc"):
             errors.append(f"{where}: argument '{arg.get('name')}' needs a doc")
     safety = item.get("thread_safety", {})
@@ -128,7 +163,8 @@ def check_function(errors, where, item, kind_of):
 def validate(contract):
     """The contract's structural errors, as messages; empty when valid."""
     errors, kind_of = [], {}
-    for key in ("library", "title", "prefix", "macro", "guard", "version", "headers"):
+    for key in ("library", "title", "prefix", "macro", "guard", "version", "contract_version",
+                "headers"):
         if key not in contract:
             errors.append(f"the contract has no '{key}'")
     if errors:
@@ -142,17 +178,19 @@ def validate(contract):
         if item.get("name") in kind_of:
             errors.append(f"{where}: the name is declared twice")
         kind_of[item.get("name")] = item.get("kind")
+    checks = {"result": check_values, "enum": check_values}
     for item in items:
         where = f"{item['kind']} '{item['name']}'"
-        if item["kind"] == "result":
-            check_values(errors, where, item)
+        if item["kind"] in checks:
+            checks[item["kind"]](errors, where, item)
         elif item["kind"] == "struct":
-            for member in item.get("members", []):
-                check_name(errors, where, member.get("name"))
-                check_type(errors, where, kind_of, member.get("type"))
+            check_struct(errors, where, item, kind_of)
         elif item["kind"] == "function":
             check_function(errors, where, item, kind_of)
     return errors
+
+
+# Emission: C text in the family's style.
 
 
 def comment(text, indent, marker):
@@ -161,17 +199,47 @@ def comment(text, indent, marker):
     return [lead + line for line in textwrap.wrap(text, WIDTH - len(lead))]
 
 
-def c_type(names, type_name):
+def c_type(names, spec, own=None):
+    """The C type of a type spec; own is the struct being declared, which
+    refers to itself by its struct tag."""
+    type_name = spec["type"]
     if type_name in PRIMITIVES:
-        return PRIMITIVES[type_name]
-    return names.type(type_name.partition(".")[2] or type_name)
+        base = PRIMITIVES[type_name]
+    elif type_name in ("void", "result"):
+        base = names.type("result") if type_name == "result" else "void"
+    else:
+        name = type_name.partition(".")[2]
+        base = ("struct " if name == own else "") + names.type(name)
+    pointer = spec.get("pointer")
+    if pointer == "const":
+        return "const " + base + "*"
+    return base + {"mutable": "*", "out": "**"}.get(pointer, "")
+
+
+def c_signature(names, spec):
+    """A parameter list in C."""
+    args = spec.get("args", [])
+    return ", ".join(c_declaration(names, arg) for arg in args) or "void"
+
+
+def c_declaration(names, spec, own=None):
+    """A member or parameter: its type and name, or a function pointer."""
+    name = camel(spec["name"])
+    if spec["type"] == "function":
+        returns = c_type(names, spec["returns"]) if spec.get("returns") else "void"
+        return f"{returns} (*{name})({c_signature(names, spec)})"
+    return f"{c_type(names, spec, own)} {name}"
 
 
 def preamble_version(contract, names):
-    version = contract["version"]
+    version, macro = contract["version"], names.macro
     lines = ["// The library version. CMake reads it from here."]
     for part in ("major", "minor", "patch"):
-        lines.append(f"#define {names.macro}_VERSION_{part.upper()} {version[part]}")
+        lines.append(f"#define {macro}_VERSION_{part.upper()} {version[part]}")
+    lines += [""]
+    lines += comment("The contract version a program is built against. An instance refuses any "
+                     "other before 1.0.", 0, "//")
+    lines.append(f"#define {macro}_CONTRACT_VERSION {contract['contract_version']}")
     return lines
 
 
@@ -218,25 +286,42 @@ PREAMBLES = {
 }
 
 
-def emit_result(names, item):
+def emit_values(names, item):
+    width = PRIMITIVES[item["width"]] if item["kind"] == "enum" else "int32_t"
     lines = comment(item["doc"], 4, "//")
-    lines.append(f"    typedef int32_t {names.type(item['name'])};")
+    lines.append(f"    typedef {width} {names.type(item['name'])};")
     lines += ["", "    enum", "    {"]
     for value in item["values"]:
         lines += comment(value["doc"], 8, "//")
-        lines.append(f"        {names.value(value['name'])} = {value['value']},")
+        lines.append(f"        {names.value(value['name'])} = {c_value(value['value'])},")
     lines.append("    };")
     return lines
 
 
+def c_value(value):
+    """An enum value; large ones in hexadecimal with an unsigned suffix."""
+    return f"0x{value:08X}u" if value > 0xFFFF else str(value)
+
+
+def emit_opaque(names, item):
+    c_name = names.type(item["name"])
+    return comment(item["doc"], 4, "//") + [f"    typedef struct {c_name} {c_name};"]
+
+
 def emit_struct(names, item):
     c_name = names.type(item["name"])
+    chain = names.type("chain")
     lines = comment(item["doc"], 4, "//")
     lines += [f"    typedef struct {c_name}", "    {"]
+    if item.get("def"):
+        lines += ["        uint32_t cookie;", "        // Extensions, or NULL.",
+                  f"        const {chain}* next;"]
+    if item.get("chained"):
+        lines.append(f"        {chain} chain;")
     for member in item["members"]:
         if member.get("doc"):
             lines += comment(member["doc"], 8, "//")
-        lines.append(f"        {c_type(names, member['type'])} {camel(member['name'])};")
+        lines.append(f"        {c_declaration(names, member, item['name'])};")
     lines.append(f"    }} {c_name};")
     return lines
 
@@ -257,17 +342,42 @@ def emit_function(names, item):
     safety = item["thread_safety"]
     opening = THREAD_SAFETY[safety["class"]].format(object=safety.get("object", ""))
     lines.append("    /// @par Thread safety")
-    lines += comment(" ".join([opening] + ([safety["note"]] if safety.get("note") else [])), 4, "///")
-    returns = item.get("returns", {}).get("type")
+    lines += comment(" ".join([opening] + ([safety["note"]] if safety.get("note") else [])), 4,
+                     "///")
+    returns = item.get("returns")
     result = c_type(names, returns) if returns else "void"
-    params = ", ".join(f"{c_type(names, a['type'])} {camel(a['name'])}" for a in args) or "void"
-    nodiscard = f"{names.macro}_NODISCARD " if returns == "result" else ""
-    lines.append(
-        f"    {names.macro}_API {nodiscard}{result} {names.function(item['name'])}({params});")
-    return lines
+    nodiscard = f"{names.macro}_NODISCARD " if returns and returns["type"] == "result" else ""
+    declaration = (f"    {nodiscard}{names.macro}_API {result} "
+                   f"{names.function(item['name'])}({c_signature(names, item)});")
+    return lines + wrap_declaration(declaration)
 
 
-EMITTERS = {"result": emit_result, "struct": emit_struct, "function": emit_function}
+def wrap_declaration(line):
+    """A declaration packed as clang-format packs parameters: as many per
+    line as fit the column limit, continuations aligned after the opening
+    parenthesis."""
+    if len(line) <= 100:
+        return [line]
+    column = line.index("(") + 1
+    parts = line[column:].split(", ")
+    lines, current = [], line[:column] + parts[0]
+    for index, part in enumerate(parts[1:], start=2):
+        trailing = 0 if index == len(parts) else 1
+        if len(current) + 2 + len(part) + trailing <= 100:
+            current += ", " + part
+        else:
+            lines.append(current + ",")
+            current = " " * column + part
+    return lines + [current]
+
+
+EMITTERS = {
+    "result": emit_values,
+    "enum": emit_values,
+    "opaque": emit_opaque,
+    "struct": emit_struct,
+    "function": emit_function,
+}
 
 
 def emit_header(contract, header):
@@ -279,7 +389,9 @@ def emit_header(contract, header):
     lines += comment(f"Generated by tools/gen_contract.py from {CONTRACT}: edit the contract, "
                      "not this file.", 0, "//")
     lines += ["", f"#ifndef {guard}", f"#define {guard}", ""]
-    lines += ["#include <stddef.h>", "#include <stdint.h>", ""]
+    includes = [f'#include "{contract["library"]}/{name}.h"' for name in header.get("includes", [])]
+    lines += includes + ([""] if includes else [])
+    lines += ["#include <stdbool.h>", "#include <stddef.h>", "#include <stdint.h>", ""]
     lines += ["#ifdef __cplusplus", 'extern "C"', "{", "#endif", ""]
     for preamble in header.get("preamble", []):
         lines += PREAMBLES[preamble](contract, names) + [""]
@@ -294,11 +406,7 @@ def emit_thread_table(contract):
     lines = [f"# {contract['title']} thread safety", ""]
     lines += textwrap.wrap(f"Generated by `tools/gen_contract.py` from `{CONTRACT}`: edit the "
                            "contract, not this file.", 72)
-    lines += [
-        "",
-        "| Function | Thread safety |",
-        "| --- | --- |",
-    ]
+    lines += ["", "| Function | Thread safety |", "| --- | --- |"]
     for header in contract["headers"]:
         for item in header["items"]:
             if item["kind"] != "function":
@@ -306,6 +414,35 @@ def emit_thread_table(contract):
             safety = item["thread_safety"]
             text = THREAD_SAFETY[safety["class"]].format(object=safety.get("object", ""))
             lines.append(f"| `{names.function(item['name'])}` | {text} |")
+    return "\n".join(lines) + "\n"
+
+
+def emit_result_names(contract):
+    """The source of the ResultName function, one case per result value."""
+    names = Names(contract)
+    result = next(item for header in contract["headers"] for item in header["items"]
+                  if item["kind"] == "result")
+    function = names.function(result["name"] + "_name")
+    lines = [
+        "// SPDX-License-Identifier: MIT",
+        "// Copyright (c) 2026 Sirac Ozmen",
+        "//",
+        f"// Generated by tools/gen_contract.py from {CONTRACT}: the names of",
+        "// the result values.",
+        "",
+        "// clang-format off",
+        "",
+        f'#include "{contract["library"]}/base.h"',
+        "",
+        f"const char* {function}({names.type(result['name'])} result)",
+        "{",
+        "    switch (result)",
+        "    {",
+    ]
+    for value in result["values"]:
+        lines += [f"    case {names.value(value['name'])}:",
+                  f'        return "{names.value(value["name"])}";']
+    lines += ["    default:", '        return "unknown result";', "    }", "}"]
     return "\n".join(lines) + "\n"
 
 
@@ -317,6 +454,10 @@ def outputs(contract):
         for header in contract["headers"]
     }
     files[os.path.join("docs", "contract", "thread-safety.md")] = emit_thread_table(contract)
+    files[os.path.join("src", "generated", "result_names.c")] = emit_result_names(contract)
+    # The contract itself, in one canonical layout, so that its diffs
+    # show only what changed.
+    files[CONTRACT] = json.dumps(contract, indent=2, ensure_ascii=False) + "\n"
     return files
 
 

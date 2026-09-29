@@ -4,21 +4,66 @@
   "prefix": "mrhi",
   "macro": "MRHI",
   "guard": "MAUL_RHI",
-  "version": { "major": 0, "minor": 0, "patch": 1 },
+  "version": {
+    "major": 0,
+    "minor": 0,
+    "patch": 1
+  },
   "headers": [
     {
       "name": "base",
-      "doc": "The base of the Maul RHI API: the library version, the export and attribute macros, and the result codes every fallible function returns.",
-      "preamble": ["version", "api", "nodiscard"],
+      "doc": "The base of the Maul RHI API: the library and contract versions, the export and attribute macros, the result codes every fallible function returns, the allocator and the extension chain.",
+      "preamble": [
+        "version",
+        "api",
+        "nodiscard"
+      ],
       "items": [
         {
           "kind": "result",
           "name": "result",
           "doc": "The status a fallible function returns. Zero is success, positive values are outcomes that are not errors, negative values are errors. The type has a fixed width so that result structs have one layout in C and C++.",
           "values": [
-            { "name": "success", "value": 0, "doc": "The call did what was asked." },
-            { "name": "error_invalid", "value": -1, "doc": "An argument is invalid: a null pointer where one is required, a value out of range." },
-            { "name": "error_capacity", "value": -2, "doc": "A caller buffer or a named limit is too small for the result." }
+            {
+              "name": "success",
+              "value": 0,
+              "doc": "The call did what was asked."
+            },
+            {
+              "name": "error_invalid",
+              "value": -1,
+              "doc": "An argument is invalid: a null pointer where one is required, a value out of range, a def without its cookie."
+            },
+            {
+              "name": "error_capacity",
+              "value": -2,
+              "doc": "A caller buffer, a named limit or the allocator is too small for the result."
+            },
+            {
+              "name": "error_stale",
+              "value": -3,
+              "doc": "An id names an object that no longer exists."
+            },
+            {
+              "name": "error_unsupported",
+              "value": -4,
+              "doc": "This platform, driver or build cannot do what was asked, or a def carries a critical extension the library does not know."
+            },
+            {
+              "name": "error_platform",
+              "value": -5,
+              "doc": "The platform or its GPU driver failed a call the library made."
+            },
+            {
+              "name": "error_state",
+              "value": -6,
+              "doc": "The call is not allowed now, in the object's current state."
+            },
+            {
+              "name": "error_version",
+              "value": -7,
+              "doc": "The program was built against another contract version."
+            }
           ]
         },
         {
@@ -26,30 +71,245 @@
           "name": "version",
           "doc": "A library version: major, minor and patch.",
           "members": [
-            { "name": "major", "type": "uint16" },
-            { "name": "minor", "type": "uint16" },
-            { "name": "patch", "type": "uint16" }
+            {
+              "name": "major",
+              "type": "uint16"
+            },
+            {
+              "name": "minor",
+              "type": "uint16"
+            },
+            {
+              "name": "patch",
+              "type": "uint16"
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "allocator",
+          "doc": "The allocator an owner object takes in its def and keeps for its lifetime. Alignment is a power of two. A zeroed allocator means the C library's functions, which serve alignments up to that of max_align_t.",
+          "members": [
+            {
+              "name": "alloc",
+              "type": "function",
+              "returns": {
+                "type": "void",
+                "pointer": "mutable"
+              },
+              "args": [
+                {
+                  "name": "size",
+                  "type": "size"
+                },
+                {
+                  "name": "alignment",
+                  "type": "size"
+                },
+                {
+                  "name": "context",
+                  "type": "void",
+                  "pointer": "mutable"
+                }
+              ]
+            },
+            {
+              "name": "free",
+              "type": "function",
+              "args": [
+                {
+                  "name": "memory",
+                  "type": "void",
+                  "pointer": "mutable"
+                },
+                {
+                  "name": "size",
+                  "type": "size"
+                },
+                {
+                  "name": "alignment",
+                  "type": "size"
+                },
+                {
+                  "name": "context",
+                  "type": "void",
+                  "pointer": "mutable"
+                }
+              ]
+            },
+            {
+              "name": "context",
+              "type": "void",
+              "pointer": "mutable"
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "struct_type",
+          "width": "uint32",
+          "doc": "The type of a chained struct. Bit 31 clear marks a critical extension, which a library that does not know it refuses; bit 31 set marks a hint it may skip.",
+          "values": [
+            {
+              "name": "struct_none",
+              "value": 0,
+              "doc": "No struct: never valid in a chain."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "chain",
+          "doc": "The header every chained struct opens with. A def's next field, or a chained struct's chain.next, points at the next struct of the chain, or is NULL.",
+          "members": [
+            {
+              "name": "next",
+              "type": "struct.chain",
+              "pointer": "const"
+            },
+            {
+              "name": "type",
+              "type": "enum.struct_type"
+            }
           ]
         },
         {
           "kind": "function",
           "name": "get_version",
           "doc": "Returns the version of the library that was linked, which may differ from the MRHI_VERSION macros a program was compiled with.",
-          "returns": { "type": "struct.version", "doc": "The library version." },
+          "returns": {
+            "type": "struct.version",
+            "doc": "The library version."
+          },
           "args": [],
-          "thread_safety": { "class": "any" }
+          "thread_safety": {
+            "class": "any"
+          }
         },
         {
           "kind": "function",
           "name": "result_name",
           "doc": "Returns the name of a result code, for diagnostics.",
-          "returns": { "type": "static_cstring", "doc": "A static, NUL-terminated string such as \"mrhi_errorCapacity\"." },
+          "returns": {
+            "type": "static_cstring",
+            "doc": "A static, NUL-terminated string such as \"mrhi_errorCapacity\"."
+          },
           "args": [
-            { "name": "result", "type": "result", "doc": "Any value; an unknown one is named as such." }
+            {
+              "name": "result",
+              "type": "result",
+              "doc": "Any value; an unknown one is named as such."
+            }
           ],
-          "thread_safety": { "class": "any" }
+          "thread_safety": {
+            "class": "any"
+          }
+        }
+      ]
+    },
+    {
+      "name": "instance",
+      "doc": "The instance: the root of Maul RHI, made first and destroyed last, which negotiates the contract version and finds the adapters.",
+      "includes": [
+        "base"
+      ],
+      "items": [
+        {
+          "kind": "opaque",
+          "name": "instance",
+          "doc": "An instance, made by mrhiCreateInstance."
+        },
+        {
+          "kind": "struct",
+          "name": "instance_limits",
+          "doc": "The named limits of an instance.",
+          "members": [
+            {
+              "name": "chain_depth",
+              "type": "uint32",
+              "doc": "Chained structs one def may carry; 8 by default."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "instance_def",
+          "def": true,
+          "doc": "How an instance is made. Build it with mrhiDefaultInstanceDef.",
+          "members": [
+            {
+              "name": "contract_version",
+              "type": "uint32",
+              "doc": "MRHI_CONTRACT_VERSION, as the program was built."
+            },
+            {
+              "name": "allocator",
+              "type": "struct.allocator"
+            },
+            {
+              "name": "limits",
+              "type": "struct.instance_limits"
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_instance_def",
+          "doc": "Returns the default instance def: the contract version the program is built against, the C library's allocator and the default limits (8 chained structs per def).",
+          "returns": {
+            "type": "struct.instance_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "create_instance",
+          "doc": "Makes an instance.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a zero limit or an allocator with one function; `mrhi_errorVersion` when the def's contract version is not the library's; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the chain is deeper than the limit or the allocator fails."
+          },
+          "args": [
+            {
+              "name": "def",
+              "type": "struct.instance_def",
+              "pointer": "const",
+              "doc": "The instance to make."
+            },
+            {
+              "name": "instance_out",
+              "type": "opaque.instance",
+              "pointer": "out",
+              "doc": "Receives the instance; set to NULL on failure."
+            }
+          ],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "destroy_instance",
+          "doc": "Destroys an instance. Its devices must be destroyed first.",
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "mutable",
+              "doc": "The instance, or NULL for nothing."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          }
         }
       ]
     }
-  ]
+  ],
+  "contract_version": 1
 }

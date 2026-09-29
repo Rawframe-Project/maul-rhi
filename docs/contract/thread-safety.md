@@ -7,3 +7,6 @@ edit the contract, not this file.
 | --- | --- |
 | `mrhiGetVersion` | Safe from any thread. |
 | `mrhiResultName` | Safe from any thread. |
+| `mrhiDefaultInstanceDef` | Safe from any thread. |
+| `mrhiCreateInstance` | Safe from any thread. |
+| `mrhiDestroyInstance` | Safe from any thread; the instance is used by one thread at a time. |

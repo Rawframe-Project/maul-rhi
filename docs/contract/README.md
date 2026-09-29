@@ -11,10 +11,12 @@ thread safety table (record mrhi-0002). Edit it, then run
 | `library`, `title` | The repository name and the display name. |
 | `prefix`, `macro`, `guard` | `mrhi`, `MRHI` and `MAUL_RHI`: the C name prefixes. |
 | `version` | `major`, `minor`, `patch`: the library version. |
+| `contract_version` | The contract version, `MRHI_CONTRACT_VERSION`. |
 | `headers` | The public headers, in order, each with a `name`, a `doc`, an optional `preamble` and its `items`. |
 
 A header's `preamble` lists the fixed blocks it opens with: `version`
-(the version macros), `api` (the export macro) and `nodiscard`.
+(the library and contract version macros), `api` (the export macro)
+and `nodiscard`. `includes` lists the other headers it needs.
 
 ## Items
 
@@ -23,7 +25,9 @@ Every item has a `kind`, a snake_case `name` and a `doc`.
 | Kind | Fields | C form |
 |---|---|---|
 | `result` | `values`: `name`, `value`, `doc` | a fixed-width `int32_t` type and its values; `success` is zero |
-| `struct` | `members`: `name`, `type`, optional `doc` | a typedef struct |
+| `enum` | `width` (`uint8`, `uint16`, `uint32`, `int32`), `values` | a fixed-width type and its values |
+| `opaque` | none | a typed opaque pointer's struct, for a root object |
+| `struct` | `members`: `name`, `type`, optional `doc`, `pointer`; optional `def` or `chained` | a typedef struct; a def opens with `cookie` and `next` (record R13), a chained struct with `mrhiChain chain` |
 | `function` | `args` (`name`, `type`, `doc`), optional `returns` (`type`, `doc`), `thread_safety` | a documented declaration; one returning `result` is nodiscard |
 
 C names follow `docs/conventions.md` section 4: `get_version` becomes
@@ -34,8 +38,14 @@ C names follow `docs/conventions.md` section 4: `get_version` becomes
 ## Types
 
 A type is a primitive (`bool`, `int8` to `int64`, `uint8` to `uint64`,
-`size`, `float32`, `float64`, `static_cstring`), `result`, or a
-reference to an item as `kind.name`, such as `struct.version`.
+`size`, `float32`, `float64`, `static_cstring`), `result`, `void`, or a
+reference to an item as `kind.name`, such as `struct.version`. A member
+or argument may add `pointer`: `const` (`const T*`), `mutable` (`T*`)
+or `out` (`T**`, where a function hands back a new root). `void` and
+opaque types are only used through a pointer.
+
+A member of type `function` is a function pointer, with `returns` and
+`args` as a function has, without docs.
 
 ## Thread safety
 

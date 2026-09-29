@@ -40,12 +40,18 @@ else()
     set(MAUL_LIBRARY_KIND STATIC)
 endif()
 add_library(maul-rhi ${MAUL_LIBRARY_KIND}
-    src/base.c)
+    src/allocator.c
+    src/base.c
+    src/chain.c
+    src/generated/result_names.c
+    src/instance.c)
 maul_configure_library(maul-rhi)
 
 if(MAUL_RHI_BUILD_TESTS)
     enable_testing()
     maul_add_test(base)
+    maul_add_test(chain WHITEBOX)
+    maul_add_test(instance)
     maul_add_header_tests()
 endif()
 
