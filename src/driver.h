@@ -11,10 +11,11 @@
 #include "command.h"
 #include "reflection.h"
 
+#include "maul-rhi/heap.h"
 #include "maul-rhi/pipeline.h"
 
 // The SPI version a driver's vtable must carry.
-#define MRHI_SPI_VERSION 1
+#define MRHI_SPI_VERSION 2
 
 // An adapter as a driver reports it: its handle, never zero, its facts,
 // and the features and limits it can grant.
@@ -99,7 +100,8 @@ typedef struct mrhiDriverResource
 // naming frame resources by slot plus one, with the stores the compile
 // derived; its render area; its occlusion query set's handle (0 for
 // none); its timestamp query set's handle and the queries written at
-// its start and end (MRHI_NO_QUERY for none); and its first command
+// its start and end (MRHI_NO_QUERY for none); its heap's handle (0 for
+// none); and its first command
 // chunk, an index into the frame's chunks plus one (0 for none), each
 // chunk naming the next.
 typedef struct mrhiDriverPass
@@ -120,8 +122,21 @@ typedef struct mrhiDriverPass
     uint64_t timestampSet;
     uint32_t timestampBegin;
     uint32_t timestampEnd;
+    uint64_t heap;
     uint32_t firstChunk;
 } mrhiDriverPass;
+
+// A heap entry as its driver writes it (mrhi-0015): its kind, the
+// view's or buffer's driver handle, a buffer's range with its size
+// resolved, and whether shaders may write it.
+typedef struct mrhiDriverHeapEntry
+{
+    mrhiHeapEntryKind kind;
+    bool writable;
+    uint64_t handle;
+    uint64_t offset;
+    uint64_t size;
+} mrhiDriverHeapEntry;
 
 // A submitted frame as the driver sees it (mrhi-0013): its
 // resources by frame slot less one; its kept passes in the order they
@@ -243,6 +258,16 @@ typedef struct mrhiDeviceDriverVtable
     // Waits up to timeoutNs for a frame and returns whether it finished;
     // a finished frame is still reported by poll.
     bool (*waitFrame)(void* self, uint64_t tag, uint64_t timeoutNs);
+    // Makes a heap the core has checked, every entry empty; its handle,
+    // never zero. Its destruction waits for the frames that used it, as
+    // other objects' do.
+    mrhiResult (*createHeap)(void* self, const mrhiHeapDef* def, uint64_t* handleOut);
+    void (*destroyHeap)(void* self, uint64_t handle);
+    // Writes an entry the core has checked and found empty, which no
+    // running frame reads.
+    void (*writeHeapEntry)(void* self, uint64_t heap, uint32_t index,
+                           const mrhiDriverHeapEntry* entry);
+    void (*writeHeapSampler)(void* self, uint64_t heap, uint32_t index, uint64_t sampler);
 } mrhiDeviceDriverVtable;
 
 typedef struct mrhiDeviceDriver

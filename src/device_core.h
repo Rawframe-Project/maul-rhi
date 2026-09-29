@@ -61,7 +61,36 @@ typedef struct mrhiSamplerSlot
     // Whether it compares, and whether any of its filters is linear.
     bool comparison;
     bool filtering;
+    // The heap entries naming it, which its destruction empties.
+    uint32_t heapRefs;
 } mrhiSamplerSlot;
+
+// A heap entry as its heap keeps it (mrhi-0015): the view, buffer or
+// sampler slot it names and that slot's generation, 0 for an empty
+// entry; a buffer's range; its kind and whether it is writable; and the
+// token of the last frame submitted when it was emptied, 0 when no
+// frame can still read it.
+typedef struct mrhiHeapEntrySlot
+{
+    uint32_t object;
+    uint32_t generation;
+    uint64_t offset;
+    uint64_t size;
+    uint32_t freeAfter;
+    mrhiHeapEntryKind kind;
+    bool writable;
+} mrhiHeapEntrySlot;
+
+// A heap as its device keeps it: its driver handle, and its resource and
+// sampler entries in one block from the device's allocator; entries 0
+// for a free slot.
+typedef struct mrhiHeapSlot
+{
+    uint64_t handle;
+    uint32_t entries;
+    uint32_t samplers;
+    mrhiHeapEntrySlot* table;
+} mrhiHeapSlot;
 
 // A query set as its device keeps it: its driver handle, its type, and
 // the run of the device's query marks it holds; a count of 0 for a free
@@ -83,6 +112,8 @@ typedef struct mrhiBufferSlot
     mrhiImport import;
     // The state frames leave it in.
     mrhiResourceState state;
+    // The heap entries naming it, which its destruction empties.
+    uint32_t heapRefs;
 } mrhiBufferSlot;
 
 // A texture as its device keeps it: its def (without its chain), its
@@ -107,6 +138,8 @@ typedef struct mrhiViewSlot
     uint32_t texture;
     uint32_t previous;
     uint32_t next;
+    // The heap entries naming it, which its destruction empties.
+    uint32_t heapRefs;
 } mrhiViewSlot;
 
 // What a frame resource is.
@@ -264,6 +297,8 @@ typedef struct mrhiFramePass
     uint64_t timestampSet;
     uint32_t timestampBegin;
     uint32_t timestampEnd;
+    // Its heap's driver handle, 0 for none.
+    uint64_t heap;
     // Its label's bytes, in the device's frameLabels.
     uint32_t labelLength;
 } mrhiFramePass;
@@ -368,6 +403,9 @@ struct mrhiDevice
     mrhiPool querySets;
     mrhiQuerySetSlot* querySetSlots;
     _Atomic uint64_t* queryMarks;
+    // Bindless heaps.
+    mrhiPool heaps;
+    mrhiHeapSlot* heapSlots;
     // The surfaces it configured.
     mrhiPool swapchains;
     mrhiSwapchainSlot* swapchainSlots;

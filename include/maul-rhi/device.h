@@ -87,6 +87,8 @@ extern "C"
         uint32_t querySets;
         // Queries the device's sets hold in all; 4096 by default, 0 for none.
         uint32_t queries;
+        // Bindless heaps the device holds at once; 4 by default, 0 for none.
+        uint32_t heaps;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the

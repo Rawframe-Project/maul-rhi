@@ -9,6 +9,7 @@
 #include "capabilities_core.h"
 #include "chain.h"
 #include "device_core.h"
+#include "heap_core.h"
 #include "instance_core.h"
 #include "invariant.h"
 #include "label.h"
@@ -42,6 +43,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.readbacks = 64;
     def.deviceLimits.querySets = 16;
     def.deviceLimits.queries = 4096;
+    def.deviceLimits.heaps = 4;
     return def;
 }
 
@@ -129,6 +131,7 @@ typedef struct ObjectParts
     TableParts views;
     TableParts querySets;
     size_t marks;
+    TableParts heaps;
     TableParts swapchains;
     TableParts shaders;
     TableParts pipelines;
@@ -150,6 +153,7 @@ static ObjectParts AddObjectParts(mrhiLayout* layout, const mrhiDeviceDef* def)
         AddTable(layout, limits->querySets, sizeof(mrhiQuerySetSlot), alignof(mrhiQuerySetSlot));
     parts.marks =
         mrhiLayoutAdd(layout, limits->queries, sizeof(_Atomic uint64_t), alignof(_Atomic uint64_t));
+    parts.heaps = AddTable(layout, limits->heaps, sizeof(mrhiHeapSlot), alignof(mrhiHeapSlot));
     parts.swapchains =
         AddTable(layout, limits->surfaces, sizeof(mrhiSwapchainSlot), alignof(mrhiSwapchainSlot));
     parts.shaders =
@@ -177,6 +181,11 @@ static void PlaceObjectParts(mrhiDevice* device, unsigned char* block, const Obj
         device->querySetSlots[i] = (mrhiQuerySetSlot){0};
     }
     device->queryMarks = (_Atomic uint64_t*)(block + parts->marks);
+    device->heapSlots = InitTable(block, parts->heaps, &device->heaps, limits->heaps);
+    for (uint32_t i = 0; i < limits->heaps; ++i)
+    {
+        device->heapSlots[i] = (mrhiHeapSlot){0};
+    }
     device->swapchainSlots =
         InitTable(block, parts->swapchains, &device->swapchains, limits->surfaces);
     device->shaderSlots = InitTable(block, parts->shaders, &device->shaders, limits->shaders);
@@ -408,6 +417,7 @@ void mrhiDestroyDevice(mrhiDevice* device)
             mrhiReleaseImages(device);
         }
         mrhiEndConfigurations(device);
+        mrhiDestroyHeaps(device);
         mrhiDestroyPipelines(device);
         mrhiDestroyShaders(device);
         device->driver.vtable->destroy(device->driver.self);

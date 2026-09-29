@@ -194,6 +194,7 @@ static void WalkPass(Walk* walk, const mrhiDriverPass* pass)
     WALK_CHECK(pass->depthTarget.resource.index1 <= frame->resourceCount);
     WALK_CHECK(pass->occlusionSet == 0 || IsHandle(walk, pass->occlusionSet));
     WALK_CHECK(pass->timestampSet == 0 || IsHandle(walk, pass->timestampSet));
+    WALK_CHECK(pass->heap == 0 || IsHandle(walk, pass->heap));
     walk->counts.labeled += pass->labelLength > 0 ? 1 : 0;
     walk->counts.occlusionPasses += pass->occlusionSet != 0 ? 1 : 0;
     walk->counts.timestampPasses += pass->timestampSet != 0 ? 1 : 0;

@@ -5752,6 +5752,11 @@
               "name": "queries",
               "type": "uint32",
               "doc": "Queries the device's sets hold in all; 4096 by default, 0 for none."
+            },
+            {
+              "name": "heaps",
+              "type": "uint32",
+              "doc": "Bindless heaps the device holds at once; 4 by default, 0 for none."
             }
           ],
           "library": "sizes of the library's own tables and rings"
@@ -8843,6 +8848,628 @@
       ]
     },
     {
+      "name": "heap",
+      "doc": "Bindless heaps (mrhi-0015): device objects of resource and sampler entries at indices the program chooses, one read by each pass that names it. Entries of resources a pass does not declare are hidden from it, unless they are sealed.",
+      "includes": [
+        "resources"
+      ],
+      "items": [
+        {
+          "kind": "id",
+          "name": "heap_id",
+          "doc": "A bindless heap of a device."
+        },
+        {
+          "kind": "enum",
+          "name": "heap_entry_kind",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "How shaders read a resource heap entry.",
+          "values": [
+            {
+              "name": "heap_sampled_texture",
+              "value": 0,
+              "doc": "A texture view, read as a sampled texture.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "a SAMPLED_IMAGE descriptor"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "a shader resource view"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "a texture in the argument buffer"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until resource tables ship (sampling-resource-table)"
+                }
+              }
+            },
+            {
+              "name": "heap_storage_texture",
+              "value": 1,
+              "doc": "A texture view, read or written as a storage texture. Needs bindless_heterogeneous.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "a STORAGE_IMAGE descriptor through VK_EXT_mutable_descriptor_type"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "an unordered access view"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "a texture in the argument buffer, read or written"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until heterogeneous-resource-table ships"
+                }
+              }
+            },
+            {
+              "name": "heap_storage_buffer",
+              "value": 2,
+              "doc": "A buffer range, read or written as a storage buffer. Needs bindless_heterogeneous.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "a STORAGE_BUFFER descriptor through VK_EXT_mutable_descriptor_type"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "a raw or structured view, or an unordered access view"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "a buffer address in the argument buffer"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until heterogeneous-resource-table ships"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "heap_entry",
+          "mapped": true,
+          "doc": "A resource heap entry: a texture view, or a range of a buffer, and how shaders read it.",
+          "members": [
+            {
+              "name": "kind",
+              "type": "enum.heap_entry_kind",
+              "doc": "How shaders read it.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "the descriptor type written"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "the view's kind"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "the argument's kind"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until resource tables ship (sampling-resource-table)"
+                }
+              }
+            },
+            {
+              "name": "view",
+              "type": "id.view_id",
+              "doc": "The texture view, for a texture kind: sampled usage for a sampled texture, storage usage for a storage texture.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "the descriptor's image view"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "the view's resource and description"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "the texture"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until resource tables ship (sampling-resource-table)"
+                }
+              }
+            },
+            {
+              "name": "buffer",
+              "type": "id.buffer_id",
+              "doc": "The buffer, with storage usage, for a storage buffer.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "the descriptor's buffer"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "the view's resource"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "the buffer's GPU address"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until resource tables ship (sampling-resource-table)"
+                }
+              }
+            },
+            {
+              "name": "offset",
+              "type": "uint64",
+              "doc": "The range's first byte, a multiple of the device's minStorageBufferOffsetAlignment.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "the descriptor's offset"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "the view's first element"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "added to the address"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until resource tables ship (sampling-resource-table)"
+                }
+              }
+            },
+            {
+              "name": "size",
+              "type": "uint64",
+              "doc": "The range's bytes, a multiple of 4, or MRHI_WHOLE_SIZE for the rest of the buffer.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "the descriptor's range"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "the view's element count"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "the range the shader reads"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until resource tables ship (sampling-resource-table)"
+                }
+              }
+            },
+            {
+              "name": "writable",
+              "type": "bool",
+              "doc": "Whether shaders may write a storage kind; false reads it only.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "read-write or read-only use in the shader"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "an unordered access view or a shader resource view"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "the argument's access"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until resource tables ship (sampling-resource-table)"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "heap_def",
+          "def": true,
+          "mapped": true,
+          "doc": "How a heap is made. Build it with mrhiDefaultHeapDef.",
+          "members": [
+            {
+              "name": "label",
+              "type": "char",
+              "pointer": "const",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "vkSetDebugUtilsObjectNameEXT, with VK_EXT_debug_utils"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetName, as UTF-16"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "label"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "label"
+                }
+              }
+            },
+            {
+              "name": "label_length",
+              "type": "size",
+              "doc": "The label's bytes.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "vkSetDebugUtilsObjectNameEXT's length, with VK_EXT_debug_utils"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SetName's length, as UTF-16"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "label's length"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "label's length"
+                }
+              }
+            },
+            {
+              "name": "entries",
+              "type": "uint32",
+              "doc": "Its resource entries, 1 to the device's heapSize.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "the resource binding's variable descriptor count"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "the shader-visible CBV_SRV_UAV heap's descriptors"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "the argument buffer's resource slots"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until resource tables ship (sampling-resource-table)"
+                }
+              }
+            },
+            {
+              "name": "samplers",
+              "type": "uint32",
+              "doc": "Its sampler entries, 0 to the device's samplerHeapSize.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "the sampler binding's descriptors"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "the shader-visible sampler heap's descriptors"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "the argument buffer's sampler slots"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "until resource tables ship (sampling-resource-table)"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_heap_def",
+          "doc": "Returns the default heap def: 1024 resource entries and 16 samplers.",
+          "returns": {
+            "type": "struct.heap_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          },
+          "library": "fills a def with the library's defaults"
+        },
+        {
+          "kind": "function",
+          "name": "create_heap",
+          "doc": "Makes a bindless heap on a ready device, every entry empty.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, or 0 entries; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know, a device without the bindless_sampling feature, or entries or samplers past its heapSize or samplerHeapSize; `mrhi_errorCapacity` when the device's heaps limit is reached or the allocator fails."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "def",
+              "type": "struct.heap_def",
+              "pointer": "const",
+              "doc": "The heap to make."
+            },
+            {
+              "name": "heap_out",
+              "type": "id.heap_id",
+              "pointer": "mutable",
+              "doc": "Receives the heap."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "restricted",
+              "note": "a descriptor set of the heap layout from a pool of its own, with update after bind"
+            },
+            "d3d12": {
+              "class": "restricted",
+              "note": "CreateDescriptorHeap, one shader-visible heap for resources and one for samplers"
+            },
+            "metal": {
+              "class": "restricted",
+              "note": "an argument buffer of the entries"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "until resource tables ship (sampling-resource-table)"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "destroy_heap",
+          "doc": "Destroys a heap. Its id ends at once; the device retires it after the frames that used it.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device; `mrhi_errorStale` for a heap the device no longer has."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "heap",
+              "type": "id.heap_id",
+              "doc": "The heap."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "restricted",
+              "note": "the set and its pool destroyed once the frames that used it finish"
+            },
+            "d3d12": {
+              "class": "restricted",
+              "note": "released once those frames finish"
+            },
+            "metal": {
+              "class": "restricted",
+              "note": "released once those frames finish"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "until resource tables ship (sampling-resource-table)"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "set_heap_entry",
+          "doc": "Writes an empty resource entry, which frames submitted later read at its index. Destroying the view or buffer it names empties it.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, an index past the heap's entries, an unknown kind, a view or buffer without the usage its kind needs, or a range outside the buffer or off its alignment; `mrhi_errorStale` for a heap, view or buffer the device no longer has; `mrhi_errorUnsupported` for a storage kind without the bindless_heterogeneous feature; `mrhi_errorState` for an entry that is not empty, or one cleared before a frame that has not finished."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "heap",
+              "type": "id.heap_id",
+              "doc": "The heap."
+            },
+            {
+              "name": "index",
+              "type": "uint32",
+              "doc": "The entry, below the heap's entries."
+            },
+            {
+              "name": "entry",
+              "type": "struct.heap_entry",
+              "pointer": "const",
+              "doc": "What it holds. Only read during the call."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "restricted",
+              "note": "vkUpdateDescriptorSets into the set's resource binding"
+            },
+            "d3d12": {
+              "class": "restricted",
+              "note": "CreateShaderResourceView or CreateUnorderedAccessView at the index"
+            },
+            "metal": {
+              "class": "restricted",
+              "note": "the argument buffer's slot written"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "until resource tables ship (sampling-resource-table)"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "clear_heap_entry",
+          "doc": "Empties a resource entry. Its index can be written again once the frames submitted before now finish.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or an index past the heap's entries; `mrhi_errorStale` for a heap the device no longer has."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "heap",
+              "type": "id.heap_id",
+              "doc": "The heap."
+            },
+            {
+              "name": "index",
+              "type": "uint32",
+              "doc": "The entry."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "library": "marks the entry; nothing is written until it is set again"
+        },
+        {
+          "kind": "function",
+          "name": "set_heap_sampler",
+          "doc": "Writes an empty sampler entry, which frames submitted later read at its index. Destroying the sampler empties it.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or an index past the heap's samplers; `mrhi_errorStale` for a heap or sampler the device no longer has; `mrhi_errorState` for an entry that is not empty, or one cleared before a frame that has not finished."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "heap",
+              "type": "id.heap_id",
+              "doc": "The heap."
+            },
+            {
+              "name": "index",
+              "type": "uint32",
+              "doc": "The sampler entry, below the heap's samplers."
+            },
+            {
+              "name": "sampler",
+              "type": "id.sampler_id",
+              "doc": "The sampler."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "restricted",
+              "note": "vkUpdateDescriptorSets into the set's sampler binding"
+            },
+            "d3d12": {
+              "class": "restricted",
+              "note": "CreateSampler at the index"
+            },
+            "metal": {
+              "class": "restricted",
+              "note": "the argument buffer's sampler slot written"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "until resource tables ship (sampling-resource-table)"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "clear_heap_sampler",
+          "doc": "Empties a sampler entry. Its index can be written again once the frames submitted before now finish.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or an index past the heap's samplers; `mrhi_errorStale` for a heap the device no longer has."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "heap",
+              "type": "id.heap_id",
+              "doc": "The heap."
+            },
+            {
+              "name": "index",
+              "type": "uint32",
+              "doc": "The sampler entry."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "library": "marks the entry; nothing is written until it is set again"
+        }
+      ]
+    },
+    {
       "name": "surface",
       "doc": "Surfaces: a window's drawable area, made from its native handles through one chained source struct per window system, and what each adapter can do with it. The library includes no window system header; a window library's handles are copied into the source.",
       "includes": [
@@ -10076,7 +10703,8 @@
       "name": "frame",
       "doc": "Frames: the frame graph, the only way work reaches the GPU. A frame is begun, its resources and passes declared, compiled, recorded and submitted; submitting returns a token that the device's notification queue answers once the GPU has finished.",
       "includes": [
-        "surface"
+        "surface",
+        "heap"
       ],
       "items": [
         {
@@ -11402,6 +12030,11 @@
               "name": "timestamp_end",
               "type": "uint32",
               "doc": "The query written at the pass's end, or MRHI_NO_QUERY."
+            },
+            {
+              "name": "heap",
+              "type": "id.heap_id",
+              "doc": "The bindless heap every draw and dispatch of the pass reads; a null id for none."
             }
           ],
           "mapping": {

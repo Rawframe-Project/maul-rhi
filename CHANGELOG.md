@@ -279,6 +279,12 @@ format.
 - A table's bindings record their count as the command's payload, so a
   driver steps over them; before, a driver read the bindings as
   commands.
+- Bindless heaps (mrhi-0015, `maul-rhi/heap.h`): heaps of resource and
+  sampler entries at indices the program chooses, written only while
+  empty and freed only after the frames that could read them finish,
+  emptied when the object they name is destroyed; a pass names the heap
+  its draws and dispatches read. Needs `bindless_sampling`, and
+  `bindless_heterogeneous` for storage textures and buffers.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

@@ -8,6 +8,7 @@
 
 #include "capabilities_core.h"
 #include "device_core.h"
+#include "heap_core.h"
 
 #include <stdckdint.h>
 
@@ -200,6 +201,10 @@ mrhiResult mrhiCreateView(mrhiDevice* device, const mrhiViewDef* def, mrhiViewId
 // Ends a view: the driver's object and the id.
 static void EndView(mrhiDevice* device, uint32_t index1)
 {
+    if (device->viewSlots[index1 - 1].heapRefs > 0)
+    {
+        mrhiForgetHeapObject(device, mrhiHeapObjectView, index1);
+    }
     device->driver.vtable->destroyView(device->driver.self, device->viewSlots[index1 - 1].handle);
     mrhiPoolRelease(&device->views, index1);
 }

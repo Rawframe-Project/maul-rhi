@@ -12,6 +12,7 @@
 #ifndef MAUL_RHI_FRAME_H
 #define MAUL_RHI_FRAME_H
 
+#include "maul-rhi/heap.h"
 #include "maul-rhi/surface.h"
 
 #include <stdbool.h>
@@ -442,6 +443,9 @@ extern "C"
         uint32_t timestampBegin;
         // The query written at the pass's end, or MRHI_NO_QUERY.
         uint32_t timestampEnd;
+        // The bindless heap every draw and dispatch of the pass reads; a null
+        // id for none.
+        mrhiHeapId heap;
     } mrhiPassDef;
 
     /// Returns the default pass def: a graphics pass with no accesses, targets

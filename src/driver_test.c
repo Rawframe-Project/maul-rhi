@@ -194,6 +194,7 @@ typedef struct TestDevice
     uint64_t bufferBytes;
     uint32_t textures;
     uint32_t querySets;
+    uint32_t heaps;
     // Live shaders and pipelines; the core destroys each before the device.
     uint32_t shaders;
     uint32_t pipelines;
@@ -374,6 +375,46 @@ static void DestroyQuerySet(void* self, uint64_t handle)
     TestDevice* device = self;
     MRHI_ASSERT(handle != 0 && handle <= device->nextHandle && device->querySets > 0);
     --device->querySets;
+}
+
+static mrhiResult CreateHeap(void* self, const mrhiHeapDef* def, uint64_t* handleOut)
+{
+    TestDevice* device = self;
+    Name(device, def->label, def->labelLength);
+    mrhiResult status = MakeObject(device, handleOut);
+    device->heaps += status == mrhi_success ? 1 : 0;
+    return status;
+}
+
+static void DestroyHeap(void* self, uint64_t handle)
+{
+    TestDevice* device = self;
+    MRHI_ASSERT(handle != 0 && handle <= device->nextHandle && device->heaps > 0);
+    --device->heaps;
+}
+
+// Whether a handle is one the device made (used only by asserts).
+[[maybe_unused]] static bool IsMade(const TestDevice* device, uint64_t handle)
+{
+    return handle > HANDLE_BASE && handle <= device->nextHandle;
+}
+
+static void WriteHeapEntry(void* self, uint64_t heap, uint32_t index,
+                           const mrhiDriverHeapEntry* entry)
+{
+    (void)index;
+    const TestDevice* device = self;
+    MRHI_ASSERT(IsMade(device, heap) && IsMade(device, entry->handle) &&
+                entry->kind <= mrhi_heapStorageBuffer &&
+                (entry->kind == mrhi_heapStorageBuffer ? entry->size > 0
+                                                       : entry->size == 0 && entry->offset == 0));
+}
+
+static void WriteHeapSampler(void* self, uint64_t heap, uint32_t index, uint64_t sampler)
+{
+    (void)index;
+    const TestDevice* device = self;
+    MRHI_ASSERT(IsMade(device, heap) && IsMade(device, sampler));
 }
 
 static double TimestampPeriod(void* self)
@@ -722,6 +763,10 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .destroyPipeline = DestroyPipeline,
     .createQuerySet = CreateQuerySet,
     .destroyQuerySet = DestroyQuerySet,
+    .createHeap = CreateHeap,
+    .destroyHeap = DestroyHeap,
+    .writeHeapEntry = WriteHeapEntry,
+    .writeHeapSampler = WriteHeapSampler,
     .lossReport = LossReport,
     .acquireImage = AcquireImage,
     .releaseImage = ReleaseImage,

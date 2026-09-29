@@ -5,7 +5,7 @@ allocator:
 base:
 capabilities_core:
 chain:
-device: allocator capabilities_core chain device_core driver instance_core invariant label pool
+device: allocator capabilities_core chain device_core driver heap_core instance_core invariant label pool
 device_core: capabilities_core command driver pool reflection
 driver: command reflection
 driver_test: allocator capabilities_core command driver driver_test_frame invariant
@@ -32,14 +32,16 @@ invariant:
 label:
 notify: instance_core
 pool:
-resources: capabilities_core device_core
+resources: capabilities_core device_core heap_core
 texture: capabilities_core device_core
-view: capabilities_core device_core
+view: capabilities_core device_core heap_core
 surface: chain device_core instance_core invariant label
 swapchain: capabilities_core device_core instance_core
 frame: device_core invariant
 frame_resource: device_core instance_core
-pass: capabilities_core device_core
+heap: allocator device_core heap_core
+heap_core: device_core
+pass: capabilities_core device_core heap_core
 compile: device_core
 plan: device_core
 memory: device_core

@@ -60,6 +60,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/binding.c
     src/copy.c
     src/upload.c
+    src/heap.c
     src/query.c
     src/readback.c
     src/submit.c
@@ -150,6 +151,7 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(copy WHITEBOX)
         maul_add_test(upload WHITEBOX)
         maul_add_test(query WHITEBOX)
+        maul_add_test(heap WHITEBOX)
         maul_add_test(readback WHITEBOX)
         maul_add_test(submit WHITEBOX)
         maul_add_test(acquire WHITEBOX)

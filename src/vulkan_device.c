@@ -177,6 +177,41 @@ static void DestroySampler(void* self, uint64_t handle)
     mrhiVulkanRetireLater(&device->frames, mrhiVulkanRetiredSampler, handle);
 }
 
+// Heaps come with the bindless slice: the adapter grants no bindless
+// feature yet, so the core never makes one here.
+static mrhiResult RefuseHeap(void* self, const mrhiHeapDef* def, uint64_t* handleOut)
+{
+    (void)self;
+    (void)def;
+    (void)handleOut;
+    return mrhi_errorUnsupported;
+}
+
+static void NeverHeap(void* self, uint64_t handle)
+{
+    (void)self;
+    (void)handle;
+    MRHI_ASSERT(false);
+}
+
+static void NeverEntry(void* self, uint64_t heap, uint32_t index, const mrhiDriverHeapEntry* entry)
+{
+    (void)self;
+    (void)heap;
+    (void)index;
+    (void)entry;
+    MRHI_ASSERT(false);
+}
+
+static void NeverSampler(void* self, uint64_t heap, uint32_t index, uint64_t sampler)
+{
+    (void)self;
+    (void)heap;
+    (void)index;
+    (void)sampler;
+    MRHI_ASSERT(false);
+}
+
 static mrhiResult CreateQuerySet(void* self, const mrhiQuerySetDef* def, uint64_t* handleOut)
 {
     VulkanDevice* device = self;
@@ -396,6 +431,10 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .releaseImage = ReleaseImage,
     .createQuerySet = CreateQuerySet,
     .destroyQuerySet = DestroyQuerySet,
+    .createHeap = RefuseHeap,
+    .destroyHeap = NeverHeap,
+    .writeHeapEntry = NeverEntry,
+    .writeHeapSampler = NeverSampler,
     .timestampPeriod = TimestampPeriod,
     .importPipelineCache = ImportPipelineCache,
     .exportPipelineCache = ExportPipelineCache,

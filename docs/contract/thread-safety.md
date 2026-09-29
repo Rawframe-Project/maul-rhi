@@ -44,6 +44,13 @@ edit the contract, not this file.
 | `mrhiDefaultQuerySetDef` | Safe from any thread. |
 | `mrhiCreateQuerySet` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDestroyQuerySet` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDefaultHeapDef` | Safe from any thread. |
+| `mrhiCreateHeap` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDestroyHeap` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiSetHeapEntry` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiClearHeapEntry` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiSetHeapSampler` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiClearHeapSampler` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDefaultSurfaceDef` | Safe from any thread. |
 | `mrhiCreateSurface` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiDestroySurface` | Safe from any thread; the instance and the device that configured the surface are used by one thread at a time. |

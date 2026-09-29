@@ -304,6 +304,34 @@ restricted or absent-rejected, with how.
 | `type` | direct: queryType | direct: the heap's Type | direct: the buffer's kind | direct: type |
 | `count` | direct: queryCount | direct: Count | direct: sampleCount, or the visibility buffer's bytes over 8 | direct: count |
 
+## mrhiHeapEntryKind
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_heapSampledTexture` | restricted: a SAMPLED_IMAGE descriptor | restricted: a shader resource view | restricted: a texture in the argument buffer | absent-rejected: until resource tables ship (sampling-resource-table) |
+| `mrhi_heapStorageTexture` | restricted: a STORAGE_IMAGE descriptor through VK_EXT_mutable_descriptor_type | restricted: an unordered access view | restricted: a texture in the argument buffer, read or written | absent-rejected: until heterogeneous-resource-table ships |
+| `mrhi_heapStorageBuffer` | restricted: a STORAGE_BUFFER descriptor through VK_EXT_mutable_descriptor_type | restricted: a raw or structured view, or an unordered access view | restricted: a buffer address in the argument buffer | absent-rejected: until heterogeneous-resource-table ships |
+
+## mrhiHeapEntry
+
+| Member | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `kind` | restricted: the descriptor type written | restricted: the view's kind | restricted: the argument's kind | absent-rejected: until resource tables ship (sampling-resource-table) |
+| `view` | restricted: the descriptor's image view | restricted: the view's resource and description | restricted: the texture | absent-rejected: until resource tables ship (sampling-resource-table) |
+| `buffer` | restricted: the descriptor's buffer | restricted: the view's resource | restricted: the buffer's GPU address | absent-rejected: until resource tables ship (sampling-resource-table) |
+| `offset` | restricted: the descriptor's offset | restricted: the view's first element | restricted: added to the address | absent-rejected: until resource tables ship (sampling-resource-table) |
+| `size` | restricted: the descriptor's range | restricted: the view's element count | restricted: the range the shader reads | absent-rejected: until resource tables ship (sampling-resource-table) |
+| `writable` | restricted: read-write or read-only use in the shader | restricted: an unordered access view or a shader resource view | restricted: the argument's access | absent-rejected: until resource tables ship (sampling-resource-table) |
+
+## mrhiHeapDef
+
+| Member | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `label` | restricted: vkSetDebugUtilsObjectNameEXT, with VK_EXT_debug_utils | direct: SetName, as UTF-16 | direct: label | direct: label |
+| `labelLength` | restricted: vkSetDebugUtilsObjectNameEXT's length, with VK_EXT_debug_utils | direct: SetName's length, as UTF-16 | direct: label's length | direct: label's length |
+| `entries` | restricted: the resource binding's variable descriptor count | restricted: the shader-visible CBV_SRV_UAV heap's descriptors | restricted: the argument buffer's resource slots | absent-rejected: until resource tables ship (sampling-resource-table) |
+| `samplers` | restricted: the sampler binding's descriptors | restricted: the shader-visible sampler heap's descriptors | restricted: the argument buffer's sampler slots | absent-rejected: until resource tables ship (sampling-resource-table) |
+
 ## mrhiColorPrimaries
 
 | Value | Vulkan | D3D12 | Metal | WebGPU |
@@ -752,6 +780,23 @@ restricted or absent-rejected, with how.
 | `mrhiDefaultTextureDef` | fills a def with the library's defaults |
 | `mrhiDefaultViewDef` | fills a def with the library's defaults |
 | `mrhiDefaultQuerySetDef` | fills a def with the library's defaults |
+
+## heap: operations and structures
+
+| Concept | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhiCreateHeap` | restricted: a descriptor set of the heap layout from a pool of its own, with update after bind | restricted: CreateDescriptorHeap, one shader-visible heap for resources and one for samplers | restricted: an argument buffer of the entries | absent-rejected: until resource tables ship (sampling-resource-table) |
+| `mrhiDestroyHeap` | restricted: the set and its pool destroyed once the frames that used it finish | restricted: released once those frames finish | restricted: released once those frames finish | absent-rejected: until resource tables ship (sampling-resource-table) |
+| `mrhiSetHeapEntry` | restricted: vkUpdateDescriptorSets into the set's resource binding | restricted: CreateShaderResourceView or CreateUnorderedAccessView at the index | restricted: the argument buffer's slot written | absent-rejected: until resource tables ship (sampling-resource-table) |
+| `mrhiSetHeapSampler` | restricted: vkUpdateDescriptorSets into the set's sampler binding | restricted: CreateSampler at the index | restricted: the argument buffer's sampler slot written | absent-rejected: until resource tables ship (sampling-resource-table) |
+
+## heap: the library's own
+
+| Concept | Why no API maps it |
+| --- | --- |
+| `mrhiDefaultHeapDef` | fills a def with the library's defaults |
+| `mrhiClearHeapEntry` | marks the entry; nothing is written until it is set again |
+| `mrhiClearHeapSampler` | marks the entry; nothing is written until it is set again |
 
 ## surface: operations and structures
 

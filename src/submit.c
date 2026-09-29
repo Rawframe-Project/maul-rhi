@@ -64,6 +64,7 @@ static mrhiDriverPass ViewPass(const mrhiDevice* device, uint32_t index)
         .height = pass->height,
         .occlusionSet = pass->occlusionHandle,
         .timestampSet = pass->timestampSet,
+        .heap = pass->heap,
         .timestampBegin = pass->timestampBegin,
         .timestampEnd = pass->timestampEnd,
         .firstChunk = pass->firstChunk,

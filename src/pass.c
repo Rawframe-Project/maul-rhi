@@ -9,6 +9,7 @@
 
 #include "capabilities_core.h"
 #include "device_core.h"
+#include "heap_core.h"
 
 #include <string.h>
 
@@ -509,7 +510,12 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
     {
         return status;
     }
-    status = mrhiCheckPassQueries(device, def);
+    uint64_t heap = 0;
+    status = mrhiCheckPassHeap(device, def->heap, &heap);
+    if (status == mrhi_success)
+    {
+        status = mrhiCheckPassQueries(device, def);
+    }
     uint32_t count = status == mrhi_success ? MakeUses(device, def, &status) : 0;
     if (status != mrhi_success)
     {
@@ -530,6 +536,7 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
         .depthTarget = def->depthTarget,
         .occlusionSet = def->occlusionQuerySet.index1,
         .occlusionGeneration = def->occlusionQuerySet.generation,
+        .heap = heap,
         .labelLength = (uint32_t)def->labelLength,
     };
     if (def->occlusionQuerySet.index1 != 0)

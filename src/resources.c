@@ -7,6 +7,7 @@
 
 #include "capabilities_core.h"
 #include "device_core.h"
+#include "heap_core.h"
 
 #define SAMPLER_DEF_COOKIE 0x6D727361u
 #define BUFFER_DEF_COOKIE  0x6D726275u
@@ -105,6 +106,10 @@ mrhiResult mrhiDestroySampler(mrhiDevice* device, mrhiSamplerId sampler)
     {
         return mrhi_errorStale;
     }
+    if (device->samplerSlots[sampler.index1 - 1].heapRefs > 0)
+    {
+        mrhiForgetHeapObject(device, mrhiHeapObjectSampler, sampler.index1);
+    }
     device->driver.vtable->destroySampler(device->driver.self,
                                           device->samplerSlots[sampler.index1 - 1].handle);
     mrhiPoolRelease(&device->samplers, sampler.index1);
@@ -185,6 +190,10 @@ mrhiResult mrhiDestroyBuffer(mrhiDevice* device, mrhiBufferId buffer)
     if (!mrhiPoolIsLive(&device->buffers, buffer.index1, buffer.generation))
     {
         return mrhi_errorStale;
+    }
+    if (device->bufferSlots[buffer.index1 - 1].heapRefs > 0)
+    {
+        mrhiForgetHeapObject(device, mrhiHeapObjectBuffer, buffer.index1);
     }
     device->driver.vtable->destroyBuffer(device->driver.self,
                                          device->bufferSlots[buffer.index1 - 1].handle);
