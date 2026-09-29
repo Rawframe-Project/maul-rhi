@@ -40,8 +40,10 @@ barriers.
   which every draw and dispatch of the pass reads.
 - **Declared access:** a pass declares every resource it reaches
   through the heap, as it declares bound ones, so the graph makes its
-  barriers; an entry of a resource the pass does not declare is hidden
-  from it unless the resource is sealed.
+  barriers. Reading an entry of a resource the pass neither declares
+  nor has sealed, or writing one it does not declare as written, is
+  invalid, with undefined results: the native APIs cannot hide such
+  entries, as the gpuweb proposal's tables will.
 - **Sealed resources:** sealing is part of a frame.
   `mrhiSealResource` on a texture or buffer the open frame imports
   ends it in the sealed state (`mrhi_stateSealed`) after the frame's
