@@ -66,8 +66,8 @@ Every `function`, `struct`, `enum` and `bitflags` is classed one way:
 A `mapping` has a row for each of `vulkan`, `d3d12`, `metal` and
 `web_gpu`: a `class` (`direct`, `emulated`, `restricted` or
 `absent_rejected`), a `note` on how, and for an emulated row its
-`cost`. A header with `"classed": true`, or the whole contract with the
-same key, must class every such item. `docs/contract/mappings.md` shows
+`cost`. The generator refuses an item classed no way or more than one.
+`docs/contract/mappings.md` shows
 the rows, and each header's whole concepts and the library's own.
 
 ## Thread safety

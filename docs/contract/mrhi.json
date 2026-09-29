@@ -292,8 +292,7 @@
           },
           "library": "names the library's result codes"
         }
-      ],
-      "classed": true
+      ]
     },
     {
       "name": "instance",
@@ -932,8 +931,7 @@
           },
           "library": "reads what the library kept of an adapter"
         }
-      ],
-      "classed": true
+      ]
     },
     {
       "name": "capabilities",
@@ -5617,8 +5615,7 @@
             }
           }
         }
-      ],
-      "classed": true
+      ]
     },
     {
       "name": "device",
@@ -6302,8 +6299,7 @@
           },
           "library": "reads what the library kept of the loss"
         }
-      ],
-      "classed": true
+      ]
     },
     {
       "name": "resources",
@@ -8844,8 +8840,7 @@
             }
           }
         }
-      ],
-      "classed": true
+      ]
     },
     {
       "name": "surface",
@@ -10075,8 +10070,7 @@
             }
           }
         }
-      ],
-      "classed": true
+      ]
     },
     {
       "name": "frame",
@@ -12182,8 +12176,7 @@
           },
           "library": "reads the library's plan"
         }
-      ],
-      "classed": true
+      ]
     },
     {
       "name": "shader",
@@ -13536,8 +13529,7 @@
           },
           "library": "reads the container's reflection"
         }
-      ],
-      "classed": true
+      ]
     },
     {
       "name": "pipeline",
@@ -16639,8 +16631,7 @@
           },
           "library": "reads what the library did with the def's cache"
         }
-      ],
-      "classed": true
+      ]
     },
     {
       "name": "encoder",
@@ -16684,7 +16675,25 @@
               "type": "float32",
               "doc": "The depth its far plane maps to, minDepth to 1."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkViewport"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "D3D12_VIEWPORT"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLViewport"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "setViewport's arguments"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -16711,7 +16720,25 @@
               "type": "uint32",
               "doc": "Its height."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkRect2D"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "D3D12_RECT"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLScissorRect"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "setScissorRect's arguments"
+            }
+          }
         },
         {
           "kind": "constant",
@@ -16764,7 +16791,25 @@
               "type": "id.sampler_id",
               "doc": "A sampler, for a sampler slot."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "a VkDescriptorBufferInfo, VkDescriptorImageInfo or sampler written to the table's set"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "a view or sampler descriptor written to the table's range"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "a buffer, texture or sampler encoded into the table's argument buffer"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "a GPUBindGroupEntry"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -16786,7 +16831,25 @@
               "type": "uint32",
               "doc": "The depth of a 3D texture, or the layers of any other."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkExtent3D"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "the box's width, height and depth"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "MTLSize"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUExtent3D"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -16813,7 +16876,25 @@
               "type": "uint32",
               "doc": "The rows of blocks from one layer to the next, at least the copy's rows; 0 when the copy has one layer."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkBufferCopy"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CopyBufferRegion's offsets and size"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:'s arguments"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "copyBufferToBuffer's arguments"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -16850,7 +16931,25 @@
               "type": "enum.texture_aspect",
               "doc": "The aspect: all of a color format; one of a depth format for a copy with a buffer, all of it for a copy between textures."
             }
-          ]
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkImageCopy"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "D3D12_TEXTURE_COPY_LOCATION pairs and a D3D12_BOX"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:'s arguments"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "GPUTexelCopyTextureInfo pairs and a copy size"
+            }
+          }
         },
         {
           "kind": "struct",
@@ -16872,7 +16971,8 @@
               "type": "uint32",
               "doc": "The rows of blocks from one layer to the next, at least the copy's rows; 0 when the copy has one layer."
             }
-          ]
+          ],
+          "library": "how the program's bytes lie; the library copies them into its staging ring laid out for the driver"
         },
         {
           "kind": "function",
@@ -16898,6 +16998,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdBeginRendering for a pass with targets, after the pass's barriers"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "BeginRenderPass for a pass with targets, after the pass's barriers"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "a render, compute or blit encoder begun by the pass's work"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "beginRenderPass or beginComputePass by the pass's work"
+            }
           }
         },
         {
@@ -16924,6 +17042,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdEndRendering for a pass with targets"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "EndRenderPass for a pass with targets"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "endEncoding"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "end on the pass encoder"
+            }
           }
         },
         {
@@ -16955,6 +17091,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdBindPipeline and the dynamic states it leaves"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "SetPipelineState, the root signature and the topology"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "setRenderPipelineState and setDepthStencilState, with the pipeline's rasterizer state"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "setPipeline"
+            }
           }
         },
         {
@@ -16986,6 +17140,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdBindPipeline"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "SetPipelineState and the root signature"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "setComputePipelineState"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "setPipeline"
+            }
           }
         },
         {
@@ -17028,6 +17200,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdBindDescriptorSets with the table's set"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "SetGraphicsRootDescriptorTable or SetComputeRootDescriptorTable"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "setVertexBuffer, setFragmentBuffer or setBuffer with the table's argument buffer, and useResource for what it names"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "setBindGroup"
+            }
           }
         },
         {
@@ -17074,6 +17264,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdBindVertexBuffers2 with the stride"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "IASetVertexBuffers"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "setVertexBuffer:offset:atIndex: past the tables' slots"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "setVertexBuffer"
+            }
           }
         },
         {
@@ -17120,6 +17328,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdBindIndexBuffer"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "IASetIndexBuffer"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "kept for the indexed draws, which take it as arguments"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "setIndexBuffer"
+            }
           }
         },
         {
@@ -17166,6 +17392,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdDraw"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "DrawInstanced"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "drawPrimitives"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "draw"
+            }
           }
         },
         {
@@ -17217,6 +17461,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdDrawIndexed"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "DrawIndexedInstanced"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "drawIndexedPrimitives"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "drawIndexed"
+            }
           }
         },
         {
@@ -17258,6 +17520,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdDispatch"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "Dispatch"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "dispatchThreadgroups with the pipeline's group size"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "dispatchWorkgroups"
+            }
           }
         },
         {
@@ -17294,6 +17574,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdDrawIndirect"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "ExecuteIndirect with a draw command signature"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "drawPrimitives:indirectBuffer:"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "drawIndirect"
+            }
           }
         },
         {
@@ -17330,6 +17628,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdDrawIndexedIndirect"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "ExecuteIndirect with an indexed draw command signature"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "drawIndexedPrimitives:indirectBuffer:"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "drawIndexedIndirect"
+            }
           }
         },
         {
@@ -17366,6 +17682,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdDispatchIndirect"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "ExecuteIndirect with a dispatch command signature"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "dispatchThreadgroupsWithIndirectBuffer:"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "dispatchWorkgroupsIndirect"
+            }
           }
         },
         {
@@ -17397,6 +17731,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdBeginQuery"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "BeginQuery"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "setVisibilityResultMode with the query's offset"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "beginOcclusionQuery"
+            }
           }
         },
         {
@@ -17423,6 +17775,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdEndQuery"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "EndQuery"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "setVisibilityResultMode disabled"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "endOcclusionQuery"
+            }
           }
         },
         {
@@ -17474,6 +17844,25 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdCopyQueryPoolResults with 64-bit results and wait"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "ResolveQueryData"
+            },
+            "metal": {
+              "class": "emulated",
+              "note": "a blit copy from the visibility buffer, or resolveCounters for timestamps",
+              "cost": "a blit copy per resolve"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "resolveQuerySet"
+            }
           }
         },
         {
@@ -17525,6 +17914,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdCopyBuffer"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CopyBufferRegion"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "copyFromBuffer:sourceOffset:toBuffer:"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "copyBufferToBuffer"
+            }
           }
         },
         {
@@ -17569,6 +17976,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdCopyBufferToImage"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CopyTextureRegion from a placed footprint"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "copyFromBuffer:toTexture:"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "copyBufferToTexture"
+            }
           }
         },
         {
@@ -17613,6 +18038,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdCopyImageToBuffer"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CopyTextureRegion into a placed footprint"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "copyFromTexture:toBuffer:"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "copyTextureToBuffer"
+            }
           }
         },
         {
@@ -17657,6 +18100,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdCopyImage"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CopyTextureRegion"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "copyFromTexture:toTexture:"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "copyTextureToTexture"
+            }
           }
         },
         {
@@ -17704,6 +18165,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "a copy from the staging ring with vkCmdCopyBuffer"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "a copy from the staging ring with CopyBufferRegion"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "a blit copy from the staging ring"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "a copy from the staging ring with copyBufferToBuffer"
+            }
           }
         },
         {
@@ -17759,6 +18238,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "a copy from the staging ring with vkCmdCopyBufferToImage"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "a copy from the staging ring with CopyTextureRegion"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "a blit copy from the staging ring"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "a copy from the staging ring with copyBufferToTexture"
+            }
           }
         },
         {
@@ -17806,6 +18303,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdCopyBuffer into the readback ring's host-visible memory"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CopyBufferRegion into the readback ring's READBACK heap"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "a blit copy into the readback ring's shared buffer"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "copyBufferToBuffer into the readback ring, mapped with mapAsync"
+            }
           }
         },
         {
@@ -17850,6 +18365,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdCopyImageToBuffer into the readback ring"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "CopyTextureRegion into the readback ring's READBACK heap"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "a blit copy into the readback ring's shared buffer"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "copyTextureToBuffer into the readback ring, mapped with mapAsync"
+            }
           }
         },
         {
@@ -17893,7 +18426,8 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the device"
-          }
+          },
+          "library": "copies bytes out of the library's readback ring, which the driver mapped when the frame finished"
         },
         {
           "kind": "function",
@@ -17935,6 +18469,25 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdPushConstants"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "SetGraphicsRoot32BitConstants or SetComputeRoot32BitConstants"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "setVertexBytes, setFragmentBytes or setBytes"
+            },
+            "web_gpu": {
+              "class": "emulated",
+              "note": "setImmediates where the browser has immediates; else a dynamic offset into a uniform buffer",
+              "cost": "without immediates, the bytes written to a per-frame uniform buffer and a dynamic offset per draw"
+            }
           }
         },
         {
@@ -17967,6 +18520,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdSetViewport"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "RSSetViewports"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "setViewport"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "setViewport"
+            }
           }
         },
         {
@@ -17999,6 +18570,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdSetScissor"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "RSSetScissorRects"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "setScissorRect"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "setScissorRect"
+            }
           }
         },
         {
@@ -18031,6 +18620,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdSetBlendConstants"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "OMSetBlendFactor"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "setBlendColorRed:green:blue:alpha:"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "setBlendConstant"
+            }
           }
         },
         {
@@ -18062,6 +18669,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdSetStencilReference for both faces"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "OMSetStencilRef"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "setStencilReferenceValue"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "setStencilReference"
+            }
           }
         },
         {
@@ -18099,6 +18724,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdBeginDebugUtilsLabelEXT where debug utils are present"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "BeginEvent"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "pushDebugGroup"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "pushDebugGroup"
+            }
           }
         },
         {
@@ -18125,6 +18768,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdEndDebugUtilsLabelEXT where debug utils are present"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "EndEvent"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "popDebugGroup"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "popDebugGroup"
+            }
           }
         },
         {
@@ -18162,6 +18823,24 @@
           "thread_safety": {
             "class": "any_exclusive",
             "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdInsertDebugUtilsLabelEXT where debug utils are present"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "SetMarker"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "insertDebugSignpost"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "insertDebugMarker"
+            }
           }
         }
       ]
@@ -18263,7 +18942,8 @@
               "type": "uint64",
               "doc": "The bytes its transients take together."
             }
-          ]
+          ],
+          "library": "what the library's test driver saw of a submitted frame"
         },
         {
           "kind": "struct",
@@ -18344,7 +19024,8 @@
               "type": "enum.device_loss_reason",
               "doc": "The reason a lost device's report gives."
             }
-          ]
+          ],
+          "library": "an adapter of the library's test driver"
         },
         {
           "kind": "struct",
@@ -18362,7 +19043,8 @@
               "name": "adapter_count",
               "type": "uint32"
             }
-          ]
+          ],
+          "library": "configures the library's test driver"
         },
         {
           "kind": "struct",
@@ -18385,7 +19067,8 @@
               "type": "bool",
               "doc": "Makes the surface's creation fail as the platform."
             }
-          ]
+          ],
+          "library": "a surface source for the library's test driver"
         }
       ]
     }

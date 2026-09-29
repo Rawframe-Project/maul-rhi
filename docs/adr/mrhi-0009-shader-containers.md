@@ -4,8 +4,8 @@ Status: Accepted
 
 ## Context
 
-The library compiles no shaders at run time. Native drivers take
-SPIR-V (translated for D3D12 and Metal), and the WebGPU driver takes
+The library compiles and translates no shaders at run time. Vulkan
+takes SPIR-V, D3D12 DXIL, Metal a metallib, and the WebGPU driver takes
 WGSL. Pipelines need each entry point's interface and every binding's
 kind to make their layouts, and WebGPU needs them explicitly, in its
 own terms. A program loads shader bytes from disk or the network, so
@@ -46,6 +46,11 @@ they are untrusted.
   floats need the device's `shaderF16`. It reads byte by byte, so nothing
   depends on the host's byte order. The device keeps the decoded
   reflection in one allocation. Drivers check the code itself.
+- **Native codes:** the D3D12 and Metal drivers read DXIL and metallib
+  sections, made offline beside the SPIR-V and added as new section
+  types when those drivers land; readers already skip section types
+  they do not know. A container without the section its driver needs
+  is refused as unsupported.
 - **The writer**, `tools/mrhi_container.py`, standard library only,
   applies the same rules and refuses modules whose entry points or
   bindings disagree with the reflection.

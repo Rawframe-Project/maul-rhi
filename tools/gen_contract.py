@@ -244,10 +244,9 @@ def check_mapping(errors, where, mapping):
 CLASSED_KINDS = ("function", "struct", "enum", "bitflags")
 
 
-def check_classed(errors, where, item, enforced):
+def check_classed(errors, where, item):
     """A concept mapped by value or member, taken whole with one row per
-    API, or declared the library's own with the reason; one of them only,
-    and one at least where the header is enforced."""
+    API, or declared the library's own with the reason: exactly one."""
     ways = [bool(item.get("mapped")), "mapping" in item, "library" in item]
     if sum(ways) > 1:
         errors.append(f"{where}: mapped, mapped whole or the library's own, only one")
@@ -255,7 +254,7 @@ def check_classed(errors, where, item, enforced):
         errors.append(f"{where}: the library's own needs the reason")
     if "mapping" in item:
         check_mapping(errors, where, item["mapping"])
-    if enforced and not any(ways):
+    if not any(ways):
         errors.append(f"{where}: needs mapping rows or the library's own reason")
 
 
@@ -293,12 +292,9 @@ def validate(contract):
         kind_of[item.get("name")] = item.get("kind")
     checks = {"result": check_values, "enum": check_values, "bitflags": check_values,
               "constant": check_constant}
-    everywhere = bool(contract.get("classed"))
-    for header in contract["headers"]:
-        for item in header["items"]:
-            if item["kind"] in CLASSED_KINDS:
-                check_classed(errors, f"{item['kind']} '{item['name']}'", item,
-                              everywhere or bool(header.get("classed")))
+    for item in items:
+        if item["kind"] in CLASSED_KINDS:
+            check_classed(errors, f"{item['kind']} '{item['name']}'", item)
     for item in items:
         where = f"{item['kind']} '{item['name']}'"
         if item["kind"] in checks:

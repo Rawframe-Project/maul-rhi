@@ -251,4 +251,6 @@ format.
 - Mapping appendix (mrhi-0002): every function, struct, enum and
   bitflags is mapped onto the four APIs or declared the library's own
   with the reason, and emulated rows state their cost; the generator
-  refuses an unclassed concept in a classed header.
+  refuses a concept classed no way or more than one. D3D12 and Metal
+  read DXIL and metallib sections made offline, so the library never
+  translates shaders at run time.

@@ -860,3 +860,62 @@ restricted or absent-rejected, with how.
 | `mrhiDefaultGraphicsPipelineDef` | fills a def with the library's defaults |
 | `mrhiDefaultComputePipelineDef` | fills a def with the library's defaults |
 | `mrhiGetPipelineCacheOutcome` | reads what the library did with the def's cache |
+
+## encoder: operations and structures
+
+| Concept | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhiViewport` | direct: VkViewport | direct: D3D12_VIEWPORT | direct: MTLViewport | direct: setViewport's arguments |
+| `mrhiScissorRect` | direct: VkRect2D | direct: D3D12_RECT | direct: MTLScissorRect | direct: setScissorRect's arguments |
+| `mrhiBinding` | direct: a VkDescriptorBufferInfo, VkDescriptorImageInfo or sampler written to the table's set | direct: a view or sampler descriptor written to the table's range | direct: a buffer, texture or sampler encoded into the table's argument buffer | direct: a GPUBindGroupEntry |
+| `mrhiExtent3d` | direct: VkExtent3D | direct: the box's width, height and depth | direct: MTLSize | direct: GPUExtent3D |
+| `mrhiBufferCopy` | direct: VkBufferCopy | direct: CopyBufferRegion's offsets and size | direct: copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:'s arguments | direct: copyBufferToBuffer's arguments |
+| `mrhiTextureCopy` | direct: VkImageCopy | direct: D3D12_TEXTURE_COPY_LOCATION pairs and a D3D12_BOX | direct: copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:'s arguments | direct: GPUTexelCopyTextureInfo pairs and a copy size |
+| `mrhiBeginPass` | direct: vkCmdBeginRendering for a pass with targets, after the pass's barriers | direct: BeginRenderPass for a pass with targets, after the pass's barriers | direct: a render, compute or blit encoder begun by the pass's work | direct: beginRenderPass or beginComputePass by the pass's work |
+| `mrhiEndPass` | direct: vkCmdEndRendering for a pass with targets | direct: EndRenderPass for a pass with targets | direct: endEncoding | direct: end on the pass encoder |
+| `mrhiSetGraphicsPipeline` | direct: vkCmdBindPipeline and the dynamic states it leaves | direct: SetPipelineState, the root signature and the topology | direct: setRenderPipelineState and setDepthStencilState, with the pipeline's rasterizer state | direct: setPipeline |
+| `mrhiSetComputePipeline` | direct: vkCmdBindPipeline | direct: SetPipelineState and the root signature | direct: setComputePipelineState | direct: setPipeline |
+| `mrhiSetBindings` | direct: vkCmdBindDescriptorSets with the table's set | direct: SetGraphicsRootDescriptorTable or SetComputeRootDescriptorTable | direct: setVertexBuffer, setFragmentBuffer or setBuffer with the table's argument buffer, and useResource for what it names | direct: setBindGroup |
+| `mrhiSetVertexBuffer` | direct: vkCmdBindVertexBuffers2 with the stride | direct: IASetVertexBuffers | direct: setVertexBuffer:offset:atIndex: past the tables' slots | direct: setVertexBuffer |
+| `mrhiSetIndexBuffer` | direct: vkCmdBindIndexBuffer | direct: IASetIndexBuffer | direct: kept for the indexed draws, which take it as arguments | direct: setIndexBuffer |
+| `mrhiDraw` | direct: vkCmdDraw | direct: DrawInstanced | direct: drawPrimitives | direct: draw |
+| `mrhiDrawIndexed` | direct: vkCmdDrawIndexed | direct: DrawIndexedInstanced | direct: drawIndexedPrimitives | direct: drawIndexed |
+| `mrhiDispatch` | direct: vkCmdDispatch | direct: Dispatch | direct: dispatchThreadgroups with the pipeline's group size | direct: dispatchWorkgroups |
+| `mrhiDrawIndirect` | direct: vkCmdDrawIndirect | direct: ExecuteIndirect with a draw command signature | direct: drawPrimitives:indirectBuffer: | direct: drawIndirect |
+| `mrhiDrawIndexedIndirect` | direct: vkCmdDrawIndexedIndirect | direct: ExecuteIndirect with an indexed draw command signature | direct: drawIndexedPrimitives:indirectBuffer: | direct: drawIndexedIndirect |
+| `mrhiDispatchIndirect` | direct: vkCmdDispatchIndirect | direct: ExecuteIndirect with a dispatch command signature | direct: dispatchThreadgroupsWithIndirectBuffer: | direct: dispatchWorkgroupsIndirect |
+| `mrhiBeginOcclusionQuery` | direct: vkCmdBeginQuery | direct: BeginQuery | direct: setVisibilityResultMode with the query's offset | direct: beginOcclusionQuery |
+| `mrhiEndOcclusionQuery` | direct: vkCmdEndQuery | direct: EndQuery | direct: setVisibilityResultMode disabled | direct: endOcclusionQuery |
+| `mrhiResolveQueries` | direct: vkCmdCopyQueryPoolResults with 64-bit results and wait | direct: ResolveQueryData | emulated: a blit copy from the visibility buffer, or resolveCounters for timestamps (cost: a blit copy per resolve) | direct: resolveQuerySet |
+| `mrhiCopyBuffer` | direct: vkCmdCopyBuffer | direct: CopyBufferRegion | direct: copyFromBuffer:sourceOffset:toBuffer: | direct: copyBufferToBuffer |
+| `mrhiCopyBufferToTexture` | direct: vkCmdCopyBufferToImage | direct: CopyTextureRegion from a placed footprint | direct: copyFromBuffer:toTexture: | direct: copyBufferToTexture |
+| `mrhiCopyTextureToBuffer` | direct: vkCmdCopyImageToBuffer | direct: CopyTextureRegion into a placed footprint | direct: copyFromTexture:toBuffer: | direct: copyTextureToBuffer |
+| `mrhiCopyTexture` | direct: vkCmdCopyImage | direct: CopyTextureRegion | direct: copyFromTexture:toTexture: | direct: copyTextureToTexture |
+| `mrhiWriteBuffer` | direct: a copy from the staging ring with vkCmdCopyBuffer | direct: a copy from the staging ring with CopyBufferRegion | direct: a blit copy from the staging ring | direct: a copy from the staging ring with copyBufferToBuffer |
+| `mrhiWriteTexture` | direct: a copy from the staging ring with vkCmdCopyBufferToImage | direct: a copy from the staging ring with CopyTextureRegion | direct: a blit copy from the staging ring | direct: a copy from the staging ring with copyBufferToTexture |
+| `mrhiReadBuffer` | direct: vkCmdCopyBuffer into the readback ring's host-visible memory | direct: CopyBufferRegion into the readback ring's READBACK heap | direct: a blit copy into the readback ring's shared buffer | direct: copyBufferToBuffer into the readback ring, mapped with mapAsync |
+| `mrhiReadTexture` | direct: vkCmdCopyImageToBuffer into the readback ring | direct: CopyTextureRegion into the readback ring's READBACK heap | direct: a blit copy into the readback ring's shared buffer | direct: copyTextureToBuffer into the readback ring, mapped with mapAsync |
+| `mrhiSetRootBlock` | direct: vkCmdPushConstants | direct: SetGraphicsRoot32BitConstants or SetComputeRoot32BitConstants | direct: setVertexBytes, setFragmentBytes or setBytes | emulated: setImmediates where the browser has immediates; else a dynamic offset into a uniform buffer (cost: without immediates, the bytes written to a per-frame uniform buffer and a dynamic offset per draw) |
+| `mrhiSetViewport` | direct: vkCmdSetViewport | direct: RSSetViewports | direct: setViewport | direct: setViewport |
+| `mrhiSetScissor` | direct: vkCmdSetScissor | direct: RSSetScissorRects | direct: setScissorRect | direct: setScissorRect |
+| `mrhiSetBlendConstant` | direct: vkCmdSetBlendConstants | direct: OMSetBlendFactor | direct: setBlendColorRed:green:blue:alpha: | direct: setBlendConstant |
+| `mrhiSetStencilReference` | direct: vkCmdSetStencilReference for both faces | direct: OMSetStencilRef | direct: setStencilReferenceValue | direct: setStencilReference |
+| `mrhiPushDebugGroup` | direct: vkCmdBeginDebugUtilsLabelEXT where debug utils are present | direct: BeginEvent | direct: pushDebugGroup | direct: pushDebugGroup |
+| `mrhiPopDebugGroup` | direct: vkCmdEndDebugUtilsLabelEXT where debug utils are present | direct: EndEvent | direct: popDebugGroup | direct: popDebugGroup |
+| `mrhiInsertDebugMarker` | direct: vkCmdInsertDebugUtilsLabelEXT where debug utils are present | direct: SetMarker | direct: insertDebugSignpost | direct: insertDebugMarker |
+
+## encoder: the library's own
+
+| Concept | Why no API maps it |
+| --- | --- |
+| `mrhiTexelLayout` | how the program's bytes lie; the library copies them into its staging ring laid out for the driver |
+| `mrhiTakeReadback` | copies bytes out of the library's readback ring, which the driver mapped when the frame finished |
+
+## test: the library's own
+
+| Concept | Why no API maps it |
+| --- | --- |
+| `mrhiTestFrameLog` | what the library's test driver saw of a submitted frame |
+| `mrhiTestAdapter` | an adapter of the library's test driver |
+| `mrhiTestDriverDef` | configures the library's test driver |
+| `mrhiSurfaceSourceTest` | a surface source for the library's test driver |
