@@ -96,3 +96,11 @@ format.
   `mrhiUnconfigureSurface`; one device at a time, reconfiguring in
   place, and configurations ended with their surface or device; the
   device's `surfaces` limit.
+- Frames (mrhi-0008, `frame.h`): `mrhiBeginFrame`, `mrhiDropFrame` and
+  `mrhiSubmitFrame`, one frame open at a time; the token each
+  submission returns is answered once by a `mrhi_deviceFrameDone`
+  record in the device's queue (`mrhiNextDeviceNotification`), and
+  `mrhiWaitFrame` waits with a deadline (`mrhi_timeout`); the limit's
+  `framesInFlight` refuses a new frame until one finishes. The test
+  adapter can hold frames (`holdFrames`) and fail them
+  (`frameOutcome`).

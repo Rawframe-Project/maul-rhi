@@ -8,7 +8,7 @@
 #ifndef MAUL_RHI_SRC_DRIVER_H
 #define MAUL_RHI_SRC_DRIVER_H
 
-#include "maul-rhi/surface.h"
+#include "maul-rhi/frame.h"
 
 // The SPI version a driver's vtable must carry.
 #define MRHI_SPI_VERSION 1
@@ -60,6 +60,15 @@ typedef struct mrhiDeviceDriverVtable
     mrhiResult (*configureSurface)(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
                                    uint64_t oldSwapchain, uint64_t* swapchainOut);
     void (*unconfigureSurface)(void* self, uint64_t swapchain);
+    // Runs a frame on the GPU; finished, it is reported by poll with the
+    // tag.
+    mrhiResult (*submitFrame)(void* self, uint64_t tag);
+    // Moves up to capacity finished frames into events and returns how
+    // many it moved.
+    size_t (*poll)(void* self, mrhiDriverEvent* events, size_t capacity);
+    // Waits up to timeoutNs for a frame and returns whether it finished;
+    // a finished frame is still reported by poll.
+    bool (*waitFrame)(void* self, uint64_t tag, uint64_t timeoutNs);
 } mrhiDeviceDriverVtable;
 
 typedef struct mrhiDeviceDriver

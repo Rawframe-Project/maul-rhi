@@ -150,6 +150,16 @@ static size_t GetAdapters(const void* self, mrhiDriverAdapter* adapters, size_t 
 // platform.
 #define TEST_VIEWS 64
 
+// The frames a test device runs at once.
+#define TEST_FRAMES 16
+
+// A frame the test device runs, and whether a wait finished it.
+typedef struct TestFrame
+{
+    uint64_t tag;
+    bool done;
+} TestFrame;
+
 typedef struct TestView
 {
     uint64_t handle;
@@ -172,6 +182,11 @@ typedef struct TestDevice
     char label[MRHI_LABEL_BYTES + 1];
     // Configured surfaces; the core ends each before the device.
     uint32_t swapchains;
+    // Running frames; held ones finish only through a wait.
+    bool holdFrames;
+    mrhiResult frameOutcome;
+    TestFrame frames[TEST_FRAMES];
+    uint32_t frameCount;
     // The live views and their textures, so that a texture destroyed
     // before its views traps.
     TestView views[TEST_VIEWS];
@@ -313,6 +328,58 @@ static void UnconfigureSurface(void* self, uint64_t swapchain)
     --device->swapchains;
 }
 
+static mrhiResult SubmitFrame(void* self, uint64_t tag)
+{
+    TestDevice* device = self;
+    MRHI_ASSERT(tag != 0 && device->frameCount < TEST_FRAMES);
+    uint64_t handle = 0;
+    mrhiResult status = MakeObject(device, &handle);
+    if (status == mrhi_success)
+    {
+        device->frames[device->frameCount++] = (TestFrame){.tag = tag};
+    }
+    return status;
+}
+
+// Reports the frames that finished: all of them, or only those a wait
+// finished when frames are held.
+static size_t PollFrames(void* self, mrhiDriverEvent* events, size_t capacity)
+{
+    TestDevice* device = self;
+    size_t moved = 0;
+    uint32_t i = 0;
+    while (i < device->frameCount && moved < capacity)
+    {
+        if (device->holdFrames && !device->frames[i].done)
+        {
+            ++i;
+            continue;
+        }
+        events[moved++] =
+            (mrhiDriverEvent){.tag = device->frames[i].tag, .outcome = device->frameOutcome};
+        device->frames[i] = device->frames[--device->frameCount];
+    }
+    return moved;
+}
+
+// A frame that is not held has finished; a held one finishes when waited
+// on with a nonzero timeout, and a zero timeout only checks.
+static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
+{
+    TestDevice* device = self;
+    for (uint32_t i = 0; i < device->frameCount; ++i)
+    {
+        if (device->frames[i].tag == tag)
+        {
+            device->frames[i].done = device->frames[i].done || !device->holdFrames || timeoutNs > 0;
+            return device->frames[i].done;
+        }
+    }
+    // The core asks only about frames it has not seen finish.
+    MRHI_ASSERT(false);
+    return true;
+}
+
 static void DestroyDevice(void* self)
 {
     TestDevice* device = self;
@@ -335,6 +402,9 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .destroyView = DestroyView,
     .configureSurface = ConfigureSurface,
     .unconfigureSurface = UnconfigureSurface,
+    .submitFrame = SubmitFrame,
+    .poll = PollFrames,
+    .waitFrame = WaitFrame,
 };
 
 static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef* def, uint64_t tag,
@@ -353,6 +423,8 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
     *device = (TestDevice){
         .allocator = driver->allocator,
         .madeBeforeFailure = driver->adapters[adapter - 1].objectsBeforeFailure,
+        .holdFrames = driver->adapters[adapter - 1].holdFrames,
+        .frameOutcome = driver->adapters[adapter - 1].frameOutcome,
     };
     Name(device, def->label, def->labelLength);
     driver->pending[driver->pendingCount++] = (mrhiDriverEvent){

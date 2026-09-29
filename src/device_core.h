@@ -81,6 +81,16 @@ struct mrhiDevice
     // The surfaces it configured.
     mrhiPool swapchains;
     mrhiSwapchainSlot* swapchainSlots;
+    // Frames: whether one is open, the last token given, and the tokens
+    // of the frames the GPU has not finished, at most framesInFlight.
+    bool frameOpen;
+    uint32_t lastToken;
+    uint32_t* running;
+    uint32_t runningCount;
+    // A ring of deviceLimits.notifications records.
+    mrhiDeviceNotification* queue;
+    uint32_t queueHead;
+    uint32_t queueCount;
     // What each known format can do on this device: the adapter's
     // capabilities, with the compressed families the device was not
     // granted cleared.

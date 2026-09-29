@@ -46,3 +46,9 @@ edit the contract, not this file.
 | `mrhiDefaultSurfaceConfig` | Safe from any thread. |
 | `mrhiConfigureSurface` | Safe from any thread; the device and its instance are used by one thread at a time. |
 | `mrhiUnconfigureSurface` | Safe from any thread; the device and its instance are used by one thread at a time. |
+| `mrhiDefaultFrameDef` | Safe from any thread. |
+| `mrhiBeginFrame` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDropFrame` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiSubmitFrame` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiWaitFrame` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiNextDeviceNotification` | Safe from any thread; the device is used by one thread at a time. |

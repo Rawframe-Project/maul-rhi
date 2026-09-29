@@ -10,7 +10,7 @@
 #ifndef MAUL_RHI_TEST_H
 #define MAUL_RHI_TEST_H
 
-#include "maul-rhi/surface.h"
+#include "maul-rhi/frame.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -39,6 +39,12 @@ extern "C"
         // Objects a device on the adapter makes before every further one fails
         // with mrhi_errorPlatform; 0 for no failure.
         uint32_t objectsBeforeFailure;
+        // Keeps submitted frames running until a wait with a nonzero timeout,
+        // so that a device fills its frames in flight; otherwise frames finish
+        // at the next poll.
+        bool holdFrames;
+        // The outcome its devices' frames finish with; mrhi_success by default.
+        mrhiResult frameOutcome;
     } mrhiTestAdapter;
 
     // Turns the test driver on for an instance, chained on its def with the

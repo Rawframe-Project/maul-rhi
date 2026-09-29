@@ -66,6 +66,8 @@ extern "C"
         mrhi_success = 0,
         // There is nothing to return: the notification queue is drained.
         mrhi_empty = 1,
+        // A wait's deadline passed first; what it waited for is still running.
+        mrhi_timeout = 2,
         // An argument is invalid: a null pointer where one is required, a value
         // out of range, a def without its cookie.
         mrhi_errorInvalid = -1,

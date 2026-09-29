@@ -35,6 +35,11 @@
               "doc": "There is nothing to return: the notification queue is drained."
             },
             {
+              "name": "timeout",
+              "value": 2,
+              "doc": "A wait's deadline passed first; what it waited for is still running."
+            },
+            {
               "name": "error_invalid",
               "value": -1,
               "doc": "An argument is invalid: a null pointer where one is required, a value out of range, a def without its cookie."
@@ -8183,10 +8188,206 @@
       ]
     },
     {
+      "name": "frame",
+      "doc": "Frames: the frame graph, the only way work reaches the GPU. A frame is begun, its resources and passes declared, compiled, recorded and submitted; submitting returns a token that the device's notification queue answers once the GPU has finished.",
+      "includes": [
+        "surface"
+      ],
+      "items": [
+        {
+          "kind": "struct",
+          "name": "frame_def",
+          "def": true,
+          "doc": "How a frame begins: its extensions. Build it with mrhiDefaultFrameDef.",
+          "members": []
+        },
+        {
+          "kind": "enum",
+          "name": "device_notification_kind",
+          "width": "uint8",
+          "doc": "What a device notification reports.",
+          "values": [
+            {
+              "name": "device_frame_done",
+              "value": 0,
+              "doc": "A submitted frame finished on the GPU: its outcome is mrhi_success, or the error that ended it."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "device_notification",
+          "doc": "A record from a device's notification queue.",
+          "members": [
+            {
+              "name": "kind",
+              "type": "enum.device_notification_kind"
+            },
+            {
+              "name": "request_id",
+              "type": "id.request_id",
+              "doc": "The request the record answers: a frame's token."
+            },
+            {
+              "name": "outcome",
+              "type": "result",
+              "doc": "How the request ended."
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_frame_def",
+          "doc": "Returns the default frame def.",
+          "returns": {
+            "type": "struct.frame_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "begin_frame",
+          "doc": "Opens a frame on a ready device, first taking in the frames the GPU finished. One frame is open at a time.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument or a def without its cookie; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorState` for a device that is not ready or has a frame open; `mrhi_errorCapacity` while the device's framesInFlight frames are still running, until one finishes."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "def",
+              "type": "struct.frame_def",
+              "pointer": "const",
+              "doc": "The frame."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "drop_frame",
+          "doc": "Closes the open frame without running it. It gets no token.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device; `mrhi_errorState` for a device without an open frame."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "submit_frame",
+          "doc": "Submits the open frame to the GPU and closes it. Its token is answered by one mrhi_deviceFrameDone record.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` with the token; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's queue has no room for the answer, the frame staying open; `mrhi_errorPlatform` when the driver fails, the frame closing."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "token_out",
+              "type": "id.request_id",
+              "pointer": "mutable",
+              "doc": "Receives the frame's token."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "wait_frame",
+          "doc": "Waits until a submitted frame finishes on the GPU, or the deadline passes. On the web, where nothing may block, a frame not yet finished times out at once.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` once the frame has finished; `mrhi_timeout` when the deadline passed first; `mrhi_errorInvalid` for a NULL device or a token the device never gave."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "token",
+              "type": "id.request_id",
+              "doc": "The frame's token."
+            },
+            {
+              "name": "timeout_ns",
+              "type": "uint64",
+              "doc": "The longest wait in nanoseconds; 0 only checks."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "next_device_notification",
+          "doc": "Takes the oldest record from the device's notification queue, first taking in the frames the GPU finished.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` with a record; `mrhi_empty` when the queue is drained; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "notification_out",
+              "type": "struct.device_notification",
+              "pointer": "mutable",
+              "doc": "Receives the record."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        }
+      ]
+    },
+    {
       "name": "test",
       "doc": "The test driver (MAUL_RHI_TEST_DRIVER): a driver without a GPU whose adapters a test describes, for the library's tests and a program's own.",
       "includes": [
-        "surface"
+        "frame"
       ],
       "items": [
         {
@@ -8224,6 +8425,16 @@
               "name": "objects_before_failure",
               "type": "uint32",
               "doc": "Objects a device on the adapter makes before every further one fails with mrhi_errorPlatform; 0 for no failure."
+            },
+            {
+              "name": "hold_frames",
+              "type": "bool",
+              "doc": "Keeps submitted frames running until a wait with a nonzero timeout, so that a device fills its frames in flight; otherwise frames finish at the next poll."
+            },
+            {
+              "name": "frame_outcome",
+              "type": "result",
+              "doc": "The outcome its devices' frames finish with; mrhi_success by default."
             }
           ]
         },

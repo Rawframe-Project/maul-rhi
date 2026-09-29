@@ -114,6 +114,10 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
         AddTable(&layout, limits->views, sizeof(mrhiViewSlot), alignof(mrhiViewSlot));
     TableParts swapchains =
         AddTable(&layout, limits->surfaces, sizeof(mrhiSwapchainSlot), alignof(mrhiSwapchainSlot));
+    size_t runningAt =
+        mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
+    size_t queueAt = mrhiLayoutAdd(&layout, limits->notifications, sizeof(mrhiDeviceNotification),
+                                   alignof(mrhiDeviceNotification));
     unsigned char* block =
         layout.overflow ? nullptr : mrhiAllocate(&def->allocator, layout.size, alignof(mrhiDevice));
     if (block == nullptr)
@@ -127,6 +131,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     device->textureSlots = InitTable(block, textures, &device->textures, limits->textures);
     device->viewSlots = InitTable(block, views, &device->views, limits->views);
     device->swapchainSlots = InitTable(block, swapchains, &device->swapchains, limits->surfaces);
+    device->running = (uint32_t*)(block + runningAt);
+    device->queue = (mrhiDeviceNotification*)(block + queueAt);
     return device;
 }
 

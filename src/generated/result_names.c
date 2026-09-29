@@ -16,6 +16,8 @@ const char* mrhiResultName(mrhiResult result)
         return "mrhi_success";
     case mrhi_empty:
         return "mrhi_empty";
+    case mrhi_timeout:
+        return "mrhi_timeout";
     case mrhi_errorInvalid:
         return "mrhi_errorInvalid";
     case mrhi_errorCapacity:
