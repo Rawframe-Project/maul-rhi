@@ -59,9 +59,12 @@ const server = http.createServer((request, response) => {
 });
 
 server.listen(0, async () => {
+    // Headless Chrome's default SwiftShader path destroys a device once it
+    // presents to a canvas; its Vulkan path over SwiftShader presents.
     const browser = await puppeteer.launch({
         headless: true,
-        args: ['--no-sandbox', '--enable-unsafe-webgpu'],
+        args: ['--no-sandbox', '--enable-unsafe-webgpu', '--enable-features=Vulkan',
+               '--use-vulkan=swiftshader', '--use-angle=vulkan'],
     });
     let failed = false;
     const tab = await browser.newPage();

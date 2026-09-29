@@ -30,6 +30,7 @@
 #include <string.h>
 
 #ifdef __EMSCRIPTEN__
+#include <emscripten/em_js.h>
 #include <emscripten/emscripten.h>
 #endif
 
@@ -1589,7 +1590,7 @@ static void TestTestDriver(void)
     mrhiDestroyInstance(instance);
 }
 
-static bool IsSet(const char* name)
+[[maybe_unused]] static bool IsSet(const char* name)
 {
     const char* value = getenv(name);
     return value != nullptr && value[0] != '\0';
@@ -1612,8 +1613,13 @@ static void CheckForeignSources(mrhiInstance* instance)
         .selectorLength = 2,
     };
     mrhiSurfaceId surface = {0};
+#ifdef __EMSCRIPTEN__
+    CHECK(MakeSurface(instance, &canvas.chain, &surface) == mrhi_errorUnsupported,
+          "no canvas the selector names");
+#else
     CHECK(MakeSurface(instance, &canvas.chain, &surface) == mrhi_errorUnsupported,
           "no canvas natively");
+#endif
 #ifndef _WIN32
     int window = 0;
     const mrhiSurfaceSourceWin32 win32 = {
@@ -1626,7 +1632,7 @@ static void CheckForeignSources(mrhiInstance* instance)
 #endif
 }
 
-#ifdef MRHI_TEST_XCB
+#if defined(MRHI_TEST_XCB) || defined(__EMSCRIPTEN__)
 // Whether caps meet the floors and offer 8-bit sRGB in Rec. 709.
 static bool MeetsFloors(const mrhiSurfaceCaps* caps)
 {
@@ -1800,10 +1806,11 @@ static void CheckUnwrittenImages(mrhiDevice* device, mrhiSurfaceId surface)
 // Presents to the surface from a device on an adapter that can: frames
 // cleared and read back, more than the images and their semaphores; an
 // image given back and taken again; one presented unwritten; a
-// reconfiguration; a size the window does not take, which leaves the
-// surface unconfigured until it is configured again.
+// reconfiguration; and, where the window fixes its images' size, a size
+// it does not take, which leaves the surface unconfigured until it is
+// configured again, or else a size of the program's own.
 static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiSurfaceId surface,
-                            const mrhiSurfaceCaps* caps)
+                            const mrhiSurfaceCaps* caps, bool fixedSize)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
@@ -1830,9 +1837,18 @@ static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiS
     CHECK(Configure(device, surface, caps, 64, 48) == mrhi_success &&
               IsAcquired(PresentRed(device, surface, false, pixel)),
           "reconfigured");
-    CHECK(Configure(device, surface, caps, 32, 32) == mrhi_errorOutOfDate,
-          "a size the window does not take");
-    CHECK(PresentRed(device, surface, false, pixel) == mrhi_errorState, "unconfigured");
+    if (fixedSize)
+    {
+        CHECK(Configure(device, surface, caps, 32, 32) == mrhi_errorOutOfDate,
+              "a size the window does not take");
+        CHECK(PresentRed(device, surface, false, pixel) == mrhi_errorState, "unconfigured");
+    }
+    else
+    {
+        CHECK(Configure(device, surface, caps, 32, 32) == mrhi_success &&
+                  IsAcquired(PresentRed(device, surface, false, pixel)),
+              "a size of the program's own");
+    }
     CHECK(Configure(device, surface, caps, 64, 48) == mrhi_success &&
               IsAcquired(PresentRed(device, surface, false, pixel)),
           "configured again");
@@ -1840,6 +1856,9 @@ static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiS
     mrhiDestroyDevice(device);
 }
 
+#endif
+
+#ifdef MRHI_TEST_XCB
 // A window of the X server the environment names, where there is one.
 static void CheckXcbSurface(mrhiInstance* instance, const mrhiAdapterId* ids, size_t count)
 {
@@ -1872,7 +1891,7 @@ static void CheckXcbSurface(mrhiInstance* instance, const mrhiAdapterId* ids, si
         CHECK(!caps.presentable || MeetsFloors(&caps), "the floors where it presents");
         if (caps.presentable)
         {
-            CheckPresenting(instance, ids[i], surface, &caps);
+            CheckPresenting(instance, ids[i], surface, &caps, true);
         }
         presenting += caps.presentable ? 1 : 0;
     }
@@ -1883,14 +1902,67 @@ static void CheckXcbSurface(mrhiInstance* instance, const mrhiAdapterId* ids, si
 }
 #endif
 
+#ifdef __EMSCRIPTEN__
+// clang-format off
+// Resizes the runner's canvas as a page would.
+EM_JS(void, ResizeCanvas, (int width), {
+    document.querySelector('#mrhi-canvas').width = width;
+});
+// clang-format on
+
+// The web runner's canvas, which the adapter presents to; a drawing
+// buffer the page resizes leaves the canvas out of date until it is
+// configured again.
+static void CheckCanvasSurface(mrhiInstance* instance, const mrhiAdapterId* ids, size_t count)
+{
+    const mrhiSurfaceSourceCanvas source = {
+        .chain = {.type = mrhi_structSurfaceSourceCanvas},
+        .selector = "#mrhi-canvas",
+        .selectorLength = 12,
+    };
+    mrhiSurfaceId surface = {0};
+    CHECK(MakeSurface(instance, &source.chain, &surface) == mrhi_success, "a canvas surface");
+    for (size_t i = 0; i < count; ++i)
+    {
+        mrhiSurfaceCaps caps;
+        CHECK(mrhiGetSurfaceCaps(instance, surface, ids[i], &caps) == mrhi_success &&
+                  caps.presentable && MeetsFloors(&caps),
+              "presentable, with the floors");
+        CheckPresenting(instance, ids[i], surface, &caps, false);
+        mrhiDeviceDef def = mrhiDefaultDeviceDef();
+        def.adapter = ids[i];
+        mrhiDevice* device = nullptr;
+        mrhiRequestId request;
+        mrhiInstanceNotification record;
+        CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success &&
+                  NextInstance(instance, &record) == mrhi_success,
+              "a device");
+        uint8_t pixel[4];
+        CHECK(Configure(device, surface, &caps, 64, 48) == mrhi_success &&
+                  IsAcquired(PresentRed(device, surface, false, pixel)),
+              "configured");
+        ResizeCanvas(20);
+        CHECK(PresentRed(device, surface, false, pixel) == mrhi_errorOutOfDate,
+              "out of date once the page resizes it");
+        CHECK(Configure(device, surface, &caps, 20, 48) == mrhi_success &&
+                  IsAcquired(PresentRed(device, surface, false, pixel)),
+              "configured at the new size");
+        mrhiDestroyDevice(device);
+    }
+    CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "the surface destroyed");
+}
+#endif
+
 // Surfaces on the native driver's adapters.
 static void CheckSurfaces(mrhiInstance* instance)
 {
     CheckForeignSources(instance);
     mrhiAdapterId ids[16];
     size_t count = Search(instance, ids, 16);
-#ifdef MRHI_TEST_XCB
+#if defined(MRHI_TEST_XCB)
     CheckXcbSurface(instance, ids, count);
+#elif defined(__EMSCRIPTEN__)
+    CheckCanvasSurface(instance, ids, count);
 #else
     (void)count;
     CHECK(!IsSet("MAUL_RHI_REQUIRE_SURFACE"), "a window system where required");

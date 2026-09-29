@@ -92,6 +92,18 @@ ids, requests, the frame graph) can be tested without a GPU.
   each its own object, never aliased, and one no frame took in the
   last 8 is destroyed. A query set keeps its values across frames, so
   the queries a frame did not write are cleared to 0 after a resolve.
+- **WebGPU canvases:** a surface is the canvas its selector names, with
+  its WebGPU context; a selector naming no canvas, or a canvas without
+  a WebGPU context, is a source the driver cannot use. Its colors are
+  the browser's preferred 8-bit format first, then the other, with the
+  sRGB curve, and half floats in linear values, each in Rec. 709 and
+  Display P3, the floats also in extended range through extended tone
+  mapping; it presents in order only, opaque or premultiplied.
+  Configuring sets the canvas's drawing buffer to the configured size,
+  so the size is the program's own; an acquired image is the context's
+  current texture, out of date once the page resizes the drawing
+  buffer, and the browser presents it when the page returns to its
+  event loop, so an image given back is only forgotten.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`
@@ -183,9 +195,11 @@ ids, requests, the frame graph) can be tested without a GPU.
   adapters with heterogeneous heaps; Linux CI sets
   `MAUL_RHI_REQUIRE_BINDLESS`, so lavapipe must grant them.
   On the web the suite runs in headless Chrome with WebGPU
-  (`test/web_runner.cjs`, Puppeteer from `MRHI_NODE_MODULES`), built
-  with JSPI so that it sleeps while the browser settles its promises;
-  an error the browser logs fails it, and CI sets
+  (`test/web_runner.cjs`, Puppeteer from `MRHI_NODE_MODULES`) on
+  Chrome's Vulkan path over SwiftShader, since its default SwiftShader
+  path destroys a device that presents to a canvas. It is built with
+  JSPI so that it sleeps while the browser settles its promises; an
+  error the browser logs fails it, and CI sets
   `MAUL_RHI_REQUIRE_WEBGPU`.
   ThreadSanitizer skips the threads and locks of lavapipe, LLVM and
   the XCB client library (`test/tsan.supp`), which it cannot see

@@ -219,6 +219,54 @@ EM_JS(int, JsCreateQuerySet, (int state, bool timestamps, uint32_t count), {
                                                      count}));
 });
 
+// Configures a canvas at a size, which becomes its drawing buffer's: its
+// swapchain's handle.
+EM_JS(int, JsConfigureCanvas, (int state, int surface, const char* format, uint32_t usage,
+                               const char* viewFormats, bool displayP3, bool extended,
+                               bool premultiplied, uint32_t width, uint32_t height), {
+    const gpu = Module.mrhiGpu;
+    const self = gpu.states[state];
+    const canvas = gpu.states[surface];
+    const views = UTF8ToString(viewFormats);
+    canvas.canvas.width = width;
+    canvas.canvas.height = height;
+    canvas.context.configure({
+        device: self.device,
+        format: UTF8ToString(format),
+        usage: gpu.flags(usage, GPUTextureUsage, gpu.textureUsages),
+        viewFormats: views ? views.split(',') : [],
+        colorSpace: displayP3 ? 'display-p3' : 'srgb',
+        toneMapping: {mode: extended ? 'extended' : 'standard'},
+        alphaMode: premultiplied ? 'premultiplied' : 'opaque',
+    });
+    return gpu.put(self, {canvas, width, height});
+});
+
+EM_JS(void, JsUnconfigureCanvas, (int state, int swapchain), {
+    const gpu = Module.mrhiGpu;
+    gpu.take(gpu.states[state], swapchain).canvas.context.unconfigure();
+});
+
+// The canvas's current texture, or 0 when the page has resized its
+// drawing buffer since it was configured.
+EM_JS(int, JsAcquireCanvas, (int state, int swapchain), {
+    const gpu = Module.mrhiGpu;
+    const self = gpu.states[state];
+    const chain = self.objects[swapchain];
+    const canvas = chain.canvas.canvas;
+    if (canvas.width !== chain.width || canvas.height !== chain.height) {
+        return 0;
+    }
+    return gpu.put(self, chain.canvas.context.getCurrentTexture());
+});
+
+// Frees a handle whose object the device does not destroy: a swapchain
+// reconfigured, or a canvas's texture, which the browser presents.
+EM_JS(void, JsForget, (int state, int handle), {
+    const gpu = Module.mrhiGpu;
+    gpu.take(gpu.states[state], handle);
+});
+
 // Retires an object once the frame numbered serial has finished.
 EM_JS(void, JsRetire, (int state, int handle, double serial), {
     Module.mrhiGpu.states[state].retiring.push([serial, handle]);
@@ -475,12 +523,6 @@ static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
     return true;
 }
 
-// Canvases come with the driver's next part.
-static mrhiResult Unsupported(void)
-{
-    return mrhi_errorUnsupported;
-}
-
 static mrhiResult CreateShader(void* self, const mrhiShaderDef* def, const mrhiContainer* container,
                                uint64_t* handleOut)
 {
@@ -535,31 +577,50 @@ static void Never(void* self, uint64_t handle)
     MRHI_ASSERT(false);
 }
 
+// Configures a canvas, whose context takes the new configuration in
+// place of the old swapchain's.
 static mrhiResult ConfigureSurface(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
                                    uint64_t oldSwapchain, uint64_t* swapchainOut)
 {
-    (void)self;
-    (void)surface;
-    (void)config;
-    (void)oldSwapchain;
-    (void)swapchainOut;
-    return Unsupported();
+    const WebGpuDevice* device = self;
+    if (oldSwapchain != 0)
+    {
+        JsForget(device->state, (int)oldSwapchain);
+    }
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    memcpy(def.viewFormats, config->viewFormats, sizeof(def.viewFormats));
+    char viewFormats[MRHI_WEBGPU_VIEW_FORMAT_BYTES];
+    mrhiWebGpuViewFormats(&def, viewFormats);
+    *swapchainOut = (uint64_t)JsConfigureCanvas(
+        device->state, (int)surface, mrhiWebGpuFormat(config->color.format), config->usage,
+        viewFormats, config->color.primaries == mrhi_primariesDisplayP3,
+        config->color.range == mrhi_rangeExtended, config->alphaMode == mrhi_alphaPremultiplied,
+        config->width, config->height);
+    return mrhi_success;
 }
 
+static void UnconfigureSurface(void* self, uint64_t swapchain)
+{
+    const WebGpuDevice* device = self;
+    JsUnconfigureCanvas(device->state, (int)swapchain);
+}
+
+// The canvas's current texture: out of date once the page resizes it.
 static mrhiResult AcquireImage(void* self, uint64_t swapchain, uint64_t* imageOut)
 {
-    (void)self;
-    (void)swapchain;
-    (void)imageOut;
-    return Unsupported();
+    const WebGpuDevice* device = self;
+    int image = JsAcquireCanvas(device->state, (int)swapchain);
+    *imageOut = (uint64_t)image;
+    return image != 0 ? mrhi_success : mrhi_errorOutOfDate;
 }
 
+// The browser presents a canvas's texture itself, so one taken back is
+// only forgotten.
 static void ReleaseImage(void* self, uint64_t swapchain, uint64_t image)
 {
-    (void)self;
+    const WebGpuDevice* device = self;
     (void)swapchain;
-    (void)image;
-    MRHI_ASSERT(false);
+    JsForget(device->state, (int)image);
 }
 
 static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag)
@@ -572,12 +633,13 @@ static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t
     return mrhi_success;
 }
 
+// WebGPU has no heaps: the core never grants their features here.
 static mrhiResult CreateHeap(void* self, const mrhiHeapDef* def, uint64_t* handleOut)
 {
     (void)self;
     (void)def;
     (void)handleOut;
-    return Unsupported();
+    return mrhi_errorUnsupported;
 }
 
 static void WriteHeapEntry(void* self, uint64_t heap, uint32_t index,
@@ -612,7 +674,7 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .createView = CreateView,
     .destroyView = DestroyObject,
     .configureSurface = ConfigureSurface,
-    .unconfigureSurface = Never,
+    .unconfigureSurface = UnconfigureSurface,
     .createShader = CreateShader,
     .destroyShader = DestroyObject,
     .createComputePipeline = CreateComputePipeline,

@@ -9,6 +9,7 @@
 // again keeps its id; devices ask for a fresh adapter, since a WebGPU
 // adapter makes one device. Features and limits follow the contract's
 // WebGPU rows; an adapter without core features falls below the floor.
+// A surface is a canvas named by selector, with its WebGPU context.
 
 #include "driver_webgpu.h"
 
@@ -17,6 +18,8 @@
 #include "invariant.h"
 #include "webgpu_device.h"
 #include "webgpu_names.h"
+
+#include "maul-rhi/surface.h"
 
 #include <emscripten/em_js.h>
 #include <stdalign.h>
@@ -76,21 +79,23 @@ EM_JS(int, JsCreateState, (void), {
             });
             return flags;
         },
+        bufferUsages: ['VERTEX', 'INDEX', 'UNIFORM', 'STORAGE', 'INDIRECT', 'COPY_SRC',
+                       'COPY_DST', 'QUERY_RESOLVE'],
+        textureUsages: ['TEXTURE_BINDING', 'STORAGE_BINDING', 'RENDER_ATTACHMENT',
+                        'TRANSIENT_ATTACHMENT', 'COPY_SRC', 'COPY_DST'],
         buffer(device, size, usage) {
-            const names = ['VERTEX', 'INDEX', 'UNIFORM', 'STORAGE', 'INDIRECT', 'COPY_SRC',
-                           'COPY_DST', 'QUERY_RESOLVE'];
-            return device.createBuffer({size, usage: this.flags(usage, GPUBufferUsage, names)});
+            return device.createBuffer({size,
+                                        usage: this.flags(usage, GPUBufferUsage,
+                                                          this.bufferUsages)});
         },
         texture(device, volume, format, width, height, depth, mips, samples, usage, views) {
-            const names = ['TEXTURE_BINDING', 'STORAGE_BINDING', 'RENDER_ATTACHMENT',
-                           'TRANSIENT_ATTACHMENT', 'COPY_SRC', 'COPY_DST'];
             return device.createTexture({
                 size: [width, height, depth],
                 dimension: volume ? '3d' : '2d',
                 format,
                 mipLevelCount: mips,
                 sampleCount: samples,
-                usage: this.flags(usage, GPUTextureUsage, names),
+                usage: this.flags(usage, GPUTextureUsage, this.textureUsages),
                 viewFormats: views ? views.split(',') : [],
             });
         },
@@ -154,6 +159,29 @@ EM_JS(int, JsAdapterName, (int state, char* out, int capacity), {
     const parts = [info.vendor, info.architecture].filter(part => part);
     const name = info.description || parts.join(' ') || 'WebGPU';
     return stringToUTF8(name, out, capacity);
+});
+
+// A canvas the selector names and its WebGPU context, kept as a state of
+// its own so that any device reaches it by handle: the handle, or 0 for a
+// selector naming no canvas, or a canvas without a WebGPU context.
+EM_JS(int, JsCreateCanvas, (const char* selector, int selectorLength), {
+    let canvas = null;
+    try {
+        canvas = typeof document === 'undefined' ? null :
+            document.querySelector(UTF8ToString(selector, selectorLength));
+    } catch (error) {
+        canvas = null;
+    }
+    const context = canvas && canvas.getContext ? canvas.getContext('webgpu') : null;
+    return context ? Module.mrhiGpu.add({canvas, context}) : 0;
+});
+
+EM_JS(void, JsDestroyCanvas, (int surface), {
+    Module.mrhiGpu.states[surface] = null;
+});
+
+EM_JS(bool, JsPrefersBgra, (void), {
+    return navigator.gpu.getPreferredCanvasFormat() === 'bgra8unorm';
 });
 // clang-format on
 
@@ -259,31 +287,67 @@ static void GetFormatCaps(const void* self, uint64_t adapter, mrhiFormat format,
     *capsOut = mrhiGrantedFormatCaps(format, &driver->adapter.features);
 }
 
-// Canvases come with the presentation slice.
+// A canvas is the only source a browser has; one the selector does not
+// name, or without a WebGPU context, cannot be used.
 static mrhiResult CreateSurface(void* self, const mrhiChain* source, const mrhiSurfaceDef* def,
                                 uint64_t* handleOut)
 {
     (void)self;
-    (void)source;
     (void)def;
-    (void)handleOut;
-    return mrhi_errorUnsupported;
+    if (source->type != mrhi_structSurfaceSourceCanvas)
+    {
+        return mrhi_errorUnsupported;
+    }
+    const mrhiSurfaceSourceCanvas* canvas = (const mrhiSurfaceSourceCanvas*)source;
+    int handle = JsCreateCanvas(canvas->selector, (int)canvas->selectorLength);
+    *handleOut = (uint64_t)handle;
+    return handle != 0 ? mrhi_success : mrhi_errorUnsupported;
 }
 
 static void DestroySurface(void* self, uint64_t handle)
 {
     (void)self;
-    (void)handle;
-    MRHI_ASSERT(false);
+    JsDestroyCanvas((int)handle);
 }
 
+// What a canvas shows, the browser's preferred format first: 8-bit
+// formats with the sRGB curve, and half floats in linear values, each in
+// Rec. 709 and Display P3, the floats also past 1.0 through extended
+// tone mapping. Browsers present in order only.
 static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
                            mrhiSurfaceCaps* capsOut)
 {
-    (void)self;
+    const WebGpuDriver* driver = self;
     (void)surface;
-    (void)adapter;
-    *capsOut = (mrhiSurfaceCaps){0};
+    MRHI_ASSERT(adapter == ADAPTER_HANDLE && driver->found);
+    bool bgra = JsPrefersBgra();
+    const mrhiFormat formats[2] = {bgra ? mrhi_formatBgra8Unorm : mrhi_formatRgba8Unorm,
+                                   bgra ? mrhi_formatRgba8Unorm : mrhi_formatBgra8Unorm};
+    const mrhiColorPrimaries primaries[2] = {mrhi_primariesBt709, mrhi_primariesDisplayP3};
+    *capsOut = (mrhiSurfaceCaps){
+        .presentable = true,
+        .presentModes = mrhi_presentFifo,
+        .alphaModes = mrhi_alphaOpaque | mrhi_alphaPremultiplied,
+        .usages = mrhi_textureRenderTarget | mrhi_textureSampled | mrhi_textureStorage |
+                  mrhi_textureCopySource | mrhi_textureCopyDestination,
+    };
+    for (uint32_t p = 0; p < 2; ++p)
+    {
+        for (uint32_t f = 0; f < 2; ++f)
+        {
+            capsOut->colors[capsOut->colorCount++] =
+                (mrhiSurfaceColor){formats[f], primaries[p], mrhi_transferSrgb, mrhi_rangeStandard};
+        }
+    }
+    for (uint32_t p = 0; p < 2; ++p)
+    {
+        const mrhiColorRange ranges[2] = {mrhi_rangeStandard, mrhi_rangeExtended};
+        for (uint32_t r = 0; r < 2; ++r)
+        {
+            capsOut->colors[capsOut->colorCount++] = (mrhiSurfaceColor){
+                mrhi_formatRgba16Float, primaries[p], mrhi_transferLinear, ranges[r]};
+        }
+    }
 }
 
 // Makes the device at once and answers its opening when the browser has.

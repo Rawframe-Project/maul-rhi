@@ -324,6 +324,10 @@ format.
   scissor, stencil reference and blend constant, depth and stencil kept
   from one pass for the next; and a compute pass split around an upload,
   its root block and timestamps.
+- WebGPU canvases (mrhi-0003): surfaces by selector, their colors,
+  configuration at the program's size, the current texture acquired
+  and out of date once the page resizes the canvas; the conformance
+  suite presents to the web runner's canvas.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

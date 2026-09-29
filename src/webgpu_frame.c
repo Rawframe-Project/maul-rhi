@@ -134,6 +134,14 @@ EM_JS(void, JsUseObject, (int state, uint32_t index, int handle), {
     self.frame.objects[index] = self.objects[handle];
 });
 
+// A canvas's texture, whose handle is freed as the frame takes it: the
+// browser presents it once the page returns to its event loop.
+EM_JS(void, JsUseImage, (int state, uint32_t index, int handle), {
+    const gpu = Module.mrhiGpu;
+    const self = gpu.states[state];
+    self.frame.objects[index] = gpu.take(self, handle);
+});
+
 EM_JS(void, JsTransientBuffer, (int state, uint32_t index, double size, uint32_t usage), {
     const gpu = Module.mrhiGpu;
     const self = gpu.states[state];
@@ -569,7 +577,9 @@ static void AddResources(int state, const mrhiDriverFrame* frame)
     for (uint32_t i = 0; i < frame->resourceCount; ++i)
     {
         const mrhiDriverResource* resource = &frame->resources[i];
-        if (!resource->needed)
+        // A canvas's texture is taken even when no pass writes it, since
+        // the browser presents it either way.
+        if (!resource->needed && resource->kind != mrhiDriverSurfaceImage)
         {
             continue;
         }
@@ -586,8 +596,8 @@ static void AddResources(int state, const mrhiDriverFrame* frame)
             AddTransientTexture(state, i + 1, resource);
             break;
         default:
-            // Canvases come with the driver's next part.
-            MRHI_ASSERT(false);
+            MRHI_ASSERT(resource->kind == mrhiDriverSurfaceImage);
+            JsUseImage(state, i + 1, (int)resource->image);
             break;
         }
     }
