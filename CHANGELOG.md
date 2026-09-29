@@ -336,8 +336,11 @@ format.
 - Samples that test themselves (`samples/`, `MAUL_RHI_BUILD_SAMPLES`): a
   harness, a triangle, an upload and readback, a textured scene under
   the binding model, compute with an indirect dispatch, MSAA with a
-  resolve, and reversed-Z depth with a shadow map, run by CTest on the
-  native driver and in headless Chrome.
+  resolve, reversed-Z depth with a shadow map, an HDR surface, two
+  windows and the present state machine, run by CTest on the native
+  driver and in headless Chrome.
+- The web test runner's page has a second canvas, and ends a run at
+  once when a file it loads is missing.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

@@ -3,8 +3,8 @@
 //
 // Runs a web test in headless Chrome with WebGPU (mrhi-0003): serves the
 // test's directory from localhost, a secure context, opens a page with
-// a canvas (#mrhi-canvas) that loads the test, prints the test's output,
-// and exits with the test's status. A page error, an error the browser
+// two canvases (#mrhi-canvas, #mrhi-canvas-2) that loads the test,
+// prints the test's output, and exits with the test's status. A page error, an error the browser
 // logs, or a WebGPU error the driver kept fails it. Puppeteer
 // comes from MRHI_NODE_MODULES; without it the test is skipped (77).
 //
@@ -31,6 +31,7 @@ const root = path.dirname(script);
 // environment reach its getenv.
 const page = `<!doctype html><html><head><meta charset="utf-8"><link rel="icon" href="data:,"></head><body>
 <canvas id="mrhi-canvas" width="64" height="48"></canvas>
+<canvas id="mrhi-canvas-2" width="64" height="48"></canvas>
 <script>
 var Module = {
     print: text => console.log(text),
@@ -91,6 +92,14 @@ server.listen(0, async () => {
                 console.log(`page error: ${error.message}`);
                 resolve(1);
             });
+            // A file the page cannot load, the test's own among them,
+            // ends the run at once.
+            tab.on('response', response => {
+                if (response.status() >= 400) {
+                    console.log(`not loaded: ${response.url()} (${response.status()})`);
+                    resolve(1);
+                }
+            });
             await tab.goto(`http://localhost:${server.address().port}/`);
         })();
         setTimeout(() => {
@@ -102,7 +111,7 @@ server.listen(0, async () => {
     // The driver keeps every device's uncaptured WebGPU errors: any fails
     // the test, as validation errors do on Vulkan.
     const errors = await tab.evaluate(async () => {
-        const gpu = Module.mrhiGpu;
+        const gpu = typeof Module === 'undefined' ? null : Module.mrhiGpu;
         // Devices still closing read their error scopes first.
         for (let waited = 0; gpu && gpu.closing > 0 && waited < 10000; waited += 10) {
             await new Promise(resolve => setTimeout(resolve, 10));

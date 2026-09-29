@@ -3,11 +3,31 @@
 # suite runs (in headless Chrome on the web). A sample exits 77 when
 # there is no adapter and none is required.
 
+# The presentation samples' windows: XCB, where the Vulkan driver is
+# built and the XCB client library installed, or the web runner's
+# canvases.
+if(MAUL_RHI_VULKAN_DRIVER)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(MAUL_RHI_SAMPLE_XCB QUIET IMPORTED_TARGET xcb)
+    endif()
+endif()
+
+# maul_rhi_add_sample(<name> [WINDOW]): samples/<name>.c on the harness,
+# with the window shim when it presents.
 function(maul_rhi_add_sample name)
+    cmake_parse_arguments(ARG "WINDOW" "" "" ${ARGN})
     set(target sample_${name})
     add_executable(${target} ${name}.c harness.c)
     target_link_libraries(${target} PRIVATE maul-rhi)
     target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    if(ARG_WINDOW)
+        target_sources(${target} PRIVATE window.c)
+        if(MAUL_RHI_SAMPLE_XCB_FOUND)
+            target_link_libraries(${target} PRIVATE PkgConfig::MAUL_RHI_SAMPLE_XCB)
+            target_compile_definitions(${target} PRIVATE SAMPLE_XCB)
+        endif()
+    endif()
     maul_apply_flags(${target})
     if(NOT MAUL_RHI_BUILD_TESTS)
         return()
@@ -30,3 +50,6 @@ maul_rhi_add_sample(textured)
 maul_rhi_add_sample(compute_indirect)
 maul_rhi_add_sample(msaa)
 maul_rhi_add_sample(shadow)
+maul_rhi_add_sample(hdr_surface WINDOW)
+maul_rhi_add_sample(two_windows WINDOW)
+maul_rhi_add_sample(present_states WINDOW)
