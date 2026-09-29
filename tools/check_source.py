@@ -5,7 +5,8 @@
 # The source rules of docs/conventions.md that neither the compiler nor
 # clang-format checks:
 #
-# - every C file starts with its SPDX line; comments are // or ///;
+# - every C file, Objective-C (.m) included, starts with its SPDX line;
+#   comments are // or ///;
 # - comments carry no development history and no TODO or FIXME;
 # - no file in the repository contains an em dash;
 # - src/ calls no function the family bans (memory goes through the
@@ -28,7 +29,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 C_DIRS = ["include", "src", "test", "bench", "samples", "testbed", "tools"]
 SKIP_DIRS = {".git", "build", "_site", "out"}
-TEXT_SUFFIXES = (".c", ".h", ".md", ".txt", ".py", ".cmake", ".in", ".yml", ".yaml", ".json")
+TEXT_SUFFIXES = (".c", ".h", ".m", ".md", ".txt", ".py", ".cmake", ".in", ".yml", ".yaml", ".json")
 
 MARKERS = re.compile(
     r"(?<![\w.#/~])\d+[a-df-z]?-\d+[a-z]?(?![\w.-])"  # slice codes like 2b-9 or 6-3
@@ -85,7 +86,7 @@ THREAD_LOCAL = re.compile(r"\b(_Thread_local|thread_local|__thread)\b|__declspec
 FILE_SCOPE_STATE = re.compile(r"^static\s+(?!const\b)(?!inline\b)(?![^(=;]*\()[^=;]*[=;]")
 ASSIGN_IN_CONDITION = re.compile(
     r"\b(?:if|while)\s*\((?:[^()]|\([^()]*\))*?[^=!<>+\-*/%&|^]=(?!=)")
-SNAKE_CASE = re.compile(r"^[a-z0-9_]+\.[ch]$")
+SNAKE_CASE = re.compile(r"^[a-z0-9_]+\.[chm]$")
 
 
 def code_text(line):
@@ -184,7 +185,7 @@ def main():
     bans = dict(FAMILY_BANS)
     bans.update(library_bans())
     for top in C_DIRS:
-        for path in walk(top, (".c", ".h")):
+        for path in walk(top, (".c", ".h", ".m")):
             rel = os.path.relpath(path, ROOT)
             check_c_file(path, rel, rel.startswith("src" + os.sep), bans, findings)
     for path in walk(".", TEXT_SUFFIXES):

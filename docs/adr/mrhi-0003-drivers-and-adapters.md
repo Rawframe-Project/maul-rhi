@@ -104,6 +104,26 @@ ids, requests, the frame graph) can be tested without a GPU.
   current texture, out of date once the page resizes the drawing
   buffer, and the browser presents it when the page returns to its
   event loop, so an image given back is only forgotten.
+- **The Metal driver:** built with `MAUL_RHI_METAL_DRIVER` on Apple
+  systems, off by default until it runs everything the core records,
+  and never beside the Vulkan driver: a build has one native driver.
+  It speaks Metal's classic API (command queues, command buffers and
+  encoders), which every Metal device runs, the virtual one of hosted
+  macOS runners included; a path through Metal 4's argument tables may
+  come inside the driver where a device reports that family. Its files
+  are Objective-C (`src/*.m`) in the family's C23 dialect, compiled
+  with manual retain and release so that Metal objects sit in plain C
+  structs, released where the SPI destroys them; every entry point that
+  touches Objective-C objects drains its own autorelease pool. A search
+  lists every Metal device (the default one outside macOS) under its
+  registry id. Limits are WebGPU's floor, raised where Metal's feature
+  set tables promise more for the device's family and where the device
+  reports its own; features are granted as the driver comes to run
+  them. MoltenVK and KosmicKrisp stay usable under the Vulkan driver
+  where a program builds it and loads one, but are neither tested nor
+  promised. CI runs the conformance suite on the macOS runner's device
+  under `MTL_DEBUG_LAYER` and `MTL_SHADER_VALIDATION`; until the
+  driver makes objects, it only opens and closes devices there.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`

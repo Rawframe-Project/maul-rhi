@@ -61,6 +61,9 @@ jobs:
           - { name: linux-clang-20-tsan, os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Debug,   extra: "-DMAUL_RHI_TSAN=ON" }
           - { name: linux-shared,        os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Release, extra: "-DMAUL_RHI_BUILD_SHARED=ON" }
           - { name: macos-clang,         os: macos-15,     cc: clang,    cxx: clang++,    config: Release, extra: "" }
+          # The Metal driver on the runner's paravirtual device, samples
+          # off until the driver runs them (mrhi-0003).
+          - { name: macos-metal,         os: macos-15,     cc: clang,    cxx: clang++,    config: Debug,   extra: "-DMAUL_RHI_METAL_DRIVER=ON -DMAUL_RHI_VULKAN_DRIVER=OFF -DMAUL_RHI_BUILD_SAMPLES=OFF" }
     steps:
       - uses: actions/checkout@v4
       - name: Install compilers, lavapipe, the validation layer and Xvfb
@@ -79,10 +82,16 @@ jobs:
         # Linux runs Vulkan on lavapipe, which must be found, under the
         # validation layer, whose errors in a test's output fail it,
         # presents to an XCB window on Xvfb, and reads heaps (mrhi-0003).
+        # macOS runs Metal in its own cell.
         env:
           MAUL_RHI_REQUIRE_VULKAN: ${{ runner.os == 'Linux' && '1' || '' }}
           MAUL_RHI_REQUIRE_SURFACE: ${{ runner.os == 'Linux' && '1' || '' }}
           MAUL_RHI_REQUIRE_BINDLESS: ${{ runner.os == 'Linux' && '1' || '' }}
+          # The Metal cell must find the runner's device, under Metal's API
+          # and shader validation, which stop a test on misuse.
+          MAUL_RHI_REQUIRE_METAL: ${{ contains(matrix.extra, 'METAL_DRIVER=ON') && '1' || '' }}
+          MTL_DEBUG_LAYER: ${{ runner.os == 'macOS' && '1' || '' }}
+          MTL_SHADER_VALIDATION: ${{ runner.os == 'macOS' && '1' || '' }}
           VK_INSTANCE_LAYERS: ${{ runner.os == 'Linux' && 'VK_LAYER_KHRONOS_validation' || '' }}
           # Synchronization validation checks the barriers the graph makes.
           VK_KHRONOS_VALIDATION_VALIDATE_SYNC: "true"

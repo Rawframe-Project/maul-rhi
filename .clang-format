@@ -1,5 +1,5 @@
 # Formatting for the Maul family. Identical in every Maul library; CI pins the clang-format version.
-Language: Cpp
+# The options below hold for C and for the Objective-C a driver may need.
 Standard: Latest
 IndentWidth: 4
 TabWidth: 4
@@ -35,3 +35,7 @@ ReflowComments: true
 AlignAfterOpenBracket: Align
 BinPackArguments: true
 BinPackParameters: true
+---
+Language: Cpp
+---
+Language: ObjC

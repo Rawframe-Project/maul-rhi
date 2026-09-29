@@ -3,7 +3,7 @@
 # Copyright (c) 2026 Sirac Ozmen
 #
 # The module graph rule of docs/conventions.md, section 6. Every module
-# in src/ (a .c file and its header, or a header alone) is declared in
+# in src/ (a .c or .m file and its header, or a header alone) is declared in
 # tools/modules.txt with the modules it may use:
 #
 #     tables:
@@ -47,7 +47,7 @@ def modules_in_src():
     found = {}
     for name in sorted(os.listdir(src)):
         stem, suffix = os.path.splitext(name)
-        if suffix in (".c", ".h"):
+        if suffix in (".c", ".h", ".m"):
             found.setdefault(stem, []).append(name)
     return found
 

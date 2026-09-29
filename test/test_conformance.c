@@ -4,7 +4,8 @@
 // The conformance suite (mrhi-0003): the same checks, through the public API
 // only, on every driver: the test driver, and each adapter of the
 // build's native driver. A host without native adapters skips them,
-// unless MAUL_RHI_REQUIRE_VULKAN is set and not empty.
+// unless MAUL_RHI_REQUIRE_VULKAN (or _WEBGPU, or _METAL, for the build's
+// driver) is set and not empty.
 
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
@@ -396,6 +397,10 @@ static void Finish(mrhiDevice* device, uint32_t readbacks)
 // Whether the device's driver runs work: the test driver moves no
 // bytes, so only its answers are checked.
 static bool s_runs;
+
+// Whether the driver only opens devices: the Metal driver, whose objects,
+// pipelines and frames are not made yet (mrhi-0003).
+static bool s_opensOnly;
 
 static bool Taken(mrhiDevice* device, mrhiRequestId request, const uint8_t* expected, size_t size)
 {
@@ -1530,6 +1535,11 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CHECK(asked->timestampQuery ? status == mrhi_success && period > 0.0
                                 : status == mrhi_errorUnsupported,
           "a timestamp period with timestamps");
+    if (s_opensOnly)
+    {
+        mrhiDestroyDevice(device);
+        return;
+    }
     CheckObjects(device, asked->timestampQuery);
     CheckFrameMemory(device);
     CheckPipelines(device);
@@ -1545,6 +1555,7 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
     mrhiAdapterId ids[16];
     size_t count = Search(instance, ids, 16);
     s_runs = driver != mrhi_driverTest;
+    s_opensOnly = driver == mrhi_driverMetal;
     for (size_t i = 0; i < count; ++i)
     {
         mrhiAdapterInfo info;
@@ -1559,9 +1570,12 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         mrhiFeatures all;
         CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
         CheckDevice(instance, ids[i], &all);
-        CheckCacheImport(instance, ids[i]);
-        CheckRetirement(instance, ids[i]);
-        CheckHeaps(instance, ids[i], driver != mrhi_driverTest);
+        if (!s_opensOnly)
+        {
+            CheckCacheImport(instance, ids[i]);
+            CheckRetirement(instance, ids[i]);
+            CheckHeaps(instance, ids[i], driver != mrhi_driverTest);
+        }
     }
     mrhiAdapterId again[16];
     CHECK(Search(instance, again, 16) == count && memcmp(ids, again, count * sizeof(ids[0])) == 0,
@@ -1977,10 +1991,14 @@ static void TestNativeDriver(void)
     {
         return;
     }
-    // The build's native driver: WebGPU on the web, Vulkan elsewhere.
+    // The build's native driver: WebGPU on the web, Metal where the build
+    // chose it, Vulkan elsewhere.
 #ifdef __EMSCRIPTEN__
     size_t count = CheckDriver(instance, mrhi_driverWebGpu);
     const char* required = getenv("MAUL_RHI_REQUIRE_WEBGPU");
+#elif defined(MAUL_RHI_METAL_DRIVER)
+    size_t count = CheckDriver(instance, mrhi_driverMetal);
+    const char* required = getenv("MAUL_RHI_REQUIRE_METAL");
 #else
     size_t count = CheckDriver(instance, mrhi_driverVulkan);
     const char* required = getenv("MAUL_RHI_REQUIRE_VULKAN");

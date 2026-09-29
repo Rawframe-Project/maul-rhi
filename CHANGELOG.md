@@ -344,6 +344,12 @@ format.
   by CTest on the native driver and in headless Chrome.
 - The web test runner's page has a second canvas, and ends a run at
   once when a file it loads is missing.
+- The Metal driver's start (`MAUL_RHI_METAL_DRIVER`, off by default,
+  Objective-C): adapters for the system's Metal devices under their
+  registry ids, and devices with a command queue; objects, pipelines,
+  frames and surfaces answer `mrhi_errorUnsupported` for now. A macOS
+  CI cell runs the conformance suite's adapter and device checks on the
+  runner's Metal device under Metal's validation.
 - Metal code in shader containers: a Metal map, each entry's MSL and
   a metallib (sections 11 to 13), checked by the reader;
   `tools/mrhi_container.py --msl --metallib` writes them and

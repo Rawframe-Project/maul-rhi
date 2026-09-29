@@ -55,7 +55,7 @@ def measured():
     found = {}
     src = os.path.join(ROOT, "src")
     for name in sorted(os.listdir(src)):
-        if name.endswith(".c"):
+        if name.endswith((".c", ".m")):
             path = os.path.join(src, name)
             for function, length in functions(path):
                 found[(name, function)] = length
@@ -105,7 +105,7 @@ def complexity_exceptions():
     found = []
     src = os.path.join(ROOT, "src")
     for name in sorted(os.listdir(src)):
-        if name.endswith(".c"):
+        if name.endswith((".c", ".m")):
             for number, line in enumerate(open(os.path.join(src, name), encoding="utf-8"), 1):
                 if "NOLINT(readability-function-cognitive-complexity)" in line:
                     found.append(f"src/{name}:{number}: {line.strip()}")

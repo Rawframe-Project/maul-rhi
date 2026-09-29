@@ -32,6 +32,17 @@ else()
     set(maul_rhi_vulkan_default ON)
 endif()
 option(MAUL_RHI_VULKAN_DRIVER "Build the Vulkan driver" ${maul_rhi_vulkan_default})
+# The Metal driver (mrhi-0003), in Objective-C on Apple systems: off by
+# default until it runs everything the core records. A build has one
+# native driver.
+option(MAUL_RHI_METAL_DRIVER "Build the Metal driver" OFF)
+if(MAUL_RHI_METAL_DRIVER AND NOT APPLE)
+    message(FATAL_ERROR "The Metal driver builds on Apple systems only")
+endif()
+if(MAUL_RHI_METAL_DRIVER AND MAUL_RHI_VULKAN_DRIVER)
+    message(FATAL_ERROR "A build has one native driver: turn MAUL_RHI_VULKAN_DRIVER off "
+                        "with MAUL_RHI_METAL_DRIVER on")
+endif()
 # The WebGPU driver (mrhi-0003): every web build.
 option(MAUL_RHI_WEBGPU_DRIVER "Build the WebGPU driver" ${EMSCRIPTEN})
 
@@ -111,6 +122,21 @@ if(MAUL_RHI_VULKAN_DRIVER)
     target_include_directories(maul-rhi SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/khronos)
     target_link_libraries(maul-rhi PRIVATE ${CMAKE_DL_LIBS})
 endif()
+if(MAUL_RHI_METAL_DRIVER)
+    enable_language(OBJC)
+    target_sources(maul-rhi PRIVATE src/driver_metal.m src/metal_device.m)
+    target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_METAL_DRIVER)
+    # The family's C23 for Objective-C, with manual retain and release so
+    # that Metal objects sit in plain C structs.
+    set_target_properties(maul-rhi PROPERTIES
+        OBJC_STANDARD 23
+        OBJC_STANDARD_REQUIRED ON
+        OBJC_EXTENSIONS OFF
+        OBJC_VISIBILITY_PRESET hidden)
+    target_compile_options(maul-rhi PRIVATE
+        $<$<COMPILE_LANGUAGE:OBJC>:-fno-objc-arc -Wmissing-prototypes>)
+    target_link_libraries(maul-rhi PRIVATE "-framework Foundation" "-framework Metal")
+endif()
 if(MAUL_RHI_WEBGPU_DRIVER)
     target_sources(maul-rhi PRIVATE src/driver_webgpu.c src/webgpu_device.c src/webgpu_frame.c
                                    src/webgpu_names.c src/webgpu_pipeline.c)
@@ -189,6 +215,9 @@ if(MAUL_RHI_BUILD_TESTS)
         set_tests_properties(conformance PROPERTIES SKIP_RETURN_CODE 77)
     else()
         maul_add_test(conformance)
+        if(MAUL_RHI_METAL_DRIVER)
+            target_compile_definitions(test_conformance PRIVATE MAUL_RHI_METAL_DRIVER)
+        endif()
     endif()
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND AND MAUL_RHI_VULKAN_DRIVER)
