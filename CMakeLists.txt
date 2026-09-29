@@ -45,6 +45,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/allocator.c
     src/base.c
     src/chain.c
+    src/compile.c
     src/device.c
     src/frame.c
     src/frame_resource.c
@@ -55,6 +56,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/instance.c
     src/label.c
     src/notify.c
+    src/pass.c
     src/pool.c
     src/resources.c
     src/surface.c
@@ -88,6 +90,7 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(swapchain)
         maul_add_test(frame)
         maul_add_test(frame_resource)
+        maul_add_test(pass)
     endif()
     maul_add_header_tests()
 endif()

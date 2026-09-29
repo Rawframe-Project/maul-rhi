@@ -81,16 +81,17 @@ extern "C"
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDropFrame(mrhiDevice* device);
 
-    /// Submits the open frame to the GPU and closes it. Its token is answered
-    /// by one mrhi_deviceFrameDone record.
+    /// Submits the open frame to the GPU, compiling it first if it is not, and
+    /// closes it. Its token is answered by one mrhi_deviceFrameDone record.
     ///
     /// @param device    The device.
     /// @param tokenOut  Receives the frame's token.
     /// @return `mrhi_success` with the token; `mrhi_errorInvalid` for a NULL
     /// argument; `mrhi_errorState` for a device without an open frame;
-    /// `mrhi_errorCapacity` when the device's queue has no room for the answer,
-    /// the frame staying open; `mrhi_errorPlatform` when the driver fails, the
-    /// frame closing.
+    /// `mrhi_errorUnsupported` when compiling finds a declared texture its
+    /// format cannot take, the frame staying open; `mrhi_errorCapacity` when
+    /// the device's queue has no room for the answer, the frame staying open;
+    /// `mrhi_errorPlatform` when the driver fails, the frame closing.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut);
@@ -199,6 +200,260 @@ extern "C"
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer,
                                                         mrhiResourceId* resourceOut);
+
+    // Where a pass runs: a hint drivers without the queue ignore, running it on
+    // the graphics queue.
+    typedef uint8_t mrhiPassClass;
+
+    enum
+    {
+        // Rendering and compute on the main queue.
+        mrhi_passGraphics = 0,
+        // Compute beside the graphics work; no targets, vertices or indices.
+        mrhi_passAsyncCompute = 1,
+        // Copies only.
+        mrhi_passTransfer = 2,
+    };
+
+    // How a pass uses a resource.
+    typedef uint8_t mrhiAccessKind;
+
+    enum
+    {
+        // A texture sampled or read by shaders.
+        mrhi_accessSampled = 0,
+        // A buffer read as uniforms.
+        mrhi_accessUniform = 1,
+        // A buffer read as vertices.
+        mrhi_accessVertex = 2,
+        // A buffer read as indices.
+        mrhi_accessIndex = 3,
+        // A buffer read as indirect arguments.
+        mrhi_accessIndirect = 4,
+        // Read as storage.
+        mrhi_accessStorageRead = 5,
+        // Written as storage, without reading what was there.
+        mrhi_accessStorageWrite = 6,
+        // Read and written as storage.
+        mrhi_accessStorageReadWrite = 7,
+        // Copied from.
+        mrhi_accessCopySource = 8,
+        // Copied to.
+        mrhi_accessCopyDestination = 9,
+    };
+
+    // What a target holds when its pass begins.
+    typedef uint8_t mrhiLoadOp;
+
+    enum
+    {
+        // What earlier passes wrote.
+        mrhi_loadKeep = 0,
+        // The clear value.
+        mrhi_loadClear = 1,
+        // Anything; the pass writes all of it.
+        mrhi_loadDiscard = 2,
+    };
+
+    // What a target keeps when its pass ends.
+    typedef uint8_t mrhiStoreOp;
+
+    enum
+    {
+        // What the pass wrote.
+        mrhi_storeKeep = 0,
+        // Nothing; later passes do not read it.
+        mrhi_storeDiscard = 1,
+    };
+
+    // Mips, layers and an aspect of a texture.
+    typedef struct mrhiTextureRange
+    {
+        // The first mip.
+        uint32_t baseMip;
+        // The mips, at least 1, or MRHI_REMAINING.
+        uint32_t mipCount;
+        // The first layer; 0 on a 3D texture.
+        uint32_t baseLayer;
+        // The layers, at least 1, or MRHI_REMAINING.
+        uint32_t layerCount;
+        // The aspect.
+        mrhiTextureAspect aspect;
+    } mrhiTextureRange;
+
+    // A resource a pass uses, and how.
+    typedef struct mrhiAccess
+    {
+        // A resource of the open frame.
+        mrhiResourceId resource;
+        // How: sampled only for textures; uniform, vertex, index and indirect
+        // only for buffers.
+        mrhiAccessKind kind;
+        // The texture's part it uses; buffers are used whole, and ignore it.
+        mrhiTextureRange range;
+    } mrhiAccess;
+
+// The color targets one pass writes at most.
+#define MRHI_COLOR_TARGETS 8
+
+    // A color target's clear value.
+    typedef struct mrhiClearColor
+    {
+        float red;
+        float green;
+        float blue;
+        float alpha;
+    } mrhiClearColor;
+
+    // A texture a pass renders colors to.
+    typedef struct mrhiColorTarget
+    {
+        // A texture of the open frame whose format renders.
+        mrhiResourceId resource;
+        // The mip it renders to.
+        uint32_t mip;
+        // The layer, or the depth slice of a 3D texture.
+        uint32_t layer;
+        // What it holds when the pass begins.
+        mrhiLoadOp load;
+        // What it keeps when the pass ends.
+        mrhiStoreOp store;
+        // The clear value, for mrhi_loadClear.
+        mrhiClearColor clear;
+        // A single-sampled texture of the same format and size the samples
+        // resolve to, or a null id.
+        mrhiResourceId resolve;
+        // The resolve texture's mip.
+        uint32_t resolveMip;
+        // The resolve texture's layer.
+        uint32_t resolveLayer;
+    } mrhiColorTarget;
+
+    // A texture a pass tests and writes depth and stencil in.
+    typedef struct mrhiDepthTarget
+    {
+        // A texture of the open frame with a depth format, or a null id for
+        // none.
+        mrhiResourceId resource;
+        // The mip.
+        uint32_t mip;
+        // The layer.
+        uint32_t layer;
+        // What its depth holds when the pass begins.
+        mrhiLoadOp depthLoad;
+        // What its depth keeps when the pass ends.
+        mrhiStoreOp depthStore;
+        // The depth clear value, from 0 to 1.
+        float clearDepth;
+        // What its stencil holds, when the format has one.
+        mrhiLoadOp stencilLoad;
+        // What its stencil keeps, when the format has one.
+        mrhiStoreOp stencilStore;
+        // The stencil clear value.
+        uint32_t clearStencil;
+        // Tested but never written, so the pass may also sample it; its loads
+        // keep and its stores keep.
+        bool readOnly;
+    } mrhiDepthTarget;
+
+    // A pass of the open frame. It ends with the frame.
+    typedef struct mrhiPassId
+    {
+        uint32_t index1;
+        uint32_t generation;
+    } mrhiPassId;
+
+    // A pass: where it runs, and every resource it uses. Build it with
+    // mrhiDefaultPassDef.
+    typedef struct mrhiPassDef
+    {
+        uint32_t cookie;
+        // Extensions, or NULL.
+        const mrhiChain* next;
+        // A name for debugging tools, shown around the pass's work: UTF-8
+        // without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when
+        // labelLength is 0. Only read during the call.
+        const char* label;
+        // The label's bytes.
+        size_t labelLength;
+        // Where it runs.
+        mrhiPassClass passClass;
+        // Kept even when nothing kept reads what it writes, for work seen
+        // outside the frame.
+        bool neverCull;
+        // The resources it uses besides its targets; NULL when accessCount is
+        // 0. Only read during the call.
+        const mrhiAccess* accesses;
+        // How many.
+        uint32_t accessCount;
+        // Its color targets, colorTargetCount of them.
+        mrhiColorTarget colorTargets[MRHI_COLOR_TARGETS];
+        // How many, at most MRHI_COLOR_TARGETS.
+        uint32_t colorTargetCount;
+        // Its depth target, if its resource is not null.
+        mrhiDepthTarget depthTarget;
+    } mrhiPassDef;
+
+    /// Returns the default pass def: a graphics pass with no accesses or
+    /// targets.
+    ///
+    /// @return The def, with a valid cookie.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MRHI_API mrhiPassDef mrhiDefaultPassDef(void);
+
+    /// Declares a pass of the open frame, after the passes declared before it
+    /// in its class.
+    ///
+    /// @param device   The device.
+    /// @param def      The pass.
+    /// @param passOut  Receives the pass.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
+    /// without its cookie, a bad label, an unknown class, kind, aspect or
+    /// operation, an access or target its resource cannot take (a kind for the
+    /// other resource type, a range outside the texture, a use an imported
+    /// object was not made with, a target that does not render or depth-test),
+    /// targets of different sizes or sample counts, a resolve that does not
+    /// match, a subresource written and used otherwise in the pass, an access
+    /// the class does not allow, or a declared resource read before any pass
+    /// wrote it; `mrhi_errorStale` for a resource of another frame, or an
+    /// imported object destroyed since; `mrhi_errorUnsupported` for a critical
+    /// extension the library does not know; `mrhi_errorState` for a device
+    /// without an open frame, or a frame already compiled; `mrhi_errorCapacity`
+    /// when the device's framePasses or frameAccesses limit is reached.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def,
+                                                   mrhiPassId* passOut);
+
+    /// Compiles the open frame: culls the passes nothing kept needs, and checks
+    /// each declared resource's derived usages against its format. After it,
+    /// nothing more is declared; submitting compiles a frame not yet compiled.
+    ///
+    /// @param device  The device.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, or a
+    /// declared texture of several samples its kept passes use other than as a
+    /// render target, or with storage; `mrhi_errorUnsupported` for a declared
+    /// texture whose format cannot take the usages its kept passes make of it,
+    /// the frame staying open; `mrhi_errorState` for a device without an open
+    /// frame, or a frame already compiled.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiCompileFrame(mrhiDevice* device);
+
+    /// Reads whether the compiled frame keeps a pass; a culled pass is never
+    /// recorded.
+    ///
+    /// @param device   The device.
+    /// @param pass     The pass.
+    /// @param keptOut  Receives whether it is kept.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
+    /// `mrhi_errorStale` for a pass of another frame; `mrhi_errorState` for a
+    /// frame not compiled.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiIsPassKept(mrhiDevice* device, mrhiPassId pass,
+                                                      bool* keptOut);
 
 #ifdef __cplusplus
 }

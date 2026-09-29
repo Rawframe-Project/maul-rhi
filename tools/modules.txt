@@ -22,3 +22,5 @@ surface: chain device_core instance_core invariant label
 swapchain: capabilities_core device_core instance_core
 frame: device_core
 frame_resource: device_core
+pass: capabilities_core device_core
+compile: device_core

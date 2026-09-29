@@ -337,3 +337,41 @@ restricted or absent-rejected, with how.
 | `height` | direct: imageExtent, met with currentExtent where it is fixed | direct: the buffer Height | direct: drawableSize | direct: the canvas's height |
 | `presentMode` | direct: presentMode | direct: the sync interval and ALLOW_TEARING | direct: displaySyncEnabled | direct: the browser's fifo |
 | `alphaMode` | direct: compositeAlpha | direct: AlphaMode | direct: opaque | direct: alphaMode |
+
+## mrhiPassClass
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_passGraphics` | direct: a graphics queue | direct: a direct command list | direct: a render or compute encoder | direct: the queue |
+| `mrhi_passAsyncCompute` | restricted: a compute-only queue family, where there is one | direct: a compute queue | direct: a second command queue | emulated: the queue, in order |
+| `mrhi_passTransfer` | restricted: a transfer-only queue family, where there is one | direct: a copy queue | direct: a blit encoder | direct: the queue's copies |
+
+## mrhiAccessKind
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_accessSampled` | direct: SHADER_SAMPLED_READ, SHADER_READ_ONLY_OPTIMAL | direct: SHADER_RESOURCE | direct: a read resource | direct: TEXTURE_BINDING |
+| `mrhi_accessUniform` | direct: UNIFORM_READ | direct: CONSTANT_BUFFER | direct: a read resource | direct: UNIFORM |
+| `mrhi_accessVertex` | direct: VERTEX_ATTRIBUTE_READ | direct: VERTEX_BUFFER | direct: a vertex buffer | direct: VERTEX |
+| `mrhi_accessIndex` | direct: INDEX_READ | direct: INDEX_BUFFER | direct: an index buffer | direct: INDEX |
+| `mrhi_accessIndirect` | direct: INDIRECT_COMMAND_READ | direct: INDIRECT_ARGUMENT | direct: an indirect buffer | direct: INDIRECT |
+| `mrhi_accessStorageRead` | direct: SHADER_STORAGE_READ | direct: SHADER_RESOURCE or a read UAV | direct: a read resource | direct: read-only-storage |
+| `mrhi_accessStorageWrite` | direct: SHADER_STORAGE_WRITE | direct: UNORDERED_ACCESS | direct: a written resource | direct: STORAGE, write-only |
+| `mrhi_accessStorageReadWrite` | direct: SHADER_STORAGE_READ and WRITE | direct: UNORDERED_ACCESS | direct: a read and written resource | direct: STORAGE, read-write |
+| `mrhi_accessCopySource` | direct: TRANSFER_READ, TRANSFER_SRC_OPTIMAL | direct: COPY_SOURCE | direct: a blit source | direct: COPY_SRC |
+| `mrhi_accessCopyDestination` | direct: TRANSFER_WRITE, TRANSFER_DST_OPTIMAL | direct: COPY_DEST | direct: a blit destination | direct: COPY_DST |
+
+## mrhiLoadOp
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_loadKeep` | direct: LOAD | direct: PRESERVE | direct: MTLLoadActionLoad | direct: load |
+| `mrhi_loadClear` | direct: CLEAR | direct: CLEAR | direct: MTLLoadActionClear | direct: clear |
+| `mrhi_loadDiscard` | direct: DONT_CARE | direct: DISCARD | direct: MTLLoadActionDontCare | emulated: clear, as WebGPU has no discard |
+
+## mrhiStoreOp
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_storeKeep` | direct: STORE | direct: PRESERVE | direct: MTLStoreActionStore | direct: store |
+| `mrhi_storeDiscard` | direct: DONT_CARE | direct: DISCARD | direct: MTLStoreActionDontCare | direct: discard |

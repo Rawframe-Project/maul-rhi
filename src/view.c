@@ -31,8 +31,7 @@ static bool IsKnown(const mrhiViewDef* def)
     return def->kind <= mrhi_texture3d && def->aspect <= mrhi_aspectStencilOnly;
 }
 
-// A count, with MRHI_REMAINING resolved to what follows the base.
-static uint32_t ResolveCount(uint32_t count, uint32_t base, uint32_t total)
+uint32_t mrhiResolveCount(uint32_t count, uint32_t base, uint32_t total)
 {
     if (count != MRHI_REMAINING)
     {
@@ -41,8 +40,7 @@ static uint32_t ResolveCount(uint32_t count, uint32_t base, uint32_t total)
     return base < total ? total - base : 0;
 }
 
-// Whether a range of at least one fits in the total.
-static bool IsRangeValid(uint32_t base, uint32_t count, uint32_t total)
+bool mrhiIsRangeValid(uint32_t base, uint32_t count, uint32_t total)
 {
     uint32_t end = 0;
     return count > 0 && !ckd_add(&end, base, count) && end <= total;
@@ -86,8 +84,7 @@ static bool IsFormatGiven(const mrhiTextureDef* texture, mrhiFormat format)
     return false;
 }
 
-// Whether the texture's format has the aspect.
-static bool HasAspect(mrhiFormat format, mrhiTextureAspect aspect)
+bool mrhiFormatHasAspect(mrhiFormat format, mrhiTextureAspect aspect)
 {
     switch (aspect)
     {
@@ -109,16 +106,16 @@ static bool Resolve(const mrhiTextureDef* texture, const mrhiViewDef* def, mrhiV
     view.format = view.format == mrhi_formatNone ? texture->format : view.format;
     view.usage = view.usage == 0 ? texture->usage : view.usage;
     uint32_t layers = texture->kind == mrhi_texture3d ? 1 : texture->depthOrLayers;
-    view.mipCount = ResolveCount(view.mipCount, view.baseMip, texture->mipLevels);
-    view.layerCount = ResolveCount(view.layerCount, view.baseLayer, layers);
+    view.mipCount = mrhiResolveCount(view.mipCount, view.baseMip, texture->mipLevels);
+    view.layerCount = mrhiResolveCount(view.layerCount, view.baseLayer, layers);
     *resolvedOut = view;
     mrhiTextureUsage transient = mrhi_textureTransient | mrhi_textureRenderTarget;
     bool usage = (view.usage & ~texture->usage) == 0 &&
                  ((view.usage & mrhi_textureTransient) == 0 || view.usage == transient);
     return usage && IsFormatGiven(texture, view.format) &&
-           HasAspect(texture->format, view.aspect) &&
-           IsRangeValid(view.baseMip, view.mipCount, texture->mipLevels) &&
-           IsRangeValid(view.baseLayer, view.layerCount, layers) && IsKindValid(texture, &view);
+           mrhiFormatHasAspect(texture->format, view.aspect) &&
+           mrhiIsRangeValid(view.baseMip, view.mipCount, texture->mipLevels) &&
+           mrhiIsRangeValid(view.baseLayer, view.layerCount, layers) && IsKindValid(texture, &view);
 }
 
 // Checks a def on a live device and resolves it: success, or the

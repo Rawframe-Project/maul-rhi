@@ -29,6 +29,8 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.views = 8192;
     def.deviceLimits.surfaces = 8;
     def.deviceLimits.frameResources = 1024;
+    def.deviceLimits.framePasses = 256;
+    def.deviceLimits.frameAccesses = 4096;
     return def;
 }
 
@@ -43,6 +45,7 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
         def->deviceLimits.samplers == 0 || def->deviceLimits.buffers == 0 ||
         def->deviceLimits.textures == 0 || def->deviceLimits.views == 0 ||
         def->deviceLimits.surfaces == 0 || def->deviceLimits.frameResources == 0 ||
+        def->deviceLimits.framePasses == 0 || def->deviceLimits.frameAccesses == 0 ||
         !mrhiIsLabelValid(def->label, def->labelLength) || !mrhiIsAllocatorValid(&def->allocator) ||
         !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
     {
@@ -119,6 +122,10 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
         mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
     size_t resourcesAt = mrhiLayoutAdd(&layout, limits->frameResources, sizeof(mrhiFrameResource),
                                        alignof(mrhiFrameResource));
+    size_t passesAt =
+        mrhiLayoutAdd(&layout, limits->framePasses, sizeof(mrhiFramePass), alignof(mrhiFramePass));
+    size_t usesAt =
+        mrhiLayoutAdd(&layout, limits->frameAccesses, sizeof(mrhiFrameUse), alignof(mrhiFrameUse));
     size_t queueAt = mrhiLayoutAdd(&layout, limits->notifications, sizeof(mrhiDeviceNotification),
                                    alignof(mrhiDeviceNotification));
     unsigned char* block =
@@ -137,6 +144,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     device->running = (uint32_t*)(block + runningAt);
     device->queue = (mrhiDeviceNotification*)(block + queueAt);
     device->frameResources = (mrhiFrameResource*)(block + resourcesAt);
+    device->framePasses = (mrhiFramePass*)(block + passesAt);
+    device->frameUses = (mrhiFrameUse*)(block + usesAt);
     return device;
 }
 

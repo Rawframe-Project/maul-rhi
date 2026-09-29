@@ -56,6 +56,11 @@ extern "C"
         uint32_t surfaces;
         // Resources one frame declares and imports; 1024 by default.
         uint32_t frameResources;
+        // Passes one frame declares; 256 by default.
+        uint32_t framePasses;
+        // Accesses and targets one frame's passes declare in all; 4096 by
+        // default.
+        uint32_t frameAccesses;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the

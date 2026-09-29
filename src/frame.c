@@ -88,7 +88,10 @@ mrhiResult mrhiBeginFrame(mrhiDevice* device, const mrhiFrameDef* def)
     }
     device->frameOpen = true;
     device->frameSerial = device->frameSerial == UINT32_MAX ? 1 : device->frameSerial + 1;
+    device->frameCompiled = false;
     device->frameResourceCount = 0;
+    device->framePassCount = 0;
+    device->frameUseCount = 0;
     return mrhi_success;
 }
 
@@ -119,6 +122,11 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     if (!device->frameOpen)
     {
         return mrhi_errorState;
+    }
+    mrhiResult compiled = device->frameCompiled ? mrhi_success : mrhiCompile(device);
+    if (compiled != mrhi_success)
+    {
+        return compiled;
     }
     if (device->queueCount + device->runningCount >= device->deviceLimits.notifications)
     {

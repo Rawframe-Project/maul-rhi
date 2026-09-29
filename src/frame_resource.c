@@ -11,7 +11,7 @@
 // Adds a resource to the open frame: success with its id, or the refusal.
 static mrhiResult Add(mrhiDevice* device, mrhiFrameResource resource, mrhiResourceId* resourceOut)
 {
-    if (!device->frameOpen)
+    if (!device->frameOpen || device->frameCompiled)
     {
         return mrhi_errorState;
     }

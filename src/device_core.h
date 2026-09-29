@@ -71,7 +71,51 @@ typedef struct mrhiFrameResource
     uint64_t size;
     uint32_t index1;
     uint32_t generation;
+    // Whether a pass declared so far writes it; imports count as written.
+    bool written;
+    // Whether a kept pass needs it, and the usages kept passes make of
+    // it, found by the compile.
+    bool needed;
+    uint32_t usage;
 } mrhiFrameResource;
+
+// The uses a pass makes of a resource beyond the access kinds.
+enum
+{
+    mrhiUseColorTarget = 16,
+    mrhiUseResolve = 17,
+    mrhiUseDepthTarget = 18,
+};
+
+// A use a pass makes of a resource: its slot in the frame, the access
+// kind or target use, whether it reads or writes what is there, and the
+// part of a texture it covers.
+typedef struct mrhiFrameUse
+{
+    uint32_t resource;
+    uint8_t use;
+    bool reads;
+    bool writes;
+    mrhiTextureAspect aspect;
+    uint32_t baseMip;
+    uint32_t mipCount;
+    uint32_t baseLayer;
+    uint32_t layerCount;
+} mrhiFrameUse;
+
+// A pass of the open frame: its class, its uses in the frame's use
+// table, its targets as declared, and whether the compile kept it.
+typedef struct mrhiFramePass
+{
+    mrhiPassClass passClass;
+    bool neverCull;
+    bool kept;
+    uint32_t firstUse;
+    uint32_t useCount;
+    mrhiColorTarget colorTargets[MRHI_COLOR_TARGETS];
+    uint32_t colorTargetCount;
+    mrhiDepthTarget depthTarget;
+} mrhiFramePass;
 
 // A surface as the device that configured it keeps it: the surface, the
 // driver's swapchain handle, and the configuration (without its chain).
@@ -116,9 +160,14 @@ struct mrhiDevice
     // the last token given, and the tokens of the frames the GPU has not
     // finished, at most framesInFlight.
     bool frameOpen;
+    bool frameCompiled;
     uint32_t frameSerial;
     mrhiFrameResource* frameResources;
     uint32_t frameResourceCount;
+    mrhiFramePass* framePasses;
+    uint32_t framePassCount;
+    mrhiFrameUse* frameUses;
+    uint32_t frameUseCount;
     uint32_t lastToken;
     uint32_t* running;
     uint32_t runningCount;
@@ -167,6 +216,24 @@ mrhiResult mrhiCheckBufferShape(mrhiDevice* device, const mrhiBufferDef* def);
 // Checks a texture def's usages, and that its format takes them and its
 // sample count on the device: success, or the refusal.
 mrhiResult mrhiCheckTextureUsage(mrhiDevice* device, const mrhiTextureDef* def);
+
+// Whether a format has an aspect; every format has mrhi_aspectAll.
+bool mrhiFormatHasAspect(mrhiFormat format, mrhiTextureAspect aspect);
+
+// A count, with MRHI_REMAINING resolved to what follows the base.
+uint32_t mrhiResolveCount(uint32_t count, uint32_t base, uint32_t total);
+
+// Whether a range of at least one fits in the total.
+bool mrhiIsRangeValid(uint32_t base, uint32_t count, uint32_t total);
+
+// Whether a frame resource is an imported device object.
+bool mrhiIsImported(const mrhiFrameResource* resource);
+
+// The usage bit of a texture or buffer a use needs.
+uint32_t mrhiUsageOf(const mrhiFrameResource* resource, uint8_t use);
+
+// Compiles the open frame: culls, derives usages and checks them.
+mrhiResult mrhiCompile(mrhiDevice* device);
 
 // Whether a format can take the usages on the device.
 bool mrhiFormatTakes(const mrhiDevice* device, mrhiFormat format, mrhiTextureUsage usage);

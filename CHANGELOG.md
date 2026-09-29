@@ -110,3 +110,13 @@ format.
   `mrhiImportBuffer` for device objects, one id per frame; frame-local
   `mrhiResourceId`s that end with their frame; the device's
   `frameResources` limit.
+- Passes and the compile: `mrhiAddPass` (`mrhiPassDef`: an execution
+  class, accesses of fixed kinds over texture ranges, color targets
+  with load, store, clear and resolve, a depth target, never-cull),
+  checked against each resource, the pass's class and WebGPU's usage
+  scopes, with declared resources written before they are read;
+  `mrhiCompileFrame` culls from the frame's outputs and checks declared
+  textures' derived usages, `mrhiIsPassKept` reports what was kept, and
+  submitting compiles a frame not yet compiled; classes, access kinds
+  and operations mapped onto the four APIs; the device's `framePasses`
+  and `frameAccesses` limits.

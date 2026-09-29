@@ -4870,6 +4870,16 @@
               "name": "frame_resources",
               "type": "uint32",
               "doc": "Resources one frame declares and imports; 1024 by default."
+            },
+            {
+              "name": "frame_passes",
+              "type": "uint32",
+              "doc": "Passes one frame declares; 256 by default."
+            },
+            {
+              "name": "frame_accesses",
+              "type": "uint32",
+              "doc": "Accesses and targets one frame's passes declare in all; 4096 by default."
             }
           ]
         },
@@ -8304,10 +8314,10 @@
         {
           "kind": "function",
           "name": "submit_frame",
-          "doc": "Submits the open frame to the GPU and closes it. Its token is answered by one mrhi_deviceFrameDone record.",
+          "doc": "Submits the open frame to the GPU, compiling it first if it is not, and closes it. Its token is answered by one mrhi_deviceFrameDone record.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` with the token; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's queue has no room for the answer, the frame staying open; `mrhi_errorPlatform` when the driver fails, the frame closing."
+            "doc": "`mrhi_success` with the token; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorState` for a device without an open frame; `mrhi_errorUnsupported` when compiling finds a declared texture its format cannot take, the frame staying open; `mrhi_errorCapacity` when the device's queue has no room for the answer, the frame staying open; `mrhi_errorPlatform` when the driver fails, the frame closing."
           },
           "args": [
             {
@@ -8514,6 +8524,808 @@
               "type": "id.resource_id",
               "pointer": "mutable",
               "doc": "Receives the frame's id for it."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "enum",
+          "name": "pass_class",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "Where a pass runs: a hint drivers without the queue ignore, running it on the graphics queue.",
+          "values": [
+            {
+              "name": "pass_graphics",
+              "value": 0,
+              "doc": "Rendering and compute on the main queue.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "a graphics queue"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "a direct command list"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a render or compute encoder"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "the queue"
+                }
+              }
+            },
+            {
+              "name": "pass_async_compute",
+              "value": 1,
+              "doc": "Compute beside the graphics work; no targets, vertices or indices.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "a compute-only queue family, where there is one"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "a compute queue"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a second command queue"
+                },
+                "web_gpu": {
+                  "class": "emulated",
+                  "note": "the queue, in order"
+                }
+              }
+            },
+            {
+              "name": "pass_transfer",
+              "value": 2,
+              "doc": "Copies only.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "a transfer-only queue family, where there is one"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "a copy queue"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a blit encoder"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "the queue's copies"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "access_kind",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "How a pass uses a resource.",
+          "values": [
+            {
+              "name": "access_sampled",
+              "value": 0,
+              "doc": "A texture sampled or read by shaders.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SHADER_SAMPLED_READ, SHADER_READ_ONLY_OPTIMAL"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SHADER_RESOURCE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a read resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "TEXTURE_BINDING"
+                }
+              }
+            },
+            {
+              "name": "access_uniform",
+              "value": 1,
+              "doc": "A buffer read as uniforms.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "UNIFORM_READ"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "CONSTANT_BUFFER"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a read resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "UNIFORM"
+                }
+              }
+            },
+            {
+              "name": "access_vertex",
+              "value": 2,
+              "doc": "A buffer read as vertices.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VERTEX_ATTRIBUTE_READ"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "VERTEX_BUFFER"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a vertex buffer"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "VERTEX"
+                }
+              }
+            },
+            {
+              "name": "access_index",
+              "value": 3,
+              "doc": "A buffer read as indices.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "INDEX_READ"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "INDEX_BUFFER"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "an index buffer"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "INDEX"
+                }
+              }
+            },
+            {
+              "name": "access_indirect",
+              "value": 4,
+              "doc": "A buffer read as indirect arguments.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "INDIRECT_COMMAND_READ"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "INDIRECT_ARGUMENT"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "an indirect buffer"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "INDIRECT"
+                }
+              }
+            },
+            {
+              "name": "access_storage_read",
+              "value": 5,
+              "doc": "Read as storage.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SHADER_STORAGE_READ"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SHADER_RESOURCE or a read UAV"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a read resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "read-only-storage"
+                }
+              }
+            },
+            {
+              "name": "access_storage_write",
+              "value": 6,
+              "doc": "Written as storage, without reading what was there.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SHADER_STORAGE_WRITE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "UNORDERED_ACCESS"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a written resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "STORAGE, write-only"
+                }
+              }
+            },
+            {
+              "name": "access_storage_read_write",
+              "value": 7,
+              "doc": "Read and written as storage.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SHADER_STORAGE_READ and WRITE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "UNORDERED_ACCESS"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a read and written resource"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "STORAGE, read-write"
+                }
+              }
+            },
+            {
+              "name": "access_copy_source",
+              "value": 8,
+              "doc": "Copied from.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRANSFER_READ, TRANSFER_SRC_OPTIMAL"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "COPY_SOURCE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a blit source"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "COPY_SRC"
+                }
+              }
+            },
+            {
+              "name": "access_copy_destination",
+              "value": 9,
+              "doc": "Copied to.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRANSFER_WRITE, TRANSFER_DST_OPTIMAL"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "COPY_DEST"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a blit destination"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "COPY_DST"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "load_op",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "What a target holds when its pass begins.",
+          "values": [
+            {
+              "name": "load_keep",
+              "value": 0,
+              "doc": "What earlier passes wrote.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "LOAD"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "PRESERVE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLLoadActionLoad"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "load"
+                }
+              }
+            },
+            {
+              "name": "load_clear",
+              "value": 1,
+              "doc": "The clear value.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "CLEAR"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "CLEAR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLLoadActionClear"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "clear"
+                }
+              }
+            },
+            {
+              "name": "load_discard",
+              "value": 2,
+              "doc": "Anything; the pass writes all of it.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "DONT_CARE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DISCARD"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLLoadActionDontCare"
+                },
+                "web_gpu": {
+                  "class": "emulated",
+                  "note": "clear, as WebGPU has no discard"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "store_op",
+          "width": "uint8",
+          "mapped": true,
+          "doc": "What a target keeps when its pass ends.",
+          "values": [
+            {
+              "name": "store_keep",
+              "value": 0,
+              "doc": "What the pass wrote.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "STORE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "PRESERVE"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLStoreActionStore"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "store"
+                }
+              }
+            },
+            {
+              "name": "store_discard",
+              "value": 1,
+              "doc": "Nothing; later passes do not read it.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "DONT_CARE"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "DISCARD"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLStoreActionDontCare"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "discard"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "texture_range",
+          "doc": "Mips, layers and an aspect of a texture.",
+          "members": [
+            {
+              "name": "base_mip",
+              "type": "uint32",
+              "doc": "The first mip."
+            },
+            {
+              "name": "mip_count",
+              "type": "uint32",
+              "doc": "The mips, at least 1, or MRHI_REMAINING."
+            },
+            {
+              "name": "base_layer",
+              "type": "uint32",
+              "doc": "The first layer; 0 on a 3D texture."
+            },
+            {
+              "name": "layer_count",
+              "type": "uint32",
+              "doc": "The layers, at least 1, or MRHI_REMAINING."
+            },
+            {
+              "name": "aspect",
+              "type": "enum.texture_aspect",
+              "doc": "The aspect."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "access",
+          "doc": "A resource a pass uses, and how.",
+          "members": [
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "A resource of the open frame."
+            },
+            {
+              "name": "kind",
+              "type": "enum.access_kind",
+              "doc": "How: sampled only for textures; uniform, vertex, index and indirect only for buffers."
+            },
+            {
+              "name": "range",
+              "type": "struct.texture_range",
+              "doc": "The texture's part it uses; buffers are used whole, and ignore it."
+            }
+          ]
+        },
+        {
+          "kind": "constant",
+          "name": "color_targets",
+          "value": 8,
+          "doc": "The color targets one pass writes at most."
+        },
+        {
+          "kind": "struct",
+          "name": "clear_color",
+          "doc": "A color target's clear value.",
+          "members": [
+            {
+              "name": "red",
+              "type": "float32"
+            },
+            {
+              "name": "green",
+              "type": "float32"
+            },
+            {
+              "name": "blue",
+              "type": "float32"
+            },
+            {
+              "name": "alpha",
+              "type": "float32"
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "color_target",
+          "doc": "A texture a pass renders colors to.",
+          "members": [
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "A texture of the open frame whose format renders."
+            },
+            {
+              "name": "mip",
+              "type": "uint32",
+              "doc": "The mip it renders to."
+            },
+            {
+              "name": "layer",
+              "type": "uint32",
+              "doc": "The layer, or the depth slice of a 3D texture."
+            },
+            {
+              "name": "load",
+              "type": "enum.load_op",
+              "doc": "What it holds when the pass begins."
+            },
+            {
+              "name": "store",
+              "type": "enum.store_op",
+              "doc": "What it keeps when the pass ends."
+            },
+            {
+              "name": "clear",
+              "type": "struct.clear_color",
+              "doc": "The clear value, for mrhi_loadClear."
+            },
+            {
+              "name": "resolve",
+              "type": "id.resource_id",
+              "doc": "A single-sampled texture of the same format and size the samples resolve to, or a null id."
+            },
+            {
+              "name": "resolve_mip",
+              "type": "uint32",
+              "doc": "The resolve texture's mip."
+            },
+            {
+              "name": "resolve_layer",
+              "type": "uint32",
+              "doc": "The resolve texture's layer."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "depth_target",
+          "doc": "A texture a pass tests and writes depth and stencil in.",
+          "members": [
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "A texture of the open frame with a depth format, or a null id for none."
+            },
+            {
+              "name": "mip",
+              "type": "uint32",
+              "doc": "The mip."
+            },
+            {
+              "name": "layer",
+              "type": "uint32",
+              "doc": "The layer."
+            },
+            {
+              "name": "depth_load",
+              "type": "enum.load_op",
+              "doc": "What its depth holds when the pass begins."
+            },
+            {
+              "name": "depth_store",
+              "type": "enum.store_op",
+              "doc": "What its depth keeps when the pass ends."
+            },
+            {
+              "name": "clear_depth",
+              "type": "float32",
+              "doc": "The depth clear value, from 0 to 1."
+            },
+            {
+              "name": "stencil_load",
+              "type": "enum.load_op",
+              "doc": "What its stencil holds, when the format has one."
+            },
+            {
+              "name": "stencil_store",
+              "type": "enum.store_op",
+              "doc": "What its stencil keeps, when the format has one."
+            },
+            {
+              "name": "clear_stencil",
+              "type": "uint32",
+              "doc": "The stencil clear value."
+            },
+            {
+              "name": "read_only",
+              "type": "bool",
+              "doc": "Tested but never written, so the pass may also sample it; its loads keep and its stores keep."
+            }
+          ]
+        },
+        {
+          "kind": "id",
+          "name": "pass_id",
+          "doc": "A pass of the open frame. It ends with the frame."
+        },
+        {
+          "kind": "struct",
+          "name": "pass_def",
+          "def": true,
+          "doc": "A pass: where it runs, and every resource it uses. Build it with mrhiDefaultPassDef.",
+          "members": [
+            {
+              "name": "label",
+              "type": "char",
+              "pointer": "const",
+              "doc": "A name for debugging tools, shown around the pass's work: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
+            },
+            {
+              "name": "label_length",
+              "type": "size",
+              "doc": "The label's bytes."
+            },
+            {
+              "name": "pass_class",
+              "type": "enum.pass_class",
+              "doc": "Where it runs."
+            },
+            {
+              "name": "never_cull",
+              "type": "bool",
+              "doc": "Kept even when nothing kept reads what it writes, for work seen outside the frame."
+            },
+            {
+              "name": "accesses",
+              "type": "struct.access",
+              "pointer": "const",
+              "doc": "The resources it uses besides its targets; NULL when accessCount is 0. Only read during the call."
+            },
+            {
+              "name": "access_count",
+              "type": "uint32",
+              "doc": "How many."
+            },
+            {
+              "name": "color_targets",
+              "type": "struct.color_target",
+              "array": "color_targets",
+              "doc": "Its color targets, colorTargetCount of them."
+            },
+            {
+              "name": "color_target_count",
+              "type": "uint32",
+              "doc": "How many, at most MRHI_COLOR_TARGETS."
+            },
+            {
+              "name": "depth_target",
+              "type": "struct.depth_target",
+              "doc": "Its depth target, if its resource is not null."
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_pass_def",
+          "doc": "Returns the default pass def: a graphics pass with no accesses or targets.",
+          "returns": {
+            "type": "struct.pass_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "add_pass",
+          "doc": "Declares a pass of the open frame, after the passes declared before it in its class.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an unknown class, kind, aspect or operation, an access or target its resource cannot take (a kind for the other resource type, a range outside the texture, a use an imported object was not made with, a target that does not render or depth-test), targets of different sizes or sample counts, a resolve that does not match, a subresource written and used otherwise in the pass, an access the class does not allow, or a declared resource read before any pass wrote it; `mrhi_errorStale` for a resource of another frame, or an imported object destroyed since; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorCapacity` when the device's framePasses or frameAccesses limit is reached."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "def",
+              "type": "struct.pass_def",
+              "pointer": "const",
+              "doc": "The pass."
+            },
+            {
+              "name": "pass_out",
+              "type": "id.pass_id",
+              "pointer": "mutable",
+              "doc": "Receives the pass."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "compile_frame",
+          "doc": "Compiles the open frame: culls the passes nothing kept needs, and checks each declared resource's derived usages against its format. After it, nothing more is declared; submitting compiles a frame not yet compiled.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, or a declared texture of several samples its kept passes use other than as a render target, or with storage; `mrhi_errorUnsupported` for a declared texture whose format cannot take the usages its kept passes make of it, the frame staying open; `mrhi_errorState` for a device without an open frame, or a frame already compiled."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "is_pass_kept",
+          "doc": "Reads whether the compiled frame keeps a pass; a culled pass is never recorded.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorStale` for a pass of another frame; `mrhi_errorState` for a frame not compiled."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass."
+            },
+            {
+              "name": "kept_out",
+              "type": "bool",
+              "pointer": "mutable",
+              "doc": "Receives whether it is kept."
             }
           ],
           "thread_safety": {
