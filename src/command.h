@@ -45,6 +45,13 @@ typedef enum mrhiCommandType
     mrhiCommandDrawIndexed,
     // a, b, c: the workgroups in x, y and z.
     mrhiCommandDispatch,
+    // b, c, d: the width (the bytes of a copy between buffers), height
+    // and depth or layers; the source's and destination's sides follow,
+    // an mrhiCommandBufferSide or mrhiCommandTextureSide each.
+    mrhiCommandCopyBuffer,
+    mrhiCommandCopyBufferToTexture,
+    mrhiCommandCopyTextureToBuffer,
+    mrhiCommandCopyTexture,
 } mrhiCommandType;
 
 typedef struct mrhiCommand
@@ -76,6 +83,30 @@ typedef struct mrhiCommandBinding
     uint16_t reserved;
 } mrhiCommandBinding;
 
+// A buffer's side of a copy as recorded: its frame resource's slot plus
+// one, its offset, and for a copy with a texture its layout.
+typedef struct mrhiCommandBufferSide
+{
+    uint32_t object;
+    uint32_t bytesPerRow;
+    uint64_t offset;
+    uint32_t rowsPerImage;
+    uint8_t reserved[12];
+} mrhiCommandBufferSide;
+
+// A texture's side of a copy as recorded: its frame resource's slot
+// plus one, its mip, origin and aspect.
+typedef struct mrhiCommandTextureSide
+{
+    uint32_t object;
+    uint32_t mip;
+    uint32_t x;
+    uint32_t y;
+    uint32_t z;
+    uint8_t aspect;
+    uint8_t reserved[11];
+} mrhiCommandTextureSide;
+
 // A chunk's bytes, and the records after its 32-byte header.
 #define MRHI_CHUNK_BYTES    4096
 #define MRHI_CHUNK_COMMANDS 127
@@ -92,6 +123,8 @@ typedef struct mrhiCommandChunk
 
 static_assert(sizeof(mrhiCommand) == 32, "a command is one record");
 static_assert(sizeof(mrhiCommandBinding) == 32, "a binding is one record");
+static_assert(sizeof(mrhiCommandBufferSide) == 32, "a side is one record");
+static_assert(sizeof(mrhiCommandTextureSide) == 32, "a side is one record");
 static_assert(sizeof(mrhiCommandChunk) == MRHI_CHUNK_BYTES, "a chunk is 4 KiB");
 
 #endif // MAUL_RHI_SRC_COMMAND_H

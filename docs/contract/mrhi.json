@@ -2006,6 +2006,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 4,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_rgba8_unorm_srgb",
               "target": {
                 "channels": 4,
@@ -2048,6 +2055,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 4,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_rgba8_unorm",
               "target": {
                 "channels": 4,
@@ -2090,6 +2104,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 4,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_bgra8_unorm_srgb",
               "target": {
                 "channels": 4,
@@ -2132,6 +2153,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 4,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_bgra8_unorm",
               "target": {
                 "channels": 4,
@@ -2174,6 +2202,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 1,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "target": {
                 "channels": 1,
                 "scalar": "float",
@@ -2215,6 +2250,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 2,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "target": {
                 "channels": 2,
                 "scalar": "float",
@@ -2256,6 +2298,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 2,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "target": {
                 "channels": 1,
                 "scalar": "float",
@@ -2297,6 +2346,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 4,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "target": {
                 "channels": 2,
                 "scalar": "float",
@@ -2338,6 +2394,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 8,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "target": {
                 "channels": 4,
                 "scalar": "float",
@@ -2379,6 +2442,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 4,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "target": {
                 "channels": 1,
                 "scalar": "float",
@@ -2420,6 +2490,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 8,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "target": {
                 "channels": 2,
                 "scalar": "float",
@@ -2461,6 +2538,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "target": {
                 "channels": 4,
                 "scalar": "float",
@@ -2502,6 +2586,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 4,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "target": {
                 "channels": 1,
                 "scalar": "uint",
@@ -2543,6 +2634,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 4,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "target": {
                 "channels": 1,
                 "scalar": "sint",
@@ -2584,6 +2682,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 4,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "target": {
                 "channels": 4,
                 "scalar": "float",
@@ -2625,6 +2730,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "color": {
+                  "bytes": 4,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "target": {
                 "channels": 3,
                 "scalar": "float",
@@ -2666,6 +2778,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "depth": {
+                  "bytes": 4,
+                  "source": true,
+                  "destination": false
+                }
+              },
               "aspects": [
                 "depth"
               ]
@@ -2704,6 +2823,13 @@
                 1,
                 1
               ],
+              "copy": {
+                "stencil": {
+                  "bytes": 1,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "aspects": [
                 "depth",
                 "stencil"
@@ -2744,6 +2870,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 8,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_bc1_rgba_unorm_srgb"
             },
             {
@@ -2781,6 +2914,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 8,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_bc1_rgba_unorm"
             },
             {
@@ -2818,6 +2958,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_bc2_rgba_unorm_srgb"
             },
             {
@@ -2855,6 +3002,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_bc2_rgba_unorm"
             },
             {
@@ -2892,6 +3046,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_bc3_rgba_unorm_srgb"
             },
             {
@@ -2929,6 +3090,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_bc3_rgba_unorm"
             },
             {
@@ -2965,7 +3133,14 @@
               "block": [
                 4,
                 4
-              ]
+              ],
+              "copy": {
+                "color": {
+                  "bytes": 8,
+                  "source": true,
+                  "destination": true
+                }
+              }
             },
             {
               "name": "format_bc4_r_snorm",
@@ -3001,7 +3176,14 @@
               "block": [
                 4,
                 4
-              ]
+              ],
+              "copy": {
+                "color": {
+                  "bytes": 8,
+                  "source": true,
+                  "destination": true
+                }
+              }
             },
             {
               "name": "format_bc5_rg_unorm",
@@ -3037,7 +3219,14 @@
               "block": [
                 4,
                 4
-              ]
+              ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              }
             },
             {
               "name": "format_bc5_rg_snorm",
@@ -3073,7 +3262,14 @@
               "block": [
                 4,
                 4
-              ]
+              ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              }
             },
             {
               "name": "format_bc6h_rgb_ufloat",
@@ -3109,7 +3305,14 @@
               "block": [
                 4,
                 4
-              ]
+              ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              }
             },
             {
               "name": "format_bc6h_rgb_float",
@@ -3145,7 +3348,14 @@
               "block": [
                 4,
                 4
-              ]
+              ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              }
             },
             {
               "name": "format_bc7_rgba_unorm",
@@ -3182,6 +3392,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_bc7_rgba_unorm_srgb"
             },
             {
@@ -3219,6 +3436,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_bc7_rgba_unorm"
             },
             {
@@ -3256,6 +3480,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 8,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_etc2_rgb8_unorm_srgb"
             },
             {
@@ -3293,6 +3524,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 8,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_etc2_rgb8_unorm"
             },
             {
@@ -3330,6 +3568,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 8,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_etc2_rgb8a1_unorm_srgb"
             },
             {
@@ -3367,6 +3612,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 8,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_etc2_rgb8a1_unorm"
             },
             {
@@ -3404,6 +3656,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_etc2_rgba8_unorm_srgb"
             },
             {
@@ -3441,6 +3700,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_etc2_rgba8_unorm"
             },
             {
@@ -3477,7 +3743,14 @@
               "block": [
                 4,
                 4
-              ]
+              ],
+              "copy": {
+                "color": {
+                  "bytes": 8,
+                  "source": true,
+                  "destination": true
+                }
+              }
             },
             {
               "name": "format_eac_r11_snorm",
@@ -3513,7 +3786,14 @@
               "block": [
                 4,
                 4
-              ]
+              ],
+              "copy": {
+                "color": {
+                  "bytes": 8,
+                  "source": true,
+                  "destination": true
+                }
+              }
             },
             {
               "name": "format_eac_rg11_unorm",
@@ -3549,7 +3829,14 @@
               "block": [
                 4,
                 4
-              ]
+              ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              }
             },
             {
               "name": "format_eac_rg11_snorm",
@@ -3585,7 +3872,14 @@
               "block": [
                 4,
                 4
-              ]
+              ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              }
             },
             {
               "name": "format_astc_4x4_unorm",
@@ -3622,6 +3916,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_4x4_unorm_srgb"
             },
             {
@@ -3659,6 +3960,13 @@
                 4,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_4x4_unorm"
             },
             {
@@ -3696,6 +4004,13 @@
                 5,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_5x4_unorm_srgb"
             },
             {
@@ -3733,6 +4048,13 @@
                 5,
                 4
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_5x4_unorm"
             },
             {
@@ -3770,6 +4092,13 @@
                 5,
                 5
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_5x5_unorm_srgb"
             },
             {
@@ -3807,6 +4136,13 @@
                 5,
                 5
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_5x5_unorm"
             },
             {
@@ -3844,6 +4180,13 @@
                 6,
                 5
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_6x5_unorm_srgb"
             },
             {
@@ -3881,6 +4224,13 @@
                 6,
                 5
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_6x5_unorm"
             },
             {
@@ -3918,6 +4268,13 @@
                 6,
                 6
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_6x6_unorm_srgb"
             },
             {
@@ -3955,6 +4312,13 @@
                 6,
                 6
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_6x6_unorm"
             },
             {
@@ -3992,6 +4356,13 @@
                 8,
                 5
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_8x5_unorm_srgb"
             },
             {
@@ -4029,6 +4400,13 @@
                 8,
                 5
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_8x5_unorm"
             },
             {
@@ -4066,6 +4444,13 @@
                 8,
                 6
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_8x6_unorm_srgb"
             },
             {
@@ -4103,6 +4488,13 @@
                 8,
                 6
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_8x6_unorm"
             },
             {
@@ -4140,6 +4532,13 @@
                 8,
                 8
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_8x8_unorm_srgb"
             },
             {
@@ -4177,6 +4576,13 @@
                 8,
                 8
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_8x8_unorm"
             },
             {
@@ -4214,6 +4620,13 @@
                 10,
                 5
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_10x5_unorm_srgb"
             },
             {
@@ -4251,6 +4664,13 @@
                 10,
                 5
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_10x5_unorm"
             },
             {
@@ -4288,6 +4708,13 @@
                 10,
                 6
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_10x6_unorm_srgb"
             },
             {
@@ -4325,6 +4752,13 @@
                 10,
                 6
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_10x6_unorm"
             },
             {
@@ -4362,6 +4796,13 @@
                 10,
                 8
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_10x8_unorm_srgb"
             },
             {
@@ -4399,6 +4840,13 @@
                 10,
                 8
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_10x8_unorm"
             },
             {
@@ -4436,6 +4884,13 @@
                 10,
                 10
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_10x10_unorm_srgb"
             },
             {
@@ -4473,6 +4928,13 @@
                 10,
                 10
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_10x10_unorm"
             },
             {
@@ -4510,6 +4972,13 @@
                 12,
                 10
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_12x10_unorm_srgb"
             },
             {
@@ -4547,6 +5016,13 @@
                 12,
                 10
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_12x10_unorm"
             },
             {
@@ -4584,6 +5060,13 @@
                 12,
                 12
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_12x12_unorm_srgb"
             },
             {
@@ -4621,6 +5104,13 @@
                 12,
                 12
               ],
+              "copy": {
+                "color": {
+                  "bytes": 16,
+                  "source": true,
+                  "destination": true
+                }
+              },
               "srgb_pair": "format_astc_12x12_unorm"
             }
           ]
@@ -14328,6 +14818,92 @@
           ]
         },
         {
+          "kind": "struct",
+          "name": "extent3d",
+          "doc": "The size of a copy in texels, or in bytes along x for a buffer's rows.",
+          "members": [
+            {
+              "name": "width",
+              "type": "uint32",
+              "doc": "Texels across, a multiple of the format's block width."
+            },
+            {
+              "name": "height",
+              "type": "uint32",
+              "doc": "Texels down, a multiple of the format's block height."
+            },
+            {
+              "name": "depth_or_layers",
+              "type": "uint32",
+              "doc": "The depth of a 3D texture, or the layers of any other."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "buffer_copy",
+          "doc": "The buffer side of a copy with a texture: where its texels start and how they are laid out.",
+          "members": [
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "A buffer of the open frame."
+            },
+            {
+              "name": "offset",
+              "type": "uint64",
+              "doc": "The first texel block's byte, a multiple of the block's bytes, or of 4 for a depth or stencil aspect."
+            },
+            {
+              "name": "bytes_per_row",
+              "type": "uint32",
+              "doc": "The bytes from one row of blocks to the next, a multiple of 256 and at least a row's bytes; 0 when the copy has one row and one layer."
+            },
+            {
+              "name": "rows_per_image",
+              "type": "uint32",
+              "doc": "The rows of blocks from one layer to the next, at least the copy's rows; 0 when the copy has one layer."
+            }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "texture_copy",
+          "doc": "The texture side of a copy: a mip, the origin within it, and the aspect.",
+          "members": [
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "A texture of the open frame."
+            },
+            {
+              "name": "mip",
+              "type": "uint32",
+              "doc": "The mip."
+            },
+            {
+              "name": "x",
+              "type": "uint32",
+              "doc": "The origin across, a multiple of the format's block width."
+            },
+            {
+              "name": "y",
+              "type": "uint32",
+              "doc": "The origin down, a multiple of the format's block height."
+            },
+            {
+              "name": "z",
+              "type": "uint32",
+              "doc": "The first depth slice of a 3D texture, or the first layer of any other."
+            },
+            {
+              "name": "aspect",
+              "type": "enum.texture_aspect",
+              "doc": "The aspect: all of a color format; one of a depth format for a copy with a buffer, all of it for a copy between textures."
+            }
+          ]
+        },
+        {
           "kind": "function",
           "name": "begin_pass",
           "doc": "Begins recording a kept pass of the compiled open frame. It records until mrhiEndPass; a kept pass never begun records nothing.",
@@ -14706,6 +15282,189 @@
               "name": "z",
               "type": "uint32",
               "doc": "Workgroups in z."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "copy_buffer",
+          "doc": "Copies bytes from one buffer of the frame to another.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass with targets, offsets or a size not a multiple of 4, a range past either buffer, or one buffer as both, or a resource the pass declares no covering copy source or destination access of; `mrhi_errorStale` for a pass of another frame or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, without targets."
+            },
+            {
+              "name": "source",
+              "type": "id.resource_id",
+              "doc": "The buffer copied from."
+            },
+            {
+              "name": "source_offset",
+              "type": "uint64",
+              "doc": "Its first byte, a multiple of 4."
+            },
+            {
+              "name": "destination",
+              "type": "id.resource_id",
+              "doc": "The buffer copied to, another one."
+            },
+            {
+              "name": "destination_offset",
+              "type": "uint64",
+              "doc": "Its first byte, a multiple of 4."
+            },
+            {
+              "name": "size",
+              "type": "uint64",
+              "doc": "The bytes, a multiple of 4."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "copy_buffer_to_texture",
+          "doc": "Copies texels from a buffer of the frame into a texture's mip.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass with targets, a layout that is not aligned, is not given where needed, or does not fit the buffer, a region off the texture's blocks or past its mip, a multisampled texture, or an aspect that cannot be copied to, or a resource the pass declares no covering copy source or destination access of; `mrhi_errorStale` for a pass of another frame or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, without targets."
+            },
+            {
+              "name": "source",
+              "type": "struct.buffer_copy",
+              "pointer": "const",
+              "doc": "The buffer and its layout. Only read during the call."
+            },
+            {
+              "name": "destination",
+              "type": "struct.texture_copy",
+              "pointer": "const",
+              "doc": "The texture, mip, origin and aspect. Only read during the call."
+            },
+            {
+              "name": "size",
+              "type": "struct.extent3d",
+              "pointer": "const",
+              "doc": "The texels. Only read during the call."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "copy_texture_to_buffer",
+          "doc": "Copies texels from a texture's mip into a buffer of the frame.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass with targets, a layout that is not aligned, is not given where needed, or does not fit the buffer, a region off the texture's blocks or past its mip, a multisampled texture, or an aspect that cannot be copied from, or a resource the pass declares no covering copy source or destination access of; `mrhi_errorStale` for a pass of another frame or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, without targets."
+            },
+            {
+              "name": "source",
+              "type": "struct.texture_copy",
+              "pointer": "const",
+              "doc": "The texture, mip, origin and aspect. Only read during the call."
+            },
+            {
+              "name": "destination",
+              "type": "struct.buffer_copy",
+              "pointer": "const",
+              "doc": "The buffer and its layout. Only read during the call."
+            },
+            {
+              "name": "size",
+              "type": "struct.extent3d",
+              "pointer": "const",
+              "doc": "The texels. Only read during the call."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "copy_texture",
+          "doc": "Copies texels between textures of the frame, or between parts of one.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass with targets, formats that are not copy-compatible, other sample counts, a region off either texture's blocks or past its mip, a depth format or multisampled texture copied in part or by one aspect, or overlapping parts of one texture, or a resource the pass declares no covering copy source or destination access of; `mrhi_errorStale` for a pass of another frame or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, without targets."
+            },
+            {
+              "name": "source",
+              "type": "struct.texture_copy",
+              "pointer": "const",
+              "doc": "The texture copied from. Only read during the call."
+            },
+            {
+              "name": "destination",
+              "type": "struct.texture_copy",
+              "pointer": "const",
+              "doc": "The texture copied to. Only read during the call."
+            },
+            {
+              "name": "size",
+              "type": "struct.extent3d",
+              "pointer": "const",
+              "doc": "The texels. Only read during the call."
             }
           ],
           "thread_safety": {

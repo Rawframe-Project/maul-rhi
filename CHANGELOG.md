@@ -186,3 +186,8 @@ format.
   `mrhiDraw`, `mrhiDrawIndexed` and `mrhiDispatch`, refused unless the
   pass's pipeline, the tables it reads and vertex and index buffers
   large enough for the elements drawn are set, as WebGPU refuses them.
+- Copies: `mrhiCopyBuffer`, `mrhiCopyBufferToTexture`,
+  `mrhiCopyTextureToBuffer` and `mrhiCopyTexture` (`mrhiBufferCopy`,
+  `mrhiTextureCopy`, `mrhiExtent3d`), checked as WebGPU checks them and
+  against the pass's copy accesses; formats carry their texel copy
+  footprint and copy directions per aspect in the contract.

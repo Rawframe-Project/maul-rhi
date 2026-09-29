@@ -32,6 +32,7 @@ encoder: encoder_core invariant label
 encoder_core: device_core
 binding: capabilities_core encoder_core
 draw: encoder_core
+copy: capabilities_core encoder_core
 cache: bytes device_core sha256
 bytes:
 container: bytes capabilities_core label sha256

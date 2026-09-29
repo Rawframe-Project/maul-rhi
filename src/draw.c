@@ -23,12 +23,7 @@ static uint32_t DeclaredRange(const mrhiDevice* device, const mrhiFramePass* pas
         return 0;
     }
     // Only a buffer is declared with the vertex or index access.
-    bool declared = false;
-    for (uint32_t i = pass->firstUse; i < pass->firstUse + pass->useCount; ++i)
-    {
-        const mrhiFrameUse* use = &device->frameUses[i];
-        declared = declared || (use->resource == object && use->use == kind);
-    }
+    bool declared = mrhiPassDeclares(device, pass, object, MRHI_KIND(kind), nullptr);
     uint64_t total = declared ? mrhiBufferBytesOf(device, &device->frameResources[object - 1]) : 0;
     if (!declared || offset > total)
     {

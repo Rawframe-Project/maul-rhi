@@ -85,6 +85,53 @@ extern "C"
         mrhiSamplerId sampler;
     } mrhiBinding;
 
+    // The size of a copy in texels, or in bytes along x for a buffer's rows.
+    typedef struct mrhiExtent3d
+    {
+        // Texels across, a multiple of the format's block width.
+        uint32_t width;
+        // Texels down, a multiple of the format's block height.
+        uint32_t height;
+        // The depth of a 3D texture, or the layers of any other.
+        uint32_t depthOrLayers;
+    } mrhiExtent3d;
+
+    // The buffer side of a copy with a texture: where its texels start and how
+    // they are laid out.
+    typedef struct mrhiBufferCopy
+    {
+        // A buffer of the open frame.
+        mrhiResourceId resource;
+        // The first texel block's byte, a multiple of the block's bytes, or of
+        // 4 for a depth or stencil aspect.
+        uint64_t offset;
+        // The bytes from one row of blocks to the next, a multiple of 256 and
+        // at least a row's bytes; 0 when the copy has one row and one layer.
+        uint32_t bytesPerRow;
+        // The rows of blocks from one layer to the next, at least the copy's
+        // rows; 0 when the copy has one layer.
+        uint32_t rowsPerImage;
+    } mrhiBufferCopy;
+
+    // The texture side of a copy: a mip, the origin within it, and the aspect.
+    typedef struct mrhiTextureCopy
+    {
+        // A texture of the open frame.
+        mrhiResourceId resource;
+        // The mip.
+        uint32_t mip;
+        // The origin across, a multiple of the format's block width.
+        uint32_t x;
+        // The origin down, a multiple of the format's block height.
+        uint32_t y;
+        // The first depth slice of a 3D texture, or the first layer of any
+        // other.
+        uint32_t z;
+        // The aspect: all of a color format; one of a depth format for a copy
+        // with a buffer, all of it for a copy between textures.
+        mrhiTextureAspect aspect;
+    } mrhiTextureCopy;
+
     /// Begins recording a kept pass of the compiled open frame. It records
     /// until mrhiEndPass; a kept pass never begun records nothing.
     ///
@@ -280,6 +327,100 @@ extern "C"
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDispatch(mrhiDevice* device, mrhiPassId pass, uint32_t x,
                                                     uint32_t y, uint32_t z);
+
+    /// Copies bytes from one buffer of the frame to another.
+    ///
+    /// @param device             The device.
+    /// @param pass               The pass, recording, without targets.
+    /// @param source             The buffer copied from.
+    /// @param sourceOffset       Its first byte, a multiple of 4.
+    /// @param destination        The buffer copied to, another one.
+    /// @param destinationOffset  Its first byte, a multiple of 4.
+    /// @param size               The bytes, a multiple of 4.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass
+    /// with targets, offsets or a size not a multiple of 4, a range past either
+    /// buffer, or one buffer as both, or a resource the pass declares no
+    /// covering copy source or destination access of; `mrhi_errorStale` for a
+    /// pass of another frame or a resource that is not live; `mrhi_errorState`
+    /// for a pass that is not recording; `mrhi_errorCapacity` when the frame's
+    /// commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiCopyBuffer(mrhiDevice* device, mrhiPassId pass,
+                                                      mrhiResourceId source, uint64_t sourceOffset,
+                                                      mrhiResourceId destination,
+                                                      uint64_t destinationOffset, uint64_t size);
+
+    /// Copies texels from a buffer of the frame into a texture's mip.
+    ///
+    /// @param device       The device.
+    /// @param pass         The pass, recording, without targets.
+    /// @param source       The buffer and its layout. Only read during the
+    ///                     call.
+    /// @param destination  The texture, mip, origin and aspect. Only read
+    ///                     during the call.
+    /// @param size         The texels. Only read during the call.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass
+    /// with targets, a layout that is not aligned, is not given where needed,
+    /// or does not fit the buffer, a region off the texture's blocks or past
+    /// its mip, a multisampled texture, or an aspect that cannot be copied to,
+    /// or a resource the pass declares no covering copy source or destination
+    /// access of; `mrhi_errorStale` for a pass of another frame or a resource
+    /// that is not live; `mrhi_errorState` for a pass that is not recording;
+    /// `mrhi_errorCapacity` when the frame's commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiCopyBufferToTexture(mrhiDevice* device, mrhiPassId pass,
+                                                               const mrhiBufferCopy* source,
+                                                               const mrhiTextureCopy* destination,
+                                                               const mrhiExtent3d* size);
+
+    /// Copies texels from a texture's mip into a buffer of the frame.
+    ///
+    /// @param device       The device.
+    /// @param pass         The pass, recording, without targets.
+    /// @param source       The texture, mip, origin and aspect. Only read
+    ///                     during the call.
+    /// @param destination  The buffer and its layout. Only read during the
+    ///                     call.
+    /// @param size         The texels. Only read during the call.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass
+    /// with targets, a layout that is not aligned, is not given where needed,
+    /// or does not fit the buffer, a region off the texture's blocks or past
+    /// its mip, a multisampled texture, or an aspect that cannot be copied
+    /// from, or a resource the pass declares no covering copy source or
+    /// destination access of; `mrhi_errorStale` for a pass of another frame or
+    /// a resource that is not live; `mrhi_errorState` for a pass that is not
+    /// recording; `mrhi_errorCapacity` when the frame's commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiCopyTextureToBuffer(mrhiDevice* device, mrhiPassId pass,
+                                                               const mrhiTextureCopy* source,
+                                                               const mrhiBufferCopy* destination,
+                                                               const mrhiExtent3d* size);
+
+    /// Copies texels between textures of the frame, or between parts of one.
+    ///
+    /// @param device       The device.
+    /// @param pass         The pass, recording, without targets.
+    /// @param source       The texture copied from. Only read during the call.
+    /// @param destination  The texture copied to. Only read during the call.
+    /// @param size         The texels. Only read during the call.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass
+    /// with targets, formats that are not copy-compatible, other sample counts,
+    /// a region off either texture's blocks or past its mip, a depth format or
+    /// multisampled texture copied in part or by one aspect, or overlapping
+    /// parts of one texture, or a resource the pass declares no covering copy
+    /// source or destination access of; `mrhi_errorStale` for a pass of another
+    /// frame or a resource that is not live; `mrhi_errorState` for a pass that
+    /// is not recording; `mrhi_errorCapacity` when the frame's commands are
+    /// full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiCopyTexture(mrhiDevice* device, mrhiPassId pass,
+                                                       const mrhiTextureCopy* source,
+                                                       const mrhiTextureCopy* destination,
+                                                       const mrhiExtent3d* size);
 
     /// Writes bytes of the root block later draws or dispatches read.
     ///

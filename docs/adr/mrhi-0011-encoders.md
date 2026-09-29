@@ -62,6 +62,16 @@ them at submission.
   counts within `workgroupsPerDimension`. Something not set is a state
   refusal, something too small invalid. The root block is not tracked:
   each pass starts with it zeroed, which the driver ensures.
+- **Copies** (`mrhiCopyBuffer`, `mrhiCopyBufferToTexture`,
+  `mrhiCopyTextureToBuffer`, `mrhiCopyTexture`) are recorded in passes
+  without targets and checked as WebGPU checks them: aligned offsets
+  and sizes, buffer layouts that are given where needed and fit, regions
+  in whole blocks within a mip's physical size, only the depth and
+  stencil aspects WebGPU copies, depth formats and multisampled textures
+  copied whole, and copy-compatible formats between textures. Formats
+  carry their copy facts in the contract. The pass must declare a copy
+  source access covering what is read and a copy destination access
+  covering what is written, so one part is never both.
 - **Debug groups** balance by the pass's end. A push or pop refused for
   capacity still counts, so a pass that found the arena full still
   ends.

@@ -168,6 +168,8 @@ def check_values(errors, where, item):
         if "floor" in value and not (isinstance(value.get("block"), list) and
                                      len(value["block"]) == 2):
             errors.append(f"{where}: '{value.get('name')}' needs a block of two sizes")
+        if "floor" in value and not is_copy(value.get("copy")):
+            errors.append(f"{where}: '{value.get('name')}' needs copy facts per aspect")
         if not set(value.get("aspects", [])) <= {"depth", "stencil"}:
             errors.append(f"{where}: '{value.get('name')}' has aspects other than depth and stencil")
         target = value.get("target")
@@ -186,6 +188,16 @@ def check_values(errors, where, item):
         pair = value.get("srgb_pair")
         if pair is not None and pair not in {other["name"] for other in item["values"]}:
             errors.append(f"{where}: '{value.get('name')}' pairs with an unknown format")
+
+
+def is_copy(copy):
+    """Whether a format's copy facts are well formed: per aspect (color,
+    depth or stencil) the bytes of a block and the directions it copies."""
+    return isinstance(copy, dict) and set(copy) <= {"color", "depth", "stencil"} and all(
+        isinstance(facts, dict) and set(facts) == {"bytes", "source", "destination"}
+        and isinstance(facts["bytes"], int) and 0 < facts["bytes"] <= 16
+        and isinstance(facts["source"], bool) and isinstance(facts["destination"], bool)
+        for facts in copy.values())
 
 
 def check_constant(errors, where, item):
@@ -636,6 +648,19 @@ def format_checks(contract):
             lines += [f"    case {names.value(value['name'])}:",
                       f"        return (mrhiFormatBlock){{{value['block'][0]}, {value['block'][1]}}};"]
     lines += ["    default:", "        return (mrhiFormatBlock){1, 1};", "    }", "}"]
+    aspects = {"color": "mrhi_aspectAll", "depth": "mrhi_aspectDepthOnly",
+               "stencil": "mrhi_aspectStencilOnly"}
+    lines += ["", "mrhiFormatCopy mrhiGetFormatCopy(mrhiFormat format, mrhiTextureAspect aspect)",
+              "{", "    switch (format)", "    {"]
+    for value in listed:
+        lines += [f"    case {names.value(value['name'])}:"]
+        for aspect, facts in value["copy"].items():
+            lines += [f"        if (aspect == {aspects[aspect]})", "        {",
+                      f"            return (mrhiFormatCopy){{{facts['bytes']}, "
+                      f"{str(facts['source']).lower()}, {str(facts['destination']).lower()}}};",
+                      "        }"]
+        lines += ["        break;"]
+    lines += ["    default:", "        break;", "    }", "    return (mrhiFormatCopy){0};", "}"]
     lines += ["", "mrhiFormat mrhiFormatSrgbPair(mrhiFormat format)", "{", "    switch (format)",
               "    {"]
     for value in listed:

@@ -42,6 +42,29 @@ static mrhiFramePass* Find(mrhiDevice* device, mrhiPassId id, mrhiResult* status
     return &device->framePasses[id.index1 - 1];
 }
 
+bool mrhiPassDeclares(const mrhiDevice* device, const mrhiFramePass* pass, uint32_t object,
+                      uint32_t kinds, const mrhiFrameUse* part)
+{
+    for (uint32_t i = pass->firstUse; i < pass->firstUse + pass->useCount; ++i)
+    {
+        const mrhiFrameUse* use = &device->frameUses[i];
+        if (use->resource != object || (kinds & MRHI_KIND(use->use)) == 0)
+        {
+            continue;
+        }
+        if (part == nullptr ||
+            ((use->planes & part->planes) == part->planes && use->baseMip <= part->baseMip &&
+             (uint64_t)part->baseMip + part->mipCount <= (uint64_t)use->baseMip + use->mipCount &&
+             use->baseLayer <= part->baseLayer &&
+             (uint64_t)part->baseLayer + part->layerCount <=
+                 (uint64_t)use->baseLayer + use->layerCount))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 uint64_t mrhiBufferBytesOf(const mrhiDevice* device, const mrhiFrameResource* resource)
 {
     return resource->kind == mrhiFrameBuffer ? resource->size

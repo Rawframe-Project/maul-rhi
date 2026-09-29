@@ -622,6 +622,436 @@ mrhiFormatBlock mrhiGetFormatBlock(mrhiFormat format)
     }
 }
 
+mrhiFormatCopy mrhiGetFormatCopy(mrhiFormat format, mrhiTextureAspect aspect)
+{
+    switch (format)
+    {
+    case mrhi_formatRgba8Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){4, true, true};
+        }
+        break;
+    case mrhi_formatRgba8UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){4, true, true};
+        }
+        break;
+    case mrhi_formatBgra8Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){4, true, true};
+        }
+        break;
+    case mrhi_formatBgra8UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){4, true, true};
+        }
+        break;
+    case mrhi_formatR8Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){1, true, true};
+        }
+        break;
+    case mrhi_formatRg8Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){2, true, true};
+        }
+        break;
+    case mrhi_formatR16Float:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){2, true, true};
+        }
+        break;
+    case mrhi_formatRg16Float:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){4, true, true};
+        }
+        break;
+    case mrhi_formatRgba16Float:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){8, true, true};
+        }
+        break;
+    case mrhi_formatR32Float:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){4, true, true};
+        }
+        break;
+    case mrhi_formatRg32Float:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){8, true, true};
+        }
+        break;
+    case mrhi_formatRgba32Float:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatR32Uint:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){4, true, true};
+        }
+        break;
+    case mrhi_formatR32Sint:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){4, true, true};
+        }
+        break;
+    case mrhi_formatRgb10a2Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){4, true, true};
+        }
+        break;
+    case mrhi_formatRg11b10Ufloat:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){4, true, true};
+        }
+        break;
+    case mrhi_formatDepth32Float:
+        if (aspect == mrhi_aspectDepthOnly)
+        {
+            return (mrhiFormatCopy){4, true, false};
+        }
+        break;
+    case mrhi_formatDepthStencil:
+        if (aspect == mrhi_aspectStencilOnly)
+        {
+            return (mrhiFormatCopy){1, true, true};
+        }
+        break;
+    case mrhi_formatBc1RgbaUnorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){8, true, true};
+        }
+        break;
+    case mrhi_formatBc1RgbaUnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){8, true, true};
+        }
+        break;
+    case mrhi_formatBc2RgbaUnorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatBc2RgbaUnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatBc3RgbaUnorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatBc3RgbaUnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatBc4RUnorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){8, true, true};
+        }
+        break;
+    case mrhi_formatBc4RSnorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){8, true, true};
+        }
+        break;
+    case mrhi_formatBc5RgUnorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatBc5RgSnorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatBc6hRgbUfloat:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatBc6hRgbFloat:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatBc7RgbaUnorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatBc7RgbaUnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatEtc2Rgb8Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){8, true, true};
+        }
+        break;
+    case mrhi_formatEtc2Rgb8UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){8, true, true};
+        }
+        break;
+    case mrhi_formatEtc2Rgb8a1Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){8, true, true};
+        }
+        break;
+    case mrhi_formatEtc2Rgb8a1UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){8, true, true};
+        }
+        break;
+    case mrhi_formatEtc2Rgba8Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatEtc2Rgba8UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatEacR11Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){8, true, true};
+        }
+        break;
+    case mrhi_formatEacR11Snorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){8, true, true};
+        }
+        break;
+    case mrhi_formatEacRg11Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatEacRg11Snorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc4x4Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc4x4UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc5x4Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc5x4UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc5x5Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc5x5UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc6x5Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc6x5UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc6x6Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc6x6UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc8x5Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc8x5UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc8x6Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc8x6UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc8x8Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc8x8UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc10x5Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc10x5UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc10x6Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc10x6UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc10x8Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc10x8UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc10x10Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc10x10UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc12x10Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc12x10UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc12x12Unorm:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    case mrhi_formatAstc12x12UnormSrgb:
+        if (aspect == mrhi_aspectAll)
+        {
+            return (mrhiFormatCopy){16, true, true};
+        }
+        break;
+    default:
+        break;
+    }
+    return (mrhiFormatCopy){0};
+}
+
 mrhiFormat mrhiFormatSrgbPair(mrhiFormat format)
 {
     switch (format)

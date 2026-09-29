@@ -13,9 +13,6 @@
 
 static_assert(1 + MRHI_TABLE_BINDINGS <= MRHI_CHUNK_COMMANDS, "a whole table fits a chunk");
 
-// The access kinds as bits, for the kinds a binding may be declared as.
-#define KIND(kind) (1u << (kind))
-
 // The reflection of the pass's pipeline: or NULL with the refusal.
 static const mrhiReflection* ReflectionOf(const mrhiDevice* device, const mrhiFramePass* pass,
                                           mrhiResult* statusOut)
@@ -72,54 +69,29 @@ static const mrhiShaderBinding* SlotOf(const mrhiReflection* reflection, uint32_
 // also takes a write access.
 static uint32_t KindsOf(const mrhiShaderBinding* binding)
 {
-    uint32_t readWrite = KIND(mrhi_accessStorageReadWrite);
+    uint32_t readWrite = MRHI_KIND(mrhi_accessStorageReadWrite);
     switch (binding->kind)
     {
     case mrhi_bindingUniformBuffer:
-        return KIND(mrhi_accessUniform);
+        return MRHI_KIND(mrhi_accessUniform);
     case mrhi_bindingStorageBuffer:
-        return KIND(mrhi_accessStorageWrite) | readWrite;
+        return MRHI_KIND(mrhi_accessStorageWrite) | readWrite;
     case mrhi_bindingReadOnlyStorageBuffer:
-        return KIND(mrhi_accessStorageRead) | readWrite;
+        return MRHI_KIND(mrhi_accessStorageRead) | readWrite;
     case mrhi_bindingSampledTexture:
-        return KIND(mrhi_accessSampled);
+        return MRHI_KIND(mrhi_accessSampled);
     default:
         break;
     }
     switch (binding->access)
     {
     case mrhi_storageReadOnly:
-        return KIND(mrhi_accessStorageRead) | readWrite;
+        return MRHI_KIND(mrhi_accessStorageRead) | readWrite;
     case mrhi_storageWriteOnly:
-        return KIND(mrhi_accessStorageWrite) | readWrite;
+        return MRHI_KIND(mrhi_accessStorageWrite) | readWrite;
     default:
         return readWrite;
     }
-}
-
-// Whether the pass declares a use of the resource, of one of the kinds,
-// covering the recorded view's planes, mips and layers; any use of a
-// buffer covers it. Target uses are of no access kind.
-static bool IsDeclared(const mrhiDevice* device, const mrhiFramePass* pass, uint32_t kinds,
-                       const mrhiCommandBinding* recorded, uint8_t planes, bool buffer)
-{
-    for (uint32_t i = pass->firstUse; i < pass->firstUse + pass->useCount; ++i)
-    {
-        const mrhiFrameUse* use = &device->frameUses[i];
-        if (use->resource != recorded->object || (kinds & KIND(use->use)) == 0)
-        {
-            continue;
-        }
-        if (buffer ||
-            ((use->planes & planes) == planes && use->baseMip <= recorded->baseMip &&
-             recorded->baseMip + recorded->mipCount <= use->baseMip + use->mipCount &&
-             use->baseLayer <= recorded->offset &&
-             recorded->offset + recorded->size <= (uint64_t)use->baseLayer + use->layerCount))
-        {
-            return true;
-        }
-    }
-    return false;
 }
 
 // Whether a view of a format and aspect samples as a sample type: a
@@ -280,8 +252,15 @@ static mrhiResult CheckBinding(const mrhiDevice* device, const mrhiFramePass* pa
                  : recordedOut->aspect == mrhi_aspectDepthOnly ? 1
                                                                : mrhiFormatPlanes(texture->format);
     }
+    mrhiFrameUse part = {
+        .planes = planes,
+        .baseMip = recordedOut->baseMip,
+        .mipCount = recordedOut->mipCount,
+        .baseLayer = (uint32_t)recordedOut->offset,
+        .layerCount = (uint32_t)recordedOut->size,
+    };
     if (status == mrhi_success &&
-        !IsDeclared(device, pass, KindsOf(slot), recordedOut, planes, buffer))
+        !mrhiPassDeclares(device, pass, object, KindsOf(slot), buffer ? nullptr : &part))
     {
         status = mrhi_errorInvalid;
     }

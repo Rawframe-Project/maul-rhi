@@ -50,6 +50,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/container.c
     src/device.c
     src/binding.c
+    src/copy.c
     src/draw.c
     src/encoder.c
     src/frame.c
@@ -113,6 +114,7 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(encoder WHITEBOX)
         maul_add_test(binding WHITEBOX)
         maul_add_test(draw WHITEBOX)
+        maul_add_test(copy WHITEBOX)
         # The container writer against the reader, where Python runs.
         find_package(Python3 COMPONENTS Interpreter)
         if(TARGET test_shader AND Python3_Interpreter_FOUND AND NOT CMAKE_CROSSCOMPILING)

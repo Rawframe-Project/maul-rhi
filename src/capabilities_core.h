@@ -68,6 +68,19 @@ typedef struct mrhiFormatBlock
 
 mrhiFormatBlock mrhiGetFormatBlock(mrhiFormat format);
 
+// What a texel copy moves of a format's aspect (mrhi_aspectAll for a
+// color format, depth or stencil only for a depth format): the bytes of
+// one block, and whether the aspect may be copied from and to, as
+// WebGPU allows. All zero for an aspect that is never copied.
+typedef struct mrhiFormatCopy
+{
+    uint8_t bytes;
+    bool source;
+    bool destination;
+} mrhiFormatCopy;
+
+mrhiFormatCopy mrhiGetFormatCopy(mrhiFormat format, mrhiTextureAspect aspect);
+
 // The sRGB or linear twin of a format, the one reinterpretation a view
 // may make, or mrhi_formatNone.
 mrhiFormat mrhiFormatSrgbPair(mrhiFormat format);
