@@ -33,6 +33,7 @@ compile: device_core
 plan: device_core
 memory: device_core
 sha256:
+tlsf: invariant
 command:
 encoder: encoder_core invariant label
 encoder_core: device_core

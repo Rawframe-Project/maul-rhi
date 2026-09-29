@@ -86,6 +86,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/surface.c
     src/swapchain.c
     src/texture.c
+    src/tlsf.c
     src/view.c)
 maul_configure_library(maul-rhi)
 if(MAUL_RHI_TEST_DRIVER)
@@ -110,6 +111,7 @@ if(MAUL_RHI_BUILD_TESTS)
     maul_add_test(pool WHITEBOX)
     maul_add_test(label WHITEBOX)
     maul_add_test(sha256 WHITEBOX)
+    maul_add_test(tlsf WHITEBOX)
     maul_add_test(instance)
     if(MAUL_RHI_TEST_DRIVER)
         maul_add_test(adapter)
