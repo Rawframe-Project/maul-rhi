@@ -60,11 +60,16 @@ const server = http.createServer((request, response) => {
 
 server.listen(0, async () => {
     // Headless Chrome's default SwiftShader path destroys a device once it
-    // presents to a canvas; its Vulkan path over SwiftShader presents.
+    // presents to a canvas; its Vulkan path presents, here over the
+    // SwiftShader Chrome ships, whatever Vulkan drivers the host has.
+    const executable = await puppeteer.executablePath();
+    const icd = path.join(path.dirname(executable), 'vk_swiftshader_icd.json');
     const browser = await puppeteer.launch({
         headless: true,
+        executablePath: executable,
         args: ['--no-sandbox', '--enable-unsafe-webgpu', '--enable-features=Vulkan',
                '--use-vulkan=swiftshader', '--use-angle=vulkan'],
+        env: Object.assign({}, process.env, {VK_ICD_FILENAMES: icd, VK_DRIVER_FILES: icd}),
     });
     let failed = false;
     const tab = await browser.newPage();

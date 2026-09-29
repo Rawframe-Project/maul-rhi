@@ -196,8 +196,9 @@ ids, requests, the frame graph) can be tested without a GPU.
   `MAUL_RHI_REQUIRE_BINDLESS`, so lavapipe must grant them.
   On the web the suite runs in headless Chrome with WebGPU
   (`test/web_runner.cjs`, Puppeteer from `MRHI_NODE_MODULES`) on
-  Chrome's Vulkan path over SwiftShader, since its default SwiftShader
-  path destroys a device that presents to a canvas. It is built with
+  Chrome's Vulkan path over the SwiftShader it ships, named as the only
+  Vulkan driver, since its default SwiftShader path destroys a device
+  that presents to a canvas. It is built with
   JSPI so that it sleeps while the browser settles its promises; an
   error the browser logs fails it, and CI sets
   `MAUL_RHI_REQUIRE_WEBGPU`.
