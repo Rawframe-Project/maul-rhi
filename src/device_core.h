@@ -355,6 +355,9 @@ typedef struct mrhiPipelineSlot
     uint64_t handle;
     mrhiReflection* reflection;
     uint32_t entries[2];
+    // What its entry points read through heaps, so that it is set only in
+    // passes naming one.
+    mrhiShaderHeapUses heapUses;
     // A graphics pipeline's targets, its vertex buffers (their facts in
     // the device's pipelineVertex), and its strip index format.
     mrhiRenderLayout layout;

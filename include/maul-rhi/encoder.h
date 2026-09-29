@@ -175,33 +175,38 @@ extern "C"
 
     /// Sets the graphics pipeline later draws use, in a pass with targets. It
     /// must be ready and fit the pass's targets: their formats and sample
-    /// count, and no depth or stencil writes to a read-only depth target.
+    /// count, and no depth or stencil writes to a read-only depth target. A
+    /// pipeline whose entry points read a heap needs a pass that names one
+    /// (mrhi-0015).
     ///
     /// @param device    The device.
     /// @param pass      The pass, recording.
     /// @param pipeline  The pipeline.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass
-    /// without targets, or a pipeline that does not fit its targets;
-    /// `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState`
-    /// for a pass that is not recording, or a pipeline that is not ready;
-    /// `mrhi_errorStale` also for a pipeline the device no longer has;
-    /// `mrhi_errorCapacity` when the frame's commands are full.
+    /// without targets, a pipeline that does not fit its targets, or one
+    /// reading a heap in a pass naming none; `mrhi_errorStale` for a pass of
+    /// another frame or none; `mrhi_errorState` for a pass that is not
+    /// recording, or a pipeline that is not ready; `mrhi_errorStale` also for a
+    /// pipeline the device no longer has; `mrhi_errorCapacity` when the frame's
+    /// commands are full.
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiSetGraphicsPipeline(mrhiDevice* device, mrhiPassId pass,
                                                                mrhiGraphicsPipelineId pipeline);
 
     /// Sets the compute pipeline later dispatches use, in a pass without
-    /// targets.
+    /// targets. A pipeline whose entry point reads a heap needs a pass that
+    /// names one (mrhi-0015).
     ///
     /// @param device    The device.
     /// @param pass      The pass, recording.
     /// @param pipeline  The pipeline.
-    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or a pass
-    /// that renders or copies; `mrhi_errorStale` for a pass of another frame or
-    /// none; `mrhi_errorState` for a pass that is not recording, or a pipeline
-    /// that is not ready; `mrhi_errorStale` also for a pipeline the device no
-    /// longer has; `mrhi_errorCapacity` when the frame's commands are full.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device a pass
+    /// that renders or copies, or a pipeline reading a heap in a pass naming
+    /// none; `mrhi_errorStale` for a pass of another frame or none;
+    /// `mrhi_errorState` for a pass that is not recording, or a pipeline that
+    /// is not ready; `mrhi_errorStale` also for a pipeline the device no longer
+    /// has; `mrhi_errorCapacity` when the frame's commands are full.
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiSetComputePipeline(mrhiDevice* device, mrhiPassId pass,

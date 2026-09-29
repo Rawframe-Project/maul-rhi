@@ -243,7 +243,8 @@ mrhiResult mrhiSetGraphicsPipeline(mrhiDevice* device, mrhiPassId id,
     }
     bool readOnly = pass->depthTarget.readOnly;
     if (!AreTargetsEqual(&slot->layout, &pass->layout) ||
-        (readOnly && (slot->layout.writesDepth || slot->layout.writesStencil)))
+        (readOnly && (slot->layout.writesDepth || slot->layout.writesStencil)) ||
+        (slot->heapUses != 0 && pass->heap == 0))
     {
         return mrhiDeviceMisuse(device);
     }
@@ -274,6 +275,11 @@ mrhiResult mrhiSetComputePipeline(mrhiDevice* device, mrhiPassId id, mrhiCompute
     if (slot == nullptr)
     {
         return status;
+    }
+    // A pipeline reading a heap needs the pass's.
+    if (slot->heapUses != 0 && pass->heap == 0)
+    {
+        return mrhiDeviceMisuse(device);
     }
     pass->pipeline = pipeline.index1;
     pass->pipelineGeneration = pipeline.generation;

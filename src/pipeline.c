@@ -197,6 +197,7 @@ mrhiResult mrhiCreateComputePipeline(mrhiDevice* device, const mrhiComputePipeli
     }
     mrhiPipelineSlot* slot = &device->pipelineSlots[index1 - 1];
     slot->entries[0] = entry;
+    slot->heapUses = shader->reflection->entries[entry].heapUses;
     mrhiDriverComputePipeline pipeline = {
         .label = def->label,
         .labelLength = def->labelLength,

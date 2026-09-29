@@ -295,6 +295,8 @@ format.
   word; SPIR-V reads them at set 4; a container using a heap has no
   WGSL; `mrhiShaderInfo.heapUses`; the writer takes `heap_uses` and `-`
   for no WGSL.
+- A pipeline whose entry points read a heap is set only in a pass
+  naming one (mrhi-0015).
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

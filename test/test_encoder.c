@@ -11,6 +11,7 @@
 #include "test_device_setup.h"
 
 #include "maul-rhi/encoder.h"
+#include "maul-rhi/heap.h"
 
 #include <math.h>
 
@@ -64,14 +65,12 @@ static mrhiGraphicsPipelineId Graphics(const mrhiGraphicsPipelineDef* def)
     return pipeline;
 }
 
-// Opens a ready device whose frames hold chunks of commands, with the
-// default container and a pipeline of each kind.
-static void Open(uint32_t chunks)
+// Opens a ready device of a def with the default container and a
+// pipeline of each kind.
+static void OpenOn(mrhiDeviceDef def)
 {
     Reset();
     Assemble();
-    mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.frameCommandBytes = chunks * MRHI_CHUNK_BYTES;
     s_device = OpenWith(def, true);
     mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
     shaderDef.bytes = s_container;
@@ -97,6 +96,14 @@ static void Open(uint32_t chunks)
           "a depth texture");
 }
 
+// Opens a ready device whose frames hold chunks of commands.
+static void Open(uint32_t chunks)
+{
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.deviceLimits.frameCommandBytes = chunks * MRHI_CHUNK_BYTES;
+    OpenOn(def);
+}
+
 // A declared rgba8 texture.
 static mrhiResourceId Declare(uint32_t width, uint32_t height, uint32_t mips)
 {
@@ -117,6 +124,9 @@ static mrhiPassId Add(mrhiPassDef def)
     return pass;
 }
 
+// The heap the render and dispatch passes of the next frames name.
+static mrhiHeapId s_frameHeap;
+
 // Opens a frame of the five passes, compiled; the depth pass's target,
 // the device's depth texture, read-only when asked.
 static void Frame(bool readOnly)
@@ -131,6 +141,7 @@ static void Frame(bool readOnly)
         .load = mrhi_loadClear,
     };
     def.colorTargetCount = 1;
+    def.heap = s_frameHeap;
     s_render = Add(def);
     mrhiResourceId depth = {0};
     CHECK(mrhiImportTexture(s_device, s_depthTexture, &depth) == mrhi_success, "imported");
@@ -145,7 +156,9 @@ static void Frame(bool readOnly)
     s_depth = Add(def);
     def = mrhiDefaultPassDef();
     def.neverCull = true;
+    def.heap = s_frameHeap;
     s_dispatch = Add(def);
+    def.heap = (mrhiHeapId){0};
     def.passClass = mrhi_passTransfer;
     s_copy = Add(def);
     def = mrhiDefaultPassDef();
@@ -701,6 +714,93 @@ static void TestFailed(void)
     Close2();
 }
 
+// A shader of the default container whose entries read heaps as given,
+// without the WGSL that excludes.
+static mrhiShaderId HeapShader(mrhiShaderHeapUses vertex, mrhiShaderHeapUses fragment,
+                               mrhiShaderHeapUses compute)
+{
+    Reset();
+    Put32(Record(ENTRIES, 0, 48) + 44, vertex);
+    Put32(Record(ENTRIES, 1, 48) + 44, fragment);
+    Put32(Record(ENTRIES, 2, 48) + 44, compute);
+    s_sections[WGSL].size = 0;
+    Assemble();
+    mrhiShaderDef def = mrhiDefaultShaderDef();
+    def.bytes = s_container;
+    def.byteCount = s_size;
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &def, &shader) == mrhi_success, "a shader reading heaps");
+    return shader;
+}
+
+static mrhiGraphicsPipelineId HeapGraphics(mrhiShaderHeapUses vertex, mrhiShaderHeapUses fragment)
+{
+    mrhiGraphicsPipelineDef def = GraphicsDef();
+    def.shader = HeapShader(vertex, fragment, 0);
+    return Graphics(&def);
+}
+
+// A pipeline reading a heap only in a pass naming one, from either of a
+// graphics pipeline's entry points.
+static void TestHeaps(void)
+{
+    s_adapter.features.bindlessSampling = true;
+    s_adapter.features.bindlessHeterogeneous = true;
+    s_adapter.limits.heapSize = 4096;
+    s_adapter.limits.samplerHeapSize = 64;
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.features.bindlessSampling = true;
+    def.features.bindlessHeterogeneous = true;
+    def.limits.heapSize = 1024;
+    def.limits.samplerHeapSize = 16;
+    OpenOn(def);
+    mrhiGraphicsPipelineId vertex = HeapGraphics(mrhi_heapUseStorageBuffers, 0);
+    mrhiGraphicsPipelineId fragment =
+        HeapGraphics(0, mrhi_heapUseSampledTextures | mrhi_heapUseSamplers);
+    mrhiComputePipelineDef computeDef = mrhiDefaultComputePipelineDef();
+    computeDef.shader = HeapShader(0, 0, mrhi_heapUseStorageBuffers | mrhi_heapUseWrites);
+    computeDef.entry = "cs";
+    computeDef.entryLength = 2;
+    mrhiComputePipelineId compute = {0};
+    mrhiRequestId request;
+    CHECK(mrhiCreateComputePipeline(s_device, &computeDef, &compute, &request) == mrhi_success,
+          "a compute pipeline reading a heap");
+    mrhiDeviceNotification record;
+    CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_success, "answered");
+    mrhiHeapDef heapDef = mrhiDefaultHeapDef();
+    heapDef.entries = 4;
+    heapDef.samplers = 2;
+    mrhiHeapId heap = {0};
+    CHECK(mrhiCreateHeap(s_device, &heapDef, &heap) == mrhi_success, "a heap");
+    Frame(false);
+    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
+              mrhiBeginPass(s_device, s_dispatch) == mrhi_success,
+          "begun without a heap");
+    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, vertex) == mrhi_errorInvalid &&
+              mrhiSetGraphicsPipeline(s_device, s_render, fragment) == mrhi_errorInvalid &&
+              mrhiSetComputePipeline(s_device, s_dispatch, compute) == mrhi_errorInvalid,
+          "no pipeline reading a heap");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 3, "each misuse");
+    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, s_graphics) == mrhi_success &&
+              mrhiSetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_success,
+          "others");
+    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    s_frameHeap = heap;
+    Frame(false);
+    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
+              mrhiBeginPass(s_device, s_dispatch) == mrhi_success,
+          "begun with the heap");
+    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, vertex) == mrhi_success &&
+              mrhiSetGraphicsPipeline(s_device, s_render, fragment) == mrhi_success &&
+              mrhiSetGraphicsPipeline(s_device, s_render, s_graphics) == mrhi_success &&
+              mrhiSetComputePipeline(s_device, s_dispatch, compute) == mrhi_success,
+          "any pipeline");
+    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    s_frameHeap = (mrhiHeapId){0};
+    Close2();
+    ResetAdapter();
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -714,5 +814,6 @@ int main(void)
     TestArena();
     TestLimit();
     TestFailed();
+    TestHeaps();
     return s_failures == 0 ? 0 : 1;
 }

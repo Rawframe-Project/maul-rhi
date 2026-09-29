@@ -65,7 +65,9 @@ barriers.
   existing HLSL compiles unchanged. WGSL reads no heaps until WebGPU's
   resource tables ship, so a container using a heap has no WGSL.
   Creating a shader whose entries use heaps needs the features they
-  name.
+  name, and a pipeline whose entry points read a heap is set only in a
+  pass that names one, as the gpuweb proposal requires a table for such
+  a pipeline's draws.
 - **Drivers** get a heap handle per pass and write entries as the core
   accepts them (`createHeap`, `destroyHeap`, `writeHeapEntry`,
   `writeHeapSampler`; SPI version 2). The test driver checks every

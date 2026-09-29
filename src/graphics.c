@@ -528,6 +528,8 @@ mrhiResult mrhiCreateGraphicsPipeline(mrhiDevice* device, const mrhiGraphicsPipe
     slot->entries[1] = stages.fragment == nullptr
                            ? reflection->entryCount
                            : (uint32_t)(stages.fragment - reflection->entries);
+    slot->heapUses =
+        stages.vertex->heapUses | (stages.fragment == nullptr ? 0 : stages.fragment->heapUses);
     mrhiDriverGraphicsPipeline pipeline = {
         .shader = shader->handle,
         .reflection = reflection,
