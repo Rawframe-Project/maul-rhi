@@ -1076,6 +1076,7 @@ static void CheckForeignSources(mrhiInstance* instance)
 #endif
 }
 
+#ifdef MRHI_TEST_XCB
 // Whether caps meet the floors and offer 8-bit sRGB in Rec. 709.
 static bool MeetsFloors(const mrhiSurfaceCaps* caps)
 {
@@ -1095,7 +1096,6 @@ static bool MeetsFloors(const mrhiSurfaceCaps* caps)
            (caps->usages & mrhi_textureRenderTarget) != 0;
 }
 
-#ifdef MRHI_TEST_XCB
 // A window of the X server the environment names, where there is one.
 static void CheckXcbSurface(mrhiInstance* instance, const mrhiAdapterId* ids, size_t count)
 {

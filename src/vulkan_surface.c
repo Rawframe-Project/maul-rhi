@@ -15,8 +15,9 @@
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
-#include <vulkan/vulkan_win32.h>
 #include <windows.h>
+// The Win32 header needs the types windows.h declares.
+#include <vulkan/vulkan_win32.h>
 #define MRHI_VULKAN_WIN32 1
 #elif defined(__ANDROID__)
 #include <vulkan/vulkan_android.h>
