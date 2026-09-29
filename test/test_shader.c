@@ -6,6 +6,9 @@
 // them, and, given a file tools/mrhi_container.py wrote and what it
 // should hold, a check that the library reads it the same way.
 
+// fopen is standard C; MSVC's runtime deprecates it for its own.
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "container.h"
 #include "sha256.h"
 #include "test_device_setup.h"
@@ -845,12 +848,15 @@ static int CheckFile(char** args)
     }
     s_size = fread(s_container, 1, sizeof(s_container), file);
     fclose(file);
-    uint8_t digest[MRHI_DIGEST_BYTES];
-    for (int i = 0; i < MRHI_DIGEST_BYTES; ++i)
+    uint8_t digest[MRHI_DIGEST_BYTES] = {0};
+    const char* hex = args[1];
+    CHECK(strlen(hex) == 2 * MRHI_DIGEST_BYTES, "a digest in hex");
+    for (size_t i = 0; i < 2 * MRHI_DIGEST_BYTES && hex[i] != '\0'; ++i)
     {
-        unsigned value = 0;
-        CHECK(sscanf(args[1] + 2 * i, "%2x", &value) == 1, "a digest in hex");
-        digest[i] = (uint8_t)value;
+        const char* digit = strchr("0123456789abcdef", hex[i]);
+        CHECK(digit != nullptr, "a hex digit");
+        uint8_t value = digit == nullptr ? 0 : (uint8_t)(digit - "0123456789abcdef");
+        digest[i / 2] = (uint8_t)(digest[i / 2] << 4 | value);
     }
     mrhiDevice* device = Open(1, true);
     mrhiShaderDef def = Def();
