@@ -30,7 +30,8 @@ static bool IsSurfaceRequired(void)
     return IsSurfaceRequired() ? 1 : SAMPLE_SKIPPED;
 }
 
-static int MakeSurface(Sample* sample, SampleWindow* window, const mrhiChain* source)
+[[maybe_unused]] static int MakeSurface(Sample* sample, SampleWindow* window,
+                                        const mrhiChain* source)
 {
     mrhiSurfaceDef def = mrhiDefaultSurfaceDef();
     def.next = source;

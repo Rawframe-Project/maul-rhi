@@ -1,8 +1,12 @@
-# ThreadSanitizer suppressions for the conformance suite (mrhi-0003).
-# Lavapipe runs its rasterizer on threads of its own, compiles shaders
-# with LLVM and presents through the XCB client library, all built
-# without ThreadSanitizer, which cannot see how they order their
-# threads and locks; they are not the driver's to check.
+# ThreadSanitizer suppressions for the conformance suite and the samples
+# (mrhi-0003). Lavapipe runs its rasterizer on threads of its own,
+# compiles shaders with LLVM and presents through the XCB client
+# library, and the Khronos validation layer checks submissions on a
+# thread of its own, all built without ThreadSanitizer, which cannot see
+# how they order their threads and locks; they are not the driver's to
+# check. The layer's thread was seen holding a lock of a swapchain's
+# state as the layer freed it, the queue already idle.
 called_from_lib:libvulkan_lvp.so
 called_from_lib:libLLVM
 called_from_lib:libxcb.so
+called_from_lib:libVkLayer_khronos_validation.so
