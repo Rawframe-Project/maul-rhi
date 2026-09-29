@@ -1,0 +1,55 @@
+{
+  "library": "maul-rhi",
+  "title": "Maul RHI",
+  "prefix": "mrhi",
+  "macro": "MRHI",
+  "guard": "MAUL_RHI",
+  "version": { "major": 0, "minor": 0, "patch": 1 },
+  "headers": [
+    {
+      "name": "base",
+      "doc": "The base of the Maul RHI API: the library version, the export and attribute macros, and the result codes every fallible function returns.",
+      "preamble": ["version", "api", "nodiscard"],
+      "items": [
+        {
+          "kind": "result",
+          "name": "result",
+          "doc": "The status a fallible function returns. Zero is success, positive values are outcomes that are not errors, negative values are errors. The type has a fixed width so that result structs have one layout in C and C++.",
+          "values": [
+            { "name": "success", "value": 0, "doc": "The call did what was asked." },
+            { "name": "error_invalid", "value": -1, "doc": "An argument is invalid: a null pointer where one is required, a value out of range." },
+            { "name": "error_capacity", "value": -2, "doc": "A caller buffer or a named limit is too small for the result." }
+          ]
+        },
+        {
+          "kind": "struct",
+          "name": "version",
+          "doc": "A library version: major, minor and patch.",
+          "members": [
+            { "name": "major", "type": "uint16" },
+            { "name": "minor", "type": "uint16" },
+            { "name": "patch", "type": "uint16" }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "get_version",
+          "doc": "Returns the version of the library that was linked, which may differ from the MRHI_VERSION macros a program was compiled with.",
+          "returns": { "type": "struct.version", "doc": "The library version." },
+          "args": [],
+          "thread_safety": { "class": "any" }
+        },
+        {
+          "kind": "function",
+          "name": "result_name",
+          "doc": "Returns the name of a result code, for diagnostics.",
+          "returns": { "type": "static_cstring", "doc": "A static, NUL-terminated string such as \"mrhi_errorCapacity\"." },
+          "args": [
+            { "name": "result", "type": "result", "doc": "Any value; an unknown one is named as such." }
+          ],
+          "thread_safety": { "class": "any" }
+        }
+      ]
+    }
+  ]
+}

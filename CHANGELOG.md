@@ -13,3 +13,6 @@ format.
 - The library skeleton: the build, the family rules and tools, the
   version and result API (`mrhiGetVersion`, `mrhiResultName`) and the
   library profile.
+- The contract (`docs/contract/mrhi.json`), the source of truth for
+  the public headers and the thread safety table, and its generator
+  (`tools/gen_contract.py`), checked for drift in CI (mrhi-0002).
