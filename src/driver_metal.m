@@ -5,8 +5,10 @@
 // lists (the one default device outside macOS), each an adapter under
 // its registry id, so an adapter found again keeps its id. Searches and
 // device openings are answered at the next poll. Limits are WebGPU's
-// floor, raised where every Metal device of the family goes further;
-// features are granted as the driver comes to run them. Every entry
+// floor, raised where every Metal device of the family goes further.
+// Features are what the device reports among those the driver runs:
+// timestamps, present timing, multiview, counted multi-draws, pipeline
+// statistics and heaps are not granted yet. Every entry
 // point that touches Objective-C objects drains its own autorelease
 // pool, since the calling thread may have none. A surface is a
 // CAMetalLayer the driver retains, which every adapter presents to.
@@ -113,6 +115,38 @@ static mrhiLimits LimitsOf(id<MTLDevice> device)
     return limits;
 }
 
+static mrhiFeatures FeaturesOf(id<MTLDevice> device)
+{
+    bool apple7 = [device supportsFamily:MTLGPUFamilyApple7];
+    bool mac2 = [device supportsFamily:MTLGPUFamilyMac2];
+    return (mrhiFeatures){
+        .textureCompressionBc = device.supportsBCTextureCompression,
+        .textureCompressionEtc2 = [device supportsFamily:MTLGPUFamilyApple2],
+        .textureCompressionAstc = [device supportsFamily:MTLGPUFamilyApple2],
+        .float32Filterable = device.supports32BitFloatFiltering,
+        .rg11b10Renderable = true,
+        .dualSourceBlending = true,
+        .unclippedDepth = true,
+        .shaderF16 = true,
+        .subgroups = apple7 || mac2,
+        .shaderInt64 = apple7 || mac2,
+        .indirectFirstInstance = true,
+    };
+}
+
+// The device an adapter handle names, from a list of the system's.
+static id<MTLDevice> DeviceOf(NSArray<id<MTLDevice>>* devices, uint64_t adapter)
+{
+    for (NSUInteger i = 0; i < devices.count; ++i)
+    {
+        if (HandleOf(devices[i], i) == adapter)
+        {
+            return devices[i];
+        }
+    }
+    return nil;
+}
+
 static mrhiResult RequestAdapters(void* self, uint64_t tag)
 {
     MetalDriver* driver = self;
@@ -151,6 +185,7 @@ static size_t GetAdapters(const void* self, mrhiDriverAdapter* adapters, size_t 
             adapters[i] = (mrhiDriverAdapter){
                 .handle = HandleOf(device, i),
                 .info = InfoOf(device),
+                .features = FeaturesOf(device),
                 .limits = LimitsOf(device),
             };
         }
@@ -159,14 +194,20 @@ static size_t GetAdapters(const void* self, mrhiDriverAdapter* adapters, size_t 
     return found;
 }
 
-// No feature is granted, so an adapter does what the floor promises.
+// What the floor promises, and what the adapter's features add.
 static void GetFormatCaps(const void* self, uint64_t adapter, mrhiFormat format,
                           mrhiFormatCaps* capsOut)
 {
     (void)self;
-    (void)adapter;
-    mrhiFeatures none = {0};
-    *capsOut = mrhiGrantedFormatCaps(format, &none);
+    mrhiFeatures features = {0};
+    @autoreleasepool
+    {
+        NSArray<id<MTLDevice>>* devices = CopyDevices();
+        id<MTLDevice> device = DeviceOf(devices, adapter);
+        features = device != nil ? FeaturesOf(device) : features;
+        [devices release];
+    }
+    *capsOut = mrhiGrantedFormatCaps(format, &features);
 }
 
 // A CAMetalLayer is the only source Metal presents to; the pointer must
@@ -236,13 +277,10 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
     @autoreleasepool
     {
         NSArray<id<MTLDevice>>* devices = CopyDevices();
-        for (NSUInteger i = 0; i < devices.count; ++i)
+        id<MTLDevice> device = DeviceOf(devices, adapter);
+        if (device != nil)
         {
-            if (HandleOf(devices[i], i) == adapter)
-            {
-                status = mrhiCreateMetalDevice(&driver->allocator, devices[i], def, deviceOut);
-                break;
-            }
+            status = mrhiCreateMetalDevice(&driver->allocator, device, def, deviceOut);
         }
         [devices release];
     }

@@ -350,7 +350,11 @@ format.
   with a command queue, and their buffers, textures, views, samplers,
   occlusion query sets, shaders (from the container's metallib or
   MSL), compute and graphics pipelines, frames and CAMetalLayer
-  surfaces; heaps answer `mrhi_errorUnsupported` for now. macOS CI
+  surfaces, with the features the device reports among compression
+  families, float32 filtering, rg11b10 rendering, dual-source blending,
+  unclipped depth, 16-bit floats, subgroups, 64-bit integers and
+  indirect first instances; heaps answer `mrhi_errorUnsupported` for
+  now. macOS CI
   runs the whole conformance suite and every sample on the runner's
   Metal device under Metal's validation, presenting to layers outside
   any window.
