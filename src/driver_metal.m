@@ -16,13 +16,12 @@
 #include "format_caps.h"
 #include "invariant.h"
 #include "metal_device.h"
+#include "metal_frame.h"
 
 #import <TargetConditionals.h>
 #include <stdalign.h>
 #include <string.h>
 
-// The frames a device lets run at once.
-#define METAL_FRAMES_IN_FLIGHT 3
 // The root block's bytes: setBytes takes up to 4 KiB, the container 256.
 #define METAL_ROOT_BLOCK_BYTES 256
 
@@ -107,7 +106,7 @@ static mrhiLimits LimitsOf(id<MTLDevice> device)
     limits.storageBindingBytes = device.maxBufferLength;
     limits.workgroupStorageBytes = Clamp32(device.maxThreadgroupMemoryLength);
     limits.rootBlockBytes = METAL_ROOT_BLOCK_BYTES;
-    limits.framesInFlight = METAL_FRAMES_IN_FLIGHT;
+    limits.framesInFlight = MRHI_METAL_FRAMES;
     return limits;
 }
 

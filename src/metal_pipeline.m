@@ -238,27 +238,40 @@ static id<MTLFunction> NewFunction(const MetalShader* shader, const mrhiReflecti
     return [shader->libraries[entry] newFunctionWithName:name constantValues:values error:&error];
 }
 
-// A pipeline of a shader, with the shader's indices copied; NULL when
-// the allocator fails.
+// A pipeline of a shader, with its bindings taken from the reflection
+// and the shader's indices; NULL when the allocator fails.
 static mrhiMetalPipeline* NewPipeline(const mrhiMetalPipelines* pipelines,
-                                      const MetalShader* shader, bool compute)
+                                      const MetalShader* shader, const mrhiReflection* reflection,
+                                      bool compute)
 {
-    size_t bytes = sizeof(mrhiMetalPipeline) + shader->bindingCount;
+    static_assert(alignof(mrhiMetalBinding) <= alignof(mrhiMetalPipeline), "bindings follow");
+    size_t bytes = sizeof(mrhiMetalPipeline) + shader->bindingCount * sizeof(mrhiMetalBinding);
     mrhiMetalPipeline* pipeline =
         mrhiAllocate(pipelines->allocator, bytes, alignof(mrhiMetalPipeline));
     if (pipeline == nullptr)
     {
         return nullptr;
     }
-    uint8_t* indices = (uint8_t*)(pipeline + 1);
-    memcpy(indices, shader->indices, shader->bindingCount);
+    mrhiMetalBinding* bindings = (mrhiMetalBinding*)(void*)(pipeline + 1);
+    for (uint32_t i = 0; i < shader->bindingCount; ++i)
+    {
+        const mrhiShaderBinding* binding = &reflection->bindings[i];
+        bindings[i] = (mrhiMetalBinding){
+            .slot = binding->slot,
+            .table = binding->table,
+            .kind = binding->kind,
+            .stages = (uint8_t)binding->stages,
+            .index = shader->indices[i],
+        };
+    }
     *pipeline = (mrhiMetalPipeline){
         .bytes = bytes,
         .compute = compute,
+        .rootBytes = reflection->rootBlockBytes,
         .root = shader->root,
         .sizes = {MRHI_METAL_NONE, MRHI_METAL_NONE},
         .bindingCount = shader->bindingCount,
-        .indices = indices,
+        .bindings = bindings,
     };
     return pipeline;
 }
@@ -288,7 +301,7 @@ mrhiResult mrhiMetalCreateCompute(mrhiMetalPipelines* pipelines,
                                   uint64_t* handleOut)
 {
     const MetalShader* shader = PointerOf(pipeline->shader);
-    mrhiMetalPipeline* made = NewPipeline(pipelines, shader, true);
+    mrhiMetalPipeline* made = NewPipeline(pipelines, shader, pipeline->reflection, true);
     if (made == nullptr)
     {
         return mrhi_errorCapacity;
@@ -409,7 +422,7 @@ mrhiResult mrhiMetalCreateGraphics(mrhiMetalPipelines* pipelines,
     {
         return mrhi_errorUnsupported;
     }
-    mrhiMetalPipeline* made = NewPipeline(pipelines, shader, false);
+    mrhiMetalPipeline* made = NewPipeline(pipelines, shader, pipeline->reflection, false);
     if (made == nullptr)
     {
         return mrhi_errorCapacity;
@@ -428,7 +441,7 @@ mrhiResult mrhiMetalCreateGraphics(mrhiMetalPipelines* pipelines,
     return mrhi_success;
 }
 
-void mrhiMetalDestroyPipeline(mrhiMetalPipelines* pipelines, uint64_t handle)
+void mrhiMetalForgetPipeline(mrhiMetalPipelines* pipelines, uint64_t handle)
 {
     for (uint32_t i = 0; i < pipelines->pendingCount; ++i)
     {
@@ -442,6 +455,10 @@ void mrhiMetalDestroyPipeline(mrhiMetalPipelines* pipelines, uint64_t handle)
             break;
         }
     }
+}
+
+void mrhiMetalReleasePipeline(const mrhiMetalPipelines* pipelines, uint64_t handle)
+{
     FreePipeline(pipelines, PointerOf(handle));
 }
 

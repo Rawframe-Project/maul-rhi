@@ -29,8 +29,12 @@ vulkan_surface: vulkan_adapter vulkan_api
 vulkan_label: invariant vulkan_api
 vulkan_api:
 instance: allocator chain driver driver_metal driver_test driver_vulkan driver_webgpu instance_core invariant
-driver_metal: allocator driver format_caps invariant metal_device
-metal_device: allocator driver invariant metal_pipeline metal_resource
+driver_metal: allocator driver format_caps invariant metal_device metal_frame
+metal_device: allocator driver invariant metal_frame metal_pipeline metal_resource
+metal_frame: invariant metal_encode metal_resource metal_state
+metal_encode: capabilities_core invariant metal_copy metal_names metal_resource metal_state
+metal_copy: capabilities_core invariant metal_resource metal_state
+metal_state: driver metal_pipeline
 metal_pipeline: allocator container driver invariant metal_graphics metal_names reflection
 metal_graphics: capabilities_core invariant metal_names
 metal_resource: driver invariant metal_names

@@ -16,10 +16,21 @@
 
 #import <Metal/Metal.h>
 
+// A binding as a pipeline's frames set it: its table and slot, its kind,
+// the stages that use it, and its index in its Metal class.
+typedef struct mrhiMetalBinding
+{
+    uint16_t slot;
+    uint8_t table;
+    uint8_t kind;
+    uint8_t stages;
+    uint8_t index;
+} mrhiMetalBinding;
+
 // A pipeline: its state (a compute or render pipeline state), and for
 // frames the workgroup size, the render state set at encoding, the root
-// block's buffer index, each stage's buffer sizes index, and each
-// binding's index in its class.
+// block's bytes and buffer index, each stage's buffer sizes index, and
+// its bindings.
 typedef struct mrhiMetalPipeline
 {
     size_t bytes;
@@ -28,12 +39,13 @@ typedef struct mrhiMetalPipeline
     id<MTLDepthStencilState> depthStencil;
     MTLSize workgroup;
     mrhiMetalRaster raster;
+    uint32_t rootBytes;
     uint8_t root;
     // The vertex and fragment entries' buffer sizes, or the compute
     // entry's first.
     uint8_t sizes[2];
     uint32_t bindingCount;
-    const uint8_t* indices;
+    const mrhiMetalBinding* bindings;
 } mrhiMetalPipeline;
 
 // The pipelines made and not yet answered, at most one per pipeline the
@@ -66,8 +78,12 @@ mrhiResult mrhiMetalCreateCompute(mrhiMetalPipelines* pipelines,
 mrhiResult mrhiMetalCreateGraphics(mrhiMetalPipelines* pipelines,
                                    const mrhiDriverGraphicsPipeline* pipeline, uint64_t tag,
                                    uint64_t* handleOut);
-// Destroys a pipeline; a pending one is never answered.
-void mrhiMetalDestroyPipeline(mrhiMetalPipelines* pipelines, uint64_t handle);
+// Drops a destroyed pipeline's answer, if it has not been polled yet, so
+// that it is never given.
+void mrhiMetalForgetPipeline(mrhiMetalPipelines* pipelines, uint64_t handle);
+
+// Frees a destroyed pipeline once no frame can name it.
+void mrhiMetalReleasePipeline(const mrhiMetalPipelines* pipelines, uint64_t handle);
 
 // Moves up to capacity answers into events and returns how many.
 size_t mrhiMetalPollPipelines(mrhiMetalPipelines* pipelines, mrhiDriverEvent* events,
