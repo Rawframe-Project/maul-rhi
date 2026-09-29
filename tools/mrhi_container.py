@@ -65,7 +65,17 @@
 # (spvBufferSizeConstants), whose index the map records. Of a metallib,
 # only the magic is checked.
 #
-# usage: mrhi_container.py [--msl DIR] [--metallib FILE] SPIRV WGSL|- REFLECTION OUTPUT
+# D3D12 code is optional too, and only for containers using no heap:
+# with --dxil, each entry's DXIL from DIR/NAME.dxil (tools/mrhi_dxil.py
+# makes them). The D3D12 map places each binding at its slot as its
+# register, in its table's space, and the root block, the constants and
+# the vertex information at constant buffers 0, 1 and 2 of space 5. A
+# constant the SPIR-V sizes something with is fixed. Each entry's DXIL
+# must be of its stage and declare no resource outside the map, which
+# the writer reads from its PSV0 part.
+#
+# usage: mrhi_container.py [--msl DIR] [--metallib FILE] [--dxil DIR]
+#                          SPIRV WGSL|- REFLECTION OUTPUT
 # Standard library only; exits 1 naming the first problem.
 
 import argparse
@@ -102,6 +112,28 @@ METAL_LIMITS = {"buffer": 31, "texture": 128, "sampler": 16}
 METAL_ROOT = 0
 METAL_NONE = 255
 MSL_KEYWORDS = {"vertex": "vertex", "fragment": "fragment", "compute": "kernel"}
+# SPIR-V instructions and decorations that make a specialization
+# constant size something, and those that build constants from others.
+OP_TYPE_ARRAY = 28
+OP_SPEC_CONSTANT_COMPOSITE = 51
+OP_SPEC_CONSTANT_OP = 52
+OP_EXECUTION_MODE_ID = 331
+MODE_LOCAL_SIZE_ID = 38
+DECORATION_SPEC_ID = 1
+DECORATION_BUILTIN = 11
+BUILTIN_WORKGROUP_SIZE = 25
+# D3D12: the space and registers of the map's own constant buffers (the
+# root block, the constants and the vertex information), each binding
+# kind's register class, the classes of DXIL's resource types (the PSV0
+# part's), and DXIL's shader kinds by stage.
+D3D12_SPACE = 5
+D3D12_ROOT = 0
+D3D12_CONSTANTS = 1
+D3D12_VERTEX_INFO = 2
+D3D12_CLASSES = {"uniform_buffer": "b", "read_only_storage_buffer": "t",
+                 "sampled_texture": "t", "sampler": "s"}
+PSV_CLASSES = {1: "s", 2: "b", 3: "t", 4: "t", 5: "t", 6: "u", 7: "u", 8: "u", 9: "u"}
+DXIL_KINDS = {"fragment": 0, "vertex": 1, "compute": 5}
 
 
 class ContainerError(Exception):
@@ -545,13 +577,133 @@ def metal_sections(reflection, root, msl, metallib):
     return sections
 
 
+# D3D12.
+
+def fixed_constants(code):
+    """The ids of the specialization constants the SPIR-V sizes something
+    with: a workgroup size or an array's length, directly or through
+    constants made from them. HLSL needs a literal there."""
+    words = struct.unpack(f"<{len(code) // 4}I", code)
+    spec_ids = {}
+    roots = set()
+    parts = {}
+    at = 5
+    while at < len(words):
+        count = words[at] >> 16
+        opcode = words[at] & 0xFFFF
+        need(count > 0 and at + count <= len(words), "SPIR-V: a damaged instruction")
+        operands = words[at + 1:at + count]
+        if opcode == OP_DECORATE and len(operands) >= 3:
+            if operands[1] == DECORATION_SPEC_ID:
+                spec_ids[operands[0]] = operands[2]
+            elif operands[1] == DECORATION_BUILTIN and operands[2] == BUILTIN_WORKGROUP_SIZE:
+                roots.add(operands[0])
+        elif opcode == OP_EXECUTION_MODE_ID and len(operands) >= 5 and \
+                operands[1] == MODE_LOCAL_SIZE_ID:
+            roots.update(operands[2:5])
+        elif opcode == OP_TYPE_ARRAY and len(operands) >= 3:
+            roots.add(operands[2])
+        elif opcode in (OP_SPEC_CONSTANT_COMPOSITE, OP_SPEC_CONSTANT_OP) and len(operands) >= 2:
+            parts[operands[1]] = operands[2:]
+        at += count
+    seen = set()
+    pending = list(roots)
+    while pending:
+        ident = pending.pop()
+        if ident not in seen:
+            seen.add(ident)
+            pending.extend(parts.get(ident, ()))
+    return {spec_ids[i] for i in seen if i in spec_ids}
+
+
+def dxil_parts(where, code):
+    """A DXIL container's parts by their four-character codes."""
+    need(len(code) >= 32 and code[:4] == b"DXBC", f"{where}: not a DXIL container")
+    size, count = struct.unpack_from("<II", code, 24)
+    need(size == len(code) and 32 + 4 * count <= size, f"{where}: its size is not its length")
+    parts = {}
+    for i in range(count):
+        (at,) = struct.unpack_from("<I", code, 32 + 4 * i)
+        need(at + 8 <= size, f"{where}: a part past its end")
+        fourcc, length = struct.unpack_from("<4sI", code, at)
+        need(at + 8 + length <= size, f"{where}: a part past its end")
+        parts[fourcc] = code[at + 8:at + 8 + length]
+    need(b"DXIL" in parts and b"PSV0" in parts, f"{where}: no DXIL or PSV0 part")
+    return parts
+
+
+def dxil_resources(entry, code):
+    """Checks an entry's DXIL is of its stage, and answers the resources
+    it declares as (class, register, space)."""
+    where = f"DXIL of {entry['name']}"
+    try:
+        parts = dxil_parts(where, code)
+        (program,) = struct.unpack_from("<I", parts[b"DXIL"], 0)
+        need(program >> 16 == DXIL_KINDS[entry["stage"]], f"{where}: DXIL of another stage")
+        psv = parts[b"PSV0"]
+        (info,) = struct.unpack_from("<I", psv, 0)
+        (count,) = struct.unpack_from("<I", psv, 4 + info)
+        resources = []
+        if count > 0:
+            (stride,) = struct.unpack_from("<I", psv, 8 + info)
+            need(stride >= 16, f"{where}: resource records too short")
+            for i in range(count):
+                kind, space, low, high = struct.unpack_from("<4I", psv, 12 + info + i * stride)
+                need(kind in PSV_CLASSES, f"{where}: an unknown resource type {kind}")
+                need(low == high, f"{where}: a range of registers, which only heaps use")
+                resources.append((PSV_CLASSES[kind], low, space))
+        return resources
+    except struct.error as error:
+        raise ContainerError(f"{where}: a damaged PSV0 part ({error})") from error
+
+
+def d3d12_sections(reflection, root, spirv, dxil):
+    """The D3D12 map and DXIL sections, or none without DXIL."""
+    if dxil is None:
+        return []
+    need(not any(e.get("heap_uses") for e in reflection["entries"]),
+         "D3D12 reads no heaps yet: a container using one has no DXIL")
+    bindings = reflection.get("bindings", [])
+    constants = reflection.get("constants", [])
+    fixed = fixed_constants(spirv)
+    for constant in constants:
+        need(constant["id"] not in fixed or "default" in constant,
+             f"constant {constant['id']} sizes something, so it needs a default")
+    allowed = {(D3D12_CLASSES.get(b["kind"], "u"), b["slot"], b["table"]) for b in bindings}
+    own = [(D3D12_ROOT, D3D12_SPACE) if root else (0, 0),
+           (D3D12_CONSTANTS, D3D12_SPACE) if constants else (0, 0)]
+    allowed |= {("b", reg, space) for reg, space in own if space}
+    info = ("b", D3D12_VERTEX_INFO, D3D12_SPACE)
+    records = b""
+    code = b""
+    reads_info = False
+    for entry in reflection["entries"]:
+        need(entry["name"] in dxil, f"no DXIL for entry {entry['name']}")
+        blob = dxil[entry["name"]]
+        reads = False
+        for resource in dxil_resources(entry, blob):
+            reads = reads or resource == info
+            need(resource in allowed or (resource == info and entry["stage"] == "vertex"),
+                 f"DXIL of {entry['name']}: {resource[0]}{resource[1]} of space {resource[2]}"
+                 " is outside the D3D12 map")
+        code += bytes(-len(code) % 4)
+        records += struct.pack("<III4x", len(code), len(blob), 1 if reads else 0)
+        code += blob
+        reads_info = reads_info or reads
+    own.append(info[1:] if reads_info else (0, 0))
+    head = b"".join(struct.pack("<II", reg, space) for reg, space in own) + bytes(8)
+    places = b"".join(struct.pack("<II", b["slot"], b["table"]) for b in bindings)
+    flags = bytes(1 if c["id"] in fixed else 0 for c in constants)
+    return [(14, head + records + places + flags), (15, code)]
+
+
 # The container.
 
 def pad8(data):
     return data + bytes(-len(data) % 8)
 
 
-def build(spirv, wgsl, reflection, enums, msl=None, metallib=None):
+def build(spirv, wgsl, reflection, enums, msl=None, metallib=None, dxil=None):
     keys(reflection, ("root_block_bytes", "entries", "bindings", "constants"), "the reflection")
     root = number(reflection.get("root_block_bytes", 0), "the root block's bytes", 0,
                   MAX_ROOT_BLOCK)
@@ -599,6 +751,7 @@ def build(spirv, wgsl, reflection, enums, msl=None, metallib=None):
     ]
     sections = [(kind, data) for kind, data in sections if kind != 9 or data]
     sections += metal_sections(reflection, root, msl, metallib)
+    sections += d3d12_sections(reflection, root, spirv, dxil)
     offset = 64 + 24 * len(sections)
     table = b""
     body = b""
@@ -611,10 +764,27 @@ def build(spirv, wgsl, reflection, enums, msl=None, metallib=None):
     return b"MRSC" + struct.pack("<IQ", 1, size) + digest + signed
 
 
+def read_entries(reflection, folder, suffix):
+    """Each entry's file in folder, by the entry's name, or None without a
+    folder; an entry without its file is left out."""
+    if folder is None:
+        return None
+    found = {}
+    for entry in reflection.get("entries", []):
+        name = entry.get("name") if isinstance(entry, dict) else None
+        if isinstance(name, str) and os.path.basename(name) == name:
+            path = os.path.join(folder, name + suffix)
+            if os.path.exists(path):
+                with open(path, "rb") as f:
+                    found[name] = f.read()
+    return found
+
+
 def main():
     parser = argparse.ArgumentParser(prog="mrhi_container.py")
     parser.add_argument("--msl", metavar="DIR", help="each entry's MSL, in DIR/NAME.metal")
     parser.add_argument("--metallib", metavar="FILE", help="a Metal library of every entry")
+    parser.add_argument("--dxil", metavar="DIR", help="each entry's DXIL, in DIR/NAME.dxil")
     parser.add_argument("spirv", metavar="SPIRV")
     parser.add_argument("wgsl", metavar="WGSL|-")
     parser.add_argument("reflection", metavar="REFLECTION")
@@ -633,21 +803,13 @@ def main():
                 wgsl = f.read()
         with open(reflection_path, encoding="utf-8") as f:
             reflection = json.load(f)
-        msl = None
-        if args.msl is not None:
-            msl = {}
-            for entry in reflection.get("entries", []):
-                name = entry.get("name") if isinstance(entry, dict) else None
-                if isinstance(name, str) and os.path.basename(name) == name:
-                    path = os.path.join(args.msl, name + ".metal")
-                    if os.path.exists(path):
-                        with open(path, "rb") as f:
-                            msl[name] = f.read()
+        msl = read_entries(reflection, args.msl, ".metal")
+        dxil = read_entries(reflection, args.dxil, ".dxil")
         metallib = None
         if args.metallib is not None:
             with open(args.metallib, "rb") as f:
                 metallib = f.read()
-        container = build(spirv, wgsl, reflection, enums, msl, metallib)
+        container = build(spirv, wgsl, reflection, enums, msl, metallib, dxil)
     except (OSError, ValueError, ContainerError) as error:
         print(f"mrhi_container: {error}", file=sys.stderr)
         return 1

@@ -72,6 +72,19 @@ they are untrusted.
   sampler index, so a cook other than `tools/mrhi_msl.py` may place
   them its own way; the reader checks the indices against Metal's
   ranges and each other.
+- **D3D12 code** (amended for the D3D12 driver): a D3D12 map and each
+  entry's DXIL, for containers using no heap. D3D12 has no compiler of
+  its own, so the DXIL is made offline, by SPIRV-Cross's HLSL and DXC
+  in `tools/mrhi_dxil.py`. The map records the register and space of
+  the root block, the specialization constants, the vertex information
+  (the base vertex and first instance D3D12's ids leave out) and each
+  binding, so another cook may place them its own way; the reader
+  checks that no two share a register and space in their class, and
+  that each entry's DXIL is a DXIL container. Specialization constants
+  are reads of root constants, since DXIL has none; a constant the code
+  must have as a literal (a workgroup size, an array's length) is
+  compiled with its default and marked fixed. The writer reads each
+  entry's resources from its DXIL and refuses any outside the map.
 - **The writer**, `tools/mrhi_container.py`, standard library only,
   applies the same rules and refuses modules whose entry points or
   bindings disagree with the reflection.

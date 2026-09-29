@@ -14128,8 +14128,8 @@
                 },
                 "d3d12": {
                   "class": "emulated",
-                  "note": "a variant or root constant",
-                  "cost": "a pipeline variant per value, or a root constant read in the shader"
+                  "note": "a root constant the shader reads",
+                  "cost": "a root constant read in the shader"
                 },
                 "metal": {
                   "class": "direct",
@@ -14152,8 +14152,8 @@
                 },
                 "d3d12": {
                   "class": "emulated",
-                  "note": "a variant or root constant",
-                  "cost": "a pipeline variant per value, or a root constant read in the shader"
+                  "note": "a root constant the shader reads",
+                  "cost": "a root constant read in the shader"
                 },
                 "metal": {
                   "class": "direct",
@@ -14176,8 +14176,8 @@
                 },
                 "d3d12": {
                   "class": "emulated",
-                  "note": "a variant or root constant",
-                  "cost": "a pipeline variant per value, or a root constant read in the shader"
+                  "note": "a root constant the shader reads",
+                  "cost": "a root constant read in the shader"
                 },
                 "metal": {
                   "class": "direct",
@@ -14200,8 +14200,8 @@
                 },
                 "d3d12": {
                   "class": "emulated",
-                  "note": "a variant or root constant",
-                  "cost": "a pipeline variant per value, or a root constant read in the shader"
+                  "note": "a root constant the shader reads",
+                  "cost": "a root constant read in the shader"
                 },
                 "metal": {
                   "class": "direct",
@@ -15645,8 +15645,8 @@
             },
             "d3d12": {
               "class": "emulated",
-              "note": "a root constant the shader reads, or a variant made offline",
-              "cost": "a root constant read in the shader, or one DXIL variant per value set"
+              "note": "a root constant the shader reads; a constant sizing something is compiled at its default and refused another value with mrhi_errorUnsupported",
+              "cost": "a root constant read in the shader"
             },
             "metal": {
               "class": "direct",

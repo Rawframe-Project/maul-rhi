@@ -5,8 +5,8 @@
 # tools/mrhi_container.py against the library: a container it writes
 # is read by test_shader with the same digest and reflection, as are one
 # whose entries use heaps and so has no WGSL, and ones with Metal code,
-# whose map follows the writer's rule; code that disagrees with its
-# reflection is refused.
+# and D3D12 code, whose maps follow the writer's rules; code that
+# disagrees with its reflection is refused.
 #
 # usage: test_container_writer.py TEST_SHADER
 
@@ -95,6 +95,45 @@ MSL = {
 METAL_INDICES = bytes([1, 0, 0, 2, 1, 1])
 
 
+# Each entry's DXIL resources, as (class, register, space), at the
+# places the writer's D3D12 rule gives: a binding at its slot in its
+# table's space, the root block, constants and vertex information at b0,
+# b1 and b2 of space 5.
+DXIL = {
+    "vs": [("b", 0, 5), ("b", 0, 0), ("b", 2, 5), ("b", 1, 5)],
+    "fs": [("t", 2, 0), ("s", 1, 0), ("s", 0, 2)],
+    "cs": [("u", 0, 1), ("u", 1, 1)],
+}
+PSV_TYPES = {"invalid": 0, "s": 1, "b": 2, "t": 4, "u": 7}
+DXIL_KINDS = {"fragment": 0, "vertex": 1, "compute": 5}
+
+
+def dxbc(stage, resources, stride=24, parts=(b"PSV0", b"DXIL"), count=None):
+    """A DXIL container of a stage declaring the resources, a class of
+    "range" being eight shader resource views, its PSV0 part claiming
+    count of them: all the writer reads."""
+    count = len(resources) if count is None else count
+    psv = struct.pack("<I", 24) + bytes(24) + struct.pack("<I", count)
+    if resources:
+        psv += struct.pack("<I", stride)
+        for kind, reg, space in resources:
+            high = reg + 7 if kind == "range" else reg
+            psv += struct.pack("<4I", PSV_TYPES.get(kind, 4), space, reg, high)
+            psv += bytes(max(stride - 16, 0))
+    blobs = {b"PSV0": psv, b"DXIL": struct.pack("<II", DXIL_KINDS[stage] << 16 | 0x60, 2),
+             b"ODD!": b"\1"}
+    head = 32 + 4 * len(parts)
+    offsets = []
+    body = b""
+    for fourcc in parts:
+        body += bytes(-len(body) % 4)
+        offsets.append(head + len(body))
+        body += fourcc + struct.pack("<I", len(blobs[fourcc])) + blobs[fourcc]
+    size = head + len(body)
+    return (b"DXBC" + bytes(20) + struct.pack("<II", size, len(parts)) +
+            struct.pack(f"<{len(parts)}I", *offsets) + body)
+
+
 def instruction(opcode, *operands):
     return [(len(operands) + 1) << 16 | opcode, *operands]
 
@@ -176,6 +215,18 @@ def metal_options(folder, msl=None, metallib=None):
             f.write(metallib)
         options += ["--metallib", path]
     return options
+
+
+def dxil_options(folder, dxil):
+    """Writes each entry's DXIL as given and answers the writer's options
+    for it."""
+    directory = os.path.join(folder, "dxil")
+    shutil.rmtree(directory, ignore_errors=True)
+    os.makedirs(directory)
+    for name, code in dxil.items():
+        with open(os.path.join(directory, name + ".dxil"), "wb") as f:
+            f.write(code)
+    return ["--dxil", directory]
 
 
 def main():
@@ -401,6 +452,99 @@ def main():
                       reflection=dict(REFLECTION, bindings=REFLECTION["bindings"] + [
                           {"table": 3, "slot": i, "kind": "sampler", "stages": ["fragment"],
                            "sampler": "filtering"} for i in range(15)]))
+
+        # D3D12: DXIL, its map, fixed constants, and what the writer
+        # refuses.
+        stages = {e["name"]: e["stage"] for e in REFLECTION["entries"]}
+        blobs = {n: dxbc(stages[n], r) for n, r in DXIL.items()}
+        data = read_back(dxil_options(folder, blobs), "DXIL")
+        if data is not None:
+            head = struct.pack("<6I", 0, 5, 1, 5, 2, 5) + bytes(8)
+            records = b""
+            at = 0
+            for name in ("vs", "fs", "cs"):
+                records += struct.pack("<III4x", at, len(blobs[name]), name == "vs")
+                at += len(blobs[name])
+            places = b"".join(struct.pack("<II", b["slot"], b["table"])
+                              for b in REFLECTION["bindings"])
+            check(section(data, 14) == head + records + places + bytes(4),
+                  "the map: its buffers, each entry's DXIL, each binding, no constant fixed")
+            check(section(data, 15) == blobs["vs"] + blobs["fs"] + blobs["cs"],
+                  "the DXIL, in the entries' order")
+        unread = dict(blobs, vs=dxbc("vertex", [("b", 0, 5), ("b", 0, 0)]))
+        data = read_back(dxil_options(folder, unread), "DXIL reading no vertex information")
+        if data is not None:
+            check(section(data, 14)[16:24] == bytes(8) and section(data, 14)[40] == 0,
+                  "no vertex information's place, and no reader")
+        # Constant 0 sizes an array through another constant, constant 1
+        # the workgroup, and constant 2 nothing.
+        words = list(struct.unpack(f"<{len(code) // 4}I", code))
+        words += instruction(71, 80, 1, 0) + instruction(71, 81, 1, 1)
+        words += instruction(71, 82, 1, 2) + instruction(71, 83, 11, 25)
+        words += instruction(52, 90, 84, 128, 80, 85)
+        words += instruction(28, 86, 91, 84)
+        words += instruction(51, 90, 83, 81, 87, 87)
+        sized = struct.pack(f"<{len(words)}I", *words)
+        status, errors, output = write(folder, sized, WGSL, REFLECTION,
+                                       dxil_options(folder, blobs))
+        check(status == 0, f"DXIL with fixed constants is written: {errors}")
+        if status == 0:
+            with open(output, "rb") as f:
+                check(section(f.read(), 14)[-4:] == bytes([1, 1, 0, 0]),
+                      "constants sizing something fixed, through others too")
+        undefaulted = copy.deepcopy(REFLECTION)
+        del undefaulted["constants"][1]["default"]
+        status, _, _ = write(folder, sized, WGSL, undefaulted, dxil_options(folder, blobs))
+        check(status == 1, "refused: a fixed constant without a default")
+
+        odd = dict(blobs, vs=dxbc("vertex", DXIL["vs"], parts=(b"PSV0", b"DXIL", b"ODD!")))
+        data = read_back(dxil_options(folder, odd), "DXIL of a length not a multiple of 4")
+        if data is not None:
+            check(struct.unpack_from("<I", section(data, 14), 48)[0] == len(odd["vs"]) + 3,
+                  "the next DXIL at a multiple of 4")
+        read_only = copy.deepcopy(REFLECTION)
+        read_only["bindings"].append({"table": 1, "slot": 2, "kind": "read_only_storage_buffer",
+                                      "stages": ["compute"]})
+        status, errors, _ = write(folder, code, WGSL, read_only, dxil_options(
+            folder, dict(blobs, cs=dxbc("compute", DXIL["cs"] + [("t", 2, 1)]))))
+        check(status == 0, f"a read-only storage buffer as a shader resource view: {errors}")
+        status, errors, _ = write(folder, code, WGSL, REFLECTION, dxil_options(
+            folder, dict(blobs, fs=dxbc("fragment", [("t", 2, 0)], stride=0))))
+        check(status == 1 and errors.startswith("mrhi_container: "),
+              "refused: one resource record at stride 0")
+
+        def d3d12_refused(what, change, reflection=REFLECTION, wgsl=WGSL, module=code):
+            status, errors, output = write(folder, module, wgsl, reflection,
+                                           dxil_options(folder, dict(blobs, **change)))
+            check(status == 1 and errors.startswith("mrhi_container: ") and
+                  not os.path.exists(output), f"refused: {what}")
+
+        status, errors, _ = write(folder, code, WGSL, REFLECTION, dxil_options(
+            folder, {"vs": blobs["vs"], "cs": blobs["cs"]}))
+        check(status == 1 and errors.startswith("mrhi_container: "),
+              "refused: an entry without DXIL")
+        d3d12_refused("DXIL of another stage", {"fs": dxbc("vertex", DXIL["fs"])})
+        d3d12_refused("a resource outside the map",
+                      {"cs": dxbc("compute", DXIL["cs"] + [("u", 5, 1)])})
+        d3d12_refused("a register of another class",
+                      {"cs": dxbc("compute", [("t", 0, 1)])})
+        d3d12_refused("vertex information outside a vertex entry",
+                      {"fs": dxbc("fragment", DXIL["fs"] + [("b", 2, 5)])})
+        d3d12_refused("the root block without one", {}, reflection=rootless)
+        d3d12_refused("constants without any", {}, reflection=dict(REFLECTION, constants=[]))
+        d3d12_refused("an unknown resource type",
+                      {"fs": dxbc("fragment", [("invalid", 0, 0)])})
+        d3d12_refused("a range of registers",
+                      {"fs": dxbc("fragment", [("range", 2, 0)])})
+        d3d12_refused("resource records too short",
+                      {"fs": dxbc("fragment", DXIL["fs"], stride=12)})
+        d3d12_refused("no PSV0 part", {"fs": dxbc("fragment", DXIL["fs"], parts=(b"DXIL",))})
+        d3d12_refused("no DXIL part", {"fs": dxbc("fragment", DXIL["fs"], parts=(b"PSV0",))})
+        d3d12_refused("DXIL without its magic", {"fs": b"DXBX" + blobs["fs"][4:]})
+        d3d12_refused("DXIL whose size is not its length", {"fs": blobs["fs"] + bytes(4)})
+        d3d12_refused("a PSV0 part short of its resources",
+                      {"fs": dxbc("fragment", DXIL["fs"], count=40)})
+        d3d12_refused("DXIL beside a heap", {}, wgsl=None, reflection=heaped, module=heap_code)
     return 1 if failures else 0
 
 

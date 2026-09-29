@@ -19,38 +19,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Parses a copy of exactly the container's bytes, so that a read past
-// them is caught under the sanitizers.
-static mrhiResult Parse(void)
-{
-    uint8_t* copy = malloc(s_size);
-    CHECK(copy != nullptr, "room for a copy");
-    if (copy == nullptr)
-    {
-        return mrhi_errorCapacity;
-    }
-    memcpy(copy, s_container, s_size);
-    mrhiContainer container;
-    mrhiResult status = mrhiParseContainer(copy, s_size, &container);
-    free(copy);
-    return status;
-}
-
-// Assembles the sections and parses them.
-static mrhiResult Built(void)
-{
-    Assemble();
-    return Parse();
-}
-
-// Removes a section.
-static void Drop(uint32_t section)
-{
-    memmove(&s_sections[section], &s_sections[section + 1],
-            (s_sectionCount - section - 1) * sizeof(Section));
-    --s_sectionCount;
-}
-
 static void TestDefault(void)
 {
     Reset();
@@ -109,7 +77,7 @@ static void TestDefault(void)
         Put16(Record(ENTRIES, 0, 48) + 34, optional[i] == VARIABLES ? 0 : 1);
         Put16(Record(ENTRIES, 1, 48) + 34, optional[i] == VARIABLES ? 0 : 1);
         Put16(Record(ENTRIES, 1, 48) + 32, optional[i] == VARIABLES ? 0 : 1);
-        Drop(optional[i]);
+        DropSection(optional[i]);
         CHECK(Built() == mrhi_success, "an optional section left out");
     }
     Reset();
@@ -251,7 +219,7 @@ static void TestSections(void)
     for (size_t i = 0; i < sizeof(required) / sizeof(required[0]); ++i)
     {
         Reset();
-        Drop(required[i]);
+        DropSection(required[i]);
         CHECK(Built() == mrhi_errorInvalid, "a required section left out");
     }
     Reset();
@@ -548,7 +516,7 @@ static void TestHeapUses(void)
               mrhiContainerEntry(&container, 2).heapUses ==
                   (mrhi_heapUseStorageBuffers | mrhi_heapUseWrites),
           "the heap uses of every entry noted");
-    Drop(WGSL);
+    DropSection(WGSL);
     CHECK(Built() == mrhi_success, "no WGSL section at all");
 }
 
@@ -712,11 +680,11 @@ static void TestMetalCode(void)
     CHECK(Built() == mrhi_errorInvalid, "a map without code");
     Reset();
     AddMetal(true, true);
-    Drop(METAL_MAP);
+    DropSection(METAL_MAP);
     CHECK(Built() == mrhi_errorInvalid, "code without a map");
     Reset();
     AddMetal(false, true);
-    Drop(METAL_MAP);
+    DropSection(METAL_MAP);
     CHECK(Built() == mrhi_errorInvalid, "a metallib without a map");
     Reset();
     AddMetal(true, true);

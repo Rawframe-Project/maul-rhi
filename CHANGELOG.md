@@ -363,6 +363,12 @@ format.
   `tools/mrhi_container.py --msl --metallib` writes them and
   `tools/mrhi_msl.py` makes the MSL offline with SPIRV-Cross. The
   suite's and the samples' containers carry MSL.
+- D3D12 code in shader containers: a D3D12 map and each entry's DXIL
+  (sections 14 and 15), checked by the reader;
+  `tools/mrhi_container.py --dxil` writes them, checking each entry's
+  resources against the map, and `tools/mrhi_dxil.py` makes the DXIL
+  offline with SPIRV-Cross and DXC. The suite's and the samples'
+  containers carry DXIL.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.

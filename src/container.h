@@ -75,11 +75,36 @@ typedef struct mrhiMetalEntry
 // A Metal index the map leaves unused.
 #define MRHI_METAL_NONE 255
 
+// A D3D12 register and its space.
+typedef struct mrhiD3d12Place
+{
+    uint32_t reg;
+    uint32_t space;
+} mrhiD3d12Place;
+
+// The constant buffers a D3D12 map places besides the bindings.
+typedef enum mrhiD3d12Buffer
+{
+    mrhiD3d12RootBlock,
+    mrhiD3d12Constants,
+    mrhiD3d12VertexInfo,
+} mrhiD3d12Buffer;
+
+// An entry's D3D12 code: its DXIL's range in the DXIL section, and
+// whether it reads the vertex information.
+typedef struct mrhiD3d12Entry
+{
+    uint32_t dxilOffset;
+    uint32_t dxilLength;
+    bool vertexInfo;
+} mrhiD3d12Entry;
+
 // A checked container: its digest and root block, its sections in the
 // caller's bytes, whether it uses 16-bit floats, and the builtins and
 // heap uses of its entries together; the WGSL is absent (NULL, 0 bytes)
 // exactly when an entry uses a heap. The Metal map is NULL without Metal
-// code, and the MSL and metallib each NULL and 0 bytes when absent.
+// code, and the MSL and metallib each NULL and 0 bytes when absent; the
+// D3D12 map and DXIL are both NULL and 0 bytes, or both present.
 typedef struct mrhiContainer
 {
     uint8_t digest[MRHI_DIGEST_BYTES];
@@ -111,6 +136,10 @@ typedef struct mrhiContainer
     size_t mslBytes;
     const uint8_t* metallib;
     size_t metallibBytes;
+    const uint8_t* d3d12Map;
+    size_t d3d12MapBytes;
+    const uint8_t* dxil;
+    size_t dxilBytes;
 } mrhiContainer;
 
 // Checks a container: success with its sections, mrhi_errorVersion for
@@ -131,5 +160,13 @@ mrhiShaderConstant mrhiContainerConstant(const mrhiContainer* container, uint32_
 uint8_t mrhiContainerMetalRoot(const mrhiContainer* container);
 mrhiMetalEntry mrhiContainerMetalEntry(const mrhiContainer* container, uint32_t index);
 uint8_t mrhiContainerMetalIndex(const mrhiContainer* container, uint32_t binding);
+
+// The D3D12 map of a checked container with DXIL: where a constant
+// buffer lies ({0, 0} when the container has none of it), an entry's
+// code, where a binding lies, and whether a constant is fixed.
+mrhiD3d12Place mrhiContainerD3d12Buffer(const mrhiContainer* container, mrhiD3d12Buffer buffer);
+mrhiD3d12Entry mrhiContainerD3d12Entry(const mrhiContainer* container, uint32_t index);
+mrhiD3d12Place mrhiContainerD3d12Binding(const mrhiContainer* container, uint32_t binding);
+bool mrhiContainerD3d12Fixed(const mrhiContainer* container, uint32_t constant);
 
 #endif // MAUL_RHI_SRC_CONTAINER_H

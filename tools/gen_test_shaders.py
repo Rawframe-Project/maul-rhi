@@ -10,9 +10,10 @@
 # compiles each stage under its entry name, spirv-link joins them into
 # one module, spirv-val checks it for Vulkan 1.3, tools/mrhi_msl.py
 # crosses each entry of a container with WGSL to MSL through
-# spirv-cross, and tools/mrhi_container.py writes the container, which
-# lands beside its
-# sources in NAME_container.h as bytes. CI runs none of these tools; the
+# spirv-cross, tools/mrhi_dxil.py compiles it to DXIL through
+# spirv-cross and dxc, and tools/mrhi_container.py writes the
+# container, which lands beside its sources in NAME_container.h as
+# bytes. CI runs none of these tools; the
 # headers are committed, and this script is run again whenever a source
 # changes.
 #
@@ -25,8 +26,8 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Each container: its directory, its name, its stages' sources and
-# entries, and whether it has WGSL, and so MSL (a container reading
-# heaps has neither).
+# entries, and whether it has WGSL, and so MSL and DXIL (a container
+# reading heaps has none of them).
 CONTAINERS = (
     ("test/shaders", "conformance", (("vert", "vs"), ("frag", "fs"), ("comp", "cs"),
                                      ("placed.vert", "vp"), ("root.frag", "fr"),
@@ -61,12 +62,14 @@ def build(work, shaders, name, stages, wgsl):
     run("spirv-val", "--target-env", "vulkan1.3", linked)
     container = os.path.join(work, f"{name}.mrsc")
     reflection = os.path.join(shaders, f"{name}.json")
-    metal = []
+    code = []
     if wgsl:
         msl = os.path.join(work, "msl")
         run(sys.executable, os.path.join(ROOT, "tools", "mrhi_msl.py"), linked, reflection, msl)
-        metal = ["--msl", msl]
-    run(sys.executable, os.path.join(ROOT, "tools", "mrhi_container.py"), *metal, linked,
+        dxil = os.path.join(work, "dxil")
+        run(sys.executable, os.path.join(ROOT, "tools", "mrhi_dxil.py"), linked, reflection, dxil)
+        code = ["--msl", msl, "--dxil", dxil]
+    run(sys.executable, os.path.join(ROOT, "tools", "mrhi_container.py"), *code, linked,
         os.path.join(shaders, f"{name}.wgsl") if wgsl else "-",
         reflection, container)
     with open(container, "rb") as file:

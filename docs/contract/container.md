@@ -60,6 +60,8 @@ after checking their bounds, so a later writer can add sections.
 | 11 | Metal map | with Metal code | where each binding lies in Metal, and each entry's MSL |
 | 12 | MSL | no | Metal Shading Language sources, UTF-8 |
 | 13 | metallib | no | a Metal library holding every entry point |
+| 14 | D3D12 map | with DXIL | where each binding lies in D3D12, and each entry's DXIL |
+| 15 | DXIL | no | a DXIL container per entry point |
 
 An array section's size is a whole number of its records, at most
 4,096 of them. Every record is checked, whether or not an entry names
@@ -183,6 +185,50 @@ Vertex buffers take buffer indices from 30 downwards, vertex buffer 0
 at 30; the Metal driver refuses a pipeline whose vertex buffers reach
 an index its container uses.
 
+## The D3D12 map
+
+D3D12 binds by register and space, per class: constant buffers (`b`),
+shader resource views (`t`), unordered access views (`u`) and samplers
+(`s`). Uniform buffers are constant buffers; sampled textures and
+read-only storage buffers shader resource views; storage buffers and
+storage textures unordered access views. The map says where the root
+block, the specialization constants, the vertex information and each
+binding lie, and where each entry's DXIL is:
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | 2 × u32 | the root block's constant buffer register and space; both 0 when the root block is empty |
+| 8 | 2 × u32 | the constants' constant buffer register and space; both 0 without constants |
+| 16 | 2 × u32 | the vertex information's constant buffer register and space; both 0 when no entry reads it |
+| 24 | 8 bytes | zero |
+| 32 | 16 bytes per entry | the entries, in the entries section's order |
+| after them | 2 × u32 per binding | each binding's register and space, in the bindings section's order |
+| after them | u8 per constant | 1 when the constant is fixed, else 0, in the constants section's order |
+
+Its size is exactly that. An entry's record:
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | u32 | its DXIL's offset in the DXIL section, a multiple of 4 |
+| 4 | u32 | its DXIL's length in bytes |
+| 8 | u32 | 1 when it reads the vertex information, else 0; 0 unless it is a vertex entry |
+| 12 | 4 bytes | zero |
+
+- The constants' constant buffer holds each constant's 32 bits in the
+  constants section's order, constant i at byte 4i. A fixed constant
+  was compiled with its default, which it must have: the code does not
+  read it, and a pipeline may not give it another value.
+- The vertex information's constant buffer holds the draw's base
+  vertex, then its first instance, as 32-bit integers, which D3D12's
+  vertex and instance ids leave out.
+- Spaces are below `0xFFFFFFF0`, and no two of the root block, the
+  constants, the vertex information and the bindings share a register
+  and space in their class.
+- Every entry's DXIL lies inside the DXIL section and is a DXIL
+  container: it begins with `DXBC` and its size field (the u32 at byte
+  24) is its length.
+- An entry that reads a heap has no D3D12 code yet.
+
 ## On a device
 
 `mrhiCreateShader` refuses as unsupported a container that exceeds the
@@ -221,18 +267,21 @@ same for every pipeline made from it.
 - **The WGSL section:** well-formed UTF-8 without NUL.
 - **The MSL section:** its entries' ranges, as the Metal map says.
 - **The metallib section:** at least its four-byte magic.
+- **The DXIL section:** its entries' containers, as the D3D12 map says.
 
 Drivers check the code itself when they make their modules.
 
 ## The writer
 
-`tools/mrhi_container.py [--msl DIR] [--metallib FILE] SPIRV WGSL
-REFLECTION OUTPUT` writes a container from the two modules and a JSON
-reflection (`-` for the WGSL of a container whose entries use heaps);
-its opening comment shows the reflection's form, whose enum names are
-the contract's without their prefixes. With `--msl`, it reads each
-entry's MSL from `DIR/ENTRY.metal`; with `--metallib`, the library; with
-either, it writes the Metal map by the rule below. It applies the rules above, and
+`tools/mrhi_container.py [--msl DIR] [--metallib FILE] [--dxil DIR]
+SPIRV WGSL REFLECTION OUTPUT` writes a container from the two modules
+and a JSON reflection (`-` for the WGSL of a container whose entries
+use heaps); its opening comment shows the reflection's form, whose enum
+names are the contract's without their prefixes. With `--msl`, it reads
+each entry's MSL from `DIR/ENTRY.metal`; with `--metallib`, the
+library; with either, it writes the Metal map by the rule below. With
+`--dxil`, it reads each entry's DXIL from `DIR/ENTRY.dxil` and writes
+the D3D12 map by the rule below. It applies the rules above, and
 refuses code that disagrees with the reflection:
 - both modules hold exactly the reflection's entry points, with their
   stages; a WGSL compute entry's workgroup size is literal, since no
@@ -255,3 +304,19 @@ from the MSL. `tools/mrhi_msl.py SPIRV REFLECTION DIR` makes that MSL
 with SPIRV-Cross: it rewrites a copy of the SPIR-V's descriptor
 decorations to the rule's indices and crosses each entry to
 `DIR/ENTRY.metal`.
+
+The writer's D3D12 rule: a binding's register is its slot and its
+space its table; the root block, the constants and the vertex
+information are constant buffers 0, 1 and 2 of space 5. A constant is
+fixed when the SPIR-V sizes something with it (a workgroup size or an
+array's length, directly or through other constants), since HLSL needs
+a literal there. The writer reads each entry's resources from its DXIL
+(the `PSV0` part) and refuses DXIL of another stage or reading a
+resource outside the map, including the vertex information outside a
+vertex entry; an entry reads the vertex information when its DXIL
+declares that constant buffer. `tools/mrhi_dxil.py SPIRV REFLECTION DIR`
+makes that DXIL for shader model 6.0 with SPIRV-Cross and DXC: it gives
+a copy of the SPIR-V's root block the rule's register, crosses each
+entry to HLSL that reads the vertex information, defines each unfixed
+constant as a read of the constants' buffer, and compiles
+`DIR/ENTRY.dxil` without reflection or debug data.

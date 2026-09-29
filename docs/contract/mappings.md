@@ -552,10 +552,10 @@ restricted or absent-rejected, with how.
 
 | Value | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
-| `mrhi_constantBool` | direct: OpSpecConstantTrue | emulated: a variant or root constant (cost: a pipeline variant per value, or a root constant read in the shader) | direct: a function constant | direct: override bool |
-| `mrhi_constantInt32` | direct: OpSpecConstant | emulated: a variant or root constant (cost: a pipeline variant per value, or a root constant read in the shader) | direct: a function constant | direct: override i32 |
-| `mrhi_constantUint32` | direct: OpSpecConstant | emulated: a variant or root constant (cost: a pipeline variant per value, or a root constant read in the shader) | direct: a function constant | direct: override u32 |
-| `mrhi_constantFloat32` | direct: OpSpecConstant | emulated: a variant or root constant (cost: a pipeline variant per value, or a root constant read in the shader) | direct: a function constant | direct: override f32 |
+| `mrhi_constantBool` | direct: OpSpecConstantTrue | emulated: a root constant the shader reads (cost: a root constant read in the shader) | direct: a function constant | direct: override bool |
+| `mrhi_constantInt32` | direct: OpSpecConstant | emulated: a root constant the shader reads (cost: a root constant read in the shader) | direct: a function constant | direct: override i32 |
+| `mrhi_constantUint32` | direct: OpSpecConstant | emulated: a root constant the shader reads (cost: a root constant read in the shader) | direct: a function constant | direct: override u32 |
+| `mrhi_constantFloat32` | direct: OpSpecConstant | emulated: a root constant the shader reads (cost: a root constant read in the shader) | direct: a function constant | direct: override f32 |
 
 ## mrhiVertexFormat
 
@@ -900,7 +900,7 @@ restricted or absent-rejected, with how.
 
 | Concept | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
-| `mrhiConstantValue` | direct: a VkSpecializationMapEntry and its bytes | emulated: a root constant the shader reads, or a variant made offline (cost: a root constant read in the shader, or one DXIL variant per value set) | direct: MTLFunctionConstantValues | direct: a pipeline-overridable constant |
+| `mrhiConstantValue` | direct: a VkSpecializationMapEntry and its bytes | emulated: a root constant the shader reads; a constant sizing something is compiled at its default and refused another value with mrhi_errorUnsupported (cost: a root constant read in the shader) | direct: MTLFunctionConstantValues | direct: a pipeline-overridable constant |
 | `mrhiVertexBufferLayout` | direct: VkVertexInputBindingDescription | direct: the input slot class and the stride given with IASetVertexBuffers | direct: MTLVertexBufferLayoutDescriptor | direct: GPUVertexBufferLayout |
 | `mrhiVertexAttribute` | direct: VkVertexInputAttributeDescription | direct: D3D12_INPUT_ELEMENT_DESC | direct: MTLVertexAttributeDescriptor | direct: GPUVertexAttribute |
 | `mrhiStencilFace` | direct: VkStencilOpState | direct: D3D12_DEPTH_STENCILOP_DESC | direct: MTLStencilDescriptor | direct: GPUStencilFaceState |

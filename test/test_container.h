@@ -8,7 +8,9 @@
 #ifndef MAUL_RHI_TEST_CONTAINER_H
 #define MAUL_RHI_TEST_CONTAINER_H
 
+#include "container.h"
 #include "sha256.h"
+#include "test_harness.h"
 
 #include "maul-rhi/shader.h"
 
@@ -216,6 +218,48 @@ static inline void AddMetal(bool msl, bool metallib)
     }
 }
 
+// The D3D12 map's section, once AddD3d12 appended it; the DXIL follows.
+static uint32_t s_d3d12Map;
+
+// Appends the D3D12 map and DXIL to the container: the root block,
+// constants and vertex information at constant buffers 0 to 2 of space
+// 5, each binding at its slot in its table's space, the vertex entry
+// reading the vertex information, and three 32-byte DXIL containers.
+static inline void AddD3d12(void)
+{
+    s_d3d12Map = s_sectionCount;
+    s_sections[s_d3d12Map] = (Section){.type = 14};
+    uint8_t* head = Record(s_d3d12Map, 0, 32);
+    for (uint32_t i = 0; i < 3; ++i)
+    {
+        Put32(head + i * 8, i);
+        Put32(head + i * 8 + 4, 5);
+    }
+    for (uint32_t i = 0; i < 3; ++i)
+    {
+        uint8_t* entry = Record(s_d3d12Map, 0, 32 + (i + 1) * 16) + 32 + i * 16;
+        Put32(entry, i * 32);
+        Put32(entry + 4, 32);
+        Put32(entry + 8, i == 0 ? 1 : 0);
+    }
+    static const uint8_t places[6][2] = {{0, 0}, {1, 0}, {2, 0}, {3, 0}, {0, 1}, {1, 1}};
+    for (uint32_t i = 0; i < 6; ++i)
+    {
+        uint8_t* binding = Record(s_d3d12Map, 0, 80 + (i + 1) * 8) + 80 + i * 8;
+        Put32(binding, places[i][0]);
+        Put32(binding + 4, places[i][1]);
+    }
+    Record(s_d3d12Map, 0, 129)[128] = 0;
+    s_sections[s_d3d12Map + 1] = (Section){.type = 15};
+    for (uint32_t i = 0; i < 3; ++i)
+    {
+        uint8_t* dxil = Record(s_d3d12Map + 1, i, 32);
+        memcpy(dxil, "DXBC", 4);
+        Put32(dxil + 24, 32);
+    }
+    s_sectionCount = s_d3d12Map + 2;
+}
+
 // Writes the digest of the container's bytes past it.
 static inline void Seal(void)
 {
@@ -243,6 +287,38 @@ static inline void Assemble(void)
     s_size = offset;
     Put64(s_container + 8, s_size);
     Seal();
+}
+
+// Parses a copy of exactly the container's bytes, so that a read past
+// them is caught under the sanitizers.
+static inline mrhiResult Parse(void)
+{
+    uint8_t* copy = malloc(s_size);
+    CHECK(copy != nullptr, "room for a copy");
+    if (copy == nullptr)
+    {
+        return mrhi_errorCapacity;
+    }
+    memcpy(copy, s_container, s_size);
+    mrhiContainer container;
+    mrhiResult status = mrhiParseContainer(copy, s_size, &container);
+    free(copy);
+    return status;
+}
+
+// Assembles the sections and parses them.
+static inline mrhiResult Built(void)
+{
+    Assemble();
+    return Parse();
+}
+
+// Removes a section.
+static inline void DropSection(uint32_t section)
+{
+    memmove(&s_sections[section], &s_sections[section + 1],
+            (s_sectionCount - section - 1) * sizeof(Section));
+    --s_sectionCount;
 }
 
 #endif // MAUL_RHI_TEST_CONTAINER_H
