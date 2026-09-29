@@ -8,7 +8,7 @@
 #include "capabilities_core.h"
 #include "vulkan_adapter.h"
 
-static VkImageUsageFlags ImageUsageOf(mrhiTextureUsage usage, mrhiFormat format)
+VkImageUsageFlags mrhiVulkanImageUsage(mrhiTextureUsage usage, mrhiFormat format)
 {
     bool depth = mrhiFormatHasDepth(format) || mrhiFormatHasStencil(format);
     VkImageUsageFlags flags = 0;
@@ -41,7 +41,7 @@ void mrhiVulkanImageOf(const mrhiTextureDef* def, VkFormat depthStencil, mrhiVul
                 .arrayLayers = volume ? 1 : def->depthOrLayers,
                 .samples = (VkSampleCountFlagBits)def->sampleCount,
                 .tiling = VK_IMAGE_TILING_OPTIMAL,
-                .usage = ImageUsageOf(def->usage, def->format),
+                .usage = mrhiVulkanImageUsage(def->usage, def->format),
                 .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
                 .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             },

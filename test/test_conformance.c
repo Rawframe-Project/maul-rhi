@@ -14,7 +14,9 @@
 
 #include "maul-rhi/capabilities.h"
 #include "maul-rhi/device.h"
+#include "maul-rhi/frame.h"
 #include "maul-rhi/instance.h"
+#include "maul-rhi/resources.h"
 #include "maul-rhi/test.h"
 
 #include <stdlib.h>
@@ -138,6 +140,125 @@ static void CheckFormats(mrhiInstance* instance, mrhiAdapterId adapter)
           "rg11b10Renderable renders");
 }
 
+static mrhiBufferId MakeBuffer(mrhiDevice* device, uint64_t size)
+{
+    mrhiBufferDef def = mrhiDefaultBufferDef();
+    def.size = size;
+    def.usage = mrhi_bufferStorage | mrhi_bufferCopySource | mrhi_bufferCopyDestination;
+    mrhiBufferId buffer = {0};
+    CHECK(mrhiCreateBuffer(device, &def, &buffer) == mrhi_success, "a buffer");
+    return buffer;
+}
+
+static mrhiTextureId MakeTexture(mrhiDevice* device, mrhiTextureKind kind, mrhiFormat format,
+                                 uint32_t layers)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.kind = kind;
+    def.format = format;
+    def.width = 64;
+    def.height = 64;
+    def.depthOrLayers = layers;
+    def.mipLevels = 7;
+    def.usage = mrhi_textureSampled | mrhi_textureRenderTarget | mrhi_textureCopyDestination;
+    mrhiTextureId texture = {0};
+    CHECK(mrhiCreateTexture(device, &def, &texture) == mrhi_success, "a texture");
+    return texture;
+}
+
+static mrhiViewId MakeView(mrhiDevice* device, mrhiTextureId texture, mrhiTextureKind kind,
+                           mrhiTextureAspect aspect)
+{
+    mrhiViewDef def = mrhiDefaultViewDef();
+    def.texture = texture;
+    def.kind = kind;
+    def.aspect = aspect;
+    mrhiViewId view = {0};
+    CHECK(mrhiCreateView(device, &def, &view) == mrhi_success, "a view");
+    return view;
+}
+
+// Objects of every kind: many buffers over more than one block, one
+// larger than half a block, textures and views of each shape, a
+// comparing anisotropic sampler; some destroyed, the rest left for the
+// device's end.
+static void CheckObjects(mrhiDevice* device)
+{
+    mrhiBufferId buffers[80];
+    for (int i = 0; i < 80; ++i)
+    {
+        buffers[i] = MakeBuffer(device, 1u << 20);
+    }
+    mrhiBufferId large = MakeBuffer(device, 40u << 20);
+    // Sizes off every alignment, so each next offset must be aligned.
+    for (uint64_t size = 4; size < 4096; size = size * 3 + 4)
+    {
+        (void)MakeBuffer(device, size);
+    }
+    for (int i = 0; i < 80; i += 2)
+    {
+        CHECK(mrhiDestroyBuffer(device, buffers[i]) == mrhi_success, "a buffer destroyed");
+    }
+    CHECK(mrhiDestroyBuffer(device, large) == mrhi_success, "the large one destroyed");
+    mrhiTextureId color = MakeTexture(device, mrhi_texture2d, mrhi_formatRgba8Unorm, 1);
+    mrhiTextureId depth = MakeTexture(device, mrhi_texture2d, mrhi_formatDepthStencil, 1);
+    mrhiTextureId cube = MakeTexture(device, mrhi_textureCube, mrhi_formatRgba16Float, 6);
+    (void)MakeView(device, color, mrhi_texture2d, mrhi_aspectAll);
+    mrhiViewId depthView = MakeView(device, depth, mrhi_texture2d, mrhi_aspectDepthOnly);
+    (void)MakeView(device, depth, mrhi_texture2d, mrhi_aspectAll);
+    (void)MakeView(device, cube, mrhi_textureCube, mrhi_aspectAll);
+    CHECK(mrhiDestroyView(device, depthView) == mrhi_success, "a view destroyed");
+    CHECK(mrhiDestroyTexture(device, depth) == mrhi_success, "a texture destroyed");
+    mrhiSamplerDef def = mrhiDefaultSamplerDef();
+    def.magFilter = mrhi_filterLinear;
+    def.minFilter = mrhi_filterLinear;
+    def.mipFilter = mrhi_filterLinear;
+    def.maxAnisotropy = 16;
+    def.compare = mrhi_compareLess;
+    mrhiSamplerId sampler = {0};
+    CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_success, "a sampler");
+}
+
+// A frame whose transients take memory the driver measures: a target
+// and two buffers, in a pass never culled.
+static void CheckFrameMemory(mrhiDevice* device)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiTextureDef texture = mrhiDefaultTextureDef();
+    texture.format = mrhi_formatRgba8Unorm;
+    texture.width = 64;
+    texture.height = 64;
+    mrhiResourceId target = {0};
+    CHECK(mrhiDeclareTexture(device, &texture, &target) == mrhi_success, "a target");
+    mrhiBufferDef buffer = mrhiDefaultBufferDef();
+    buffer.size = 1000;
+    mrhiResourceId buffers[2] = {{0}};
+    CHECK(mrhiDeclareBuffer(device, &buffer, &buffers[0]) == mrhi_success &&
+              mrhiDeclareBuffer(device, &buffer, &buffers[1]) == mrhi_success,
+          "two buffers");
+    mrhiAccess writes[2];
+    for (int i = 0; i < 2; ++i)
+    {
+        writes[i] = (mrhiAccess){.resource = buffers[i], .kind = mrhi_accessStorageWrite};
+    }
+    mrhiPassDef pass = mrhiDefaultPassDef();
+    pass.colorTargets[0] =
+        (mrhiColorTarget){.resource = target, .load = mrhi_loadClear, .store = mrhi_storeKeep};
+    pass.colorTargetCount = 1;
+    pass.accesses = writes;
+    pass.accessCount = 2;
+    pass.neverCull = true;
+    mrhiPassId id = {0};
+    CHECK(mrhiAddPass(device, &pass, &id) == mrhi_success, "a pass");
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    uint64_t bytes = 0;
+    // The target is transient, which a tile GPU keeps on chip.
+    CHECK(mrhiGetFrameMemory(device, &bytes) == mrhi_success && bytes >= 2000,
+          "the transients' memory");
+    CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
+}
+
 // Opens a device on an adapter with the features asked for, which it
 // answers ready at the next poll with them granted.
 static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrhiFeatures* asked)
@@ -162,6 +283,8 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CHECK(asked->timestampQuery ? status == mrhi_success && period > 0.0
                                 : status == mrhi_errorUnsupported,
           "a timestamp period with timestamps");
+    CheckObjects(device);
+    CheckFrameMemory(device);
     mrhiDestroyDevice(device);
 }
 

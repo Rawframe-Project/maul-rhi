@@ -42,6 +42,15 @@ ids, requests, the frame graph) can be tested without a GPU.
   `depthBiasClamp`, `fragmentStoresAndAtomics`, `samplerAnisotropy`,
   `shaderStorageImageExtendedFormats`), keyed by the physical device,
   so a device found again keeps its id.
+- **Vulkan memory:** buffers and textures are suballocated with TLSF
+  (`docs/references.md`) from device-local blocks per memory type and
+  kind, buffers apart from textures so that `bufferImageGranularity`
+  never applies; a block is 64 MiB or an eighth of its heap if smaller,
+  and a resource the driver wants alone or over half a block gets its
+  own allocation. An empty block is freed unless it is its pool's last.
+  The bookkeeping is sized from the device limits when the device is
+  made. Each frame slot will keep one block for its transients, and
+  mapped staging and readback memory come with the device.
 - **Conformance:** `test_conformance` runs the same checks through the
   public API on the test driver and on every native adapter. A host
   without one skips it unless `MAUL_RHI_REQUIRE_VULKAN` is set; Linux

@@ -11,7 +11,9 @@ driver: command reflection
 driver_test: allocator capabilities_core command driver driver_test_frame invariant
 driver_test_frame: command driver label
 driver_vulkan: allocator driver invariant vulkan_adapter vulkan_api vulkan_device
-vulkan_device: allocator driver invariant vulkan_adapter vulkan_api vulkan_resource
+vulkan_device: allocator driver invariant tlsf vulkan_adapter vulkan_api vulkan_memory vulkan_object vulkan_resource
+vulkan_memory: invariant tlsf vulkan_api
+vulkan_object: capabilities_core invariant vulkan_adapter vulkan_api vulkan_memory vulkan_resource
 vulkan_resource: capabilities_core vulkan_adapter vulkan_api
 vulkan_adapter: capabilities_core driver vulkan_api
 vulkan_api:

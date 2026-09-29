@@ -259,8 +259,11 @@ format.
   instance, and physical devices that meet the driver's floor listed as
   adapters with their features, limits and format capabilities; lavapipe
   is a software adapter. The Khronos C headers are kept as published in
-  `khronos/`. Surfaces and devices on it are refused as unsupported
-  until they land.
+  `khronos/`. Devices open with the floor's features and the granted
+  ones, one queue and a timeline semaphore; buffers, textures, views
+  and samplers are made in device-local memory suballocated with TLSF.
+  Surfaces, shaders, pipelines, queries and frames on it are refused as
+  unsupported until they land.
 - The conformance suite (`test_conformance`): the same checks through
   the public API on the test driver and every native adapter, run on
   lavapipe under the Khronos validation layer in Linux CI.

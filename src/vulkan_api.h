@@ -40,7 +40,21 @@
     X(vkGetSemaphoreCounterValue)                                                                  \
     X(vkWaitSemaphores)                                                                            \
     X(vkGetDeviceBufferMemoryRequirements)                                                         \
-    X(vkGetDeviceImageMemoryRequirements)
+    X(vkGetDeviceImageMemoryRequirements)                                                          \
+    X(vkAllocateMemory)                                                                            \
+    X(vkFreeMemory)                                                                                \
+    X(vkGetBufferMemoryRequirements2)                                                              \
+    X(vkGetImageMemoryRequirements2)                                                               \
+    X(vkBindBufferMemory)                                                                          \
+    X(vkBindImageMemory)                                                                           \
+    X(vkCreateBuffer)                                                                              \
+    X(vkDestroyBuffer)                                                                             \
+    X(vkCreateImage)                                                                               \
+    X(vkDestroyImage)                                                                              \
+    X(vkCreateImageView)                                                                           \
+    X(vkDestroyImageView)                                                                          \
+    X(vkCreateSampler)                                                                             \
+    X(vkDestroySampler)
 
 #define MRHI_VULKAN_FIELD(name) PFN_##name name;
 

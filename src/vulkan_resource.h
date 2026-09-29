@@ -25,6 +25,9 @@ typedef struct mrhiVulkanImage
 // not move before it is used.
 void mrhiVulkanImageOf(const mrhiTextureDef* def, VkFormat depthStencil, mrhiVulkanImage* imageOut);
 
+// The image usage a texture usage is for a format.
+VkImageUsageFlags mrhiVulkanImageUsage(mrhiTextureUsage usage, mrhiFormat format);
+
 // A buffer's create info from a buffer def.
 VkBufferCreateInfo mrhiVulkanBufferOf(const mrhiBufferDef* def);
 
