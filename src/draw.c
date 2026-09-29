@@ -4,7 +4,9 @@
 // Draws and dispatches (mrhi-0011): vertex and index buffers set per
 // slot, and each draw or dispatch checked against the pass's state as
 // WebGPU checks it: its pipeline, the tables that pipeline reads, and
-// buffers large enough for the elements it names.
+// buffers large enough for the elements it names. Indirect forms check
+// the same state and where their arguments lie, but not the arguments,
+// which are on the GPU.
 
 #include "encoder_core.h"
 
@@ -328,4 +330,100 @@ mrhiResult mrhiDispatch(mrhiDevice* device, mrhiPassId id, uint32_t x, uint32_t 
     }
     *record = (mrhiCommand){.type = mrhiCommandDispatch, .a = x, .b = y, .c = z};
     return mrhi_success;
+}
+
+// Checks the indirect arguments of bytes a command reads, then records
+// the command: success or the refusal.
+static mrhiResult RecordIndirect(mrhiDevice* device, mrhiFramePass* pass, mrhiCommandType type,
+                                 mrhiResourceId resource, uint64_t offset, uint64_t bytes)
+{
+    mrhiResult status = mrhi_success;
+    uint32_t object = offset % 4 != 0 ? 0
+                                      : DeclaredRange(device, pass, resource, mrhi_accessIndirect,
+                                                      offset, &bytes, &status);
+    if (object == 0)
+    {
+        return status == mrhi_errorStale ? status : mrhiDeviceMisuse(device);
+    }
+    mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
+    if (record == nullptr)
+    {
+        return mrhi_errorCapacity;
+    }
+    *record = (mrhiCommand){.type = type, .a = object, .c = offset};
+    return mrhi_success;
+}
+
+mrhiResult mrhiDrawIndirect(mrhiDevice* device, mrhiPassId id, mrhiResourceId resource,
+                            uint64_t offset)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    const mrhiPipelineSlot* slot = nullptr;
+    mrhiFramePass* pass = DrawPass(device, id, &slot, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    // No counts, so only whether each vertex buffer is set.
+    status = CheckVertexBuffers(device, id, slot, 0, 0, 0, 0);
+    if (status != mrhi_success)
+    {
+        return status;
+    }
+    return RecordIndirect(device, pass, mrhiCommandDrawIndirect, resource, offset, 16);
+}
+
+mrhiResult mrhiDrawIndexedIndirect(mrhiDevice* device, mrhiPassId id, mrhiResourceId resource,
+                                   uint64_t offset)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    const mrhiPipelineSlot* slot = nullptr;
+    mrhiFramePass* pass = DrawPass(device, id, &slot, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (pass->indexFormat == mrhi_indexNone ||
+        (slot->stripIndexFormat != mrhi_indexNone && slot->stripIndexFormat != pass->indexFormat))
+    {
+        return mrhi_errorState;
+    }
+    status = CheckVertexBuffers(device, id, slot, 0, 0, 0, 0);
+    if (status != mrhi_success)
+    {
+        return status;
+    }
+    return RecordIndirect(device, pass, mrhiCommandDrawIndexedIndirect, resource, offset, 20);
+}
+
+mrhiResult mrhiDispatchIndirect(mrhiDevice* device, mrhiPassId id, mrhiResourceId resource,
+                                uint64_t offset)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (mrhiWorkOf(pass) != mrhiWorkCompute)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    if (ReadyToRun(device, pass, &status) == nullptr)
+    {
+        return status;
+    }
+    return RecordIndirect(device, pass, mrhiCommandDispatchIndirect, resource, offset, 12);
 }

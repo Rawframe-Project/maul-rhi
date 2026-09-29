@@ -62,6 +62,15 @@ them at submission.
   counts within `workgroupsPerDimension`. Something not set is a state
   refusal, something too small invalid. The root block is not tracked:
   each pass starts with it zeroed, which the driver ensures.
+- **Indirect draws and dispatches** (`mrhiDrawIndirect`,
+  `mrhiDrawIndexedIndirect`, `mrhiDispatchIndirect`) check the same
+  state and that their arguments, 16, 20 or 12 bytes at an offset that
+  is a multiple of 4, lie in a buffer the pass declares with the
+  indirect access. The arguments are read on the GPU, so nothing checks
+  them here: as in WebGPU, a draw whose first instance is not zero
+  without `indirect_first_instance`, or a dispatch past
+  `workgroupsPerDimension`, does nothing, which a driver whose API does
+  not ensure it validates on the GPU.
 - **Copies** (`mrhiCopyBuffer`, `mrhiCopyBufferToTexture`,
   `mrhiCopyTextureToBuffer`, `mrhiCopyTexture`) are recorded in passes
   without targets and checked as WebGPU checks them: aligned offsets

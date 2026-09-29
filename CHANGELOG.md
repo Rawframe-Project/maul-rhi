@@ -186,6 +186,10 @@ format.
   `mrhiDraw`, `mrhiDrawIndexed` and `mrhiDispatch`, refused unless the
   pass's pipeline, the tables it reads and vertex and index buffers
   large enough for the elements drawn are set, as WebGPU refuses them.
+- Indirect draws and dispatches: `mrhiDrawIndirect`,
+  `mrhiDrawIndexedIndirect` and `mrhiDispatchIndirect`, their arguments
+  in a buffer the pass declares with the indirect access, checked as
+  WebGPU checks them; the arguments themselves are read on the GPU.
 - Copies: `mrhiCopyBuffer`, `mrhiCopyBufferToTexture`,
   `mrhiCopyTextureToBuffer` and `mrhiCopyTexture` (`mrhiBufferCopy`,
   `mrhiTextureCopy`, `mrhiExtent3d`), checked as WebGPU checks them and

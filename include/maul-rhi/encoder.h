@@ -342,6 +342,82 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDispatch(mrhiDevice* device, mrhiPassId pass, uint32_t x,
                                                     uint32_t y, uint32_t z);
 
+    /// Draws with the pass's pipeline, tables and vertex buffers, the arguments
+    /// read on the GPU: the vertices, the instances, the first vertex and the
+    /// first instance, 32-bit each. A first instance other than zero without
+    /// the indirect_first_instance feature makes the draw do nothing.
+    ///
+    /// @param device    The device.
+    /// @param pass      The pass, recording, with a graphics pipeline set.
+    /// @param resource  A buffer of the open frame the pass declares with the
+    ///                  indirect access, holding the arguments.
+    /// @param offset    The arguments' first byte, a multiple of 4, with 16
+    ///                  bytes after it in the buffer.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass
+    /// without targets, or a resource that is not a buffer the pass declares
+    /// with the indirect access, or an offset not a multiple of 4 or without
+    /// the arguments' bytes after it; `mrhi_errorStale` for a pass of another
+    /// frame, a destroyed pipeline, or a resource that is not live;
+    /// `mrhi_errorState` for a pass that is not recording, has no pipeline set,
+    /// or lacks a table or vertex buffer the pipeline reads;
+    /// `mrhi_errorCapacity` when the frame's commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDrawIndirect(mrhiDevice* device, mrhiPassId pass,
+                                                        mrhiResourceId resource, uint64_t offset);
+
+    /// Draws indexed vertices with the pass's pipeline, tables, vertex and
+    /// index buffers, the arguments read on the GPU: the indices, the
+    /// instances, the first index, the base vertex (signed) and the first
+    /// instance, 32-bit each. A first instance other than zero without the
+    /// indirect_first_instance feature makes the draw do nothing.
+    ///
+    /// @param device    The device.
+    /// @param pass      The pass, recording, with a graphics pipeline and an
+    ///                  index buffer set.
+    /// @param resource  A buffer of the open frame the pass declares with the
+    ///                  indirect access, holding the arguments.
+    /// @param offset    The arguments' first byte, a multiple of 4, with 20
+    ///                  bytes after it in the buffer.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass
+    /// without targets, or a resource that is not a buffer the pass declares
+    /// with the indirect access, or an offset not a multiple of 4 or without
+    /// the arguments' bytes after it; `mrhi_errorStale` for a pass of another
+    /// frame, a destroyed pipeline, or a resource that is not live;
+    /// `mrhi_errorState` for a pass that is not recording, has no pipeline set,
+    /// lacks a table or vertex buffer the pipeline reads, or has no index
+    /// buffer of the pipeline's strip index format; `mrhi_errorCapacity` when
+    /// the frame's commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDrawIndexedIndirect(mrhiDevice* device, mrhiPassId pass,
+                                                               mrhiResourceId resource,
+                                                               uint64_t offset);
+
+    /// Dispatches workgroups with the pass's compute pipeline and tables, the
+    /// counts in x, y and z read on the GPU, 32-bit each. A count past the
+    /// device's workgroupsPerDimension makes the dispatch do nothing.
+    ///
+    /// @param device    The device.
+    /// @param pass      The pass, recording, with a compute pipeline set.
+    /// @param resource  A buffer of the open frame the pass declares with the
+    ///                  indirect access, holding the counts.
+    /// @param offset    The arguments' first byte, a multiple of 4, with 12
+    ///                  bytes after it in the buffer.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass
+    /// that renders or copies, or a resource that is not a buffer the pass
+    /// declares with the indirect access, or an offset not a multiple of 4 or
+    /// without the arguments' bytes after it; `mrhi_errorStale` for a pass of
+    /// another frame, a destroyed pipeline, or a resource that is not live;
+    /// `mrhi_errorState` for a pass that is not recording, has no pipeline set,
+    /// or lacks a table the pipeline reads; `mrhi_errorCapacity` when the
+    /// frame's commands are full.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDispatchIndirect(mrhiDevice* device, mrhiPassId pass,
+                                                            mrhiResourceId resource,
+                                                            uint64_t offset);
+
     /// Copies bytes from one buffer of the frame to another.
     ///
     /// @param device             The device.

@@ -45,6 +45,11 @@ typedef enum mrhiCommandType
     mrhiCommandDrawIndexed,
     // a, b, c: the workgroups in x, y and z.
     mrhiCommandDispatch,
+    // a: the frame resource's slot plus one; c: the offset of the
+    // arguments, read on the GPU.
+    mrhiCommandDrawIndirect,
+    mrhiCommandDrawIndexedIndirect,
+    mrhiCommandDispatchIndirect,
     // b, c, d: the width (the bytes of a copy between buffers), height
     // and depth or layers; the source's and destination's sides follow,
     // an mrhiCommandBufferSide or mrhiCommandTextureSide each.

@@ -86,6 +86,9 @@ edit the contract, not this file.
 | `mrhiDraw` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiDrawIndexed` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiDispatch` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiDrawIndirect` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiDrawIndexedIndirect` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiDispatchIndirect` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiCopyBuffer` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiCopyBufferToTexture` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiCopyTextureToBuffer` | Safe from any thread; the pass is used by one thread at a time. |
