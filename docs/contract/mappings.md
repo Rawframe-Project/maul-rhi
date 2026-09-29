@@ -768,7 +768,7 @@ restricted or absent-rejected, with how.
 | `mrhiCreateSurface` | direct: the source's vkCreate*SurfaceKHR | direct: the window kept; the swapchain comes with configuring | direct: the layer kept; its device comes with configuring | direct: canvas.getContext('webgpu') |
 | `mrhiDestroySurface` | direct: vkDestroySurfaceKHR after its swapchain | direct: the window released | direct: the layer released | direct: context.unconfigure, the context dropped |
 | `mrhiGetSurfaceCaps` | direct: the surface capability, format and present mode queries for the adapter | direct: the factory's and output's support queries | direct: the layer's supported formats for the device | direct: getPreferredCanvasFormat, and the adapter's formats |
-| `mrhiConfigureSurface` | direct: vkCreateSwapchainKHR, the old swapchain retired | direct: CreateSwapChainForHwnd, or ResizeBuffers when only the size changes | direct: the layer's device, pixelFormat, colorspace, drawableSize and displaySyncEnabled set | direct: GPUCanvasContext.configure |
+| `mrhiConfigureSurface` | direct: vkCreateSwapchainKHR, VK_KHR_swapchain_mutable_format for the twin, the old swapchain destroyed once the queue is idle; a size other than a fixed currentExtent is out of date | direct: CreateSwapChainForHwnd, or ResizeBuffers when only the size changes | direct: the layer's device, pixelFormat, colorspace, drawableSize and displaySyncEnabled set | direct: GPUCanvasContext.configure |
 | `mrhiUnconfigureSurface` | direct: vkDestroySwapchainKHR once the frames that used it finish | direct: the swapchain released once those frames finish | direct: the layer's device cleared | direct: GPUCanvasContext.unconfigure |
 
 ## surface: the library's own

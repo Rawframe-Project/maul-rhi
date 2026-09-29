@@ -51,6 +51,12 @@ must not make one a dependency.
   - Configuring again reconfigures, and a failed reconfiguration
     leaves the surface unconfigured (Vulkan retires the old swapchain
     either way).
+  - Where the window fixes its images' size (Vulkan on Win32, X11 and
+    Android), a size other than the window's is
+    `mrhi_errorOutOfDate`: the program configures again with the
+    window's size. View formats a device cannot give the surface's
+    images (Vulkan without `VK_KHR_swapchain_mutable_format`) are
+    unsupported.
 - **Lifetimes:**
   - destroying a surface first ends its configuration;
   - destroying a device ends every configuration it holds;

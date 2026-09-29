@@ -12,6 +12,7 @@
 #define MAUL_RHI_SRC_VULKAN_FRAME_H
 
 #include "vulkan_pipeline.h"
+#include "vulkan_swapchain.h"
 
 #include "maul-rhi/device.h"
 
@@ -93,6 +94,7 @@ typedef struct mrhiVulkanFrames
     const VkPhysicalDeviceMemoryProperties* memory;
     mrhiVulkanObjects* objects;
     mrhiVulkanPipelines* pipelines;
+    mrhiVulkanSwapchains* swapchains;
     mrhiVulkanSlot* slots;
     uint32_t slotCount;
     uint32_t readbackLimit;
@@ -123,9 +125,8 @@ mrhiResult mrhiVulkanFramesInit(mrhiVulkanFrames* frames, uint32_t family,
 // on an idle device.
 void mrhiVulkanFramesDestroy(mrhiVulkanFrames* frames);
 
-// Records and submits a frame: mrhi_success, mrhi_errorUnsupported for
-// work this driver does not run yet, mrhi_errorCapacity, or
-// mrhi_errorDeviceLost.
+// Records and submits a frame, then presents its surface images:
+// mrhi_success, mrhi_errorCapacity, or mrhi_errorDeviceLost.
 mrhiResult mrhiVulkanSubmit(mrhiVulkanFrames* frames, const mrhiDriverFrame* frame, uint64_t tag);
 
 // Moves up to capacity finished frames into events, in order, their
@@ -140,7 +141,8 @@ bool mrhiVulkanWaitFrame(mrhiVulkanFrames* frames, uint64_t tag, uint64_t timeou
 void mrhiVulkanRetireLater(mrhiVulkanFrames* frames, mrhiVulkanRetired kind, uint64_t handle);
 
 // Records a frame's work into its slot's command buffer
-// (vulkan_record.c): mrhi_errorUnsupported for work not run yet.
+// (vulkan_record.c): mrhi_success, or mrhi_errorCapacity when views or
+// descriptor sets run out.
 mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
                             const mrhiDriverFrame* frame);
 

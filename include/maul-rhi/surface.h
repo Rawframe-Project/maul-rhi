@@ -300,11 +300,14 @@ extern "C"
     /// a surface the instance no longer has; `mrhi_errorUnsupported` for a
     /// surface the device's adapter cannot present to, a color, usage, present
     /// mode or alpha mode it does not report, a usage the format cannot take on
-    /// the device, a size past the device's limits, or a critical extension the
-    /// library does not know; `mrhi_errorState` for a device that is not ready,
-    /// or a surface configured on another device; `mrhi_errorCapacity` when the
-    /// device's surface limit is reached; `mrhi_errorPlatform` when the driver
-    /// fails.
+    /// the device, a size past the device's limits, view formats the device
+    /// cannot give the surface's images, or a critical extension the library
+    /// does not know; `mrhi_errorOutOfDate` for a size the window does not take
+    /// now, where the window fixes its images' size (Vulkan on Win32, X11 and
+    /// Android), to be configured again with the window's size;
+    /// `mrhi_errorState` for a device that is not ready, or a surface
+    /// configured on another device; `mrhi_errorCapacity` when the device's
+    /// surface limit is reached; `mrhi_errorPlatform` when the driver fails.
     /// @par Thread safety
     /// Safe from any thread; the device and its instance are used by one thread
     /// at a time.

@@ -373,7 +373,11 @@ static VkResult Run(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, const mrhiDr
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
         .commandBuffer = slot->commands,
     };
-    const VkSemaphoreSubmitInfo signal = {
+    // The frame waits for its surface images' acquires and signals their
+    // presents beside its serial.
+    mrhiVulkanSwapchains* swapchains = frames->swapchains;
+    uint32_t images = mrhiVulkanPresentSemaphores(swapchains, frame, frames->submitted + 1);
+    swapchains->signals[0] = (VkSemaphoreSubmitInfo){
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
         .semaphore = frames->timeline,
         .value = frames->submitted + 1,
@@ -381,10 +385,12 @@ static VkResult Run(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, const mrhiDr
     };
     const VkSubmitInfo2 submit = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .waitSemaphoreInfoCount = images,
+        .pWaitSemaphoreInfos = swapchains->waits,
         .commandBufferInfoCount = 1,
         .pCommandBufferInfos = &commands,
-        .signalSemaphoreInfoCount = 1,
-        .pSignalSemaphoreInfos = &signal,
+        .signalSemaphoreInfoCount = images + 1,
+        .pSignalSemaphoreInfos = swapchains->signals,
     };
     return frames->api->vkQueueSubmit2(frames->queue, 1, &submit, VK_NULL_HANDLE);
 }
@@ -418,6 +424,9 @@ mrhiResult mrhiVulkanSubmit(mrhiVulkanFrames* frames, const mrhiDriverFrame* fra
     slot->serial = frames->submitted;
     slot->tag = tag;
     slot->ring = frame->readbackRing;
+    // A present's own results reach the program at the next acquire;
+    // only a lost device ends the frame here.
+    frames->lost = !mrhiVulkanPresent(frames->swapchains);
     return mrhi_success;
 }
 

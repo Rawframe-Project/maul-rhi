@@ -1096,6 +1096,203 @@ static bool MeetsFloors(const mrhiSurfaceCaps* caps)
            (caps->usages & mrhi_textureRenderTarget) != 0;
 }
 
+// The first 8-bit sRGB color in Rec. 709 caps report, and its sRGB
+// twin.
+static mrhiSurfaceColor Srgb8(const mrhiSurfaceCaps* caps, mrhiFormat* twinOut)
+{
+    mrhiSurfaceColor found = {0};
+    for (uint32_t i = caps->colorCount; i > 0; --i)
+    {
+        const mrhiSurfaceColor* color = &caps->colors[i - 1];
+        bool srgb8 =
+            (color->format == mrhi_formatBgra8Unorm || color->format == mrhi_formatRgba8Unorm) &&
+            color->primaries == mrhi_primariesBt709 && color->transfer == mrhi_transferSrgb &&
+            color->range == mrhi_rangeStandard;
+        found = srgb8 ? *color : found;
+    }
+    *twinOut = found.format == mrhi_formatBgra8Unorm ? mrhi_formatBgra8UnormSrgb
+                                                     : mrhi_formatRgba8UnormSrgb;
+    return found;
+}
+
+static mrhiResult Configure(mrhiDevice* device, mrhiSurfaceId surface, const mrhiSurfaceCaps* caps,
+                            uint32_t width, uint32_t height)
+{
+    mrhiSurfaceConfig config = mrhiDefaultSurfaceConfig();
+    config.surface = surface;
+    config.color = Srgb8(caps, &config.viewFormats[0]);
+    config.usage = mrhi_textureRenderTarget | (caps->usages & mrhi_textureCopySource);
+    config.width = width;
+    config.height = height;
+    return mrhiConfigureSurface(device, &config);
+}
+
+// Whether an acquire gave an image.
+static bool IsAcquired(mrhiResult result)
+{
+    return result == mrhi_success || result == mrhi_suboptimal;
+}
+
+// Records a frame, opened already, that clears the surface's image to
+// red and reads its first pixel back when asked: the acquire's outcome.
+// A frame without an image is dropped.
+static mrhiResult RecordRed(mrhiDevice* device, mrhiSurfaceId surface, bool read,
+                            mrhiRequestId* requestOut)
+{
+    mrhiResourceId image = {0};
+    mrhiResult acquired = mrhiAcquireSurfaceImage(device, surface, &image);
+    if (!IsAcquired(acquired))
+    {
+        CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
+        return acquired;
+    }
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.colorTargets[0] = (mrhiColorTarget){
+        .resource = image,
+        .load = mrhi_loadClear,
+        .store = mrhi_storeKeep,
+        .clear = {1.0f, 0.0f, 0.0f, 1.0f},
+    };
+    def.colorTargetCount = 1;
+    mrhiPassId clear = {0};
+    CHECK(mrhiAddPass(device, &def, &clear) == mrhi_success, "a clearing pass");
+    mrhiAccess reads = Whole(image, mrhi_accessCopySource);
+    mrhiPassId copy = read ? CopyPass(device, &reads, 1) : (mrhiPassId){0};
+    CHECK(mrhiCompileFrame(device) == mrhi_success &&
+              mrhiBeginPass(device, clear) == mrhi_success &&
+              mrhiEndPass(device, clear) == mrhi_success,
+          "cleared");
+    if (read)
+    {
+        const mrhiTextureCopy source = {.resource = image};
+        const mrhiExtent3d one = {1, 1, 1};
+        CHECK(mrhiBeginPass(device, copy) == mrhi_success &&
+                  mrhiReadTexture(device, copy, &source, &one, requestOut) == mrhi_success &&
+                  mrhiEndPass(device, copy) == mrhi_success,
+              "read");
+    }
+    return acquired;
+}
+
+// A frame that clears the surface's image to red, reads its first pixel
+// back where the image allows, and presents it: the acquire's outcome.
+static mrhiResult PresentRed(mrhiDevice* device, mrhiSurfaceId surface, bool read,
+                             uint8_t pixelOut[4])
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiRequestId request = {0};
+    mrhiResult acquired = RecordRed(device, surface, read, &request);
+    if (!IsAcquired(acquired))
+    {
+        return acquired;
+    }
+    Finish(device, read ? 1 : 0);
+    size_t size = 0;
+    CHECK(!read ||
+              (mrhiTakeReadback(device, request, pixelOut, 4, &size) == mrhi_success && size == 4),
+          "a pixel");
+    return acquired;
+}
+
+// Frames presented back to back, waiting only when the device's frames
+// in flight are all running, so that acquire semaphores come round
+// again while frames still run.
+static void CheckFramesInFlight(mrhiDevice* device, mrhiSurfaceId surface)
+{
+    mrhiRequestId tokens[16];
+    uint32_t submitted = 0;
+    uint32_t waited = 0;
+    for (int i = 0; i < 12; ++i)
+    {
+        mrhiFrameDef frame = mrhiDefaultFrameDef();
+        mrhiResult begun = mrhiBeginFrame(device, &frame);
+        while (begun == mrhi_errorCapacity && waited < submitted)
+        {
+            CHECK(mrhiWaitFrame(device, tokens[waited++ % 16], UINT64_C(10000000000)) ==
+                      mrhi_success,
+                  "a frame finished");
+            begun = mrhiBeginFrame(device, &frame);
+        }
+        mrhiRequestId request = {0};
+        CHECK(begun == mrhi_success && IsAcquired(RecordRed(device, surface, false, &request)) &&
+                  mrhiSubmitFrame(device, &tokens[submitted++ % 16]) == mrhi_success,
+              "a frame in flight");
+    }
+    while (waited < submitted)
+    {
+        CHECK(mrhiWaitFrame(device, tokens[waited++ % 16], UINT64_C(10000000000)) == mrhi_success,
+              "a frame finished");
+    }
+    mrhiDeviceNotification record;
+    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    {
+        CHECK(record.outcome == mrhi_success, "a frame done");
+    }
+}
+
+// A frame that acquires an image and gives it back, and one that
+// presents an image no pass wrote.
+static void CheckUnwrittenImages(mrhiDevice* device, mrhiSurfaceId surface)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId image = {0};
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              IsAcquired(mrhiAcquireSurfaceImage(device, surface, &image)) &&
+              mrhiDropFrame(device) == mrhi_success,
+          "an image given back");
+    uint8_t pixel[4];
+    CHECK(IsAcquired(PresentRed(device, surface, false, pixel)), "the image taken again");
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              IsAcquired(mrhiAcquireSurfaceImage(device, surface, &image)) &&
+              mrhiCompileFrame(device) == mrhi_success,
+          "an image no pass writes");
+    Finish(device, 0);
+}
+
+// Presents to the surface from a device on an adapter that can: frames
+// cleared and read back, more than the images and their semaphores; an
+// image given back and taken again; one presented unwritten; a
+// reconfiguration; a size the window does not take, which leaves the
+// surface unconfigured until it is configured again.
+static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiSurfaceId surface,
+                            const mrhiSurfaceCaps* caps)
+{
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.adapter = adapter;
+    mrhiDevice* device = nullptr;
+    mrhiRequestId request;
+    mrhiInstanceNotification record;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success &&
+              mrhiNextInstanceNotification(instance, &record) == mrhi_success,
+          "a device");
+    CHECK(Configure(device, surface, caps, 64, 48) == mrhi_success, "configured");
+    bool read = (caps->usages & mrhi_textureCopySource) != 0;
+    mrhiFormat twin = mrhi_formatNone;
+    bool bgra = Srgb8(caps, &twin).format == mrhi_formatBgra8Unorm;
+    const uint8_t red[4] = {bgra ? 0 : 255, 0, bgra ? 255 : 0, 255};
+    for (int i = 0; i < 8; ++i)
+    {
+        uint8_t pixel[4] = {0};
+        CHECK(IsAcquired(PresentRed(device, surface, read, pixel)), "presented");
+        CHECK(!read || memcmp(pixel, red, 4) == 0, "red, in the format's channel order");
+    }
+    CheckFramesInFlight(device, surface);
+    CheckUnwrittenImages(device, surface);
+    uint8_t pixel[4];
+    CHECK(Configure(device, surface, caps, 64, 48) == mrhi_success &&
+              IsAcquired(PresentRed(device, surface, false, pixel)),
+          "reconfigured");
+    CHECK(Configure(device, surface, caps, 32, 32) == mrhi_errorOutOfDate,
+          "a size the window does not take");
+    CHECK(PresentRed(device, surface, false, pixel) == mrhi_errorState, "unconfigured");
+    CHECK(Configure(device, surface, caps, 64, 48) == mrhi_success &&
+              IsAcquired(PresentRed(device, surface, false, pixel)),
+          "configured again");
+    CHECK(mrhiUnconfigureSurface(device, surface) == mrhi_success, "unconfigured");
+    mrhiDestroyDevice(device);
+}
+
 // A window of the X server the environment names, where there is one.
 static void CheckXcbSurface(mrhiInstance* instance, const mrhiAdapterId* ids, size_t count)
 {
@@ -1126,6 +1323,10 @@ static void CheckXcbSurface(mrhiInstance* instance, const mrhiAdapterId* ids, si
         mrhiSurfaceCaps caps;
         CHECK(mrhiGetSurfaceCaps(instance, surface, ids[i], &caps) == mrhi_success, "caps");
         CHECK(!caps.presentable || MeetsFloors(&caps), "the floors where it presents");
+        if (caps.presentable)
+        {
+            CheckPresenting(instance, ids[i], surface, &caps);
+        }
         presenting += caps.presentable ? 1 : 0;
     }
     CHECK(presenting > 0 || !IsSet("MAUL_RHI_REQUIRE_SURFACE"), "an adapter presents there");

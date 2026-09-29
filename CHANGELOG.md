@@ -269,7 +269,11 @@ format.
   and dispatch, with +Y up, and query sets measure occlusion and
   timestamps. Surfaces are made from XCB, Wayland, Win32, Android and
   Metal layer sources and report their colors, present modes, alpha
-  modes and usages; configuring them waits for swapchains.
+  modes and usages. Configured surfaces get swapchains whose images
+  frames acquire, render to and present; an image a dropped frame gave
+  back is handed out again. A configuration whose size the window does
+  not take is `mrhi_errorOutOfDate`, and one naming the twin view
+  format where the device cannot give it is unsupported.
 - A table's bindings record their count as the command's payload, so a
   driver steps over them; before, a driver read the bindings as
   commands.

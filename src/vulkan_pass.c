@@ -34,6 +34,9 @@ mrhiVulkanFrameTexture mrhiVulkanFrameImage(const mrhiVulkanRecording* recording
     const mrhiDriverResource* resource = Find(recording->frame, index1);
     VkImage image = resource->kind == mrhiDriverDeviceTexture
                         ? recording->frames->objects->textures[resource->handle - 1].image
+                    : resource->kind == mrhiDriverSurfaceImage
+                        ? mrhiVulkanSwapchainImage(recording->frames->swapchains, resource->handle,
+                                                   resource->image)
                         : recording->slot->images[index1 - 1];
     return (mrhiVulkanFrameTexture){.image = image, .def = resource->texture};
 }

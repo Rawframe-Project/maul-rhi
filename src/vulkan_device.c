@@ -6,8 +6,8 @@
 // memory a declared resource takes is read from the create info alone
 // (Vulkan 1.3's device memory requirements). Buffers, textures, views
 // and samplers are made in device-local memory, query sets as query
-// pools; shader modules and pipelines are made at the call. Frames run;
-// configuring a surface is refused as unsupported until swapchains land.
+// pools; shader modules and pipelines are made at the call; configured
+// surfaces get swapchains (vulkan_swapchain.c). Frames run.
 
 #include "vulkan_device.h"
 
@@ -19,6 +19,7 @@
 #include "vulkan_object.h"
 #include "vulkan_pipeline.h"
 #include "vulkan_resource.h"
+#include "vulkan_swapchain.h"
 
 #include <stdalign.h>
 #include <stdckdint.h>
@@ -50,6 +51,7 @@ typedef struct VulkanDevice
     mrhiVulkanObjects objects;
     mrhiVulkanPipelines pipelines;
     mrhiVulkanFrames frames;
+    mrhiVulkanSwapchains swapchains;
 } VulkanDevice;
 
 // The features a device enables, chained.
@@ -151,6 +153,7 @@ static void Destroy(void* self)
     // Nothing runs once a device is destroyed; a lost device answers at
     // once.
     (void)device->api.vkDeviceWaitIdle(device->device);
+    mrhiVulkanSwapchainsDestroy(&device->swapchains);
     mrhiVulkanFramesDestroy(&device->frames);
     mrhiVulkanPipelinesDestroy(&device->pipelines);
     DestroyObjects(&device->objects);
@@ -271,41 +274,35 @@ static void LossReport(void* self, mrhiDeviceLossReport* reportOut)
     memcpy(reportOut->message, message, sizeof(message) - 1);
 }
 
-// The entries of later slices: making refuses as unsupported, so the
-// core never destroys, acquires or waits on anything of theirs.
-static mrhiResult RefuseSurface(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
-                                uint64_t oldSwapchain, uint64_t* swapchainOut)
+static mrhiResult ConfigureSurface(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
+                                   uint64_t oldSwapchain, uint64_t* swapchainOut)
 {
-    (void)self;
-    (void)surface;
-    (void)config;
-    (void)swapchainOut;
-    MRHI_ASSERT(oldSwapchain == 0);
-    return mrhi_errorUnsupported;
+    VulkanDevice* device = self;
+    // The core configures only surfaces the adapter presents to, which
+    // needs VK_KHR_swapchain, enabled wherever it is offered.
+    MRHI_ASSERT(device->api.vkCreateSwapchainKHR != nullptr);
+    static_assert(sizeof(VkSurfaceKHR) == sizeof(uint64_t), "a handle holds a surface");
+    VkSurfaceKHR handle;
+    memcpy((void*)&handle, &surface, sizeof(surface));
+    return mrhiVulkanConfigure(&device->swapchains, handle, config, oldSwapchain, swapchainOut);
 }
 
-static void NeverDestroyed(void* self, uint64_t handle)
+static void UnconfigureSurface(void* self, uint64_t swapchain)
 {
-    (void)self;
-    (void)handle;
-    MRHI_ASSERT(false);
+    VulkanDevice* device = self;
+    mrhiVulkanUnconfigure(&device->swapchains, swapchain);
 }
 
-static mrhiResult NeverAcquired(void* self, uint64_t swapchain, uint64_t* imageOut)
+static mrhiResult AcquireImage(void* self, uint64_t swapchain, uint64_t* imageOut)
 {
-    (void)self;
-    (void)swapchain;
-    (void)imageOut;
-    MRHI_ASSERT(false);
-    return mrhi_errorOutOfDate;
+    VulkanDevice* device = self;
+    return mrhiVulkanAcquire(&device->swapchains, swapchain, imageOut);
 }
 
-static void NeverReleased(void* self, uint64_t swapchain, uint64_t image)
+static void ReleaseImage(void* self, uint64_t swapchain, uint64_t image)
 {
-    (void)self;
-    (void)swapchain;
-    (void)image;
-    MRHI_ASSERT(false);
+    VulkanDevice* device = self;
+    mrhiVulkanGiveBack(&device->swapchains, swapchain, image);
 }
 
 static mrhiResult CreateShader(void* self, const mrhiShaderDef* def, const mrhiContainer* container,
@@ -387,16 +384,16 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .destroyTexture = DestroyTexture,
     .createView = CreateView,
     .destroyView = DestroyView,
-    .configureSurface = RefuseSurface,
-    .unconfigureSurface = NeverDestroyed,
+    .configureSurface = ConfigureSurface,
+    .unconfigureSurface = UnconfigureSurface,
     .createShader = CreateShader,
     .destroyShader = DestroyShader,
     .createComputePipeline = CreateCompute,
     .createGraphicsPipeline = CreateGraphics,
     .destroyPipeline = DestroyPipeline,
     .lossReport = LossReport,
-    .acquireImage = NeverAcquired,
-    .releaseImage = NeverReleased,
+    .acquireImage = AcquireImage,
+    .releaseImage = ReleaseImage,
     .createQuerySet = CreateQuerySet,
     .destroyQuerySet = DestroyQuerySet,
     .timestampPeriod = TimestampPeriod,
@@ -448,11 +445,31 @@ static VkResult Open(VulkanDevice* device, const mrhiDeviceDef* def)
     };
     Enabled enabled;
     Enable(&def->features, &enabled);
+    // Presenting needs VK_KHR_swapchain, and a swapchain whose images
+    // take their sRGB twin's views VK_KHR_swapchain_mutable_format.
+    static const char* const s_wanted[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                                           VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_EXTENSION_NAME};
+    uint32_t offered =
+        mrhiVulkanExtensions(device->vulkan, &device->allocator, device->physical, s_wanted, 2);
+    // The mutable format extension needs the swapchain.
+    offered = (offered & 1u) != 0 ? offered : 0;
+    const char* names[2];
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        if ((offered >> i & 1u) != 0)
+        {
+            names[count++] = s_wanted[i];
+        }
+    }
+    device->swapchains.mutableFormat = (offered & 2u) != 0;
     const VkDeviceCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .pNext = &enabled.features,
         .queueCreateInfoCount = 1,
         .pQueueCreateInfos = &queue,
+        .enabledExtensionCount = count,
+        .ppEnabledExtensionNames = names,
     };
     VkResult result =
         device->vulkan->vkCreateDevice(device->physical, &info, nullptr, &device->device);
@@ -460,7 +477,7 @@ static VkResult Open(VulkanDevice* device, const mrhiDeviceDef* def)
     {
         return result;
     }
-    if (!mrhiLoadVulkanDevice(device->vulkan, device->device, &device->api))
+    if (!mrhiLoadVulkanDevice(device->vulkan, device->device, (offered & 1u) != 0, &device->api))
     {
         PFN_vkDestroyDevice destroy = device->api.vkDestroyDevice;
         if (destroy != nullptr)
@@ -516,6 +533,15 @@ typedef struct Layout
     uint32_t viewLimit;
     size_t retire;
     uint32_t retireCount;
+    // The swapchains, and room for one frame's surface images.
+    size_t swapchains;
+    size_t waits;
+    size_t signals;
+    size_t presentChains;
+    size_t presentImages;
+    size_t presentWaits;
+    size_t presentResults;
+    size_t presentSlots;
     uint32_t blockCount;
     uint32_t nodeCount;
 } Layout;
@@ -570,6 +596,19 @@ static Layout LayoutOf(const mrhiDeviceDef* def)
                      limits->querySets + limits->pipelines;
     at.retire =
         mrhiLayoutAdd(layout, at.retireCount, sizeof(mrhiVulkanRetire), alignof(mrhiVulkanRetire));
+    uint32_t surfaces = limits->surfaces;
+    at.swapchains =
+        mrhiLayoutAdd(layout, surfaces, sizeof(mrhiVulkanSwapchain), alignof(mrhiVulkanSwapchain));
+    at.waits = mrhiLayoutAdd(layout, surfaces, sizeof(VkSemaphoreSubmitInfo),
+                             alignof(VkSemaphoreSubmitInfo));
+    at.signals = mrhiLayoutAdd(layout, (size_t)surfaces + 1, sizeof(VkSemaphoreSubmitInfo),
+                               alignof(VkSemaphoreSubmitInfo));
+    at.presentChains =
+        mrhiLayoutAdd(layout, surfaces, sizeof(VkSwapchainKHR), alignof(VkSwapchainKHR));
+    at.presentImages = mrhiLayoutAdd(layout, surfaces, sizeof(uint32_t), alignof(uint32_t));
+    at.presentWaits = mrhiLayoutAdd(layout, surfaces, sizeof(VkSemaphore), alignof(VkSemaphore));
+    at.presentResults = mrhiLayoutAdd(layout, surfaces, sizeof(VkResult), alignof(VkResult));
+    at.presentSlots = mrhiLayoutAdd(layout, surfaces, sizeof(uint32_t), alignof(uint32_t));
     return at;
 }
 
@@ -619,6 +658,32 @@ static void PlaceTables(VulkanDevice* device, const Layout* at, const mrhiDevice
     mrhiVulkanSlotsInit(&pipelines->pipelineSlots, slots, limits->pipelines);
 }
 
+// Sets up the swapchains over their tables in the device's block.
+static void PlaceSwapchains(VulkanDevice* device, const Layout* at, uint32_t surfaces)
+{
+    unsigned char* block = (unsigned char*)device;
+    bool mutableFormat = device->swapchains.mutableFormat;
+    device->swapchains = (mrhiVulkanSwapchains){
+        .vulkan = device->vulkan,
+        .api = &device->api,
+        .physical = device->physical,
+        .device = device->device,
+        .queue = device->queue,
+        .timeline = device->timeline,
+        .mutableFormat = mutableFormat,
+        .depthStencil = device->depthStencil,
+        .slots = (mrhiVulkanSwapchain*)(block + at->swapchains),
+        .capacity = surfaces,
+        .waits = (VkSemaphoreSubmitInfo*)(block + at->waits),
+        .signals = (VkSemaphoreSubmitInfo*)(block + at->signals),
+        .presentChains = (VkSwapchainKHR*)(block + at->presentChains),
+        .presentImages = (uint32_t*)(block + at->presentImages),
+        .presentWaits = (VkSemaphore*)(block + at->presentWaits),
+        .presentResults = (VkResult*)(block + at->presentResults),
+        .presentSlots = (uint32_t*)(block + at->presentSlots),
+    };
+}
+
 // Sets up the frames over their tables in the device's block.
 static void PlaceFrames(VulkanDevice* device, const Layout* at, const mrhiDeviceDef* def)
 {
@@ -634,6 +699,7 @@ static void PlaceFrames(VulkanDevice* device, const Layout* at, const mrhiDevice
         .memory = &device->memory.properties,
         .objects = &device->objects,
         .pipelines = &device->pipelines,
+        .swapchains = &device->swapchains,
         .slots = (mrhiVulkanSlot*)(block + at->frames),
         .slotCount = def->limits.framesInFlight,
         .readbackLimit = limits->readbacks,
@@ -705,6 +771,7 @@ mrhiResult mrhiCreateVulkanDevice(const mrhiAllocator* allocator, const mrhiVulk
         return status == mrhi_errorDeviceLost ? mrhi_errorPlatform : status;
     }
     PlaceTables(device, &at, &def->deviceLimits, &properties);
+    PlaceSwapchains(device, &at, def->deviceLimits.surfaces);
     PlaceFrames(device, &at, def);
     mrhiResult status = mrhiVulkanPipelinesInit(&device->pipelines);
     if (status == mrhi_success)

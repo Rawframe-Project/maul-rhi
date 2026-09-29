@@ -5,8 +5,7 @@
 // barriers, each state standing for a stage, an access and a layout,
 // then each kept pass's commands: pipelines, binding tables, the root
 // block, dynamic state, draws and dispatches in passes (vulkan_pass.c),
-// queries (vulkan_query.c), and copies, uploads and readbacks. Surface
-// images are refused as unsupported until their slice lands.
+// queries (vulkan_query.c), and copies, uploads and readbacks.
 
 #include "capabilities_core.h"
 #include "invariant.h"
@@ -76,7 +75,10 @@ static const Use s_uses[] = {
                              VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL},
     [mrhi_stateQueryResolve] = {VK_PIPELINE_STAGE_2_COPY_BIT | VK_PIPELINE_STAGE_2_CLEAR_BIT,
                                 VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED},
-    [mrhi_statePresent] = {VK_PIPELINE_STAGE_2_NONE, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR},
+    // The present semaphore is signalled after all commands, which orders
+    // the transition to presenting before it.
+    [mrhi_statePresent] = {VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, 0,
+                           VK_IMAGE_LAYOUT_PRESENT_SRC_KHR},
 };
 
 // The barriers gathered for one vkCmdPipelineBarrier2.
@@ -110,7 +112,8 @@ static bool IsTexture(const mrhiDriverFrame* frame, uint32_t index1)
 {
     MRHI_ASSERT(index1 != 0 && index1 <= frame->resourceCount);
     mrhiDriverResourceKind kind = frame->resources[index1 - 1].kind;
-    return kind == mrhiDriverDeviceTexture || kind == mrhiDriverTransientTexture;
+    return kind == mrhiDriverDeviceTexture || kind == mrhiDriverTransientTexture ||
+           kind == mrhiDriverSurfaceImage;
 }
 
 static void AddBarrier(const mrhiVulkanRecording* recording, const mrhiBarrier* barrier,
@@ -137,9 +140,13 @@ static void AddBarrier(const mrhiVulkanRecording* recording, const mrhiBarrier* 
     {
         const mrhiTextureRange* range = &barrier->range;
         mrhiVulkanFrameTexture texture = mrhiVulkanFrameImage(recording, index1);
+        // A surface image's first transition waits for its acquire, whose
+        // semaphore the frame waits on at all commands.
+        bool acquired = barrier->before == mrhi_stateUndefined &&
+                        recording->frame->resources[index1 - 1].kind == mrhiDriverSurfaceImage;
         batch->images[batch->imageCount++] = (VkImageMemoryBarrier2){
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-            .srcStageMask = before->stages,
+            .srcStageMask = acquired ? VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT : before->stages,
             .srcAccessMask = before->access,
             .dstStageMask = after->stages,
             .dstAccessMask = after->access,
@@ -454,26 +461,9 @@ static void RecordCommand(mrhiVulkanRecording* recording, const mrhiCommand* com
     }
 }
 
-// Whether this driver runs a frame: no surface images yet.
-static bool IsRunnable(const mrhiDriverFrame* frame)
-{
-    for (uint32_t i = 0; i < frame->resourceCount; ++i)
-    {
-        if (frame->resources[i].kind == mrhiDriverSurfaceImage && frame->resources[i].needed)
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
 mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
                             const mrhiDriverFrame* frame)
 {
-    if (!IsRunnable(frame))
-    {
-        return mrhi_errorUnsupported;
-    }
     mrhiVulkanRecording recording = {
         .frames = frames,
         .slot = slot,

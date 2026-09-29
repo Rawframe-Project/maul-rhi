@@ -36,6 +36,7 @@
 #define MRHI_VULKAN_DEVICE(X)                                                                      \
     X(vkDestroyDevice)                                                                             \
     X(vkDeviceWaitIdle)                                                                            \
+    X(vkQueueWaitIdle)                                                                             \
     X(vkGetDeviceQueue)                                                                            \
     X(vkCreateSemaphore)                                                                           \
     X(vkDestroySemaphore)                                                                          \
@@ -122,6 +123,14 @@
     X(vkGetPhysicalDeviceSurfaceFormatsKHR)                                                        \
     X(vkGetPhysicalDeviceSurfacePresentModesKHR)
 
+// The functions of VK_KHR_swapchain, read when the device has it.
+#define MRHI_VULKAN_SWAPCHAIN(X)                                                                   \
+    X(vkCreateSwapchainKHR)                                                                        \
+    X(vkDestroySwapchainKHR)                                                                       \
+    X(vkGetSwapchainImagesKHR)                                                                     \
+    X(vkAcquireNextImageKHR)                                                                       \
+    X(vkQueuePresentKHR)
+
 #define MRHI_VULKAN_FIELD(name) PFN_##name name;
 
 // The loader's library and the functions read from it.
@@ -140,6 +149,7 @@ typedef struct mrhiVulkan
 typedef struct mrhiVulkanDevice
 {
     MRHI_VULKAN_DEVICE(MRHI_VULKAN_FIELD)
+    MRHI_VULKAN_SWAPCHAIN(MRHI_VULKAN_FIELD)
 } mrhiVulkanDevice;
 
 // Opens the loader and reads the global functions: false, with nothing
@@ -153,8 +163,10 @@ bool mrhiLoadVulkanInstance(mrhiVulkan* vulkan, VkInstance instance);
 // when one is missing.
 bool mrhiLoadVulkanSurface(mrhiVulkan* vulkan, VkInstance instance);
 
-// Reads a device's functions: false when one is missing.
-bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, mrhiVulkanDevice* functions);
+// Reads a device's functions, and those of VK_KHR_swapchain when it has
+// it: false when one is missing.
+bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, bool swapchain,
+                          mrhiVulkanDevice* functions);
 
 // Closes the loader.
 void mrhiCloseVulkan(mrhiVulkan* vulkan);

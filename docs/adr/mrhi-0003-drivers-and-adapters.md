@@ -93,7 +93,16 @@ ids, requests, the frame graph) can be tested without a GPU.
   a surface when it offers `VK_KHR_swapchain` and its queue family
   presents there; its colors are the surface's format and color space
   pairs the contract's rows map, an sRGB format standing for its unorm
-  twin.
+  twin. A configuration makes a swapchain of at least three images,
+  with `VK_KHR_swapchain_mutable_format` for the twin; a retired
+  swapchain is destroyed once the queue is idle. Each swapchain has a
+  semaphore per image, signalled by the frame for its present, and one
+  acquire semaphore more than its images, each reused once the frame
+  that waited on it finishes. A frame waits on its images' acquires,
+  which its first transitions wait for, and its images are presented
+  after its submission; a present's result is reported at the next
+  acquire, and a window with no area is occluded. An image a frame
+  gives back stays acquired and is handed out at the next acquire.
 - **Vulkan queries:** a query set is a query pool. Each set a frame
   names is reset once before its first pass; a pass's timestamps are
   written before and after it, and occlusion queries bracket draws. As

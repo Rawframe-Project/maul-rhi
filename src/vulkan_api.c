@@ -72,6 +72,7 @@ static const Function s_global[] = {MRHI_VULKAN_GLOBAL(MRHI_VULKAN_LOADER_ENTRY)
 static const Function s_instance[] = {MRHI_VULKAN_INSTANCE(MRHI_VULKAN_LOADER_ENTRY)};
 static const Function s_surface[] = {MRHI_VULKAN_SURFACE(MRHI_VULKAN_LOADER_ENTRY)};
 static const Function s_device[] = {MRHI_VULKAN_DEVICE(MRHI_VULKAN_DEVICE_ENTRY)};
+static const Function s_swapchain[] = {MRHI_VULKAN_SWAPCHAIN(MRHI_VULKAN_DEVICE_ENTRY)};
 
 // Stores a function in its table's typed field: every Vulkan function
 // pointer has the one representation.
@@ -128,16 +129,29 @@ bool mrhiLoadVulkanSurface(mrhiVulkan* vulkan, VkInstance instance)
     return ReadInstance(vulkan, instance, s_surface, sizeof(s_surface) / sizeof(s_surface[0]));
 }
 
-bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, mrhiVulkanDevice* functions)
+// Reads functions through vkGetDeviceProcAddr: false when one is
+// missing.
+static bool ReadDevice(const mrhiVulkan* vulkan, VkDevice device, const Function* functions,
+                       size_t count, mrhiVulkanDevice* table)
 {
     bool found = true;
-    for (size_t i = 0; i < sizeof(s_device) / sizeof(s_device[0]); ++i)
+    for (size_t i = 0; i < count; ++i)
     {
-        PFN_vkVoidFunction function = vulkan->vkGetDeviceProcAddr(device, s_device[i].name);
+        PFN_vkVoidFunction function = vulkan->vkGetDeviceProcAddr(device, functions[i].name);
         found = found && function != nullptr;
-        Store(functions, s_device[i].offset, function);
+        Store(table, functions[i].offset, function);
     }
     return found;
+}
+
+bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, bool swapchain,
+                          mrhiVulkanDevice* functions)
+{
+    *functions = (mrhiVulkanDevice){0};
+    return ReadDevice(vulkan, device, s_device, sizeof(s_device) / sizeof(s_device[0]),
+                      functions) &&
+           (!swapchain || ReadDevice(vulkan, device, s_swapchain,
+                                     sizeof(s_swapchain) / sizeof(s_swapchain[0]), functions));
 }
 
 void mrhiCloseVulkan(mrhiVulkan* vulkan)
