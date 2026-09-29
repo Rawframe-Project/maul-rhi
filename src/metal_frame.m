@@ -8,8 +8,8 @@
 // once the frame has finished. Declared resources are made for the frame
 // in private memory, each its own object, and released as soon as the
 // command buffer is committed, since it holds them until it finishes.
-// The occlusion query sets a frame names are cleared to 0 before its
-// passes, so a query it never writes resolves to 0. The command buffer's
+// The query sets a frame resolves are cleared to 0 before its passes, so
+// a query it never writes resolves to 0. The command buffer's
 // completion only signals a semaphore, which waits take with their
 // deadline; polls read the command buffer's status.
 
@@ -148,17 +148,14 @@ static void ClearSet(id<MTLCommandBuffer> commands, id<MTLBlitCommandEncoder>* b
     [*blit fillBuffer:results range:NSMakeRange(0, results.length) value:0];
 }
 
-// Clears every occlusion query set the frame's passes write or resolve.
+// Clears every query set the frame resolves: a query the frame has not
+// written reads 0, and a set's results are seen only through a resolve.
 static void ClearQueries(id<MTLCommandBuffer> commands, const mrhiDriverFrame* frame)
 {
     id<MTLBlitCommandEncoder> blit = nil;
     for (uint32_t p = 0; p < frame->passCount; ++p)
     {
         const mrhiDriverPass* pass = &frame->passes[p];
-        if (pass->occlusionSet != 0)
-        {
-            ClearSet(commands, &blit, pass->occlusionSet);
-        }
         for (uint32_t chunk = pass->firstChunk; chunk != 0; chunk = frame->chunks[chunk - 1].next)
         {
             const mrhiCommandChunk* at = &frame->chunks[chunk - 1];
