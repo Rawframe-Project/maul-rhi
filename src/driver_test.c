@@ -72,6 +72,8 @@ typedef struct TestDevice
     uint32_t made;
     uint32_t madeBeforeFailure;
     uint32_t samplers;
+    uint32_t buffers;
+    uint64_t bufferBytes;
 } TestDevice;
 
 // A new object's handle, or mrhi_errorPlatform once the adapter's
@@ -96,6 +98,25 @@ static mrhiResult CreateSampler(void* self, const mrhiSamplerDef* def, uint64_t*
     return status;
 }
 
+static mrhiResult CreateBuffer(void* self, const mrhiBufferDef* def, uint64_t* handleOut)
+{
+    TestDevice* device = self;
+    mrhiResult status = MakeObject(device, handleOut);
+    if (status == mrhi_success)
+    {
+        ++device->buffers;
+        device->bufferBytes += def->size;
+    }
+    return status;
+}
+
+static void DestroyBuffer(void* self, uint64_t handle)
+{
+    TestDevice* device = self;
+    MRHI_ASSERT(handle != 0 && handle <= device->nextHandle && device->buffers > 0);
+    --device->buffers;
+}
+
 static void DestroySampler(void* self, uint64_t handle)
 {
     TestDevice* device = self;
@@ -116,6 +137,8 @@ static const mrhiDeviceDriverVtable s_deviceVtable = {
     .destroy = DestroyDevice,
     .createSampler = CreateSampler,
     .destroySampler = DestroySampler,
+    .createBuffer = CreateBuffer,
+    .destroyBuffer = DestroyBuffer,
 };
 
 static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiFeatures* features,

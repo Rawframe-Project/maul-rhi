@@ -519,3 +519,5 @@ bool mrhiFormatCapsWithin(const mrhiFormatCaps* asked, const mrhiFormatCaps* gra
         && (!asked->storage || granted->storage)
         && (asked->sampleCounts & ~granted->sampleCounts) == 0;
 }
+
+const mrhiBufferUsage mrhiBufferUsageKnown = 0xFFu;

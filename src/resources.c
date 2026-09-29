@@ -5,11 +5,13 @@
 // each def checked, the driver asked to make the object, and a
 // destruction that ends the id at once.
 
+#include "capabilities_core.h"
 #include "chain.h"
 #include "device_core.h"
 #include "instance_core.h"
 
 #define SAMPLER_DEF_COOKIE 0x6D727361u
+#define BUFFER_DEF_COOKIE  0x6D726275u
 
 mrhiSamplerDef mrhiDefaultSamplerDef(void)
 {
@@ -115,5 +117,76 @@ mrhiResult mrhiDestroySampler(mrhiDevice* device, mrhiSamplerId sampler)
     device->driver.vtable->destroySampler(device->driver.self,
                                           device->samplerHandles[sampler.index1 - 1]);
     mrhiPoolRelease(&device->samplers, sampler.index1);
+    return mrhi_success;
+}
+
+mrhiBufferDef mrhiDefaultBufferDef(void)
+{
+    mrhiBufferDef def = {0};
+    def.cookie = BUFFER_DEF_COOKIE;
+    return def;
+}
+
+mrhiResult mrhiCreateBuffer(mrhiDevice* device, const mrhiBufferDef* def, mrhiBufferId* bufferOut)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (def == nullptr || bufferOut == nullptr)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    mrhiResult status = CheckDef(device, def->cookie, BUFFER_DEF_COOKIE, def->next);
+    if (status != mrhi_success)
+    {
+        return status;
+    }
+    if (def->size == 0 || def->size % 4 != 0 || def->usage == 0 ||
+        (def->usage & ~mrhiBufferUsageKnown) != 0)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    if (def->size > device->limits.bufferBytes)
+    {
+        return mrhi_errorUnsupported;
+    }
+    status = mrhiDeviceUsable(device);
+    if (status != mrhi_success)
+    {
+        return status;
+    }
+    uint32_t index1 = 0;
+    uint32_t generation = 0;
+    if (!mrhiPoolAcquire(&device->buffers, &index1, &generation))
+    {
+        return mrhi_errorCapacity;
+    }
+    uint64_t handle = 0;
+    status = device->driver.vtable->createBuffer(device->driver.self, def, &handle);
+    if (status != mrhi_success)
+    {
+        mrhiPoolRelease(&device->buffers, index1);
+        return status;
+    }
+    device->bufferSlots[index1 - 1] =
+        (mrhiBufferSlot){.handle = handle, .size = def->size, .usage = def->usage};
+    *bufferOut = (mrhiBufferId){index1, generation};
+    return mrhi_success;
+}
+
+mrhiResult mrhiDestroyBuffer(mrhiDevice* device, mrhiBufferId buffer)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (!mrhiPoolIsLive(&device->buffers, buffer.index1, buffer.generation))
+    {
+        return mrhi_errorStale;
+    }
+    device->driver.vtable->destroyBuffer(device->driver.self,
+                                         device->bufferSlots[buffer.index1 - 1].handle);
+    mrhiPoolRelease(&device->buffers, buffer.index1);
     return mrhi_success;
 }

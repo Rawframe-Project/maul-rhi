@@ -12,6 +12,14 @@
 
 #include "maul-rhi/device.h"
 
+// A buffer as its device keeps it.
+typedef struct mrhiBufferSlot
+{
+    uint64_t handle;
+    uint64_t size;
+    mrhiBufferUsage usage;
+} mrhiBufferSlot;
+
 struct mrhiDevice
 {
     mrhiInstance* instance;
@@ -30,6 +38,9 @@ struct mrhiDevice
     // Samplers: ids, and each slot's driver handle.
     mrhiPool samplers;
     uint64_t* samplerHandles;
+    // Buffers: ids, and each slot's driver handle and def.
+    mrhiPool buffers;
+    mrhiBufferSlot* bufferSlots;
 };
 
 // mrhi_success for a ready device, mrhi_errorState for one that is not.

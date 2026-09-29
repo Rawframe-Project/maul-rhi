@@ -14,4 +14,4 @@ instance_core: driver
 invariant:
 notify: instance_core
 pool:
-resources: chain device_core instance_core
+resources: capabilities_core chain device_core instance_core

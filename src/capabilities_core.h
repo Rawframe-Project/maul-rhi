@@ -7,7 +7,7 @@
 #ifndef MAUL_RHI_SRC_CAPABILITIES_CORE_H
 #define MAUL_RHI_SRC_CAPABILITIES_CORE_H
 
-#include "maul-rhi/capabilities.h"
+#include "maul-rhi/resources.h"
 
 // Whether every feature asked for is granted.
 bool mrhiFeaturesWithin(const mrhiFeatures* asked, const mrhiFeatures* granted);
@@ -37,5 +37,8 @@ bool mrhiFormatFamilyGranted(mrhiFormat format, const mrhiFeatures* features);
 
 // Whether every capability asked for is granted.
 bool mrhiFormatCapsWithin(const mrhiFormatCaps* asked, const mrhiFormatCaps* granted);
+
+// The bits of each bitflags type the contract lists.
+extern const mrhiBufferUsage mrhiBufferUsageKnown;
 
 #endif // MAUL_RHI_SRC_CAPABILITIES_CORE_H

@@ -26,9 +26,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTRACT = os.path.join("docs", "contract", "mrhi.json")
 WIDTH = 80
 NAME = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
-KINDS = ("constant", "result", "enum", "opaque", "id", "struct", "function")
+KINDS = ("constant", "result", "enum", "bitflags", "opaque", "id", "struct", "function")
 # The kinds a type reference may name, as kind.name.
-REFERABLE = ("enum", "opaque", "id", "struct")
+REFERABLE = ("enum", "bitflags", "opaque", "id", "struct")
 WIDTHS = ("uint8", "uint16", "uint32", "int32")
 POINTERS = (None, "const", "mutable", "out")
 PRIMITIVES = {
@@ -148,8 +148,13 @@ def check_values(errors, where, item):
             errors.append(f"{where}: '{value.get('name')}' needs an integer value and a doc")
     if item["kind"] == "result" and 0 not in seen_values:
         errors.append(f"{where}: a result needs success as zero")
-    if item["kind"] == "enum" and item.get("width") not in WIDTHS:
-        errors.append(f"{where}: an enum needs a width, one of {', '.join(WIDTHS)}")
+    if item["kind"] in ("enum", "bitflags") and item.get("width") not in WIDTHS:
+        errors.append(f"{where}: needs a width, one of {', '.join(WIDTHS)}")
+    if item["kind"] == "bitflags":
+        for value in item.get("values", []):
+            bits = value.get("value")
+            if not isinstance(bits, int) or bits <= 0 or bits & (bits - 1):
+                errors.append(f"{where}: '{value.get('name')}' is not a single bit")
     if item.get("mapped"):
         for value in item.get("values", []):
             if not value.get("unmapped"):
@@ -227,7 +232,8 @@ def validate(contract):
         if item.get("name") in kind_of:
             errors.append(f"{where}: the name is declared twice")
         kind_of[item.get("name")] = item.get("kind")
-    checks = {"result": check_values, "enum": check_values, "constant": check_constant}
+    checks = {"result": check_values, "enum": check_values, "bitflags": check_values,
+              "constant": check_constant}
     for item in items:
         where = f"{item['kind']} '{item['name']}'"
         if item["kind"] in checks:
@@ -338,19 +344,22 @@ PREAMBLES = {
 
 
 def emit_values(names, item):
-    width = PRIMITIVES[item["width"]] if item["kind"] == "enum" else "int32_t"
+    width = PRIMITIVES[item["width"]] if item["kind"] != "result" else "int32_t"
     lines = comment(item["doc"], 4, "//")
     lines.append(f"    typedef {width} {names.type(item['name'])};")
     lines += ["", "    enum", "    {"]
     for value in item["values"]:
         lines += comment(value["doc"], 8, "//")
-        lines.append(f"        {names.value(value['name'])} = {c_value(value['value'])},")
+        bits = item["kind"] == "bitflags"
+        lines.append(f"        {names.value(value['name'])} = {c_value(value['value'], bits)},")
     lines.append("    };")
     return lines
 
 
-def c_value(value):
-    """An enum value; large ones in hexadecimal with an unsigned suffix."""
+def c_value(value, bits=False):
+    """An enum value; bits and large values in hexadecimal."""
+    if bits:
+        return f"0x{value:X}u"
     return f"0x{value:08X}u" if value > 0xFFFF else str(value)
 
 
@@ -416,6 +425,7 @@ def emit_function(names, item):
 
 
 EMITTERS = {
+    "bitflags": emit_values,
     "constant": emit_constant,
     "id": emit_id,
     "result": emit_values,
@@ -458,7 +468,7 @@ def emit_mappings(contract):
         for item in header["items"]:
             if not item.get("mapped"):
                 continue
-            is_enum = item["kind"] == "enum"
+            is_enum = item["kind"] in ("enum", "bitflags")
             lines += ["", f"## {names.type(item['name'])}", ""]
             lines.append(f"| {'Value' if is_enum else 'Member'} | "
                          + " | ".join(title for _, title in APIS) + " |")
@@ -549,7 +559,22 @@ def emit_capability_checks(contract):
                 lines.append(f"        features->{camel(member['name'])} = false;")
         lines.append("        break;")
     lines += ["    default:", "        break;", "    }", "}"]
-    return "\n".join(lines + format_checks(contract)) + "\n"
+    return "\n".join(lines + format_checks(contract) + known_bits(contract)) + "\n"
+
+
+def known_bits(contract):
+    """For every bitflags item, the mask of the bits the contract lists."""
+    names = Names(contract)
+    lines = []
+    for header in contract["headers"]:
+        for item in header["items"]:
+            if item["kind"] == "bitflags":
+                mask = 0
+                for value in item["values"]:
+                    mask |= value["value"]
+                c_name = names.type(item["name"])
+                lines += ["", f"const {c_name} {c_name}Known = 0x{mask:X}u;"]
+    return lines
 
 
 def format_checks(contract):

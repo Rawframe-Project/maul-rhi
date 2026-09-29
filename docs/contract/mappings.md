@@ -192,3 +192,23 @@ restricted or absent-rejected, with how.
 | `lodMax` | direct: maxLod | direct: MaxLOD | direct: lodMaxClamp | direct: lodMaxClamp |
 | `maxAnisotropy` | restricted: maxAnisotropy with samplerAnisotropy, clamped to maxSamplerAnisotropy | direct: MaxAnisotropy with an anisotropic filter | direct: maxAnisotropy | direct: maxAnisotropy, clamped by the implementation |
 | `compare` | direct: compareEnable and compareOp | direct: ComparisonFunc with a comparison filter | direct: compareFunction | direct: compare |
+
+## mrhiBufferUsage
+
+| Value | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhi_bufferVertex` | direct: VERTEX_BUFFER_BIT | direct: a vertex buffer view | direct: any buffer | direct: VERTEX |
+| `mrhi_bufferIndex` | direct: INDEX_BUFFER_BIT | direct: an index buffer view | direct: any buffer | direct: INDEX |
+| `mrhi_bufferUniform` | direct: UNIFORM_BUFFER_BIT | direct: a constant buffer view | direct: the constant address space | direct: UNIFORM |
+| `mrhi_bufferStorage` | direct: STORAGE_BUFFER_BIT | direct: ALLOW_UNORDERED_ACCESS | direct: the device address space | direct: STORAGE |
+| `mrhi_bufferIndirect` | direct: INDIRECT_BUFFER_BIT | direct: an ExecuteIndirect argument buffer | direct: an indirect buffer | direct: INDIRECT |
+| `mrhi_bufferCopySource` | direct: TRANSFER_SRC_BIT | direct: a copy source | direct: a blit source | direct: COPY_SRC |
+| `mrhi_bufferCopyDestination` | direct: TRANSFER_DST_BIT | direct: a copy destination | direct: a blit destination | direct: COPY_DST |
+| `mrhi_bufferQueryResolve` | direct: TRANSFER_DST_BIT, from vkCmdCopyQueryPoolResults | direct: a ResolveQueryData destination | direct: a resolveCounters destination | direct: QUERY_RESOLVE |
+
+## mrhiBufferDef
+
+| Member | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `size` | direct: size | direct: the resource's Width | direct: length | direct: size |
+| `usage` | direct: usage | direct: the resource's flags and the views made of it | direct: the storage mode | direct: usage |

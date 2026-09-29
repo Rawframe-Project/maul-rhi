@@ -30,3 +30,6 @@ edit the contract, not this file.
 | `mrhiDefaultSamplerDef` | Safe from any thread. |
 | `mrhiCreateSampler` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDestroySampler` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDefaultBufferDef` | Safe from any thread. |
+| `mrhiCreateBuffer` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiDestroyBuffer` | Safe from any thread; the device is used by one thread at a time. |

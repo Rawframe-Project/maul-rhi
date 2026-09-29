@@ -4451,6 +4451,11 @@
               "name": "samplers",
               "type": "uint32",
               "doc": "Samplers the device holds at once; 256 by default."
+            },
+            {
+              "name": "buffers",
+              "type": "uint32",
+              "doc": "Buffers the device holds at once; 4096 by default."
             }
           ]
         },
@@ -4488,7 +4493,7 @@
         {
           "kind": "function",
           "name": "default_device_def",
-          "doc": "Returns the default device def: no adapter, no optional features, the floor limits, 256 notifications, 256 samplers and the C library's allocator.",
+          "doc": "Returns the default device def: no adapter, no optional features, the floor limits, 256 notifications, 256 samplers, 4096 buffers and the C library's allocator.",
           "returns": {
             "type": "struct.device_def",
             "doc": "The def, with a valid cookie."
@@ -5298,6 +5303,331 @@
               "name": "sampler",
               "type": "id.sampler_id",
               "doc": "The sampler."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "bitflags",
+          "name": "buffer_usage",
+          "width": "uint32",
+          "mapped": true,
+          "doc": "What a buffer is used for, declared when it is made.",
+          "values": [
+            {
+              "name": "buffer_vertex",
+              "value": 1,
+              "doc": "Vertex data.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VERTEX_BUFFER_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "a vertex buffer view"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "any buffer"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "VERTEX"
+                }
+              }
+            },
+            {
+              "name": "buffer_index",
+              "value": 2,
+              "doc": "Index data.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "INDEX_BUFFER_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "an index buffer view"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "any buffer"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "INDEX"
+                }
+              }
+            },
+            {
+              "name": "buffer_uniform",
+              "value": 4,
+              "doc": "Uniform data.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "UNIFORM_BUFFER_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "a constant buffer view"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the constant address space"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "UNIFORM"
+                }
+              }
+            },
+            {
+              "name": "buffer_storage",
+              "value": 8,
+              "doc": "Storage read and written by shaders.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "STORAGE_BUFFER_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "ALLOW_UNORDERED_ACCESS"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the device address space"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "STORAGE"
+                }
+              }
+            },
+            {
+              "name": "buffer_indirect",
+              "value": 16,
+              "doc": "Arguments of indirect draws and dispatches.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "INDIRECT_BUFFER_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "an ExecuteIndirect argument buffer"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "an indirect buffer"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "INDIRECT"
+                }
+              }
+            },
+            {
+              "name": "buffer_copy_source",
+              "value": 32,
+              "doc": "The source of copies.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRANSFER_SRC_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "a copy source"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a blit source"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "COPY_SRC"
+                }
+              }
+            },
+            {
+              "name": "buffer_copy_destination",
+              "value": 64,
+              "doc": "The destination of copies and uploads.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRANSFER_DST_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "a copy destination"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a blit destination"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "COPY_DST"
+                }
+              }
+            },
+            {
+              "name": "buffer_query_resolve",
+              "value": 128,
+              "doc": "The destination of query results.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "TRANSFER_DST_BIT, from vkCmdCopyQueryPoolResults"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "a ResolveQueryData destination"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "a resolveCounters destination"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "QUERY_RESOLVE"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "id",
+          "name": "buffer_id",
+          "doc": "A buffer of a device."
+        },
+        {
+          "kind": "struct",
+          "name": "buffer_def",
+          "def": true,
+          "mapped": true,
+          "doc": "How a buffer is made. Build it with mrhiDefaultBufferDef and set its size and usage. A buffer is never mapped: the frame graph fills and reads it.",
+          "members": [
+            {
+              "name": "size",
+              "type": "uint64",
+              "doc": "Bytes, a multiple of 4, at most the device's bufferBytes limit.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "size"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the resource's Width"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "length"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "size"
+                }
+              }
+            },
+            {
+              "name": "usage",
+              "type": "bitflags.buffer_usage",
+              "doc": "Its uses, at least one.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "usage"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "the resource's flags and the views made of it"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "the storage mode"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "usage"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "default_buffer_def",
+          "doc": "Returns the default buffer def: no size and no usage, which must be set.",
+          "returns": {
+            "type": "struct.buffer_def",
+            "doc": "The def, with a valid cookie."
+          },
+          "args": [],
+          "thread_safety": {
+            "class": "any"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "create_buffer",
+          "doc": "Makes a buffer on a ready device. Its contents are undefined until the frame graph writes them.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a size of 0 or not a multiple of 4, or no usage or an unknown one; `mrhi_errorUnsupported` for a size beyond the device's bufferBytes limit or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's buffer limit is reached; `mrhi_errorPlatform` when the driver fails."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "def",
+              "type": "struct.buffer_def",
+              "pointer": "const",
+              "doc": "The buffer to make."
+            },
+            {
+              "name": "buffer_out",
+              "type": "id.buffer_id",
+              "pointer": "mutable",
+              "doc": "Receives the buffer."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          }
+        },
+        {
+          "kind": "function",
+          "name": "destroy_buffer",
+          "doc": "Destroys a buffer. Its id ends at once; the device retires it after the frames that used it.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device; `mrhi_errorStale` for a buffer the device no longer has."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "buffer",
+              "type": "id.buffer_id",
+              "doc": "The buffer."
             }
           ],
           "thread_safety": {

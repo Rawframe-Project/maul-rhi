@@ -141,6 +141,86 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroySampler(mrhiDevice* device,
                                                           mrhiSamplerId sampler);
 
+    // What a buffer is used for, declared when it is made.
+    typedef uint32_t mrhiBufferUsage;
+
+    enum
+    {
+        // Vertex data.
+        mrhi_bufferVertex = 0x1u,
+        // Index data.
+        mrhi_bufferIndex = 0x2u,
+        // Uniform data.
+        mrhi_bufferUniform = 0x4u,
+        // Storage read and written by shaders.
+        mrhi_bufferStorage = 0x8u,
+        // Arguments of indirect draws and dispatches.
+        mrhi_bufferIndirect = 0x10u,
+        // The source of copies.
+        mrhi_bufferCopySource = 0x20u,
+        // The destination of copies and uploads.
+        mrhi_bufferCopyDestination = 0x40u,
+        // The destination of query results.
+        mrhi_bufferQueryResolve = 0x80u,
+    };
+
+    // A buffer of a device.
+    typedef struct mrhiBufferId
+    {
+        uint32_t index1;
+        uint32_t generation;
+    } mrhiBufferId;
+
+    // How a buffer is made. Build it with mrhiDefaultBufferDef and set its size
+    // and usage. A buffer is never mapped: the frame graph fills and reads it.
+    typedef struct mrhiBufferDef
+    {
+        uint32_t cookie;
+        // Extensions, or NULL.
+        const mrhiChain* next;
+        // Bytes, a multiple of 4, at most the device's bufferBytes limit.
+        uint64_t size;
+        // Its uses, at least one.
+        mrhiBufferUsage usage;
+    } mrhiBufferDef;
+
+    /// Returns the default buffer def: no size and no usage, which must be set.
+    ///
+    /// @return The def, with a valid cookie.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MRHI_API mrhiBufferDef mrhiDefaultBufferDef(void);
+
+    /// Makes a buffer on a ready device. Its contents are undefined until the
+    /// frame graph writes them.
+    ///
+    /// @param device     The device.
+    /// @param def        The buffer to make.
+    /// @param bufferOut  Receives the buffer.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
+    /// without its cookie, a size of 0 or not a multiple of 4, or no usage or
+    /// an unknown one; `mrhi_errorUnsupported` for a size beyond the device's
+    /// bufferBytes limit or a critical extension the library does not know;
+    /// `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity`
+    /// when the device's buffer limit is reached; `mrhi_errorPlatform` when the
+    /// driver fails.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateBuffer(mrhiDevice* device,
+                                                        const mrhiBufferDef* def,
+                                                        mrhiBufferId* bufferOut);
+
+    /// Destroys a buffer. Its id ends at once; the device retires it after the
+    /// frames that used it.
+    ///
+    /// @param device  The device.
+    /// @param buffer  The buffer.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
+    /// `mrhi_errorStale` for a buffer the device no longer has.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyBuffer(mrhiDevice* device, mrhiBufferId buffer);
+
 #ifdef __cplusplus
 }
 #endif

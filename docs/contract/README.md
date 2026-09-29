@@ -26,6 +26,7 @@ Every item has a `kind`, a snake_case `name` and a `doc`.
 |---|---|---|
 | `result` | `values`: `name`, `value`, `doc` | a fixed-width `int32_t` type and its values; `success` is zero |
 | `enum` | `width` (`uint8`, `uint16`, `uint32`, `int32`), `values` | a fixed-width type and its values |
+| `bitflags` | `width`, `values`, each a single bit | a fixed-width type and its bits; the core refuses bits the contract does not list |
 | `constant` | `value`, a non-negative integer | a macro, `MRHI_` and the name in capitals |
 | `opaque` | none | a typed opaque pointer's struct, for a root object |
 | `id` | none | a generation-checked id, `{ index1, generation }` (family record 0016) |

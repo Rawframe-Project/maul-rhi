@@ -59,3 +59,7 @@ format.
   limits (`samplers`), and a destroyed one's id ends at once.
 - The test driver fails a device's objects after a set number
   (`objectsBeforeFailure`), to test platform failures.
+- Buffers: `mrhiCreateBuffer` and `mrhiDestroyBuffer` with declared
+  usages (`mrhiBufferUsage`, mapped onto the four APIs), sizes that are
+  multiples of 4 up to the device's `bufferBytes`, never mapped; the
+  device's `buffers` limit.

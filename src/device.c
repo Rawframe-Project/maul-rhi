@@ -23,6 +23,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.limits = mrhiDefaultLimits();
     def.deviceLimits.notifications = 256;
     def.deviceLimits.samplers = 256;
+    def.deviceLimits.buffers = 4096;
     return def;
 }
 
@@ -34,8 +35,9 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
     mrhiLimits floor = mrhiDefaultLimits();
     mrhiResult chain = mrhiCheckChain(def->next, nullptr, 0, instance->limits.chainDepth);
     if (def->cookie != DEVICE_DEF_COOKIE || def->deviceLimits.notifications == 0 ||
-        def->deviceLimits.samplers == 0 || !mrhiIsAllocatorValid(&def->allocator) ||
-        !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
+        def->deviceLimits.samplers == 0 || def->deviceLimits.buffers == 0 ||
+        !mrhiIsAllocatorValid(&def->allocator) || !mrhiLimitsWithin(&floor, &def->limits) ||
+        chain == mrhi_errorInvalid)
     {
         *statusOut = mrhiMisuse(instance);
         return nullptr;
@@ -65,14 +67,41 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
     return nullptr;
 }
 
+// Where one table of the device's block starts: its pool's two arrays
+// and its payload.
+typedef struct TableParts
+{
+    size_t generations;
+    size_t nextFree;
+    size_t payload;
+} TableParts;
+
+static TableParts AddTable(mrhiLayout* layout, uint32_t count, size_t payloadSize,
+                           size_t payloadAlignment)
+{
+    TableParts parts;
+    parts.generations = mrhiLayoutAdd(layout, count, sizeof(uint32_t), alignof(uint32_t));
+    parts.nextFree = mrhiLayoutAdd(layout, count, sizeof(uint32_t), alignof(uint32_t));
+    parts.payload = mrhiLayoutAdd(layout, count, payloadSize, payloadAlignment);
+    return parts;
+}
+
+// Starts a table's pool in the block and returns its payload.
+static void* InitTable(unsigned char* block, TableParts parts, mrhiPool* pool, uint32_t count)
+{
+    mrhiPoolInit(pool, count, (uint32_t*)(block + parts.generations),
+                 (uint32_t*)(block + parts.nextFree));
+    return block + parts.payload;
+}
+
 // The device's block: the struct, then its tables, sized by its limits.
 static mrhiDevice* Allocate(const mrhiDeviceDef* def)
 {
-    uint32_t samplers = def->deviceLimits.samplers;
+    const mrhiDeviceLimits* limits = &def->deviceLimits;
     mrhiLayout layout = {.size = sizeof(mrhiDevice)};
-    size_t generationsAt = mrhiLayoutAdd(&layout, samplers, sizeof(uint32_t), alignof(uint32_t));
-    size_t nextAt = mrhiLayoutAdd(&layout, samplers, sizeof(uint32_t), alignof(uint32_t));
-    size_t handlesAt = mrhiLayoutAdd(&layout, samplers, sizeof(uint64_t), alignof(uint64_t));
+    TableParts samplers = AddTable(&layout, limits->samplers, sizeof(uint64_t), alignof(uint64_t));
+    TableParts buffers =
+        AddTable(&layout, limits->buffers, sizeof(mrhiBufferSlot), alignof(mrhiBufferSlot));
     unsigned char* block =
         layout.overflow ? nullptr : mrhiAllocate(&def->allocator, layout.size, alignof(mrhiDevice));
     if (block == nullptr)
@@ -81,9 +110,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     }
     mrhiDevice* device = (mrhiDevice*)block;
     *device = (mrhiDevice){.bytes = layout.size};
-    mrhiPoolInit(&device->samplers, samplers, (uint32_t*)(block + generationsAt),
-                 (uint32_t*)(block + nextAt));
-    device->samplerHandles = (uint64_t*)(block + handlesAt);
+    device->samplerHandles = InitTable(block, samplers, &device->samplers, limits->samplers);
+    device->bufferSlots = InitTable(block, buffers, &device->buffers, limits->buffers);
     return device;
 }
 

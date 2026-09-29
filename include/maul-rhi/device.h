@@ -46,6 +46,8 @@ extern "C"
         uint32_t notifications;
         // Samplers the device holds at once; 256 by default.
         uint32_t samplers;
+        // Buffers the device holds at once; 4096 by default.
+        uint32_t buffers;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the
@@ -66,8 +68,8 @@ extern "C"
     } mrhiDeviceDef;
 
     /// Returns the default device def: no adapter, no optional features, the
-    /// floor limits, 256 notifications, 256 samplers and the C library's
-    /// allocator.
+    /// floor limits, 256 notifications, 256 samplers, 4096 buffers and the C
+    /// library's allocator.
     ///
     /// @return The def, with a valid cookie.
     /// @par Thread safety

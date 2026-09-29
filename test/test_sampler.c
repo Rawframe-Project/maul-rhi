@@ -4,58 +4,19 @@
 // Samplers on a test driver device: the def's checks, the device's state
 // and limit, and ids that end with their sampler.
 
-#include "test_harness.h"
+#include "test_device_setup.h"
 
 #include "maul-rhi/resources.h"
-#include "maul-rhi/test.h"
 
 #include <math.h>
 
-static mrhiTestAdapter s_adapter;
-static mrhiTestDriverDef s_driver;
-static mrhiInstance* s_instance;
-
-// The objects a device makes before its driver fails; 0 for none.
-static uint32_t s_objectsBeforeFailure;
-
-// A ready device holding at most samplers samplers, or an opening one.
-static mrhiDevice* Open(uint32_t samplers, bool ready)
+// A ready device holding at most count samplers, or an opening one; the
+// driver fails after s_adapter's objectsBeforeFailure objects.
+static mrhiDevice* Open(uint32_t count, bool ready)
 {
-    s_adapter = (mrhiTestAdapter){
-        .info = {.driver = mrhi_driverTest, .kind = mrhi_adapterDiscrete},
-        .limits = mrhiDefaultLimits(),
-        .objectsBeforeFailure = s_objectsBeforeFailure,
-    };
-    s_driver = (mrhiTestDriverDef){
-        .chain = {.next = nullptr, .type = mrhi_structTestDriver},
-        .adapters = &s_adapter,
-        .adapterCount = 1,
-    };
-    mrhiInstanceDef def = mrhiDefaultInstanceDef();
-    def.next = &s_driver.chain;
-    CHECK(mrhiCreateInstance(&def, &s_instance) == mrhi_success, "the instance");
-    mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
-    mrhiRequestId request;
-    mrhiInstanceNotification record;
-    CHECK(mrhiRequestAdapters(s_instance, &search, &request) == mrhi_success, "the search");
-    CHECK(mrhiNextInstanceNotification(s_instance, &record) == mrhi_success, "found");
-    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    size_t count = 0;
-    CHECK(mrhiGetAdapters(s_instance, &deviceDef.adapter, 1, &count) == mrhi_success, "one");
-    deviceDef.deviceLimits.samplers = samplers;
-    mrhiDevice* device = nullptr;
-    CHECK(mrhiCreateDevice(s_instance, &deviceDef, &device, &request) == mrhi_success, "made");
-    if (ready)
-    {
-        CHECK(mrhiNextInstanceNotification(s_instance, &record) == mrhi_success, "ready");
-    }
-    return device;
-}
-
-static void Close(mrhiDevice* device)
-{
-    mrhiDestroyDevice(device);
-    mrhiDestroyInstance(s_instance);
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.deviceLimits.samplers = count;
+    return OpenWith(def, ready);
 }
 
 static void TestMakeAndDestroy(void)
@@ -152,9 +113,8 @@ static void TestStateAndLimit(void)
 
 static void TestDriverFailure(void)
 {
-    s_objectsBeforeFailure = 1;
+    s_adapter.objectsBeforeFailure = 1;
     mrhiDevice* device = Open(2, true);
-    s_objectsBeforeFailure = 0;
     mrhiSamplerDef def = mrhiDefaultSamplerDef();
     mrhiSamplerId a;
     mrhiSamplerId b;
@@ -168,6 +128,7 @@ static void TestDriverFailure(void)
 
 int main(void)
 {
+    ResetAdapter();
     TestMakeAndDestroy();
     TestInvalidDefs();
     TestStateAndLimit();
