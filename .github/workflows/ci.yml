@@ -86,6 +86,9 @@ jobs:
           VK_INSTANCE_LAYERS: ${{ runner.os == 'Linux' && 'VK_LAYER_KHRONOS_validation' || '' }}
           # Synchronization validation checks the barriers the graph makes.
           VK_KHRONOS_VALIDATION_VALIDATE_SYNC: "true"
+          # Lavapipe fills new memory with non-zero bytes, so a read of
+          # memory nothing wrote fails reliably.
+          LVP_POISON_MEMORY: "true"
         run: |
           if [ "$RUNNER_OS" = Linux ]; then run="xvfb-run -a"; else run=""; fi
           $run ctest --test-dir build --output-on-failure

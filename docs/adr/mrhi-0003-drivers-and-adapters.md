@@ -187,7 +187,9 @@ ids, requests, the frame graph) can be tested without a GPU.
   without one skips it unless `MAUL_RHI_REQUIRE_VULKAN` is set; Linux
   CI sets it, runs lavapipe, and enables the Khronos validation layer
   with synchronization validation, which logs to each test's output;
-  CTest fails any test whose output reports a validation error.
+  CTest fails any test whose output reports a validation error. Lavapipe
+  poisons new memory there (`LVP_POISON_MEMORY`), so reading memory
+  nothing wrote fails reliably. The samples run as tests the same way.
   Where the XCB client library is installed, the suite makes a window
   and checks surfaces on it; Linux CI runs the tests under Xvfb and
   sets `MAUL_RHI_REQUIRE_SURFACE`, so a missing X server fails. A second
