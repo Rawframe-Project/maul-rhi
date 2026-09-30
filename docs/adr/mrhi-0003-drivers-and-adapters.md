@@ -258,6 +258,24 @@ ids, requests, the frame graph) can be tested without a GPU.
   loads; discarding loads and stores keep the contents. A pass's
   multisampled targets resolve at its end. A destroyed object waits
   until the next frame submitted finishes.
+- **D3D12 surfaces:** a surface is a Win32 window, its handle holding
+  the window; every adapter presents there, DXGI's compositor taking
+  another adapter's images. The caps offer 8-bit and 10-bit unorm
+  buffers in sRGB, half floats in scRGB, and HDR10 where the window's
+  monitor is in HDR; fifo, mailbox, and immediate where DXGI tears;
+  opaque alpha, since only composition swapchains blend; images that
+  render, sample and copy. A configured surface is a flip-discard
+  swapchain of three images on the device's queue, its color space set
+  from the color, DXGI's Alt+Enter turned off, its images stretched to
+  the window, whose size never refuses one. A window holds one
+  swapchain at a time, so configuring again and unconfiguring wait for
+  the device's frames and release the old swapchain at once. Acquiring
+  waits on the frame latency waitable object (two presents queued at
+  most, a second at most) so that presenting never blocks, answers
+  occluded for a minimized window and suboptimal for a window whose size
+  is no longer the swapchain's; a frame presents its images after its
+  work, at sync interval 1 for fifo and 0 otherwise, tearing for
+  immediate.
 - **D3D12 bindings and draws:** each slot has shader-visible heaps of
   resource and sampler descriptors, as many resource descriptors as the
   frame's command records (each binding is one) and samplers up to

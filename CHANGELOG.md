@@ -372,13 +372,15 @@ format.
   occlusion query sets, shaders (from the container's DXIL, with a root
   signature from its D3D12 map) and compute and graphics pipelines, and
   frames: bindings, draws and dispatches, direct and indirect, occlusion
-  queries, copies, uploads, readbacks, target clears and resolves;
+  queries, copies, uploads, readbacks, target clears and resolves, with
+  transients placed as the core places them; and surfaces of Win32
+  windows, presented through DXGI flip model swapchains;
   everything else answers
   `mrhi_errorUnsupported` until the driver's later slices. It compiles
   against the DirectX headers kept as published in `directx/` and opens
   `d3d12.dll` and `dxgi.dll` at run time. Windows CI makes devices,
   objects, pipelines and frames on WARP under the Agility SDK's debug
-  layer.
+  layer, and presents to a window.
 - D3D12 code in shader containers: a D3D12 map and each entry's DXIL
   (sections 14 and 15), checked by the reader;
   `tools/mrhi_container.py --dxil` writes them, checking each entry's

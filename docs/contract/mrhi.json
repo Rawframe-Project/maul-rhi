@@ -10722,7 +10722,7 @@
             },
             "d3d12": {
               "class": "direct",
-              "note": "CreateSwapChainForHwnd, or ResizeBuffers when only the size changes"
+              "note": "CreateSwapChainForHwnd with three flip-discard buffers, after the frames using an earlier swapchain of the window finish, since a window holds one"
             },
             "metal": {
               "class": "direct",
@@ -10767,7 +10767,7 @@
             },
             "d3d12": {
               "class": "direct",
-              "note": "the swapchain released once those frames finish"
+              "note": "the swapchain released once those frames finish, which unconfiguring waits for"
             },
             "metal": {
               "class": "direct",
@@ -11282,7 +11282,7 @@
             },
             "d3d12": {
               "class": "direct",
-              "note": "GetCurrentBackBufferIndex, and the swapchain's occlusion status"
+              "note": "the frame latency waitable object, then GetCurrentBackBufferIndex; a minimized window is occluded, and one whose size is no longer the swapchain's suboptimal"
             },
             "metal": {
               "class": "direct",
@@ -11413,7 +11413,7 @@
                 },
                 "d3d12": {
                   "class": "direct",
-                  "note": "a copy queue"
+                  "note": "the direct queue, as every pass"
                 },
                 "metal": {
                   "class": "direct",
@@ -11931,7 +11931,7 @@
             },
             "d3d12": {
               "class": "direct",
-              "note": "D3D12_RENDER_PASS_BEGINNING_ACCESS_CLEAR_PARAMETERS"
+              "note": "ClearRenderTargetView"
             },
             "metal": {
               "class": "direct",
@@ -12001,7 +12001,7 @@
             },
             "d3d12": {
               "class": "direct",
-              "note": "D3D12_RENDER_PASS_RENDER_TARGET_DESC"
+              "note": "a render target view of its mip and layer, set with OMSetRenderTargets"
             },
             "metal": {
               "class": "direct",
