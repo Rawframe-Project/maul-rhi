@@ -565,8 +565,11 @@ static Work WorkOf(const mrhiDriverPass* pass)
 static void AddTransientTexture(int state, uint32_t index1, const mrhiDriverResource* resource)
 {
     const mrhiTextureDef* def = resource->texture;
+    // The usage the frame's passes gave it, transient among them.
+    mrhiTextureDef used = *def;
+    used.usage = resource->usage;
     char viewFormats[MRHI_WEBGPU_VIEW_FORMAT_BYTES];
-    mrhiWebGpuViewFormats(def, viewFormats);
+    mrhiWebGpuViewFormats(&used, viewFormats);
     mrhiJsTransientTexture(state, index1, def->kind == mrhi_texture3d,
                            mrhiWebGpuFormat(def->format), def->width, def->height,
                            def->depthOrLayers, def->mipLevels, def->sampleCount, resource->usage,

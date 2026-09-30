@@ -420,3 +420,8 @@ format.
   last used their slot, so synchronization validation sees the reuse
   of the slot's transient memory ordered; a conformance check that
   clears a target to a color with distinct channels exposed it.
+- The WebGPU driver gave a transient target the view formats of its
+  declaration, which WebGPU refuses on a transient attachment: a frame
+  that only rendered to a texture declared with its sRGB twin lost the
+  texture. Such a target now takes none, since only its own format
+  renders.

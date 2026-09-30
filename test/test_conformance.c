@@ -393,6 +393,41 @@ static void CheckFrameMemory(mrhiDevice* device)
     CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
 }
 
+// A target with its twin among its view formats, only ever rendered to:
+// transient, so kept on chip where the GPU can, and made on every API
+// though no view takes the twin (WebGPU refuses view formats on a
+// transient attachment).
+static void CheckTransientTwin(mrhiDevice* device)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiTextureDef texture = mrhiDefaultTextureDef();
+    texture.format = mrhi_formatRgba8UnormSrgb;
+    texture.viewFormats[0] = mrhi_formatRgba8Unorm;
+    texture.width = 16;
+    texture.height = 16;
+    mrhiResourceId target = {0};
+    CHECK(mrhiDeclareTexture(device, &texture, &target) == mrhi_success, "a target with a twin");
+    mrhiPassDef pass = mrhiDefaultPassDef();
+    pass.colorTargets[0] =
+        (mrhiColorTarget){.resource = target, .load = mrhi_loadClear, .store = mrhi_storeKeep};
+    pass.colorTargetCount = 1;
+    pass.neverCull = true;
+    mrhiPassId id = {0};
+    CHECK(mrhiAddPass(device, &pass, &id) == mrhi_success, "a pass");
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiBeginPass(device, id) == mrhi_success && mrhiEndPass(device, id) == mrhi_success,
+          "recorded");
+    mrhiRequestId token = {0};
+    CHECK(mrhiSubmitFrame(device, &token) == mrhi_success && WaitFor(device, token) == mrhi_success,
+          "finished");
+    mrhiDeviceNotification record;
+    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    {
+        CHECK(record.outcome == mrhi_success, "a success");
+    }
+}
+
 static mrhiPassId CopyPass(mrhiDevice* device, const mrhiAccess* accesses, uint32_t count)
 {
     mrhiPassDef def = mrhiDefaultPassDef();
@@ -1910,6 +1945,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
           "a timestamp period with timestamps");
     CheckObjects(device, asked->timestampQuery);
     CheckFrameMemory(device);
+    CheckTransientTwin(device);
     CheckPipelines(device);
     CheckRoundTrip(device);
     CheckAliasing(device);
