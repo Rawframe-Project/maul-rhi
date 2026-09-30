@@ -471,11 +471,13 @@ EM_JS(void, JsCopyWithTexture, (int state, bool toTexture, uint32_t buffer, doub
     const self = gpu.states[state];
     const frame = self.frame;
     const ring = !toTexture && !buffer;
+    // A layout of 0, for a copy of one row or one layer, is left out,
+    // as WebGPU takes it.
     const side = {
         buffer: buffer ? frame.objects[buffer] : (toTexture ? self.staging : frame.ring()),
         offset,
-        bytesPerRow,
-        rowsPerImage,
+        bytesPerRow: bytesPerRow || undefined,
+        rowsPerImage: rowsPerImage || undefined,
     };
     const image = {texture: frame.objects[texture], mipLevel: mip, origin: {x, y, z},
                    aspect: gpu.names.aspects[aspect]};
