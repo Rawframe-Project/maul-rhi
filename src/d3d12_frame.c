@@ -311,6 +311,11 @@ static void Drop(void* object)
     }
 }
 
+void mrhiD3d12WaitIdle(mrhiD3d12Frames* frames)
+{
+    WaitFor(frames, frames->submitted);
+}
+
 void mrhiD3d12CloseFrames(mrhiD3d12Frames* frames)
 {
     if (frames->fence != nullptr && frames->event != nullptr)
@@ -443,8 +448,10 @@ static bool TakeObjects(const mrhiD3d12Frames* frames, mrhiD3d12Slot* slot,
             object->resource = frames->objects->buffers[resource->handle - 1].resource;
             break;
         default:
-            // Surfaces are never configured on D3D12 yet.
-            MRHI_ASSERT(false);
+            MRHI_ASSERT(resource->kind == mrhiDriverSurfaceImage);
+            object->resource =
+                mrhiD3d12ImageOf(frames->swapchains, resource->handle, resource->image);
+            object->texture = resource->texture;
             break;
         }
         made = object->resource != nullptr;
@@ -549,6 +556,22 @@ static bool Removed(mrhiD3d12Frames* frames)
     return frames->lost;
 }
 
+// Presents the frame's surface images after its work: success, or
+// mrhi_errorDeviceLost.
+static mrhiResult Present(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame)
+{
+    bool presented = true;
+    for (uint32_t i = 0; i < frame->resourceCount; ++i)
+    {
+        const mrhiDriverResource* resource = &frame->resources[i];
+        if (resource->kind == mrhiDriverSurfaceImage)
+        {
+            presented = mrhiD3d12Present(frames->swapchains, resource->handle) && presented;
+        }
+    }
+    return presented ? mrhi_success : mrhi_errorDeviceLost;
+}
+
 mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame, uint64_t tag)
 {
     if (frames->lost)
@@ -572,10 +595,12 @@ mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame
     {
         ID3D12CommandList* lists[] = {(ID3D12CommandList*)slot->list};
         ID3D12CommandQueue_ExecuteCommandLists(frames->queue, 1, lists);
-        status =
-            FAILED(ID3D12CommandQueue_Signal(frames->queue, frames->fence, frames->submitted + 1))
-                ? mrhi_errorDeviceLost
-                : mrhi_success;
+        status = Present(frames, frame);
+    }
+    if (status == mrhi_success &&
+        FAILED(ID3D12CommandQueue_Signal(frames->queue, frames->fence, frames->submitted + 1)))
+    {
+        status = mrhi_errorDeviceLost;
     }
     if (status != mrhi_success)
     {

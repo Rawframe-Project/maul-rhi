@@ -43,6 +43,9 @@
 #endif
 #ifdef MAUL_RHI_D3D12_DRIVER
 #include "d3d12_debug.h"
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
 #endif
 
 // A label from a string literal, for a def's label and labelLength.
@@ -1814,7 +1817,8 @@ static void CheckForeignSources(mrhiInstance* instance)
 #endif
 }
 
-#if defined(MRHI_TEST_XCB) || defined(__EMSCRIPTEN__) || defined(MAUL_RHI_METAL_DRIVER)
+#if defined(MRHI_TEST_XCB) || defined(__EMSCRIPTEN__) || defined(MAUL_RHI_METAL_DRIVER) ||         \
+    defined(MAUL_RHI_D3D12_DRIVER)
 // Whether caps meet the floors and offer 8-bit sRGB in Rec. 709.
 static bool MeetsFloors(const mrhiSurfaceCaps* caps)
 {
@@ -2084,6 +2088,51 @@ static void CheckXcbSurface(mrhiInstance* instance, const mrhiAdapterId* ids, si
 }
 #endif
 
+#ifdef MAUL_RHI_D3D12_DRIVER
+// A Win32 window whose client area is 64 by 48, which every adapter
+// presents to; a swapchain of another size stretches to it.
+static void CheckWin32Surface(mrhiInstance* instance, const mrhiAdapterId* ids, size_t count)
+{
+    HINSTANCE module = GetModuleHandleW(nullptr);
+    const WNDCLASSW windowClass = {
+        .lpfnWndProc = DefWindowProcW,
+        .hInstance = module,
+        .lpszClassName = L"mrhiConformance",
+    };
+    CHECK(RegisterClassW(&windowClass) != 0, "a window class");
+    RECT rect = {0, 0, 64, 48};
+    (void)AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
+    HWND window = CreateWindowExW(0, L"mrhiConformance", L"conformance", WS_OVERLAPPEDWINDOW, 0, 0,
+                                  rect.right - rect.left, rect.bottom - rect.top, nullptr, nullptr,
+                                  module, nullptr);
+    CHECK(window != nullptr, "a window");
+    (void)ShowWindow(window, SW_SHOWNOACTIVATE);
+    const mrhiSurfaceSourceWin32 source = {
+        .chain = {.type = mrhi_structSurfaceSourceWin32},
+        .hinstance = module,
+        .hwnd = window,
+    };
+    mrhiSurfaceId surface = {0};
+    CHECK(MakeSurface(instance, &source.chain, &surface) == mrhi_success, "a Win32 surface");
+    size_t presenting = 0;
+    for (size_t i = 0; i < count; ++i)
+    {
+        mrhiSurfaceCaps caps;
+        CHECK(mrhiGetSurfaceCaps(instance, surface, ids[i], &caps) == mrhi_success, "caps");
+        CHECK(!caps.presentable || MeetsFloors(&caps), "the floors where it presents");
+        if (caps.presentable)
+        {
+            CheckPresenting(instance, ids[i], surface, &caps, false);
+        }
+        presenting += caps.presentable ? 1 : 0;
+    }
+    CHECK(presenting > 0 || !IsSet("MAUL_RHI_REQUIRE_SURFACE"), "an adapter presents there");
+    CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "the surface destroyed");
+    (void)DestroyWindow(window);
+    (void)UnregisterClassW(L"mrhiConformance", module);
+}
+#endif
+
 #ifdef __EMSCRIPTEN__
 // clang-format off
 // Resizes the runner's canvas as a page would.
@@ -2193,6 +2242,8 @@ static void CheckSurfaces(mrhiInstance* instance)
     CheckCanvasSurface(instance, ids, count);
 #elif defined(MAUL_RHI_METAL_DRIVER)
     CheckMetalSurface(instance, ids, count);
+#elif defined(MAUL_RHI_D3D12_DRIVER)
+    CheckWin32Surface(instance, ids, count);
 #else
     (void)count;
     CHECK(!IsSet("MAUL_RHI_REQUIRE_SURFACE"), "a window system where required");

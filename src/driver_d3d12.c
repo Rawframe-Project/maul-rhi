@@ -8,13 +8,14 @@
 // read it, which D3D12 keeps as the adapter's one device while it is
 // held. Searches and device openings are answered at the next poll.
 // Limits are WebGPU's floor, raised where every device at the floor
-// goes further; features and surfaces come in the driver's later
-// slices.
+// goes further; features come in the driver's later slices. Surfaces
+// are Win32 windows (d3d12_surface.c).
 
 #include "driver_d3d12.h"
 
 #include "allocator.h"
 #include "d3d12_device.h"
+#include "d3d12_surface.h"
 #include "format_caps.h"
 #include "invariant.h"
 
@@ -183,33 +184,28 @@ static void GetFormatCaps(const void* self, uint64_t adapter, mrhiFormat format,
     *capsOut = mrhiGrantedFormatCaps(format, &features);
 }
 
-// Presentation lands in a later slice: no source is taken yet.
 static mrhiResult CreateSurface(void* self, const mrhiChain* source, const mrhiSurfaceDef* def,
                                 uint64_t* handleOut)
 {
     (void)self;
-    (void)source;
     (void)def;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    return mrhiD3d12CreateSurface(source, handleOut);
 }
 
-// No surface is made, so none is destroyed or asked about.
+// A surface holds only its window, which the program keeps.
 static void DestroySurface(void* self, uint64_t handle)
 {
     (void)self;
     (void)handle;
-    MRHI_ASSERT(false);
 }
 
+// Every adapter presents to a window, through DXGI's compositor.
 static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
                            mrhiSurfaceCaps* capsOut)
 {
-    (void)self;
-    (void)surface;
+    const D3d12Driver* driver = self;
     (void)adapter;
-    (void)capsOut;
-    MRHI_ASSERT(false);
+    mrhiD3d12SurfaceCaps(driver->factory, surface, capsOut);
 }
 
 // The adapter an adapter handle names: nullptr when it is gone.
@@ -247,8 +243,8 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
     {
         return mrhi_errorPlatform;
     }
-    mrhiResult status =
-        mrhiCreateD3d12Device(&driver->allocator, &driver->api, device, def, deviceOut);
+    mrhiResult status = mrhiCreateD3d12Device(&driver->allocator, &driver->api, driver->factory,
+                                              device, def, deviceOut);
     if (status == mrhi_success)
     {
         driver->pending[driver->pendingCount++] =

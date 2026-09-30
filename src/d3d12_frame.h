@@ -17,6 +17,7 @@
 
 #include "d3d12_pipeline.h"
 #include "d3d12_state.h"
+#include "d3d12_swapchain.h"
 
 #include "maul-rhi/device.h"
 
@@ -68,6 +69,7 @@ typedef struct mrhiD3d12Frames
     ID3D12CommandQueue* queue;
     mrhiD3d12Objects* objects;
     mrhiD3d12Pipelines* pipelines;
+    mrhiD3d12Swapchains* swapchains;
     ID3D12Fence* fence;
     HANDLE event;
     mrhiD3d12Slot* slots;
@@ -134,14 +136,18 @@ mrhiResult mrhiD3d12OpenFrames(mrhiD3d12Frames* frames);
 // retiring objects included.
 void mrhiD3d12CloseFrames(mrhiD3d12Frames* frames);
 
-// Records and submits a frame: success, mrhi_errorCapacity when D3D12
-// makes no transient, or mrhi_errorDeviceLost.
+// Records and submits a frame, then presents its surface images:
+// success, mrhi_errorCapacity when D3D12 makes no transient or a ring
+// runs out, or mrhi_errorDeviceLost.
 mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame, uint64_t tag);
 
 // Moves up to capacity finished frames into events, in order, their
 // readbacks filled and their transients and the objects they retire
 // gone; or reports the device's loss with tag 0.
 size_t mrhiD3d12PollFrames(mrhiD3d12Frames* frames, mrhiDriverEvent* events, size_t capacity);
+
+// Waits for every frame submitted to finish, or the device to be lost.
+void mrhiD3d12WaitIdle(mrhiD3d12Frames* frames);
 
 // Waits up to timeoutNs for a running frame: whether it finished.
 bool mrhiD3d12WaitFrame(mrhiD3d12Frames* frames, uint64_t tag, uint64_t timeoutNs);
