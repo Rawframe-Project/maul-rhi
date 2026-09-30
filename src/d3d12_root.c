@@ -175,7 +175,7 @@ static uint32_t AddHeapTables(const mrhiContainer* container, mrhiD3d12Layout* l
         for (uint32_t i = 0; i < mrhiContainerD3d12HeapRangeCount(container); ++i)
         {
             mrhiD3d12HeapRange range = mrhiContainerD3d12HeapRange(container, i);
-            if (range.rangeClass == c)
+            if ((uint32_t)range.rangeClass == c)
             {
                 ranges[at++] = (D3D12_DESCRIPTOR_RANGE1){
                     .RangeType = types[c],
