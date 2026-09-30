@@ -18,6 +18,7 @@
 #include "invariant.h"
 
 #include <stdalign.h>
+#include <string.h>
 
 // The longest an acquire waits for DXGI to take a present.
 #define WAIT_MS 1000
@@ -35,6 +36,8 @@ void mrhiD3d12LaySwapchains(mrhiD3d12Swapchains* swapchains, unsigned char* bloc
                             const mrhiD3d12SwapchainRoom* room, const mrhiDeviceLimits* limits)
 {
     swapchains->swapchains = (mrhiD3d12Swapchain*)(block + room->swapchains);
+    // Free entries hold nothing, which the device's end relies on.
+    memset(swapchains->swapchains, 0, limits->surfaces * sizeof(mrhiD3d12Swapchain));
     (void)mrhiD3d12InitSlots(&swapchains->slots, (uint32_t*)(block + room->slots),
                              limits->surfaces);
 }
