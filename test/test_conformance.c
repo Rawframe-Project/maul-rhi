@@ -30,9 +30,38 @@
 #include <stdlib.h>
 #include <string.h>
 
+// On the web, built with Emscripten or with a plain WebAssembly
+// toolchain (mrhi-0016), the suite runs in a page with a canvas.
 #ifdef __EMSCRIPTEN__
 #include <emscripten/em_js.h>
 #include <emscripten/emscripten.h>
+#define MRHI_TEST_WEB
+// Waits a millisecond while the page runs its event loop (JSPI).
+static void Sleep(void)
+{
+    emscripten_sleep(1);
+}
+// clang-format off
+// Resizes the runner's canvas as a page would.
+EM_JS(void, ResizeCanvas, (int width), {
+    document.querySelector('#mrhi-canvas').width = width;
+});
+// clang-format on
+#elif defined(__wasi__)
+#define MRHI_TEST_WEB
+// Without Emscripten the runner's page gives both (web_runner.cjs), the
+// sleep through JSPI's WebAssembly.Suspending.
+__attribute__((import_module("env"), import_name("mrhiTestSleep"))) void mrhiTestSleep(void);
+__attribute__((import_module("env"), import_name("mrhiTestResizeCanvas"))) void
+mrhiTestResizeCanvas(int width);
+static void Sleep(void)
+{
+    mrhiTestSleep();
+}
+static void ResizeCanvas(int width)
+{
+    mrhiTestResizeCanvas(width);
+}
 #endif
 
 #ifdef MRHI_TEST_XCB
@@ -90,10 +119,10 @@
 static mrhiResult NextInstance(mrhiInstance* instance, mrhiInstanceNotification* recordOut)
 {
     mrhiResult status = mrhiNextInstanceNotification(instance, recordOut);
-#ifdef __EMSCRIPTEN__
+#ifdef MRHI_TEST_WEB
     for (int slept = 0; status == mrhi_empty && slept < 10000; ++slept)
     {
-        emscripten_sleep(1);
+        Sleep();
         status = mrhiNextInstanceNotification(instance, recordOut);
     }
 #endif
@@ -105,10 +134,10 @@ static mrhiResult NextInstance(mrhiInstance* instance, mrhiInstanceNotification*
 static mrhiResult NextDevice(mrhiDevice* device, mrhiDeviceNotification* recordOut)
 {
     mrhiResult status = mrhiNextDeviceNotification(device, recordOut);
-#ifdef __EMSCRIPTEN__
+#ifdef MRHI_TEST_WEB
     for (int slept = 0; status == mrhi_empty && slept < 10000; ++slept)
     {
-        emscripten_sleep(1);
+        Sleep();
         status = mrhiNextDeviceNotification(device, recordOut);
     }
 #endif
@@ -120,10 +149,10 @@ static mrhiResult NextDevice(mrhiDevice* device, mrhiDeviceNotification* recordO
 static mrhiResult WaitFor(mrhiDevice* device, mrhiRequestId token)
 {
     mrhiResult status = mrhiWaitFrame(device, token, UINT64_C(10000000000));
-#ifdef __EMSCRIPTEN__
+#ifdef MRHI_TEST_WEB
     for (int slept = 0; status == mrhi_timeout && slept < 10000; ++slept)
     {
-        emscripten_sleep(1);
+        Sleep();
         status = mrhiWaitFrame(device, token, 0);
     }
 #endif
@@ -1964,7 +1993,7 @@ static void CheckForeignSources(mrhiInstance* instance)
         .selectorLength = 2,
     };
     mrhiSurfaceId surface = {0};
-#ifdef __EMSCRIPTEN__
+#ifdef MRHI_TEST_WEB
     CHECK(MakeSurface(instance, &canvas.chain, &surface) == mrhi_errorUnsupported,
           "no canvas the selector names");
 #else
@@ -1983,7 +2012,7 @@ static void CheckForeignSources(mrhiInstance* instance)
 #endif
 }
 
-#if defined(MRHI_TEST_XCB) || defined(__EMSCRIPTEN__) || defined(MAUL_RHI_METAL_DRIVER) ||         \
+#if defined(MRHI_TEST_XCB) || defined(MRHI_TEST_WEB) || defined(MAUL_RHI_METAL_DRIVER) ||          \
     defined(MAUL_RHI_D3D12_DRIVER)
 // Whether caps meet the floors and offer 8-bit sRGB in Rec. 709.
 static bool MeetsFloors(const mrhiSurfaceCaps* caps)
@@ -2299,14 +2328,7 @@ static void CheckWin32Surface(mrhiInstance* instance, const mrhiAdapterId* ids, 
 }
 #endif
 
-#ifdef __EMSCRIPTEN__
-// clang-format off
-// Resizes the runner's canvas as a page would.
-EM_JS(void, ResizeCanvas, (int width), {
-    document.querySelector('#mrhi-canvas').width = width;
-});
-// clang-format on
-
+#ifdef MRHI_TEST_WEB
 // The web runner's canvas, which the adapter presents to; a drawing
 // buffer the page resizes leaves the canvas out of date until it is
 // configured again.
@@ -2404,7 +2426,7 @@ static void CheckSurfaces(mrhiInstance* instance)
     size_t count = Search(instance, ids, 16);
 #if defined(MRHI_TEST_XCB)
     CheckXcbSurface(instance, ids, count);
-#elif defined(__EMSCRIPTEN__)
+#elif defined(MRHI_TEST_WEB)
     CheckCanvasSurface(instance, ids, count);
 #elif defined(MAUL_RHI_METAL_DRIVER)
     CheckMetalSurface(instance, ids, count);
@@ -2426,7 +2448,7 @@ static void TestNativeDriver(void)
     }
     // The build's native driver: WebGPU on the web, Metal or D3D12 where
     // the build chose it, Vulkan elsewhere.
-#ifdef __EMSCRIPTEN__
+#ifdef MRHI_TEST_WEB
     size_t count = CheckDriver(instance, mrhi_driverWebGpu);
     const char* required = getenv("MAUL_RHI_REQUIRE_WEBGPU");
 #elif defined(MAUL_RHI_METAL_DRIVER)

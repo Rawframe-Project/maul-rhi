@@ -7,8 +7,13 @@
 // prints the test's output, and exits with the test's status. A page error, an error the browser
 // logs, or a WebGPU error the driver kept fails it. Puppeteer
 // comes from MRHI_NODE_MODULES; without it the test is skipped (77).
+// A test built without Emscripten (mrhi-0016) is a WebAssembly reactor:
+// the page gives it a minimal WASI (standard output to the console, the
+// environment, the clocks, random bytes and exit), the driver's imports
+// from maul-rhi.mjs beside it, a sleep through JSPI and the canvas's
+// resizing, and calls its main.
 //
-// usage: node web_runner.cjs <test.js>
+// usage: node web_runner.cjs <test.js | test.wasm>
 
 const http = require('http');
 const fs = require('fs');
@@ -23,6 +28,9 @@ try {
 }
 
 const script = path.resolve(process.argv[2]);
+// A WebAssembly module, by its first bytes: CMake names one with or
+// without .wasm, as its version's WASI platform does.
+const wasi = fs.readFileSync(script).subarray(0, 4).equals(Buffer.from([0, 0x61, 0x73, 0x6d]));
 const environment = Object.fromEntries(
     Object.entries(process.env).filter(([name]) => name.startsWith('MAUL_RHI_')));
 const root = path.dirname(script);
@@ -32,7 +40,7 @@ const root = path.dirname(script);
 const page = `<!doctype html><html><head><meta charset="utf-8"><link rel="icon" href="data:,"></head><body>
 <canvas id="mrhi-canvas" width="64" height="48"></canvas>
 <canvas id="mrhi-canvas-2" width="64" height="48"></canvas>
-<script>
+${wasi ? '<script type="module" src="/__wasi.mjs"></script>' : `<script>
 var Module = {
     print: text => console.log(text),
     printErr: text => console.log(text),
@@ -40,13 +48,98 @@ var Module = {
     preRun: [() => Object.assign(Module.ENV, ${JSON.stringify(environment)})],
 };
 </script>
-<script src="${path.basename(script)}"></script></body></html>`;
-const types = {'.js': 'text/javascript', '.wasm': 'application/wasm'};
+<script src="${path.basename(script)}"></script>`}</body></html>`;
+const types = {'.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm'};
+
+// The page of a test without Emscripten.
+const wasiPage = `import {maulRhiImports} from './maul-rhi.mjs';
+// The driver keeps its state here, where the runner reads its errors.
+globalThis.Module = {};
+let instance = null;
+const memory = () => instance.exports.memory.buffer;
+const view = () => new DataView(memory());
+const decoder = new TextDecoder();
+const encoder = new TextEncoder();
+const environment = Object.entries(${JSON.stringify(environment)}).map(([name, value]) => name + '=' + value);
+let line = '';
+const system = {
+    fd_write(fd, vectors, count, written) {
+        let total = 0;
+        for (let i = 0; i < count; i++) {
+            const at = view().getUint32(vectors + 8 * i, true);
+            const length = view().getUint32(vectors + 8 * i + 4, true);
+            line += decoder.decode(new Uint8Array(memory(), at, length));
+            total += length;
+        }
+        for (let end = line.indexOf('\\n'); end >= 0; end = line.indexOf('\\n')) {
+            console.log(line.slice(0, end));
+            line = line.slice(end + 1);
+        }
+        view().setUint32(written, total, true);
+        return 0;
+    },
+    fd_fdstat_get(fd, out) {
+        view().setUint8(out, 2);
+        view().setUint16(out + 2, 0, true);
+        view().setBigUint64(out + 8, 0n, true);
+        view().setBigUint64(out + 16, 0n, true);
+        return 0;
+    },
+    fd_close: () => 0,
+    fd_seek: () => 70,
+    environ_sizes_get(count, bytes) {
+        view().setUint32(count, environment.length, true);
+        view().setUint32(bytes, environment.reduce((sum, entry) => sum + encoder.encode(entry).length + 1, 0), true);
+        return 0;
+    },
+    environ_get(pointers, buffer) {
+        for (const [index, entry] of environment.entries()) {
+            const bytes = encoder.encode(entry);
+            view().setUint32(pointers + 4 * index, buffer, true);
+            new Uint8Array(memory(), buffer, bytes.length).set(bytes);
+            view().setUint8(buffer + bytes.length, 0);
+            buffer += bytes.length + 1;
+        }
+        return 0;
+    },
+    clock_time_get(id, precision, out) {
+        view().setBigUint64(out, BigInt(Math.round(performance.now() * 1e6)), true);
+        return 0;
+    },
+    random_get(at, length) {
+        crypto.getRandomValues(new Uint8Array(memory(), at, length));
+        return 0;
+    },
+    proc_exit(status) {
+        console.log('mrhi-test: exit ' + status);
+        throw new Error('exit ' + status);
+    },
+};
+const wasiImports = new Proxy(system, {get: (target, key) => target[key] || (() => 52)});
+const bytes = await (await fetch('./${path.basename(script)}')).arrayBuffer();
+({instance} = await WebAssembly.instantiate(bytes, {
+    env: Object.assign(maulRhiImports(() => instance.exports, globalThis.Module), {
+        mrhiTestSleep: new WebAssembly.Suspending(() => new Promise(resolve => setTimeout(resolve, 1))),
+        mrhiTestResizeCanvas: width => {
+            document.querySelector('#mrhi-canvas').width = width;
+        },
+    }),
+    wasi_snapshot_preview1: wasiImports,
+}));
+instance.exports._initialize();
+const status = await WebAssembly.promising(instance.exports.main)();
+console.log('mrhi-test: exit ' + status);
+`;
 
 const server = http.createServer((request, response) => {
     if (request.url === '/') {
         response.writeHead(200, {'Content-Type': 'text/html'});
         response.end(page);
+        return;
+    }
+    if (wasi && request.url === '/__wasi.mjs') {
+        response.writeHead(200, {'Content-Type': 'text/javascript'});
+        response.end(wasiPage);
         return;
     }
     const file = path.join(root, path.normalize(decodeURIComponent(request.url)));
