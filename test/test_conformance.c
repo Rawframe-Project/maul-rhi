@@ -1329,9 +1329,9 @@ static mrhiPassId PlacedPass(const Scene* scene, mrhiResourceId depth, bool load
 }
 
 // The first placed pass: red where the indexed quad covers the left half
-// through the viewport, stencil 1 there; then green over the upper half
-// through the scissor, farther, so only the upper right passes the
-// depth test and takes stencil 2.
+// through the viewport, stencil 1 there; then green over the lower right
+// quarter through the scissor, which starts off both edges, farther, so
+// only that quarter passes the depth test and takes stencil 2.
 static void DrawPlaced(const Scene* scene, mrhiPassId pass, mrhiResourceId vertices,
                        mrhiResourceId indices)
 {
@@ -1340,7 +1340,7 @@ static void DrawPlaced(const Scene* scene, mrhiPassId pass, mrhiResourceId verti
     const float green[4] = {0.0f, 1.0f, 0.0f, 1.0f};
     const mrhiViewport left = {0.0f, 0.0f, 4.0f, 8.0f, 0.0f, 1.0f};
     const mrhiViewport whole = {0.0f, 0.0f, 8.0f, 8.0f, 0.0f, 1.0f};
-    const mrhiScissorRect upper = {0, 0, 8, 4};
+    const mrhiScissorRect lowerRight = {4, 4, 4, 4};
     CHECK(mrhiBeginPass(device, pass) == mrhi_success &&
               mrhiSetGraphicsPipeline(device, pass, scene->placed) == mrhi_success,
           "a placed pipeline");
@@ -1352,7 +1352,7 @@ static void DrawPlaced(const Scene* scene, mrhiPassId pass, mrhiResourceId verti
               mrhiSetRootBlock(device, pass, 0, red, sizeof(red)) == mrhi_success &&
               mrhiDrawIndexed(device, pass, 6, 1, 0, 1, 0) == mrhi_success &&
               mrhiSetViewport(device, pass, &whole) == mrhi_success &&
-              mrhiSetScissor(device, pass, &upper) == mrhi_success &&
+              mrhiSetScissor(device, pass, &lowerRight) == mrhi_success &&
               mrhiSetStencilReference(device, pass, 2) == mrhi_success &&
               mrhiSetRootBlock(device, pass, 0, green, sizeof(green)) == mrhi_success &&
               mrhiDraw(device, pass, 3, 1, 5, 0) == mrhi_success &&
@@ -1363,8 +1363,8 @@ static void DrawPlaced(const Scene* scene, mrhiPassId pass, mrhiResourceId verti
 // Render state on the target: a first pass writes depth and stencil,
 // kept for a second that loads them and draws, from indirect arguments
 // past a draw of nothing, blue scaled by the blend constant only where
-// both tests pass, which is the upper right: the left half stays red,
-// the lower right black.
+// both tests pass, which is the lower right: the left half stays red,
+// the upper right black.
 static void CheckRenderState(Scene* scene)
 {
     mrhiDevice* device = scene->device;
@@ -1428,11 +1428,11 @@ static void CheckRenderState(Scene* scene)
         for (int x = 0; x < 8; ++x)
         {
             const uint8_t* pixel = &image[(y * 8 + x) * 4];
-            right = right &&
-                    (x < 4 ? IsNear(pixel, kRed) : (y < 4 ? IsNear(pixel, kBlue) : IsBlack(pixel)));
+            right = right && (x < 4 ? IsNear(pixel, kRed)
+                                    : (y >= 4 ? IsNear(pixel, kBlue) : IsBlack(pixel)));
         }
     }
-    CHECK(right, "red left, blended blue upper right, black lower right");
+    CHECK(right, "red left, blended blue lower right, black upper right");
 }
 
 // A compute pass that leaves its GPU compute pass for an upload between
