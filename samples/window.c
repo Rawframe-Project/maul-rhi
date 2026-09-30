@@ -16,6 +16,8 @@
 #include <emscripten/em_js.h>
 #elif defined(SAMPLE_XCB)
 #include <xcb/xcb.h>
+#elif defined(SAMPLE_WIN32)
+#include <windows.h>
 #elif defined(SAMPLE_METAL)
 #include "metal_layer.h"
 #endif
@@ -127,6 +129,77 @@ void SampleWindowClose(Sample* sample, SampleWindow* window)
                 "the surface destroyed");
     xcb_destroy_window(window->connection, window->window);
     xcb_disconnect(window->connection);
+}
+
+#elif defined(SAMPLE_WIN32)
+
+// The samples' window class, registered with the first window.
+#define WINDOW_CLASS L"mrhiSample"
+
+// Handles the messages the window system has sent, so that it treats
+// the window as live.
+static void Pump(void)
+{
+    MSG message;
+    while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+    {
+        (void)TranslateMessage(&message);
+        (void)DispatchMessageW(&message);
+    }
+}
+
+// The window's outer size for a client area of width by height.
+static SIZE OuterSize(uint32_t width, uint32_t height)
+{
+    RECT rect = {0, 0, (LONG)width, (LONG)height};
+    (void)AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
+    return (SIZE){rect.right - rect.left, rect.bottom - rect.top};
+}
+
+int SampleWindowOpen(Sample* sample, SampleWindow* window, int index, uint32_t width,
+                     uint32_t height)
+{
+    *window = (SampleWindow){.index = index};
+    HINSTANCE module = GetModuleHandleW(nullptr);
+    const WNDCLASSW windowClass = {
+        .lpfnWndProc = DefWindowProcW,
+        .hInstance = module,
+        .lpszClassName = WINDOW_CLASS,
+    };
+    // A second window finds the class registered.
+    (void)RegisterClassW(&windowClass);
+    SIZE size = OuterSize(width, height);
+    HWND made = CreateWindowExW(0, WINDOW_CLASS, L"sample", WS_OVERLAPPEDWINDOW, 0, 0, size.cx,
+                                size.cy, nullptr, nullptr, module, nullptr);
+    if (made == nullptr)
+    {
+        return Missing("no Win32 window");
+    }
+    (void)ShowWindow(made, SW_SHOWNOACTIVATE);
+    Pump();
+    window->connection = made;
+    const mrhiSurfaceSourceWin32 source = {
+        .chain = {.type = mrhi_structSurfaceSourceWin32},
+        .hinstance = module,
+        .hwnd = made,
+    };
+    return MakeSurface(sample, window, &source.chain);
+}
+
+void SampleWindowResize(SampleWindow* window, uint32_t width, uint32_t height)
+{
+    SIZE size = OuterSize(width, height);
+    (void)SetWindowPos((HWND)window->connection, nullptr, 0, 0, size.cx, size.cy,
+                       SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    Pump();
+}
+
+void SampleWindowClose(Sample* sample, SampleWindow* window)
+{
+    SampleCheck(sample, mrhiDestroySurface(sample->instance, window->surface) == mrhi_success,
+                "the surface destroyed");
+    (void)DestroyWindow((HWND)window->connection);
+    Pump();
 }
 
 #elif defined(SAMPLE_METAL)

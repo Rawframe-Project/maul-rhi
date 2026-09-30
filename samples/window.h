@@ -2,8 +2,9 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The windows the presentation samples show: an X window through XCB
-// where the build has the XCB client library and an X server runs, or
-// on the web a canvas of the runner's page (#mrhi-canvas,
+// where the build has the XCB client library and an X server runs, a
+// Win32 window on the D3D12 driver, a CAMetalLayer on the Metal driver,
+// or on the web a canvas of the runner's page (#mrhi-canvas,
 // #mrhi-canvas-2). No window library is linked; a program takes its
 // window's handles from its own. Elsewhere, or without a display, the
 // samples are skipped unless MAUL_RHI_REQUIRE_SURFACE is set.
@@ -18,8 +19,8 @@
 typedef struct SampleWindow
 {
     mrhiSurfaceId surface;
-    // The X connection and window, where there are; the CAMetalLayer on
-    // the Metal driver.
+    // The X connection and window, where there are; the Win32 window on
+    // the D3D12 driver; the CAMetalLayer on the Metal driver.
     void* connection;
     uint32_t window;
     // Which window: 0 or 1.
