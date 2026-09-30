@@ -82,6 +82,8 @@ static void TestParts(void)
     CHECK(Built() == mrhi_errorInvalid, "a map short of a constant");
     s_sections[s_d3d12Map].size += 2;
     CHECK(Built() == mrhi_errorInvalid, "a map a byte long");
+    s_sections[s_d3d12Map].size = 24;
+    CHECK(Built() == mrhi_errorInvalid, "a map short of its head");
     Reset();
     AddD3d12();
     AddMetal(true, false);
@@ -301,15 +303,17 @@ static void TestHeapRanges(void)
         {{3, 0, 16}, {2, 0, 17}},
         {{0, 0, 15}, {2, 0, 17}},
         {{0, 0, 0xFFFFFFF0u}, {2, 0, 17}},
-        {{0, 1, 17}, {0, 1, 17}},
     };
     const char* names[] = {"an unknown range class", "a range below the heaps' spaces",
-                           "a range in a reserved space", "two ranges on one place"};
+                           "a range in a reserved space"};
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
     {
         AddRanges(sampling, cases[i], 2);
         CHECK(Built() == mrhi_errorInvalid, names[i]);
     }
+    const uint32_t twice[3][3] = {{0, 1, 17}, {0, 1, 17}, {2, 0, 18}};
+    AddRanges(sampling, twice, 3);
+    CHECK(Built() == mrhi_errorInvalid, "two ranges of one class on one place");
     const uint32_t shared[3][3] = {{0, 0, 16}, {1, 0, 16}, {2, 0, 16}};
     AddRanges(sampling | mrhi_heapUseStorageBuffers, shared, 3);
     CHECK(Built() == mrhi_success, "ranges of three classes on one place");

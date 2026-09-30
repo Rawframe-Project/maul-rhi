@@ -559,7 +559,8 @@ def main():
                   "the heap ranges by class, before the fixed flags")
 
         def heap_d3d12_refused(what, **change):
-            d3d12_refused(what, change, wgsl=None, reflection=heaped, module=heap_code)
+            d3d12_refused(what, dict(heap_dxil, **change), wgsl=None, reflection=heaped,
+                          module=heap_code)
 
         heap_d3d12_refused("a heap read by an entry reading none",
                            vs=dxbc("vertex", DXIL["vs"] + [("t*", 0, 16)]))
