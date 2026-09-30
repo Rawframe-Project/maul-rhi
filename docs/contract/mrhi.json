@@ -961,7 +961,7 @@
                 },
                 "metal": {
                   "class": "restricted",
-                  "note": "counter sampling at stage boundaries"
+                  "note": "the timestamp counter set, sampled at stage or encoder boundaries (not granted yet)"
                 },
                 "web_gpu": {
                   "class": "restricted",
@@ -1307,7 +1307,7 @@
                 },
                 "metal": {
                   "class": "restricted",
-                  "note": "argument buffers tier 2"
+                  "note": "MTLGPUFamilyMetal3: descriptors in a plain buffer (not granted yet)"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -1330,7 +1330,7 @@
                 },
                 "metal": {
                   "class": "restricted",
-                  "note": "argument buffers tier 2"
+                  "note": "MTLGPUFamilyMetal3: descriptors in a plain buffer (not granted yet)"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -2085,7 +2085,7 @@
                 },
                 "metal": {
                   "class": "restricted",
-                  "note": "argument buffers tier 2"
+                  "note": "MTLGPUFamilyMetal3 (not granted yet)"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -2109,7 +2109,7 @@
                 },
                 "metal": {
                   "class": "restricted",
-                  "note": "argument buffer samplers"
+                  "note": "MTLGPUFamilyMetal3 (not granted yet)"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -8930,7 +8930,7 @@
                 },
                 "metal": {
                   "class": "restricted",
-                  "note": "a texture in the argument buffer"
+                  "note": "a texture's gpuResourceID in the heap's buffer"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -8953,7 +8953,7 @@
                 },
                 "metal": {
                   "class": "restricted",
-                  "note": "a texture in the argument buffer, read or written"
+                  "note": "a texture's gpuResourceID in the heap's buffer, read or written"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -8976,7 +8976,7 @@
                 },
                 "metal": {
                   "class": "restricted",
-                  "note": "a buffer address in the argument buffer"
+                  "note": "a buffer's gpuAddress in the heap's buffer"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -9201,7 +9201,7 @@
                 },
                 "metal": {
                   "class": "restricted",
-                  "note": "the argument buffer's resource slots"
+                  "note": "the heap buffer's resource descriptors"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -9224,7 +9224,7 @@
                 },
                 "metal": {
                   "class": "restricted",
-                  "note": "the argument buffer's sampler slots"
+                  "note": "the heap buffer's sampler descriptors"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -9390,7 +9390,7 @@
             },
             "metal": {
               "class": "restricted",
-              "note": "the argument buffer's slot written"
+              "note": "the heap buffer's descriptor written"
             },
             "web_gpu": {
               "class": "absent_rejected",
@@ -9476,7 +9476,7 @@
             },
             "metal": {
               "class": "restricted",
-              "note": "the argument buffer's sampler slot written"
+              "note": "the heap buffer's sampler descriptor written"
             },
             "web_gpu": {
               "class": "absent_rejected",
@@ -14007,7 +14007,7 @@
                 },
                 "metal": {
                   "class": "direct",
-                  "note": "argument buffer, tier 2"
+                  "note": "a runtime array in an argument buffer, MSL 3.0"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -14030,7 +14030,7 @@
                 },
                 "metal": {
                   "class": "direct",
-                  "note": "argument buffer, tier 2"
+                  "note": "a runtime array in an argument buffer, MSL 3.0"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -14053,7 +14053,7 @@
                 },
                 "metal": {
                   "class": "direct",
-                  "note": "argument buffer, tier 2"
+                  "note": "a runtime array in an argument buffer, MSL 3.0"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -14076,7 +14076,7 @@
                 },
                 "metal": {
                   "class": "direct",
-                  "note": "argument buffer, tier 2"
+                  "note": "a runtime array in an argument buffer, MSL 3.0"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -14099,7 +14099,7 @@
                 },
                 "metal": {
                   "class": "direct",
-                  "note": "argument buffer, tier 2, read_write"
+                  "note": "a runtime array in an argument buffer, MSL 3.0, read_write"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",

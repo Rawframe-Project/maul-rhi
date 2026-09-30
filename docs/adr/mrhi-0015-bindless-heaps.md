@@ -109,6 +109,12 @@ barriers.
   container reading heaps adds an unbounded table per range class
   (shader resource, unordered access, sampler), pointed at the pass's
   heap after each pipeline.
+- **Metal** (amended for the Metal driver) will grant heaps only on
+  `MTLGPUFamilyMetal3` devices, whose descriptors (`gpuResourceID`,
+  `gpuAddress`) fill a plain buffer per heap: SPIRV-Cross writes runtime
+  arrays in argument buffers that way and refuses them below MSL 3.0.
+  The driver grants no heap until a CI device runs that path; the
+  hosted runner's device is not in the family.
 
 ## Consequences
 
