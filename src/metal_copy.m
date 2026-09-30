@@ -79,7 +79,15 @@ static void CopyWithTexture(mrhiMetalEncoder* encoder, const mrhiCommand* comman
     bool volume = def->kind == mrhi_texture3d;
     uint32_t depth = (uint32_t)command->d;
     MTLSize size = MTLSizeMake((uint32_t)command->b, (uint32_t)command->c, volume ? depth : 1);
-    uint64_t imageBytes = (uint64_t)buffer.bytesPerRow * buffer.rowsPerImage;
+    // A layout of 0, for a copy of one row or one layer, is the copy's
+    // own rows packed, as Metal takes no 0.
+    mrhiFormatBlock block = mrhiGetFormatBlock(def->format);
+    uint32_t rowBytes =
+        (uint32_t)command->b / block.width * mrhiGetFormatCopy(def->format, texture.aspect).bytes;
+    uint32_t pitch = buffer.bytesPerRow != 0 ? buffer.bytesPerRow : rowBytes;
+    uint32_t rows =
+        buffer.rowsPerImage != 0 ? buffer.rowsPerImage : (uint32_t)command->c / block.height;
+    uint64_t imageBytes = (uint64_t)pitch * rows;
     MTLBlitOption option = AspectOf(def, texture.aspect);
     if (readback)
     {
@@ -95,7 +103,7 @@ static void CopyWithTexture(mrhiMetalEncoder* encoder, const mrhiCommand* comman
         {
             [encoder->blit copyFromBuffer:bytes
                              sourceOffset:offset
-                        sourceBytesPerRow:buffer.bytesPerRow
+                        sourceBytesPerRow:pitch
                       sourceBytesPerImage:stride
                                sourceSize:size
                                 toTexture:image
@@ -113,7 +121,7 @@ static void CopyWithTexture(mrhiMetalEncoder* encoder, const mrhiCommand* comman
                                 sourceSize:size
                                   toBuffer:bytes
                          destinationOffset:offset
-                    destinationBytesPerRow:buffer.bytesPerRow
+                    destinationBytesPerRow:pitch
                   destinationBytesPerImage:stride
                                    options:option];
         }

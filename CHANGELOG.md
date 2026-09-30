@@ -399,8 +399,9 @@ format.
   use as aliasing, which the Vulkan driver waits on for all commands'
   writes. A conformance check that uploads, clears and copies out
   resources sharing memory exposed it under synchronization validation.
-- The WebGPU driver passed a buffer layout of 0 to WebGPU for a copy of
-  one row or layer, which WebGPU refuses; it now leaves it out.
+- The WebGPU and Metal drivers passed a buffer layout of 0 on for a
+  copy of one row or layer, which both APIs refuse: WebGPU now leaves it
+  out, and Metal takes the copy's own rows packed.
 
 - The Vulkan driver's frames wait on the timeline for the frame that
   last used their slot, so synchronization validation sees the reuse
