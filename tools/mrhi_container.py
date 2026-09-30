@@ -125,8 +125,12 @@ BUILTIN_WORKGROUP_SIZE = 25
 # D3D12: the space and registers of the map's own constant buffers (the
 # root block, the constants and the vertex information), each binding
 # kind's register class, the classes of DXIL's resource types (the PSV0
-# part's), and DXIL's shader kinds by stage.
+# part's), DXIL's shader kinds by stage, the heap ranges' first space
+# and classes, and the first space the format reserves.
 D3D12_SPACE = 5
+D3D12_HEAP_SPACE = 16
+RESERVED_SPACE = 0xFFFFFFF0
+HEAP_CLASSES = {"t": 0, "u": 1, "s": 2}
 D3D12_ROOT = 0
 D3D12_CONSTANTS = 1
 D3D12_VERTEX_INFO = 2
@@ -650,7 +654,8 @@ def dxil_resources(entry, code):
             for i in range(count):
                 kind, space, low, high = struct.unpack_from("<4I", psv, 12 + info + i * stride)
                 need(kind in PSV_CLASSES, f"{where}: an unknown resource type {kind}")
-                need(low == high, f"{where}: a range of registers, which only heaps use")
+                need(low == high or space >= D3D12_HEAP_SPACE,
+                     f"{where}: a range of registers, which only heaps use")
                 resources.append((PSV_CLASSES[kind], low, space))
         return resources
     except struct.error as error:
@@ -661,8 +666,6 @@ def d3d12_sections(reflection, root, spirv, dxil):
     """The D3D12 map and DXIL sections, or none without DXIL."""
     if dxil is None:
         return []
-    need(not any(e.get("heap_uses") for e in reflection["entries"]),
-         "D3D12 reads no heaps yet: a container using one has no DXIL")
     bindings = reflection.get("bindings", [])
     constants = reflection.get("constants", [])
     fixed = fixed_constants(spirv)
@@ -677,11 +680,21 @@ def d3d12_sections(reflection, root, spirv, dxil):
     records = b""
     code = b""
     reads_info = False
+    heap = set()
     for entry in reflection["entries"]:
         need(entry["name"] in dxil, f"no DXIL for entry {entry['name']}")
         blob = dxil[entry["name"]]
         reads = False
+        uses = set(entry.get("heap_uses", []))
         for resource in dxil_resources(entry, blob):
+            if resource[2] >= D3D12_HEAP_SPACE:
+                need(resource[2] < RESERVED_SPACE,
+                     f"DXIL of {entry['name']}: space {resource[2]} is reserved")
+                need(uses & ({"samplers"} if resource[0] == "s" else set(RESOURCE_USES)),
+                     f"DXIL of {entry['name']}: {resource[0]}{resource[1]} of space "
+                     f"{resource[2]} reads a heap the entry does not")
+                heap.add(resource)
+                continue
             reads = reads or resource == info
             need(resource in allowed or (resource == info and entry["stage"] == "vertex"),
                  f"DXIL of {entry['name']}: {resource[0]}{resource[1]} of space {resource[2]}"
@@ -691,10 +704,17 @@ def d3d12_sections(reflection, root, spirv, dxil):
         code += blob
         reads_info = reads_info or reads
     own.append(info[1:] if reads_info else (0, 0))
-    head = b"".join(struct.pack("<II", reg, space) for reg, space in own) + bytes(8)
+    heap = sorted(heap, key=lambda r: (HEAP_CLASSES[r[0]], r[2], r[1]))
+    uses = set().union(*(set(e.get("heap_uses", [])) for e in reflection["entries"]))
+    need(any(r[0] != "s" for r in heap) == bool(uses & set(RESOURCE_USES)) and
+         any(r[0] == "s" for r in heap) == ("samplers" in uses),
+         "the DXIL reads the heaps other than the entries do")
+    head = (b"".join(struct.pack("<II", reg, space) for reg, space in own) +
+            struct.pack("<I4x", len(heap)))
     places = b"".join(struct.pack("<II", b["slot"], b["table"]) for b in bindings)
+    ranges = b"".join(struct.pack("<III4x", HEAP_CLASSES[c], reg, space) for c, reg, space in heap)
     flags = bytes(1 if c["id"] in fixed else 0 for c in constants)
-    return [(14, head + records + places + flags), (15, code)]
+    return [(14, head + records + places + ranges + flags), (15, code)]
 
 
 # The container.

@@ -26,6 +26,7 @@
 #define METAL_ENTRY_BYTES 16
 #define D3D12_HEAD_BYTES  32
 #define D3D12_ENTRY_BYTES 16
+#define D3D12_RANGE_BYTES 16
 #define SECTION_TYPES     15
 #define MAX_SECTIONS      64
 #define MAX_ROOT_BLOCK    256
@@ -301,9 +302,31 @@ mrhiD3d12Place mrhiContainerD3d12Binding(const mrhiContainer* container, uint32_
     return ReadPlace(D3d12Bindings(container) + (size_t)binding * 8);
 }
 
+uint32_t mrhiContainerD3d12HeapRangeCount(const mrhiContainer* container)
+{
+    return mrhiRead32(container->d3d12Map + 24);
+}
+
+static const uint8_t* D3d12HeapRanges(const mrhiContainer* container)
+{
+    return D3d12Bindings(container) + (size_t)container->bindingCount * 8;
+}
+
+mrhiD3d12HeapRange mrhiContainerD3d12HeapRange(const mrhiContainer* container, uint32_t index)
+{
+    const uint8_t* at = D3d12HeapRanges(container) + (size_t)index * D3D12_RANGE_BYTES;
+    return (mrhiD3d12HeapRange){
+        .rangeClass = (mrhiD3d12HeapClass)mrhiRead32(at),
+        .reg = mrhiRead32(at + 4),
+        .space = mrhiRead32(at + 8),
+    };
+}
+
 bool mrhiContainerD3d12Fixed(const mrhiContainer* container, uint32_t constant)
 {
-    return D3d12Bindings(container)[(size_t)container->bindingCount * 8 + constant] != 0;
+    return D3d12HeapRanges(
+               container)[(size_t)mrhiContainerD3d12HeapRangeCount(container) * D3D12_RANGE_BYTES +
+                          constant] != 0;
 }
 
 // What an interface record is.
@@ -680,7 +703,7 @@ static bool AreD3d12BuffersValid(const mrhiContainer* container, bool vertexInfo
             }
             continue;
         }
-        if (place.space >= D3D12_SPACES)
+        if (place.space >= MRHI_D3D12_HEAP_SPACE)
         {
             return false;
         }
@@ -704,7 +727,7 @@ static bool AreD3d12BindingsValid(const mrhiContainer* container, const bool* pr
     {
         int kind = D3d12Class(mrhiContainerBinding(container, i).kind);
         mrhiD3d12Place place = mrhiContainerD3d12Binding(container, i);
-        if (place.space >= D3D12_SPACES)
+        if (place.space >= MRHI_D3D12_HEAP_SPACE)
         {
             return false;
         }
@@ -747,19 +770,61 @@ static bool IsD3d12EntryValid(const mrhiContainer* container, uint32_t index)
     return memcmp(dxil, "DXBC", 4) == 0 && mrhiRead32(dxil + 24) == entry.dxilLength;
 }
 
+// Whether the heap ranges are well formed: in the heap's spaces, apart
+// within their class, resource ranges exactly when an entry reads
+// resources from the heap and sampler ranges exactly when one reads
+// samplers.
+static bool AreD3d12HeapRangesValid(const mrhiContainer* container)
+{
+    uint32_t count = mrhiContainerD3d12HeapRangeCount(container);
+    bool resources = false;
+    bool samplers = false;
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        const uint8_t* raw = D3d12HeapRanges(container) + (size_t)i * D3D12_RANGE_BYTES;
+        mrhiD3d12HeapRange range = mrhiContainerD3d12HeapRange(container, i);
+        if (mrhiRead32(raw) > mrhiD3d12HeapSampler || !IsZero(raw + 12, 4) ||
+            range.space < MRHI_D3D12_HEAP_SPACE || range.space >= D3D12_SPACES)
+        {
+            return false;
+        }
+        for (uint32_t j = 0; j < i; ++j)
+        {
+            mrhiD3d12HeapRange other = mrhiContainerD3d12HeapRange(container, j);
+            if (other.rangeClass == range.rangeClass && other.reg == range.reg &&
+                other.space == range.space)
+            {
+                return false;
+            }
+        }
+        samplers = samplers || range.rangeClass == mrhiD3d12HeapSampler;
+        resources = resources || range.rangeClass != mrhiD3d12HeapSampler;
+    }
+    const mrhiShaderHeapUses reads =
+        mrhi_heapUseSampledTextures | mrhi_heapUseStorageTextures | mrhi_heapUseStorageBuffers;
+    return resources == ((container->heapUses & reads) != 0) &&
+           samplers == ((container->heapUses & mrhi_heapUseSamplers) != 0);
+}
+
 // Whether the D3D12 code agrees with the rules: the map exactly when
-// there is DXIL and no entry uses a heap, of its size, with its entries,
-// constant buffers, bindings and constants well formed.
+// there is DXIL, of its size, with its entries, constant buffers,
+// bindings, heap ranges and constants well formed.
 static bool IsD3d12Valid(const mrhiContainer* container)
 {
     if (container->d3d12Map == nullptr || container->dxil == nullptr)
     {
         return container->d3d12Map == nullptr && container->dxil == nullptr;
     }
+    if (container->d3d12MapBytes < D3D12_HEAD_BYTES)
+    {
+        return false;
+    }
+    uint32_t ranges = mrhiContainerD3d12HeapRangeCount(container);
     uint64_t size = D3D12_HEAD_BYTES + (uint64_t)container->entryCount * D3D12_ENTRY_BYTES +
-                    (uint64_t)container->bindingCount * 8 + container->constantCount;
-    if (container->heapUses != 0 || container->d3d12MapBytes != size ||
-        !IsZero(container->d3d12Map + 24, 8))
+                    (uint64_t)container->bindingCount * 8 + (uint64_t)ranges * D3D12_RANGE_BYTES +
+                    container->constantCount;
+    if (ranges > MAX_RECORDS || container->d3d12MapBytes != size ||
+        !IsZero(container->d3d12Map + 28, 4) || !AreD3d12HeapRangesValid(container))
     {
         return false;
     }
@@ -778,7 +843,7 @@ static bool IsD3d12Valid(const mrhiContainer* container)
     {
         return false;
     }
-    const uint8_t* fixed = D3d12Bindings(container) + (size_t)container->bindingCount * 8;
+    const uint8_t* fixed = D3d12HeapRanges(container) + (size_t)ranges * D3D12_RANGE_BYTES;
     for (uint32_t i = 0; i < container->constantCount; ++i)
     {
         if (fixed[i] > 1 || (fixed[i] == 1 && mrhiContainerConstant(container, i).required))

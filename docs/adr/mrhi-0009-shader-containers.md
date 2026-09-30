@@ -73,7 +73,7 @@ they are untrusted.
   them its own way; the reader checks the indices against Metal's
   ranges and each other.
 - **D3D12 code** (amended for the D3D12 driver): a D3D12 map and each
-  entry's DXIL, for containers using no heap. D3D12 has no compiler of
+  entry's DXIL. D3D12 has no compiler of
   its own, so the DXIL is made offline, by SPIRV-Cross's HLSL and DXC
   in `tools/mrhi_dxil.py`. The map records the register and space of
   the root block, the specialization constants, the vertex information
@@ -85,6 +85,13 @@ they are untrusted.
   must have as a literal (a workgroup size, an array's length) is
   compiled with its default and marked fixed. The writer reads each
   entry's resources from its DXIL and refuses any outside the map.
+  Amended for D3D12's heaps (mrhi-0015): the map also lists the heaps'
+  ranges, each a class (views of the resource heap, shader resource or
+  unordered access, or samplers), a register and a space from 16, so
+  the driver builds only the tables a container reads; bindings and
+  buffers keep to spaces below 16. The DXIL tool gives each heap
+  variable a space of its own, since arrays of one register class at
+  one place collide.
 - **The writer**, `tools/mrhi_container.py`, standard library only,
   applies the same rules and refuses modules whose entry points or
   bindings disagree with the reflection.

@@ -91,8 +91,9 @@ static void TestParts(void)
     s_sections[WGSL].size = 0;
     CHECK(Built() == mrhi_success, "a heap without D3D12 code");
     AddD3d12();
-    CHECK(Built() == mrhi_errorInvalid, "D3D12 code beside a heap");
-    for (size_t at = 24; at < 32; ++at)
+    CHECK(Built() == mrhi_errorInvalid, "a heap the map gives no range");
+    CHECK(MapWith(24, 1) == mrhi_errorInvalid, "a heap range the map has no room for");
+    for (size_t at = 28; at < 32; ++at)
     {
         Reset();
         AddD3d12();
@@ -177,8 +178,8 @@ static void TestBuffers(void)
     Put32(Map() + 16, 0);
     Put32(Map() + 20, 0);
     CHECK(Built() == mrhi_success, "no reader, no place");
-    CHECK(MapWith(4, 0xFFFFFFEFu) == mrhi_success, "the root block in the last space");
-    CHECK(MapWith(4, 0xFFFFFFF0u) == mrhi_errorInvalid, "the root block in a reserved space");
+    CHECK(MapWith(4, 15) == mrhi_success, "the root block in the last space");
+    CHECK(MapWith(4, 16) == mrhi_errorInvalid, "the root block in a heap's space");
     CHECK(MapWith(8, 0) == mrhi_errorInvalid, "the constants on the root block");
     CHECK(MapWith(16, 1) == mrhi_errorInvalid, "the vertex information on the constants");
     CHECK(MapWith(20, 6) == mrhi_success, "the vertex information in another space");
@@ -186,9 +187,8 @@ static void TestBuffers(void)
 
 static void TestBindings(void)
 {
-    CHECK(MapWith(MAP_BINDING(0) + 4, 0xFFFFFFEFu) == mrhi_success, "a binding in the last space");
-    CHECK(MapWith(MAP_BINDING(5) + 4, 0xFFFFFFF0u) == mrhi_errorInvalid,
-          "a binding in a reserved space");
+    CHECK(MapWith(MAP_BINDING(0) + 4, 15) == mrhi_success, "a binding in the last space");
+    CHECK(MapWith(MAP_BINDING(5) + 4, 16) == mrhi_errorInvalid, "a binding in a heap's space");
     Reset();
     AddD3d12();
     Put32(Map() + MAP_BINDING(0) + 4, 5);
@@ -249,6 +249,75 @@ static void TestConstants(void)
     CHECK(Built() == mrhi_errorInvalid, "a required constant fixed");
 }
 
+// Resets and adds the D3D12 sections with heap ranges before the fixed
+// flag, each a class, register and space, the compute entry reading the
+// heaps as uses says.
+static void AddRanges(mrhiShaderHeapUses uses, const uint32_t (*ranges)[3], uint32_t count)
+{
+    Reset();
+    Put32(Record(ENTRIES, 2, 48) + 44, uses);
+    s_sections[WGSL].size = 0;
+    AddD3d12();
+    uint8_t fixed = Map()[MAP_FIXED];
+    Put32(Map() + 24, count);
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        uint8_t* range = Record(s_d3d12Map, 0, MAP_FIXED + (i + 1) * 16) + MAP_FIXED + i * 16;
+        for (uint32_t j = 0; j < 3; ++j)
+        {
+            Put32(range + j * 4, ranges[i][j]);
+        }
+        Put32(range + 12, 0);
+    }
+    Record(s_d3d12Map, 0, MAP_FIXED + count * 16 + 1)[MAP_FIXED + count * 16] = fixed;
+}
+
+static void TestHeapRanges(void)
+{
+    const mrhiShaderHeapUses sampling = mrhi_heapUseSampledTextures | mrhi_heapUseSamplers;
+    const uint32_t both[3][3] = {{0, 0, 16}, {2, 0, 17}, {1, 0, 18}};
+    AddRanges(sampling | mrhi_heapUseStorageBuffers, both, 3);
+    Map()[MAP_FIXED + 48] = 1;
+    Assemble();
+    mrhiContainer container;
+    CHECK(mrhiParseContainer(s_container, s_size, &container) == mrhi_success &&
+              mrhiContainerD3d12HeapRangeCount(&container) == 3 &&
+              mrhiContainerD3d12HeapRange(&container, 1).rangeClass == mrhiD3d12HeapSampler &&
+              mrhiContainerD3d12HeapRange(&container, 1).space == 17 &&
+              mrhiContainerD3d12HeapRange(&container, 2).rangeClass == mrhiD3d12HeapStorage &&
+              mrhiContainerD3d12Fixed(&container, 0),
+          "heap ranges read back, the fixed flag after them");
+    AddRanges(sampling, both, 2);
+    CHECK(Built() == mrhi_success, "a resource range and a sampler range");
+    AddRanges(mrhi_heapUseSampledTextures, both, 2);
+    CHECK(Built() == mrhi_errorInvalid, "a sampler range for an entry reading no samplers");
+    AddRanges(sampling, both, 1);
+    CHECK(Built() == mrhi_errorInvalid, "samplers read without a sampler range");
+    AddRanges(mrhi_heapUseSamplers, both + 1, 1);
+    CHECK(Built() == mrhi_success, "only samplers");
+    AddRanges(mrhi_heapUseSamplers, both, 2);
+    CHECK(Built() == mrhi_errorInvalid, "a resource range for an entry reading no resources");
+    const uint32_t cases[][2][3] = {
+        {{3, 0, 16}, {2, 0, 17}},
+        {{0, 0, 15}, {2, 0, 17}},
+        {{0, 0, 0xFFFFFFF0u}, {2, 0, 17}},
+        {{0, 1, 17}, {0, 1, 17}},
+    };
+    const char* names[] = {"an unknown range class", "a range below the heaps' spaces",
+                           "a range in a reserved space", "two ranges on one place"};
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+    {
+        AddRanges(sampling, cases[i], 2);
+        CHECK(Built() == mrhi_errorInvalid, names[i]);
+    }
+    const uint32_t shared[3][3] = {{0, 0, 16}, {1, 0, 16}, {2, 0, 16}};
+    AddRanges(sampling | mrhi_heapUseStorageBuffers, shared, 3);
+    CHECK(Built() == mrhi_success, "ranges of three classes on one place");
+    AddRanges(sampling, both, 2);
+    Map()[MAP_FIXED + 12] = 1;
+    CHECK(Built() == mrhi_errorInvalid, "a range's zero that is not zero");
+}
+
 int main(void)
 {
     TestParts();
@@ -256,5 +325,6 @@ int main(void)
     TestBuffers();
     TestBindings();
     TestConstants();
+    TestHeapRanges();
     return s_failures == 0 ? 0 : 1;
 }

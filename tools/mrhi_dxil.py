@@ -8,7 +8,10 @@
 # its binding number as register and its set as space, which is the
 # rule; the tool gives a copy of the SPIR-V's root block (its push
 # constants) descriptor set 5 and binding 0, so that SPIRV-Cross places
-# it at b0 of space 5. Each entry is crossed alone to HLSL, a vertex
+# it at b0 of space 5. Each variable of the heaps (set 4) moves to
+# binding 0 of a set of its own from 16, in the order the module
+# declares them, so that arrays of one register class never share a
+# register and space. Each entry is crossed alone to HLSL, a vertex
 # entry reading the draw's base vertex and first instance from b2 of
 # space 5, since D3D12's vertex and instance ids leave them out. Each
 # constant the SPIR-V does not size anything with is defined as a read
@@ -76,6 +79,35 @@ def place_root(writer, code):
     return struct.pack(f"<{len(words)}I", *words)
 
 
+def place_heaps(writer, code):
+    """The SPIR-V with each heap variable at binding 0 of its own set
+    from the heap's first space."""
+    words = list(struct.unpack(f"<{len(code) // 4}I", code))
+    sets = {}
+    order = []
+    at = 5
+    while at < len(words):
+        count = words[at] >> 16
+        opcode = words[at] & 0xFFFF
+        if opcode == writer.OP_DECORATE and count >= 4 and words[at + 2] == writer.DECORATION_SET:
+            sets[words[at + 1]] = at
+        if opcode == OP_VARIABLE and count >= 4:
+            order.append(words[at + 2])
+        at += count
+    heap = [v for v in order if v in sets and words[sets[v] + 3] == writer.HEAP_SET]
+    at = 5
+    while at < len(words):
+        count = words[at] >> 16
+        if ((words[at] & 0xFFFF) == writer.OP_DECORATE and count >= 4 and
+                words[at + 1] in heap):
+            if words[at + 2] == writer.DECORATION_SET:
+                words[at + 3] = writer.D3D12_HEAP_SPACE + heap.index(words[at + 1])
+            elif words[at + 2] == writer.DECORATION_BINDING:
+                words[at + 3] = 0
+        at += count
+    return struct.pack(f"<{len(words)}I", *words)
+
+
 def constant_defines(writer, constants, fixed):
     """The HLSL declaring the constants' buffer, and DXC's definitions of
     each unfixed constant as a read of it."""
@@ -112,9 +144,7 @@ def main():
         with open(reflection_path, encoding="utf-8") as f:
             reflection = json.load(f)
         entries = reflection["entries"]
-        writer.need(not any(e.get("heap_uses") for e in entries),
-                    "D3D12 reads no heaps yet: a container using one has no DXIL")
-        placed = place_root(writer, code)
+        placed = place_heaps(writer, place_root(writer, code))
         declaration, defines = constant_defines(writer, reflection.get("constants", []),
                                                 writer.fixed_constants(code))
     except (OSError, ValueError, KeyError, TypeError, writer.ContainerError) as error:

@@ -192,17 +192,19 @@ shader resource views (`t`), unordered access views (`u`) and samplers
 (`s`). Uniform buffers are constant buffers; sampled textures and
 read-only storage buffers shader resource views; storage buffers and
 storage textures unordered access views. The map says where the root
-block, the specialization constants, the vertex information and each
-binding lie, and where each entry's DXIL is:
+block, the specialization constants, the vertex information, each
+binding and the heaps' ranges lie, and where each entry's DXIL is:
 
 | Offset | Type | Field |
 |---|---|---|
 | 0 | 2 × u32 | the root block's constant buffer register and space; both 0 when the root block is empty |
 | 8 | 2 × u32 | the constants' constant buffer register and space; both 0 without constants |
 | 16 | 2 × u32 | the vertex information's constant buffer register and space; both 0 when no entry reads it |
-| 24 | 8 bytes | zero |
+| 24 | u32 | the heaps' range count |
+| 28 | 4 bytes | zero |
 | 32 | 16 bytes per entry | the entries, in the entries section's order |
 | after them | 2 × u32 per binding | each binding's register and space, in the bindings section's order |
+| after them | 16 bytes per range | the heaps' ranges |
 | after them | u8 per constant | 1 when the constant is fixed, else 0, in the constants section's order |
 
 Its size is exactly that. An entry's record:
@@ -214,6 +216,16 @@ Its size is exactly that. An entry's record:
 | 8 | u32 | 1 when it reads the vertex information, else 0; 0 unless it is a vertex entry |
 | 12 | 4 bytes | zero |
 
+A range of the heaps, an unbounded array of descriptors the code reads
+from its register on:
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | u32 | its class: 0 shader resource views and 1 unordered access views, both from the resource heap, or 2 samplers from the sampler heap |
+| 4 | u32 | its register |
+| 8 | u32 | its space |
+| 12 | 4 bytes | zero |
+
 - The constants' constant buffer holds each constant's 32 bits in the
   constants section's order, constant i at byte 4i. A fixed constant
   was compiled with its default, which it must have: the code does not
@@ -221,13 +233,17 @@ Its size is exactly that. An entry's record:
 - The vertex information's constant buffer holds the draw's base
   vertex, then its first instance, as 32-bit integers, which D3D12's
   vertex and instance ids leave out.
-- Spaces are below `0xFFFFFFF0`, and no two of the root block, the
-  constants, the vertex information and the bindings share a register
-  and space in their class.
+- The root block, the constants, the vertex information and the
+  bindings lie in spaces below 16, and no two of them share a register
+  and space in their class. The heaps' ranges lie in spaces from 16 and
+  below `0xFFFFFFF0`, and no two of one class share a register and
+  space.
+- There is a sampler range exactly when an entry reads samplers from
+  the heap, and a range of views exactly when one reads resources from
+  it.
 - Every entry's DXIL lies inside the DXIL section and is a DXIL
   container: it begins with `DXBC` and its size field (the u32 at byte
   24) is its length.
-- An entry that reads a heap has no D3D12 code yet.
 
 ## On a device
 
@@ -314,9 +330,14 @@ a literal there. The writer reads each entry's resources from its DXIL
 (the `PSV0` part) and refuses DXIL of another stage or reading a
 resource outside the map, including the vertex information outside a
 vertex entry; an entry reads the vertex information when its DXIL
-declares that constant buffer. `tools/mrhi_dxil.py SPIRV REFLECTION DIR`
-makes that DXIL for shader model 6.0 with SPIRV-Cross and DXC: it gives
-a copy of the SPIR-V's root block the rule's register, crosses each
+declares that constant buffer. A resource in a space from 16 is a
+range of the heaps, which only an entry reading that heap may declare;
+the writer lists the ranges every entry declares, by class, space and
+register. `tools/mrhi_dxil.py SPIRV REFLECTION DIR` makes that DXIL for
+shader model 6.0 with SPIRV-Cross and DXC: it gives a copy of the
+SPIR-V's root block the rule's register, moves each heap variable to
+register 0 of a space of its own from 16, in the order the module
+declares them, so that arrays of one class never collide, crosses each
 entry to HLSL that reads the vertex information, defines each unfixed
 constant as a read of the constants' buffer, and compiles
 `DIR/ENTRY.dxil` without reflection or debug data.

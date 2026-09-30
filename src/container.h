@@ -90,6 +90,28 @@ typedef enum mrhiD3d12MapBuffer
     mrhiD3d12VertexInfo,
 } mrhiD3d12MapBuffer;
 
+// The classes of a D3D12 heap range: shader resource views, unordered
+// access views, samplers.
+typedef enum mrhiD3d12HeapClass
+{
+    mrhiD3d12HeapResource,
+    mrhiD3d12HeapStorage,
+    mrhiD3d12HeapSampler,
+} mrhiD3d12HeapClass;
+
+// A range of heap descriptors a container's DXIL reads: its class, and
+// the register and space of its unbounded array.
+typedef struct mrhiD3d12HeapRange
+{
+    mrhiD3d12HeapClass rangeClass;
+    uint32_t reg;
+    uint32_t space;
+} mrhiD3d12HeapRange;
+
+// The first space of heap ranges; bindings and constant buffers lie
+// below it.
+#define MRHI_D3D12_HEAP_SPACE 16
+
 // An entry's D3D12 code: its DXIL's range in the DXIL section, and
 // whether it reads the vertex information.
 typedef struct mrhiD3d12Entry
@@ -167,6 +189,8 @@ uint8_t mrhiContainerMetalIndex(const mrhiContainer* container, uint32_t binding
 mrhiD3d12Place mrhiContainerD3d12Buffer(const mrhiContainer* container, mrhiD3d12MapBuffer buffer);
 mrhiD3d12Entry mrhiContainerD3d12Entry(const mrhiContainer* container, uint32_t index);
 mrhiD3d12Place mrhiContainerD3d12Binding(const mrhiContainer* container, uint32_t binding);
+uint32_t mrhiContainerD3d12HeapRangeCount(const mrhiContainer* container);
+mrhiD3d12HeapRange mrhiContainerD3d12HeapRange(const mrhiContainer* container, uint32_t index);
 bool mrhiContainerD3d12Fixed(const mrhiContainer* container, uint32_t constant);
 
 #endif // MAUL_RHI_SRC_CONTAINER_H

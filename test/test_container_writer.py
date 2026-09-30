@@ -110,15 +110,16 @@ DXIL_KINDS = {"fragment": 0, "vertex": 1, "compute": 5}
 
 def dxbc(stage, resources, stride=24, parts=(b"PSV0", b"DXIL"), count=None):
     """A DXIL container of a stage declaring the resources, a class of
-    "range" being eight shader resource views, its PSV0 part claiming
-    count of them: all the writer reads."""
+    "range" being eight shader resource views and one ending in "*" an
+    unbounded array of its class, its PSV0 part claiming count of them:
+    all the writer reads."""
     count = len(resources) if count is None else count
     psv = struct.pack("<I", 24) + bytes(24) + struct.pack("<I", count)
     if resources:
         psv += struct.pack("<I", stride)
         for kind, reg, space in resources:
-            high = reg + 7 if kind == "range" else reg
-            psv += struct.pack("<4I", PSV_TYPES.get(kind, 4), space, reg, high)
+            high = reg + 7 if kind == "range" else 0xFFFFFFFF if kind.endswith("*") else reg
+            psv += struct.pack("<4I", PSV_TYPES.get(kind.rstrip("*"), 4), space, reg, high)
             psv += bytes(max(stride - 16, 0))
     blobs = {b"PSV0": psv, b"DXIL": struct.pack("<II", DXIL_KINDS[stage] << 16 | 0x60, 2),
              b"ODD!": b"\1"}
@@ -544,7 +545,30 @@ def main():
         d3d12_refused("DXIL whose size is not its length", {"fs": blobs["fs"] + bytes(4)})
         d3d12_refused("a PSV0 part short of its resources",
                       {"fs": dxbc("fragment", DXIL["fs"], count=40)})
-        d3d12_refused("DXIL beside a heap", {}, wgsl=None, reflection=heaped, module=heap_code)
+        # Heaps: fs samples textures and samplers, cs writes buffers.
+        heap_dxil = dict(blobs, fs=dxbc("fragment", DXIL["fs"] + [("t*", 0, 16), ("s*", 0, 17)]),
+                         cs=dxbc("compute", DXIL["cs"] + [("u*", 0, 18)]))
+        status, errors, output = write(folder, heap_code, None, heaped,
+                                       dxil_options(folder, heap_dxil))
+        check(status == 0, f"DXIL reading heaps is written: {errors}")
+        if status == 0:
+            with open(output, "rb") as f:
+                heap_map = section(f.read(), 14)
+            ranges = b"".join(struct.pack("<III4x", c, 0, s) for c, s in ((0, 16), (1, 18), (2, 17)))
+            check(heap_map[24:28] == struct.pack("<I", 3) and heap_map[-16 * 3 - 4:-4] == ranges,
+                  "the heap ranges by class, before the fixed flags")
+
+        def heap_d3d12_refused(what, **change):
+            d3d12_refused(what, change, wgsl=None, reflection=heaped, module=heap_code)
+
+        heap_d3d12_refused("a heap read by an entry reading none",
+                           vs=dxbc("vertex", DXIL["vs"] + [("t*", 0, 16)]))
+        heap_d3d12_refused("samplers from the heap in an entry reading none",
+                           cs=dxbc("compute", DXIL["cs"] + [("u*", 0, 18), ("s*", 0, 17)]))
+        heap_d3d12_refused("heap samplers used but never read",
+                           fs=dxbc("fragment", DXIL["fs"] + [("t*", 0, 16)]))
+        heap_d3d12_refused("a heap in a reserved space",
+                           cs=dxbc("compute", DXIL["cs"] + [("u*", 0, 0xFFFFFFF0)]))
     return 1 if failures else 0
 
 

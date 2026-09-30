@@ -386,7 +386,8 @@ format.
   `tools/mrhi_container.py --dxil` writes them, checking each entry's
   resources against the map, and `tools/mrhi_dxil.py` makes the DXIL
   offline with SPIRV-Cross and DXC. The suite's and the samples'
-  containers carry DXIL.
+  containers carry DXIL. The map lists the heaps' ranges, in spaces
+  from 16, so containers reading heaps carry DXIL too.
 - `fuzz_container` fuzzes the shader container reader from a seed
   (`MAUL_RHI_FUZZ`, `tools/container_seed.py`), a minute in CI on
   every push.
