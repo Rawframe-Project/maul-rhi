@@ -8,14 +8,16 @@
 // read it, which D3D12 keeps as the adapter's one device while it is
 // held. Searches and device openings are answered at the next poll.
 // Limits are WebGPU's floor, raised where every device at the floor
-// goes further. Feature level 12_0 grants BC textures, filtering of
-// 32-bit floats, rg11b10ufloat targets, dual-source blending, unclipped
-// depth and first instances in indirect draws on every device (the
-// format tables of feature level 11_0 require the formats' parts); 64-bit
-// integers and wave operations are the device's to report. Resource
-// binding tier 3 grants bindless heaps of every kind (mrhi-0015): 65536 entries, the portable
-// ceiling, and 256 samplers, since the heaps and the frames' rings share D3D12's 2048
-// shader-visible samplers. Surfaces are Win32 windows (d3d12_surface.c).
+// goes further. Feature level 12_0 grants timestamps on the direct
+// queue, BC textures, filtering of 32-bit floats, rg11b10ufloat
+// targets, dual-source blending, unclipped depth and first instances in
+// indirect draws on every device (the format tables of feature level
+// 11_0 require the formats' parts); 64-bit integers and wave operations
+// are the device's to report. Resource binding tier 3 grants bindless
+// heaps of every kind (mrhi-0015): 65536 entries, the portable ceiling,
+// and 256 samplers, since the heaps and the frames' rings share D3D12's
+// 2048 shader-visible samplers. Surfaces are Win32 windows
+// (d3d12_surface.c).
 
 #include "driver_d3d12.h"
 
@@ -120,9 +122,10 @@ static mrhiAdapterInfo InfoOf(const DXGI_ADAPTER_DESC1* desc, ID3D12Device* devi
     return info;
 }
 
-// The optional features every device at the floor grants, which are
+// The optional features every device at the floor grants, which hold
 // all that formats' caps depend on.
 static const mrhiFeatures s_floorFeatures = {
+    .timestampQuery = true,
     .textureCompressionBc = true,
     .float32Filterable = true,
     .rg11b10Renderable = true,

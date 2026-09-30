@@ -21,4 +21,7 @@ void mrhiD3d12Draw(mrhiD3d12Recorder* recorder, const mrhiCommand* command);
 // Records an occlusion query's begin or end, or a resolve of queries.
 void mrhiD3d12Query(mrhiD3d12Recorder* recorder, const mrhiCommand* command);
 
+// Writes the pass's timestamp at its start or its end, where it has one.
+void mrhiD3d12PassTimestamp(const mrhiD3d12Recorder* recorder, bool end);
+
 #endif // MAUL_RHI_SRC_D3D12_DRAW_H

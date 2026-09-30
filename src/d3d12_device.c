@@ -188,11 +188,15 @@ static mrhiResult CreateQuerySet(void* self, const mrhiQuerySetDef* def, uint64_
     return mrhiD3d12CreateQuerySet(&device->objects, def, handleOut);
 }
 
-// Timestamps are not granted yet, so the core never asks.
+// Nanoseconds per tick of the queue's timestamps.
 static double TimestampPeriod(void* self)
 {
-    (void)self;
-    return 0.0;
+    const D3d12Device* device = self;
+    UINT64 frequency = 0;
+    return SUCCEEDED(ID3D12CommandQueue_GetTimestampFrequency(device->queue, &frequency)) &&
+                   frequency > 0
+               ? 1e9 / (double)frequency
+               : 0.0;
 }
 
 // No pipeline is made yet, so the driver's cache is empty: it takes an

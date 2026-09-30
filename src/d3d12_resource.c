@@ -264,14 +264,18 @@ ID3D12Resource* mrhiD3d12CommitTexture(const mrhiD3d12Objects* objects, const mr
 mrhiResult mrhiD3d12CreateQuerySet(mrhiD3d12Objects* objects, const mrhiQuerySetDef* def,
                                    uint64_t* handleOut)
 {
-    MRHI_ASSERT(def->type == mrhi_queryOcclusion && def->count <= MRHI_D3D12_SET_QUERIES);
+    MRHI_ASSERT(def->count <= MRHI_D3D12_SET_QUERIES);
+    bool occlusion = def->type == mrhi_queryOcclusion;
     *handleOut = 0;
     uint32_t handle = mrhiD3d12TakeSlot(&objects->querySetSlots);
     if (handle == 0)
     {
         return mrhi_errorCapacity;
     }
-    D3D12_QUERY_HEAP_DESC desc = {.Type = D3D12_QUERY_HEAP_TYPE_OCCLUSION, .Count = def->count};
+    D3D12_QUERY_HEAP_DESC desc = {
+        .Type = occlusion ? D3D12_QUERY_HEAP_TYPE_OCCLUSION : D3D12_QUERY_HEAP_TYPE_TIMESTAMP,
+        .Count = def->count,
+    };
     ID3D12QueryHeap* heap = nullptr;
     if (FAILED(ID3D12Device_CreateQueryHeap(objects->device, &desc, &IID_ID3D12QueryHeap,
                                             (void**)&heap)))
@@ -280,7 +284,11 @@ mrhiResult mrhiD3d12CreateQuerySet(mrhiD3d12Objects* objects, const mrhiQuerySet
         return mrhi_errorCapacity;
     }
     mrhiD3d12Label((ID3D12Object*)heap, def->label, def->labelLength);
-    objects->querySets[handle - 1] = (mrhiD3d12QuerySet){.heap = heap, .count = def->count};
+    objects->querySets[handle - 1] = (mrhiD3d12QuerySet){
+        .heap = heap,
+        .type = occlusion ? D3D12_QUERY_TYPE_BINARY_OCCLUSION : D3D12_QUERY_TYPE_TIMESTAMP,
+        .count = def->count,
+    };
     *handleOut = handle;
     return mrhi_success;
 }

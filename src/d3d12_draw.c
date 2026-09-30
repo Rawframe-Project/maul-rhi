@@ -7,9 +7,10 @@
 // direct draw, and for an indirect one copied from its arguments into
 // the slot's scratch buffer ahead of them, where the pipeline's command
 // signature sets them. Other indirect draws and dispatches read their
-// arguments in place. A resolve copies the occlusion queries the frame
-// wrote, as D3D12's binary occlusion (0 or 1), and zeros for the
-// others, which D3D12 would leave undefined.
+// arguments in place. A resolve copies the queries the frame wrote,
+// occlusion as D3D12's binary occlusion (0 or 1) and timestamps in the
+// queue's ticks, and zeros for the others, which D3D12 would leave
+// undefined.
 
 #include "d3d12_draw.h"
 
@@ -238,9 +239,8 @@ static void Resolve(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
         uint64_t offset = command->d + (uint64_t)i * sizeof(uint64_t);
         if (written)
         {
-            ID3D12GraphicsCommandList_ResolveQueryData(recorder->list, set->heap,
-                                                       D3D12_QUERY_TYPE_BINARY_OCCLUSION, first + i,
-                                                       run, buffer, offset);
+            ID3D12GraphicsCommandList_ResolveQueryData(recorder->list, set->heap, set->type,
+                                                       first + i, run, buffer, offset);
         }
         else
         {
@@ -250,6 +250,20 @@ static void Resolve(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
         }
         i += run;
     }
+}
+
+void mrhiD3d12PassTimestamp(const mrhiD3d12Recorder* recorder, bool end)
+{
+    const mrhiDriverPass* pass = recorder->pass;
+    uint32_t query = end ? pass->timestampEnd : pass->timestampBegin;
+    if (pass->timestampSet == 0 || query == MRHI_NO_QUERY)
+    {
+        return;
+    }
+    mrhiD3d12QuerySet* set = SetOf(recorder, pass->timestampSet);
+    Mark(recorder, set, query);
+    ID3D12GraphicsCommandList_EndQuery(recorder->list, set->heap, D3D12_QUERY_TYPE_TIMESTAMP,
+                                       query);
 }
 
 void mrhiD3d12Query(mrhiD3d12Recorder* recorder, const mrhiCommand* command)

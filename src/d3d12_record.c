@@ -10,8 +10,10 @@
 // commands follow, each pass setting its own pipeline, tables and
 // buffers (d3d12_bind.c), then draws and queries (d3d12_draw.c), copies
 // (d3d12_copy.c) and labels; at its end its multisampled targets
-// resolve, each moved to the resolve source state and back. Discarding
-// loads and stores keep the contents, which D3D12 allows.
+// resolve, each moved to the resolve source state and back. A pass's
+// timestamps are written after its barriers and after its resolves, the
+// span of its work. Discarding loads and stores keep the contents,
+// which D3D12 allows.
 
 #include "d3d12_record.h"
 
@@ -293,7 +295,6 @@ static void Forget(mrhiD3d12Recorder* recorder)
 
 void mrhiD3d12RecordPass(mrhiD3d12Recorder* recorder, const mrhiDriverPass* pass)
 {
-    MRHI_ASSERT(pass->timestampSet == 0);
     mrhiD3d12RecordBarriers(recorder, pass->id);
     mrhiD3d12UseDeclared(recorder, pass);
     recorder->pass = pass;
@@ -304,6 +305,7 @@ void mrhiD3d12RecordPass(mrhiD3d12Recorder* recorder, const mrhiDriverPass* pass
     {
         Mark(recorder, pass->label, pass->labelLength, true);
     }
+    mrhiD3d12PassTimestamp(recorder, false);
     bool targets = pass->colorTargetCount > 0 || pass->depthTarget.resource.index1 != 0;
     if (pass->passClass != mrhi_passTransfer && targets)
     {
@@ -326,6 +328,7 @@ void mrhiD3d12RecordPass(mrhiD3d12Recorder* recorder, const mrhiDriverPass* pass
     {
         Resolve(recorder);
     }
+    mrhiD3d12PassTimestamp(recorder, true);
     if (pass->labelLength > 0)
     {
         ID3D12GraphicsCommandList_EndEvent(recorder->list);
