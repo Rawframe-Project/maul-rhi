@@ -489,6 +489,7 @@ struct mrhiDevice
     char* frameLabels;
     mrhiDriverPass* driverPasses;
     mrhiDriverResource* driverResources;
+    mrhiDriverAccess* driverAccesses;
     // The last request given, frames' tokens and pipelines' requests
     // alike.
     uint32_t lastRequest;

@@ -19810,6 +19810,11 @@
               "doc": "Its passes writing timestamps."
             },
             {
+              "name": "accesses",
+              "type": "uint32",
+              "doc": "The resources its passes declare, their targets among them."
+            },
+            {
               "name": "label_bytes",
               "type": "uint64",
               "doc": "Their labels' bytes together."
@@ -19828,6 +19833,11 @@
               "name": "needed",
               "type": "uint32",
               "doc": "Its resources a kept pass uses."
+            },
+            {
+              "name": "sealed",
+              "type": "uint32",
+              "doc": "Its resources that began it sealed."
             },
             {
               "name": "transients",

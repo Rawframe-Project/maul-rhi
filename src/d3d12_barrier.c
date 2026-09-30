@@ -222,6 +222,51 @@ void mrhiD3d12RecordBarriers(mrhiD3d12Recorder* recorder, mrhiPassId pass)
     mrhiD3d12FlushBarriers(recorder);
 }
 
+D3D12_RESOURCE_STATES mrhiD3d12BufferState(mrhiResourceState state)
+{
+    switch (state)
+    {
+    case mrhi_stateUniform:
+    case mrhi_stateVertex:
+        return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    case mrhi_stateIndex:
+        return D3D12_RESOURCE_STATE_INDEX_BUFFER;
+    case mrhi_stateIndirect:
+        return D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+    case mrhi_stateStorageRead:
+        return SHADER_READ;
+    case mrhi_stateStorageWrite:
+    case mrhi_stateStorageReadWrite:
+        return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    case mrhi_stateCopySource:
+        return D3D12_RESOURCE_STATE_COPY_SOURCE;
+    case mrhi_stateCopyDestination:
+    case mrhi_stateQueryResolve:
+        return D3D12_RESOURCE_STATE_COPY_DEST;
+    case mrhi_stateSealed:
+        return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER | D3D12_RESOURCE_STATE_INDEX_BUFFER |
+               D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT | SHADER_READ;
+    default:
+        return D3D12_RESOURCE_STATE_COMMON;
+    }
+}
+
+void mrhiD3d12UseDeclared(mrhiD3d12Recorder* recorder, const mrhiDriverPass* pass)
+{
+    for (uint32_t i = 0; i < pass->accessCount; ++i)
+    {
+        const mrhiDriverAccess* access = &pass->accesses[i];
+        const mrhiD3d12Object* object = &recorder->table[access->resource - 1];
+        D3D12_RESOURCE_STATES state = mrhiD3d12BufferState(access->state);
+        if (object->resource != nullptr && object->texture == nullptr &&
+            state != D3D12_RESOURCE_STATE_COMMON)
+        {
+            mrhiD3d12Use(recorder, access->resource, state);
+        }
+    }
+    mrhiD3d12FlushBarriers(recorder);
+}
+
 static bool IsRead(D3D12_RESOURCE_STATES state)
 {
     return state != D3D12_RESOURCE_STATE_COMMON && (state & WRITES) == 0;

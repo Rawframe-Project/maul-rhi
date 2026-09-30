@@ -14,6 +14,14 @@
 // The D3D12 state a texture is in for a resource state.
 D3D12_RESOURCE_STATES mrhiD3d12TextureState(mrhiResourceState state);
 
+// The D3D12 state a buffer is in for a resource state; the common state
+// for one no buffer is in. A sealed buffer is in every read it allows.
+D3D12_RESOURCE_STATES mrhiD3d12BufferState(mrhiResourceState state);
+
+// Moves the buffers a pass declares to the states it declares them in,
+// since a heap may reach them unbound, and records the moves.
+void mrhiD3d12UseDeclared(mrhiD3d12Recorder* recorder, const mrhiDriverPass* pass);
+
 // Records the frame's barriers that come before a pass, or with a null
 // id those at the frame's end.
 void mrhiD3d12RecordBarriers(mrhiD3d12Recorder* recorder, mrhiPassId pass);

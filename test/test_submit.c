@@ -164,6 +164,7 @@ static void TestView(void)
     CHECK(s_log.stagingBytes == 512 && s_log.uploadSum == 1 + 2 + 3 + 4,
           "one upload at a 512-byte boundary, its bytes");
     CHECK(s_log.occlusionPasses == 1 && s_log.timestampPasses == 1, "the passes' query sets");
+    CHECK(s_log.accesses == 4 && s_log.sealed == 0, "each kept pass's one declared resource");
     // The first frame still runs, so the next stages into the other region.
     CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "another frame");
     CHECK(s_device->stagingRegion == 1, "the second region");

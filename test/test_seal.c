@@ -11,9 +11,12 @@
 #include "test_device_setup.h"
 
 static mrhiDevice* s_device;
+static mrhiTestFrameLog s_log;
 
 static void Open(bool sampling)
 {
+    s_log = (mrhiTestFrameLog){0};
+    s_adapter.frameLog = &s_log;
     s_adapter.features.bindlessSampling = true;
     s_adapter.limits.heapSize = 4096;
     s_adapter.limits.samplerHeapSize = 64;
@@ -236,6 +239,8 @@ static void TestSealedBuffer(void)
     Compile();
     CHECK(s_count == 0, "no barriers");
     Submit();
+    CHECK(s_log.sealed == 1 && s_log.accesses == 5,
+          "the driver told it began sealed, and each pass's read");
     Close(s_device);
 }
 

@@ -529,6 +529,18 @@ static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrh
     };
     ID3D12DescriptorHeap* heaps[] = {slot->viewHeap, slot->samplerHeap};
     ID3D12GraphicsCommandList_SetDescriptorHeaps(slot->list, 2, heaps);
+    // A heap may read a sealed buffer in any pass without it being
+    // declared, so it starts the frame in every read it allows rather
+    // than be promoted there.
+    for (uint32_t i = 0; i < frame->resourceCount; ++i)
+    {
+        if (frame->resources[i].sealed && frames->table[i].resource != nullptr &&
+            frames->table[i].texture == nullptr)
+        {
+            mrhiD3d12Use(recorder, i + 1, mrhiD3d12BufferState(mrhi_stateSealed));
+        }
+    }
+    mrhiD3d12FlushBarriers(recorder);
     for (uint32_t i = 0; i < frame->passCount && recorder->status == mrhi_success; ++i)
     {
         mrhiD3d12RecordPass(recorder, &frame->passes[i]);

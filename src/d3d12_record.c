@@ -2,16 +2,16 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The D3D12 driver's passes (d3d12_record.h). A pass's barriers come
-// first, then its debug group, then, for a pass with targets, a render
-// target view of each target's mip and layer and a depth stencil view,
-// read-only for a read-only depth target, taken from the slot's rings,
-// with the clears its loads ask for; its viewport and scissor start as
-// its area. Its commands follow, each pass setting its own pipeline,
-// tables and buffers (d3d12_bind.c), then draws and queries
-// (d3d12_draw.c), copies (d3d12_copy.c) and labels; at its end its
-// multisampled targets resolve, each moved to the resolve source state
-// and back.
-// Discarding loads and stores keep the contents, which D3D12 allows.
+// first, with its declared buffers moved to their states, then its
+// debug group, then, for a pass with targets, a render target view of
+// each target's mip and layer and a depth stencil view, read-only for a
+// read-only depth target, taken from the slot's rings, with the clears
+// its loads ask for; its viewport and scissor start as its area. Its
+// commands follow, each pass setting its own pipeline, tables and
+// buffers (d3d12_bind.c), then draws and queries (d3d12_draw.c), copies
+// (d3d12_copy.c) and labels; at its end its multisampled targets
+// resolve, each moved to the resolve source state and back. Discarding
+// loads and stores keep the contents, which D3D12 allows.
 
 #include "d3d12_record.h"
 
@@ -295,6 +295,7 @@ void mrhiD3d12RecordPass(mrhiD3d12Recorder* recorder, const mrhiDriverPass* pass
 {
     MRHI_ASSERT(pass->heap == 0 && pass->timestampSet == 0);
     mrhiD3d12RecordBarriers(recorder, pass->id);
+    mrhiD3d12UseDeclared(recorder, pass);
     recorder->pass = pass;
     recorder->labelCount = 0;
     Forget(recorder);

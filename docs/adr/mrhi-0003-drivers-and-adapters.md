@@ -249,8 +249,10 @@ ids, requests, the frame graph) can be tested without a GPU.
   states their plan states map to, a transition between two unordered
   access uses being a UAV barrier. Buffers are the driver's to track:
   the plan gives no barrier between two reads, which D3D12's states
-  tell apart, so each copy moves its buffer to the state it needs,
-  gathering read states, and a plan's barrier after a write on a buffer
+  tell apart, so each copy, binding and pass declaring it moves its
+  buffer to the state it needs, gathering read states, an imported
+  sealed buffer starting the frame in every read the sealed state
+  allows, and a plan's barrier after a write on a buffer
   in the unordered access state is a UAV barrier. Every buffer starts a
   frame in the common state, which D3D12 decays buffers to when a list
   finishes. A copy with a buffer offset off D3D12's 512-byte placement

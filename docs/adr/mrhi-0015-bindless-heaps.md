@@ -72,8 +72,11 @@ barriers.
   a pipeline's draws.
 - **Drivers** get a heap handle per pass and write entries as the core
   accepts them (`createHeap`, `destroyHeap`, `writeHeapEntry`,
-  `writeHeapSampler`; SPI version 2). The test driver checks every
-  handle it is given.
+  `writeHeapSampler`; SPI version 2). SPI version 3 also gives each
+  kept pass the resources it declares, with the states they leave, and
+  each frame resource whether it began the frame sealed, for drivers
+  that track buffer states themselves (D3D12). The test driver checks
+  every handle it is given.
 - **Vulkan** grants `bindless_sampling` with descriptor indexing over
   sampled images and samplers (runtime arrays, partially bound and
   update after bind bindings updatable while pending, non-uniform
