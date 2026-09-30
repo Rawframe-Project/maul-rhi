@@ -11113,7 +11113,7 @@
             },
             "d3d12": {
               "class": "direct",
-              "note": "a placed resource in the frame's heap, aliased by lifetime"
+              "note": "a placed resource in the frame's heap, aliased by lifetime, or a committed resource of its own where resource heap tier 1 keeps buffers and textures apart"
             },
             "metal": {
               "class": "direct",
@@ -11165,7 +11165,7 @@
             },
             "d3d12": {
               "class": "direct",
-              "note": "a placed resource in the frame's heap, aliased by lifetime"
+              "note": "a placed resource in the frame's heap, aliased by lifetime, or a committed resource of its own where resource heap tier 1 keeps buffers and textures apart"
             },
             "metal": {
               "class": "direct",
@@ -12747,16 +12747,21 @@
               "name": "after",
               "type": "enum.resource_state",
               "doc": "Its state from then."
+            },
+            {
+              "name": "aliasing",
+              "type": "bool",
+              "doc": "Whether it is the first use of a declared resource placed over memory that resources used earlier in the frame: it then also waits for their uses, and comes from the undefined state even for a buffer."
             }
           ],
           "mapping": {
             "vulkan": {
               "class": "direct",
-              "note": "VkImageMemoryBarrier2 and VkBufferMemoryBarrier2 in vkCmdPipelineBarrier2"
+              "note": "VkImageMemoryBarrier2 and VkBufferMemoryBarrier2 in vkCmdPipelineBarrier2, an aliasing one waiting for all commands' writes"
             },
             "d3d12": {
               "class": "direct",
-              "note": "ResourceBarrier transitions, or enhanced barriers where present"
+              "note": "ResourceBarrier transitions, an aliasing one led by an aliasing barrier"
             },
             "metal": {
               "class": "direct",

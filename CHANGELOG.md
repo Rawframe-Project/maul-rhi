@@ -127,7 +127,9 @@ format.
   frame's end; `mrhiGetResourcePlan` reads each resource's derived
   usages, transience (targets that live only inside their passes) and
   first and last kept passes; a texture's part is in one state per pass;
-  the device's `frameBarriers` limit.
+  the device's `frameBarriers` limit. A barrier marks the first use of
+  a declared resource placed over memory used earlier in the frame
+  (`aliasing`), a buffer's first use gaining one for it.
 - Transient memory and stores: declared resources placed by lifetime in
   one frame memory, first fit in first-use order with the driver's sizes
   and alignments (`memoryOffset` and `memoryBytes` in the resource plan,
@@ -391,6 +393,14 @@ format.
   lavapipe under the Khronos validation layer in Linux CI.
 
 ### Fixed
+
+- Declared resources placed over each other's memory were not ordered
+  after the earlier ones' uses: the plan now marks the later one's first
+  use as aliasing, which the Vulkan driver waits on for all commands'
+  writes. A conformance check that uploads, clears and copies out
+  resources sharing memory exposed it under synchronization validation.
+- The WebGPU driver passed a buffer layout of 0 to WebGPU for a copy of
+  one row or layer, which WebGPU refuses; it now leaves it out.
 
 - The Vulkan driver's frames wait on the timeline for the frame that
   last used their slot, so synchronization validation sees the reuse

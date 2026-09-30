@@ -166,6 +166,69 @@ static void TestBuffers(void)
     Drop();
 }
 
+// The barriers of the compiled frame that name a resource.
+static uint32_t BarriersOf(mrhiResourceId resource, mrhiBarrier* found, uint32_t capacity)
+{
+    mrhiBarrier barriers[32];
+    size_t count = 0;
+    CHECK(mrhiGetFrameBarriers(s_device, barriers, 32, &count) == mrhi_success, "the barriers");
+    uint32_t matched = 0;
+    for (size_t i = 0; i < count && matched < capacity; ++i)
+    {
+        if (barriers[i].resource.index1 == resource.index1)
+        {
+            found[matched++] = barriers[i];
+        }
+    }
+    return matched;
+}
+
+// A resource placed over memory an earlier one used marks its first
+// use as aliasing: a buffer gains a barrier from the undefined state, a
+// texture's barrier from it is marked. Resources on fresh memory mark
+// nothing.
+static void TestAliasing(void)
+{
+    Begin();
+    mrhiResourceId x = DeclareBuffer(100);
+    mrhiResourceId y = DeclareBuffer(1000);
+    mrhiResourceId z = DeclareBuffer(200);
+    mrhiTextureDef small = mrhiDefaultTextureDef();
+    small.format = mrhi_formatRgba8Unorm;
+    small.width = 8;
+    small.height = 8;
+    mrhiResourceId t = {0};
+    CHECK(mrhiDeclareTexture(s_device, &small, &t) == mrhi_success, "a texture");
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    mrhiAccess first[2] = {Access(x, mrhi_accessStorageWrite), Access(y, mrhi_accessStorageWrite)};
+    def.accesses = first;
+    def.accessCount = 2;
+    AddPass(def);
+    mrhiAccess second[2] = {Access(y, mrhi_accessStorageRead), Access(z, mrhi_accessStorageWrite)};
+    def.accesses = second;
+    mrhiPassId secondPass = AddPass(def);
+    mrhiAccess third = Access(t, mrhi_accessStorageWrite);
+    def.accesses = &third;
+    def.accessCount = 1;
+    mrhiPassId thirdPass = AddPass(def);
+    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(Plan(z).memoryOffset == 0 && Plan(t).memoryOffset == 0, "z and t where x was");
+    mrhiBarrier found[4];
+    CHECK(BarriersOf(x, found, 4) == 0, "x on fresh memory");
+    CHECK(BarriersOf(y, found, 4) == 1 && !found[0].aliasing &&
+              found[0].before == mrhi_stateStorageWrite,
+          "y on fresh memory, read after its write");
+    CHECK(BarriersOf(z, found, 4) == 1 && found[0].aliasing &&
+              found[0].pass.index1 == secondPass.index1 && found[0].before == mrhi_stateUndefined &&
+              found[0].after == mrhi_stateStorageWrite && found[0].range.mipCount == 1,
+          "z's first use waits for x's");
+    CHECK(BarriersOf(t, found, 4) == 1 && found[0].aliasing &&
+              found[0].pass.index1 == thirdPass.index1 && found[0].before == mrhi_stateUndefined,
+          "t's first transition marked");
+    Drop();
+}
+
 // Placed neighbours taken in offset order, not in the order they were
 // declared.
 static void TestOrder(void)
@@ -357,6 +420,7 @@ int main(void)
     CHECK(mrhiCreateTexture(s_device, &def, &window) == mrhi_success, "the window's texture");
     TestChain(window);
     TestBuffers();
+    TestAliasing();
     TestOrder();
     TestTransient();
     TestStores(window);

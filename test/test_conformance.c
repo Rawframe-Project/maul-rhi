@@ -494,6 +494,126 @@ static void CheckRoundTrip(mrhiDevice* device)
     CHECK(Taken(device, fromX, pattern + 512, 512), "kept across frames and until the end");
 }
 
+// Declared resources whose passes never meet share memory: two buffers,
+// each uploaded to and copied out before the next takes the same bytes,
+// then two targets, each cleared and copied out, over the same bytes
+// again. Each copy holds only its own resource's contents.
+static void CheckAliasing(mrhiDevice* device)
+{
+    uint8_t first[256];
+    uint8_t second[256];
+    for (size_t i = 0; i < sizeof(first); ++i)
+    {
+        first[i] = (uint8_t)(i * 5 + 1);
+        second[i] = (uint8_t)(i * 11 + 7);
+    }
+    mrhiBufferId buffer = MakeBuffer(device, 1024);
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiResourceId out = {0};
+    mrhiResourceId buffers[2] = {{0}};
+    mrhiResourceId targets[2] = {{0}};
+    mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
+    bufferDef.size = sizeof(first);
+    mrhiTextureDef targetDef = mrhiDefaultTextureDef();
+    targetDef.format = mrhi_formatRgba8Unorm;
+    targetDef.width = 4;
+    targetDef.height = 4;
+    CHECK(mrhiImportBuffer(device, buffer, &out) == mrhi_success, "the output");
+    const uint8_t* uploads[2] = {first, second};
+    mrhiPassId passes[8] = {{0}};
+    for (int i = 0; i < 2; ++i)
+    {
+        CHECK(mrhiDeclareBuffer(device, &bufferDef, &buffers[i]) == mrhi_success, "a buffer");
+        mrhiAccess write = Whole(buffers[i], mrhi_accessCopyDestination);
+        passes[2 * i] = CopyPass(device, &write, 1);
+        mrhiAccess copies[2] = {Whole(buffers[i], mrhi_accessCopySource),
+                                Whole(out, mrhi_accessCopyDestination)};
+        passes[2 * i + 1] = CopyPass(device, copies, 2);
+    }
+    for (int i = 0; i < 2; ++i)
+    {
+        CHECK(mrhiDeclareTexture(device, &targetDef, &targets[i]) == mrhi_success, "a target");
+        mrhiPassDef def = mrhiDefaultPassDef();
+        def.colorTargets[0] = (mrhiColorTarget){
+            .resource = targets[i],
+            .load = mrhi_loadClear,
+            .store = mrhi_storeKeep,
+            .clear = i == 0 ? (mrhiClearColor){1.0f, 0.0f, 0.0f, 1.0f}
+                            : (mrhiClearColor){0.0f, 0.0f, 1.0f, 1.0f},
+        };
+        def.colorTargetCount = 1;
+        def.neverCull = true;
+        CHECK(mrhiAddPass(device, &def, &passes[4 + 2 * i]) == mrhi_success, "a clearing pass");
+        mrhiAccess copies[2] = {Whole(targets[i], mrhi_accessCopySource),
+                                Whole(out, mrhi_accessCopyDestination)};
+        passes[5 + 2 * i] = CopyPass(device, copies, 2);
+    }
+    mrhiAccess read = Whole(out, mrhi_accessCopySource);
+    mrhiPassId reading = CopyPass(device, &read, 1);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    mrhiResourcePlan plans[4];
+    const mrhiResourceId planned[4] = {buffers[0], buffers[1], targets[0], targets[1]};
+    for (int i = 0; i < 4; ++i)
+    {
+        CHECK(mrhiGetResourcePlan(device, planned[i], &plans[i]) == mrhi_success, "a plan");
+    }
+    CHECK(plans[0].memoryBytes > 0 && plans[1].memoryOffset == plans[0].memoryOffset &&
+              plans[3].memoryBytes > 0 && plans[3].memoryOffset == plans[2].memoryOffset,
+          "each second resource placed over the first");
+    const mrhiExtent3d row = {4, 1, 1};
+    for (int i = 0; i < 2; ++i)
+    {
+        CHECK(mrhiBeginPass(device, passes[2 * i]) == mrhi_success &&
+                  mrhiWriteBuffer(device, passes[2 * i], buffers[i], 0, uploads[i],
+                                  sizeof(first)) == mrhi_success &&
+                  mrhiEndPass(device, passes[2 * i]) == mrhi_success &&
+                  mrhiBeginPass(device, passes[2 * i + 1]) == mrhi_success &&
+                  mrhiCopyBuffer(device, passes[2 * i + 1], buffers[i], 0, out,
+                                 (uint64_t)i * sizeof(first), sizeof(first)) == mrhi_success &&
+                  mrhiEndPass(device, passes[2 * i + 1]) == mrhi_success,
+              "a buffer uploaded and copied out");
+    }
+    for (int i = 0; i < 2; ++i)
+    {
+        const mrhiTextureCopy texels = {.resource = targets[i]};
+        const mrhiBufferCopy bytes = {.resource = out, .offset = 512 + (uint64_t)i * 16};
+        CHECK(mrhiBeginPass(device, passes[4 + 2 * i]) == mrhi_success &&
+                  mrhiEndPass(device, passes[4 + 2 * i]) == mrhi_success &&
+                  mrhiBeginPass(device, passes[5 + 2 * i]) == mrhi_success &&
+                  mrhiCopyTextureToBuffer(device, passes[5 + 2 * i], &texels, &bytes, &row) ==
+                      mrhi_success &&
+                  mrhiEndPass(device, passes[5 + 2 * i]) == mrhi_success,
+              "a target cleared and copied out");
+    }
+    mrhiRequestId taken = {0};
+    CHECK(mrhiBeginPass(device, reading) == mrhi_success &&
+              mrhiReadBuffer(device, reading, out, 0, 544, &taken) == mrhi_success &&
+              mrhiEndPass(device, reading) == mrhi_success,
+          "read");
+    Finish(device, 1);
+    uint8_t bytes[544];
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, taken, bytes, sizeof(bytes), &size) == mrhi_success &&
+              size == sizeof(bytes),
+          "the bytes");
+    static const uint8_t kRed[4] = {255, 0, 0, 255};
+    static const uint8_t kBlue[4] = {0, 0, 255, 255};
+    bool red = true;
+    bool blue = true;
+    for (int i = 0; i < 4; ++i)
+    {
+        red = red && memcmp(bytes + 512 + 4 * i, kRed, 4) == 0;
+        blue = blue && memcmp(bytes + 528 + 4 * i, kBlue, 4) == 0;
+    }
+    CHECK(!s_runs || memcmp(bytes, first, sizeof(first)) == 0, "the first buffer's own bytes");
+    CHECK(!s_runs || memcmp(bytes + 256, second, sizeof(second)) == 0,
+          "the second buffer's own bytes over the first's memory");
+    CHECK(!s_runs || red, "the first target's own texels");
+    CHECK(!s_runs || blue, "the second target's own texels over the same memory");
+    CHECK(mrhiDestroyBuffer(device, buffer) == mrhi_success, "destroyed");
+}
+
 // A device allowed one buffer replaces it every frame: a destroyed
 // buffer retires when the next frame finishes, freeing room.
 static void CheckRetirement(mrhiInstance* instance, mrhiAdapterId adapter)
@@ -1595,6 +1715,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CheckFrameMemory(device);
     CheckPipelines(device);
     CheckRoundTrip(device);
+    CheckAliasing(device);
     CheckDrawing(device, asked->timestampQuery);
     mrhiDestroyDevice(device);
 }

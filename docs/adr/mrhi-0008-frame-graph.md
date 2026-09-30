@@ -65,6 +65,12 @@ thread.
   the driver reports (none for a transient texture a tile GPU keeps on
   chip). A target's store is kept only when a later kept pass reads it
   or the texture is imported.
+- **Aliasing** (amended when the D3D12 driver placed transients): the
+  first use of a declared resource placed over memory that resources
+  used earlier in the frame is marked on its barriers (`aliasing`), a
+  buffer's first use gaining a barrier from the undefined state for
+  it, so that drivers order it after those resources' uses: Vulkan
+  waits for all commands' writes, D3D12 records an aliasing barrier.
 - **The plan is readable** after the compile, for conformance tests
   and graph tools:
   - `mrhiGetFrameBarriers`;
