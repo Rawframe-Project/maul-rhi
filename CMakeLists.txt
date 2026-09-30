@@ -25,10 +25,16 @@ option(MAUL_RHI_TSAN "Instrument with ThreadSanitizer" OFF)
 option(MAUL_RHI_COVERAGE "Instrument for gcov coverage" OFF)
 option(MAUL_RHI_FUZZ "Build the libFuzzer targets (Clang)" OFF)
 option(MAUL_RHI_TEST_DRIVER "Build the test driver (mrhiTestDriverDef)" ${MAUL_RHI_BUILD_TESTS})
+# The web: Emscripten's, or a plain WebAssembly toolchain's (mrhi-0016).
+if(EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "WASI")
+    set(maul_rhi_web ON)
+else()
+    set(maul_rhi_web OFF)
+endif()
 # The native driver (mrhi-0003), one per build: Metal on Apple systems,
 # D3D12 on Windows, Vulkan on the others; the web has none. A Windows
 # build may take Vulkan instead of D3D12.
-if(EMSCRIPTEN OR APPLE OR WIN32)
+if(maul_rhi_web OR APPLE OR WIN32)
     set(maul_rhi_vulkan_default OFF)
 else()
     set(maul_rhi_vulkan_default ON)
@@ -53,7 +59,7 @@ if(MAUL_RHI_D3D12_DRIVER AND MAUL_RHI_VULKAN_DRIVER)
                         "with MAUL_RHI_D3D12_DRIVER on")
 endif()
 # The WebGPU driver (mrhi-0003): every web build.
-option(MAUL_RHI_WEBGPU_DRIVER "Build the WebGPU driver" ${EMSCRIPTEN})
+option(MAUL_RHI_WEBGPU_DRIVER "Build the WebGPU driver" ${maul_rhi_web})
 
 # Every executable (tests, benchmarks, tools) lands in the top of the
 # build tree, so scripts and CI find them in one place.
@@ -163,9 +169,7 @@ if(MAUL_RHI_D3D12_DRIVER)
     target_include_directories(maul-rhi SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
 endif()
 if(MAUL_RHI_WEBGPU_DRIVER)
-    target_sources(maul-rhi PRIVATE src/driver_webgpu.c src/webgpu_device.c src/webgpu_frame.c
-                                   src/webgpu_names.c src/webgpu_pipeline.c)
-    target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_WEBGPU_DRIVER)
+    include(cmake/Web.cmake)
 endif()
 
 if(MAUL_RHI_BUILD_TESTS)
@@ -230,11 +234,19 @@ if(MAUL_RHI_BUILD_TESTS)
     # Where the XCB client library is installed, the suite also makes a
     # window to check surfaces on; only the test links it. On the web it
     # runs in headless Chrome (test/web_runner.cjs), sleeping through
-    # JSPI while the browser settles its promises.
-    if(EMSCRIPTEN)
+    # JSPI while the browser settles its promises, with Emscripten or
+    # without (mrhi-0016).
+    if(maul_rhi_web)
         maul_add_test(conformance MANUAL)
-        target_link_options(test_conformance PRIVATE -sJSPI -sEXIT_RUNTIME
-                            -sEXPORTED_RUNTIME_METHODS=ENV)
+        if(EMSCRIPTEN)
+            target_link_options(test_conformance PRIVATE -sJSPI -sEXIT_RUNTIME
+                                -sEXPORTED_RUNTIME_METHODS=ENV)
+        else()
+            # A reactor whose main the runner calls through JSPI, with the
+            # driver's imports from maul-rhi.mjs (mrhi-0016).
+            target_link_options(test_conformance PRIVATE -mexec-model=reactor -Wl,--export-table
+                                -Wl,--export=main)
+        endif()
         add_test(NAME conformance
                  COMMAND node ${PROJECT_SOURCE_DIR}/test/web_runner.cjs
                          $<TARGET_FILE:test_conformance>)

@@ -399,6 +399,11 @@ format.
 - The conformance suite (`test_conformance`): the same checks through
   the public API on the test driver and every native adapter, run on
   lavapipe under the Khronos validation layer in Linux CI.
+- The web without Emscripten (mrhi-0016): a `wasm32-wasi` build
+  imports the WebGPU driver's JavaScript from `maul-rhi.mjs`, which the
+  build writes from the same `EM_JS` functions (`maulRhiImports`), with
+  `cmake/wasm32-wasi.cmake`, the suites under Node's WASI and the
+  conformance suite in headless Chrome.
 
 ### Fixed
 

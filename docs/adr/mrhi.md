@@ -20,3 +20,4 @@ are listed in [README.md](README.md).
 | [mrhi-0013](mrhi-0013-submission.md) | Submission: a frame reaches its driver as one read-only view | Accepted |
 | [mrhi-0014](mrhi-0014-device-loss.md) | Device loss: terminal, answered, reported | Accepted |
 | [mrhi-0015](mrhi-0015-bindless-heaps.md) | Bindless heaps: one heap per pass, stable entries, sealed reads | Accepted |
+| [mrhi-0016](mrhi-0016-web-without-emscripten.md) | The web without Emscripten | Accepted |

@@ -30,7 +30,11 @@ drivers, the conformance suite and the samples are in place; the Metal
 driver still lacks heaps, timestamps, present timing and multiview.
 Each build has one native driver: Metal on Apple systems, Direct3D 12
 on Windows (or Vulkan, with `MAUL_RHI_VULKAN_DRIVER=ON` and
-`MAUL_RHI_D3D12_DRIVER=OFF`), Vulkan on the others, WebGPU on the web.
+`MAUL_RHI_D3D12_DRIVER=OFF`), Vulkan on the others, WebGPU on the web,
+built with Emscripten or with Clang's `wasm32-wasi`
+(`-DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake`), whose page loads
+the driver's JavaScript from the `maul-rhi.mjs` the build writes
+(mrhi-0016).
 
 ## Building
 
