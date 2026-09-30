@@ -133,8 +133,11 @@ void SampleWindowClose(Sample* sample, SampleWindow* window)
 
 #elif defined(SAMPLE_WIN32)
 
-// The samples' window class, registered with the first window.
+// The samples' window class, registered with the first window, and the
+// windows' style: popups, which Windows gives no minimum size, so that
+// a small client area is the size asked for.
 #define WINDOW_CLASS L"mrhiSample"
+#define WINDOW_STYLE WS_POPUP
 
 // Handles the messages the window system has sent, so that it treats
 // the window as live.
@@ -152,7 +155,7 @@ static void Pump(void)
 static SIZE OuterSize(uint32_t width, uint32_t height)
 {
     RECT rect = {0, 0, (LONG)width, (LONG)height};
-    (void)AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
+    (void)AdjustWindowRect(&rect, WINDOW_STYLE, FALSE);
     return (SIZE){rect.right - rect.left, rect.bottom - rect.top};
 }
 
@@ -169,8 +172,8 @@ int SampleWindowOpen(Sample* sample, SampleWindow* window, int index, uint32_t w
     // A second window finds the class registered.
     (void)RegisterClassW(&windowClass);
     SIZE size = OuterSize(width, height);
-    HWND made = CreateWindowExW(0, WINDOW_CLASS, L"sample", WS_OVERLAPPEDWINDOW, 0, 0, size.cx,
-                                size.cy, nullptr, nullptr, module, nullptr);
+    HWND made = CreateWindowExW(0, WINDOW_CLASS, L"sample", WINDOW_STYLE, 0, 0, size.cx, size.cy,
+                                nullptr, nullptr, module, nullptr);
     if (made == nullptr)
     {
         return Missing("no Win32 window");
