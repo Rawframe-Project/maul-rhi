@@ -784,19 +784,21 @@ static mrhiTextureId MakeImage(mrhiDevice* device, uint32_t size, mrhiTextureUsa
     return texture;
 }
 
-// Where the heap check's objects sit in its heap: the clamping sampler
-// it reads, and a repeating one it must not.
+// Where the heap check's objects sit in its heaps: the sampler it reads,
+// and another it must not. The texture sits where the second descriptor
+// a frame binds lands if a driver's rings overlap its heaps.
 enum
 {
-    HEAP_TEXTURE = 3,
+    HEAP_TEXTURE = 1,
     HEAP_SAMPLER = 2,
     HEAP_OTHER_SAMPLER = 0,
     HEAP_BUFFER = 7,
 };
 
-// Makes the heap check's heap with its entries: the texture's view, the
-// buffer and two samplers.
-static mrhiHeapId MakeHeap(mrhiDevice* device, mrhiTextureId texture, mrhiBufferId buffer)
+// Makes a heap of the heap check with its entries: the texture's view,
+// the buffer and two samplers, the one read clamping or repeating.
+static mrhiHeapId MakeHeap(mrhiDevice* device, mrhiTextureId texture, mrhiBufferId buffer,
+                           bool clamping)
 {
     mrhiViewDef viewDef = mrhiDefaultViewDef();
     viewDef.texture = texture;
@@ -825,18 +827,22 @@ static mrhiHeapId MakeHeap(mrhiDevice* device, mrhiTextureId texture, mrhiBuffer
     };
     CHECK(mrhiSetHeapEntry(device, heap, HEAP_TEXTURE, &sampled) == mrhi_success &&
               mrhiSetHeapEntry(device, heap, HEAP_BUFFER, &storage) == mrhi_success &&
-              mrhiSetHeapSampler(device, heap, HEAP_SAMPLER, clamp) == mrhi_success &&
-              mrhiSetHeapSampler(device, heap, HEAP_OTHER_SAMPLER, repeat) == mrhi_success,
+              mrhiSetHeapSampler(device, heap, HEAP_SAMPLER, clamping ? clamp : repeat) ==
+                  mrhi_success &&
+              mrhiSetHeapSampler(device, heap, HEAP_OTHER_SAMPLER, clamping ? repeat : clamp) ==
+                  mrhi_success,
           "the entries");
     return heap;
 }
 
 // Texels uploaded to a texture sealed in the same frame, then sampled
-// past its right edge through a heap with a clamping sampler from it by
-// a compute pipeline that writes the texel to a buffer from the heap,
-// all named by index: the sealed texture undeclared, the buffer
-// declared. Needs heterogeneous heaps, which MAUL_RHI_REQUIRE_BINDLESS
-// requires of every native adapter.
+// past its right edge by a compute pipeline in each of two passes, each
+// through its own heap, which holds a repeating or a clamping sampler
+// at the index read, and each writing the texel to a buffer from its
+// heap, then a word from a uniform buffer bound in a table: the sealed
+// texture undeclared, the buffers declared. Two heaps tell a driver's
+// regions apart. Needs heterogeneous heaps, which
+// MAUL_RHI_REQUIRE_BINDLESS requires of every native adapter.
 static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool native)
 {
     mrhiFeatures features;
@@ -874,13 +880,20 @@ static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool nativ
           "a pipeline reading the heap");
     AwaitPipelines(device, 1, 0);
     mrhiTextureId texture = MakeImage(device, 2, mrhi_textureSampled | mrhi_textureCopyDestination);
-    mrhiBufferId buffer = MakeBuffer(device, 256);
-    mrhiHeapId heap = MakeHeap(device, texture, buffer);
-    // Each row the texel a repeating sampler would read, then the one the
+    mrhiBufferId buffers[2] = {MakeBuffer(device, 256), MakeBuffer(device, 256)};
+    mrhiBufferDef uniformDef = mrhiDefaultBufferDef();
+    uniformDef.size = 16;
+    uniformDef.usage = mrhi_bufferUniform | mrhi_bufferCopyDestination;
+    mrhiBufferId uniform = {0};
+    CHECK(mrhiCreateBuffer(device, &uniformDef, &uniform) == mrhi_success, "a uniform buffer");
+    // The repeating heap first, so the clamping one is not the first
+    // region.
+    mrhiHeapId heaps[2] = {MakeHeap(device, texture, buffers[0], false),
+                           MakeHeap(device, texture, buffers[1], true)};
+    // Each row the texel a repeating sampler reads, then the one the
     // clamping sampler reads.
     static const uint8_t pixels[16] = {10, 20, 30, 255, 255, 51, 153, 255,
                                        10, 20, 30, 255, 255, 51, 153, 255};
-    const uint8_t* clamped = pixels + 4;
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId t = {0};
     CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
@@ -898,35 +911,67 @@ static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool nativ
               mrhiEndPass(device, copy) == mrhi_success,
           "uploaded and sealed");
     Finish(device, 0);
-    mrhiResourceId b = {0};
+    mrhiResourceId b[2] = {{0}, {0}};
+    mrhiResourceId u = {0};
     CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
-              mrhiImportBuffer(device, buffer, &b) == mrhi_success,
-          "a frame reading the heap");
-    mrhiPassDef passDef = mrhiDefaultPassDef();
-    mrhiAccess write = Whole(b, mrhi_accessStorageWrite);
-    passDef.accesses = &write;
-    passDef.accessCount = 1;
-    passDef.heap = heap;
-    LABEL(passDef, "bindless");
-    mrhiPassId dispatch = {0};
-    CHECK(mrhiAddPass(device, &passDef, &dispatch) == mrhi_success, "a pass naming the heap");
-    mrhiAccess read = Whole(b, mrhi_accessCopySource);
-    mrhiPassId readPass = CopyPass(device, &read, 1);
+              mrhiImportBuffer(device, buffers[0], &b[0]) == mrhi_success &&
+              mrhiImportBuffer(device, buffers[1], &b[1]) == mrhi_success &&
+              mrhiImportBuffer(device, uniform, &u) == mrhi_success,
+          "a frame reading the heaps");
+    mrhiAccess fill = Whole(u, mrhi_accessCopyDestination);
+    mrhiPassId fillPass = CopyPass(device, &fill, 1);
+    mrhiPassId dispatches[2] = {{0}, {0}};
+    for (int i = 0; i < 2; ++i)
+    {
+        mrhiPassDef passDef = mrhiDefaultPassDef();
+        mrhiAccess accesses[2] = {Whole(b[i], mrhi_accessStorageWrite),
+                                  Whole(u, mrhi_accessUniform)};
+        passDef.accesses = accesses;
+        passDef.accessCount = 2;
+        passDef.heap = heaps[i];
+        LABEL(passDef, "bindless");
+        CHECK(mrhiAddPass(device, &passDef, &dispatches[i]) == mrhi_success,
+              "a pass naming a heap");
+    }
+    mrhiAccess reads[2] = {Whole(b[0], mrhi_accessCopySource), Whole(b[1], mrhi_accessCopySource)};
+    mrhiPassId readPass = CopyPass(device, reads, 2);
+    static const uint32_t kWord[4] = {0x5A1234A5u, 0, 0, 0};
     const uint32_t indices[4] = {HEAP_TEXTURE, HEAP_SAMPLER, HEAP_BUFFER, 0};
-    mrhiRequestId written = {0};
+    const mrhiBinding table = {.slot = 0, .resource = u, .size = MRHI_WHOLE_SIZE};
     CHECK(mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, dispatch) == mrhi_success &&
-              mrhiSetComputePipeline(device, dispatch, pipeline) == mrhi_success &&
-              mrhiSetRootBlock(device, dispatch, 0, indices, sizeof(indices)) == mrhi_success &&
-              mrhiDispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
-              mrhiEndPass(device, dispatch) == mrhi_success &&
-              mrhiBeginPass(device, readPass) == mrhi_success &&
-              mrhiReadBuffer(device, readPass, b, 0, 4, &written) == mrhi_success &&
+              mrhiBeginPass(device, fillPass) == mrhi_success &&
+              mrhiWriteBuffer(device, fillPass, u, 0, kWord, sizeof(kWord)) == mrhi_success &&
+              mrhiEndPass(device, fillPass) == mrhi_success,
+          "the uniform buffer filled");
+    for (int i = 0; i < 2; ++i)
+    {
+        CHECK(mrhiBeginPass(device, dispatches[i]) == mrhi_success &&
+                  mrhiSetComputePipeline(device, dispatches[i], pipeline) == mrhi_success &&
+                  mrhiSetBindings(device, dispatches[i], 0, &table, 1) == mrhi_success &&
+                  mrhiSetRootBlock(device, dispatches[i], 0, indices, sizeof(indices)) ==
+                      mrhi_success &&
+                  mrhiDispatch(device, dispatches[i], 1, 1, 1) == mrhi_success &&
+                  mrhiEndPass(device, dispatches[i]) == mrhi_success,
+              "dispatched through a heap");
+    }
+    mrhiRequestId written[2] = {{0}, {0}};
+    CHECK(mrhiBeginPass(device, readPass) == mrhi_success &&
+              mrhiReadBuffer(device, readPass, b[0], 0, 8, &written[0]) == mrhi_success &&
+              mrhiReadBuffer(device, readPass, b[1], 0, 8, &written[1]) == mrhi_success &&
               mrhiEndPass(device, readPass) == mrhi_success,
-          "dispatched and read");
-    Finish(device, 1);
-    CHECK(Taken(device, written, clamped, 4), "the clamped texel, through the heaps");
-    CHECK(mrhiDestroyHeap(device, heap) == mrhi_success, "the heap destroyed");
+          "read");
+    Finish(device, 2);
+    uint8_t expected[2][8];
+    for (int i = 0; i < 2; ++i)
+    {
+        memcpy(expected[i], pixels + 4 * i, 4);
+        memcpy(expected[i] + 4, kWord, 4);
+    }
+    CHECK(Taken(device, written[0], expected[0], 8), "the repeated texel, through a heap");
+    CHECK(Taken(device, written[1], expected[1], 8), "the clamped texel, through the other");
+    CHECK(mrhiDestroyHeap(device, heaps[0]) == mrhi_success &&
+              mrhiDestroyHeap(device, heaps[1]) == mrhi_success,
+          "the heaps destroyed");
     mrhiDestroyDevice(device);
 }
 

@@ -1,5 +1,8 @@
 {
   "root_block_bytes": 16,
+  "bindings": [
+    {"table": 0, "slot": 0, "kind": "uniform_buffer", "stages": ["compute"], "min_size": 16}
+  ],
   "entries": [
     {"name": "cs", "stage": "compute", "workgroup": [1, 1, 1],
      "heap_uses": ["sampled_textures", "samplers", "storage_buffers", "writes"]}

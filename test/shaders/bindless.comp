@@ -5,7 +5,8 @@
 // the resource heap with a sampler from the sampler heap, past the
 // texture's right edge so that the sampler's addressing shows, and
 // writes the texel, packed, to a storage buffer from the same heap, all
-// three named by index in the root block (mrhi-0015).
+// three named by index in the root block (mrhi-0015), then a word from
+// a uniform buffer bound in table 0, so that tables and heaps meet.
 
 #version 450
 #extension GL_EXT_nonuniform_qualifier : require
@@ -19,6 +20,11 @@ layout(push_constant) uniform Root
     uint target;
 } root;
 
+layout(set = 0, binding = 0) uniform Table
+{
+    uvec4 word;
+} table;
+
 layout(set = 4, binding = 0) uniform texture2D textures[];
 layout(set = 4, binding = 0) buffer Data
 {
@@ -31,4 +37,5 @@ void main()
     vec4 texel =
         textureLod(sampler2D(textures[root.image], samplers[root.sampling]), vec2(1.25, 0.25), 0.0);
     buffers[root.target].values[0] = packUnorm4x8(texel);
+    buffers[root.target].values[1] = table.word.x;
 }
