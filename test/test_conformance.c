@@ -987,20 +987,31 @@ static bool IsBlack(const uint8_t* pixel)
 }
 
 // One frame uploads the scene, draws the upper left half of the target
-// (vertices 2 to 4, the triangle y > x with +Y up), scales the storage buffer in a
-// compute pass and reads both back.
-static void CheckDrawFrame(Scene* scene)
+// (vertices 2 to 4, the triangle y > x with +Y up), directly or from
+// indirect arguments, scales the storage buffer in a compute pass and
+// reads both back. The vertex entry reads its vertex index, which
+// includes the first vertex either way.
+static void CheckDrawFrame(Scene* scene, bool indirect)
 {
     mrhiDevice* device = scene->device;
     BeginScene(scene);
-    mrhiAccess uploads[3] = {Whole(scene->u, mrhi_accessCopyDestination),
-                             Whole(scene->w, mrhi_accessCopyDestination),
-                             Whole(scene->d, mrhi_accessCopyDestination)};
-    mrhiPassId upload = CopyPass(device, uploads, 3);
-    mrhiAccess draws[3] = {Whole(scene->u, mrhi_accessUniform),
+    mrhiBufferDef argumentsDef = mrhiDefaultBufferDef();
+    argumentsDef.size = 16;
+    mrhiResourceId a = {0};
+    CHECK(!indirect || mrhiDeclareBuffer(device, &argumentsDef, &a) == mrhi_success,
+          "an arguments buffer");
+    mrhiAccess uploads[4] = {
+        Whole(scene->u, mrhi_accessCopyDestination), Whole(scene->w, mrhi_accessCopyDestination),
+        Whole(scene->d, mrhi_accessCopyDestination), Whole(a, mrhi_accessCopyDestination)};
+    mrhiPassId upload = CopyPass(device, uploads, indirect ? 4 : 3);
+    mrhiAccess draws[4] = {Whole(scene->u, mrhi_accessUniform),
                            Whole(scene->d, mrhi_accessStorageReadWrite),
-                           Whole(scene->w, mrhi_accessSampled)};
-    mrhiPassId draw = DrawPass(scene, draws);
+                           Whole(scene->w, mrhi_accessSampled), Whole(a, mrhi_accessIndirect)};
+    mrhiPassDef drawDef = DrawDef(scene, draws);
+    drawDef.accessCount = indirect ? 4 : 3;
+    LABEL(drawDef, "draw");
+    mrhiPassId draw = {0};
+    CHECK(mrhiAddPass(device, &drawDef, &draw) == mrhi_success, "a drawing pass");
     mrhiPassId compute = CopyPass(device, draws, 3);
     mrhiAccess reads[2] = {Whole(scene->t, mrhi_accessCopySource),
                            Whole(scene->d, mrhi_accessCopySource)};
@@ -1008,6 +1019,8 @@ static void CheckDrawFrame(Scene* scene)
     CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
     const uint8_t white[4] = {255, 255, 255, 255};
     uint32_t values[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    // Three vertices from vertex 2, one instance from instance 0.
+    const uint32_t arguments[4] = {3, 1, 2, 0};
     const mrhiTextureCopy texel = {.resource = scene->w};
     const mrhiTexelLayout layout = {.bytesPerRow = 4, .rowsPerImage = 1};
     const mrhiExtent3d one = {1, 1, 1};
@@ -1016,6 +1029,8 @@ static void CheckDrawFrame(Scene* scene)
             mrhiWriteBuffer(device, upload, scene->u, 0, kColor, sizeof(kColor)) == mrhi_success &&
             mrhiWriteTexture(device, upload, &texel, white, 4, &layout, &one) == mrhi_success &&
             mrhiWriteBuffer(device, upload, scene->d, 0, values, sizeof(values)) == mrhi_success &&
+            (!indirect ||
+             mrhiWriteBuffer(device, upload, a, 0, arguments, sizeof(arguments)) == mrhi_success) &&
             mrhiEndPass(device, upload) == mrhi_success,
         "uploaded");
     const float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -1026,7 +1041,8 @@ static void CheckDrawFrame(Scene* scene)
     BindScene(scene, draw);
     CHECK(mrhiPushDebugGroup(device, draw, "half", 4) == mrhi_success &&
               mrhiInsertDebugMarker(device, draw, "upper left", 10) == mrhi_success &&
-              mrhiDraw(device, draw, 3, 1, 2, 0) == mrhi_success &&
+              (indirect ? mrhiDrawIndirect(device, draw, a, 0)
+                        : mrhiDraw(device, draw, 3, 1, 2, 0)) == mrhi_success &&
               mrhiPopDebugGroup(device, draw) == mrhi_success &&
               mrhiEndPass(device, draw) == mrhi_success,
           "drawn");
@@ -1525,7 +1541,8 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
 {
     Scene scene = {.device = device};
     MakeScene(&scene);
-    CheckDrawFrame(&scene);
+    CheckDrawFrame(&scene, false);
+    CheckDrawFrame(&scene, true);
     CheckClear(&scene);
     CheckCulling(&scene);
     CheckQueries(&scene, timestamps);
