@@ -81,6 +81,30 @@ static void QueueUav(mrhiD3d12Recorder* recorder, ID3D12Resource* resource)
     Queue(recorder, &barrier);
 }
 
+// Makes a placed resource the one its memory holds, after whatever the
+// frame placed there before.
+static void QueueAliasing(mrhiD3d12Recorder* recorder, ID3D12Resource* resource)
+{
+    D3D12_RESOURCE_BARRIER barrier = {.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING,
+                                      .Aliasing = {.pResourceAfter = resource}};
+    Queue(recorder, &barrier);
+}
+
+// Discards a placed target whole, in the target state its kind takes,
+// which its undefined parts then start from.
+static void Discard(mrhiD3d12Recorder* recorder, mrhiD3d12Object* object)
+{
+    bool depth = mrhiFormatHasDepth(object->texture->format);
+    D3D12_RESOURCE_STATES target =
+        depth ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET;
+    mrhiD3d12Transition(recorder, object->resource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                        object->initial, target);
+    mrhiD3d12FlushBarriers(recorder);
+    ID3D12GraphicsCommandList_DiscardResource(recorder->list, object->resource, nullptr);
+    object->initial = target;
+    object->discard = false;
+}
+
 void mrhiD3d12Transition(mrhiD3d12Recorder* recorder, ID3D12Resource* resource, UINT subresource,
                          D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after)
 {
@@ -115,12 +139,18 @@ static uint32_t PlanesOf(const mrhiTextureDef* def, mrhiTextureAspect aspect, ui
 
 // Queues a texture's transitions over a range, the whole texture at
 // once when the range covers it.
-static void TextureBarrier(mrhiD3d12Recorder* recorder, const mrhiD3d12Object* object,
+static void TextureBarrier(mrhiD3d12Recorder* recorder, mrhiD3d12Object* object,
                            const mrhiBarrier* barrier)
 {
     const mrhiTextureDef* def = object->texture;
     const mrhiTextureRange* range = &barrier->range;
-    D3D12_RESOURCE_STATES before = mrhiD3d12TextureState(barrier->before);
+    bool undefined = barrier->before == mrhi_stateUndefined;
+    if (undefined && object->discard)
+    {
+        Discard(recorder, object);
+    }
+    D3D12_RESOURCE_STATES before =
+        undefined ? object->initial : mrhiD3d12TextureState(barrier->before);
     D3D12_RESOURCE_STATES after = mrhiD3d12TextureState(barrier->after);
     uint32_t layers = def->kind == mrhi_texture3d ? 1 : def->depthOrLayers;
     uint32_t firstPlane = 0;
@@ -171,10 +201,14 @@ void mrhiD3d12RecordBarriers(mrhiD3d12Recorder* recorder, mrhiPassId pass)
         const mrhiBarrier* barrier = &frame->barriers[recorder->barrierAt++];
         MRHI_ASSERT(barrier->resource.index1 != 0 &&
                     barrier->resource.index1 <= frame->resourceCount);
-        const mrhiD3d12Object* object = &recorder->table[barrier->resource.index1 - 1];
+        mrhiD3d12Object* object = &recorder->table[barrier->resource.index1 - 1];
         if (object->resource == nullptr)
         {
             continue;
+        }
+        if (barrier->aliasing)
+        {
+            QueueAliasing(recorder, object->resource);
         }
         if (object->texture != nullptr)
         {

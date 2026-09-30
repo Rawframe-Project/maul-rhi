@@ -122,10 +122,14 @@ mrhiResult mrhiD3d12CreateSampler(mrhiD3d12Objects* objects, const mrhiSamplerDe
                                   uint64_t* handleOut);
 mrhiResult mrhiD3d12CreateQuerySet(mrhiD3d12Objects* objects, const mrhiQuerySetDef* def,
                                    uint64_t* handleOut);
-// A frame's transient, committed in the common state without a table
-// slot: nullptr when D3D12 makes none.
+// A frame's transient, committed, or placed in a heap at an offset, in
+// the common state without a table slot: nullptr when D3D12 makes none.
 ID3D12Resource* mrhiD3d12CommitBuffer(const mrhiD3d12Objects* objects, const mrhiBufferDef* def);
 ID3D12Resource* mrhiD3d12CommitTexture(const mrhiD3d12Objects* objects, const mrhiTextureDef* def);
+ID3D12Resource* mrhiD3d12PlaceBuffer(const mrhiD3d12Objects* objects, ID3D12Heap* heap,
+                                     uint64_t offset, const mrhiBufferDef* def);
+ID3D12Resource* mrhiD3d12PlaceTexture(const mrhiD3d12Objects* objects, ID3D12Heap* heap,
+                                      uint64_t offset, const mrhiTextureDef* def);
 void mrhiD3d12ReleaseObject(mrhiD3d12Objects* objects, mrhiD3d12Kind kind, uint64_t handle);
 
 // The CPU descriptors of a view (its shader resource view, or its

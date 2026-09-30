@@ -238,8 +238,13 @@ ids, requests, the frame graph) can be tested without a GPU.
   its readbacks' ranges out. Frames signal one fence with their serial,
   so a poll reads one value; a removed device reads all ones, and its
   removal reason becomes the loss report's reason and message. A
-  frame's transients are committed resources of their own, made at its
-  submit and released when it finishes, until transients alias. The
+  frame's transients are made at its submit and released when it
+  finishes: placed where the core put them in the slot's heap, which
+  grows as frames need, where resource heap tier 2 lets one heap hold
+  buffers and textures, and committed on their own on tier 1. A barrier
+  marked aliasing is led by an aliasing barrier, and a placed render
+  target or depth texture is discarded whole at its first use, as D3D12
+  asks before anything else touches it. The
   core's barriers move textures, per subresource, between the classic
   states their plan states map to, a transition between two unordered
   access uses being a UAV barrier. Buffers are the driver's to track:

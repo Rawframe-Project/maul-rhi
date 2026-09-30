@@ -4,7 +4,8 @@
 // A D3D12 device's frames (mrhi-0003, mrhi-0013): a slot per frame in
 // flight with its command allocator and list, its mapped staging, the
 // descriptor heaps its targets' views and its bindings take, its
-// scratch buffer, its transients and the readbacks it fills; the fence
+// scratch buffer, its transients with the heap they are placed in, and
+// the readbacks it fills; the fence
 // whose value counts the frames finished; the readback buffer, the
 // command signatures of indirect work and the zeros of unwritten
 // queries; the recorder; and the queue of destroyed objects, released
@@ -47,6 +48,11 @@ typedef struct mrhiD3d12Slot
     // Where indirect draws setting the vertex information copy their
     // arguments; made at its first use.
     ID3D12Resource* scratch;
+    // The heap its transients are placed in, kept while large enough,
+    // with its bytes and whether it takes multisampled textures.
+    ID3D12Heap* heap;
+    uint64_t heapBytes;
+    bool heapSamples;
     // The frame's transients by frame slot, null where it has none.
     ID3D12Resource** transients;
     uint32_t transientCount;
@@ -91,6 +97,10 @@ typedef struct mrhiD3d12Frames
     uint32_t retireFirst;
     uint32_t retireCount;
     uint32_t retireCapacity;
+    // Whether transients are placed as the core places them, in one heap
+    // of buffers and textures, which resource heap tier 2 allows; on tier
+    // 1 each is committed.
+    bool placing;
     // Why D3D12 removed the device, once it has.
     HRESULT removed;
     bool lost;

@@ -24,12 +24,16 @@
 // A frame's object: its resource, whether it is a texture (with its def)
 // or a buffer, and a buffer's D3D12 state. Every buffer starts a frame
 // in the common state, since D3D12 decays buffers to it when a command
-// list finishes.
+// list finishes. A texture's undefined parts are in the initial state;
+// a placed target is discarded at its first use, which D3D12 asks of
+// placed render target and depth textures before anything else.
 typedef struct mrhiD3d12Object
 {
     ID3D12Resource* resource;
     const mrhiTextureDef* texture;
     D3D12_RESOURCE_STATES state;
+    D3D12_RESOURCE_STATES initial;
+    bool discard;
 } mrhiD3d12Object;
 
 // A range of the readback ring a frame fills.

@@ -218,6 +218,36 @@ mrhiResult mrhiD3d12CreateTexture(mrhiD3d12Objects* objects, const mrhiTextureDe
     return mrhi_success;
 }
 
+// A resource placed in a heap at an offset: nullptr when D3D12 makes
+// none.
+static ID3D12Resource* Place(const mrhiD3d12Objects* objects, ID3D12Heap* heap, uint64_t offset,
+                             const D3D12_RESOURCE_DESC* desc, const char* label, size_t labelLength)
+{
+    ID3D12Resource* resource = nullptr;
+    if (FAILED(ID3D12Device_CreatePlacedResource(objects->device, heap, offset, desc,
+                                                 D3D12_RESOURCE_STATE_COMMON, nullptr,
+                                                 &IID_ID3D12Resource, (void**)&resource)))
+    {
+        return nullptr;
+    }
+    mrhiD3d12Label((ID3D12Object*)resource, label, labelLength);
+    return resource;
+}
+
+ID3D12Resource* mrhiD3d12PlaceBuffer(const mrhiD3d12Objects* objects, ID3D12Heap* heap,
+                                     uint64_t offset, const mrhiBufferDef* def)
+{
+    D3D12_RESOURCE_DESC desc = DescribeBuffer(def);
+    return Place(objects, heap, offset, &desc, def->label, def->labelLength);
+}
+
+ID3D12Resource* mrhiD3d12PlaceTexture(const mrhiD3d12Objects* objects, ID3D12Heap* heap,
+                                      uint64_t offset, const mrhiTextureDef* def)
+{
+    D3D12_RESOURCE_DESC desc = DescribeTexture(def);
+    return Place(objects, heap, offset, &desc, def->label, def->labelLength);
+}
+
 ID3D12Resource* mrhiD3d12CommitBuffer(const mrhiD3d12Objects* objects, const mrhiBufferDef* def)
 {
     D3D12_RESOURCE_DESC desc = DescribeBuffer(def);

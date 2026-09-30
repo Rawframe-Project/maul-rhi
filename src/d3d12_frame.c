@@ -5,9 +5,10 @@
 // order on one queue, each signalling the fence with its serial, so a
 // poll reads one counter to know every frame finished, and a slot is
 // reused only once the core has been told its frame finished. A frame's
-// transients are committed resources of their own, made at its submit
-// and released when it finishes; the core's placement of them is not
-// used yet.
+// transients are made at its submit and released when it finishes:
+// placed where the core put them in the slot's heap, which grows as
+// frames need, or committed on their own where the heap's tier cannot
+// mix buffers and textures, or D3D12 makes no heap.
 
 #include "d3d12_frame.h"
 
@@ -219,6 +220,11 @@ mrhiResult mrhiD3d12OpenFrames(mrhiD3d12Frames* frames)
         return mrhi_errorCapacity;
     }
     frames->event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    D3D12_FEATURE_DATA_D3D12_OPTIONS options = {0};
+    frames->placing =
+        SUCCEEDED(ID3D12Device_CheckFeatureSupport(frames->device, D3D12_FEATURE_D3D12_OPTIONS,
+                                                   &options, sizeof(options))) &&
+        options.ResourceHeapTier >= D3D12_RESOURCE_HEAP_TIER_2;
     bool made = frames->event != nullptr && OpenShared(frames);
     for (uint32_t i = 0; i < frames->slotCount && made; ++i)
     {
@@ -316,6 +322,7 @@ void mrhiD3d12CloseFrames(mrhiD3d12Frames* frames)
     {
         mrhiD3d12Slot* slot = &frames->slots[i];
         DropTransients(slot);
+        Drop(slot->heap);
         Drop(slot->scratch);
         Drop(slot->staging);
         Drop(slot->targetHeap);
@@ -338,18 +345,81 @@ void mrhiD3d12CloseFrames(mrhiD3d12Frames* frames)
     Drop(frames->fence);
 }
 
+// The slot's heap, made anew for a frame whose placed transients need
+// more bytes or take multisampled textures: nullptr when there is none.
+static ID3D12Heap* Reserve(const mrhiD3d12Frames* frames, mrhiD3d12Slot* slot,
+                           const mrhiDriverFrame* frame)
+{
+    bool samples = false;
+    for (uint32_t i = 0; i < frame->resourceCount; ++i)
+    {
+        const mrhiDriverResource* resource = &frame->resources[i];
+        samples = samples || (resource->kind == mrhiDriverTransientTexture && resource->needed &&
+                              resource->memoryBytes > 0 && resource->texture->sampleCount > 1);
+    }
+    if (slot->heap != nullptr && slot->heapBytes >= frame->memoryBytes &&
+        (slot->heapSamples || !samples))
+    {
+        return slot->heap;
+    }
+    Drop(slot->heap);
+    slot->heap = nullptr;
+    slot->heapBytes = 0;
+    uint64_t alignment = samples ? D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT
+                                 : D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+    const D3D12_HEAP_DESC desc = {
+        .SizeInBytes = (frame->memoryBytes + alignment - 1) & ~(alignment - 1),
+        .Properties = {.Type = D3D12_HEAP_TYPE_DEFAULT},
+        .Alignment = alignment,
+    };
+    if (SUCCEEDED(
+            ID3D12Device_CreateHeap(frames->device, &desc, &IID_ID3D12Heap, (void**)&slot->heap)))
+    {
+        slot->heapBytes = desc.SizeInBytes;
+        slot->heapSamples = samples;
+    }
+    return slot->heap;
+}
+
+// Makes a transient, placed in the heap where the core put it when
+// there is one, else committed.
+static void MakeTransient(const mrhiD3d12Frames* frames, ID3D12Heap* heap,
+                          const mrhiDriverResource* resource, mrhiD3d12Object* object)
+{
+    bool placed = heap != nullptr && resource->memoryBytes > 0;
+    if (resource->kind == mrhiDriverTransientBuffer)
+    {
+        const mrhiBufferDef def = {.size = resource->size, .usage = resource->usage};
+        object->resource =
+            placed ? mrhiD3d12PlaceBuffer(frames->objects, heap, resource->memoryOffset, &def)
+                   : mrhiD3d12CommitBuffer(frames->objects, &def);
+        return;
+    }
+    mrhiTextureDef def = *resource->texture;
+    def.usage = resource->usage;
+    object->resource =
+        placed ? mrhiD3d12PlaceTexture(frames->objects, heap, resource->memoryOffset, &def)
+               : mrhiD3d12CommitTexture(frames->objects, &def);
+    object->texture = resource->texture;
+    object->discard = placed && (resource->usage & mrhi_textureRenderTarget) != 0;
+}
+
 // Makes a frame's transients in its slot and fills the frame's table:
 // whether D3D12 made them all.
-static bool TakeObjects(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrhiDriverFrame* frame)
+static bool TakeObjects(const mrhiD3d12Frames* frames, mrhiD3d12Slot* slot,
+                        const mrhiDriverFrame* frame)
 {
     MRHI_ASSERT(frame->resourceCount <= frames->resourceLimit);
+    ID3D12Heap* heap =
+        frames->placing && frame->memoryBytes > 0 ? Reserve(frames, slot, frame) : nullptr;
     slot->transientCount = frame->resourceCount;
     bool made = true;
     for (uint32_t i = 0; i < frame->resourceCount; ++i)
     {
         const mrhiDriverResource* resource = &frame->resources[i];
         mrhiD3d12Object* object = &frames->table[i];
-        *object = (mrhiD3d12Object){.state = D3D12_RESOURCE_STATE_COMMON};
+        *object = (mrhiD3d12Object){.state = D3D12_RESOURCE_STATE_COMMON,
+                                    .initial = D3D12_RESOURCE_STATE_COMMON};
         slot->transients[i] = nullptr;
         if (!resource->needed || !made)
         {
@@ -358,21 +428,10 @@ static bool TakeObjects(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrhi
         switch (resource->kind)
         {
         case mrhiDriverTransientTexture:
-        {
-            mrhiTextureDef def = *resource->texture;
-            def.usage = resource->usage;
-            slot->transients[i] = mrhiD3d12CommitTexture(frames->objects, &def);
-            object->resource = slot->transients[i];
-            object->texture = resource->texture;
-            break;
-        }
         case mrhiDriverTransientBuffer:
-        {
-            const mrhiBufferDef def = {.size = resource->size, .usage = resource->usage};
-            slot->transients[i] = mrhiD3d12CommitBuffer(frames->objects, &def);
-            object->resource = slot->transients[i];
+            MakeTransient(frames, heap, resource, object);
+            slot->transients[i] = object->resource;
             break;
-        }
         case mrhiDriverDeviceTexture:
         {
             const mrhiD3d12Texture* texture = &frames->objects->textures[resource->handle - 1];
