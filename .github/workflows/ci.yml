@@ -238,7 +238,7 @@ jobs:
       - name: Configure
         run: |
           cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake -DCMAKE_C_COMPILER=clang-20 \
-            -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_WERROR=ON
+            -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_WERROR=ON
       - name: Build
         run: cmake --build build -j 4
       - name: Browser
