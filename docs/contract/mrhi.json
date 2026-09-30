@@ -18502,8 +18502,9 @@
               "note": "vkCmdDrawIndirect"
             },
             "d3d12": {
-              "class": "direct",
-              "note": "ExecuteIndirect with a draw command signature"
+              "class": "emulated",
+              "note": "ExecuteIndirect with a draw command signature, which for a pipeline reading its vertex or instance index first sets their offsets from a copy of the arguments' first vertex and instance",
+              "cost": "for such a pipeline, two buffer copies and two barriers per draw"
             },
             "metal": {
               "class": "direct",
@@ -18556,8 +18557,9 @@
               "note": "vkCmdDrawIndexedIndirect"
             },
             "d3d12": {
-              "class": "direct",
-              "note": "ExecuteIndirect with an indexed draw command signature"
+              "class": "emulated",
+              "note": "ExecuteIndirect with an indexed draw command signature, which for a pipeline reading its vertex or instance index first sets their offsets from a copy of the arguments' first vertex and instance",
+              "cost": "for such a pipeline, two buffer copies and two barriers per draw"
             },
             "metal": {
               "class": "direct",

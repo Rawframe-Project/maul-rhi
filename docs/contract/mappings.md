@@ -942,8 +942,8 @@ restricted or absent-rejected, with how.
 | `mrhiDraw` | direct: vkCmdDraw | direct: DrawInstanced | direct: drawPrimitives | direct: draw |
 | `mrhiDrawIndexed` | direct: vkCmdDrawIndexed | direct: DrawIndexedInstanced | direct: drawIndexedPrimitives | direct: drawIndexed |
 | `mrhiDispatch` | direct: vkCmdDispatch | direct: Dispatch | direct: dispatchThreadgroups with the pipeline's group size | direct: dispatchWorkgroups |
-| `mrhiDrawIndirect` | direct: vkCmdDrawIndirect | direct: ExecuteIndirect with a draw command signature | direct: drawPrimitives:indirectBuffer: | direct: drawIndirect |
-| `mrhiDrawIndexedIndirect` | direct: vkCmdDrawIndexedIndirect | direct: ExecuteIndirect with an indexed draw command signature | direct: drawIndexedPrimitives:indirectBuffer: | direct: drawIndexedIndirect |
+| `mrhiDrawIndirect` | direct: vkCmdDrawIndirect | emulated: ExecuteIndirect with a draw command signature, which for a pipeline reading its vertex or instance index first sets their offsets from a copy of the arguments' first vertex and instance (cost: for such a pipeline, two buffer copies and two barriers per draw) | direct: drawPrimitives:indirectBuffer: | direct: drawIndirect |
+| `mrhiDrawIndexedIndirect` | direct: vkCmdDrawIndexedIndirect | emulated: ExecuteIndirect with an indexed draw command signature, which for a pipeline reading its vertex or instance index first sets their offsets from a copy of the arguments' first vertex and instance (cost: for such a pipeline, two buffer copies and two barriers per draw) | direct: drawIndexedPrimitives:indirectBuffer: | direct: drawIndexedIndirect |
 | `mrhiDispatchIndirect` | direct: vkCmdDispatchIndirect | direct: ExecuteIndirect with a dispatch command signature | direct: dispatchThreadgroupsWithIndirectBuffer: | direct: dispatchWorkgroupsIndirect |
 | `mrhiBeginOcclusionQuery` | direct: vkCmdBeginQuery | direct: BeginQuery | direct: setVisibilityResultMode with the query's offset | direct: beginOcclusionQuery |
 | `mrhiEndOcclusionQuery` | direct: vkCmdEndQuery | direct: EndQuery | direct: setVisibilityResultMode disabled | direct: endOcclusionQuery |

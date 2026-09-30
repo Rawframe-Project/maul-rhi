@@ -252,8 +252,26 @@ ids, requests, the frame graph) can be tested without a GPU.
   is split into one copy per row of blocks. Clears are the targets'
   loads; discarding loads and stores keep the contents. A pass's
   multisampled targets resolve at its end. A destroyed object waits
-  until the next frame submitted finishes. Draws, dispatches, bindings
-  and queries land in the driver's next slice.
+  until the next frame submitted finishes.
+- **D3D12 bindings and draws:** each slot has shader-visible heaps of
+  resource and sampler descriptors, as many resource descriptors as the
+  frame's command records (each binding is one) and samplers up to
+  D3D12's 2048, a table of the samplers the last one wrote taking those
+  again. A table writes its descriptors there together, a uniform buffer
+  as a constant buffer view, a storage buffer as a raw unordered access
+  view (read-only, a raw shader resource view), a texture as a view of
+  the binding's shape, and sets them as its descriptor tables. Pipelines
+  of one container share a root signature, so their tables and root
+  block stay set between them; each pass sets its own. The buffers a
+  bind point's tables, vertex and index buffers use move to the states
+  they need at each draw or dispatch; vertex buffers are set at the draw,
+  with the pipeline's strides. D3D12's vertex and instance ids leave out
+  the first vertex and instance, so a pipeline whose vertex entry reads
+  them takes them as root constants: set before a direct draw, and for
+  an indirect one copied ahead of its arguments into the slot's scratch
+  buffer, where the pipeline's command signature sets them. Occlusion
+  queries are binary; a resolve copies the ones the frame wrote and
+  zeros for the others.
 - **Vulkan memory:** buffers and textures are suballocated with TLSF
   (`docs/references.md`) from device-local blocks per memory type and
   kind, buffers apart from textures so that `bufferImageGranularity`

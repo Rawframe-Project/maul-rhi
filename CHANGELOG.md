@@ -369,7 +369,8 @@ format.
   with a direct queue, and their buffers, textures, views, samplers,
   occlusion query sets, shaders (from the container's DXIL, with a root
   signature from its D3D12 map) and compute and graphics pipelines, and
-  frames of copies, uploads, readbacks, target clears and resolves;
+  frames: bindings, draws and dispatches, direct and indirect, occlusion
+  queries, copies, uploads, readbacks, target clears and resolves;
   everything else answers
   `mrhi_errorUnsupported` until the driver's later slices. It compiles
   against the DirectX headers kept as published in `directx/` and opens
