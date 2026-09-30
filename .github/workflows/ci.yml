@@ -80,8 +80,9 @@ jobs:
       - name: Build
         run: cmake --build build -j 4
       - name: Describe the Metal device
-        # What macOS runs on: the Metal device's families and argument
-        # buffer tier, which decide the driver's limits and heaps.
+        # What macOS runs on: the Metal device's families, argument
+        # buffer tier and counter sampling, which decide the driver's
+        # limits, heaps and timestamps.
         if: runner.os == 'macOS'
         run: |
           cat > probe.m <<'EOF'
@@ -109,6 +110,15 @@ jobs:
               printf("  threadgroup memory %lu, buffer %lu\n",
                      (unsigned long)device.maxThreadgroupMemoryLength,
                      (unsigned long)device.maxBufferLength);
+              printf("  counter sampling at stage %d, draw %d, dispatch %d, blit %d boundaries\n",
+                     (int)[device supportsCounterSampling:MTLCounterSamplingPointAtStageBoundary],
+                     (int)[device supportsCounterSampling:MTLCounterSamplingPointAtDrawBoundary],
+                     (int)[device supportsCounterSampling:MTLCounterSamplingPointAtDispatchBoundary],
+                     (int)[device supportsCounterSampling:MTLCounterSamplingPointAtBlitBoundary]);
+              for (id<MTLCounterSet> set in device.counterSets)
+              {
+                  printf("  counter set %s\n", set.name.UTF8String);
+              }
               return 0;
           }
           EOF
