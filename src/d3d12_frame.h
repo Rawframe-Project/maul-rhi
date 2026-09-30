@@ -3,11 +3,13 @@
 //
 // A D3D12 device's frames (mrhi-0003, mrhi-0013): a slot per frame in
 // flight with its command allocator and list, its mapped staging, the
-// descriptor heaps its targets' views take, its transients and the
-// readbacks it fills; the fence whose value counts the frames finished;
-// the readback buffer; and the queue of destroyed objects, released once
-// the next frame submitted after their destruction finishes. Included
-// by the driver's files only.
+// descriptor heaps its targets' views and its bindings take, its
+// scratch buffer, its transients and the readbacks it fills; the fence
+// whose value counts the frames finished; the readback buffer, the
+// command signatures of indirect work and the zeros of unwritten
+// queries; the recorder; and the queue of destroyed objects, released
+// once the next frame submitted after their destruction finishes.
+// Included by the driver's files only.
 
 #ifndef MAUL_RHI_SRC_D3D12_FRAME_H
 #define MAUL_RHI_SRC_D3D12_FRAME_H
@@ -39,6 +41,12 @@ typedef struct mrhiD3d12Slot
     uint8_t* stagingBytes;
     ID3D12DescriptorHeap* targetHeap;
     ID3D12DescriptorHeap* depthHeap;
+    // The shader-visible heaps its bindings take.
+    ID3D12DescriptorHeap* viewHeap;
+    ID3D12DescriptorHeap* samplerHeap;
+    // Where indirect draws setting the vertex information copy their
+    // arguments; made at its first use.
+    ID3D12Resource* scratch;
     // The frame's transients by frame slot, null where it has none.
     ID3D12Resource** transients;
     uint32_t transientCount;
@@ -63,11 +71,19 @@ typedef struct mrhiD3d12Frames
     uint32_t resourceLimit;
     uint32_t targetLimit;
     uint32_t depthLimit;
+    uint32_t viewLimit;
+    uint32_t samplerLimit;
     uint32_t readbackLimit;
     uint64_t uploadBytes;
+    uint64_t scratchBytes;
     ID3D12Resource* readback;
     uint8_t* readbackBytes;
     uint64_t readbackSize;
+    ID3D12CommandSignature* signatures[mrhiD3d12IndirectCount];
+    ID3D12Resource* zeros;
+    uint64_t zeroBytes;
+    // The frame being recorded's state, kept here for its size.
+    mrhiD3d12Recorder recorder;
     // Frames submitted, and frames reported finished.
     uint64_t submitted;
     uint64_t finished;

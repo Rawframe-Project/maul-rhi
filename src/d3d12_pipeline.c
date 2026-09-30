@@ -256,6 +256,14 @@ static void FreePipeline(mrhiD3d12Pipelines* pipelines, uint64_t handle)
         ID3D12PipelineState_Release(pipeline->state);
     }
     ID3D12RootSignature_Release(pipeline->root);
+    if (pipeline->draw != nullptr)
+    {
+        ID3D12CommandSignature_Release(pipeline->draw);
+    }
+    if (pipeline->drawIndexed != nullptr)
+    {
+        ID3D12CommandSignature_Release(pipeline->drawIndexed);
+    }
     if (pipeline->bytes > 0)
     {
         mrhiRelease(pipelines->allocator, pipeline->block, pipeline->bytes,
@@ -325,6 +333,32 @@ mrhiResult mrhiD3d12CreateCompute(mrhiD3d12Pipelines* pipelines,
                   handleOut);
 }
 
+// An indirect draw's command signature that first sets the vertex
+// information, the two words before the draw's arguments: nullptr when
+// D3D12 makes none.
+static ID3D12CommandSignature* SignatureOf(ID3D12Device* device, const mrhiD3d12Pipeline* pipeline,
+                                           bool indexed)
+{
+    const D3D12_INDIRECT_ARGUMENT_DESC arguments[] = {
+        {.Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT,
+         .Constant = {.RootParameterIndex = pipeline->layout.vertexInfoParameter,
+                      .Num32BitValuesToSet = 2}},
+        {.Type = indexed ? D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED
+                         : D3D12_INDIRECT_ARGUMENT_TYPE_DRAW},
+    };
+    const D3D12_COMMAND_SIGNATURE_DESC desc = {
+        .ByteStride = 2 * sizeof(uint32_t) + (indexed ? sizeof(D3D12_DRAW_INDEXED_ARGUMENTS)
+                                                      : sizeof(D3D12_DRAW_ARGUMENTS)),
+        .NumArgumentDescs = 2,
+        .pArgumentDescs = arguments,
+    };
+    ID3D12CommandSignature* signature = nullptr;
+    return SUCCEEDED(ID3D12Device_CreateCommandSignature(
+               device, &desc, pipeline->root, &IID_ID3D12CommandSignature, (void**)&signature))
+               ? signature
+               : nullptr;
+}
+
 mrhiResult mrhiD3d12CreateGraphics(mrhiD3d12Pipelines* pipelines,
                                    const mrhiDriverGraphicsPipeline* pipeline, uint64_t tag,
                                    uint64_t* handleOut)
@@ -362,6 +396,13 @@ mrhiResult mrhiD3d12CreateGraphics(mrhiD3d12Pipelines* pipelines,
                 pipelines->device, &graphics.desc, &IID_ID3D12PipelineState, (void**)&made->state))
                 ? mrhi_errorPlatform
                 : mrhi_success;
+    }
+    if (status == mrhi_success && made->vertexInfo)
+    {
+        made->draw = SignatureOf(pipelines->device, made, false);
+        made->drawIndexed = SignatureOf(pipelines->device, made, true);
+        status = made->draw != nullptr && made->drawIndexed != nullptr ? mrhi_success
+                                                                       : mrhi_errorPlatform;
     }
     return Finish(pipelines, handle, status, def->label, def->labelLength, tag, handleOut);
 }

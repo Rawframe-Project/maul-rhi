@@ -6,15 +6,20 @@
 // target view of each target's mip and layer and a depth stencil view,
 // read-only for a read-only depth target, taken from the slot's rings,
 // with the clears its loads ask for; its viewport and scissor start as
-// its area. Its commands follow, and at its end its multisampled
-// targets resolve, each moved to the resolve source state and back.
+// its area. Its commands follow, each pass setting its own pipeline,
+// tables and buffers (d3d12_bind.c), then draws and queries
+// (d3d12_draw.c), copies (d3d12_copy.c) and labels; at its end its
+// multisampled targets resolve, each moved to the resolve source state
+// and back.
 // Discarding loads and stores keep the contents, which D3D12 allows.
 
 #include "d3d12_record.h"
 
 #include "capabilities_core.h"
 #include "d3d12_barrier.h"
+#include "d3d12_bind.h"
 #include "d3d12_copy.h"
+#include "d3d12_draw.h"
 #include "d3d12_names.h"
 #include "invariant.h"
 
@@ -127,6 +132,13 @@ static void StartTargets(mrhiD3d12Recorder* recorder)
         const mrhiColorTarget* target = &pass->colorTargets[i];
         if (target->resource.index1 == 0)
         {
+            // A hole takes a null view, which D3D12 writes nothing to.
+            const D3D12_RENDER_TARGET_VIEW_DESC none = {
+                .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+                .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+            };
+            colors[i] = Take(&recorder->targets);
+            ID3D12Device_CreateRenderTargetView(recorder->device, nullptr, &none, colors[i]);
             continue;
         }
         colors[i] = ColorView(recorder, target);
@@ -223,18 +235,60 @@ static void Record(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
 {
     switch (command->type)
     {
+    case mrhiCommandGraphicsPipeline:
+    case mrhiCommandComputePipeline:
+        mrhiD3d12SetPipeline(recorder, command->b);
+        break;
+    case mrhiCommandRootBlock:
+        mrhiD3d12SetRootBlock(recorder, command);
+        break;
+    case mrhiCommandViewport:
+    case mrhiCommandScissor:
+    case mrhiCommandBlendConstant:
+    case mrhiCommandStencilReference:
+        mrhiD3d12SetState(recorder, command);
+        break;
+    case mrhiCommandBindings:
+        mrhiD3d12BindTable(recorder, command);
+        break;
+    case mrhiCommandVertexBuffer:
+    case mrhiCommandIndexBuffer:
+        mrhiD3d12BindBuffer(recorder, command);
+        break;
+    case mrhiCommandDraw:
+    case mrhiCommandDrawIndexed:
+    case mrhiCommandDispatch:
+    case mrhiCommandDrawIndirect:
+    case mrhiCommandDrawIndexedIndirect:
+    case mrhiCommandDispatchIndirect:
+        mrhiD3d12Draw(recorder, command);
+        break;
+    case mrhiCommandBeginOcclusionQuery:
+    case mrhiCommandEndOcclusionQuery:
+    case mrhiCommandResolveQueries:
+        mrhiD3d12Query(recorder, command);
+        break;
     case mrhiCommandPushDebugGroup:
     case mrhiCommandPopDebugGroup:
     case mrhiCommandDebugMarker:
         Label(recorder, command);
         break;
     default:
-        // Draws, dispatches, bindings and queries land in the driver's
-        // next slice; the conformance suite records none on D3D12 yet.
-        MRHI_ASSERT(command->type >= mrhiCommandCopyBuffer);
+        MRHI_ASSERT(command->type >= mrhiCommandCopyBuffer && command->type < mrhiCommandTypeEnd);
         mrhiD3d12Copy(recorder, command);
         break;
     }
+}
+
+// Forgets what the last pass set: each pass sets its own pipeline,
+// tables and buffers. The root signatures stay set on the list.
+static void Forget(mrhiD3d12Recorder* recorder)
+{
+    recorder->pipeline = nullptr;
+    memset(recorder->boundCounts, 0, sizeof(recorder->boundCounts));
+    memset(recorder->vertices, 0, sizeof(recorder->vertices));
+    recorder->verticesChanged = false;
+    recorder->indexObject = 0;
 }
 
 void mrhiD3d12RecordPass(mrhiD3d12Recorder* recorder, const mrhiDriverPass* pass)
@@ -243,6 +297,7 @@ void mrhiD3d12RecordPass(mrhiD3d12Recorder* recorder, const mrhiDriverPass* pass
     mrhiD3d12RecordBarriers(recorder, pass->id);
     recorder->pass = pass;
     recorder->labelCount = 0;
+    Forget(recorder);
     if (pass->labelLength > 0)
     {
         Mark(recorder, pass->label, pass->labelLength, true);
@@ -252,7 +307,7 @@ void mrhiD3d12RecordPass(mrhiD3d12Recorder* recorder, const mrhiDriverPass* pass
     {
         StartTargets(recorder);
     }
-    for (uint32_t chunk = pass->firstChunk; chunk != 0;
+    for (uint32_t chunk = pass->firstChunk; chunk != 0 && recorder->status == mrhi_success;
          chunk = recorder->frame->chunks[chunk - 1].next)
     {
         const mrhiCommandChunk* at = &recorder->frame->chunks[chunk - 1];

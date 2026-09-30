@@ -38,10 +38,19 @@ typedef struct mrhiD3d12View
     bool write;
 } mrhiD3d12View;
 
+// The most queries a set has (mrhi-0012), and the words of a set's
+// bits.
+#define MRHI_D3D12_SET_QUERIES 4096
+#define MRHI_D3D12_SET_WORDS   (MRHI_D3D12_SET_QUERIES / 64)
+
+// A query set: its heap, its queries, and the queries the frame of a
+// serial has written so far as it records.
 typedef struct mrhiD3d12QuerySet
 {
     ID3D12QueryHeap* heap;
     uint32_t count;
+    uint64_t serial;
+    uint64_t written[MRHI_D3D12_SET_WORDS];
 } mrhiD3d12QuerySet;
 
 // What a handle names, for its release.
@@ -125,6 +134,11 @@ D3D12_CPU_DESCRIPTOR_HANDLE mrhiD3d12ViewDescriptor(const mrhiD3d12Objects* obje
                                                     bool write);
 D3D12_CPU_DESCRIPTOR_HANDLE mrhiD3d12SamplerDescriptor(const mrhiD3d12Objects* objects,
                                                        uint64_t sampler);
+
+// A texture view's shader resource view, on a texture of that many
+// samples, and its unordered access view.
+D3D12_SHADER_RESOURCE_VIEW_DESC mrhiD3d12DescribeRead(const mrhiViewDef* def, uint32_t samples);
+D3D12_UNORDERED_ACCESS_VIEW_DESC mrhiD3d12DescribeWrite(const mrhiViewDef* def);
 
 // The bytes and alignment a texture or buffer takes in a D3D12 heap.
 void mrhiD3d12TextureMemory(const mrhiD3d12Objects* objects, const mrhiTextureDef* def,

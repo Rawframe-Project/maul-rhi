@@ -233,7 +233,7 @@ ID3D12Resource* mrhiD3d12CommitTexture(const mrhiD3d12Objects* objects, const mr
 mrhiResult mrhiD3d12CreateQuerySet(mrhiD3d12Objects* objects, const mrhiQuerySetDef* def,
                                    uint64_t* handleOut)
 {
-    MRHI_ASSERT(def->type == mrhi_queryOcclusion);
+    MRHI_ASSERT(def->type == mrhi_queryOcclusion && def->count <= MRHI_D3D12_SET_QUERIES);
     *handleOut = 0;
     uint32_t handle = mrhiD3d12TakeSlot(&objects->querySetSlots);
     if (handle == 0)

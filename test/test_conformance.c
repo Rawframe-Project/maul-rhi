@@ -404,10 +404,6 @@ static void Finish(mrhiDevice* device, uint32_t readbacks)
 // bytes, so only its answers are checked.
 static bool s_runs;
 
-// Whether the driver draws nothing: the D3D12 driver, whose frames run
-// only copies yet (mrhi-0003).
-static bool s_noDraws;
-
 static bool Taken(mrhiDevice* device, mrhiRequestId request, const uint8_t* expected, size_t size)
 {
     static uint8_t bytes[4096];
@@ -1582,10 +1578,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CheckFrameMemory(device);
     CheckPipelines(device);
     CheckRoundTrip(device);
-    if (!s_noDraws)
-    {
-        CheckDrawing(device, asked->timestampQuery);
-    }
+    CheckDrawing(device, asked->timestampQuery);
     mrhiDestroyDevice(device);
 }
 
@@ -1596,7 +1589,6 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
     mrhiAdapterId ids[16];
     size_t count = Search(instance, ids, 16);
     s_runs = driver != mrhi_driverTest;
-    s_noDraws = driver == mrhi_driverD3d12;
     for (size_t i = 0; i < count; ++i)
     {
         mrhiAdapterInfo info;

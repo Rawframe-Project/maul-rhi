@@ -39,12 +39,15 @@ typedef struct mrhiD3d12Shader
 
 // A pipeline: its state, its root signature and layout, whether it
 // computes, and for frames the topology, each vertex buffer's stride,
-// whether its vertex entry reads the vertex information, the root
+// whether its vertex entry reads the vertex information, with the
+// command signatures of its indirect draws that set it, the root
 // block's bytes, and in one block its bindings and constants' bits.
 typedef struct mrhiD3d12Pipeline
 {
     ID3D12PipelineState* state;
     ID3D12RootSignature* root;
+    ID3D12CommandSignature* draw;
+    ID3D12CommandSignature* drawIndexed;
     mrhiD3d12Layout layout;
     bool compute;
     bool vertexInfo;

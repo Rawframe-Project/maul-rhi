@@ -156,7 +156,8 @@ if(MAUL_RHI_D3D12_DRIVER)
                                    src/d3d12_names.c src/d3d12_resource.c src/d3d12_slots.c
                                    src/d3d12_view.c src/d3d12_pipeline.c src/d3d12_root.c
                                    src/d3d12_graphics.c src/d3d12_frame.c src/d3d12_record.c
-                                   src/d3d12_barrier.c src/d3d12_copy.c)
+                                   src/d3d12_barrier.c src/d3d12_copy.c src/d3d12_bind.c
+                                   src/d3d12_draw.c)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_D3D12_DRIVER)
     # The DirectX headers, kept as published (directx/README.md).
     target_include_directories(maul-rhi SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)

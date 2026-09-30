@@ -31,11 +31,13 @@ vulkan_api:
 instance: allocator chain driver driver_d3d12 driver_metal driver_test driver_vulkan driver_webgpu instance_core invariant
 driver_d3d12: allocator d3d12_api d3d12_device driver format_caps invariant
 d3d12_device: allocator d3d12_api d3d12_frame d3d12_names d3d12_pipeline d3d12_resource driver invariant
-d3d12_frame: allocator d3d12_barrier d3d12_pipeline d3d12_record d3d12_state invariant
-d3d12_record: capabilities_core d3d12_barrier d3d12_copy d3d12_names d3d12_state invariant
+d3d12_frame: allocator d3d12_barrier d3d12_pipeline d3d12_record d3d12_resource d3d12_state invariant
+d3d12_record: capabilities_core d3d12_barrier d3d12_bind d3d12_copy d3d12_draw d3d12_names d3d12_state invariant
+d3d12_bind: command d3d12_barrier d3d12_state invariant
+d3d12_draw: command d3d12_barrier d3d12_bind d3d12_resource d3d12_state invariant
 d3d12_copy: capabilities_core d3d12_barrier d3d12_names d3d12_state invariant
 d3d12_barrier: capabilities_core d3d12_state invariant
-d3d12_state: d3d12_resource driver
+d3d12_state: d3d12_pipeline d3d12_resource driver
 d3d12_pipeline: allocator container d3d12_api d3d12_graphics d3d12_names d3d12_root d3d12_slots driver invariant reflection
 d3d12_root: allocator container d3d12_api driver invariant
 d3d12_graphics: d3d12_api d3d12_names driver invariant

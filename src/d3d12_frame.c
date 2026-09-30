@@ -58,9 +58,14 @@ static ID3D12Resource* MakeMapped(ID3D12Device* device, D3D12_HEAP_TYPE type, ui
 }
 
 static ID3D12DescriptorHeap* MakeHeap(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
-                                      uint32_t count)
+                                      uint32_t count, bool visible)
 {
-    const D3D12_DESCRIPTOR_HEAP_DESC desc = {.Type = type, .NumDescriptors = count};
+    const D3D12_DESCRIPTOR_HEAP_DESC desc = {
+        .Type = type,
+        .NumDescriptors = count,
+        .Flags =
+            visible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
+    };
     ID3D12DescriptorHeap* heap = nullptr;
     return SUCCEEDED(ID3D12Device_CreateDescriptorHeap(device, &desc, &IID_ID3D12DescriptorHeap,
                                                        (void**)&heap))
@@ -99,6 +104,21 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
     // target at most.
     frames->targetLimit = limits->framePasses * MRHI_COLOR_TARGETS;
     frames->depthLimit = limits->framePasses;
+    // Each binding of a table is a record of the frame's commands, and
+    // takes one descriptor at most; a slot's samplers are as many as a
+    // shader-visible heap holds at most.
+    uint32_t records = limits->frameCommandBytes / (uint32_t)sizeof(mrhiCommand);
+    records = records > 0 ? records : 1;
+    frames->viewLimit = records < D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_1
+                            ? records
+                            : D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_1;
+    frames->samplerLimit = records < D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE
+                               ? records
+                               : D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE;
+    // Each indirect draw is a record, larger than the arguments it
+    // copies.
+    frames->scratchBytes = limits->frameCommandBytes;
+    frames->zeroBytes = (uint64_t)limits->queries * sizeof(uint64_t);
     frames->readbackLimit = limits->readbacks;
     frames->uploadBytes = limits->frameUploadBytes;
     frames->readbackSize = limits->readbackBytes;
@@ -129,16 +149,66 @@ static bool OpenSlot(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot)
         return false;
     }
     slot->targetHeap = MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
-                                frames->targetLimit > 0 ? frames->targetLimit : 1);
+                                frames->targetLimit > 0 ? frames->targetLimit : 1, false);
     slot->depthHeap = MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
-                               frames->depthLimit > 0 ? frames->depthLimit : 1);
+                               frames->depthLimit > 0 ? frames->depthLimit : 1, false);
+    slot->viewHeap =
+        MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, frames->viewLimit, true);
+    slot->samplerHeap =
+        MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, frames->samplerLimit, true);
     if (frames->uploadBytes > 0)
     {
         slot->staging =
             MakeMapped(device, D3D12_HEAP_TYPE_UPLOAD, frames->uploadBytes, &slot->stagingBytes);
     }
-    return slot->targetHeap != nullptr && slot->depthHeap != nullptr &&
-           (frames->uploadBytes == 0 || slot->staging != nullptr);
+    return slot->targetHeap != nullptr && slot->depthHeap != nullptr && slot->viewHeap != nullptr &&
+           slot->samplerHeap != nullptr && (frames->uploadBytes == 0 || slot->staging != nullptr);
+}
+
+// The command signature of an indirect draw or dispatch reading its
+// arguments alone: nullptr when D3D12 makes none.
+static ID3D12CommandSignature* SignatureOf(ID3D12Device* device, mrhiD3d12Indirect kind)
+{
+    static const D3D12_INDIRECT_ARGUMENT_TYPE types[] = {
+        [mrhiD3d12IndirectDraw] = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW,
+        [mrhiD3d12IndirectDrawIndexed] = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED,
+        [mrhiD3d12IndirectDispatch] = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH,
+    };
+    static const UINT strides[] = {
+        [mrhiD3d12IndirectDraw] = sizeof(D3D12_DRAW_ARGUMENTS),
+        [mrhiD3d12IndirectDrawIndexed] = sizeof(D3D12_DRAW_INDEXED_ARGUMENTS),
+        [mrhiD3d12IndirectDispatch] = sizeof(D3D12_DISPATCH_ARGUMENTS),
+    };
+    const D3D12_INDIRECT_ARGUMENT_DESC argument = {.Type = types[kind]};
+    const D3D12_COMMAND_SIGNATURE_DESC desc = {
+        .ByteStride = strides[kind],
+        .NumArgumentDescs = 1,
+        .pArgumentDescs = &argument,
+    };
+    ID3D12CommandSignature* signature = nullptr;
+    return SUCCEEDED(ID3D12Device_CreateCommandSignature(
+               device, &desc, nullptr, &IID_ID3D12CommandSignature, (void**)&signature))
+               ? signature
+               : nullptr;
+}
+
+// Makes the command signatures and, for a device with queries, the
+// zeros their resolves copy, which D3D12 zeroes as it commits them.
+static bool OpenShared(mrhiD3d12Frames* frames)
+{
+    bool made = true;
+    for (int i = 0; i < mrhiD3d12IndirectCount; ++i)
+    {
+        frames->signatures[i] = SignatureOf(frames->device, (mrhiD3d12Indirect)i);
+        made = made && frames->signatures[i] != nullptr;
+    }
+    if (made && frames->zeroBytes > 0)
+    {
+        const mrhiBufferDef def = {.size = frames->zeroBytes};
+        frames->zeros = mrhiD3d12CommitBuffer(frames->objects, &def);
+        made = frames->zeros != nullptr;
+    }
+    return made;
 }
 
 mrhiResult mrhiD3d12OpenFrames(mrhiD3d12Frames* frames)
@@ -149,7 +219,7 @@ mrhiResult mrhiD3d12OpenFrames(mrhiD3d12Frames* frames)
         return mrhi_errorCapacity;
     }
     frames->event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-    bool made = frames->event != nullptr;
+    bool made = frames->event != nullptr && OpenShared(frames);
     for (uint32_t i = 0; i < frames->slotCount && made; ++i)
     {
         made = OpenSlot(frames, &frames->slots[i]);
@@ -226,6 +296,15 @@ static void WaitFor(mrhiD3d12Frames* frames, uint64_t serial)
     }
 }
 
+// Releases a COM object, if there is one.
+static void Drop(void* object)
+{
+    if (object != nullptr)
+    {
+        IUnknown_Release((IUnknown*)object);
+    }
+}
+
 void mrhiD3d12CloseFrames(mrhiD3d12Frames* frames)
 {
     if (frames->fence != nullptr && frames->event != nullptr)
@@ -237,39 +316,26 @@ void mrhiD3d12CloseFrames(mrhiD3d12Frames* frames)
     {
         mrhiD3d12Slot* slot = &frames->slots[i];
         DropTransients(slot);
-        if (slot->staging != nullptr)
-        {
-            ID3D12Resource_Release(slot->staging);
-        }
-        if (slot->targetHeap != nullptr)
-        {
-            ID3D12DescriptorHeap_Release(slot->targetHeap);
-        }
-        if (slot->depthHeap != nullptr)
-        {
-            ID3D12DescriptorHeap_Release(slot->depthHeap);
-        }
-        if (slot->list != nullptr)
-        {
-            ID3D12GraphicsCommandList_Release(slot->list);
-        }
-        if (slot->allocator != nullptr)
-        {
-            ID3D12CommandAllocator_Release(slot->allocator);
-        }
+        Drop(slot->scratch);
+        Drop(slot->staging);
+        Drop(slot->targetHeap);
+        Drop(slot->depthHeap);
+        Drop(slot->viewHeap);
+        Drop(slot->samplerHeap);
+        Drop(slot->list);
+        Drop(slot->allocator);
     }
-    if (frames->readback != nullptr)
+    for (int i = 0; i < mrhiD3d12IndirectCount; ++i)
     {
-        ID3D12Resource_Release(frames->readback);
+        Drop(frames->signatures[i]);
     }
+    Drop(frames->zeros);
+    Drop(frames->readback);
     if (frames->event != nullptr)
     {
         (void)CloseHandle(frames->event);
     }
-    if (frames->fence != nullptr)
-    {
-        ID3D12Fence_Release(frames->fence);
-    }
+    Drop(frames->fence);
 }
 
 // Makes a frame's transients in its slot and fills the frame's table:
@@ -339,9 +405,24 @@ static mrhiD3d12Ring RingOf(ID3D12Device* device, ID3D12DescriptorHeap* heap,
     };
 }
 
+static mrhiD3d12GpuRing GpuRingOf(ID3D12Device* device, ID3D12DescriptorHeap* heap,
+                                  D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t capacity)
+{
+    mrhiD3d12GpuRing ring = {
+        .heap = heap,
+        .step = ID3D12Device_GetDescriptorHandleIncrementSize(device, type),
+        .capacity = capacity,
+    };
+    (void)ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(heap, &ring.cpu);
+    (void)ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(heap, &ring.gpu);
+    return ring;
+}
+
 // Records a frame into its slot's list: its passes, each after its
-// barriers, then the barriers at its end.
-static HRESULT Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrhiDriverFrame* frame)
+// barriers, then the barriers at its end. Answers success,
+// mrhi_errorCapacity when a descriptor ring or the scratch buffer ran
+// out, or mrhi_errorDeviceLost when D3D12 fails the list.
+static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrhiDriverFrame* frame)
 {
     HRESULT result = ID3D12CommandAllocator_Reset(slot->allocator);
     if (SUCCEEDED(result))
@@ -350,13 +431,16 @@ static HRESULT Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrhiDr
     }
     if (FAILED(result))
     {
-        return result;
+        return mrhi_errorDeviceLost;
     }
-    mrhiD3d12Recorder recorder = {
+    mrhiD3d12Recorder* recorder = &frames->recorder;
+    *recorder = (mrhiD3d12Recorder){
         .device = frames->device,
         .list = slot->list,
         .objects = frames->objects,
+        .pipelines = frames->pipelines,
         .frame = frame,
+        .serial = frames->submitted + 1,
         .table = frames->table,
         .staging = slot->staging,
         .readback = frames->readback,
@@ -364,17 +448,34 @@ static HRESULT Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrhiDr
                           frames->targetLimit),
         .depths = RingOf(frames->device, slot->depthHeap, D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
                          frames->depthLimit),
+        .views = GpuRingOf(frames->device, slot->viewHeap, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+                           frames->viewLimit),
+        .samplers = GpuRingOf(frames->device, slot->samplerHeap, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+                              frames->samplerLimit),
         .readbacks = slot->readbacks,
         .readbackLimit = frames->readbackLimit,
+        .signatures = frames->signatures,
+        .zeros = frames->zeros,
+        .scratch = &slot->scratch,
+        .scratchBytes = frames->scratchBytes,
+        .scratchState = D3D12_RESOURCE_STATE_COMMON,
+        .status = mrhi_success,
     };
-    for (uint32_t i = 0; i < frame->passCount; ++i)
+    ID3D12DescriptorHeap* heaps[] = {slot->viewHeap, slot->samplerHeap};
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(slot->list, 2, heaps);
+    for (uint32_t i = 0; i < frame->passCount && recorder->status == mrhi_success; ++i)
     {
-        mrhiD3d12RecordPass(&recorder, &frame->passes[i]);
+        mrhiD3d12RecordPass(recorder, &frame->passes[i]);
     }
-    mrhiD3d12RecordBarriers(&recorder, (mrhiPassId){0});
-    MRHI_ASSERT(recorder.barrierAt == frame->barrierCount);
-    slot->readbackCount = recorder.readbackCount;
-    return ID3D12GraphicsCommandList_Close(slot->list);
+    if (recorder->status == mrhi_success)
+    {
+        mrhiD3d12RecordBarriers(recorder, (mrhiPassId){0});
+        MRHI_ASSERT(recorder->barrierAt == frame->barrierCount);
+    }
+    slot->readbackCount = recorder->readbackCount;
+    // A list is closed even when it is not run, so that it resets.
+    result = ID3D12GraphicsCommandList_Close(slot->list);
+    return FAILED(result) ? mrhi_errorDeviceLost : recorder->status;
 }
 
 // Notes the device removed when D3D12 says so: whether it has.
@@ -407,22 +508,28 @@ mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame
         MRHI_ASSERT(frame->stagingBytes <= frames->uploadBytes);
         memcpy(slot->stagingBytes, frame->staging, frame->stagingBytes);
     }
-    HRESULT result = Record(frames, slot, frame);
-    if (SUCCEEDED(result))
+    mrhiResult status = Record(frames, slot, frame);
+    if (status == mrhi_success)
     {
         ID3D12CommandList* lists[] = {(ID3D12CommandList*)slot->list};
         ID3D12CommandQueue_ExecuteCommandLists(frames->queue, 1, lists);
-        result = ID3D12CommandQueue_Signal(frames->queue, frames->fence, frames->submitted + 1);
+        status =
+            FAILED(ID3D12CommandQueue_Signal(frames->queue, frames->fence, frames->submitted + 1))
+                ? mrhi_errorDeviceLost
+                : mrhi_success;
     }
-    if (FAILED(result))
+    if (status != mrhi_success)
     {
-        // A list D3D12 refuses to close is a recording the core never
-        // makes; either way the device is gone to the program.
         DropTransients(slot);
         slot->readbackCount = 0;
-        (void)Removed(frames);
-        frames->lost = true;
-        return mrhi_errorDeviceLost;
+        if (status == mrhi_errorDeviceLost)
+        {
+            // A list D3D12 refuses to close is a recording the core
+            // never makes; either way the device is gone to the program.
+            (void)Removed(frames);
+            frames->lost = true;
+        }
+        return status;
     }
     ++frames->submitted;
     slot->serial = frames->submitted;

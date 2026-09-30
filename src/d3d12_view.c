@@ -38,7 +38,7 @@ static UINT PlaneOf(const mrhiViewDef* def)
     return def->aspect == mrhi_aspectStencilOnly ? 1 : 0;
 }
 
-static D3D12_SHADER_RESOURCE_VIEW_DESC DescribeRead(const mrhiViewDef* def, uint32_t samples)
+D3D12_SHADER_RESOURCE_VIEW_DESC mrhiD3d12DescribeRead(const mrhiViewDef* def, uint32_t samples)
 {
     D3D12_SHADER_RESOURCE_VIEW_DESC desc = {
         .Format = mrhiD3d12ViewFormat(def->format, def->aspect),
@@ -98,7 +98,7 @@ static D3D12_SHADER_RESOURCE_VIEW_DESC DescribeRead(const mrhiViewDef* def, uint
     return desc;
 }
 
-static D3D12_UNORDERED_ACCESS_VIEW_DESC DescribeWrite(const mrhiViewDef* def)
+D3D12_UNORDERED_ACCESS_VIEW_DESC mrhiD3d12DescribeWrite(const mrhiViewDef* def)
 {
     D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {.Format =
                                                  mrhiD3d12ViewFormat(def->format, def->aspect)};
@@ -143,13 +143,13 @@ mrhiResult mrhiD3d12CreateView(mrhiD3d12Objects* objects, uint64_t texture, cons
     view->def.labelLength = 0;
     if (view->read)
     {
-        D3D12_SHADER_RESOURCE_VIEW_DESC desc = DescribeRead(def, source->def.sampleCount);
+        D3D12_SHADER_RESOURCE_VIEW_DESC desc = mrhiD3d12DescribeRead(def, source->def.sampleCount);
         ID3D12Device_CreateShaderResourceView(objects->device, source->resource, &desc,
                                               mrhiD3d12ViewDescriptor(objects, handle, false));
     }
     if (view->write)
     {
-        D3D12_UNORDERED_ACCESS_VIEW_DESC desc = DescribeWrite(def);
+        D3D12_UNORDERED_ACCESS_VIEW_DESC desc = mrhiD3d12DescribeWrite(def);
         ID3D12Device_CreateUnorderedAccessView(objects->device, source->resource, nullptr, &desc,
                                                mrhiD3d12ViewDescriptor(objects, handle, true));
     }
