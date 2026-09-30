@@ -74,6 +74,22 @@ static ID3D12DescriptorHeap* MakeHeap(ID3D12Device* device, D3D12_DESCRIPTOR_HEA
                : nullptr;
 }
 
+// The descriptors a shader-visible heap of total leaves its ring past
+// count regions of each: 0 when they fill it.
+static uint32_t RingRoom(uint32_t total, uint32_t count, uint32_t each)
+{
+    uint64_t regions = (uint64_t)count * each;
+    return regions < total ? total - (uint32_t)regions : 0;
+}
+
+bool mrhiD3d12HeapsFit(uint32_t count, uint32_t entries, uint32_t samplers)
+{
+    return RingRoom(D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_1, count, entries) >=
+               MRHI_D3D12_RING_FLOOR &&
+           RingRoom(D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE, count, samplers) >=
+               MRHI_D3D12_RING_FLOOR;
+}
+
 mrhiD3d12FrameRoom mrhiD3d12PlanFrames(mrhiLayout* layout, const mrhiDeviceLimits* limits,
                                        uint32_t slots)
 {
@@ -86,7 +102,7 @@ mrhiD3d12FrameRoom mrhiD3d12PlanFrames(mrhiLayout* layout, const mrhiDeviceLimit
     room.readbacks = mrhiLayoutAdd(layout, (size_t)slots * limits->readbacks,
                                    sizeof(mrhiD3d12Range), alignof(mrhiD3d12Range));
     uint64_t retirees = (uint64_t)limits->buffers + limits->textures + limits->views +
-                        limits->samplers + limits->querySets + limits->pipelines;
+                        limits->samplers + limits->querySets + limits->pipelines + limits->heaps;
     room.retireCapacity = retirees < UINT32_MAX ? (uint32_t)retirees : UINT32_MAX;
     room.retirees = mrhiLayoutAdd(layout, room.retireCapacity, sizeof(mrhiD3d12Retiree),
                                   alignof(mrhiD3d12Retiree));
@@ -106,16 +122,16 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
     frames->targetLimit = limits->framePasses * MRHI_COLOR_TARGETS;
     frames->depthLimit = limits->framePasses;
     // Each binding of a table is a record of the frame's commands, and
-    // takes one descriptor at most; a slot's samplers are as many as a
-    // shader-visible heap holds at most.
+    // takes one descriptor at most; a slot's rings take what its
+    // shader-visible heaps hold past the program's heaps at most.
     uint32_t records = limits->frameCommandBytes / (uint32_t)sizeof(mrhiCommand);
     records = records > 0 ? records : 1;
-    frames->viewLimit = records < D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_1
-                            ? records
-                            : D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_1;
-    frames->samplerLimit = records < D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE
-                               ? records
-                               : D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE;
+    uint32_t views = RingRoom(D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_1,
+                              frames->heapCount, frames->heapEntries);
+    uint32_t samplers = RingRoom(D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE, frames->heapCount,
+                                 frames->heapSamplers);
+    frames->viewLimit = records < views ? records : views;
+    frames->samplerLimit = records < samplers ? records : samplers;
     // Each indirect draw is a record, larger than the arguments it
     // copies.
     frames->scratchBytes = limits->frameCommandBytes;
@@ -153,10 +169,11 @@ static bool OpenSlot(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot)
                                 frames->targetLimit > 0 ? frames->targetLimit : 1, false);
     slot->depthHeap = MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
                                frames->depthLimit > 0 ? frames->depthLimit : 1, false);
-    slot->viewHeap =
-        MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, frames->viewLimit, true);
+    slot->viewHeap = MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+                              frames->heapCount * frames->heapEntries + frames->viewLimit, true);
     slot->samplerHeap =
-        MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, frames->samplerLimit, true);
+        MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+                 frames->heapCount * frames->heapSamplers + frames->samplerLimit, true);
     if (frames->uploadBytes > 0)
     {
         slot->staging =
@@ -471,8 +488,11 @@ static mrhiD3d12Ring RingOf(ID3D12Device* device, ID3D12DescriptorHeap* heap,
     };
 }
 
+// A slot's shader-visible ring, after the regions of the program's
+// heaps.
 static mrhiD3d12GpuRing GpuRingOf(ID3D12Device* device, ID3D12DescriptorHeap* heap,
-                                  D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t capacity)
+                                  D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t regions,
+                                  uint32_t capacity)
 {
     mrhiD3d12GpuRing ring = {
         .heap = heap,
@@ -481,6 +501,8 @@ static mrhiD3d12GpuRing GpuRingOf(ID3D12Device* device, ID3D12DescriptorHeap* he
     };
     (void)ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(heap, &ring.cpu);
     (void)ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(heap, &ring.gpu);
+    ring.cpu.ptr += (SIZE_T)ring.step * regions;
+    ring.gpu.ptr += (UINT64)ring.step * regions;
     return ring;
 }
 
@@ -515,9 +537,11 @@ static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrh
         .depths = RingOf(frames->device, slot->depthHeap, D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
                          frames->depthLimit),
         .views = GpuRingOf(frames->device, slot->viewHeap, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-                           frames->viewLimit),
+                           frames->heapCount * frames->heapEntries, frames->viewLimit),
         .samplers = GpuRingOf(frames->device, slot->samplerHeap, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
-                              frames->samplerLimit),
+                              frames->heapCount * frames->heapSamplers, frames->samplerLimit),
+        .heapEntries = frames->heapEntries,
+        .heapSamplers = frames->heapSamplers,
         .readbacks = slot->readbacks,
         .readbackLimit = frames->readbackLimit,
         .signatures = frames->signatures,

@@ -7,20 +7,24 @@
 // container has them, then per table a descriptor table of its
 // resources and one of its samplers where it has them, each binding a
 // one-descriptor range at its register and space, in the container's
-// order. Every parameter is visible to every stage. Resource data is
-// volatile, since frames may write a resource between passes that read
-// it.
+// order, then a heap table of each class of the container's heap ranges
+// (mrhi-0015), each range unbounded from the table's start: D3D12 lets
+// ranges of one class alias, not of two. Every parameter is visible to
+// every stage. Resource data is volatile, since frames may write a
+// resource between passes that read it; heap descriptors are volatile
+// too, since entries are written while other frames run.
 
 #include "d3d12_root.h"
 
 #include "container.h"
 #include "invariant.h"
 
+#include <limits.h>
 #include <stdalign.h>
 
 // The words a root signature holds, and the parameters it can have.
 #define ROOT_WORDS      64
-#define ROOT_PARAMETERS (3 + 2 * MRHI_D3D12_TABLES)
+#define ROOT_PARAMETERS (3 + 2 * MRHI_D3D12_TABLES + MRHI_D3D12_HEAP_CLASSES)
 
 static D3D12_DESCRIPTOR_RANGE_TYPE RangeOf(mrhiBindingKind kind)
 {
@@ -151,6 +155,55 @@ static uint32_t AddParameters(const mrhiContainer* container, mrhiD3d12Layout* l
     return words;
 }
 
+// Adds a heap table of each class the container's heap ranges have to
+// parameters, laying their ranges in ranges by class, and answers the
+// words they take.
+static uint32_t AddHeapTables(const mrhiContainer* container, mrhiD3d12Layout* layout,
+                              D3D12_DESCRIPTOR_RANGE1* ranges, D3D12_ROOT_PARAMETER1* parameters,
+                              uint32_t* countOut)
+{
+    static const D3D12_DESCRIPTOR_RANGE_TYPE types[MRHI_D3D12_HEAP_CLASSES] = {
+        [mrhiD3d12HeapResource] = D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+        [mrhiD3d12HeapStorage] = D3D12_DESCRIPTOR_RANGE_TYPE_UAV,
+        [mrhiD3d12HeapSampler] = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
+    };
+    uint32_t words = 0;
+    uint32_t at = 0;
+    for (uint32_t c = 0; c < MRHI_D3D12_HEAP_CLASSES; ++c)
+    {
+        uint32_t first = at;
+        for (uint32_t i = 0; i < mrhiContainerD3d12HeapRangeCount(container); ++i)
+        {
+            mrhiD3d12HeapRange range = mrhiContainerD3d12HeapRange(container, i);
+            if (range.rangeClass == c)
+            {
+                ranges[at++] = (D3D12_DESCRIPTOR_RANGE1){
+                    .RangeType = types[c],
+                    .NumDescriptors = UINT_MAX,
+                    .BaseShaderRegister = range.reg,
+                    .RegisterSpace = range.space,
+                    .Flags = c == mrhiD3d12HeapSampler
+                                 ? D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE
+                                 : D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE |
+                                       D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE,
+                };
+            }
+        }
+        if (at > first)
+        {
+            layout->heapParameters[c] = (uint8_t)*countOut;
+            parameters[(*countOut)++] = (D3D12_ROOT_PARAMETER1){
+                .ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+                .DescriptorTable = {.NumDescriptorRanges = at - first,
+                                    .pDescriptorRanges = ranges + first},
+                .ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL,
+            };
+            ++words;
+        }
+    }
+    return words;
+}
+
 // Serializes and makes a root signature: nullptr when D3D12 refuses.
 static ID3D12RootSignature* Make(const mrhiD3d12Api* api, ID3D12Device* device,
                                  const D3D12_ROOT_PARAMETER1* parameters, uint32_t count)
@@ -193,6 +246,8 @@ mrhiResult mrhiD3d12MakeRoot(const mrhiAllocator* allocator, const mrhiD3d12Api*
                                MRHI_D3D12_NO_PARAMETER, MRHI_D3D12_NO_PARAMETER},
         .samplerParameters = {MRHI_D3D12_NO_PARAMETER, MRHI_D3D12_NO_PARAMETER,
                               MRHI_D3D12_NO_PARAMETER, MRHI_D3D12_NO_PARAMETER},
+        .heapParameters = {MRHI_D3D12_NO_PARAMETER, MRHI_D3D12_NO_PARAMETER,
+                           MRHI_D3D12_NO_PARAMETER},
         .rootWords = container->rootBlockBytes / 4,
         .constantWords = (container->constantCount + 3) / 4 * 4,
     };
@@ -201,9 +256,11 @@ mrhiResult mrhiD3d12MakeRoot(const mrhiAllocator* allocator, const mrhiD3d12Api*
     {
         return mrhi_errorUnsupported;
     }
-    // Room for the ranges twice, unsorted and sorted, and never none.
+    // Room for the bindings' ranges twice, unsorted and sorted, then the
+    // heap ranges, and never none.
     size_t room = container->bindingCount > 0 ? container->bindingCount : 1;
-    size_t bytes = 2 * room * sizeof(D3D12_DESCRIPTOR_RANGE1);
+    size_t bytes =
+        (2 * room + mrhiContainerD3d12HeapRangeCount(container)) * sizeof(D3D12_DESCRIPTOR_RANGE1);
     D3D12_DESCRIPTOR_RANGE1* ranges =
         mrhiAllocate(allocator, bytes, alignof(D3D12_DESCRIPTOR_RANGE1));
     if (ranges == nullptr)
@@ -216,6 +273,7 @@ mrhiResult mrhiD3d12MakeRoot(const mrhiAllocator* allocator, const mrhiD3d12Api*
     D3D12_ROOT_PARAMETER1 parameters[ROOT_PARAMETERS];
     uint32_t count = 0;
     uint32_t words = AddParameters(container, layoutOut, sorted, parameters, &count);
+    words += AddHeapTables(container, layoutOut, sorted + room, parameters, &count);
     mrhiResult status = mrhi_errorUnsupported;
     if (words <= ROOT_WORDS)
     {

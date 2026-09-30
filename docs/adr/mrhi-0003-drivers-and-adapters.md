@@ -279,15 +279,17 @@ ids, requests, the frame graph) can be tested without a GPU.
   work, at sync interval 1 for fifo and 0 otherwise, tearing for
   immediate.
 - **D3D12 bindings and draws:** each slot has shader-visible heaps of
-  resource and sampler descriptors, as many resource descriptors as the
-  frame's command records (each binding is one) and samplers up to
-  D3D12's 2048, a table of the samplers the last one wrote taking those
-  again. A table writes its descriptors there together, a uniform buffer
+  resource and sampler descriptors: the program's heaps' regions first
+  (mrhi-0015), then rings of as many resource descriptors as the
+  frame's command records (each binding is one) and of samplers up to
+  what D3D12's 2048 leave, a table of the samplers the last one wrote
+  taking those again. A table writes its descriptors there together, a uniform buffer
   as a constant buffer view, a storage buffer as a raw unordered access
   view (read-only, a raw shader resource view), a texture as a view of
   the binding's shape, and sets them as its descriptor tables. Pipelines
   of one container share a root signature, so their tables and root
-  block stay set between them; each pass sets its own. The buffers a
+  block stay set between them; each pass sets its own. A pipeline
+  reading heaps points its heap tables at the pass's heap as it is set. The buffers a
   bind point's tables, vertex and index buffers use move to the states
   they need at each draw or dispatch; vertex buffers are set at the draw,
   with the pipeline's strides. D3D12's vertex and instance ids leave out

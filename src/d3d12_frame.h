@@ -43,7 +43,8 @@ typedef struct mrhiD3d12Slot
     uint8_t* stagingBytes;
     ID3D12DescriptorHeap* targetHeap;
     ID3D12DescriptorHeap* depthHeap;
-    // The shader-visible heaps its bindings take.
+    // The shader-visible heaps its bindings take, after the program's
+    // heaps' regions.
     ID3D12DescriptorHeap* viewHeap;
     ID3D12DescriptorHeap* samplerHeap;
     // Where indirect draws setting the vertex information copy their
@@ -76,6 +77,12 @@ typedef struct mrhiD3d12Frames
     uint32_t slotCount;
     // The frame being recorded's objects, by frame slot less one.
     mrhiD3d12Object* table;
+    // The program's heaps: how many, and each one's resource and sampler
+    // descriptors, the regions at the front of every slot's
+    // shader-visible heaps; set before the frames are laid out.
+    uint32_t heapCount;
+    uint32_t heapEntries;
+    uint32_t heapSamplers;
     uint32_t resourceLimit;
     uint32_t targetLimit;
     uint32_t depthLimit;
@@ -118,6 +125,14 @@ typedef struct mrhiD3d12FrameRoom
     size_t retirees;
     uint32_t retireCapacity;
 } mrhiD3d12FrameRoom;
+
+// The descriptors of each kind a slot's rings keep at least beside the
+// program's heaps.
+#define MRHI_D3D12_RING_FLOOR 64
+
+// Whether count heaps of entries and samplers each leave every slot's
+// rings their floor.
+bool mrhiD3d12HeapsFit(uint32_t count, uint32_t entries, uint32_t samplers);
 
 // Adds the tables a device's limits need to its layout, and sets them
 // up in its block.

@@ -92,6 +92,23 @@ barriers.
   a set from its own pool; pipelines from containers reading heaps
   have the layout at set 4 and bind the pass's heap after each
   pipeline, since other table layouts disturb it.
+- **D3D12** (amended for the D3D12 driver) grants both features on
+  resource binding tier 3, which lets tables hold unread descriptors
+  uninitialized, with `heapSize` 65536 and `samplerHeapSize` 256, since
+  the heaps and the frames' descriptor rings share the 2048
+  shader-visible samplers a list binds; a device whose heaps would leave
+  the rings fewer than 64 descriptors of a kind is refused. Every frame
+  slot's shader-visible heaps hold each heap's regions at the front, at
+  the heap's slot, and an entry is written into every slot's region. A
+  sampled texture entry is a shader resource view and a storage texture
+  an unordered access view; a storage buffer is a raw unordered access
+  view when shaders may write it, else a raw shader resource view, so a
+  shader reads a buffer entry through a declaration of the same
+  writability, which Vulkan does not mind. The DXIL tool gives each
+  heap variable a space of its own from 16, and a root signature of a
+  container reading heaps adds an unbounded table per range class
+  (shader resource, unordered access, sampler), pointed at the pass's
+  heap after each pipeline.
 
 ## Consequences
 

@@ -293,12 +293,13 @@ static void Forget(mrhiD3d12Recorder* recorder)
 
 void mrhiD3d12RecordPass(mrhiD3d12Recorder* recorder, const mrhiDriverPass* pass)
 {
-    MRHI_ASSERT(pass->heap == 0 && pass->timestampSet == 0);
+    MRHI_ASSERT(pass->timestampSet == 0);
     mrhiD3d12RecordBarriers(recorder, pass->id);
     mrhiD3d12UseDeclared(recorder, pass);
     recorder->pass = pass;
     recorder->labelCount = 0;
     Forget(recorder);
+    mrhiD3d12EnterHeap(recorder, pass->heap);
     if (pass->labelLength > 0)
     {
         Mark(recorder, pass->label, pass->labelLength, true);

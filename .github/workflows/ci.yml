@@ -207,6 +207,7 @@ jobs:
         env:
           MAUL_RHI_REQUIRE_D3D12: "1"
           MAUL_RHI_REQUIRE_SURFACE: "1"
+          MAUL_RHI_REQUIRE_BINDLESS: "1"
           MAUL_RHI_D3D12_DEBUG: "1"
         run: ctest --test-dir build -C Debug --output-on-failure
 

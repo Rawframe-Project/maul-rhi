@@ -23,7 +23,7 @@ restricted or absent-rejected, with how.
 | `indirectFirstInstance` | restricted: drawIndirectFirstInstance | direct: indirect arguments | direct: indirect arguments | restricted: indirect-first-instance |
 | `multiDrawIndirectCount` | direct: drawIndirectCount (1.2) | direct: ExecuteIndirect with a count buffer | emulated: an indirect command buffer filled by a compute pass (cost: a compute dispatch per multi-draw, and an indirect command buffer of the largest count) | absent-rejected: no multi-draw indirect |
 | `multiview` | direct: multiview (1.1) | restricted: view instancing tiers | restricted: vertex amplification | absent-rejected: no multiview |
-| `bindlessSampling` | restricted: descriptor indexing or descriptor heaps | restricted: resource binding tier 2 | restricted: argument buffers tier 2 | absent-rejected: until the resource table draft ships (sampling-resource-table) |
+| `bindlessSampling` | restricted: descriptor indexing or descriptor heaps | restricted: resource binding tier 3 | restricted: argument buffers tier 2 | absent-rejected: until the resource table draft ships (sampling-resource-table) |
 | `bindlessHeterogeneous` | restricted: descriptor heaps, or descriptor indexing over the storage types | restricted: resource binding tier 3 | restricted: argument buffers tier 2 | absent-rejected: until heterogeneous-resource-table ships |
 | `presentTiming` | restricted: VK_EXT_present_timing | direct: DXGI frame statistics | direct: a drawable's presented time | absent-rejected: the browser paces presentation |
 
@@ -60,8 +60,8 @@ restricted or absent-rejected, with how.
 | `workgroupSizeZ` | direct: maxComputeWorkGroupSize[2] | direct: 64 | direct: maxThreadsPerThreadgroup | direct: maxComputeWorkgroupSizeZ |
 | `workgroupsPerDimension` | direct: maxComputeWorkGroupCount | direct: 65535 | direct: no lower bound | direct: maxComputeWorkgroupsPerDimension |
 | `rootBlockBytes` | direct: push constants (at least 128) | direct: root constants | direct: argument table bytes | restricted: maxImmediateSize (64) through setImmediates and WGSL var<immediate>; a browser without immediates lists no adapter (cost: no adapter on browsers that have not shipped immediates) |
-| `heapSize` | restricted: descriptor indexing counts or the heap's size | restricted: 1000000 at tier 2 | restricted: argument buffers tier 2 | absent-rejected: until resource tables ship |
-| `samplerHeapSize` | restricted: maxDescriptorSetUpdateAfterBindSamplers | restricted: 2048, or the queried maximum | restricted: argument buffer samplers | absent-rejected: until resource tables ship |
+| `heapSize` | restricted: descriptor indexing counts or the heap's size | restricted: 65536 at resource binding tier 3 | restricted: argument buffers tier 2 | absent-rejected: until resource tables ship |
+| `samplerHeapSize` | restricted: maxDescriptorSetUpdateAfterBindSamplers | restricted: 256: the heaps and the frames' rings share 2048 samplers | restricted: argument buffer samplers | absent-rejected: until resource tables ship |
 | `framesInFlight` | direct: the core's timeline semaphores | direct: the core's fences | direct: command buffer completion | emulated: submitted-work-done promises (cost: a promise per frame, settled only when the browser runs its event loop) |
 
 ## mrhiFormat
@@ -311,7 +311,7 @@ restricted or absent-rejected, with how.
 | --- | --- | --- | --- | --- |
 | `mrhi_heapSampledTexture` | restricted: a SAMPLED_IMAGE descriptor | restricted: a shader resource view | restricted: a texture in the argument buffer | absent-rejected: until resource tables ship (sampling-resource-table) |
 | `mrhi_heapStorageTexture` | restricted: a STORAGE_IMAGE descriptor through VK_EXT_mutable_descriptor_type | restricted: an unordered access view | restricted: a texture in the argument buffer, read or written | absent-rejected: until heterogeneous-resource-table ships |
-| `mrhi_heapStorageBuffer` | restricted: a STORAGE_BUFFER descriptor through VK_EXT_mutable_descriptor_type | restricted: a raw or structured view, or an unordered access view | restricted: a buffer address in the argument buffer | absent-rejected: until heterogeneous-resource-table ships |
+| `mrhi_heapStorageBuffer` | restricted: a STORAGE_BUFFER descriptor through VK_EXT_mutable_descriptor_type | restricted: a raw unordered access view when writable, else a raw shader resource view | restricted: a buffer address in the argument buffer | absent-rejected: until heterogeneous-resource-table ships |
 
 ## mrhiHeapEntry
 
@@ -330,8 +330,8 @@ restricted or absent-rejected, with how.
 | --- | --- | --- | --- | --- |
 | `label` | restricted: vkSetDebugUtilsObjectNameEXT, with VK_EXT_debug_utils | direct: SetName, as UTF-16 | direct: label | direct: label |
 | `labelLength` | restricted: vkSetDebugUtilsObjectNameEXT's length, with VK_EXT_debug_utils | direct: SetName's length, as UTF-16 | direct: label's length | direct: label's length |
-| `entries` | restricted: the resource binding's variable descriptor count | restricted: the shader-visible CBV_SRV_UAV heap's descriptors | restricted: the argument buffer's resource slots | absent-rejected: until resource tables ship (sampling-resource-table) |
-| `samplers` | restricted: the sampler binding's descriptors | restricted: the shader-visible sampler heap's descriptors | restricted: the argument buffer's sampler slots | absent-rejected: until resource tables ship (sampling-resource-table) |
+| `entries` | restricted: the resource binding's variable descriptor count | restricted: a region of every frame slot's shader-visible CBV_SRV_UAV heap | restricted: the argument buffer's resource slots | absent-rejected: until resource tables ship (sampling-resource-table) |
+| `samplers` | restricted: the sampler binding's descriptors | restricted: a region of every frame slot's shader-visible sampler heap | restricted: the argument buffer's sampler slots | absent-rejected: until resource tables ship (sampling-resource-table) |
 
 ## mrhiColorPrimaries
 
@@ -542,10 +542,10 @@ restricted or absent-rejected, with how.
 
 | Value | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
-| `mrhi_heapUseSampledTextures` | direct: set 4 binding 0: SAMPLED_IMAGE | direct: ResourceDescriptorHeap, SM 6.6 | direct: argument buffer, tier 2 | absent-rejected: no heaps until WGSL reads resource tables |
-| `mrhi_heapUseStorageTextures` | direct: set 4 binding 0: STORAGE_IMAGE, with VK_EXT_mutable_descriptor_type | direct: ResourceDescriptorHeap, SM 6.6 | direct: argument buffer, tier 2 | absent-rejected: no heaps until WGSL reads resource tables |
-| `mrhi_heapUseStorageBuffers` | direct: set 4 binding 0: STORAGE_BUFFER, with VK_EXT_mutable_descriptor_type | direct: ResourceDescriptorHeap, SM 6.6 | direct: argument buffer, tier 2 | absent-rejected: no heaps until WGSL reads resource tables |
-| `mrhi_heapUseSamplers` | direct: set 4 binding 1: SAMPLER | direct: SamplerDescriptorHeap, SM 6.6 | direct: argument buffer, tier 2 | absent-rejected: no heaps until WGSL reads resource tables |
+| `mrhi_heapUseSampledTextures` | direct: set 4 binding 0: SAMPLED_IMAGE | direct: an unbounded array at register 0 of a space of its own from 16 | direct: argument buffer, tier 2 | absent-rejected: no heaps until WGSL reads resource tables |
+| `mrhi_heapUseStorageTextures` | direct: set 4 binding 0: STORAGE_IMAGE, with VK_EXT_mutable_descriptor_type | direct: an unbounded array at register 0 of a space of its own from 16 | direct: argument buffer, tier 2 | absent-rejected: no heaps until WGSL reads resource tables |
+| `mrhi_heapUseStorageBuffers` | direct: set 4 binding 0: STORAGE_BUFFER, with VK_EXT_mutable_descriptor_type | direct: an unbounded array at register 0 of a space of its own from 16 | direct: argument buffer, tier 2 | absent-rejected: no heaps until WGSL reads resource tables |
+| `mrhi_heapUseSamplers` | direct: set 4 binding 1: SAMPLER | direct: an unbounded sampler array at register 0 of a space of its own from 16 | direct: argument buffer, tier 2 | absent-rejected: no heaps until WGSL reads resource tables |
 | `mrhi_heapUseWrites` | direct: storage writes through set 4 binding 0 | direct: RW resources from ResourceDescriptorHeap | direct: argument buffer, tier 2, read_write | absent-rejected: no heaps until WGSL reads resource tables |
 
 ## mrhiConstantType

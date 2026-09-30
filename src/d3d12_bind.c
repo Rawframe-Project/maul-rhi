@@ -11,9 +11,11 @@
 // copy of its descriptor. A table of the samplers the last one wrote
 // takes those again. Pipelines of one container share a root signature,
 // so their tables and root blocks stay set between them; a pipeline of
-// another container needs its tables set again, as on Vulkan. Each
-// bind point keeps the buffers its tables use, moved at each draw or
-// dispatch to the states they need.
+// another container needs its tables set again, as on Vulkan. A
+// pipeline reading heaps points its heap tables at the pass's heap's
+// regions, its shader resource and unordered access tables at the same
+// descriptors. Each bind point keeps the buffers its tables use, moved
+// at each draw or dispatch to the states they need.
 
 #include "d3d12_bind.h"
 
@@ -85,11 +87,38 @@ void mrhiD3d12SetPipeline(mrhiD3d12Recorder* recorder, uint64_t handle)
         SetConstants(recorder, layout->constantsParameter, layout->constantWords,
                      pipeline->constants, 0);
     }
+    // The core sets a pipeline reading heaps only in a pass with one.
+    const D3D12_GPU_DESCRIPTOR_HANDLE heaps[MRHI_D3D12_HEAP_CLASSES] = {
+        recorder->heapViews, recorder->heapViews, recorder->heapSamplerViews};
+    for (uint32_t c = 0; c < MRHI_D3D12_HEAP_CLASSES; ++c)
+    {
+        if (layout->heapParameters[c] != MRHI_D3D12_NO_PARAMETER)
+        {
+            SetTable(recorder, layout->heapParameters[c], heaps[c]);
+        }
+    }
     if (!pipeline->compute)
     {
         ID3D12GraphicsCommandList_IASetPrimitiveTopology(list, pipeline->topology);
         recorder->verticesChanged = true;
     }
+}
+
+void mrhiD3d12EnterHeap(mrhiD3d12Recorder* recorder, uint64_t heap)
+{
+    if (heap == 0)
+    {
+        return;
+    }
+    D3D12_GPU_DESCRIPTOR_HANDLE views;
+    D3D12_GPU_DESCRIPTOR_HANDLE samplers;
+    (void)ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(recorder->views.heap, &views);
+    (void)ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(recorder->samplers.heap,
+                                                                  &samplers);
+    recorder->heapViews.ptr =
+        views.ptr + (UINT64)recorder->views.step * (heap - 1) * recorder->heapEntries;
+    recorder->heapSamplerViews.ptr =
+        samplers.ptr + (UINT64)recorder->samplers.step * (heap - 1) * recorder->heapSamplers;
 }
 
 // Takes count descriptors from a ring: false, failing the frame, when

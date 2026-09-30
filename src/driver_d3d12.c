@@ -8,8 +8,10 @@
 // read it, which D3D12 keeps as the adapter's one device while it is
 // held. Searches and device openings are answered at the next poll.
 // Limits are WebGPU's floor, raised where every device at the floor
-// goes further; features come in the driver's later slices. Surfaces
-// are Win32 windows (d3d12_surface.c).
+// goes further. Resource binding tier 3 grants bindless heaps of every
+// kind (mrhi-0015): 65536 entries, the portable ceiling, and 256
+// samplers, since the heaps and the frames' rings share D3D12's 2048
+// shader-visible samplers. Surfaces are Win32 windows (d3d12_surface.c).
 
 #include "driver_d3d12.h"
 
@@ -25,6 +27,10 @@
 // The root block's bytes: 32 of the root signature's 64 DWORDs, the
 // others left for the constants, the vertex information and the tables.
 #define D3D12_ROOT_BLOCK_BYTES 128
+
+// A heap's resource and sampler entries at most.
+#define D3D12_HEAP_SIZE         65536
+#define D3D12_SAMPLER_HEAP_SIZE 256
 
 typedef struct D3d12Driver
 {
@@ -110,14 +116,30 @@ static mrhiAdapterInfo InfoOf(const DXGI_ADAPTER_DESC1* desc, ID3D12Device* devi
     return info;
 }
 
-// WebGPU's floor, raised to what every feature level 12_0 device takes.
-static mrhiLimits LimitsOf(void)
+// The optional features a device grants.
+static mrhiFeatures FeaturesOf(ID3D12Device* device)
+{
+    D3D12_FEATURE_DATA_D3D12_OPTIONS options = {0};
+    bool heaps = SUCCEEDED(ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS,
+                                                            &options, sizeof(options))) &&
+                 options.ResourceBindingTier >= D3D12_RESOURCE_BINDING_TIER_3;
+    return (mrhiFeatures){.bindlessSampling = heaps, .bindlessHeterogeneous = heaps};
+}
+
+// WebGPU's floor, raised to what every feature level 12_0 device takes,
+// with heaps where the features grant them.
+static mrhiLimits LimitsOf(const mrhiFeatures* features)
 {
     mrhiLimits limits = mrhiDefaultLimits();
     limits.textureDimension2d = D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION;
     limits.textureArrayLayers = D3D12_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION;
     limits.rootBlockBytes = D3D12_ROOT_BLOCK_BYTES;
     limits.framesInFlight = MRHI_D3D12_FRAMES;
+    if (features->bindlessSampling)
+    {
+        limits.heapSize = D3D12_HEAP_SIZE;
+        limits.samplerHeapSize = D3D12_SAMPLER_HEAP_SIZE;
+    }
     return limits;
 }
 
@@ -160,10 +182,12 @@ static size_t GetAdapters(const void* self, mrhiDriverAdapter* adapters, size_t 
         {
             if (found < capacity)
             {
+                mrhiFeatures features = FeaturesOf(device);
                 adapters[found] = (mrhiDriverAdapter){
                     .handle = HandleOf(&desc, i),
                     .info = InfoOf(&desc, device),
-                    .limits = LimitsOf(),
+                    .features = features,
+                    .limits = LimitsOf(&features),
                 };
             }
             ++found;

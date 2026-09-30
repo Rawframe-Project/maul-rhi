@@ -1303,7 +1303,7 @@
                 },
                 "d3d12": {
                   "class": "restricted",
-                  "note": "resource binding tier 2"
+                  "note": "resource binding tier 3"
                 },
                 "metal": {
                   "class": "restricted",
@@ -2081,7 +2081,7 @@
                 },
                 "d3d12": {
                   "class": "restricted",
-                  "note": "1000000 at tier 2"
+                  "note": "65536 at resource binding tier 3"
                 },
                 "metal": {
                   "class": "restricted",
@@ -2105,7 +2105,7 @@
                 },
                 "d3d12": {
                   "class": "restricted",
-                  "note": "2048, or the queried maximum"
+                  "note": "256: the heaps and the frames' rings share 2048 samplers"
                 },
                 "metal": {
                   "class": "restricted",
@@ -8972,7 +8972,7 @@
                 },
                 "d3d12": {
                   "class": "restricted",
-                  "note": "a raw or structured view, or an unordered access view"
+                  "note": "a raw unordered access view when writable, else a raw shader resource view"
                 },
                 "metal": {
                   "class": "restricted",
@@ -9197,7 +9197,7 @@
                 },
                 "d3d12": {
                   "class": "restricted",
-                  "note": "the shader-visible CBV_SRV_UAV heap's descriptors"
+                  "note": "a region of every frame slot's shader-visible CBV_SRV_UAV heap"
                 },
                 "metal": {
                   "class": "restricted",
@@ -9220,7 +9220,7 @@
                 },
                 "d3d12": {
                   "class": "restricted",
-                  "note": "the shader-visible sampler heap's descriptors"
+                  "note": "a region of every frame slot's shader-visible sampler heap"
                 },
                 "metal": {
                   "class": "restricted",
@@ -14003,7 +14003,7 @@
                 },
                 "d3d12": {
                   "class": "direct",
-                  "note": "ResourceDescriptorHeap, SM 6.6"
+                  "note": "an unbounded array at register 0 of a space of its own from 16"
                 },
                 "metal": {
                   "class": "direct",
@@ -14026,7 +14026,7 @@
                 },
                 "d3d12": {
                   "class": "direct",
-                  "note": "ResourceDescriptorHeap, SM 6.6"
+                  "note": "an unbounded array at register 0 of a space of its own from 16"
                 },
                 "metal": {
                   "class": "direct",
@@ -14049,7 +14049,7 @@
                 },
                 "d3d12": {
                   "class": "direct",
-                  "note": "ResourceDescriptorHeap, SM 6.6"
+                  "note": "an unbounded array at register 0 of a space of its own from 16"
                 },
                 "metal": {
                   "class": "direct",
@@ -14072,7 +14072,7 @@
                 },
                 "d3d12": {
                   "class": "direct",
-                  "note": "SamplerDescriptorHeap, SM 6.6"
+                  "note": "an unbounded sampler array at register 0 of a space of its own from 16"
                 },
                 "metal": {
                   "class": "direct",

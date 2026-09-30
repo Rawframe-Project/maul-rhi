@@ -12,15 +12,16 @@
 #include "d3d12_api.h"
 #include "driver.h"
 
-// The binding tables a container has, and a root parameter a layout
-// lacks.
+// The binding tables a container has, the classes of its heap ranges
+// (mrhiD3d12HeapClass), and a root parameter a layout lacks.
 #define MRHI_D3D12_TABLES       4
+#define MRHI_D3D12_HEAP_CLASSES 3
 #define MRHI_D3D12_NO_PARAMETER 0xFF
 
 // Where a root signature's parameters lie: the root block's, the
-// constants' and the vertex information's root constants, and each
-// table's descriptor tables of resources and of samplers, with how many
-// descriptors each holds.
+// constants' and the vertex information's root constants, each table's
+// descriptor tables of resources and of samplers, with how many
+// descriptors each holds, and the heap tables by range class.
 typedef struct mrhiD3d12Layout
 {
     uint8_t rootParameter;
@@ -28,6 +29,7 @@ typedef struct mrhiD3d12Layout
     uint8_t vertexInfoParameter;
     uint8_t resourceParameters[MRHI_D3D12_TABLES];
     uint8_t samplerParameters[MRHI_D3D12_TABLES];
+    uint8_t heapParameters[MRHI_D3D12_HEAP_CLASSES];
     uint16_t resourceCounts[MRHI_D3D12_TABLES];
     uint16_t samplerCounts[MRHI_D3D12_TABLES];
     uint32_t rootWords;

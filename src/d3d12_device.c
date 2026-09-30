@@ -4,8 +4,10 @@
 // The D3D12 driver's devices (mrhi-0003): a D3D12 device, its direct
 // command queue, its objects (d3d12_resource.c), its shaders and
 // pipelines (d3d12_pipeline.c), its swapchains (d3d12_swapchain.c) and
-// its frames (d3d12_frame.c). A destroyed object or pipeline waits until
-// no frame can name it. A window holds one swapchain at a time, so
+// its frames (d3d12_frame.c) and its heaps (d3d12_heap.c). A destroyed
+// object, pipeline or heap waits until no frame can name it. A device
+// whose heaps would leave the frames' descriptor rings too little is
+// refused. A window holds one swapchain at a time, so
 // configuring a surface again and unconfiguring it wait for the frames
 // to finish and release the swapchain at once.
 
@@ -13,6 +15,7 @@
 
 #include "allocator.h"
 #include "d3d12_frame.h"
+#include "d3d12_heap.h"
 #include "d3d12_names.h"
 #include "d3d12_pipeline.h"
 #include "d3d12_resource.h"
@@ -106,14 +109,6 @@ static void DestroyView(void* self, uint64_t handle)
 static void DestroyQuerySet(void* self, uint64_t handle)
 {
     Retire(self, handle, mrhiD3d12KindQuerySet);
-}
-
-// What is not made yet is never destroyed.
-static void Never(void* self, uint64_t handle)
-{
-    (void)self;
-    (void)handle;
-    MRHI_ASSERT(false);
 }
 
 static mrhiResult ConfigureSurface(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
@@ -250,31 +245,30 @@ static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
     return mrhiD3d12WaitFrame(&device->frames, tag, timeoutNs);
 }
 
+// A heap's regions are the device's heap limits whatever it asks.
 static mrhiResult CreateHeap(void* self, const mrhiHeapDef* def, uint64_t* handleOut)
 {
-    (void)self;
+    D3d12Device* device = self;
     (void)def;
-    *handleOut = 0;
-    return mrhi_errorUnsupported;
+    return mrhiD3d12CreateHeap(&device->frames, handleOut);
+}
+
+static void DestroyHeap(void* self, uint64_t handle)
+{
+    Retire(self, handle, mrhiD3d12KindHeap);
 }
 
 static void WriteHeapEntry(void* self, uint64_t heap, uint32_t index,
                            const mrhiDriverHeapEntry* entry)
 {
-    (void)self;
-    (void)heap;
-    (void)index;
-    (void)entry;
-    MRHI_ASSERT(false);
+    const D3d12Device* device = self;
+    mrhiD3d12WriteHeapEntry(&device->frames, heap, index, entry);
 }
 
 static void WriteHeapSampler(void* self, uint64_t heap, uint32_t index, uint64_t sampler)
 {
-    (void)self;
-    (void)heap;
-    (void)index;
-    (void)sampler;
-    MRHI_ASSERT(false);
+    const D3d12Device* device = self;
+    mrhiD3d12WriteHeapSampler(&device->frames, heap, index, sampler);
 }
 
 static const mrhiDeviceDriverVtable s_vtable = {
@@ -310,7 +304,7 @@ static const mrhiDeviceDriverVtable s_vtable = {
     .poll = Poll,
     .waitFrame = WaitFrame,
     .createHeap = CreateHeap,
-    .destroyHeap = Never,
+    .destroyHeap = DestroyHeap,
     .writeHeapEntry = WriteHeapEntry,
     .writeHeapSampler = WriteHeapSampler,
 };
@@ -338,8 +332,10 @@ static Room RoomOf(const mrhiDeviceLimits* limits)
 
 // Lays out a device's parts in its block, around its D3D12 device and
 // queue.
-static void Lay(D3d12Device* made, const Room* room, const mrhiDeviceLimits* limits)
+static void Lay(D3d12Device* made, const Room* room, const mrhiDeviceDef* def)
 {
+    const mrhiDeviceLimits* limits = &def->deviceLimits;
+    bool heaps = def->features.bindlessSampling;
     unsigned char* block = (unsigned char*)made;
     made->objects = (mrhiD3d12Objects){.device = made->device};
     mrhiD3d12LayObjects(&made->objects, block, &room->objects, limits);
@@ -356,6 +352,9 @@ static void Lay(D3d12Device* made, const Room* room, const mrhiDeviceLimits* lim
         .objects = &made->objects,
         .pipelines = &made->pipelines,
         .swapchains = &made->swapchains,
+        .heapCount = heaps ? limits->heaps : 0,
+        .heapEntries = heaps ? def->limits.heapSize : 0,
+        .heapSamplers = heaps ? def->limits.samplerHeapSize : 0,
     };
     mrhiD3d12LayFrames(&made->frames, block, &room->frames, limits, MRHI_D3D12_FRAMES);
 }
@@ -364,6 +363,13 @@ mrhiResult mrhiCreateD3d12Device(const mrhiAllocator* allocator, const mrhiD3d12
                                  IDXGIFactory4* factory, ID3D12Device* device,
                                  const mrhiDeviceDef* def, mrhiDeviceDriver* deviceOut)
 {
+    if (def->features.bindlessSampling &&
+        !mrhiD3d12HeapsFit(def->deviceLimits.heaps, def->limits.heapSize,
+                           def->limits.samplerHeapSize))
+    {
+        ID3D12Device_Release(device);
+        return mrhi_errorUnsupported;
+    }
     Room room = RoomOf(&def->deviceLimits);
     D3d12Device* made = room.layout.overflow
                             ? nullptr
@@ -392,7 +398,7 @@ mrhiResult mrhiCreateD3d12Device(const mrhiAllocator* allocator, const mrhiD3d12
         .queue = queue,
         .swapchains = {.factory = factory, .queue = queue},
     };
-    Lay(made, &room, &def->deviceLimits);
+    Lay(made, &room, def);
     if (mrhiD3d12OpenObjects(&made->objects) != mrhi_success ||
         mrhiD3d12OpenFrames(&made->frames) != mrhi_success)
     {

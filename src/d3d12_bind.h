@@ -2,7 +2,8 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The D3D12 driver's bindings (mrhi-0003): pipelines, tables written
-// into a frame slot's shader-visible descriptor rings, root blocks, and
+// into a frame slot's shader-visible descriptor rings, heap tables
+// pointing at a pass's heap (mrhi-0015), root blocks, and
 // vertex and index buffers, with the buffers they use moved to the
 // states each draw or dispatch needs. Included by the driver's files
 // only.
@@ -13,8 +14,12 @@
 #include "command.h"
 #include "d3d12_state.h"
 
+// Points the heap tables of the pipelines set after at a pass's heap's
+// regions in the frame's slot; a heap of 0 leaves them.
+void mrhiD3d12EnterHeap(mrhiD3d12Recorder* recorder, uint64_t heap);
+
 // Sets a pipeline, by its handle, with its root signature where that
-// changes, its constants and its topology.
+// changes, its constants, its heap tables and its topology.
 void mrhiD3d12SetPipeline(mrhiD3d12Recorder* recorder, uint64_t handle);
 
 // Sets a table from a bindings command with its payload.

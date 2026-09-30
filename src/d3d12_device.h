@@ -15,8 +15,10 @@
 
 // Makes a device driver around a D3D12 device, which it takes, with the
 // driver's entry points and the factory its swapchains come from, which
-// it holds: success, mrhi_errorCapacity when the allocator fails, or
-// mrhi_errorPlatform when D3D12 makes no queue. The device is released
+// it holds: success, mrhi_errorUnsupported when its heaps leave the
+// frames' descriptor rings less than their floor, mrhi_errorCapacity
+// when the allocator fails, or mrhi_errorPlatform when D3D12 makes no
+// queue. The device is released
 // on failure.
 mrhiResult mrhiCreateD3d12Device(const mrhiAllocator* allocator, const mrhiD3d12Api* api,
                                  IDXGIFactory4* factory, ID3D12Device* device,

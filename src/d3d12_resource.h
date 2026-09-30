@@ -61,6 +61,8 @@ typedef enum mrhiD3d12Kind
     mrhiD3d12KindView,
     mrhiD3d12KindSampler,
     mrhiD3d12KindQuerySet,
+    // A heap (d3d12_heap.h), only its slot, which is its region.
+    mrhiD3d12KindHeap,
     // A pipeline (d3d12_pipeline.h), which the frames retire too.
     mrhiD3d12KindPipeline,
 } mrhiD3d12Kind;
@@ -87,6 +89,7 @@ typedef struct mrhiD3d12Objects
     mrhiD3d12Slots viewSlots;
     mrhiD3d12Slots samplerSlots;
     mrhiD3d12Slots querySetSlots;
+    mrhiD3d12Slots heapSlots;
 } mrhiD3d12Objects;
 
 // Where the tables lie in a device's block.

@@ -114,6 +114,12 @@ typedef struct mrhiD3d12Recorder
     mrhiD3d12Ring depths;
     mrhiD3d12GpuRing views;
     mrhiD3d12GpuRing samplers;
+    // Each program heap's resource and sampler descriptors, and the
+    // regions of the pass's heap, which heap tables point at.
+    uint32_t heapEntries;
+    uint32_t heapSamplers;
+    D3D12_GPU_DESCRIPTOR_HANDLE heapViews;
+    D3D12_GPU_DESCRIPTOR_HANDLE heapSamplerViews;
     D3D12_RESOURCE_BARRIER barriers[MRHI_D3D12_BARRIERS];
     uint32_t barrierCount;
     // The frame's next barrier to record.

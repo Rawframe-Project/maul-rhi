@@ -26,7 +26,7 @@ static const D3D12_HEAP_PROPERTIES s_defaultHeap = {.Type = D3D12_HEAP_TYPE_DEFA
 mrhiD3d12ObjectRoom mrhiD3d12PlanObjects(mrhiLayout* layout, const mrhiDeviceLimits* limits)
 {
     uint64_t slots = (uint64_t)limits->buffers + limits->textures + limits->views +
-                     limits->samplers + limits->querySets;
+                     limits->samplers + limits->querySets + limits->heaps;
     return (mrhiD3d12ObjectRoom){
         .buffers = mrhiLayoutAdd(layout, limits->buffers, sizeof(mrhiD3d12Buffer),
                                  alignof(mrhiD3d12Buffer)),
@@ -52,7 +52,8 @@ void mrhiD3d12LayObjects(mrhiD3d12Objects* objects, unsigned char* block,
     next = mrhiD3d12InitSlots(&objects->textureSlots, next, limits->textures);
     next = mrhiD3d12InitSlots(&objects->viewSlots, next, limits->views);
     next = mrhiD3d12InitSlots(&objects->samplerSlots, next, limits->samplers);
-    (void)mrhiD3d12InitSlots(&objects->querySetSlots, next, limits->querySets);
+    next = mrhiD3d12InitSlots(&objects->querySetSlots, next, limits->querySets);
+    (void)mrhiD3d12InitSlots(&objects->heapSlots, next, limits->heaps);
 }
 
 // A CPU-only descriptor heap of count descriptors, and where it starts.
@@ -303,6 +304,9 @@ void mrhiD3d12ReleaseObject(mrhiD3d12Objects* objects, mrhiD3d12Kind kind, uint6
         break;
     case mrhiD3d12KindView:
         mrhiD3d12GiveSlot(&objects->viewSlots, handle);
+        break;
+    case mrhiD3d12KindHeap:
+        mrhiD3d12GiveSlot(&objects->heapSlots, handle);
         break;
     default:
         mrhiD3d12GiveSlot(&objects->samplerSlots, handle);
