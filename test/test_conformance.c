@@ -497,6 +497,126 @@ static void CheckRoundTrip(mrhiDevice* device)
     CHECK(Taken(device, fromX, pattern + 512, 512), "kept across frames and until the end");
 }
 
+// A texture of a format for the feature format check.
+static mrhiTextureId MakeFormatTexture(mrhiDevice* device, mrhiFormat format, uint32_t size,
+                                       mrhiTextureUsage usage)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = format;
+    def.width = size;
+    def.height = size;
+    def.usage = usage | mrhi_textureCopySource;
+    LABEL(def, "feature format");
+    mrhiTextureId texture = {0};
+    CHECK(mrhiCreateTexture(device, &def, &texture) == mrhi_success, "a texture of a feature");
+    return texture;
+}
+
+// What formats' features grant: BC1 blocks uploaded and read back
+// unchanged, and an rg11b10ufloat target cleared to 1, 0.5 and 0.25,
+// which pack exactly.
+static void CheckFeatureFormats(mrhiDevice* device, const mrhiFeatures* granted)
+{
+    if (!granted->textureCompressionBc && !granted->rg11b10Renderable)
+    {
+        return;
+    }
+    uint8_t blocks[32];
+    for (size_t i = 0; i < sizeof(blocks); ++i)
+    {
+        blocks[i] = (uint8_t)(i * 13 + 5);
+    }
+    mrhiTextureId compressed = {0};
+    mrhiTextureId packed = {0};
+    if (granted->textureCompressionBc)
+    {
+        compressed = MakeFormatTexture(device, mrhi_formatBc1RgbaUnorm, 8,
+                                       mrhi_textureSampled | mrhi_textureCopyDestination);
+    }
+    if (granted->rg11b10Renderable)
+    {
+        packed = MakeFormatTexture(device, mrhi_formatRg11b10Ufloat, 4, mrhi_textureRenderTarget);
+    }
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a feature format frame");
+    mrhiResourceId c = {0};
+    mrhiResourceId p = {0};
+    mrhiPassId upload = {0};
+    mrhiPassId clear = {0};
+    mrhiAccess reads[2];
+    uint32_t readCount = 0;
+    if (granted->textureCompressionBc)
+    {
+        CHECK(mrhiImportTexture(device, compressed, &c) == mrhi_success, "the BC texture");
+        mrhiAccess write = Whole(c, mrhi_accessCopyDestination);
+        upload = CopyPass(device, &write, 1);
+        reads[readCount++] = Whole(c, mrhi_accessCopySource);
+    }
+    if (granted->rg11b10Renderable)
+    {
+        CHECK(mrhiImportTexture(device, packed, &p) == mrhi_success, "the rg11b10 target");
+        mrhiPassDef def = mrhiDefaultPassDef();
+        def.colorTargets[0] = (mrhiColorTarget){
+            .resource = p,
+            .load = mrhi_loadClear,
+            .store = mrhi_storeKeep,
+            .clear = {1.0f, 0.5f, 0.25f, 1.0f},
+        };
+        def.colorTargetCount = 1;
+        CHECK(mrhiAddPass(device, &def, &clear) == mrhi_success, "a pass clearing rg11b10");
+        reads[readCount++] = Whole(p, mrhi_accessCopySource);
+    }
+    mrhiPassId read = CopyPass(device, reads, readCount);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "the feature formats compiled");
+    const mrhiTextureCopy compressedCopy = {.resource = c};
+    const mrhiTextureCopy packedCopy = {.resource = p};
+    const mrhiTexelLayout layout = {.bytesPerRow = 16, .rowsPerImage = 8};
+    const mrhiExtent3d compressedExtent = {8, 8, 1};
+    const mrhiExtent3d packedExtent = {4, 4, 1};
+    if (granted->textureCompressionBc)
+    {
+        CHECK(mrhiBeginPass(device, upload) == mrhi_success &&
+                  mrhiWriteTexture(device, upload, &compressedCopy, blocks, sizeof(blocks), &layout,
+                                   &compressedExtent) == mrhi_success &&
+                  mrhiEndPass(device, upload) == mrhi_success,
+              "BC blocks uploaded");
+    }
+    if (granted->rg11b10Renderable)
+    {
+        CHECK(mrhiBeginPass(device, clear) == mrhi_success &&
+                  mrhiEndPass(device, clear) == mrhi_success,
+              "rg11b10 cleared");
+    }
+    mrhiRequestId fromC = {0};
+    mrhiRequestId fromP = {0};
+    CHECK(mrhiBeginPass(device, read) == mrhi_success &&
+              (!granted->textureCompressionBc ||
+               mrhiReadTexture(device, read, &compressedCopy, &compressedExtent, &fromC) ==
+                   mrhi_success) &&
+              (!granted->rg11b10Renderable ||
+               mrhiReadTexture(device, read, &packedCopy, &packedExtent, &fromP) == mrhi_success) &&
+              mrhiEndPass(device, read) == mrhi_success,
+          "the feature formats read");
+    Finish(device, readCount);
+    if (granted->textureCompressionBc)
+    {
+        CHECK(Taken(device, fromC, blocks, sizeof(blocks)), "BC blocks, unchanged");
+        CHECK(mrhiDestroyTexture(device, compressed) == mrhi_success, "the BC texture destroyed");
+    }
+    if (granted->rg11b10Renderable)
+    {
+        // 1.0 and 0.5 as 6e5 floats, 0.25 as a 5e5 one.
+        const uint32_t texel = 0x3C0u | 0x380u << 11 | 0x1A0u << 22;
+        uint8_t texels[64];
+        for (size_t i = 0; i < sizeof(texels); i += 4)
+        {
+            memcpy(texels + i, &texel, 4);
+        }
+        CHECK(Taken(device, fromP, texels, sizeof(texels)), "rg11b10 packed exactly");
+        CHECK(mrhiDestroyTexture(device, packed) == mrhi_success, "the rg11b10 target destroyed");
+    }
+}
+
 // Declared resources whose passes never meet share memory: two buffers,
 // each uploaded to and copied out before the next takes the same bytes,
 // then two targets, each cleared and copied out, over the same bytes
@@ -1764,6 +1884,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CheckPipelines(device);
     CheckRoundTrip(device);
     CheckAliasing(device);
+    CheckFeatureFormats(device, asked);
     CheckDrawing(device, asked->timestampQuery);
     mrhiDestroyDevice(device);
 }

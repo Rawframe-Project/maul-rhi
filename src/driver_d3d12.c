@@ -8,9 +8,13 @@
 // read it, which D3D12 keeps as the adapter's one device while it is
 // held. Searches and device openings are answered at the next poll.
 // Limits are WebGPU's floor, raised where every device at the floor
-// goes further. Resource binding tier 3 grants bindless heaps of every
-// kind (mrhi-0015): 65536 entries, the portable ceiling, and 256
-// samplers, since the heaps and the frames' rings share D3D12's 2048
+// goes further. Feature level 12_0 grants BC textures, filtering of
+// 32-bit floats, rg11b10ufloat targets, dual-source blending, unclipped
+// depth and first instances in indirect draws on every device (the
+// format tables of feature level 11_0 require the formats' parts); 64-bit
+// integers and wave operations are the device's to report. Resource
+// binding tier 3 grants bindless heaps of every kind (mrhi-0015): 65536 entries, the portable
+// ceiling, and 256 samplers, since the heaps and the frames' rings share D3D12's 2048
 // shader-visible samplers. Surfaces are Win32 windows (d3d12_surface.c).
 
 #include "driver_d3d12.h"
@@ -116,14 +120,35 @@ static mrhiAdapterInfo InfoOf(const DXGI_ADAPTER_DESC1* desc, ID3D12Device* devi
     return info;
 }
 
+// The optional features every device at the floor grants, which are
+// all that formats' caps depend on.
+static const mrhiFeatures s_floorFeatures = {
+    .textureCompressionBc = true,
+    .float32Filterable = true,
+    .rg11b10Renderable = true,
+    .dualSourceBlending = true,
+    .unclippedDepth = true,
+    .indirectFirstInstance = true,
+};
+
 // The optional features a device grants.
 static mrhiFeatures FeaturesOf(ID3D12Device* device)
 {
+    mrhiFeatures features = s_floorFeatures;
     D3D12_FEATURE_DATA_D3D12_OPTIONS options = {0};
     bool heaps = SUCCEEDED(ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS,
                                                             &options, sizeof(options))) &&
                  options.ResourceBindingTier >= D3D12_RESOURCE_BINDING_TIER_3;
-    return (mrhiFeatures){.bindlessSampling = heaps, .bindlessHeterogeneous = heaps};
+    features.bindlessSampling = heaps;
+    features.bindlessHeterogeneous = heaps;
+    D3D12_FEATURE_DATA_D3D12_OPTIONS1 options1 = {0};
+    if (SUCCEEDED(ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS1, &options1,
+                                                   sizeof(options1))))
+    {
+        features.shaderInt64 = options1.Int64ShaderOps;
+        features.subgroups = options1.WaveOps;
+    }
+    return features;
 }
 
 // WebGPU's floor, raised to what every feature level 12_0 device takes,
@@ -198,14 +223,13 @@ static size_t GetAdapters(const void* self, mrhiDriverAdapter* adapters, size_t 
     return found;
 }
 
-// What the floor promises; no feature is granted yet.
+// What the floor promises, with the features every device grants.
 static void GetFormatCaps(const void* self, uint64_t adapter, mrhiFormat format,
                           mrhiFormatCaps* capsOut)
 {
     (void)self;
     (void)adapter;
-    mrhiFeatures features = {0};
-    *capsOut = mrhiGrantedFormatCaps(format, &features);
+    *capsOut = mrhiGrantedFormatCaps(format, &s_floorFeatures);
 }
 
 static mrhiResult CreateSurface(void* self, const mrhiChain* source, const mrhiSurfaceDef* def,

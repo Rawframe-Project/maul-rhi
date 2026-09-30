@@ -373,8 +373,11 @@ format.
   signature from its D3D12 map) and compute and graphics pipelines, and
   frames: bindings, draws and dispatches, direct and indirect, occlusion
   queries, copies, uploads, readbacks, target clears and resolves, with
-  transients placed as the core places them; bindless heaps on
-  resource binding tier 3; and surfaces of Win32 windows, presented
+  transients placed as the core places them; the features every
+  feature level 12_0 device has (BC textures, 32-bit float filtering,
+  rg11b10ufloat targets, dual-source blending, unclipped depth, first
+  instances in indirect draws), 64-bit integers and wave operations
+  where reported, and bindless heaps on resource binding tier 3; and surfaces of Win32 windows, presented
   through DXGI flip model swapchains; everything else answers
   `mrhi_errorUnsupported` until the driver's later slices. It compiles
   against the DirectX headers kept as published in `directx/` and opens
