@@ -365,25 +365,27 @@ format.
   `tools/mrhi_container.py --msl --metallib` writes them and
   `tools/mrhi_msl.py` makes the MSL offline with SPIRV-Cross. The
   suite's and the samples' containers carry MSL.
-- The D3D12 driver (`MAUL_RHI_D3D12_DRIVER`, Windows, off by default
-  for now): adapters for the DXGI adapters at feature level 12_0 with
-  shader model 6.0, WARP among them, under their LUIDs, and devices
-  with a direct queue, and their buffers, textures, views, samplers,
-  occlusion query sets, shaders (from the container's DXIL, with a root
-  signature from its D3D12 map) and compute and graphics pipelines, and
-  frames: bindings, draws and dispatches, direct and indirect, occlusion
-  and timestamp queries, copies, uploads, readbacks, target clears and resolves, with
+- The D3D12 driver (`MAUL_RHI_D3D12_DRIVER`), the native driver of
+  Windows builds, where Vulkan becomes off by default: adapters for the
+  DXGI adapters at feature level 12_0 with shader model 6.0, WARP among
+  them, under their LUIDs, and devices with a direct queue, and their
+  buffers, textures, views, samplers, query sets, shaders (from the
+  container's DXIL, with a root signature from its D3D12 map), compute
+  and graphics pipelines and heaps, and frames: bindings, draws and
+  dispatches, direct and indirect, occlusion and timestamp queries,
+  copies, uploads, readbacks, target clears and resolves, with
   transients placed as the core places them; the features every
-  feature level 12_0 device has (timestamps, BC textures, 32-bit float filtering,
-  rg11b10ufloat targets, dual-source blending, unclipped depth, first
-  instances in indirect draws), 64-bit integers and wave operations
-  where reported, and bindless heaps on resource binding tier 3; and surfaces of Win32 windows, presented
-  through DXGI flip model swapchains; everything else answers
-  `mrhi_errorUnsupported` until the driver's later slices. It compiles
-  against the DirectX headers kept as published in `directx/` and opens
-  `d3d12.dll` and `dxgi.dll` at run time. Windows CI makes devices,
-  objects, pipelines, frames and heaps on WARP under the Agility SDK's
-  debug layer, and presents to a window.
+  feature level 12_0 device has (timestamps, BC textures, 32-bit float
+  filtering, rg11b10ufloat targets, dual-source blending, unclipped
+  depth, first instances in indirect draws), 64-bit integers and wave
+  operations where reported, and bindless heaps on resource binding
+  tier 3; and surfaces of Win32 windows, presented through DXGI flip
+  model swapchains. It grants no 16-bit floats, multiview or present
+  timing yet. It compiles against the DirectX headers kept as published
+  in `directx/` and opens `d3d12.dll` and `dxgi.dll` at run time.
+  Windows CI makes devices, objects, pipelines, frames and heaps on WARP
+  under the Agility SDK's debug layer, presents to a window and runs
+  the samples; another Windows job builds the Vulkan alternative.
 - D3D12 code in shader containers: a D3D12 map and each entry's DXIL
   (sections 14 and 15), checked by the reader;
   `tools/mrhi_container.py --dxil` writes them, checking each entry's

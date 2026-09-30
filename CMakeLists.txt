@@ -26,8 +26,9 @@ option(MAUL_RHI_COVERAGE "Instrument for gcov coverage" OFF)
 option(MAUL_RHI_FUZZ "Build the libFuzzer targets (Clang)" OFF)
 option(MAUL_RHI_TEST_DRIVER "Build the test driver (mrhiTestDriverDef)" ${MAUL_RHI_BUILD_TESTS})
 # The native driver (mrhi-0003), one per build: Metal on Apple systems,
-# Vulkan on the others; the web has neither.
-if(EMSCRIPTEN OR APPLE)
+# D3D12 on Windows, Vulkan on the others; the web has none. A Windows
+# build may take Vulkan instead of D3D12.
+if(EMSCRIPTEN OR APPLE OR WIN32)
     set(maul_rhi_vulkan_default OFF)
 else()
     set(maul_rhi_vulkan_default ON)
@@ -42,10 +43,8 @@ if(MAUL_RHI_METAL_DRIVER AND MAUL_RHI_VULKAN_DRIVER)
     message(FATAL_ERROR "A build has one native driver: turn MAUL_RHI_VULKAN_DRIVER off "
                         "with MAUL_RHI_METAL_DRIVER on")
 endif()
-# The D3D12 driver (mrhi-0003), on Windows: off by default until it runs
-# everything the core records, then the native driver of Windows
-# builds (R69).
-option(MAUL_RHI_D3D12_DRIVER "Build the D3D12 driver" OFF)
+# The D3D12 driver (mrhi-0003), the native driver of Windows builds.
+option(MAUL_RHI_D3D12_DRIVER "Build the D3D12 driver" ${WIN32})
 if(MAUL_RHI_D3D12_DRIVER AND NOT WIN32)
     message(FATAL_ERROR "The D3D12 driver builds on Windows only")
 endif()

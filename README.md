@@ -25,12 +25,12 @@ library thread runs, and no callback delivers a result.
 
 ## Status
 
-Not released. The contract, the Vulkan, WebGPU and Metal drivers, the
-conformance suite and the samples are in place; the Direct3D 12 driver
-is being built (`MAUL_RHI_D3D12_DRIVER`, which runs frames and presents so
-far, without heaps).
-Each build has one native driver: Metal on Apple systems, Vulkan on the
-others, WebGPU on the web.
+Not released. The contract, the Vulkan, Direct3D 12, WebGPU and Metal
+drivers, the conformance suite and the samples are in place; the Metal
+driver still lacks heaps, timestamps, present timing and multiview.
+Each build has one native driver: Metal on Apple systems, Direct3D 12
+on Windows (or Vulkan, with `MAUL_RHI_VULKAN_DRIVER=ON` and
+`MAUL_RHI_D3D12_DRIVER=OFF`), Vulkan on the others, WebGPU on the web.
 
 ## Building
 

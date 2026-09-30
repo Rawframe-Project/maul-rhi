@@ -169,16 +169,20 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+      # Vulkan instead of D3D12, the alternative a Windows build may take.
       - name: Configure
-        run: cmake -B build -T ClangCL -D${PREFIX}_WERROR=ON
+        run: >
+          cmake -B build -T ClangCL -D${PREFIX}_WERROR=ON -D${PREFIX}_D3D12_DRIVER=OFF
+          -D${PREFIX}_VULKAN_DRIVER=ON
       - name: Build
         run: cmake --build build --config Release -j 4
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
 
-  # The D3D12 driver on WARP, the runner's software adapter, under the
-  # Agility SDK's debug layer with GPU-based validation, whose errors
-  # fail the suite (R69). The SDK's NuGet package, the version the
+  # The default Windows build, the D3D12 driver, on WARP, the runner's
+  # software adapter, under the Agility SDK's debug layer with GPU-based
+  # validation, whose errors fail the suites (R69); the samples run
+  # there too. The SDK's NuGet package, the version the
   # directx/ headers are, goes beside each test in D3D12/, where the
   # tests' exports point.
   windows-d3d12:
@@ -190,9 +194,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Configure
-        run: >
-          cmake -B build -T ClangCL -D${PREFIX}_WERROR=ON -D${PREFIX}_D3D12_DRIVER=ON
-          -D${PREFIX}_VULKAN_DRIVER=OFF -D${PREFIX}_BUILD_SAMPLES=OFF
+        run: cmake -B build -T ClangCL -D${PREFIX}_WERROR=ON
       - name: Build
         run: cmake --build build --config Debug -j 4
       - name: Place the Agility SDK beside the tests

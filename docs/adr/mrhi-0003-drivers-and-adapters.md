@@ -177,9 +177,9 @@ ids, requests, the frame graph) can be tested without a GPU.
   something else resized the drawables, suboptimal while the layer's
   bounds in pixels differ. A frame presents each image it acquired
   after its work.
-- **The D3D12 driver:** built with `MAUL_RHI_D3D12_DRIVER` on Windows,
-  off by default until it runs everything the core records, and then
-  the native driver of Windows builds (a build has one). It is C over
+- **The D3D12 driver:** built with `MAUL_RHI_D3D12_DRIVER`, the native
+  driver of Windows builds, where Vulkan is off by default (a build has
+  one; a Windows build may take Vulkan instead). It is C over
   the COM interfaces' C form (`COBJMACROS`), against the DirectX headers
   kept as published in `directx/` and the Windows SDK's DXGI headers,
   and opens `d3d12.dll` and `dxgi.dll` from the system directory when
@@ -192,12 +192,16 @@ ids, requests, the frame graph) can be tested without a GPU.
   device there to read it is cheap, since D3D12 keeps one device per
   adapter while it is held. Limits are WebGPU's floor, raised where
   every device at the floor goes further (2D textures of 16384, 2048
-  layers, a 128-byte root block within the root signature's 64 words);
-  features are granted as the driver comes to run them. A device holds
+  layers, a 128-byte root block within the root signature's 64 words).
+  Every device grants timestamps, BC textures, 32-bit float filtering,
+  rg11b10ufloat targets, dual-source blending, unclipped depth and
+  indirect first instances, which feature level 12_0 requires; 64-bit
+  integers and wave operations where D3D12 reports them; heaps on
+  resource binding tier 3 (mrhi-0015). A device holds
   its D3D12 device and a direct command queue. CI runs the conformance
   suite on the hosted Windows runner's WARP under the Agility SDK's
   debug layer and GPU-based validation, which the suite's exe selects
-  and whose errors fail it.
+  and whose errors fail it, and runs the samples there.
 - **D3D12 objects:** buffers, textures, views, samplers and query sets
   sit in tables in the device's block, a handle being a slot plus one.
   Buffers and textures are committed resources in the default heap,
