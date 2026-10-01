@@ -373,8 +373,14 @@ if(MAUL_RHI_FUZZ)
     endforeach()
 endif()
 
-if(MAUL_RHI_BUILD_BENCH AND EXISTS ${PROJECT_SOURCE_DIR}/bench/bench_main.c)
+# The benchmarks run on the build's native driver through the samples'
+# harness, and not on the web, whose timers and pacing are the
+# browser's; bench/CMakeLists.txt is the family's.
+if(MAUL_RHI_BUILD_BENCH AND EXISTS ${PROJECT_SOURCE_DIR}/bench/bench_main.c AND
+   NOT (EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "WASI"))
     add_subdirectory(bench)
+    target_sources(${PROJECT_NAME}_bench PRIVATE ${PROJECT_SOURCE_DIR}/samples/harness.c)
+    target_include_directories(${PROJECT_NAME}_bench PRIVATE ${PROJECT_SOURCE_DIR}/samples)
 endif()
 
 if(MAUL_RHI_BUILD_SAMPLES)
