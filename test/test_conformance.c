@@ -2108,6 +2108,8 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CHECK(mrhiGetDeviceFeatures(device, &granted) == mrhi_success &&
               memcmp(&granted, asked, sizeof(granted)) == 0,
           "granted as asked");
+    // No query type reads statistics yet, so no driver may claim them.
+    CHECK(!granted.pipelineStatisticsQuery, "no pipeline statistics without their queries");
     double period = 0.0;
     mrhiResult status = mrhiGetDeviceTimestampPeriod(device, &period);
     CHECK(asked->timestampQuery ? status == mrhi_success && period > 0.0

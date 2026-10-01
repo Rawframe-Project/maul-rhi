@@ -28,7 +28,8 @@ extern "C"
     {
         // Timestamps at pass boundaries (mrhi-0006).
         bool timestampQuery;
-        // Pipeline statistics queries.
+        // Pipeline statistics queries; no driver grants it until a query type
+        // reads them.
         bool pipelineStatisticsQuery;
         // BC1 to BC7 textures.
         bool textureCompressionBc;

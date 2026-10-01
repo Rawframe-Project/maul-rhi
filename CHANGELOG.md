@@ -40,6 +40,11 @@ format.
   Vulkan as empty regions, which it refuses; they now record nothing,
   and an empty readback is answered with no bytes.
 
+### Fixed
+
+- The Vulkan driver granted `pipelineStatisticsQuery`, which no query
+  type reads yet; no driver grants it now.
+
 ## [0.1.0] - 2026-10-01
 
 The first release: the whole contract on Vulkan, Direct3D 12, Metal and
