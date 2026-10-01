@@ -201,6 +201,16 @@ mrhiSubmitFrame(device, &token);
   `mrhiReadBuffer` and `mrhiReadTexture` answer with
   `mrhi_deviceReadbackReady` once the frame has finished, and
   `mrhiTakeReadback` copies the bytes out.
+- **Counted draws.** Where the device has `multiDrawIndirectCount`,
+  `mrhiDrawIndirectCount` and `mrhiDrawIndexedIndirectCount` make up to
+  `maxCount` indirect draws from packed records, the number drawn read
+  on the GPU from a count a culling pass wrote. A frame's `maxCount`s
+  together stay within the device limit `frameIndirectDraws`.
+- **Multiview.** Where the device has `multiview`, a pass's `viewCount`
+  renders it into that many layers of its targets, from each target's
+  layer, with pipelines made for as many views; shader entries read
+  the view index (`mrhi_builtinViewIndex`), so their containers carry
+  no WGSL. The adapter limit `multiviewViews` bounds the views.
 - **Submitting.** `mrhiSubmitFrame` returns a token that
   `mrhi_deviceFrameDone` answers; `mrhiWaitFrame` blocks for it, with a
   timeout, where the platform allows blocking. `mrhiDropFrame` abandons
