@@ -145,16 +145,31 @@ static bool IsTexture(const mrhiDriverFrame* frame, uint32_t index1)
 static const Use s_aliased = {VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_WRITE_BIT,
                               VK_IMAGE_LAYOUT_UNDEFINED};
 
+// What a barrier into a native pass waits for and makes visible: the
+// program's commands may use any stage (mrhi-0018).
+static const Use s_native = {VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                             VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+                             VK_IMAGE_LAYOUT_UNDEFINED};
+
+// A use into a native pass: the state's layout, at every stage and
+// access.
+static Use NativeUse(const Use* use)
+{
+    return (Use){s_native.stages, s_native.access, use->layout};
+}
+
 static void AddBarrier(const mrhiVulkanRecording* recording, const mrhiBarrier* barrier,
-                       Batch* batch)
+                       bool native, Batch* batch)
 {
     const Use* before = barrier->aliasing ? &s_aliased : &s_uses[barrier->before];
-    const Use* after = &s_uses[barrier->after];
+    Use into = NativeUse(&s_uses[barrier->after]);
+    const Use* after = native ? &into : &s_uses[barrier->after];
     uint32_t index1 = barrier->resource.index1;
     if (!IsTexture(recording->frame, index1))
     {
         before = barrier->aliasing ? &s_aliased : BufferUse(barrier->before);
-        after = BufferUse(barrier->after);
+        into = NativeUse(BufferUse(barrier->after));
+        after = native ? &into : BufferUse(barrier->after);
         batch->buffers[batch->bufferCount++] = (VkBufferMemoryBarrier2){
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
             .srcStageMask = before->stages,
@@ -204,10 +219,11 @@ static void Barriers(const mrhiVulkanRecording* recording, size_t* cursor, mrhiP
     const mrhiDriverFrame* frame = recording->frame;
     Batch batch = {.imageCount = 0};
     size_t at = *cursor;
+    bool native = pass.index1 != 0 && recording->pass->native;
     while (at < frame->barrierCount && frame->barriers[at].pass.index1 == pass.index1 &&
            frame->barriers[at].pass.generation == pass.generation)
     {
-        AddBarrier(recording, &frame->barriers[at], &batch);
+        AddBarrier(recording, &frame->barriers[at], native, &batch);
         ++at;
     }
     Flush(recording, &batch);
@@ -513,6 +529,56 @@ static void RecordCommand(mrhiVulkanRecording* recording, const mrhiCommand* com
     }
 }
 
+// Places a native pass (mrhi-0018): ends the part recorded so far,
+// queues it and the program's command buffer, and begins the next part
+// with a barrier that orders every later command after the program's
+// and makes its writes visible.
+static void RunNative(mrhiVulkanRecording* recording)
+{
+    mrhiVulkanFrames* frames = recording->frames;
+    mrhiVulkanSlot* slot = recording->slot;
+    MRHI_ASSERT(slot->partsUsed < 1 + MRHI_NATIVE_PASSES);
+    VkResult result = frames->api->vkEndCommandBuffer(slot->commands);
+    slot->submits[slot->submitCount++] = (VkCommandBufferSubmitInfo){
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+        .commandBuffer = slot->commands,
+    };
+    if (recording->pass->nativeCommands != nullptr)
+    {
+        slot->submits[slot->submitCount++] = (VkCommandBufferSubmitInfo){
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+            .commandBuffer = (VkCommandBuffer)recording->pass->nativeCommands,
+        };
+    }
+    slot->commands = slot->parts[slot->partsUsed++];
+    const VkCommandBufferBeginInfo begin = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+    };
+    if (result == VK_SUCCESS)
+    {
+        result = frames->api->vkBeginCommandBuffer(slot->commands, &begin);
+    }
+    if (result != VK_SUCCESS)
+    {
+        recording->status = mrhi_errorCapacity;
+        return;
+    }
+    const VkMemoryBarrier2 after = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+        .srcStageMask = s_native.stages,
+        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+        .dstStageMask = s_native.stages,
+        .dstAccessMask = s_native.access,
+    };
+    const VkDependencyInfo dependency = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .memoryBarrierCount = 1,
+        .pMemoryBarriers = &after,
+    };
+    frames->api->vkCmdPipelineBarrier2(slot->commands, &dependency);
+}
+
 mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
                             const mrhiDriverFrame* frame)
 {
@@ -528,6 +594,12 @@ mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
     for (uint32_t p = 0; p < frame->passCount && recording.status == mrhi_success; ++p)
     {
         recording.pass = &frame->passes[p];
+        if (recording.pass->native)
+        {
+            Barriers(&recording, &barrier, recording.pass->id);
+            RunNative(&recording);
+            continue;
+        }
         bool labelled = recording.pass->labelLength > 0;
         if (labelled)
         {

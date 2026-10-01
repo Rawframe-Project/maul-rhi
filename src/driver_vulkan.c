@@ -195,6 +195,10 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
     {
         return mrhi_errorInvalid;
     }
+    if (!mrhiVulkanDefFeaturesKnown(def))
+    {
+        return mrhi_errorUnsupported;
+    }
     mrhiResult status = mrhiCreateVulkanDevice(&driver->allocator, &driver->vulkan,
                                                DeviceOf(adapter), def, deviceOut);
     if (status == mrhi_success)

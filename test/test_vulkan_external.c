@@ -28,8 +28,9 @@
 
 // The functions the test calls, read from the loader.
 static mrhiVulkan s_vulkan;
-// The functions of the instance the test made.
+// The functions of the instance the test made, and that instance.
 static mrhiVulkan s_made;
+static VkInstance s_instance;
 // Whether the test's instances enable VK_KHR_surface, which the loader
 // offers wherever a driver presents.
 static bool s_surface;
@@ -369,6 +370,188 @@ static void CheckImageAdoption(mrhiDevice* device, VkDevice made, VkPhysicalDevi
     s_device.vkFreeMemory(made, memory, nullptr);
 }
 
+// A native pass between two of the library's: a texture uploaded,
+// cleared by the program's own command buffer, and read back, the
+// clear's texels coming back; the native objects the device borrows
+// out; and the refusals.
+static void CheckNativePass(mrhiDevice* device, VkDevice made, VkInstance instance,
+                            VkPhysicalDevice physical, uint32_t family)
+{
+    void* natives[5] = {0};
+    CHECK(mrhiGetVulkanDevice(device, &natives[0], &natives[1], &natives[2], &natives[3],
+                              &natives[4]) == mrhi_success &&
+              natives[0] == (void*)instance && natives[1] == (void*)physical &&
+              natives[2] == (void*)made && natives[3] != nullptr && natives[4] != nullptr,
+          "the device's native objects");
+    PFN_vkGetDeviceProcAddr getDeviceProcAddr = nullptr;
+    memcpy((void*)&getDeviceProcAddr, (const void*)&natives[4], sizeof(getDeviceProcAddr));
+    PFN_vkCmdClearColorImage clearImage = nullptr;
+    PFN_vkVoidFunction found = getDeviceProcAddr(made, "vkCmdClearColorImage");
+    memcpy((void*)&clearImage, (const void*)&found, sizeof(clearImage));
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = mrhi_formatRgba8Unorm;
+    def.width = 16;
+    def.height = 16;
+    def.usage = mrhi_textureCopySource | mrhi_textureCopyDestination;
+    mrhiTextureId texture = {0};
+    mrhiVulkanTextureInfo info = {0};
+    CHECK(mrhiCreateTexture(device, &def, &texture) == mrhi_success &&
+              mrhiGetVulkanTexture(device, texture, &info) == mrhi_success &&
+              info.image != nullptr && info.memory != nullptr &&
+              info.format == VK_FORMAT_R8G8B8A8_UNORM &&
+              (info.usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT) != 0,
+          "the texture's image");
+    // The program's command buffer: a clear, in the layout a copy
+    // destination is in.
+    const VkCommandPoolCreateInfo poolInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .queueFamilyIndex = family,
+    };
+    VkCommandPool pool = VK_NULL_HANDLE;
+    VkCommandBuffer commands = VK_NULL_HANDLE;
+    bool recorded = s_device.vkCreateCommandPool(made, &poolInfo, nullptr, &pool) == VK_SUCCESS;
+    const VkCommandBufferAllocateInfo allocate = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = pool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1,
+    };
+    const VkCommandBufferBeginInfo begin = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    recorded = recorded &&
+               s_device.vkAllocateCommandBuffers(made, &allocate, &commands) == VK_SUCCESS &&
+               s_device.vkBeginCommandBuffer(commands, &begin) == VK_SUCCESS;
+    const VkClearColorValue color = {.float32 = {0.0f, 1.0f, 0.0f, 1.0f}};
+    const VkImageSubresourceRange range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    if (recorded && clearImage != nullptr)
+    {
+        clearImage(commands, (VkImage)info.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &color, 1,
+                   &range);
+    }
+    recorded =
+        recorded && clearImage != nullptr && s_device.vkEndCommandBuffer(commands) == VK_SUCCESS;
+    CHECK(recorded, "the program's command buffer");
+    // The frame: an upload, the native clear, a readback.
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId resource = {0};
+    mrhiResourceId declared = {0};
+    mrhiBufferDef declaredDef = mrhiDefaultBufferDef();
+    declaredDef.size = 256;
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportTexture(device, texture, &resource) == mrhi_success &&
+              mrhiDeclareBuffer(device, &declaredDef, &declared) == mrhi_success,
+          "a frame with the texture");
+    mrhiAccess write = Whole(resource, mrhi_accessCopyDestination);
+    mrhiAccess read = Whole(resource, mrhi_accessCopySource);
+    mrhiPassDef passDef = mrhiDefaultPassDef();
+    passDef.neverCull = true;
+    passDef.accessCount = 1;
+    passDef.accesses = &write;
+    mrhiPassId upload = {0};
+    mrhiPassId native = {0};
+    mrhiPassId back = {0};
+    mrhiPassId refused = {0};
+    CHECK(mrhiAddPass(device, &passDef, &upload) == mrhi_success, "the upload");
+    passDef.native = true;
+    mrhiAccess onDeclared = Whole(declared, mrhi_accessCopyDestination);
+    passDef.accesses = &onDeclared;
+    CHECK(mrhiAddPass(device, &passDef, &refused) == mrhi_errorInvalid,
+          "a native pass on a declared resource refused");
+    passDef.accesses = &write;
+    passDef.colorTargetCount = 1;
+    passDef.colorTargets[0] = (mrhiColorTarget){.resource = resource};
+    CHECK(mrhiAddPass(device, &passDef, &refused) == mrhi_errorInvalid,
+          "a native pass with a target refused");
+    passDef.colorTargetCount = 0;
+    CHECK(mrhiAddPass(device, &passDef, &native) == mrhi_success, "the native pass");
+    passDef.native = false;
+    passDef.accesses = &read;
+    CHECK(mrhiAddPass(device, &passDef, &back) == mrhi_success, "the readback");
+    uint8_t texels[16 * 16 * 4];
+    memset(texels, 0x40, sizeof(texels));
+    const mrhiTextureCopy whole = {.resource = resource};
+    const mrhiTexelLayout layout = {.bytesPerRow = 64, .rowsPerImage = 16};
+    const mrhiExtent3d extent = {16, 16, 1};
+    mrhiRequestId bytes = {0};
+    mrhiRequestId token = {0};
+    CHECK(mrhiCompileFrame(device) == mrhi_success &&
+              mrhiBeginPass(device, upload) == mrhi_success &&
+              mrhiWriteTexture(device, upload, &whole, texels, sizeof(texels), &layout, &extent) ==
+                  mrhi_success &&
+              mrhiEndPass(device, upload) == mrhi_success,
+          "uploaded");
+    CHECK(mrhiSetVulkanPassCommands(device, native, commands) == mrhi_errorState,
+          "no command buffer before the pass begins");
+    CHECK(mrhiBeginPass(device, native) == mrhi_success &&
+              mrhiWriteTexture(device, native, &whole, texels, sizeof(texels), &layout, &extent) ==
+                  mrhi_errorInvalid &&
+              mrhiSetVulkanPassCommands(device, native, nullptr) == mrhi_errorInvalid &&
+              mrhiSetVulkanPassCommands(device, native, commands) == mrhi_success &&
+              mrhiSetVulkanPassCommands(device, native, commands) == mrhi_errorState &&
+              mrhiEndPass(device, native) == mrhi_success,
+          "the native pass given its commands, and no encoder call");
+    CHECK(mrhiBeginPass(device, back) == mrhi_success &&
+              mrhiSetVulkanPassCommands(device, back, commands) == mrhi_errorInvalid &&
+              mrhiReadTexture(device, back, &whole, &extent, &bytes) == mrhi_success &&
+              mrhiEndPass(device, back) == mrhi_success &&
+              mrhiSubmitFrame(device, &token) == mrhi_success &&
+              mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
+          "read back and finished");
+    mrhiDeviceNotification record;
+    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    {
+    }
+    uint8_t taken[sizeof(texels)] = {0};
+    size_t size = 0;
+    bool cleared = mrhiTakeReadback(device, bytes, taken, sizeof(taken), &size) == mrhi_success &&
+                   size == sizeof(taken);
+    for (size_t i = 0; cleared && i < sizeof(taken); i += 4)
+    {
+        cleared = taken[i] == 0 && taken[i + 1] == 255 && taken[i + 2] == 0 && taken[i + 3] == 255;
+    }
+    CHECK(cleared, "the program's clear, after the upload and before the readback");
+    if (pool != VK_NULL_HANDLE)
+    {
+        s_device.vkDestroyCommandPool(made, pool, nullptr);
+    }
+    CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "the texture ended");
+    // A frame holds MRHI_NATIVE_PASSES of them.
+    mrhiPassDef nativeDef = mrhiDefaultPassDef();
+    nativeDef.native = true;
+    bool added = mrhiBeginFrame(device, &frame) == mrhi_success;
+    for (uint32_t i = 0; i < MRHI_NATIVE_PASSES && added; ++i)
+    {
+        added = mrhiAddPass(device, &nativeDef, &refused) == mrhi_success;
+    }
+    CHECK(added && mrhiAddPass(device, &nativeDef, &refused) == mrhi_errorCapacity &&
+              mrhiDropFrame(device) == mrhi_success,
+          "native passes up to their limit");
+}
+
+// Whether a create info's features hold the merged ones beside the
+// library's own: clip distances, mirror clamping and timelines.
+static bool Features(const VkDeviceCreateInfo* info, const VkPhysicalDeviceVulkan12Features* asked)
+{
+    bool clip = false;
+    bool mirror = false;
+    bool timeline = false;
+    for (const VkBaseInStructure* node = info->pNext; node != nullptr; node = node->pNext)
+    {
+        if (node->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2)
+        {
+            clip =
+                ((const VkPhysicalDeviceFeatures2*)(const void*)node)->features.shaderClipDistance;
+        }
+        if (node->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES &&
+            (const void*)node != (const void*)asked)
+        {
+            const VkPhysicalDeviceVulkan12Features* features = (const void*)node;
+            mirror = features->samplerMirrorClampToEdge;
+            timeline = features->timelineSemaphore;
+        }
+    }
+    return clip && mirror && timeline;
+}
+
 // Whether a create info names an extension, and how often.
 static int Named(const VkDeviceCreateInfo* info, const char* name)
 {
@@ -479,6 +662,7 @@ static void CheckDeviceAdoption(mrhiInstance* instance, mrhiAdapterId adapter)
           "the queue the session binds");
     CheckRuns(device);
     CHECK(mrhiLoadVulkanDevice(&s_made, made, false, &s_device), "the device's functions");
+    CheckNativePass(device, made, s_instance, (VkPhysicalDevice)physical, family);
     CheckImageAdoption(device, made, (VkPhysicalDevice)physical, family,
                        def.features.bindlessSampling);
     mrhiDestroyDevice(device);
@@ -521,6 +705,17 @@ static void CheckDeviceExtensions(mrhiInstance* instance, mrhiAdapterId adapter)
         .extensions = s_surface ? names : names + maintenanceAt,
         .extensionsLength = s_surface ? sizeof(names) : sizeof(names) - maintenanceAt,
     };
+    // Features an upscaler asks for, merged into the library's own.
+    VkPhysicalDeviceVulkan12Features wanted12 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+        .samplerMirrorClampToEdge = VK_TRUE,
+    };
+    VkPhysicalDeviceFeatures2 wanted = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &wanted12,
+        .features = {.shaderClipDistance = VK_TRUE},
+    };
+    extensions.features = &wanted;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
     def.next = &extensions.chain;
@@ -528,6 +723,7 @@ static void CheckDeviceExtensions(mrhiInstance* instance, mrhiAdapterId adapter)
     void* physical = nullptr;
     CHECK(mrhiDescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_success,
           "described with extensions");
+    CHECK(Features(info, &wanted12), "the features merged into the library's");
     memset(names, 'x', sizeof(names) - 1);
     const VkDeviceCreateInfo* created = info;
     CHECK(Named(created, VK_KHR_MAINTENANCE_1_EXTENSION_NAME) == 1 &&
@@ -543,6 +739,15 @@ static void CheckDeviceExtensions(mrhiInstance* instance, mrhiAdapterId adapter)
         CheckRuns(device);
         mrhiDestroyDevice(device);
     }
+    // A feature struct the library cannot place is refused.
+    const VkPhysicalDeviceRobustness2FeaturesEXT unknown = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT,
+    };
+    extensions.features = &unknown;
+    CHECK(mrhiDescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_errorUnsupported &&
+              Open(instance, &def, &status) == nullptr && status == mrhi_errorUnsupported,
+          "an unknown feature struct refused");
+    extensions.features = nullptr;
     static const char unended[] = {'a', 'b'};
     static const char empty[] = {'a', 0, 0};
     extensions.extensions = unended;
@@ -570,6 +775,7 @@ static void CheckInstanceAdoption(void)
         return;
     }
     s_made = s_vulkan;
+    s_instance = made;
     CHECK(mrhiLoadVulkanInstance(&s_made, made), "its functions");
     mrhiInstanceVulkanAdopt adopt = AdoptOf(made);
     mrhiResult status = mrhi_success;
@@ -698,6 +904,18 @@ static void CheckOtherDriver(void)
     CHECK(device != nullptr &&
               mrhiCreateTexture(device, &textureDef, &texture) == mrhi_errorUnsupported,
           "no image adopted");
+    void* natives[5] = {0};
+    mrhiPassDef nativeDef = mrhiDefaultPassDef();
+    nativeDef.native = true;
+    mrhiFrameDef frameDef = mrhiDefaultFrameDef();
+    mrhiPassId pass = {0};
+    CHECK(device != nullptr &&
+              mrhiGetVulkanDevice(device, &natives[0], &natives[1], &natives[2], &natives[3],
+                                  &natives[4]) == mrhi_errorUnsupported &&
+              mrhiBeginFrame(device, &frameDef) == mrhi_success &&
+              mrhiAddPass(device, &nativeDef, &pass) == mrhi_errorUnsupported &&
+              mrhiDropFrame(device) == mrhi_success,
+          "no native objects or passes");
     mrhiDestroyDevice(device);
     mrhiDestroyInstance(instance);
     mrhiInstanceVulkanExtensions extensions = {

@@ -134,6 +134,7 @@ bool mrhiAdoptVulkan(mrhiVulkan* vulkan, PFN_vkGetInstanceProcAddr entry)
 
 bool mrhiLoadVulkanInstance(mrhiVulkan* vulkan, VkInstance instance)
 {
+    vulkan->instance = instance;
     return ReadInstance(vulkan, instance, s_instance, sizeof(s_instance) / sizeof(s_instance[0]));
 }
 

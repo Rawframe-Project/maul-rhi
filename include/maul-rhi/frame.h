@@ -283,6 +283,9 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiUnsealResource(mrhiDevice* device,
                                                           mrhiResourceId resource);
 
+// The native passes a frame holds at most (mrhiPassDef's native).
+#define MRHI_NATIVE_PASSES 8
+
     // Where a pass runs: a hint drivers without the queue ignore, running it on
     // the graphics queue.
     typedef uint8_t mrhiPassClass;
@@ -465,6 +468,12 @@ extern "C"
         // Kept even when nothing kept reads what it writes, for work seen
         // outside the frame.
         bool neverCull;
+        // Whether the program records the pass's commands itself, in a native
+        // command buffer it hands over (maul-rhi/vulkan.h); its accesses name
+        // imported resources only, it has no targets, query sets or heap, and
+        // no encoder call records into it. The library orders it against all
+        // commands before and after it.
+        bool native;
         // The resources it uses besides its targets; NULL when accessCount is
         // 0. Only read during the call.
         const mrhiAccess* accesses;

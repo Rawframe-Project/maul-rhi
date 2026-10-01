@@ -463,6 +463,38 @@ static uint32_t MakeUses(const mrhiDevice* device, const mrhiPassDef* def, mrhiR
 }
 
 // Checks what a def says before its uses: success, or the refusal.
+// Checks a native pass's def (mrhi-0018): on a Vulkan device, without
+// targets, queries or a heap, its accesses to imported resources only,
+// and room for it in the frame.
+static mrhiResult CheckNative(mrhiDevice* device, const mrhiPassDef* def)
+{
+    if (device->adapterInfo.driver != mrhi_driverVulkan)
+    {
+        return mrhi_errorUnsupported;
+    }
+    if (def->colorTargetCount > 0 || def->depthTarget.resource.index1 != 0 ||
+        def->occlusionQuerySet.index1 != 0 || def->timestampQuerySet.index1 != 0 ||
+        def->heap.index1 != 0)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    for (uint32_t i = 0; i < def->accessCount; ++i)
+    {
+        uint32_t slot = mrhiFindFrameResource(device, def->accesses[i].resource);
+        if (def->accesses[i].kind == mrhi_accessQueryResolve ||
+            (slot != 0 && !mrhiIsImported(&device->frameResources[slot - 1])))
+        {
+            return mrhiDeviceMisuse(device);
+        }
+    }
+    uint32_t natives = 0;
+    for (uint32_t i = 0; i < device->framePassCount; ++i)
+    {
+        natives += device->framePasses[i].native ? 1u : 0u;
+    }
+    return natives < MRHI_NATIVE_PASSES ? mrhi_success : mrhi_errorCapacity;
+}
+
 static mrhiResult CheckDef(mrhiDevice* device, const mrhiPassDef* def)
 {
     mrhiResult status = mrhiCheckObjectDef(device, MRHI_DEF_HEAD(def), PASS_DEF_COOKIE);
@@ -487,7 +519,7 @@ static mrhiResult CheckDef(mrhiDevice* device, const mrhiPassDef* def)
     {
         return mrhi_errorCapacity;
     }
-    return mrhi_success;
+    return def->native ? CheckNative(device, def) : mrhi_success;
 }
 
 // The layout and size of a render pass's targets, from their textures;
@@ -551,6 +583,7 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
     *pass = (mrhiFramePass){
         .passClass = def->passClass,
         .neverCull = def->neverCull,
+        .native = def->native,
         .firstUse = device->frameUseCount,
         .useCount = count,
         .colorTargetCount = def->colorTargetCount,

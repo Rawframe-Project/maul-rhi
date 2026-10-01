@@ -137,6 +137,11 @@ typedef struct mrhiDriverPass
     const mrhiDriverAccess* accesses;
     uint32_t accessCount;
     uint32_t firstChunk;
+    // A native pass's command buffer, which the driver runs in its place
+    // instead of a command stream; 0 for any other pass, and for a native
+    // pass the program gave none (NULL).
+    bool native;
+    void* nativeCommands;
 } mrhiDriverPass;
 
 // A heap entry as its driver writes it (mrhi-0015): its kind, the

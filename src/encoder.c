@@ -70,13 +70,25 @@ uint64_t mrhiBufferBytesOf(const mrhiFrameResource* resource)
     return resource->size;
 }
 
-mrhiFramePass* mrhiRecordingPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
+mrhiFramePass* mrhiOpenPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
 {
     mrhiFramePass* pass = Find(device, id, statusOut);
     if (pass != nullptr &&
         atomic_load_explicit(&pass->recording, memory_order_relaxed) != mrhiRecordingOpen)
     {
         *statusOut = mrhi_errorState;
+        return nullptr;
+    }
+    return pass;
+}
+
+mrhiFramePass* mrhiRecordingPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
+{
+    mrhiFramePass* pass = mrhiOpenPass(device, id, statusOut);
+    // A native pass's commands are the program's own (mrhi-0018).
+    if (pass != nullptr && pass->native)
+    {
+        *statusOut = mrhiDeviceMisuse(device);
         return nullptr;
     }
     return pass;
@@ -170,7 +182,7 @@ mrhiResult mrhiEndPass(mrhiDevice* device, mrhiPassId id)
         return mrhi_errorInvalid;
     }
     mrhiResult status = mrhi_success;
-    mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);
+    mrhiFramePass* pass = mrhiOpenPass(device, id, &status);
     if (pass == nullptr)
     {
         return status;

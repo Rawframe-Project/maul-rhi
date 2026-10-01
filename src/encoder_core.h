@@ -22,9 +22,14 @@ typedef enum mrhiPassWork
 
 mrhiPassWork mrhiWorkOf(const mrhiFramePass* pass);
 
-// The pass an id names in the open, compiled frame, recording: or NULL
-// with the refusal.
+// The pass an id names in the open, compiled frame, recording, and not
+// native (a native pass refuses every encoder call): or NULL with the
+// refusal.
 mrhiFramePass* mrhiRecordingPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut);
+
+// The pass the id names, begun and not ended, native or not: NULL with
+// the refusal in statusOut otherwise.
+mrhiFramePass* mrhiOpenPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut);
 
 // Takes count records, at most a chunk's, in the pass's last chunk or a
 // new one: the records, or NULL when the arena is full, which marks the

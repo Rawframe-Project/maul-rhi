@@ -266,6 +266,10 @@ typedef struct mrhiFramePass
     mrhiPassClass passClass;
     bool neverCull;
     bool kept;
+    // Whether the program records it in a native command buffer, and
+    // that buffer once handed over (0 before).
+    bool native;
+    void* nativeCommands;
     uint32_t firstUse;
     uint32_t useCount;
     mrhiColorTarget colorTargets[MRHI_COLOR_TARGETS];

@@ -984,6 +984,10 @@ restricted or absent-rejected, with how.
 | `mrhiDescribeVulkanDevice` | direct: VkDeviceCreateInfo | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |
 | `mrhiGetVulkanPhysicalDevice` | direct: VkPhysicalDevice | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |
 | `mrhiGetVulkanQueue` | direct: queueFamilyIndex and queueIndex | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |
+| `mrhiGetVulkanDevice` | direct: the instance, physical device and device | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |
+| `mrhiVulkanTextureInfo` | direct: VkImage | absent-rejected: Vulkan only | absent-rejected: Vulkan only | absent-rejected: Vulkan only |
+| `mrhiGetVulkanTexture` | direct: VkImage | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |
+| `mrhiSetVulkanPassCommands` | direct: vkQueueSubmit2's command buffers, in order | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |
 
 ## test: the library's own
 

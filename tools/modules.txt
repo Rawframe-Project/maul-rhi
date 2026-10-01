@@ -106,5 +106,5 @@ reflection: allocator container
 pipeline: device_core invariant pipeline_core
 pipeline_core: device_core
 graphics: capabilities_core pipeline_core
-vulkan_recipe: allocator vulkan_adapter vulkan_api
-vulkan_external: device_core driver_vulkan instance_core vulkan_device
+vulkan_recipe: allocator chain vulkan_adapter vulkan_api
+vulkan_external: device_core driver_vulkan encoder_core instance_core pool vulkan_device

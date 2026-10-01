@@ -6,9 +6,12 @@
 // unsupported on every other.
 
 #include "device_core.h"
+#include "encoder_core.h"
 #include "instance_core.h"
 
 #include "maul-rhi/vulkan.h"
+
+#include <string.h>
 
 #ifdef MAUL_RHI_VULKAN_DRIVER
 #include "driver_vulkan.h"
@@ -100,4 +103,94 @@ mrhiResult mrhiGetVulkanQueue(mrhiDevice* device, uint32_t* familyOut, uint32_t*
 #else
     return mrhi_errorUnsupported;
 #endif
+}
+
+mrhiResult mrhiGetVulkanDevice(mrhiDevice* device, void** instanceOut, void** physicalDeviceOut,
+                               void** deviceOut, void** getInstanceProcAddrOut,
+                               void** getDeviceProcAddrOut)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (instanceOut == nullptr || physicalDeviceOut == nullptr || deviceOut == nullptr ||
+        getInstanceProcAddrOut == nullptr || getDeviceProcAddrOut == nullptr)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+#ifdef MAUL_RHI_VULKAN_DRIVER
+    mrhiVulkanNative native;
+    if (!mrhiVulkanDeviceNative(&device->driver, &native))
+    {
+        return mrhi_errorUnsupported;
+    }
+    *instanceOut = (void*)native.instance;
+    *physicalDeviceOut = (void*)native.physical;
+    *deviceOut = (void*)native.device;
+    // Function pointers read out as the program's untyped ones.
+    static_assert(sizeof(void*) == sizeof(native.getInstanceProcAddr), "function pointers");
+    memcpy((void*)getInstanceProcAddrOut, (const void*)&native.getInstanceProcAddr, sizeof(void*));
+    memcpy((void*)getDeviceProcAddrOut, (const void*)&native.getDeviceProcAddr, sizeof(void*));
+    return mrhi_success;
+#else
+    return mrhi_errorUnsupported;
+#endif
+}
+
+mrhiResult mrhiGetVulkanTexture(mrhiDevice* device, mrhiTextureId texture,
+                                mrhiVulkanTextureInfo* textureOut)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (textureOut == nullptr)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+#ifdef MAUL_RHI_VULKAN_DRIVER
+    if (device->adapterInfo.driver != mrhi_driverVulkan)
+    {
+        return mrhi_errorUnsupported;
+    }
+    if (!mrhiPoolIsLive(&device->textures, texture.index1, texture.generation))
+    {
+        return mrhi_errorStale;
+    }
+    const mrhiTextureSlot* slot = &device->textureSlots[texture.index1 - 1];
+    return mrhiVulkanDeviceTexture(&device->driver, slot->handle, &slot->def, textureOut)
+               ? mrhi_success
+               : mrhi_errorUnsupported;
+#else
+    (void)texture;
+    return mrhi_errorUnsupported;
+#endif
+}
+
+mrhiResult mrhiSetVulkanPassCommands(mrhiDevice* device, mrhiPassId pass, void* commandBuffer)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (device->adapterInfo.driver != mrhi_driverVulkan)
+    {
+        return mrhi_errorUnsupported;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* open = mrhiOpenPass(device, pass, &status);
+    if (open == nullptr)
+    {
+        return status;
+    }
+    if (commandBuffer == nullptr || !open->native)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    if (open->nativeCommands != nullptr)
+    {
+        return mrhi_errorState;
+    }
+    open->nativeCommands = commandBuffer;
+    return mrhi_success;
 }

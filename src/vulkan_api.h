@@ -147,6 +147,8 @@ typedef struct mrhiVulkan
 {
     void* library;
     PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
+    // The instance the functions were read for.
+    VkInstance instance;
     MRHI_VULKAN_GLOBAL(MRHI_VULKAN_FIELD)
     MRHI_VULKAN_INSTANCE(MRHI_VULKAN_FIELD)
     // Whether the instance has VK_KHR_surface, and its functions.

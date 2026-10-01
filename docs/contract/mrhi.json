@@ -11384,6 +11384,12 @@
           "library": "marks the resource; nothing reaches the driver"
         },
         {
+          "kind": "constant",
+          "name": "native_passes",
+          "value": 8,
+          "doc": "The native passes a frame holds at most (mrhiPassDef's native)."
+        },
+        {
           "kind": "enum",
           "name": "pass_class",
           "width": "uint8",
@@ -12154,6 +12160,11 @@
               "name": "never_cull",
               "type": "bool",
               "doc": "Kept even when nothing kept reads what it writes, for work seen outside the frame."
+            },
+            {
+              "name": "native",
+              "type": "bool",
+              "doc": "Whether the program records the pass's commands itself, in a native command buffer it hands over (maul-rhi/vulkan.h); its accesses name imported resources only, it has no targets, query sets or heap, and no encoder call records into it. The library orders it against all commands before and after it."
             },
             {
               "name": "accesses",
@@ -19809,9 +19820,10 @@
     },
     {
       "name": "vulkan",
-      "doc": "Vulkan objects made outside the library, for OpenXR (XR_KHR_vulkan_enable2): instances and devices adopted with what they were made with, a device described for the runtime to make, its swapchain images adopted as textures, and the queries a session binds with. Every other driver refuses the structs and answers the functions unsupported.",
+      "doc": "Vulkan objects made outside the library, for OpenXR (XR_KHR_vulkan_enable2): instances and devices adopted with what they were made with, a device described for the runtime to make, its swapchain images adopted as textures, the queries a session binds with, and the native objects and passes an upscaler records with. Every other driver refuses the structs and answers the functions unsupported.",
       "includes": [
-        "device"
+        "device",
+        "frame"
       ],
       "items": [
         {
@@ -19941,7 +19953,7 @@
           "kind": "struct",
           "name": "device_vulkan_extensions",
           "chained": true,
-          "doc": "Extensions the Vulkan device enables beyond the library's own, chained on a device def with the type mrhi_structDeviceVulkanExtensions; a description includes them. Vulkan only. The names are copied at the call, and those the library enables itself are named once; on another driver's adapter the def is refused with mrhi_errorUnsupported.",
+          "doc": "Extensions and features the Vulkan device enables beyond the library's own (an upscaler's, such as XeSS's or Streamline's), chained on a device def with the type mrhi_structDeviceVulkanExtensions; a description includes them. Vulkan only. The names are copied at the call, and those the library enables itself are named once; on another driver's adapter the def is refused with mrhi_errorUnsupported.",
           "members": [
             {
               "name": "extensions",
@@ -19953,6 +19965,12 @@
               "name": "extensions_length",
               "type": "size",
               "doc": "The bytes of extensions."
+            },
+            {
+              "name": "features",
+              "type": "void",
+              "pointer": "const",
+              "doc": "A chain of Vulkan feature structs (VkBaseInStructure) to enable as well, or NULL: VkPhysicalDeviceFeatures2 and the 1.1, 1.2 and 1.3 feature structs, whose true members are merged into the library's; a def with any other struct is refused with mrhi_errorUnsupported, since the library cannot place a struct it does not know the size of. Only read during the call."
             }
           ],
           "mapping": {
@@ -20149,6 +20167,232 @@
             "vulkan": {
               "class": "direct",
               "note": "queueFamilyIndex and queueIndex"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_vulkan_device",
+          "doc": "Reads a Vulkan device's native objects, borrowed for the device's life: what an upscaler's context is made from (XeSS's xessVKCreateContext, Streamline's Vulkan setup).",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` where the device's driver is not Vulkan; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "instance_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the VkInstance."
+            },
+            {
+              "name": "physical_device_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the VkPhysicalDevice."
+            },
+            {
+              "name": "device_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the VkDevice."
+            },
+            {
+              "name": "get_instance_proc_addr_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the vkGetInstanceProcAddr the library uses."
+            },
+            {
+              "name": "get_device_proc_addr_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the vkGetDeviceProcAddr the library uses."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "the instance, physical device and device"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            }
+          }
+        },
+        {
+          "kind": "struct",
+          "name": "vulkan_texture_info",
+          "doc": "A device texture's Vulkan image, as an upscaler's resource description takes it (Streamline's sl::Resource, XeSS's xess_vk_image_view_info, with a view the program makes).",
+          "members": [
+            {
+              "name": "image",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The VkImage."
+            },
+            {
+              "name": "memory",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The VkDeviceMemory it is bound to, or NULL for an adopted image."
+            },
+            {
+              "name": "memory_offset",
+              "type": "uint64",
+              "doc": "Its offset in that memory."
+            },
+            {
+              "name": "format",
+              "type": "uint32",
+              "doc": "Its VkFormat."
+            },
+            {
+              "name": "usage",
+              "type": "uint32",
+              "doc": "Its VkImageUsageFlags."
+            },
+            {
+              "name": "create_flags",
+              "type": "uint32",
+              "doc": "Its VkImageCreateFlags."
+            }
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkImage"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_vulkan_texture",
+          "doc": "Reads a device texture's Vulkan image. In a native pass the texture is in the layout its access puts it in: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for mrhi_accessSampled, VK_IMAGE_LAYOUT_GENERAL for the storage accesses, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL and VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL for the copies.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` where the device's driver is not Vulkan; `mrhi_errorStale` for a texture the device no longer has; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "texture",
+              "type": "id.texture_id",
+              "doc": "The texture."
+            },
+            {
+              "name": "texture_out",
+              "type": "struct.vulkan_texture_info",
+              "pointer": "mutable",
+              "doc": "Receives the image."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkImage"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "set_vulkan_pass_commands",
+          "doc": "Hands a native pass the command buffer the program recorded for it: a primary VkCommandBuffer from the program's own pool on the device's queue family, ended and not submitted. The library submits it at the pass's place in the frame, after the library's commands before it and before those after it; it must leave every declared resource in its access's layout (mrhiGetVulkanTexture), and may change any other state. The program keeps it alive until the frame is done.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` where the device's driver is not Vulkan; `mrhi_errorState` outside the pass's recording, or for a pass that already has one; `mrhi_errorInvalid` for a NULL command buffer or a pass that is not native."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The native pass, begun."
+            },
+            {
+              "name": "command_buffer",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The VkCommandBuffer."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkQueueSubmit2's command buffers, in order"
             },
             "d3d12": {
               "class": "absent_rejected",

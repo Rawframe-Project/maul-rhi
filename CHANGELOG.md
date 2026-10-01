@@ -428,6 +428,13 @@ format.
   (`mrhiInstanceVulkanExtensions`, `mrhiDeviceVulkanExtensions`); and
   the queries a session binds with (`mrhiGetVulkanPhysicalDevice`,
   `mrhiGetVulkanQueue`).
+- Native passes for vendor upscalers (mrhi-0019): a pass the program
+  records itself in a `VkCommandBuffer` it hands over
+  (`mrhiPassDef::native`, `mrhiSetVulkanPassCommands`), placed between
+  the library's command buffers with barriers around it; the device's
+  native objects (`mrhiGetVulkanDevice`) and a texture's image
+  (`mrhiGetVulkanTexture`); and feature structs enabled with a device's
+  extra extensions.
 - Swapchain images adopted as textures (mrhi-0018,
   `mrhiTextureVulkanAdopt`): never destroyed by the library, and left
   by every frame in the color or depth target layout OpenXR takes them

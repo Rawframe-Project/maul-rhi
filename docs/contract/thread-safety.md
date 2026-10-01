@@ -129,3 +129,6 @@ edit the contract, not this file.
 | `mrhiDescribeVulkanDevice` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiGetVulkanPhysicalDevice` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiGetVulkanQueue` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiGetVulkanDevice` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiGetVulkanTexture` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiSetVulkanPassCommands` | Safe from any thread; the device is used by one thread at a time. |

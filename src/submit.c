@@ -80,6 +80,8 @@ static mrhiDriverPass ViewPass(const mrhiDevice* device, uint32_t index, uint32_
         .timestampBegin = pass->timestampBegin,
         .timestampEnd = pass->timestampEnd,
         .firstChunk = pass->firstChunk,
+        .native = pass->native,
+        .nativeCommands = pass->nativeCommands,
     };
     for (uint32_t i = 0; i < pass->colorTargetCount; ++i)
     {

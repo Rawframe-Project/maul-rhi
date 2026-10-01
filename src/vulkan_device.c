@@ -816,3 +816,42 @@ bool mrhiVulkanDeviceQueue(const mrhiDeviceDriver* driver, uint32_t* familyOut, 
     *indexOut = 0;
     return true;
 }
+
+bool mrhiVulkanDeviceNative(const mrhiDeviceDriver* driver, mrhiVulkanNative* nativeOut)
+{
+    if (driver->vtable != &s_vtable)
+    {
+        return false;
+    }
+    const VulkanDevice* device = driver->self;
+    *nativeOut = (mrhiVulkanNative){
+        .instance = device->vulkan->instance,
+        .physical = device->physical,
+        .device = device->device,
+        .getInstanceProcAddr = device->vulkan->vkGetInstanceProcAddr,
+        .getDeviceProcAddr = device->vulkan->vkGetDeviceProcAddr,
+    };
+    return true;
+}
+
+bool mrhiVulkanDeviceTexture(const mrhiDeviceDriver* driver, uint64_t handle,
+                             const mrhiTextureDef* def, mrhiVulkanTextureInfo* textureOut)
+{
+    if (driver->vtable != &s_vtable)
+    {
+        return false;
+    }
+    const VulkanDevice* device = driver->self;
+    const mrhiVulkanTexture* texture = &device->objects.textures[handle - 1];
+    mrhiVulkanImage image;
+    mrhiVulkanImageOf(def, device->objects.depthStencil, &image);
+    *textureOut = (mrhiVulkanTextureInfo){
+        .image = (void*)texture->image,
+        .memory = (void*)texture->allocation.memory,
+        .memoryOffset = texture->allocation.offset,
+        .format = (uint32_t)image.info.format,
+        .usage = image.info.usage,
+        .createFlags = image.info.flags,
+    };
+    return true;
+}

@@ -52,9 +52,13 @@ typedef struct mrhiVulkanRecipe
 // struct.
 bool mrhiVulkanDefExtensions(const mrhiDeviceDef* def, const char** namesOut, size_t* bytesOut);
 
+// Whether the def's features chain holds the core feature structs only.
+bool mrhiVulkanDefFeaturesKnown(const mrhiDeviceDef* def);
+
 // Composes the recipe for a def on a physical device: mrhi_success,
-// mrhi_errorCapacity when memory runs out, or mrhi_errorInvalid for a
-// malformed extension list.
+// mrhi_errorCapacity when memory runs out, mrhi_errorInvalid for a
+// malformed extension list, or mrhi_errorUnsupported for a features
+// chain with a struct other than the core feature structs.
 mrhiResult mrhiVulkanComposeDevice(const mrhiVulkan* vulkan, const mrhiAllocator* allocator,
                                    VkPhysicalDevice physical, const mrhiDeviceDef* def,
                                    mrhiVulkanRecipe* recipeOut);
