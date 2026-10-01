@@ -540,7 +540,14 @@ uint64_t mrhiGetDeviceMisuse(mrhiDevice* device)
 
 mrhiResult mrhiCheckObjectDef(mrhiDevice* device, mrhiDefHead head, uint32_t expected)
 {
-    mrhiResult chain = mrhiCheckChain(head.next, nullptr, 0, device->instance->limits.chainDepth);
+    return mrhiCheckObjectDefWith(device, head, expected, nullptr, 0);
+}
+
+mrhiResult mrhiCheckObjectDefWith(mrhiDevice* device, mrhiDefHead head, uint32_t expected,
+                                  const mrhiStructType* known, size_t knownCount)
+{
+    mrhiResult chain =
+        mrhiCheckChain(head.next, known, knownCount, device->instance->limits.chainDepth);
     if (head.cookie != expected || chain == mrhi_errorInvalid ||
         !mrhiIsLabelValid(head.label, head.labelLength))
     {

@@ -154,6 +154,8 @@ extern "C"
         // mrhiDeviceVulkanExtensions, on a device def: extensions the Vulkan
         // device also enables.
         mrhi_structDeviceVulkanExtensions = 12,
+        // mrhiTextureVulkanAdopt, on a texture def: a VkImage made elsewhere.
+        mrhi_structTextureVulkanAdopt = 13,
     };
 
     // The header every chained struct opens with. A def's next field, or a

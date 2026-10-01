@@ -30,6 +30,9 @@ typedef struct mrhiVulkanTexture
 {
     VkImage image;
     mrhiVulkanAllocation allocation;
+    // Made elsewhere and adopted (mrhi-0018): neither it nor its memory is
+    // the library's to destroy.
+    bool adopted;
 } mrhiVulkanTexture;
 
 // The most queries a set has (mrhi-0012), and the words of a set's

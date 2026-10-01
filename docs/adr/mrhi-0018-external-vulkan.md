@@ -51,8 +51,17 @@ every other driver refuses the structs and answers the functions
   `mrhiGetVulkanQueue` the queue family and index a device submits on.
 - **Swapchains** are enabled on a device only where the instance has
   surfaces, as `VK_KHR_swapchain` requires `VK_KHR_surface`.
-- **External images**, a runtime's swapchain images adopted as
-  textures, come in a later change on the same chain.
+- **Swapchain images.** `mrhiTextureVulkanAdopt`, chained on a
+  texture def, adopts a `VkImage` as a texture; the def states its
+  format, shape and usage, which Vulkan cannot report. OpenXR hands
+  each image over in `COLOR_ATTACHMENT_OPTIMAL` (a color format) or
+  `DEPTH_STENCIL_ATTACHMENT_OPTIMAL` (a depth one) on the session's
+  queue and takes it back the same way, so an adopted texture starts
+  in the color or depth target state and every frame that uses it
+  ends it there, whatever its last use, as a surface image ends ready
+  to present. It must therefore be a render target, and it is never
+  sealed. The library makes views of it and destroys neither it nor
+  its memory.
 
 ## Consequences
 
@@ -62,3 +71,5 @@ every other driver refuses the structs and answers the functions
   library: the library's end leaves both alive, as the test checks.
 - A runtime may add features and extensions the library does not
   know; the driver uses only its own, which the description named.
+- A frame that renders to a swapchain image and then reads it pays one
+  more barrier, back to the target layout, at its end.

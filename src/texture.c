@@ -8,7 +8,10 @@
 // first.
 
 #include "capabilities_core.h"
+#include "chain.h"
 #include "device_core.h"
+
+#include "maul-rhi/vulkan.h"
 
 #define TEXTURE_DEF_COOKIE 0x6D727478u
 
@@ -141,9 +144,19 @@ static bool IsGranted(const mrhiDevice* device, const mrhiTextureDef* def)
            (caps->sampleCounts & def->sampleCount) != 0;
 }
 
-mrhiResult mrhiCheckTextureShape(mrhiDevice* device, const mrhiTextureDef* def)
+// The chained structs a created texture's def accepts.
+static const mrhiStructType s_createdStructs[] = {
+#ifdef MAUL_RHI_VULKAN_DRIVER
+    mrhi_structTextureVulkanAdopt,
+#endif
+    mrhi_structNone,
+};
+
+mrhiResult mrhiCheckTextureShape(mrhiDevice* device, const mrhiTextureDef* def, bool created)
 {
-    mrhiResult status = mrhiCheckObjectDef(device, MRHI_DEF_HEAD(def), TEXTURE_DEF_COOKIE);
+    size_t known = created ? sizeof(s_createdStructs) / sizeof(s_createdStructs[0]) - 1 : 0;
+    mrhiResult status = mrhiCheckObjectDefWith(device, MRHI_DEF_HEAD(def), TEXTURE_DEF_COOKIE,
+                                               s_createdStructs, known);
     if (status != mrhi_success)
     {
         return status;
@@ -173,7 +186,7 @@ mrhiResult mrhiCheckTextureUsage(mrhiDevice* device, const mrhiTextureDef* def)
 // Checks a def on a live device: success, or the refusal.
 static mrhiResult CheckTexture(mrhiDevice* device, const mrhiTextureDef* def)
 {
-    mrhiResult status = mrhiCheckTextureShape(device, def);
+    mrhiResult status = mrhiCheckTextureShape(device, def, true);
     if (status != mrhi_success)
     {
         return status;
@@ -183,7 +196,30 @@ static mrhiResult CheckTexture(mrhiDevice* device, const mrhiTextureDef* def)
     {
         return status;
     }
+    // An adopted image (mrhi-0018) is Vulkan's, made, and a render target.
+    const mrhiTextureVulkanAdopt* adopt =
+        (const mrhiTextureVulkanAdopt*)mrhiFindStruct(def->next, mrhi_structTextureVulkanAdopt);
+    if (adopt != nullptr && device->adapterInfo.driver != mrhi_driverVulkan)
+    {
+        return mrhi_errorUnsupported;
+    }
+    if (adopt != nullptr &&
+        (adopt->image == nullptr || (def->usage & mrhi_textureRenderTarget) == 0))
+    {
+        return mrhiDeviceMisuse(device);
+    }
     return mrhiDeviceUsable(device);
+}
+
+// The state an adopted image rests in between frames: undefined for a
+// texture the library made.
+static mrhiResourceState RestingOf(const mrhiTextureDef* def)
+{
+    if (mrhiFindStruct(def->next, mrhi_structTextureVulkanAdopt) == nullptr)
+    {
+        return mrhi_stateUndefined;
+    }
+    return mrhiFormatHasDepth(def->format) ? mrhi_stateDepthTarget : mrhi_stateColorTarget;
 }
 
 mrhiResult mrhiCreateTexture(mrhiDevice* device, const mrhiTextureDef* def,
@@ -217,7 +253,8 @@ mrhiResult mrhiCreateTexture(mrhiDevice* device, const mrhiTextureDef* def,
         return status;
     }
     mrhiTextureSlot* slot = &device->textureSlots[index1 - 1];
-    *slot = (mrhiTextureSlot){.handle = handle, .def = *def};
+    mrhiResourceState resting = RestingOf(def);
+    *slot = (mrhiTextureSlot){.handle = handle, .def = *def, .state = resting, .resting = resting};
     slot->def.next = nullptr;
     slot->def.label = nullptr;
     slot->def.labelLength = 0;

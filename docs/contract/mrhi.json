@@ -246,6 +246,11 @@
               "name": "struct_device_vulkan_extensions",
               "value": 12,
               "doc": "mrhiDeviceVulkanExtensions, on a device def: extensions the Vulkan device also enables."
+            },
+            {
+              "name": "struct_texture_vulkan_adopt",
+              "value": 13,
+              "doc": "mrhiTextureVulkanAdopt, on a texture def: a VkImage made elsewhere."
             }
           ],
           "library": "tags of the library's extension chain"
@@ -19804,7 +19809,7 @@
     },
     {
       "name": "vulkan",
-      "doc": "Vulkan objects made outside the library, for OpenXR (XR_KHR_vulkan_enable2): instances and devices adopted with what they were made with, a device described for the runtime to make, and the queries a session binds with. Every other driver refuses the structs and answers the functions unsupported.",
+      "doc": "Vulkan objects made outside the library, for OpenXR (XR_KHR_vulkan_enable2): instances and devices adopted with what they were made with, a device described for the runtime to make, its swapchain images adopted as textures, and the queries a session binds with. Every other driver refuses the structs and answers the functions unsupported.",
       "includes": [
         "device"
       ],
@@ -19954,6 +19959,38 @@
             "vulkan": {
               "class": "direct",
               "note": "ppEnabledExtensionNames"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            }
+          }
+        },
+        {
+          "kind": "struct",
+          "name": "texture_vulkan_adopt",
+          "chained": true,
+          "doc": "A VkImage made elsewhere (an OpenXR runtime's swapchain image), which the device adopts as a texture and never destroys, nor its memory, chained on a texture def given to mrhiCreateTexture with the type mrhi_structTextureVulkanAdopt. The def states the image's format, kind, size, layers, mips, samples, usage and view formats, which Vulkan cannot report; its usage includes mrhi_textureRenderTarget. Between frames the image rests as a render target, in VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL for a color format or VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL for a depth one, owned by the device's queue: it must be so when adopted, and every frame that uses it leaves it so, as OpenXR hands images over and takes them back. It cannot be sealed. On another driver's device the def is refused with mrhi_errorUnsupported.",
+          "members": [
+            {
+              "name": "image",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The VkImage."
+            }
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "the image xrEnumerateSwapchainImages gives"
             },
             "d3d12": {
               "class": "absent_rejected",

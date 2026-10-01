@@ -22,7 +22,7 @@ vulkan_query: command invariant vulkan_frame vulkan_pass
 vulkan_pipeline: container driver invariant reflection vulkan_api vulkan_label vulkan_object
 vulkan_graphics: capabilities_core container invariant reflection vulkan_adapter vulkan_label vulkan_pipeline
 vulkan_memory: invariant tlsf vulkan_api
-vulkan_object: capabilities_core invariant vulkan_adapter vulkan_api vulkan_label vulkan_memory vulkan_resource
+vulkan_object: capabilities_core chain invariant vulkan_adapter vulkan_api vulkan_label vulkan_memory vulkan_resource
 vulkan_resource: capabilities_core vulkan_adapter vulkan_api
 vulkan_adapter: allocator capabilities_core driver invariant stage_limits vulkan_api
 vulkan_surface: capabilities_core vulkan_adapter vulkan_api
@@ -72,7 +72,7 @@ label:
 notify: instance_core
 pool:
 resources: capabilities_core device_core heap_core
-texture: capabilities_core device_core
+texture: capabilities_core chain device_core
 view: capabilities_core device_core heap_core
 surface: chain device_core instance_core invariant label
 swapchain: capabilities_core device_core instance_core

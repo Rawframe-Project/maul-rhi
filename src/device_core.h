@@ -124,8 +124,10 @@ typedef struct mrhiTextureSlot
     mrhiTextureDef def;
     uint32_t firstView;
     mrhiImport import;
-    // The state frames leave it in.
+    // The state frames leave it in, and the one every frame ends an
+    // adopted image in (undefined for the others).
     mrhiResourceState state;
+    mrhiResourceState resting;
 } mrhiTextureSlot;
 
 // A view as its device keeps it: its resolved def (without its chain),
@@ -171,6 +173,9 @@ typedef struct mrhiFrameResource
     // only the reads of the sealed state, and whether it ends sealed.
     bool sealed;
     bool seal;
+    // The state an adopted image ends every frame in, undefined for the
+    // others.
+    mrhiResourceState resting;
     // A surface image's driver image; its handle is its swapchain's.
     uint64_t image;
     // Whether a pass declared so far writes it; imports count as written.
@@ -539,10 +544,14 @@ typedef struct mrhiDefHead
 // device: success, or the refusal (invalid input counted as misuse).
 mrhiResult mrhiCheckObjectDef(mrhiDevice* device, mrhiDefHead head, uint32_t expected);
 
+// mrhiCheckObjectDef for a def that takes the known chained structs.
+mrhiResult mrhiCheckObjectDefWith(mrhiDevice* device, mrhiDefHead head, uint32_t expected,
+                                  const mrhiStructType* known, size_t knownCount);
+
 // Checks what a texture def says of its shape on a live device (its
 // cookie, chain and label, format, size, layers, mips, samples and view
 // formats): success, or the refusal, invalid input counted as misuse.
-mrhiResult mrhiCheckTextureShape(mrhiDevice* device, const mrhiTextureDef* def);
+mrhiResult mrhiCheckTextureShape(mrhiDevice* device, const mrhiTextureDef* def, bool created);
 
 // Checks what a buffer def says of its shape on a live device (its
 // cookie, chain and label, and size): success, or the refusal.

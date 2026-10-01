@@ -980,6 +980,7 @@ restricted or absent-rejected, with how.
 | `mrhiInstanceVulkanExtensions` | direct: ppEnabledExtensionNames | absent-rejected: Vulkan only | absent-rejected: Vulkan only | absent-rejected: Vulkan only |
 | `mrhiDeviceVulkanAdopt` | direct: the device XR_KHR_vulkan_enable2's xrCreateVulkanDeviceKHR made | absent-rejected: Vulkan only | absent-rejected: Vulkan only | absent-rejected: Vulkan only |
 | `mrhiDeviceVulkanExtensions` | direct: ppEnabledExtensionNames | absent-rejected: Vulkan only | absent-rejected: Vulkan only | absent-rejected: Vulkan only |
+| `mrhiTextureVulkanAdopt` | direct: the image xrEnumerateSwapchainImages gives | absent-rejected: Vulkan only | absent-rejected: Vulkan only | absent-rejected: Vulkan only |
 | `mrhiDescribeVulkanDevice` | direct: VkDeviceCreateInfo | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |
 | `mrhiGetVulkanPhysicalDevice` | direct: VkPhysicalDevice | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |
 | `mrhiGetVulkanQueue` | direct: queueFamilyIndex and queueIndex | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |

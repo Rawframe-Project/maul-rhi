@@ -37,8 +37,8 @@ the driver's JavaScript from the `maul-rhi.mjs` the build writes
 (mrhi-0016). Android runs the Vulkan driver, built with the NDK
 (`-DCMAKE_TOOLCHAIN_FILE=cmake/android-emulator.cmake`) and tested in
 the emulator (mrhi-0017).
-On Vulkan, an OpenXR runtime's instance and device are adopted
-(`maul-rhi/vulkan.h`, mrhi-0018).
+On Vulkan, an OpenXR runtime's instance, device and swapchain images
+are adopted (`maul-rhi/vulkan.h`, mrhi-0018).
 
 ## Building
 

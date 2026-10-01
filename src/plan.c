@@ -5,10 +5,10 @@
 // state their last use left them in, as disjoint boxes of mips, layers
 // and planes, and each kept use makes barriers from the states it meets.
 // Imported objects carry one state between frames, so the frame's end
-// unifies theirs. The barriers are then put in the order they run. Once
-// the declared resources are placed, the first use of one over memory
-// used earlier in the frame is marked as aliasing, a buffer's gaining a
-// barrier from the undefined state for it.
+// unifies theirs, an adopted image's to the state it rests in. The barriers are then put in the
+// order they run. Once the declared resources are placed, the first use of one over memory used
+// earlier in the frame is marked as aliasing, a buffer's gaining a barrier from the undefined state
+// for it.
 
 #include "device_core.h"
 
@@ -277,6 +277,10 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
     if (resource->seal)
     {
         resource->finalState = mrhi_stateSealed;
+    }
+    if (resource->resting != mrhi_stateUndefined)
+    {
+        resource->finalState = resource->resting;
     }
     if (mrhiOutlivesFrame(resource))
     {

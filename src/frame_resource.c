@@ -36,7 +36,7 @@ mrhiResult mrhiDeclareTexture(mrhiDevice* device, const mrhiTextureDef* def,
     {
         return mrhiDeviceMisuse(device);
     }
-    mrhiResult status = mrhiCheckTextureShape(device, def);
+    mrhiResult status = mrhiCheckTextureShape(device, def, false);
     if (status != mrhi_success)
     {
         return status;
@@ -117,6 +117,7 @@ mrhiResult mrhiImportTexture(mrhiDevice* device, mrhiTextureId texture, mrhiReso
         .generation = texture.generation,
         .initialState = slot->state,
         .sealed = slot->state == mrhi_stateSealed,
+        .resting = slot->resting,
     };
     return Import(device, &device->textureSlots[texture.index1 - 1].import, resource, resourceOut);
 }
@@ -185,8 +186,9 @@ mrhiResult mrhiSealResource(mrhiDevice* device, mrhiResourceId resource)
     {
         return status;
     }
-    // A sealed texture is sampled.
-    if (found->kind == mrhiImportedTexture && (found->texture.usage & mrhi_textureSampled) == 0)
+    // A sealed texture is sampled, and an adopted image rests as a target.
+    if (found->kind == mrhiImportedTexture && ((found->texture.usage & mrhi_textureSampled) == 0 ||
+                                               found->resting != mrhi_stateUndefined))
     {
         return mrhiDeviceMisuse(device);
     }

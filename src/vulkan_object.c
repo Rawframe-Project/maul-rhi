@@ -8,10 +8,13 @@
 #include "vulkan_object.h"
 
 #include "capabilities_core.h"
+#include "chain.h"
 #include "invariant.h"
 #include "vulkan_adapter.h"
 #include "vulkan_label.h"
 #include "vulkan_resource.h"
+
+#include "maul-rhi/vulkan.h"
 
 void mrhiVulkanSlotsInit(mrhiVulkanSlots* slots, uint32_t* next, uint32_t capacity)
 {
@@ -93,6 +96,16 @@ mrhiResult mrhiVulkanCreateTexture(mrhiVulkanObjects* objects, const mrhiTexture
         return mrhi_errorCapacity;
     }
     mrhiVulkanTexture* made = &objects->textures[handle - 1];
+    const mrhiTextureVulkanAdopt* adopt =
+        (const mrhiTextureVulkanAdopt*)mrhiFindStruct(def->next, mrhi_structTextureVulkanAdopt);
+    if (adopt != nullptr)
+    {
+        *made = (mrhiVulkanTexture){.image = (VkImage)adopt->image, .adopted = true};
+        mrhiVulkanName(objects->api, objects->device, VK_OBJECT_TYPE_IMAGE,
+                       MRHI_VULKAN_HANDLE(made->image), def->label, def->labelLength);
+        *handleOut = handle;
+        return mrhi_success;
+    }
     mrhiVulkanImage image;
     mrhiVulkanImageOf(def, objects->depthStencil, &image);
     VkResult result =
@@ -118,8 +131,11 @@ mrhiResult mrhiVulkanCreateTexture(mrhiVulkanObjects* objects, const mrhiTexture
 void mrhiVulkanDestroyTexture(mrhiVulkanObjects* objects, uint64_t handle)
 {
     mrhiVulkanTexture* texture = &objects->textures[handle - 1];
-    objects->api->vkDestroyImage(objects->device, texture->image, nullptr);
-    mrhiVulkanRelease(objects->memory, &texture->allocation);
+    if (!texture->adopted)
+    {
+        objects->api->vkDestroyImage(objects->device, texture->image, nullptr);
+        mrhiVulkanRelease(objects->memory, &texture->allocation);
+    }
     *texture = (mrhiVulkanTexture){0};
     mrhiVulkanGiveSlot(&objects->textureSlots, handle);
 }

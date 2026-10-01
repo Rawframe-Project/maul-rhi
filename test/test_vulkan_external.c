@@ -13,6 +13,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#include "device_core.h"
 #include "test_harness.h"
 #include "vulkan_api.h"
 
@@ -129,6 +130,245 @@ static void CheckRuns(mrhiDevice* device)
           "the bytes back");
 }
 
+// The functions of the device the test made.
+static mrhiVulkanDevice s_device;
+
+// Moves an image between layouts on the device's queue, as the OpenXR
+// runtime does around the program's frames, and waits.
+static void Transition(VkDevice device, uint32_t family, VkImage image, VkImageLayout from,
+                       VkImageLayout to)
+{
+    const VkCommandPoolCreateInfo poolInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .queueFamilyIndex = family,
+    };
+    VkCommandPool pool = VK_NULL_HANDLE;
+    VkCommandBuffer commands = VK_NULL_HANDLE;
+    const VkCommandBufferBeginInfo begin = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    const VkImageMemoryBarrier2 barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+        .oldLayout = from,
+        .newLayout = to,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = image,
+        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+    };
+    const VkDependencyInfo dependency = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers = &barrier,
+    };
+    VkQueue queue = VK_NULL_HANDLE;
+    s_device.vkGetDeviceQueue(device, family, 0, &queue);
+    bool done = s_device.vkCreateCommandPool(device, &poolInfo, nullptr, &pool) == VK_SUCCESS;
+    const VkCommandBufferAllocateInfo allocate = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = pool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1,
+    };
+    done = done && s_device.vkAllocateCommandBuffers(device, &allocate, &commands) == VK_SUCCESS &&
+           s_device.vkBeginCommandBuffer(commands, &begin) == VK_SUCCESS;
+    if (done)
+    {
+        s_device.vkCmdPipelineBarrier2(commands, &dependency);
+    }
+    const VkCommandBufferSubmitInfo commandInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+        .commandBuffer = commands,
+    };
+    const VkSubmitInfo2 submit = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos = &commandInfo,
+    };
+    done = done && s_device.vkEndCommandBuffer(commands) == VK_SUCCESS &&
+           s_device.vkQueueSubmit2(queue, 1, &submit, VK_NULL_HANDLE) == VK_SUCCESS &&
+           s_device.vkQueueWaitIdle(queue) == VK_SUCCESS;
+    CHECK(done, "the image moved between layouts");
+    if (pool != VK_NULL_HANDLE)
+    {
+        s_device.vkDestroyCommandPool(device, pool, nullptr);
+    }
+}
+
+// An image as an OpenXR runtime makes one for a swapchain: 16 by 16,
+// RGBA8, a color target, a copy source and sampled, bound to device memory and
+// in COLOR_ATTACHMENT_OPTIMAL.
+static VkImage MakeImage(VkDevice device, VkPhysicalDevice physical, uint32_t family,
+                         VkDeviceMemory* memoryOut)
+{
+    const VkImageCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format = VK_FORMAT_R8G8B8A8_UNORM,
+        .extent = {16, 16, 1},
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                 VK_IMAGE_USAGE_SAMPLED_BIT,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+    VkImage image = VK_NULL_HANDLE;
+    *memoryOut = VK_NULL_HANDLE;
+    if (s_device.vkCreateImage(device, &info, nullptr, &image) != VK_SUCCESS)
+    {
+        return VK_NULL_HANDLE;
+    }
+    const VkImageMemoryRequirementsInfo2 asked = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2,
+        .image = image,
+    };
+    VkMemoryRequirements2 needs = {.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2};
+    s_device.vkGetImageMemoryRequirements2(device, &asked, &needs);
+    VkPhysicalDeviceMemoryProperties properties;
+    s_made.vkGetPhysicalDeviceMemoryProperties(physical, &properties);
+    uint32_t type = 0;
+    while (type < properties.memoryTypeCount &&
+           (needs.memoryRequirements.memoryTypeBits >> type & 1u) == 0)
+    {
+        ++type;
+    }
+    const VkMemoryAllocateInfo allocate = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = needs.memoryRequirements.size,
+        .memoryTypeIndex = type,
+    };
+    if (s_device.vkAllocateMemory(device, &allocate, nullptr, memoryOut) != VK_SUCCESS ||
+        s_device.vkBindImageMemory(device, image, *memoryOut, 0) != VK_SUCCESS)
+    {
+        s_device.vkDestroyImage(device, image, nullptr);
+        return VK_NULL_HANDLE;
+    }
+    Transition(device, family, image, VK_IMAGE_LAYOUT_UNDEFINED,
+               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    return image;
+}
+
+// One frame clearing the adopted texture and reading it back: every
+// texel the clear's.
+static void ClearAndRead(mrhiDevice* device, mrhiTextureId texture, float green)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId target = {0};
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportTexture(device, texture, &target) == mrhi_success,
+          "a frame with the image");
+    mrhiPassDef clearDef = mrhiDefaultPassDef();
+    clearDef.colorTargets[0] = (mrhiColorTarget){
+        .resource = target,
+        .load = mrhi_loadClear,
+        .store = mrhi_storeKeep,
+        .clear = {0.0f, green, 1.0f, 1.0f},
+    };
+    clearDef.colorTargetCount = 1;
+    mrhiPassDef readDef = mrhiDefaultPassDef();
+    mrhiAccess read = Whole(target, mrhi_accessCopySource);
+    readDef.accesses = &read;
+    readDef.accessCount = 1;
+    readDef.neverCull = true;
+    mrhiPassId clear = {0};
+    mrhiPassId back = {0};
+    const mrhiTextureCopy whole = {.resource = target};
+    const mrhiExtent3d extent = {16, 16, 1};
+    mrhiRequestId texels = {0};
+    mrhiRequestId token = {0};
+    CHECK(mrhiAddPass(device, &clearDef, &clear) == mrhi_success &&
+              mrhiAddPass(device, &readDef, &back) == mrhi_success &&
+              mrhiCompileFrame(device) == mrhi_success &&
+              mrhiBeginPass(device, clear) == mrhi_success &&
+              mrhiEndPass(device, clear) == mrhi_success &&
+              mrhiBeginPass(device, back) == mrhi_success &&
+              mrhiReadTexture(device, back, &whole, &extent, &texels) == mrhi_success &&
+              mrhiEndPass(device, back) == mrhi_success &&
+              mrhiSubmitFrame(device, &token) == mrhi_success &&
+              mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
+          "cleared and read");
+    mrhiDeviceNotification record;
+    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    {
+    }
+    uint8_t taken[16 * 16 * 4] = {0};
+    size_t size = 0;
+    bool same = mrhiTakeReadback(device, texels, taken, sizeof(taken), &size) == mrhi_success &&
+                size == sizeof(taken);
+    uint8_t expected = green > 0.5f ? 255 : 0;
+    for (size_t i = 0; same && i < sizeof(taken); i += 4)
+    {
+        same =
+            taken[i] == 0 && taken[i + 1] == expected && taken[i + 2] == 255 && taken[i + 3] == 255;
+    }
+    CHECK(same, "the clear's texels back");
+}
+
+// A swapchain image adopted as a texture: refused when malformed,
+// rendered to and read in frames that each end it a color target, as
+// the runtime takes it back, and alive after the texture's end.
+static void CheckImageAdoption(mrhiDevice* device, VkDevice made, VkPhysicalDevice physical,
+                               uint32_t family, bool sealing)
+{
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkImage image = MakeImage(made, physical, family, &memory);
+    CHECK(image != VK_NULL_HANDLE, "an image made");
+    if (image == VK_NULL_HANDLE)
+    {
+        return;
+    }
+    mrhiTextureVulkanAdopt adopt = {
+        .chain = {.type = mrhi_structTextureVulkanAdopt},
+        .image = (void*)image,
+    };
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.next = &adopt.chain;
+    def.format = mrhi_formatRgba8Unorm;
+    def.width = 16;
+    def.height = 16;
+    def.usage = mrhi_textureCopySource | mrhi_textureSampled;
+    mrhiTextureId texture = {0};
+    CHECK(mrhiCreateTexture(device, &def, &texture) == mrhi_errorInvalid,
+          "an image that is no render target refused");
+    def.usage |= mrhi_textureRenderTarget;
+    adopt.image = nullptr;
+    CHECK(mrhiCreateTexture(device, &def, &texture) == mrhi_errorInvalid, "no image refused");
+    adopt.image = (void*)image;
+    CHECK(mrhiCreateTexture(device, &def, &texture) == mrhi_success, "the image adopted");
+    CHECK(device->textureSlots[texture.index1 - 1].state == mrhi_stateColorTarget,
+          "taken as the color target it is handed over as");
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId resource = {0};
+    mrhiRequestId token = {0};
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportTexture(device, texture, &resource) == mrhi_success,
+          "a frame importing it");
+    CHECK(mrhiSealResource(device, resource) ==
+              (sealing ? mrhi_errorInvalid : mrhi_errorUnsupported),
+          "never sealed");
+    CHECK(mrhiCompileFrame(device) == mrhi_success &&
+              mrhiSubmitFrame(device, &token) == mrhi_success &&
+              mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
+          "an empty frame");
+    ClearAndRead(device, texture, 1.0f);
+    // The frame ended it a color target, as the runtime takes it back:
+    // the validation layer checks the runtime's barrier from that layout.
+    Transition(made, family, image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    ClearAndRead(device, texture, 0.0f);
+    CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "the texture ended");
+    // The image and its memory are still the program's.
+    CHECK(s_device.vkDeviceWaitIdle(made) == VK_SUCCESS, "idle");
+    Transition(made, family, image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    s_device.vkDestroyImage(made, image, nullptr);
+    s_device.vkFreeMemory(made, memory, nullptr);
+}
+
 // Whether a create info names an extension, and how often.
 static int Named(const VkDeviceCreateInfo* info, const char* name)
 {
@@ -183,6 +423,10 @@ static void CheckDeviceAdoption(mrhiInstance* instance, mrhiAdapterId adapter)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
+    // Sealing, which adopted images refuse, where the adapter grants it.
+    mrhiFeatures granted = {0};
+    CHECK(mrhiGetAdapterFeatures(instance, adapter, &granted) == mrhi_success, "the features");
+    def.features.bindlessSampling = granted.bindlessSampling;
     mrhiDeviceVulkanAdopt adopt = {.chain = {.type = mrhi_structDeviceVulkanAdopt}};
     mrhiDeviceDef adopting = def;
     adopting.next = &adopt.chain;
@@ -234,13 +478,13 @@ static void CheckDeviceAdoption(mrhiInstance* instance, mrhiAdapterId adapter)
               family == created->pQueueCreateInfos[0].queueFamilyIndex && index == 0,
           "the queue the session binds");
     CheckRuns(device);
+    CHECK(mrhiLoadVulkanDevice(&s_made, made, false, &s_device), "the device's functions");
+    CheckImageAdoption(device, made, (VkPhysicalDevice)physical, family,
+                       def.features.bindlessSampling);
     mrhiDestroyDevice(device);
     // The device outlives the library's hold of it.
-    mrhiVulkanDevice functions;
-    CHECK(mrhiLoadVulkanDevice(&s_made, made, false, &functions) &&
-              functions.vkDeviceWaitIdle(made) == VK_SUCCESS,
-          "the adopted device still alive");
-    functions.vkDestroyDevice(made, nullptr);
+    CHECK(s_device.vkDeviceWaitIdle(made) == VK_SUCCESS, "the adopted device still alive");
+    s_device.vkDestroyDevice(made, nullptr);
     // A later description replaces the earlier one.
     CHECK(mrhiDescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_success,
           "described again");
@@ -442,6 +686,18 @@ static void CheckOtherDriver(void)
     uint32_t index = 0;
     CHECK(device != nullptr && mrhiGetVulkanQueue(device, &family, &index) == mrhi_errorUnsupported,
           "no queue");
+    mrhiTextureVulkanAdopt image = {.chain = {.type = mrhi_structTextureVulkanAdopt},
+                                    .image = (void*)(uintptr_t)1};
+    mrhiTextureDef textureDef = mrhiDefaultTextureDef();
+    textureDef.next = &image.chain;
+    textureDef.format = mrhi_formatRgba8Unorm;
+    textureDef.width = 16;
+    textureDef.height = 16;
+    textureDef.usage = mrhi_textureRenderTarget;
+    mrhiTextureId texture = {0};
+    CHECK(device != nullptr &&
+              mrhiCreateTexture(device, &textureDef, &texture) == mrhi_errorUnsupported,
+          "no image adopted");
     mrhiDestroyDevice(device);
     mrhiDestroyInstance(instance);
     mrhiInstanceVulkanExtensions extensions = {

@@ -428,6 +428,10 @@ format.
   (`mrhiInstanceVulkanExtensions`, `mrhiDeviceVulkanExtensions`); and
   the queries a session binds with (`mrhiGetVulkanPhysicalDevice`,
   `mrhiGetVulkanQueue`).
+- Swapchain images adopted as textures (mrhi-0018,
+  `mrhiTextureVulkanAdopt`): never destroyed by the library, and left
+  by every frame in the color or depth target layout OpenXR takes them
+  back in.
 
 ### Fixed
 
