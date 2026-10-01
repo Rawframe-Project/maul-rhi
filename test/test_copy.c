@@ -177,6 +177,54 @@ static mrhiBufferCopy Buffer(uint32_t resource, uint64_t offset, uint32_t perRow
     };
 }
 
+// Clears of a buffer (mrhi-0022): recorded as one command, the size
+// resolved, nothing for an empty one, and every refusal.
+static void TestClears(void)
+{
+    Open();
+    BeginFrame();
+    mrhiAccess accesses[] = {
+        Access(SOURCE, mrhi_accessCopySource),
+        Access(DESTINATION, mrhi_accessCopyDestination),
+    };
+    Passes(accesses, 2);
+    mrhiResourceId from = s_r[SOURCE];
+    mrhiResourceId to = s_r[DESTINATION];
+    CHECK(mrhiClearBuffer(s_device, s_pass, to, 8, 16) == mrhi_success &&
+              mrhiClearBuffer(s_device, s_pass, to, 4000, MRHI_WHOLE_SIZE) == mrhi_success,
+          "cleared");
+    const mrhiCommand* first = Nth(0);
+    const mrhiCommand* second = Nth(1);
+    CHECK(first != nullptr && first->type == mrhiCommandClearBuffer && first->payload == 0 &&
+              first->a == to.index1 && first->c == 8 && first->d == 16,
+          "recorded");
+    CHECK(second != nullptr && second->c == 4000 && second->d == 96, "the rest resolved");
+    CHECK(mrhiClearBuffer(s_device, s_pass, to, 4096, MRHI_WHOLE_SIZE) == mrhi_success &&
+              mrhiClearBuffer(s_device, s_pass, to, 0, 0) == mrhi_success && Nth(2) == nullptr,
+          "nothing recorded for an empty clear");
+    CHECK(mrhiClearBuffer(s_device, s_pass, to, 2, 4) == mrhi_errorInvalid &&
+              mrhiClearBuffer(s_device, s_pass, to, 0, 6) == mrhi_errorInvalid,
+          "an offset or size not a multiple of 4");
+    CHECK(mrhiClearBuffer(s_device, s_pass, to, 8, 4092) == mrhi_errorInvalid &&
+              mrhiClearBuffer(s_device, s_pass, to, 4100, MRHI_WHOLE_SIZE) == mrhi_errorInvalid &&
+              mrhiClearBuffer(s_device, s_pass, to, UINT64_MAX - 3, 8) == mrhi_errorInvalid,
+          "past the end");
+    CHECK(mrhiClearBuffer(s_device, s_pass, from, 0, 4) == mrhi_errorInvalid,
+          "a buffer declared only as a copy source");
+    CHECK(mrhiClearBuffer(s_device, s_pass, s_r[ARRAY], 0, 4) == mrhi_errorInvalid, "a texture");
+    CHECK(mrhiClearBuffer(s_device, s_render, to, 0, 4) == mrhi_errorInvalid,
+          "a pass with targets");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 8, "each counted");
+    mrhiResourceId none = {0};
+    CHECK(mrhiClearBuffer(s_device, s_pass, none, 0, 4) == mrhi_errorStale, "none");
+    CHECK(mrhiClearBuffer(nullptr, s_pass, to, 0, 4) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiEndPass(s_device, s_pass) == mrhi_success &&
+              mrhiClearBuffer(s_device, s_pass, to, 0, 4) == mrhi_errorState,
+          "not recording");
+    Drop();
+    CloseDevice();
+}
+
 static void TestBuffers(void)
 {
     Open();
@@ -629,6 +677,7 @@ int main(void)
 {
     ResetAdapter();
     TestBuffers();
+    TestClears();
     TestLayouts();
     TestRegions();
     TestBlocks();
