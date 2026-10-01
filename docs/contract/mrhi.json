@@ -997,7 +997,7 @@
             {
               "name": "pipeline_statistics_query",
               "type": "bool",
-              "doc": "Pipeline statistics queries.",
+              "doc": "Pipeline statistics queries; no driver grants it until a query type reads them.",
               "mapping": {
                 "vulkan": {
                   "class": "restricted",
