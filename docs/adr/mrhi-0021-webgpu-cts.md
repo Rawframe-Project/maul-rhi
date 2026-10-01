@@ -30,3 +30,17 @@ The first slice found a real difference: WebGPU allows empty copies,
 and the core recorded them, which Vulkan refuses
 (`VUID-VkBufferCopy-size-01988`). Empty copies, writes and reads now
 record no command; a read is still answered, with no bytes.
+
+The cases Maul RHI decides otherwise are three rules, each kept:
+
+- A layout's `bytesPerRow` or `rowsPerImage` of 0 is absent, where
+  WebGPU's 0 is a value; the web driver passes it as undefined. So an
+  empty copy of several layers that gives 0 is refused, and a
+  `rowsPerImage` of 0 for one layer is taken.
+- An index range is whole indices; WebGPU takes any bytes.
+- A query is written at most once a frame (mrhi-0012); WebGPU allows
+  once a pass.
+
+Cases needing data a buffer cannot have (a size not a multiple of 4,
+where that changes the outcome) are counted, not run. Both counts are
+pinned in the test, so a change of either is seen.
