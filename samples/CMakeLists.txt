@@ -4,10 +4,10 @@
 # there is no adapter and none is required.
 
 # The presentation samples' windows: XCB, where the Vulkan driver is
-# built and the XCB client library installed, Win32 windows on the D3D12
+# built natively and the XCB client library installed, Win32 windows on the D3D12
 # driver, the web runner's canvases, or CAMetalLayers outside any window
 # on the Metal driver.
-if(MAUL_RHI_VULKAN_DRIVER)
+if(MAUL_RHI_VULKAN_DRIVER AND NOT CMAKE_CROSSCOMPILING)
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
         pkg_check_modules(MAUL_RHI_SAMPLE_XCB QUIET IMPORTED_TARGET xcb)

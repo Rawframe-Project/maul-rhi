@@ -176,6 +176,51 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure --timeout 240
 
+  android:
+    # The Vulkan driver on Android (mrhi-0017) in the emulator, Android
+    # 15 on x86_64 with KVM, whose SwiftShader offers Vulkan 1.3: every
+    # test through adb, a native adapter required.
+    name: android-emulator
+    runs-on: ubuntu-24.04
+    env:
+      ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/28.2.13676358
+      ANDROID_SERIAL: emulator-5554
+      # Where avdmanager writes the device and the emulator reads it.
+      ANDROID_AVD_HOME: /home/runner/.android/avd
+      MAUL_RHI_REQUIRE_VULKAN: 1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Boot the emulator
+        timeout-minutes: 15
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          tools="$ANDROID_HOME/cmdline-tools/latest/bin"
+          yes | "$tools/sdkmanager" --licenses >/dev/null 2>&1 || true
+          mkdir -p "$ANDROID_AVD_HOME"
+          "$tools/sdkmanager" --install emulator "system-images;android-35;google_apis;x86_64" >/dev/null
+          echo no | "$tools/avdmanager" create avd -n maul35 -k "system-images;android-35;google_apis;x86_64" -d pixel_5 >/dev/null
+          nohup "$ANDROID_HOME/emulator/emulator" -avd maul35 -no-window -no-audio -no-boot-anim \
+            -no-snapshot -gpu swiftshader_indirect -port 5554 > emulator.log 2>&1 &
+          emulator=$!
+          adb="$ANDROID_HOME/platform-tools/adb"
+          for i in $(seq 1 90); do
+            [ "$("$adb" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] && break
+            kill -0 "$emulator" 2>/dev/null || break
+            sleep 5
+          done
+          "$adb" shell getprop sys.boot_completed | grep -q 1 || { tail -50 emulator.log; exit 1; }
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+      - name: Configure
+        run: >
+          cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/android-emulator.cmake
+          -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_WERROR=ON
+      - name: Build
+        run: cmake --build build -j 4
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --timeout 240
+
   fuzz:
     name: fuzz
     runs-on: ubuntu-24.04

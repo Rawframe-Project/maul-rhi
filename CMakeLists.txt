@@ -114,6 +114,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/reflection.c
     src/resources.c
     src/sha256.c
+    src/stage_limits.c
     src/shader.c
     src/surface.c
     src/swapchain.c
@@ -182,12 +183,16 @@ if(MAUL_RHI_BUILD_TESTS)
     maul_add_test(label WHITEBOX)
     maul_add_test(sha256 WHITEBOX)
     maul_add_test(tlsf WHITEBOX)
+    maul_add_test(stage_limits WHITEBOX)
     if(MAUL_RHI_VULKAN_DRIVER)
         maul_add_test(vulkan_label WHITEBOX)
-        if(TARGET test_vulkan_label)
-            target_include_directories(test_vulkan_label SYSTEM PRIVATE
-                                       ${PROJECT_SOURCE_DIR}/khronos)
-        endif()
+        maul_add_test(vulkan_limits WHITEBOX)
+        foreach(test vulkan_label vulkan_limits)
+            if(TARGET test_${test})
+                target_include_directories(test_${test} SYSTEM PRIVATE
+                                           ${PROJECT_SOURCE_DIR}/khronos)
+            endif()
+        endforeach()
     endif()
     maul_add_test(instance)
     if(MAUL_RHI_TEST_DRIVER)
@@ -273,7 +278,7 @@ if(MAUL_RHI_BUILD_TESTS)
         endif()
     endif()
     find_package(PkgConfig QUIET)
-    if(PkgConfig_FOUND AND MAUL_RHI_VULKAN_DRIVER)
+    if(PkgConfig_FOUND AND MAUL_RHI_VULKAN_DRIVER AND NOT CMAKE_CROSSCOMPILING)
         pkg_check_modules(MAUL_RHI_XCB QUIET IMPORTED_TARGET xcb)
         if(MAUL_RHI_XCB_FOUND)
             target_link_libraries(test_conformance PRIVATE PkgConfig::MAUL_RHI_XCB)

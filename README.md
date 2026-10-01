@@ -34,7 +34,9 @@ on Windows (or Vulkan, with `MAUL_RHI_VULKAN_DRIVER=ON` and
 built with Emscripten or with Clang's `wasm32-wasi`
 (`-DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake`), whose page loads
 the driver's JavaScript from the `maul-rhi.mjs` the build writes
-(mrhi-0016).
+(mrhi-0016). Android runs the Vulkan driver, built with the NDK
+(`-DCMAKE_TOOLCHAIN_FILE=cmake/android-emulator.cmake`) and tested in
+the emulator (mrhi-0017).
 
 ## Building
 

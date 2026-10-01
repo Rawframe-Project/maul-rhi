@@ -1474,7 +1474,7 @@
               "mapping": {
                 "vulkan": {
                   "class": "direct",
-                  "note": "bounded by maxPerStageResources"
+                  "note": "no bound on binding numbers: the default"
                 },
                 "d3d12": {
                   "class": "direct",
@@ -1498,7 +1498,7 @@
               "mapping": {
                 "vulkan": {
                   "class": "direct",
-                  "note": "maxPerStageDescriptorSampledImages"
+                  "note": "maxPerStageDescriptorSampledImages, fitted under maxPerStageResources"
                 },
                 "d3d12": {
                   "class": "direct",
@@ -1522,7 +1522,7 @@
               "mapping": {
                 "vulkan": {
                   "class": "direct",
-                  "note": "maxPerStageDescriptorSamplers"
+                  "note": "maxPerStageDescriptorSamplers, fitted under maxPerStageResources"
                 },
                 "d3d12": {
                   "class": "direct",
@@ -1546,7 +1546,7 @@
               "mapping": {
                 "vulkan": {
                   "class": "direct",
-                  "note": "maxPerStageDescriptorStorageBuffers"
+                  "note": "maxPerStageDescriptorStorageBuffers, fitted under maxPerStageResources"
                 },
                 "d3d12": {
                   "class": "direct",
@@ -1570,7 +1570,7 @@
               "mapping": {
                 "vulkan": {
                   "class": "direct",
-                  "note": "maxPerStageDescriptorStorageImages"
+                  "note": "maxPerStageDescriptorStorageImages, fitted under maxPerStageResources"
                 },
                 "d3d12": {
                   "class": "direct",
@@ -1594,7 +1594,7 @@
               "mapping": {
                 "vulkan": {
                   "class": "direct",
-                  "note": "maxPerStageDescriptorUniformBuffers"
+                  "note": "maxPerStageDescriptorUniformBuffers, fitted under maxPerStageResources"
                 },
                 "d3d12": {
                   "class": "direct",
@@ -1740,7 +1740,7 @@
               "mapping": {
                 "vulkan": {
                   "class": "direct",
-                  "note": "no shared bound"
+                  "note": "no shared bound: the sum, at least the default"
                 },
                 "d3d12": {
                   "class": "direct",

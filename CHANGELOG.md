@@ -410,6 +410,10 @@ format.
   build writes from the same `EM_JS` functions (`maulRhiImports`), with
   `cmake/wasm32-wasi.cmake`, the suites under Node's WASI and the
   conformance suite in headless Chrome.
+- Android (mrhi-0017): the build for the NDK
+  (`cmake/android-emulator.cmake`), every suite run in the emulator
+  through adb (`tools/run_android.sh`), and an Android 15 emulator job
+  in CI on SwiftShader's Vulkan 1.3.
 
 ### Fixed
 
@@ -431,3 +435,8 @@ format.
   that only rendered to a texture declared with its sRGB twin lost the
   texture. Such a target now takes none, since only its own format
   renders.
+- The Vulkan driver's limits (mrhi-0017): `bindingsPerTable` is the
+  contract's 1000, not `maxPerStageResources`; the per-stage limits fit
+  under `maxPerStageResources` together; `tablesPlusVertexBuffers` is at
+  least the contract's 24. Devices with four descriptor sets or a small
+  per-stage bound, as many Android devices are, found no adapter.

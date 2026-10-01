@@ -35,18 +35,18 @@ restricted or absent-rejected, with how.
 | `textureDimension3d` | direct: maxImageDimension3D | direct: 2048 | direct: 2048 | direct: maxTextureDimension3D |
 | `textureArrayLayers` | direct: maxImageArrayLayers | direct: 2048 | direct: 2048 | direct: maxTextureArrayLayers |
 | `bindingTables` | direct: descriptor sets, or heap indices in the root block | direct: heap indices in root constants | direct: argument tables | direct: maxBindGroups |
-| `bindingsPerTable` | direct: bounded by maxPerStageResources | direct: heap indices, no lower bound | direct: argument buffer entries | direct: maxBindingsPerBindGroup |
-| `sampledTexturesPerStage` | direct: maxPerStageDescriptorSampledImages | direct: heap indices (tier 2 and above) | direct: argument buffers | direct: maxSampledTexturesPerShaderStage |
-| `samplersPerStage` | direct: maxPerStageDescriptorSamplers | direct: the sampler heap | direct: 16 per stage | direct: maxSamplersPerShaderStage |
-| `storageBuffersPerStage` | direct: maxPerStageDescriptorStorageBuffers | direct: UAVs through the heap | direct: argument buffers | direct: maxStorageBuffersPerShaderStage |
-| `storageTexturesPerStage` | direct: maxPerStageDescriptorStorageImages | direct: UAVs through the heap | direct: read-write textures | direct: maxStorageTexturesPerShaderStage |
-| `uniformBuffersPerStage` | direct: maxPerStageDescriptorUniformBuffers | direct: 14 constant buffers per stage | direct: argument buffers | direct: maxUniformBuffersPerShaderStage |
+| `bindingsPerTable` | direct: no bound on binding numbers: the default | direct: heap indices, no lower bound | direct: argument buffer entries | direct: maxBindingsPerBindGroup |
+| `sampledTexturesPerStage` | direct: maxPerStageDescriptorSampledImages, fitted under maxPerStageResources | direct: heap indices (tier 2 and above) | direct: argument buffers | direct: maxSampledTexturesPerShaderStage |
+| `samplersPerStage` | direct: maxPerStageDescriptorSamplers, fitted under maxPerStageResources | direct: the sampler heap | direct: 16 per stage | direct: maxSamplersPerShaderStage |
+| `storageBuffersPerStage` | direct: maxPerStageDescriptorStorageBuffers, fitted under maxPerStageResources | direct: UAVs through the heap | direct: argument buffers | direct: maxStorageBuffersPerShaderStage |
+| `storageTexturesPerStage` | direct: maxPerStageDescriptorStorageImages, fitted under maxPerStageResources | direct: UAVs through the heap | direct: read-write textures | direct: maxStorageTexturesPerShaderStage |
+| `uniformBuffersPerStage` | direct: maxPerStageDescriptorUniformBuffers, fitted under maxPerStageResources | direct: 14 constant buffers per stage | direct: argument buffers | direct: maxUniformBuffersPerShaderStage |
 | `uniformBindingBytes` | direct: maxUniformBufferRange | direct: 65536 | direct: constant address space | direct: maxUniformBufferBindingSize |
 | `storageBindingBytes` | direct: maxStorageBufferRange | direct: the buffer's size | direct: the buffer's size | direct: maxStorageBufferBindingSize |
 | `uniformOffsetAlignment` | direct: minUniformBufferOffsetAlignment | direct: 256 | direct: 256 covers every family | direct: minUniformBufferOffsetAlignment |
 | `storageOffsetAlignment` | direct: minStorageBufferOffsetAlignment | direct: 16 for raw buffers | direct: 16 or less | direct: minStorageBufferOffsetAlignment |
 | `vertexBuffers` | direct: maxVertexInputBindings, at most 64 | direct: 32 input slots | direct: 31 buffer slots, shared with argument tables | direct: maxVertexBuffers |
-| `tablesPlusVertexBuffers` | direct: no shared bound | direct: no shared bound | direct: 31 buffer slots | direct: maxBindGroupsPlusVertexBuffers |
+| `tablesPlusVertexBuffers` | direct: no shared bound: the sum, at least the default | direct: no shared bound | direct: 31 buffer slots | direct: maxBindGroupsPlusVertexBuffers |
 | `bufferBytes` | direct: maxBufferSize | direct: the resource size limit | direct: maxBufferLength | direct: maxBufferSize |
 | `vertexAttributes` | direct: maxVertexInputAttributes, at most 64 | direct: 32 | direct: 31 | direct: maxVertexAttributes |
 | `vertexStride` | direct: maxVertexInputBindingStride | direct: 2048 | direct: no lower bound | direct: maxVertexBufferArrayStride |
