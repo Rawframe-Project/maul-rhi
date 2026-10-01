@@ -25,7 +25,7 @@ vulkan_memory: invariant tlsf vulkan_api
 vulkan_object: capabilities_core invariant vulkan_adapter vulkan_api vulkan_label vulkan_memory vulkan_resource
 vulkan_resource: capabilities_core vulkan_adapter vulkan_api
 vulkan_adapter: allocator capabilities_core driver invariant stage_limits vulkan_api
-vulkan_surface: vulkan_adapter vulkan_api
+vulkan_surface: capabilities_core vulkan_adapter vulkan_api
 vulkan_label: invariant vulkan_api
 vulkan_api:
 instance: allocator chain driver driver_d3d12 driver_metal driver_test driver_vulkan driver_webgpu instance_core invariant

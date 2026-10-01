@@ -65,7 +65,11 @@ static void ResizeCanvas(int width)
 #endif
 
 #ifdef MRHI_TEST_XCB
+#include <threads.h>
 #include <xcb/xcb.h>
+#endif
+#ifdef MRHI_TEST_ANDROID
+#include "android_activity.h"
 #endif
 #ifdef MAUL_RHI_METAL_DRIVER
 #include "metal_layer.h"
@@ -2049,7 +2053,7 @@ static void CheckForeignSources(mrhiInstance* instance)
 }
 
 #if defined(MRHI_TEST_XCB) || defined(MRHI_TEST_WEB) || defined(MAUL_RHI_METAL_DRIVER) ||          \
-    defined(MAUL_RHI_D3D12_DRIVER)
+    defined(MAUL_RHI_D3D12_DRIVER) || defined(MRHI_TEST_ANDROID)
 // Whether caps meet the floors and offer 8-bit sRGB in Rec. 709.
 static bool MeetsFloors(const mrhiSurfaceCaps* caps)
 {
@@ -2064,7 +2068,7 @@ static bool MeetsFloors(const mrhiSurfaceCaps* caps)
              color->range == mrhi_rangeStandard);
     }
     return caps->colorCount >= 1 && caps->colorCount <= MRHI_SURFACE_COLORS && srgb &&
-           (caps->presentModes & mrhi_presentFifo) != 0 &&
+           (caps->presentModes & mrhi_presentFifo) != 0 && (caps->twinViews || caps->twinImages) &&
            (caps->alphaModes & mrhi_alphaOpaque) != 0 &&
            (caps->usages & mrhi_textureRenderTarget) != 0;
 }
@@ -2093,7 +2097,18 @@ static mrhiResult Configure(mrhiDevice* device, mrhiSurfaceId surface, const mrh
 {
     mrhiSurfaceConfig config = mrhiDefaultSurfaceConfig();
     config.surface = surface;
-    config.color = Srgb8(caps, &config.viewFormats[0]);
+    // sRGB through the twin: as a view where the surface allows one, else
+    // as the images' own format.
+    mrhiFormat twin = mrhi_formatNone;
+    config.color = Srgb8(caps, &twin);
+    if (caps->twinViews)
+    {
+        config.viewFormats[0] = twin;
+    }
+    else
+    {
+        config.color.format = twin;
+    }
     config.usage = mrhi_textureRenderTarget | (caps->usages & mrhi_textureCopySource);
     config.width = width;
     config.height = height;
@@ -2276,10 +2291,27 @@ static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiS
 #endif
 
 #ifdef MRHI_TEST_XCB
+// Connects to the X server DISPLAY names, trying again for a second: a
+// server busy with many clients at once may refuse a connection for a
+// moment, as Xvfb under a parallel test run does.
+static xcb_connection_t* ConnectX(void)
+{
+    xcb_connection_t* connection = xcb_connect(nullptr, nullptr);
+    for (int tries = 1;
+         tries < 20 && xcb_connection_has_error(connection) != 0 && getenv("DISPLAY") != nullptr;
+         ++tries)
+    {
+        xcb_disconnect(connection);
+        (void)thrd_sleep(&(struct timespec){.tv_nsec = 50000000}, nullptr);
+        connection = xcb_connect(nullptr, nullptr);
+    }
+    return connection;
+}
+
 // A window of the X server the environment names, where there is one.
 static void CheckXcbSurface(mrhiInstance* instance, const mrhiAdapterId* ids, size_t count)
 {
-    xcb_connection_t* connection = xcb_connect(nullptr, nullptr);
+    xcb_connection_t* connection = ConnectX();
     if (xcb_connection_has_error(connection) != 0)
     {
         xcb_disconnect(connection);
@@ -2316,6 +2348,37 @@ static void CheckXcbSurface(mrhiInstance* instance, const mrhiAdapterId* ids, si
     CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "the surface destroyed");
     xcb_destroy_window(connection, window);
     xcb_disconnect(connection);
+}
+#endif
+
+#ifdef MRHI_TEST_ANDROID
+// The application's window, which the system sizes: a swapchain of
+// another size is scaled to it, so every size configures.
+static void CheckAndroidSurface(mrhiInstance* instance, const mrhiAdapterId* ids, size_t count)
+{
+    const mrhiSurfaceSourceAndroid source = {
+        .chain = {.type = mrhi_structSurfaceSourceAndroid},
+        .window = mrhiTestAndroidWindow(),
+    };
+    mrhiSurfaceId surface = {0};
+    CHECK(source.window != nullptr &&
+              MakeSurface(instance, &source.chain, &surface) == mrhi_success,
+          "a window surface");
+    size_t presenting = 0;
+    for (size_t i = 0; i < count; ++i)
+    {
+        mrhiSurfaceCaps caps;
+        CHECK(mrhiGetSurfaceCaps(instance, surface, ids[i], &caps) == mrhi_success &&
+                  caps.presentable && MeetsFloors(&caps),
+              "presentable, with the floors");
+        if (caps.presentable)
+        {
+            CheckPresenting(instance, ids[i], surface, &caps, false);
+            presenting += 1;
+        }
+    }
+    CHECK(count == 0 || presenting > 0, "an adapter presents there");
+    CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "the surface destroyed");
 }
 #endif
 
@@ -2462,6 +2525,8 @@ static void CheckSurfaces(mrhiInstance* instance)
     size_t count = Search(instance, ids, 16);
 #if defined(MRHI_TEST_XCB)
     CheckXcbSurface(instance, ids, count);
+#elif defined(MRHI_TEST_ANDROID)
+    CheckAndroidSurface(instance, ids, count);
 #elif defined(MRHI_TEST_WEB)
     CheckCanvasSurface(instance, ids, count);
 #elif defined(MAUL_RHI_METAL_DRIVER)

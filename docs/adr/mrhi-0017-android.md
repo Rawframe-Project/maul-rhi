@@ -49,13 +49,28 @@ Vulkan wrongly, and both reject many mobile devices as well.
 - **Tables and vertex buffers:** their sum is the most a pipeline
   reaches, so the driver reports it, or the contract's 24 when the sum
   is less; a larger value bounds nothing more.
+- **Surfaces:** the conformance suite also runs as an application on
+  the system's own NativeActivity (no Java, no window library): a glue
+  file starts the suite on a thread of its own once the activity has a
+  window, waits for it in the window's destruction callback, and reads
+  the host's `MAUL_RHI_*` variables from a file the runner writes with
+  run-as; the suite presents to that window with a surface required.
+  Two findings followed. Android reports the window's size as the
+  surface's current extent yet takes any size within its bounds,
+  scaling it, so the driver takes any such size there. Android's
+  swapchain offers no `VK_KHR_swapchain_mutable_format`, so the
+  contract's sRGB twin, until now only a view, could not be reached; the
+  surface caps now say whether the twin comes as views (`twinViews`) or
+  as the images' own format (`twinImages`), and Android's surfaces take
+  sRGB images (mrhi-0007).
 - **CI:** an Android 15 emulator job runs every suite with a Vulkan
-  adapter required. Surfaces need a window and are tested on Android
-  when an application test hosts one.
+  adapter required, the application with its surface required too.
 
 ## Consequences
 
 Devices with four descriptor sets or a small per-stage bound, common on
-Android, now meet the floor. The conformance suite and every sample
-that draws, computes or loses its device run on SwiftShader in CI; the
-window samples skip there.
+Android, now meet the floor. The conformance suite, presenting to a
+window included, and every sample that draws, computes or loses its
+device run on SwiftShader in CI; the window samples, which make windows
+of their own, skip there. A program that wants sRGB output reads the
+caps and names the twin as a view or as its color format.

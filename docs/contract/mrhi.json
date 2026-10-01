@@ -9745,7 +9745,7 @@
             {
               "name": "format",
               "type": "enum.format",
-              "doc": "A unorm or float format; sRGB is rendered through the format's twin view.",
+              "doc": "A unorm or float format; sRGB is rendered through the format's twin, as a view or as the images' format (mrhiSurfaceCaps).",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -10010,12 +10010,22 @@
               "name": "usages",
               "type": "bitflags.texture_usage",
               "doc": "The usages its images may have, mrhi_textureRenderTarget among them."
+            },
+            {
+              "name": "twin_views",
+              "type": "bool",
+              "doc": "Whether a configuration may name its color format's sRGB twin among its view formats."
+            },
+            {
+              "name": "twin_images",
+              "type": "bool",
+              "doc": "Whether a configuration may take the sRGB twin of a reported color's format as its color format, its images then sRGB; at least one of twinViews and twinImages is set."
             }
           ],
           "mapping": {
             "vulkan": {
               "class": "direct",
-              "note": "vkGetPhysicalDeviceSurfaceCapabilitiesKHR, SurfaceFormats and SurfacePresentModes"
+              "note": "vkGetPhysicalDeviceSurfaceCapabilitiesKHR, SurfaceFormats and SurfacePresentModes; twin views with VK_KHR_swapchain_mutable_format, twin images where the surface lists the sRGB format"
             },
             "d3d12": {
               "class": "direct",

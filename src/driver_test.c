@@ -110,6 +110,8 @@ static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
     caps.presentModes |= mrhi_presentFifo;
     caps.alphaModes |= mrhi_alphaOpaque;
     caps.usages |= mrhi_textureRenderTarget;
+    // The sRGB floor: views of the twin unless the test gives images.
+    caps.twinViews = caps.twinViews || !caps.twinImages;
     *capsOut = caps;
 }
 

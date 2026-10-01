@@ -192,11 +192,11 @@ mrhiResult mrhiGetSurfaceCaps(mrhiInstance* instance, mrhiSurfaceId surface, mrh
     }
     mrhiSurfaceCaps caps = {0};
     instance->driver.vtable->getSurfaceCaps(instance->driver.self, handle, found->handle, &caps);
-    MRHI_ASSERT(!caps.presentable ||
-                (caps.colorCount >= 1 && caps.colorCount <= MRHI_SURFACE_COLORS &&
-                 (caps.presentModes & mrhi_presentFifo) != 0 &&
-                 (caps.alphaModes & mrhi_alphaOpaque) != 0 &&
-                 (caps.usages & mrhi_textureRenderTarget) != 0));
+    MRHI_ASSERT(
+        !caps.presentable ||
+        (caps.colorCount >= 1 && caps.colorCount <= MRHI_SURFACE_COLORS &&
+         (caps.presentModes & mrhi_presentFifo) != 0 && (caps.alphaModes & mrhi_alphaOpaque) != 0 &&
+         (caps.usages & mrhi_textureRenderTarget) != 0 && (caps.twinViews || caps.twinImages)));
     // Nothing a driver fills for an adapter that cannot present is passed on.
     *capsOut = caps.presentable ? caps : (mrhiSurfaceCaps){0};
     return mrhi_success;

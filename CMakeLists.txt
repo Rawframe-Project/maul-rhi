@@ -187,7 +187,8 @@ if(MAUL_RHI_BUILD_TESTS)
     if(MAUL_RHI_VULKAN_DRIVER)
         maul_add_test(vulkan_label WHITEBOX)
         maul_add_test(vulkan_limits WHITEBOX)
-        foreach(test vulkan_label vulkan_limits)
+        maul_add_test(vulkan_surface WHITEBOX)
+        foreach(test vulkan_label vulkan_limits vulkan_surface)
             if(TARGET test_${test})
                 target_include_directories(test_${test} SYSTEM PRIVATE
                                            ${PROJECT_SOURCE_DIR}/khronos)
@@ -284,6 +285,32 @@ if(MAUL_RHI_BUILD_TESTS)
             target_link_libraries(test_conformance PRIVATE PkgConfig::MAUL_RHI_XCB)
             target_compile_definitions(test_conformance PRIVATE MRHI_TEST_XCB)
         endif()
+    endif()
+    # On Android the suite also runs as an application on the system's
+    # NativeActivity, whose window its surface checks present to
+    # (test/android_activity.c, mrhi-0017).
+    if(ANDROID AND MAUL_RHI_VULKAN_DRIVER)
+        set(package org.maul.rhi.tests.conformance)
+        add_library(test_conformance_app SHARED test/test_conformance.c test/android_activity.c)
+        target_link_libraries(test_conformance_app PRIVATE maul-rhi android)
+        target_include_directories(test_conformance_app PRIVATE ${PROJECT_SOURCE_DIR}/test)
+        target_compile_definitions(test_conformance_app PRIVATE MRHI_TEST_ANDROID)
+        maul_apply_flags(test_conformance_app)
+        add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/test_conformance_app.apk
+            COMMAND ${CMAKE_COMMAND} -E env ANDROID_HOME=$ENV{ANDROID_HOME}
+                    ${PROJECT_SOURCE_DIR}/tools/build_android_app.sh
+                    ${PROJECT_BINARY_DIR}/test_conformance_app.apk
+                    $<TARGET_FILE:test_conformance_app> ${package} ${ANDROID_ABI}
+            DEPENDS test_conformance_app ${PROJECT_SOURCE_DIR}/test/android/AndroidManifest.xml
+                    ${PROJECT_SOURCE_DIR}/tools/build_android_app.sh
+            VERBATIM)
+        add_custom_target(test_conformance_apk ALL
+                          DEPENDS ${PROJECT_BINARY_DIR}/test_conformance_app.apk)
+        add_test(NAME conformance_app COMMAND ${PROJECT_SOURCE_DIR}/tools/run_android_app.sh
+                 ${PROJECT_BINARY_DIR}/test_conformance_app.apk ${package})
+        # The application always has a window, so its surface is required.
+        set_tests_properties(conformance_app PROPERTIES TIMEOUT 300
+                             ENVIRONMENT MAUL_RHI_REQUIRE_SURFACE=1)
     endif()
     maul_add_header_tests()
     # The Vulkan loader keeps drivers loaded after an instance ends, so

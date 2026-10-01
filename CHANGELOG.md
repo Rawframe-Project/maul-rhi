@@ -414,6 +414,12 @@ format.
   (`cmake/android-emulator.cmake`), every suite run in the emulator
   through adb (`tools/run_android.sh`), and an Android 15 emulator job
   in CI on SwiftShader's Vulkan 1.3.
+- Surface caps say how the sRGB twin is reached (mrhi-0007,
+  mrhi-0017): `twinViews` (a view of unorm images, as before) and
+  `twinImages` (the twin as the images' own format, which Android's
+  swapchain needs); a presenting surface has at least one.
+- The conformance suite runs on Android as an application on the
+  system's NativeActivity and presents to its window (mrhi-0017).
 
 ### Fixed
 
@@ -440,3 +446,6 @@ format.
   under `maxPerStageResources` together; `tablesPlusVertexBuffers` is at
   least the contract's 24. Devices with four descriptor sets or a small
   per-stage bound, as many Android devices are, found no adapter.
+- The Vulkan driver on Android took only the window's size for a
+  swapchain; Android scales any size within the surface's bounds, so
+  any such size is taken there (mrhi-0007).

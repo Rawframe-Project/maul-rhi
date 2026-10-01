@@ -285,6 +285,7 @@ static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
         .alphaModes = mrhi_alphaOpaque | mrhi_alphaPremultiplied,
         .usages = mrhi_textureRenderTarget | mrhi_textureSampled | mrhi_textureCopySource |
                   mrhi_textureCopyDestination,
+        .twinViews = true,
     };
 #if TARGET_OS_OSX
     capsOut->presentModes |= mrhi_presentImmediate;

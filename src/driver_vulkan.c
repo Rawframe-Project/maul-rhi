@@ -144,11 +144,12 @@ static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
                            mrhiSurfaceCaps* capsOut)
 {
     const VulkanDriver* driver = self;
-    const char* const swapchain = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+    const char* const wanted[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                                  VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_EXTENSION_NAME};
     VkPhysicalDevice device = DeviceOf(adapter);
-    bool presents =
-        mrhiVulkanExtensions(&driver->vulkan, &driver->allocator, device, &swapchain, 1) != 0;
-    mrhiVulkanSurfaceCaps(&driver->vulkan, device, presents, SurfaceOf(surface), capsOut);
+    uint32_t offered = mrhiVulkanExtensions(&driver->vulkan, &driver->allocator, device, wanted, 2);
+    mrhiVulkanSurfaceCaps(&driver->vulkan, device, (offered & 1u) != 0, offered == 3u,
+                          SurfaceOf(surface), capsOut);
 }
 
 // Opens the device at once and answers the opening at the next poll.

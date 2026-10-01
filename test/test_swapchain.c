@@ -177,6 +177,72 @@ static void TestUnsupported(void)
     Close(device);
 }
 
+// A test surface in BGRA8 sRGB, presenting on the first adapter, whose
+// sRGB twin comes as images, as views, or both.
+static mrhiSurfaceId MakeTwinSurface(bool views, bool images)
+{
+    mrhiSurfaceSourceTest source = {
+        .chain = {.next = nullptr, .type = mrhi_structSurfaceSourceTest},
+        .caps =
+            {
+                .colors = {{.format = mrhi_formatBgra8Unorm}},
+                .colorCount = 1,
+                .twinViews = views,
+                .twinImages = images,
+            },
+        .presentingAdapters = 1,
+    };
+    mrhiSurfaceDef def = mrhiDefaultSurfaceDef();
+    def.next = &source.chain;
+    mrhiSurfaceId surface = {0};
+    CHECK(mrhiCreateSurface(s_instance, &def, &surface) == mrhi_success, "the surface");
+    return surface;
+}
+
+// sRGB as the twin view or as the images' own format, each only where
+// the surface reports it.
+static void TestTwins(void)
+{
+    mrhiDevice* device = OpenWith(mrhiDefaultDeviceDef(), true);
+    mrhiSurfaceCaps caps;
+    mrhiSurfaceId images = MakeTwinSurface(false, true);
+    size_t count = 0;
+    mrhiAdapterId adapter;
+    CHECK(mrhiGetAdapters(s_instance, &adapter, 1, &count) == mrhi_success, "the adapter");
+    CHECK(mrhiGetSurfaceCaps(s_instance, images, adapter, &caps) == mrhi_success &&
+              caps.twinImages && !caps.twinViews,
+          "images and no views reported");
+    mrhiSurfaceConfig config = Config(images);
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported,
+          "no twin view where only images are");
+    config.viewFormats[0] = mrhi_formatNone;
+    config.color.format = mrhi_formatBgra8UnormSrgb;
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "sRGB images");
+    config.color.format = mrhi_formatRgba8UnormSrgb;
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported,
+          "the twin of a format not reported");
+    config = Config(images);
+    config.viewFormats[0] = mrhi_formatNone;
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "unorm images still");
+    CHECK(mrhiUnconfigureSurface(device, images) == mrhi_success, "unconfigured");
+    mrhiSurfaceId views = MakeTwinSurface(false, false);
+    CHECK(mrhiGetSurfaceCaps(s_instance, views, adapter, &caps) == mrhi_success && caps.twinViews &&
+              !caps.twinImages,
+          "views at least");
+    config = Config(views);
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "a twin view");
+    config.viewFormats[0] = mrhi_formatNone;
+    config.color.format = mrhi_formatBgra8UnormSrgb;
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported,
+          "no sRGB images where only views are");
+    CHECK(mrhiUnconfigureSurface(device, views) == mrhi_success, "unconfigured");
+    CHECK(mrhiDestroySurface(s_instance, images) == mrhi_success &&
+              mrhiDestroySurface(s_instance, views) == mrhi_success,
+          "destroyed");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "none counted");
+    Close(device);
+}
+
 // One device at a time, states and the device's limit.
 static void TestOwnership(void)
 {
@@ -227,6 +293,7 @@ int main(void)
     TestConfigure();
     TestInvalid();
     TestUnsupported();
+    TestTwins();
     TestOwnership();
     TestFailures();
     return s_failures == 0 ? 0 : 1;

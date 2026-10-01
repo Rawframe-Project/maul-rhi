@@ -64,8 +64,8 @@ extern "C"
     // primaries, its transfer and its range.
     typedef struct mrhiSurfaceColor
     {
-        // A unorm or float format; sRGB is rendered through the format's twin
-        // view.
+        // A unorm or float format; sRGB is rendered through the format's twin,
+        // as a view or as the images' format (mrhiSurfaceCaps).
         mrhiFormat format;
         // The primaries.
         mrhiColorPrimaries primaries;
@@ -119,6 +119,13 @@ extern "C"
         mrhiAlphaModes alphaModes;
         // The usages its images may have, mrhi_textureRenderTarget among them.
         mrhiTextureUsage usages;
+        // Whether a configuration may name its color format's sRGB twin among
+        // its view formats.
+        bool twinViews;
+        // Whether a configuration may take the sRGB twin of a reported color's
+        // format as its color format, its images then sRGB; at least one of
+        // twinViews and twinImages is set.
+        bool twinImages;
     } mrhiSurfaceCaps;
 
     // A Win32 window, chained on a surface def with the type

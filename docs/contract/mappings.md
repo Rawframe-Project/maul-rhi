@@ -815,7 +815,7 @@ restricted or absent-rejected, with how.
 
 | Concept | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
-| `mrhiSurfaceCaps` | direct: vkGetPhysicalDeviceSurfaceCapabilitiesKHR, SurfaceFormats and SurfacePresentModes | direct: the flip model's formats, CheckColorSpaceSupport and DXGI_FEATURE_PRESENT_ALLOW_TEARING | direct: CAMetalLayer's pixel formats and color spaces | direct: getPreferredCanvasFormat and the formats configure accepts |
+| `mrhiSurfaceCaps` | direct: vkGetPhysicalDeviceSurfaceCapabilitiesKHR, SurfaceFormats and SurfacePresentModes; twin views with VK_KHR_swapchain_mutable_format, twin images where the surface lists the sRGB format | direct: the flip model's formats, CheckColorSpaceSupport and DXGI_FEATURE_PRESENT_ALLOW_TEARING | direct: CAMetalLayer's pixel formats and color spaces | direct: getPreferredCanvasFormat and the formats configure accepts |
 | `mrhiSurfaceSourceWin32` | direct: vkCreateWin32SurfaceKHR | direct: CreateSwapChainForHwnd's window | absent-rejected: no windows but CAMetalLayer | absent-rejected: a canvas only in browsers |
 | `mrhiSurfaceSourceWayland` | direct: vkCreateWaylandSurfaceKHR | absent-rejected: Windows only | absent-rejected: Apple platforms only | absent-rejected: a canvas only in browsers |
 | `mrhiSurfaceSourceXcb` | direct: vkCreateXcbSurfaceKHR | absent-rejected: Windows only | absent-rejected: Apple platforms only | absent-rejected: a canvas only in browsers |

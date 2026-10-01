@@ -331,6 +331,8 @@ static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
         .alphaModes = mrhi_alphaOpaque | mrhi_alphaPremultiplied,
         .usages = mrhi_textureRenderTarget | mrhi_textureSampled | mrhi_textureStorage |
                   mrhi_textureCopySource | mrhi_textureCopyDestination,
+        // A canvas takes viewFormats, never an sRGB format of its own.
+        .twinViews = true,
     };
     for (uint32_t p = 0; p < 2; ++p)
     {
