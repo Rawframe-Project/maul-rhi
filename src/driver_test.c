@@ -791,13 +791,13 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
     {
         return mrhi_errorCapacity;
     }
-    TestDevice* device = mrhiAllocate(&driver->allocator, sizeof(TestDevice), alignof(TestDevice));
+    TestDevice* device = mrhiAllocate(&def->allocator, sizeof(TestDevice), alignof(TestDevice));
     if (device == nullptr)
     {
         return mrhi_errorCapacity;
     }
     *device = (TestDevice){
-        .allocator = driver->allocator,
+        .allocator = def->allocator,
         .nextHandle = HANDLE_BASE,
         .madeBeforeFailure = driver->adapters[adapter - 1].objectsBeforeFailure,
         .holdFrames = driver->adapters[adapter - 1].holdFrames,

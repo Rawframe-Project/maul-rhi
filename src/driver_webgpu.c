@@ -365,7 +365,7 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
         return mrhi_errorCapacity;
     }
     mrhiResult status =
-        mrhiCreateWebGpuDevice(&driver->allocator, driver->state, slot, def, deviceOut);
+        mrhiCreateWebGpuDevice(&def->allocator, driver->state, slot, def, deviceOut);
     if (status != mrhi_success)
     {
         driver->tags[slot] = 0;

@@ -309,7 +309,7 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
         id<MTLDevice> device = DeviceOf(devices, adapter);
         if (device != nil)
         {
-            status = mrhiCreateMetalDevice(&driver->allocator, device, def, deviceOut);
+            status = mrhiCreateMetalDevice(&def->allocator, device, def, deviceOut);
         }
         [devices release];
     }

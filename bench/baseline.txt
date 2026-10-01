@@ -1,0 +1,11 @@
+# The reference numbers for bench/bench_main.c, written by the benchmark
+# itself: GCC 14, Release, lavapipe (Mesa 25.2.8), AMD Ryzen 9 5900X
+# pinned to one core (taskset -c 0), Linux 6.8, 2026-10-01. Compare runs
+# on one core of one machine. Compare with:
+# maul-rhi_bench bench/baseline.txt
+draw, recorded                           22.1 ns
+draw frame, start to submit             979.4 us
+pass, declared and recorded            1603.4 ns
+compile, 200 chained passes             165.9 us
+instance, default def                 20544.0 bytes
+device, default def                13124352.0 bytes

@@ -420,6 +420,11 @@ format.
   swapchain needs); a presenting surface has at least one.
 - The conformance suite runs on Android as an application on the
   system's NativeActivity and presents to its window (mrhi-0017).
+- Benchmarks (`maul-rhi_bench`): the CPU cost per draw recorded and
+  per pass, a fixed frame's compile, a frame's start to its submission,
+  and the bytes of an instance and a device with the default defs, on
+  the build's native driver; given `bench/baseline.txt`, each number's
+  ratio to the recorded one.
 - External Vulkan objects for OpenXR (mrhi-0018, `maul-rhi/vulkan.h`):
   an instance made elsewhere adopted (`mrhiInstanceVulkanAdopt`), a
   device described (`mrhiDescribeVulkanDevice`) for the runtime to make
@@ -446,6 +451,9 @@ format.
 
 ### Fixed
 
+- A device's driver memory now comes from the device def's allocator,
+  as the family's rule of allocators per object says; every driver
+  took it from the instance's.
 - A Vulkan device no longer enables `VK_KHR_swapchain` on an instance
   without `VK_KHR_surface`, which the extension requires.
 - Declared resources placed over each other's memory were not ordered

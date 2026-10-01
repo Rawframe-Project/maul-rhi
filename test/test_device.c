@@ -299,7 +299,7 @@ static void TestDeviceAllocatorAndMisuse(void)
     mrhiDevice* device = nullptr;
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "made");
-    CHECK(s_allocations == 1, "the device's own allocator");
+    CHECK(s_allocations == 2, "the device's own allocator, for the core and the driver");
     CHECK(mrhiGetDeviceFeatures(device, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiGetDeviceLimits(device, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiGetDeviceMisuse(device) == 2 && mrhiGetDeviceMisuse(nullptr) == 0, "counted");

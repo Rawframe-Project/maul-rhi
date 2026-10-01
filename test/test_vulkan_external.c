@@ -35,6 +35,42 @@ static VkInstance s_instance;
 // offers wherever a driver presents.
 static bool s_surface;
 
+// The allocations a device's allocator holds.
+static int s_deviceAllocations;
+
+// Memory with its offset into the block before it, so that any
+// alignment is served on every platform.
+static void* CountingAlloc(size_t size, size_t alignment, void* context)
+{
+    (void)context;
+    size_t head = alignment > sizeof(size_t) ? alignment : sizeof(size_t);
+    unsigned char* block = malloc(size + head + alignment);
+    if (block == nullptr)
+    {
+        return nullptr;
+    }
+    uintptr_t at = ((uintptr_t)block + head + alignment - 1) & ~(uintptr_t)(alignment - 1);
+    size_t offset = (size_t)(at - (uintptr_t)block);
+    memcpy((unsigned char*)at - sizeof(size_t), &offset, sizeof(size_t));
+    ++s_deviceAllocations;
+    return (void*)at;
+}
+
+static void CountingFree(void* memory, size_t size, size_t alignment, void* context)
+{
+    (void)size;
+    (void)alignment;
+    (void)context;
+    if (memory == nullptr)
+    {
+        return;
+    }
+    size_t offset = 0;
+    memcpy(&offset, (unsigned char*)memory - sizeof(size_t), sizeof(size_t));
+    --s_deviceAllocations;
+    free((unsigned char*)memory - offset);
+}
+
 static mrhiInstance* Create(const mrhiChain* chain, mrhiResult* statusOut)
 {
     mrhiInstanceDef def = mrhiDefaultInstanceDef();
@@ -719,6 +755,7 @@ static void CheckDeviceExtensions(mrhiInstance* instance, mrhiAdapterId adapter)
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
     def.next = &extensions.chain;
+    def.allocator = (mrhiAllocator){CountingAlloc, CountingFree, nullptr};
     void* info = nullptr;
     void* physical = nullptr;
     CHECK(mrhiDescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_success,
@@ -734,6 +771,7 @@ static void CheckDeviceExtensions(mrhiInstance* instance, mrhiAdapterId adapter)
     mrhiResult status = mrhi_success;
     mrhiDevice* device = Open(instance, &def, &status);
     CHECK(device != nullptr && status == mrhi_success, "a device with them");
+    CHECK(s_deviceAllocations >= 2, "the device's memory, the core's and the driver's, its own");
     if (device != nullptr)
     {
         CheckRuns(device);

@@ -294,7 +294,7 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
     {
         return mrhi_errorPlatform;
     }
-    mrhiResult status = mrhiCreateD3d12Device(&driver->allocator, &driver->api, driver->factory,
+    mrhiResult status = mrhiCreateD3d12Device(&def->allocator, &driver->api, driver->factory,
                                               device, def, deviceOut);
     if (status == mrhi_success)
     {
