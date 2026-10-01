@@ -24,7 +24,13 @@ option(MAUL_RHI_SANITIZE "Instrument with AddressSanitizer and UBSan" OFF)
 option(MAUL_RHI_TSAN "Instrument with ThreadSanitizer" OFF)
 option(MAUL_RHI_COVERAGE "Instrument for gcov coverage" OFF)
 option(MAUL_RHI_FUZZ "Build the libFuzzer targets (Clang)" OFF)
-option(MAUL_RHI_TEST_DRIVER "Build the test driver (mrhiTestDriverDef)" ${MAUL_RHI_BUILD_TESTS})
+# The tests run on the test driver, and so does fuzz_cache.
+if(MAUL_RHI_BUILD_TESTS OR MAUL_RHI_FUZZ)
+    set(maul_rhi_test_driver ON)
+else()
+    set(maul_rhi_test_driver OFF)
+endif()
+option(MAUL_RHI_TEST_DRIVER "Build the test driver (mrhiTestDriverDef)" ${maul_rhi_test_driver})
 # The web: Emscripten's, or a plain WebAssembly toolchain's (mrhi-0016).
 if(EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "WASI")
     set(maul_rhi_web ON)
@@ -357,13 +363,14 @@ endif()
 
 # The fuzz targets: test/fuzz_<area>.c, run as fuzz_<area> <corpus dir>,
 # over the bytes programs load from disk and hand the library.
-# tools/container_seed.py writes fuzz_container's seed.
+# tools/container_seed.py writes fuzz_container's seed; fuzz_cache makes
+# its own envelopes.
 if(MAUL_RHI_FUZZ)
     # The library is instrumented too: its coverage guides libFuzzer, and
     # the sanitizers watch its code, not only the targets'.
     target_compile_options(maul-rhi PRIVATE -fsanitize=fuzzer-no-link,address,undefined)
     target_link_options(maul-rhi PUBLIC -fsanitize=address,undefined)
-    foreach(area container)
+    foreach(area container cache)
         add_executable(fuzz_${area} test/fuzz_${area}.c)
         target_link_libraries(fuzz_${area} PRIVATE maul-rhi)
         # The targets reach the library's own functions.

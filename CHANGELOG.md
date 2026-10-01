@@ -13,6 +13,8 @@ format.
 - `mrhiClearBuffer` zeros a range of a frame buffer (mrhi-0022): a fill
   on Vulkan and Metal, `clearBuffer` on WebGPU, copies from a 64 KiB
   buffer of zeros on Direct3D 12.
+- `fuzz_cache`, a fuzz target for pipeline-cache imports (the envelope
+  and the test driver's payload); fuzz builds include the test driver.
 - Counted multi-draw indirect (mrhi-0020): `mrhiDrawIndirectCount` and
   `mrhiDrawIndexedIndirectCount`, up to `MRHI_INDIRECT_DRAWS` draws
   whose number is read on the GPU, on Vulkan devices with the
@@ -36,14 +38,11 @@ format.
 
 ### Fixed
 
+- The Vulkan driver granted `pipelineStatisticsQuery`, which no query
+  type reads yet; no driver grants it now.
 - Empty copies, uploads and readbacks, which WebGPU allows, reached
   Vulkan as empty regions, which it refuses; they now record nothing,
   and an empty readback is answered with no bytes.
-
-### Fixed
-
-- The Vulkan driver granted `pipelineStatisticsQuery`, which no query
-  type reads yet; no driver grants it now.
 
 ## [0.1.0] - 2026-10-01
 
