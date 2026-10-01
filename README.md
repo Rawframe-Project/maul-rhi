@@ -31,10 +31,11 @@ generated from the headers.
 
 0.1.0 is the first release. It has the whole contract on four drivers,
 Vulkan, Direct3D 12, Metal and WebGPU, and a test driver without a GPU,
-with the conformance suite, the samples and the benchmarks. Not yet
-granted anywhere: present timing (no CI device times its presents),
-counted multi-draw indirect and multiview; on Metal, also bindless
-heaps and timestamps, which wait for a Metal 3 device to test on.
+with the conformance suite, the samples and the benchmarks. Since
+0.1.0, counted multi-draw indirect and multiview are on every native
+driver (mrhi-0020). Not yet granted anywhere: present timing (no CI device
+times its presents); on Metal, also bindless heaps and timestamps,
+which wait for a Metal 3 device to test on.
 Each build has one native driver: Metal on Apple systems, Direct3D 12
 on Windows (or Vulkan, with `MAUL_RHI_VULKAN_DRIVER=ON` and
 `MAUL_RHI_D3D12_DRIVER=OFF`), Vulkan on the others, WebGPU on the web,
