@@ -532,6 +532,8 @@ static void CheckRoundTrip(mrhiDevice* device)
     mrhiRequestId fromX = {0};
     mrhiRequestId fromY = {0};
     mrhiRequestId fromT = {0};
+    mrhiRequestId empty = {0};
+    mrhiRequestId emptyTexels = {0};
     CHECK(mrhiBeginPass(device, upload) == mrhi_success &&
               mrhiWriteBuffer(device, upload, b, 0, pattern, sizeof(pattern)) == mrhi_success &&
               mrhiWriteTexture(device, upload, &texels, pattern, sizeof(pattern), &layout,
@@ -553,9 +555,15 @@ static void CheckRoundTrip(mrhiDevice* device)
               mrhiReadBuffer(device, read, x, 0, 256, &fromX) == mrhi_success &&
               mrhiReadBuffer(device, read, y, 0, 256, &fromY) == mrhi_success &&
               mrhiReadTexture(device, read, &texels, &extent, &fromT) == mrhi_success &&
+              // Empty reads are answered with no bytes.
+              mrhiReadBuffer(device, read, x, 0, 0, &empty) == mrhi_success &&
+              mrhiReadTexture(device, read, &texels, &(mrhiExtent3d){0, 1, 1}, &emptyTexels) ==
+                  mrhi_success &&
               mrhiEndPass(device, read) == mrhi_success,
           "read");
-    Finish(device, 3);
+    Finish(device, 5);
+    CHECK(Taken(device, empty, pattern, 0) && Taken(device, emptyTexels, pattern, 0),
+          "no bytes from empty reads");
     CHECK(Taken(device, fromX, pattern + 256, 256), "the buffer's bytes, through a transient");
     CHECK(Taken(device, fromY, pattern + 768, 256), "a second transient apart from the first");
     CHECK(Taken(device, fromT, pattern, sizeof(pattern)), "the texture's texels");
