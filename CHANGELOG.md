@@ -10,6 +10,8 @@ format.
 
 ### Added
 
+- `fuzz_cache`, a fuzz target for pipeline-cache imports (the envelope
+  and the test driver's payload); fuzz builds include the test driver.
 - Counted multi-draw indirect (mrhi-0020): `mrhiDrawIndirectCount` and
   `mrhiDrawIndexedIndirectCount`, up to `MRHI_INDIRECT_DRAWS` draws
   whose number is read on the GPU, on Vulkan devices with the
