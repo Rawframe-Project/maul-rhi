@@ -38,9 +38,13 @@
 
 #include "test_device_setup.h"
 
+#include "maul-rhi/device.h"
 #include "maul-rhi/encoder.h"
 #include "maul-rhi/frame.h"
+#include "maul-rhi/pipeline.h"
 #include "maul-rhi/resources.h"
+#include "maul-rhi/shader.h"
+#include "shaders/noop_container.h"
 
 #include <stdio.h>
 
@@ -607,15 +611,18 @@ static mrhiResult Transfer(Method method, const Block* block, mrhiTextureKind ki
 // Counts the cases Maul RHI cannot express, which are counted rather
 // than run: required_bytes_in_copy's data one byte short of a buffer's
 // need that is a multiple of 4, and bound_on_offset's offset past
-// data of 0 bytes, in copies with a buffer.
+// data of 0 bytes, in copies with a buffer; indirect_offset_oob's
+// buffers 1 byte short of the arguments.
 static uint32_t s_inexpressible;
 
-// Counts the cases Maul RHI decides otherwise than the CTS, all from
-// its layout value 0 being absent (see Owed):
+// Counts the cases Maul RHI decides otherwise than the CTS: from its
+// layout value 0 being absent (see Owed),
 // - an empty copy of several layers giving 0 for a layout value, which
 //   the CTS takes and Maul RHI refuses as a value missing where needed;
 // - a rowsPerImage of 0 for a copy of one layer with rows, which the CTS
-//   refuses as fewer than the rows and Maul RHI takes as absent.
+//   refuses as fewer than the rows and Maul RHI takes as absent;
+// and setIndexBuffer's ranges of part of an index, which Maul RHI
+// refuses (see TestVertexIndexBuffers).
 static uint32_t s_differs;
 
 // The outcome Maul RHI owes a transfer case. Its layout value 0 is an
@@ -863,6 +870,355 @@ static void TestLayouts(void)
     }
 }
 
+// The CTS's no-op pipelines and what its draw cases bind: a render
+// target and a 16-byte index buffer.
+static mrhiGraphicsPipelineId s_graphics;
+static mrhiComputePipelineId s_compute;
+static mrhiTextureId s_target;
+static mrhiBufferId s_index;
+static mrhiLimits s_limits;
+
+static void Answered(void)
+{
+    mrhiDeviceNotification record;
+    CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_success &&
+              record.outcome == mrhi_success,
+          "a pipeline ready");
+}
+
+static void MakePipelines(void)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    mrhiGraphicsPipelineDef graphics = mrhiDefaultGraphicsPipelineDef();
+    graphics.shader = shader;
+    graphics.vertexEntry = "vs";
+    graphics.vertexEntryLength = 2;
+    graphics.fragmentEntry = "fs";
+    graphics.fragmentEntryLength = 2;
+    graphics.colorTargets[0].format = mrhi_formatRgba8Unorm;
+    graphics.colorTargetCount = 1;
+    mrhiRequestId request;
+    CHECK(mrhiCreateGraphicsPipeline(s_device, &graphics, &s_graphics, &request) == mrhi_success,
+          "the graphics pipeline");
+    Answered();
+    mrhiComputePipelineDef compute = mrhiDefaultComputePipelineDef();
+    compute.shader = shader;
+    compute.entry = "cs";
+    compute.entryLength = 2;
+    CHECK(mrhiCreateComputePipeline(s_device, &compute, &s_compute, &request) == mrhi_success,
+          "the compute pipeline");
+    Answered();
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the shader destroyed");
+    mrhiTextureDef target = mrhiDefaultTextureDef();
+    target.format = mrhi_formatRgba8Unorm;
+    target.width = 4;
+    target.height = 4;
+    target.usage = mrhi_textureRenderTarget;
+    CHECK(mrhiCreateTexture(s_device, &target, &s_target) == mrhi_success, "the target");
+    s_index = MakeBuffer(16, mrhi_bufferIndex);
+    CHECK(mrhiGetDeviceLimits(s_device, &s_limits) == mrhi_success, "the limits");
+}
+
+// A pass of a draw or dispatch case: a frame of the case's buffer,
+// declared with the access, a render pass (with the index buffer too)
+// or a compute pass, begun with its no-op pipeline set; the refusal of
+// the pass, or success.
+typedef struct CasePass
+{
+    mrhiPassId pass;
+    mrhiResourceId buffer;
+    mrhiResourceId index;
+} CasePass;
+
+static mrhiResult BeginCase(mrhiBufferId buffer, mrhiAccessKind kind, bool render,
+                            CasePass* caseOut)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId target = {0};
+    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportBuffer(s_device, buffer, &caseOut->buffer) == mrhi_success &&
+              mrhiImportBuffer(s_device, s_index, &caseOut->index) == mrhi_success &&
+              mrhiImportTexture(s_device, s_target, &target) == mrhi_success,
+          "a frame of the case");
+    const mrhiAccess accesses[2] = {{.resource = caseOut->buffer, .kind = kind},
+                                    {.resource = caseOut->index, .kind = mrhi_accessIndex}};
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    def.accesses = accesses;
+    def.accessCount = render ? 2 : 1;
+    if (render)
+    {
+        def.colorTargets[0] = (mrhiColorTarget){.resource = target, .load = mrhi_loadClear};
+        def.colorTargetCount = 1;
+    }
+    mrhiResult status = mrhiAddPass(s_device, &def, &caseOut->pass);
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
+                  mrhiBeginPass(s_device, caseOut->pass) == mrhi_success &&
+                  (render ? mrhiSetGraphicsPipeline(s_device, caseOut->pass, s_graphics)
+                          : mrhiSetComputePipeline(s_device, caseOut->pass, s_compute)) ==
+                      mrhi_success,
+              "the pass begun");
+    }
+    return status;
+}
+
+static void EndCase(mrhiBufferId buffer)
+{
+    CHECK(mrhiDropFrame(s_device) == mrhi_success &&
+              mrhiDestroyBuffer(s_device, buffer) == mrhi_success,
+          "dropped");
+}
+
+// The size a case's buffer is made with: the CTS's size rounded up to a
+// positive multiple of 4, or 0 when the need of the call (from its
+// offset) falls between the two, which changes the outcome.
+static uint64_t Rounded(uint64_t size, uint64_t need)
+{
+    uint64_t rounded = size == 0 ? 4 : (size + 3) / 4 * 4;
+    return size < need && need <= rounded ? 0 : rounded;
+}
+
+// An indirect draw in a render pass of a buffer of the size and usage,
+// indexed or not, with the index buffer set when indexed.
+static mrhiResult DrawIndirect(uint64_t size, mrhiBufferUsage usage, bool indexed, uint64_t offset)
+{
+    uint64_t rounded = Rounded(size, offset + (indexed ? 20 : 16));
+    if (rounded == 0)
+    {
+        return INEXPRESSIBLE;
+    }
+    mrhiBufferId buffer = MakeBuffer(rounded, usage);
+    CasePass c = {0};
+    mrhiResult status = BeginCase(buffer, mrhi_accessIndirect, true, &c);
+    if (status == mrhi_success && indexed)
+    {
+        CHECK(mrhiSetIndexBuffer(s_device, c.pass, c.index, mrhi_indexUint32, 0, MRHI_WHOLE_SIZE) ==
+                  mrhi_success,
+              "the index buffer");
+        status = mrhiDrawIndexedIndirect(s_device, c.pass, c.buffer, offset);
+    }
+    else if (status == mrhi_success)
+    {
+        status = mrhiDrawIndirect(s_device, c.pass, c.buffer, offset);
+    }
+    EndCase(buffer);
+    return status;
+}
+
+// api,validation,encoding,cmds,render,indirect_draw; its render bundle
+// encoder has no counterpart.
+static void TestIndirectDraws(void)
+{
+    char name[128];
+    for (int indexed = 0; indexed <= 1; ++indexed)
+    {
+        uint64_t params = indexed ? 20 : 16;
+        for (uint64_t offset = 0; offset <= 4; offset += 2)
+        {
+            snprintf(name, sizeof(name), "indirect_draw:indirect_offset_alignment indexed=%d %llu",
+                     indexed, (unsigned long long)offset);
+            ExpectTransfer(name, DrawIndirect(256, mrhi_bufferIndirect, indexed, offset),
+                           offset % 4 == 0);
+        }
+        const struct
+        {
+            uint64_t offset;
+            uint64_t size;
+            bool valid;
+        } bounds[] = {
+            {0, 0, false},          {0, params, true},       {0, params + 1, true},
+            {0, params - 1, false}, {0, params - 4, false},  {4, params + 4, true},
+            {4, params + 3, false}, {2, params + 4, false},  {3, params + 4, false},
+            {5, params + 4, false}, {params, params, false}, {params + 4, params, false},
+        };
+        for (size_t i = 0; i < sizeof(bounds) / sizeof(bounds[0]); ++i)
+        {
+            snprintf(name, sizeof(name), "indirect_draw:indirect_offset_oob indexed=%d %llu,%llu",
+                     indexed, (unsigned long long)bounds[i].offset,
+                     (unsigned long long)bounds[i].size);
+            ExpectTransfer(
+                name, DrawIndirect(bounds[i].size, mrhi_bufferIndirect, indexed, bounds[i].offset),
+                bounds[i].valid);
+        }
+        static const mrhiBufferUsage usages[] = {mrhi_bufferIndirect, mrhi_bufferCopyDestination,
+                                                 mrhi_bufferCopyDestination | mrhi_bufferIndirect};
+        for (size_t i = 0; i < 3; ++i)
+        {
+            snprintf(name, sizeof(name), "indirect_draw:indirect_buffer_usage indexed=%d %#x",
+                     indexed, (unsigned)usages[i]);
+            Expect(name, DrawIndirect(256, usages[i], indexed, 0),
+                   (usages[i] & mrhi_bufferIndirect) != 0);
+        }
+    }
+}
+
+// A dispatch in a compute pass, direct or from a 12-byte indirect
+// buffer of the usage.
+static mrhiResult Dispatch(bool indirect, mrhiBufferUsage usage, uint64_t size, uint32_t x,
+                           uint32_t y, uint32_t z)
+{
+    mrhiBufferId buffer = MakeBuffer(size, usage);
+    CasePass c = {0};
+    mrhiResult status = BeginCase(buffer, mrhi_accessIndirect, false, &c);
+    if (status == mrhi_success)
+    {
+        status = indirect ? mrhiDispatchIndirect(s_device, c.pass, c.buffer, 0)
+                          : mrhiDispatch(s_device, c.pass, x, y, z);
+    }
+    EndCase(buffer);
+    return status;
+}
+
+// api,validation,encoding,cmds,compute_pass.
+static void TestDispatches(void)
+{
+    char name[128];
+    uint32_t most = s_limits.workgroupsPerDimension;
+    const uint32_t large[] = {0, 1, most, most + 1, 0x7FFFFFFFu, 0xFFFFFFFFu};
+    for (int indirect = 0; indirect <= 1; ++indirect)
+    {
+        for (size_t l = 0; l < 6; ++l)
+        {
+            for (int dimension = 0; dimension < 3; ++dimension)
+            {
+                for (uint32_t small = 0; small <= 1; ++small)
+                {
+                    uint32_t sizes[3] = {small, small, small};
+                    sizes[dimension] = large[l];
+                    snprintf(name, sizeof(name), "compute_pass:dispatch_sizes %s %u,%u,%u",
+                             indirect ? "indirect" : "direct", sizes[0], sizes[1], sizes[2]);
+                    // An indirect dispatch's counts are read on the GPU,
+                    // where too many dispatch nothing.
+                    Expect(name,
+                           Dispatch(indirect != 0, mrhi_bufferIndirect, 12, sizes[0], sizes[1],
+                                    sizes[2]),
+                           indirect || large[l] <= most);
+                }
+            }
+        }
+    }
+    size_t count = sizeof(s_usages) / sizeof(s_usages[0]);
+    for (size_t a = 0; a < count; ++a)
+    {
+        for (size_t b = 0; b < count; ++b)
+        {
+            mrhiBufferUsage usage = s_usages[a] | s_usages[b];
+            snprintf(name, sizeof(name), "compute_pass:indirect_dispatch_buffer,usage %#x",
+                     (unsigned)usage);
+            Expect(name, Dispatch(true, usage, 16, 0, 0, 0), (usage & mrhi_bufferIndirect) != 0);
+        }
+    }
+}
+
+// A vertex buffer set, or an index buffer of the format, from a buffer
+// of the size in a render pass.
+static mrhiResult SetBuffer(bool vertex, uint64_t bytes, uint32_t slot, mrhiIndexFormat format,
+                            uint64_t offset, uint64_t size)
+{
+    mrhiBufferId buffer = MakeBuffer(bytes, vertex ? mrhi_bufferVertex : mrhi_bufferIndex);
+    CasePass c = {0};
+    CHECK(BeginCase(buffer, vertex ? mrhi_accessVertex : mrhi_accessIndex, true, &c) ==
+              mrhi_success,
+          "a render pass");
+    mrhiResult status = vertex
+                            ? mrhiSetVertexBuffer(s_device, c.pass, slot, c.buffer, offset, size)
+                            : mrhiSetIndexBuffer(s_device, c.pass, c.buffer, format, offset, size);
+    EndCase(buffer);
+    return status;
+}
+
+// The CTS's buildBufferOffsetAndSizeOOBTestParams(4, 256), an absent
+// size being MRHI_WHOLE_SIZE.
+typedef struct Range
+{
+    uint64_t offset;
+    uint64_t size;
+    bool valid;
+} Range;
+
+static const Range s_ranges[] = {
+    {0, 0, true},
+    {0, 1, true},
+    {0, 4, true},
+    {0, 5, true},
+    {0, 256, true},
+    {0, 260, false},
+    {4, 256, false},
+    {4, 252, true},
+    {252, 4, true},
+    {256, 1, false},
+    {0, MRHI_WHOLE_SIZE, true},
+    {4, MRHI_WHOLE_SIZE, true},
+    {252, MRHI_WHOLE_SIZE, true},
+    {256, MRHI_WHOLE_SIZE, true},
+    {260, MRHI_WHOLE_SIZE, false},
+};
+
+// api,validation,encoding,cmds,render,setVertexBuffer and
+// setIndexBuffer; their render bundle encoder has no counterpart.
+static void TestVertexIndexBuffers(void)
+{
+    char name[128];
+    uint32_t most = s_limits.vertexBuffers;
+    const uint32_t slots[] = {0, most - 1, most};
+    for (size_t i = 0; i < 3; ++i)
+    {
+        snprintf(name, sizeof(name), "setVertexBuffer:slot %u", slots[i]);
+        Expect(name, SetBuffer(true, 16, slots[i], mrhi_indexUint32, 0, MRHI_WHOLE_SIZE),
+               slots[i] < most);
+    }
+    for (uint64_t offset = 0; offset <= 4; offset += 2)
+    {
+        snprintf(name, sizeof(name), "setVertexBuffer:offset_alignment %llu",
+                 (unsigned long long)offset);
+        Expect(name, SetBuffer(true, 16, 0, mrhi_indexUint32, offset, MRHI_WHOLE_SIZE),
+               offset % 4 == 0);
+    }
+    for (size_t i = 0; i < sizeof(s_ranges) / sizeof(s_ranges[0]); ++i)
+    {
+        snprintf(name, sizeof(name), "setVertexBuffer:offset_and_size_oob %llu,%lld",
+                 (unsigned long long)s_ranges[i].offset, (long long)s_ranges[i].size);
+        Expect(name,
+               SetBuffer(true, 256, 0, mrhi_indexUint32, s_ranges[i].offset, s_ranges[i].size),
+               s_ranges[i].valid);
+    }
+    static const struct
+    {
+        mrhiIndexFormat format;
+        uint64_t offset;
+    } aligned[] = {
+        {mrhi_indexUint16, 0}, {mrhi_indexUint16, 1}, {mrhi_indexUint16, 2},
+        {mrhi_indexUint32, 0}, {mrhi_indexUint32, 2}, {mrhi_indexUint32, 4},
+    };
+    for (size_t i = 0; i < 6; ++i)
+    {
+        uint64_t width = aligned[i].format == mrhi_indexUint16 ? 2 : 4;
+        snprintf(name, sizeof(name), "setIndexBuffer:offset_alignment %u,%llu",
+                 (unsigned)aligned[i].format, (unsigned long long)aligned[i].offset);
+        Expect(name, SetBuffer(false, 16, 0, aligned[i].format, aligned[i].offset, MRHI_WHOLE_SIZE),
+               aligned[i].offset % width == 0);
+    }
+    for (size_t i = 0; i < sizeof(s_ranges) / sizeof(s_ranges[0]); ++i)
+    {
+        snprintf(name, sizeof(name), "setIndexBuffer:offset_and_size_oob %llu,%lld",
+                 (unsigned long long)s_ranges[i].offset, (long long)s_ranges[i].size);
+        // Maul RHI takes an index range in whole indices, where WebGPU
+        // takes any bytes: a part of an index is never drawn, so a range
+        // ending in one is a mistake.
+        bool whole = s_ranges[i].size == MRHI_WHOLE_SIZE || s_ranges[i].size % 4 == 0;
+        s_differs += s_ranges[i].valid && !whole ? 1 : 0;
+        Expect(name,
+               SetBuffer(false, 256, 0, mrhi_indexUint32, s_ranges[i].offset, s_ranges[i].size),
+               s_ranges[i].valid && whole);
+    }
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -877,8 +1233,13 @@ int main(void)
     TestTextureCopies();
     TestLayouts();
     // The counts are pinned so that a change of either is seen.
-    CHECK(s_differs == 192, "the cases decided otherwise");
-    CHECK(s_inexpressible == 962, "the cases not expressible");
+    CHECK(s_differs == 192 && s_inexpressible == 962, "the layout cases set aside");
+    MakePipelines();
+    TestIndirectDraws();
+    CHECK(s_differs == 192 && s_inexpressible == 966, "the indirect draw cases set aside");
+    TestDispatches();
+    TestVertexIndexBuffers();
+    CHECK(s_differs == 194 && s_inexpressible == 966, "the draw cases set aside");
     Close(s_device);
     return s_failures == 0 ? 0 : 1;
 }

@@ -27,7 +27,8 @@ format.
   views as the device amplifies to (`tools/mrhi_msl.py` makes the view
   index's MSL).
 - The WebGPU CTS's validation cases with Maul RHI counterparts, as a
-  test on the test driver (mrhi-0021); buffer copies first.
+  test on the test driver (mrhi-0021): copies, image copy layouts,
+  indirect draws, dispatches, vertex and index buffers.
 
 ### Fixed
 
