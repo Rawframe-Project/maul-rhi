@@ -532,80 +532,132 @@ static uint8_t s_data[4u << 20];
 // A transfer case in a frame: a texture of the block's format, its
 // buffer or bytes of dataSize, a transfer pass declaring both, and the
 // copy at the texture's origin.
-static mrhiResult Transfer(Method method, const Block* block, mrhiTextureKind kind,
-                           mrhiExtent3d textureSize, uint64_t offset, uint32_t bytesPerRow,
-                           uint32_t rowsPerImage, uint64_t dataSize, mrhiExtent3d size)
+// A transfer case: the method, the texture's block facts and def, the
+// texel copy's origin and mip, the layout, the data's size and the
+// copy's size.
+typedef struct TransferCase
 {
-    if (method != WRITE_TEXTURE && (dataSize == 0 || dataSize % 4 != 0))
+    Method method;
+    const Block* block;
+    mrhiTextureDef texture;
+    mrhiTextureCopy at;
+    uint64_t offset;
+    uint32_t bytesPerRow;
+    uint32_t rowsPerImage;
+    uint64_t dataSize;
+    mrhiExtent3d size;
+} TransferCase;
+
+// The case in a frame: its texture, its buffer or bytes of the data's
+// size, a transfer pass declaring both, and the copy; the first refusal,
+// of the texture, the pass or the copy, or success.
+static mrhiResult RunTransfer(const TransferCase* c)
+{
+    uint64_t dataSize = c->dataSize;
+    if (c->method != WRITE_TEXTURE && (dataSize == 0 || dataSize % 4 != 0))
     {
         uint64_t rounded = dataSize == 0 ? 4 : (dataSize + 3) / 4 * 4;
-        Need need = DataBytes(method, block, offset, bytesPerRow == 0 ? ABSENT : bytesPerRow,
-                              rowsPerImage == 0 ? ABSENT : rowsPerImage, size);
+        Need need =
+            DataBytes(c->method, c->block, c->offset, c->bytesPerRow == 0 ? ABSENT : c->bytesPerRow,
+                      c->rowsPerImage == 0 ? ABSENT : c->rowsPerImage, c->size);
         if (need.valid && dataSize < need.bytes && need.bytes <= rounded)
         {
             return INEXPRESSIBLE;
         }
         dataSize = rounded;
     }
-    mrhiTextureDef textureDef = mrhiDefaultTextureDef();
-    textureDef.kind = kind;
-    textureDef.format = block->format;
-    textureDef.width = textureSize.width;
-    textureDef.height = textureSize.height;
-    textureDef.depthOrLayers = textureSize.depthOrLayers;
-    textureDef.usage = mrhi_textureCopySource | mrhi_textureCopyDestination;
     mrhiTextureId texture = {0};
-    CHECK(mrhiCreateTexture(s_device, &textureDef, &texture) == mrhi_success, "a texture");
+    mrhiResult status = mrhiCreateTexture(s_device, &c->texture, &texture);
+    if (status != mrhi_success)
+    {
+        return status;
+    }
     mrhiBufferId buffer = {0};
-    if (method != WRITE_TEXTURE)
+    if (c->method != WRITE_TEXTURE)
     {
         buffer = MakeBuffer(dataSize, mrhi_bufferCopySource | mrhi_bufferCopyDestination);
     }
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    mrhiResourceId t = {0};
+    mrhiTextureCopy at = c->at;
     mrhiResourceId b = {0};
-    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success &&
-              mrhiImportTexture(s_device, texture, &t) == mrhi_success &&
-              (method == WRITE_TEXTURE || mrhiImportBuffer(s_device, buffer, &b) == mrhi_success),
-          "a frame of them");
-    bool intoTexture = method != TEXTURE_TO_BUFFER;
+    CHECK(
+        mrhiBeginFrame(s_device, &frame) == mrhi_success &&
+            mrhiImportTexture(s_device, texture, &at.resource) == mrhi_success &&
+            (c->method == WRITE_TEXTURE || mrhiImportBuffer(s_device, buffer, &b) == mrhi_success),
+        "a frame of them");
+    bool intoTexture = c->method != TEXTURE_TO_BUFFER;
     const mrhiAccess accesses[2] = {
-        Whole(t, intoTexture ? mrhi_accessCopyDestination : mrhi_accessCopySource),
+        Whole(at.resource, intoTexture ? mrhi_accessCopyDestination : mrhi_accessCopySource),
         Whole(b, intoTexture ? mrhi_accessCopySource : mrhi_accessCopyDestination)};
     mrhiPassDef def = mrhiDefaultPassDef();
     def.passClass = mrhi_passTransfer;
     def.neverCull = true;
     def.accesses = accesses;
-    def.accessCount = method == WRITE_TEXTURE ? 1 : 2;
+    def.accessCount = c->method == WRITE_TEXTURE ? 1 : 2;
     mrhiPassId pass = {0};
-    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success &&
-              mrhiCompileFrame(s_device) == mrhi_success &&
-              mrhiBeginPass(s_device, pass) == mrhi_success,
-          "the pass begun");
-    const mrhiTextureCopy at = {.resource = t};
-    const mrhiBufferCopy side = {
-        .resource = b, .offset = offset, .bytesPerRow = bytesPerRow, .rowsPerImage = rowsPerImage};
-    const mrhiTexelLayout layout = {
-        .offset = offset, .bytesPerRow = bytesPerRow, .rowsPerImage = rowsPerImage};
-    mrhiResult status = mrhi_success;
-    switch (method)
+    status = mrhiAddPass(s_device, &def, &pass);
+    if (status == mrhi_success)
     {
-    case WRITE_TEXTURE:
-        status = mrhiWriteTexture(s_device, pass, &at, dataSize > 0 ? s_data : nullptr, dataSize,
-                                  &layout, &size);
-        break;
-    case BUFFER_TO_TEXTURE:
-        status = mrhiCopyBufferToTexture(s_device, pass, &side, &at, &size);
-        break;
-    case TEXTURE_TO_BUFFER:
-        status = mrhiCopyTextureToBuffer(s_device, pass, &at, &side, &size);
-        break;
+        CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
+                  mrhiBeginPass(s_device, pass) == mrhi_success,
+              "the pass begun");
+        const mrhiBufferCopy side = {.resource = b,
+                                     .offset = c->offset,
+                                     .bytesPerRow = c->bytesPerRow,
+                                     .rowsPerImage = c->rowsPerImage};
+        const mrhiTexelLayout layout = {
+            .offset = c->offset, .bytesPerRow = c->bytesPerRow, .rowsPerImage = c->rowsPerImage};
+        switch (c->method)
+        {
+        case WRITE_TEXTURE:
+            status = mrhiWriteTexture(s_device, pass, &at, dataSize > 0 ? s_data : nullptr,
+                                      dataSize, &layout, &c->size);
+            break;
+        case BUFFER_TO_TEXTURE:
+            status = mrhiCopyBufferToTexture(s_device, pass, &side, &at, &c->size);
+            break;
+        case TEXTURE_TO_BUFFER:
+            status = mrhiCopyTextureToBuffer(s_device, pass, &at, &side, &c->size);
+            break;
+        }
     }
     CHECK(mrhiDropFrame(s_device) == mrhi_success &&
               mrhiDestroyTexture(s_device, texture) == mrhi_success &&
-              (method == WRITE_TEXTURE || mrhiDestroyBuffer(s_device, buffer) == mrhi_success),
+              (c->method == WRITE_TEXTURE || mrhiDestroyBuffer(s_device, buffer) == mrhi_success),
           "dropped");
     return status;
+}
+
+// A def of a texture of the block's format, the kind and size, for
+// copies both ways.
+static mrhiTextureDef CopyTexture(const Block* block, mrhiTextureKind kind, mrhiExtent3d size)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.kind = kind;
+    def.format = block->format;
+    def.width = size.width;
+    def.height = size.height;
+    def.depthOrLayers = size.depthOrLayers;
+    def.usage = mrhi_textureCopySource | mrhi_textureCopyDestination;
+    return def;
+}
+
+// A transfer case at the texture's origin.
+static mrhiResult Transfer(Method method, const Block* block, mrhiTextureKind kind,
+                           mrhiExtent3d textureSize, uint64_t offset, uint32_t bytesPerRow,
+                           uint32_t rowsPerImage, uint64_t dataSize, mrhiExtent3d size)
+{
+    const TransferCase c = {
+        .method = method,
+        .block = block,
+        .texture = CopyTexture(block, kind, textureSize),
+        .offset = offset,
+        .bytesPerRow = bytesPerRow,
+        .rowsPerImage = rowsPerImage,
+        .dataSize = dataSize,
+        .size = size,
+    };
+    return RunTransfer(&c);
 }
 
 // Counts the cases Maul RHI cannot express, which are counted rather
@@ -629,9 +681,10 @@ static uint32_t s_differs;
 // The outcome Maul RHI owes a transfer case. Its layout value 0 is an
 // absent one, which the web driver passes as undefined, where the CTS's
 // 0 is a value: a case giving 0 is owed the outcome of the layout
-// without it, and counted when that differs from the CTS's.
+// without it and of the case's other rules (rest), and counted when that
+// differs from the CTS's.
 static bool Owed(Method method, const Block* block, uint64_t offset, int64_t bytesPerRow,
-                 int64_t rowsPerImage, uint64_t dataSize, mrhiExtent3d size, bool cts)
+                 int64_t rowsPerImage, uint64_t dataSize, mrhiExtent3d size, bool rest, bool cts)
 {
     if (bytesPerRow != 0 && rowsPerImage != 0)
     {
@@ -639,7 +692,7 @@ static bool Owed(Method method, const Block* block, uint64_t offset, int64_t byt
     }
     Need need = DataBytes(method, block, offset, bytesPerRow == 0 ? ABSENT : bytesPerRow,
                           rowsPerImage == 0 ? ABSENT : rowsPerImage, size);
-    bool owed = need.valid && need.bytes <= dataSize;
+    bool owed = rest && need.valid && need.bytes <= dataSize;
     s_differs += owed != cts ? 1 : 0;
     return owed;
 }
@@ -715,7 +768,7 @@ static void TestLayouts(void)
                                                 (mrhiExtent3d){4, 4, shapes[s].layers}, 0, 1024,
                                                 Value(imageRows[r]), need.bytes, size),
                                        Owed(method, rgba8, 0, 1024, imageRows[r], need.bytes, size,
-                                            need.valid));
+                                            true, need.valid));
                     }
                 }
             }
@@ -743,7 +796,7 @@ static void TestLayouts(void)
                                Transfer(method, rgba8, mrhi_texture2d, (mrhiExtent3d){4, 4, 1},
                                         offset, 0, 0, data, (mrhiExtent3d){0, 0, 0}),
                                Owed(method, rgba8, offset, 0, ABSENT, data, (mrhiExtent3d){0, 0, 0},
-                                    offset <= data));
+                                    true, offset <= data));
             }
         }
         for (size_t f = 0; f < sizeof(s_blocks) / sizeof(s_blocks[0]); ++f)
@@ -850,7 +903,7 @@ static void TestLayouts(void)
                                        Transfer(method, block, kind, textureSize, offset,
                                                 bytesPerRow, rowsPerImage, need.bytes, size),
                                        Owed(method, block, offset, bytesPerRow, rowsPerImage,
-                                            need.bytes, size, true));
+                                            need.bytes, size, true, true));
                         if (need.bytes > 0)
                         {
                             snprintf(name, sizeof(name),
@@ -862,7 +915,7 @@ static void TestLayouts(void)
                                                     bytesPerRow, rowsPerImage, need.bytes - 1,
                                                     size),
                                            Owed(method, block, offset, bytesPerRow, rowsPerImage,
-                                                need.bytes - 1, size, false));
+                                                need.bytes - 1, size, true, false));
                         }
                     }
                 }
@@ -1217,6 +1270,256 @@ static void TestVertexIndexBuffers(void)
         Expect(name,
                SetBuffer(false, 256, 0, mrhi_indexUint32, s_ranges[i].offset, s_ranges[i].size),
                s_ranges[i].valid && whole);
+    }
+}
+
+// The CTS's valuesToTestDivisibilityBy: 0 to twice the number, and
+// three times it; returns how many, at most 32 for a number up to 15.
+static size_t Divisibility(uint32_t number, uint32_t* valuesOut)
+{
+    size_t count = 0;
+    for (uint32_t i = 0; i <= 2 * number; ++i)
+    {
+        valuesOut[count++] = i;
+    }
+    valuesOut[count++] = 3 * number;
+    return count;
+}
+
+// The CTS's createAlignedTexture for a copy at an origin.
+static mrhiExtent3d AlignedAt(const Block* block, mrhiExtent3d size, uint32_t x, uint32_t y,
+                              uint32_t z)
+{
+    return AlignedSize(block,
+                       (mrhiExtent3d){size.width + x, size.height + y, size.depthOrLayers + z});
+}
+
+// api,validation,image_copy,texture_related; its 1D dimension has no
+// counterpart, and compressed formats are 2D only.
+static void TestTextureRelated(void)
+{
+    char name[160];
+    const Block* rgba8 = &s_blocks[2];
+    static const struct
+    {
+        bool volume;
+        uint32_t layers;
+    } shapes[] = {{false, 1}, {false, 3}, {true, 3}};
+    // The CTS's kTextureUsages less TRANSIENT_ATTACHMENT, which it skips.
+    static const mrhiTextureUsage usages[] = {mrhi_textureCopySource, mrhi_textureCopyDestination,
+                                              mrhi_textureSampled, mrhi_textureStorage,
+                                              mrhi_textureRenderTarget};
+    for (int m = 0; m < 3; ++m)
+    {
+        Method method = (Method)m;
+        const mrhiExtent3d empty = {0, 0, 0};
+        // usage: an empty copy, which still needs the copy usage.
+        for (size_t s = 0; s < 3; ++s)
+        {
+            for (size_t a = 0; a < 5; ++a)
+            {
+                for (size_t b = 0; b < 5; ++b)
+                {
+                    mrhiTextureUsage usage = usages[a] | usages[b];
+                    if (shapes[s].volume && (usage & mrhi_textureRenderTarget) != 0)
+                    {
+                        continue;
+                    }
+                    TransferCase c = {
+                        .method = method,
+                        .block = rgba8,
+                        .texture = CopyTexture(rgba8, KindOf(shapes[s].volume, shapes[s].layers),
+                                               (mrhiExtent3d){4, 4, shapes[s].layers}),
+                        .dataSize = 1,
+                        .size = empty,
+                    };
+                    c.texture.usage = usage;
+                    mrhiTextureUsage needed = method == TEXTURE_TO_BUFFER
+                                                  ? mrhi_textureCopySource
+                                                  : mrhi_textureCopyDestination;
+                    snprintf(name, sizeof(name), "texture_related:usage %s %s layers=%u %#x",
+                             s_methods[m], shapes[s].volume ? "3d" : "2d", shapes[s].layers,
+                             (unsigned)usage);
+                    ExpectTransfer(name, RunTransfer(&c), (usage & needed) != 0);
+                }
+            }
+        }
+        // sample_count.
+        for (uint32_t samples = 1; samples <= 4; samples += 3)
+        {
+            TransferCase c = {
+                .method = method,
+                .block = rgba8,
+                .texture = CopyTexture(rgba8, mrhi_texture2d, (mrhiExtent3d){4, 4, 1}),
+                .dataSize = 1,
+                .size = empty,
+            };
+            c.texture.sampleCount = samples;
+            c.texture.usage |= mrhi_textureSampled | mrhi_textureRenderTarget;
+            snprintf(name, sizeof(name), "texture_related:sample_count %s %u", s_methods[m],
+                     samples);
+            ExpectTransfer(name, RunTransfer(&c), samples == 1);
+        }
+        // mip_level.
+        static const uint32_t mipCounts[] = {1, 3, 5};
+        static const uint32_t mips[] = {0, 1, 3, 4};
+        for (size_t s = 0; s < 3; ++s)
+        {
+            for (size_t n = 0; n < 3; ++n)
+            {
+                for (size_t l = 0; l < 4; ++l)
+                {
+                    TransferCase c = {
+                        .method = method,
+                        .block = rgba8,
+                        .texture = CopyTexture(rgba8, KindOf(shapes[s].volume, shapes[s].layers),
+                                               (mrhiExtent3d){32, 32, shapes[s].layers}),
+                        .at = {.mip = mips[l]},
+                        .dataSize = 1,
+                        .size = empty,
+                    };
+                    c.texture.mipLevels = mipCounts[n];
+                    snprintf(name, sizeof(name),
+                             "texture_related:mip_level %s %s layers=%u mips=%u mip=%u",
+                             s_methods[m], shapes[s].volume ? "3d" : "2d", shapes[s].layers,
+                             mipCounts[n], mips[l]);
+                    ExpectTransfer(name, RunTransfer(&c), mips[l] < mipCounts[n]);
+                }
+            }
+        }
+        for (size_t f = 0; f < sizeof(s_blocks) / sizeof(s_blocks[0]); ++f)
+        {
+            const Block* block = &s_blocks[f];
+            uint32_t values[32];
+            // origin_alignment: an empty copy of 1 or 3 layers at an origin
+            // whose x or y is tested against the block, or whose z is any.
+            for (size_t s = 0; s < 3; ++s)
+            {
+                if (shapes[s].volume && block->compressed)
+                {
+                    continue;
+                }
+                for (int axis = 0; axis < 3; ++axis)
+                {
+                    uint32_t step = axis == 0 ? block->width : axis == 1 ? block->height : 1;
+                    size_t count = Divisibility(step, values);
+                    for (size_t v = 0; v < count; ++v)
+                    {
+                        uint32_t origin[3] = {0, 0, 0};
+                        origin[axis] = values[v];
+                        const mrhiExtent3d size = {0, 0, shapes[s].layers};
+                        mrhiExtent3d textureSize =
+                            AlignedAt(block, size, origin[0], origin[1], origin[2]);
+                        TransferCase c = {
+                            .method = method,
+                            .block = block,
+                            .texture = CopyTexture(
+                                block, KindOf(shapes[s].volume, textureSize.depthOrLayers),
+                                textureSize),
+                            .at = {.x = origin[0], .y = origin[1], .z = origin[2]},
+                            .dataSize = 1,
+                            .size = size,
+                        };
+                        bool rest = origin[0] % block->width == 0 && origin[1] % block->height == 0;
+                        snprintf(
+                            name, sizeof(name),
+                            "texture_related:origin_alignment %s f=%zu %s layers=%u axis=%d %u",
+                            s_methods[m], f, shapes[s].volume ? "3d" : "2d", shapes[s].layers, axis,
+                            values[v]);
+                        ExpectTransfer(name, RunTransfer(&c),
+                                       Owed(method, block, 0, 0, 0, 1, size, rest, rest));
+                    }
+                }
+            }
+            // size_alignment: an empty copy but for the axis tested.
+            for (int volume = 0; volume <= (block->compressed ? 0 : 1); ++volume)
+            {
+                for (int axis = 0; axis < 3; ++axis)
+                {
+                    uint32_t step = axis == 0 ? block->width : axis == 1 ? block->height : 1;
+                    size_t count = Divisibility(step, values);
+                    for (size_t v = 0; v < count; ++v)
+                    {
+                        uint32_t extent[3] = {0, 0, 0};
+                        extent[axis] = values[v];
+                        const mrhiExtent3d size = {extent[0], extent[1], extent[2]};
+                        mrhiExtent3d textureSize = AlignedSize(block, size);
+                        uint32_t blocksWide = (size.width + block->width - 1) / block->width;
+                        uint32_t bytesPerRow =
+                            ((blocksWide > 0 ? blocksWide : 1) * block->bytes + 255) / 256 * 256;
+                        uint32_t rowsPerImage = (size.height + block->height - 1) / block->height;
+                        TransferCase c = {
+                            .method = method,
+                            .block = block,
+                            .texture = CopyTexture(
+                                block, KindOf(volume != 0, textureSize.depthOrLayers), textureSize),
+                            .bytesPerRow = bytesPerRow,
+                            .rowsPerImage = rowsPerImage,
+                            .dataSize = 1,
+                            .size = size,
+                        };
+                        bool rest =
+                            size.width % block->width == 0 && size.height % block->height == 0;
+                        snprintf(name, sizeof(name),
+                                 "texture_related:size_alignment %s f=%zu %s axis=%d %u",
+                                 s_methods[m], f, volume ? "3d" : "2d", axis, values[v]);
+                        ExpectTransfer(
+                            name, RunTransfer(&c),
+                            Owed(method, block, 0, bytesPerRow, rowsPerImage, 1, size, rest, rest));
+                    }
+                }
+            }
+        }
+        // copy_rectangle: an empty copy but for the axis tested, whose
+        // origin and size end inside the texture's mip or past it.
+        for (int volume = 0; volume <= 1; ++volume)
+        {
+            for (uint32_t origin = 7; origin <= 8; ++origin)
+            {
+                for (uint32_t extent = 7; extent <= 8; ++extent)
+                {
+                    for (uint32_t total = 14; total <= 15; ++total)
+                    {
+                        for (uint32_t mip = 0; mip <= 2; mip += 2)
+                        {
+                            for (int axis = 0; axis < 3; ++axis)
+                            {
+                                uint32_t sizes[3] = {16u << mip, 16u << mip, 16};
+                                sizes[axis] = axis < 2 || volume ? total << mip : total;
+                                uint32_t at[3] = {0, 0, 0};
+                                uint32_t copy[3] = {0, 0, 0};
+                                at[axis] = origin;
+                                copy[axis] = extent;
+                                const mrhiExtent3d size = {copy[0], copy[1], copy[2]};
+                                uint32_t bytesPerRow = (copy[0] + 255) / 256 * 256;
+                                TransferCase c = {
+                                    .method = method,
+                                    .block = rgba8,
+                                    .texture = CopyTexture(
+                                        rgba8, volume ? mrhi_texture3d : mrhi_texture2dArray,
+                                        (mrhiExtent3d){sizes[0], sizes[1], sizes[2]}),
+                                    .at = {.x = at[0], .y = at[1], .z = at[2], .mip = mip},
+                                    .bytesPerRow = bytesPerRow,
+                                    .rowsPerImage = copy[1],
+                                    .dataSize = 1,
+                                    .size = size,
+                                };
+                                c.texture.mipLevels = 3;
+                                bool rest = origin + extent <= total;
+                                snprintf(name, sizeof(name),
+                                         "texture_related:copy_rectangle %s %s %u,%u,%u mip=%u "
+                                         "axis=%d",
+                                         s_methods[m], volume ? "3d" : "2d", origin, extent, total,
+                                         mip, axis);
+                                ExpectTransfer(name, RunTransfer(&c),
+                                               Owed(method, rgba8, 0, bytesPerRow, copy[1], 1, size,
+                                                    rest, rest));
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1575,15 +1878,17 @@ int main(void)
     TestLayouts();
     // The counts are pinned so that a change of either is seen.
     CHECK(s_differs == 192 && s_inexpressible == 962, "the layout cases set aside");
+    TestTextureRelated();
+    CHECK(s_differs == 876 && s_inexpressible == 962, "the texture copy cases set aside");
     MakePipelines();
     TestIndirectDraws();
-    CHECK(s_differs == 192 && s_inexpressible == 966, "the indirect draw cases set aside");
+    CHECK(s_differs == 876 && s_inexpressible == 966, "the indirect draw cases set aside");
     TestDispatches();
     TestVertexIndexBuffers();
-    CHECK(s_differs == 194 && s_inexpressible == 966, "the draw cases set aside");
+    CHECK(s_differs == 878 && s_inexpressible == 966, "the draw cases set aside");
     TestRenderPasses();
     TestQueries();
-    CHECK(s_differs == 195 && s_inexpressible == 966, "the pass and query cases set aside");
+    CHECK(s_differs == 879 && s_inexpressible == 966, "the pass and query cases set aside");
     Close(s_device);
     return s_failures == 0 ? 0 : 1;
 }
