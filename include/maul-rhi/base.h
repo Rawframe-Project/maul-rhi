@@ -142,6 +142,18 @@ extern "C"
         // mrhiSurfaceSourceTest, on a surface def: a surface of the test
         // driver.
         mrhi_structSurfaceSourceTest = 8,
+        // mrhiInstanceVulkanAdopt, on an instance def: a VkInstance made
+        // elsewhere.
+        mrhi_structInstanceVulkanAdopt = 9,
+        // mrhiInstanceVulkanExtensions, on an instance def: extensions the
+        // Vulkan instance also enables.
+        mrhi_structInstanceVulkanExtensions = 10,
+        // mrhiDeviceVulkanAdopt, on a device def: a VkDevice made from the
+        // instance's description.
+        mrhi_structDeviceVulkanAdopt = 11,
+        // mrhiDeviceVulkanExtensions, on a device def: extensions the Vulkan
+        // device also enables.
+        mrhi_structDeviceVulkanExtensions = 12,
     };
 
     // The header every chained struct opens with. A def's next field, or a

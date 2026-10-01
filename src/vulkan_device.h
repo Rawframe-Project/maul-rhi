@@ -19,4 +19,8 @@ mrhiResult mrhiCreateVulkanDevice(const mrhiAllocator* allocator, const mrhiVulk
                                   VkPhysicalDevice physical, const mrhiDeviceDef* def,
                                   mrhiDeviceDriver* deviceOut);
 
+// The queue family and index a device submits on (mrhi-0018): false for a
+// device driver that is not Vulkan's.
+bool mrhiVulkanDeviceQueue(const mrhiDeviceDriver* driver, uint32_t* familyOut, uint32_t* indexOut);
+
 #endif // MAUL_RHI_SRC_VULKAN_DEVICE_H

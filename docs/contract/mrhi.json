@@ -226,6 +226,26 @@
               "name": "struct_surface_source_test",
               "value": 8,
               "doc": "mrhiSurfaceSourceTest, on a surface def: a surface of the test driver."
+            },
+            {
+              "name": "struct_instance_vulkan_adopt",
+              "value": 9,
+              "doc": "mrhiInstanceVulkanAdopt, on an instance def: a VkInstance made elsewhere."
+            },
+            {
+              "name": "struct_instance_vulkan_extensions",
+              "value": 10,
+              "doc": "mrhiInstanceVulkanExtensions, on an instance def: extensions the Vulkan instance also enables."
+            },
+            {
+              "name": "struct_device_vulkan_adopt",
+              "value": 11,
+              "doc": "mrhiDeviceVulkanAdopt, on a device def: a VkDevice made from the instance's description."
+            },
+            {
+              "name": "struct_device_vulkan_extensions",
+              "value": 12,
+              "doc": "mrhiDeviceVulkanExtensions, on a device def: extensions the Vulkan device also enables."
             }
           ],
           "library": "tags of the library's extension chain"
@@ -19777,6 +19797,333 @@
             "web_gpu": {
               "class": "direct",
               "note": "insertDebugMarker"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "vulkan",
+      "doc": "Vulkan objects made outside the library, for OpenXR (XR_KHR_vulkan_enable2): instances and devices adopted with what they were made with, a device described for the runtime to make, and the queries a session binds with. Every other driver refuses the structs and answers the functions unsupported.",
+      "includes": [
+        "device"
+      ],
+      "items": [
+        {
+          "kind": "struct",
+          "name": "instance_vulkan_adopt",
+          "chained": true,
+          "doc": "A VkInstance made elsewhere (by an OpenXR runtime through XR_KHR_vulkan_enable2), which the instance adopts and never destroys, chained on an instance def with the type mrhi_structInstanceVulkanAdopt. Vulkan only. An instance older than 1.3, or one whose functions cannot be read, is refused with mrhi_errorUnsupported; so is the struct alongside the test driver's.",
+          "members": [
+            {
+              "name": "instance",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The VkInstance, made with Vulkan 1.3 or later."
+            },
+            {
+              "name": "get_instance_proc_addr",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "Its vkGetInstanceProcAddr."
+            },
+            {
+              "name": "api_version",
+              "type": "uint32",
+              "doc": "The API version it was made with, at least VK_API_VERSION_1_3."
+            },
+            {
+              "name": "extensions",
+              "type": "char",
+              "pointer": "const",
+              "doc": "The names of the extensions it was made with, each ended by a NUL, in extensionsLength bytes. Only read during the call: surfaces and labels are used only where their extensions are named."
+            },
+            {
+              "name": "extensions_length",
+              "type": "size",
+              "doc": "The bytes of extensions."
+            }
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "the instance XR_KHR_vulkan_enable2's xrCreateVulkanInstanceKHR made"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            }
+          }
+        },
+        {
+          "kind": "struct",
+          "name": "instance_vulkan_extensions",
+          "chained": true,
+          "doc": "Extensions the Vulkan instance enables beyond the library's own (an OpenXR runtime's, through XR_KHR_vulkan_enable), chained on an instance def with the type mrhi_structInstanceVulkanExtensions. Vulkan only. An instance the loader cannot make with them is refused with mrhi_errorUnsupported, as is the struct alongside the test driver's or an adopted instance's (mrhi_errorInvalid).",
+          "members": [
+            {
+              "name": "extensions",
+              "type": "char",
+              "pointer": "const",
+              "doc": "The extensions' names, each ended by a NUL, in extensionsLength bytes. Only read during the call."
+            },
+            {
+              "name": "extensions_length",
+              "type": "size",
+              "doc": "The bytes of extensions."
+            }
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "ppEnabledExtensionNames"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            }
+          }
+        },
+        {
+          "kind": "struct",
+          "name": "device_vulkan_adopt",
+          "chained": true,
+          "doc": "A VkDevice made from the instance's last description (mrhiDescribeVulkanDevice) of an equal device def, which the device adopts and never destroys, chained on a device def with the type mrhi_structDeviceVulkanAdopt. Vulkan only. Without such a description the def is refused with mrhi_errorInvalid; on another driver's adapter with mrhi_errorUnsupported.",
+          "members": [
+            {
+              "name": "device",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The VkDevice."
+            }
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "the device XR_KHR_vulkan_enable2's xrCreateVulkanDeviceKHR made"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            }
+          }
+        },
+        {
+          "kind": "struct",
+          "name": "device_vulkan_extensions",
+          "chained": true,
+          "doc": "Extensions the Vulkan device enables beyond the library's own, chained on a device def with the type mrhi_structDeviceVulkanExtensions; a description includes them. Vulkan only. The names are copied at the call, and those the library enables itself are named once; on another driver's adapter the def is refused with mrhi_errorUnsupported.",
+          "members": [
+            {
+              "name": "extensions",
+              "type": "char",
+              "pointer": "const",
+              "doc": "The extensions' names, each ended by a NUL, in extensionsLength bytes. Only read during the call."
+            },
+            {
+              "name": "extensions_length",
+              "type": "size",
+              "doc": "The bytes of extensions."
+            }
+          ],
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "ppEnabledExtensionNames"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Vulkan only"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "describe_vulkan_device",
+          "doc": "Describes the Vulkan device a device def would make: the VkDeviceCreateInfo and the VkPhysicalDevice the driver would pass to vkCreateDevice, for a program whose OpenXR runtime makes the device (xrCreateVulkanDeviceKHR). The description stays valid until the instance's next description, refused or not, or its end; a device made from it is adopted with mrhiDeviceVulkanAdopt.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` where the instance's driver is not Vulkan, or for a def the adapter cannot take; `mrhi_errorStale` for an adapter the instance no longer has; `mrhi_errorInvalid` for a NULL argument or a malformed def."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "mutable",
+              "doc": "The instance."
+            },
+            {
+              "name": "def",
+              "type": "struct.device_def",
+              "pointer": "const",
+              "doc": "The device def, its adapter set."
+            },
+            {
+              "name": "create_info_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the const VkDeviceCreateInfo*."
+            },
+            {
+              "name": "physical_device_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the VkPhysicalDevice."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkDeviceCreateInfo"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_vulkan_physical_device",
+          "doc": "Reads an adapter's VkPhysicalDevice, to find the adapter an OpenXR runtime names (xrGetVulkanGraphicsDevice2KHR).",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` where the instance's driver is not Vulkan; `mrhi_errorStale` for an adapter the instance no longer has; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "mutable",
+              "doc": "The instance."
+            },
+            {
+              "name": "adapter",
+              "type": "id.adapter_id",
+              "doc": "The adapter."
+            },
+            {
+              "name": "physical_device_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the VkPhysicalDevice."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "VkPhysicalDevice"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_vulkan_queue",
+          "doc": "Reads the queue family and index a Vulkan device submits on, for XrGraphicsBindingVulkan2KHR.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` where the device's driver is not Vulkan; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "family_out",
+              "type": "uint32",
+              "pointer": "mutable",
+              "doc": "Receives the queue family index."
+            },
+            {
+              "name": "index_out",
+              "type": "uint32",
+              "pointer": "mutable",
+              "doc": "Receives the queue index."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "queueFamilyIndex and queueIndex"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Vulkan only: unsupported"
             }
           }
         }

@@ -20,4 +20,11 @@
 mrhiResult mrhiCheckChain(const mrhiChain* head, const mrhiStructType* known, size_t knownCount,
                           uint32_t depthLimit);
 
+// Whether a list of names is well formed: each not empty and ended by a
+// NUL within the bytes; NULL only with no bytes.
+bool mrhiIsNameList(const char* names, size_t bytes);
+
+// The chain's first struct of a type, or NULL.
+const mrhiChain* mrhiFindStruct(const mrhiChain* head, mrhiStructType type);
+
 #endif // MAUL_RHI_SRC_CHAIN_H

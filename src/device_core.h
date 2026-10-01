@@ -513,6 +513,12 @@ struct mrhiDevice
 // mrhi_success for a ready device, mrhi_errorState for one that is not.
 mrhiResult mrhiDeviceUsable(const mrhiDevice* device);
 
+// Checks a device def against the instance, the adapter and the floor,
+// and returns the adapter it names; NULL with the refusal in statusOut
+// (a misuse counted for a malformed def).
+const mrhiDriverAdapter* mrhiCheckDeviceDef(mrhiInstance* instance, const mrhiDeviceDef* def,
+                                            mrhiResult* statusOut);
+
 // Counts one misuse on the device and returns mrhi_errorInvalid.
 mrhiResult mrhiDeviceMisuse(mrhiDevice* device);
 

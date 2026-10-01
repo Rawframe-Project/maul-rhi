@@ -14,6 +14,8 @@
 #include "invariant.h"
 #include "label.h"
 
+#include "maul-rhi/vulkan.h"
+
 #include <stdalign.h>
 #include <stdatomic.h>
 #include <stddef.h>
@@ -47,13 +49,34 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     return def;
 }
 
-// Checks a def against the instance, the adapter and the floor, and
-// returns the adapter it names; NULL with the refusal in statusOut.
-static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDeviceDef* def,
-                                         mrhiResult* statusOut)
+// The chained structs a device def accepts.
+static const mrhiStructType s_deviceStructs[] = {
+#ifdef MAUL_RHI_VULKAN_DRIVER
+    mrhi_structDeviceVulkanAdopt,
+    mrhi_structDeviceVulkanExtensions,
+#endif
+    mrhi_structNone,
+};
+
+// Whether the def's Vulkan structs are well formed (mrhi-0018).
+static bool AreVulkanStructsValid(const mrhiDeviceDef* def)
+{
+    const mrhiDeviceVulkanAdopt* adopt =
+        (const mrhiDeviceVulkanAdopt*)mrhiFindStruct(def->next, mrhi_structDeviceVulkanAdopt);
+    const mrhiDeviceVulkanExtensions* extra = (const mrhiDeviceVulkanExtensions*)mrhiFindStruct(
+        def->next, mrhi_structDeviceVulkanExtensions);
+    return (adopt == nullptr || adopt->device != nullptr) &&
+           (extra == nullptr || mrhiIsNameList(extra->extensions, extra->extensionsLength));
+}
+
+const mrhiDriverAdapter* mrhiCheckDeviceDef(mrhiInstance* instance, const mrhiDeviceDef* def,
+                                            mrhiResult* statusOut)
 {
     mrhiLimits floor = mrhiDefaultLimits();
-    mrhiResult chain = mrhiCheckChain(def->next, nullptr, 0, instance->limits.chainDepth);
+    size_t accepted = sizeof(s_deviceStructs) / sizeof(s_deviceStructs[0]) - 1;
+    mrhiResult chain =
+        mrhiCheckChain(def->next, s_deviceStructs, accepted, instance->limits.chainDepth);
+    chain = chain == mrhi_success && !AreVulkanStructsValid(def) ? mrhi_errorInvalid : chain;
     if (def->cookie != DEVICE_DEF_COOKIE || def->deviceLimits.notifications < 2 ||
         def->deviceLimits.samplers == 0 || def->deviceLimits.buffers == 0 ||
         def->deviceLimits.textures == 0 || def->deviceLimits.views == 0 ||
@@ -78,6 +101,12 @@ static const mrhiDriverAdapter* CheckDef(mrhiInstance* instance, const mrhiDevic
     else if (adapter == nullptr)
     {
         *statusOut = mrhi_errorStale;
+    }
+    else if (adapter->info.driver != mrhi_driverVulkan &&
+             (mrhiFindStruct(def->next, mrhi_structDeviceVulkanAdopt) != nullptr ||
+              mrhiFindStruct(def->next, mrhi_structDeviceVulkanExtensions) != nullptr))
+    {
+        *statusOut = mrhi_errorUnsupported;
     }
     else if (!mrhiFeaturesWithin(&def->features, &adapter->features) ||
              !mrhiLimitsWithin(&def->limits, &adapter->limits))
@@ -348,7 +377,7 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     }
     *deviceOut = nullptr;
     mrhiResult status = mrhi_success;
-    const mrhiDriverAdapter* adapter = CheckDef(instance, def, &status);
+    const mrhiDriverAdapter* adapter = mrhiCheckDeviceDef(instance, def, &status);
     if (adapter == nullptr)
     {
         return status;

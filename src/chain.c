@@ -5,6 +5,8 @@
 
 #include "chain.h"
 
+#include <string.h>
+
 static bool IsKnown(mrhiStructType type, const mrhiStructType* known, size_t knownCount)
 {
     for (size_t i = 0; i < knownCount; ++i)
@@ -38,4 +40,34 @@ mrhiResult mrhiCheckChain(const mrhiChain* head, const mrhiStructType* known, si
         }
     }
     return mrhi_success;
+}
+
+bool mrhiIsNameList(const char* names, size_t bytes)
+{
+    if (names == nullptr)
+    {
+        return bytes == 0;
+    }
+    for (size_t at = 0; at < bytes;)
+    {
+        const char* end = memchr(names + at, 0, bytes - at);
+        if (end == nullptr || end == names + at)
+        {
+            return false;
+        }
+        at = (size_t)(end - names) + 1;
+    }
+    return true;
+}
+
+const mrhiChain* mrhiFindStruct(const mrhiChain* head, mrhiStructType type)
+{
+    for (const mrhiChain* node = head; node != nullptr; node = node->next)
+    {
+        if (node->type == type)
+        {
+            return node;
+        }
+    }
+    return nullptr;
 }

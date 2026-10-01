@@ -420,9 +420,19 @@ format.
   swapchain needs); a presenting surface has at least one.
 - The conformance suite runs on Android as an application on the
   system's NativeActivity and presents to its window (mrhi-0017).
+- External Vulkan objects for OpenXR (mrhi-0018, `maul-rhi/vulkan.h`):
+  an instance made elsewhere adopted (`mrhiInstanceVulkanAdopt`), a
+  device described (`mrhiDescribeVulkanDevice`) for the runtime to make
+  and then adopted (`mrhiDeviceVulkanAdopt`), neither destroyed by the
+  library; extra instance and device extensions
+  (`mrhiInstanceVulkanExtensions`, `mrhiDeviceVulkanExtensions`); and
+  the queries a session binds with (`mrhiGetVulkanPhysicalDevice`,
+  `mrhiGetVulkanQueue`).
 
 ### Fixed
 
+- A Vulkan device no longer enables `VK_KHR_swapchain` on an instance
+  without `VK_KHR_surface`, which the extension requires.
 - Declared resources placed over each other's memory were not ordered
   after the earlier ones' uses: the plan now marks the later one's first
   use as aliasing, which the Vulkan driver waits on for all commands'

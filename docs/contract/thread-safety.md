@@ -126,3 +126,6 @@ edit the contract, not this file.
 | `mrhiPushDebugGroup` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiPopDebugGroup` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiInsertDebugMarker` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiDescribeVulkanDevice` | Safe from any thread; the instance is used by one thread at a time. |
+| `mrhiGetVulkanPhysicalDevice` | Safe from any thread; the instance is used by one thread at a time. |
+| `mrhiGetVulkanQueue` | Safe from any thread; the device is used by one thread at a time. |

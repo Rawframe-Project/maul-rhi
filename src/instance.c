@@ -10,6 +10,8 @@
 #include "instance_core.h"
 #include "invariant.h"
 
+#include "maul-rhi/vulkan.h"
+
 #ifdef MAUL_RHI_TEST_DRIVER
 #include "driver_test.h"
 #endif
@@ -35,8 +37,37 @@ static const mrhiStructType s_instanceStructs[] = {
 #ifdef MAUL_RHI_TEST_DRIVER
     mrhi_structTestDriver,
 #endif
+#ifdef MAUL_RHI_VULKAN_DRIVER
+    mrhi_structInstanceVulkanAdopt,
+    mrhi_structInstanceVulkanExtensions,
+#endif
     mrhi_structNone,
 };
+
+// Whether the def's Vulkan structs are well formed (mrhi-0018): name lists,
+// an adopted instance, and no extra extensions for an instance the
+// program made.
+static bool AreVulkanStructsValid(const mrhiInstanceDef* def)
+{
+    const mrhiInstanceVulkanAdopt* adopt =
+        (const mrhiInstanceVulkanAdopt*)mrhiFindStruct(def->next, mrhi_structInstanceVulkanAdopt);
+    const mrhiInstanceVulkanExtensions* extra = (const mrhiInstanceVulkanExtensions*)mrhiFindStruct(
+        def->next, mrhi_structInstanceVulkanExtensions);
+    bool adopted =
+        adopt == nullptr || (adopt->instance != nullptr && adopt->getInstanceProcAddr != nullptr &&
+                             mrhiIsNameList(adopt->extensions, adopt->extensionsLength));
+    bool extended = extra == nullptr || mrhiIsNameList(extra->extensions, extra->extensionsLength);
+    return adopted && extended && (adopt == nullptr || extra == nullptr);
+}
+
+// Whether the def asks for the test driver along with Vulkan structs,
+// which only the Vulkan driver takes.
+static bool MixesDrivers(const mrhiInstanceDef* def)
+{
+    bool vulkan = mrhiFindStruct(def->next, mrhi_structInstanceVulkanAdopt) != nullptr ||
+                  mrhiFindStruct(def->next, mrhi_structInstanceVulkanExtensions) != nullptr;
+    return vulkan && mrhiFindStruct(def->next, mrhi_structTestDriver) != nullptr;
+}
 
 mrhiInstanceDef mrhiDefaultInstanceDef(void)
 {
@@ -64,7 +95,16 @@ static mrhiResult CheckDef(const mrhiInstanceDef* def)
         return mrhi_errorVersion;
     }
     size_t accepted = sizeof(s_instanceStructs) / sizeof(s_instanceStructs[0]) - 1;
-    return mrhiCheckChain(def->next, s_instanceStructs, accepted, limits->chainDepth);
+    mrhiResult chain = mrhiCheckChain(def->next, s_instanceStructs, accepted, limits->chainDepth);
+    if (chain != mrhi_success)
+    {
+        return chain;
+    }
+    if (!AreVulkanStructsValid(def))
+    {
+        return mrhi_errorInvalid;
+    }
+    return MixesDrivers(def) ? mrhi_errorUnsupported : mrhi_success;
 }
 
 // The instance's block: the struct, then its arrays.
@@ -140,8 +180,9 @@ static mrhiResult StartDriver(mrhiInstance* instance, const mrhiInstanceDef* def
     return mrhiCreateMetalDriver(&instance->allocator, def->limits.notifications,
                                  &instance->driver);
 #elif defined(MAUL_RHI_VULKAN_DRIVER)
-    mrhiResult status = mrhiCreateVulkanDriver(&instance->allocator, def->limits.notifications,
-                                               def->limits.adapters, &instance->driver);
+    mrhiResult status =
+        mrhiCreateVulkanDriver(&instance->allocator, def->next, def->limits.notifications,
+                               def->limits.adapters, &instance->driver);
     MRHI_ASSERT(instance->driver.vtable == nullptr ||
                 mrhiIsDriverVtableValid(instance->driver.vtable));
     return status;

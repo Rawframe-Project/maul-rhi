@@ -21,3 +21,5 @@ are listed in [README.md](README.md).
 | [mrhi-0014](mrhi-0014-device-loss.md) | Device loss: terminal, answered, reported | Accepted |
 | [mrhi-0015](mrhi-0015-bindless-heaps.md) | Bindless heaps: one heap per pass, stable entries, sealed reads | Accepted |
 | [mrhi-0016](mrhi-0016-web-without-emscripten.md) | The web without Emscripten | Accepted |
+| [mrhi-0017](mrhi-0017-android.md) | Android: the Vulkan driver in the emulator | Accepted |
+| [mrhi-0018](mrhi-0018-external-vulkan.md) | External Vulkan objects for OpenXR | Accepted |

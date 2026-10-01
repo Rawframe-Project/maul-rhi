@@ -167,6 +167,11 @@ typedef struct mrhiVulkanDevice
 // open, when there is no loader or it lacks one of them.
 bool mrhiOpenVulkan(mrhiVulkan* vulkan);
 
+// Reads the global functions through a program's vkGetInstanceProcAddr,
+// opening no loader, for an instance made elsewhere (mrhi-0018): false, with
+// nothing kept, when one is missing.
+bool mrhiAdoptVulkan(mrhiVulkan* vulkan, PFN_vkGetInstanceProcAddr entry);
+
 // Reads the instance's functions: false when one is missing.
 bool mrhiLoadVulkanInstance(mrhiVulkan* vulkan, VkInstance instance);
 
@@ -184,7 +189,7 @@ bool mrhiLoadVulkanDebug(mrhiVulkan* vulkan, VkInstance instance);
 bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, bool swapchain,
                           mrhiVulkanDevice* functions);
 
-// Closes the loader.
+// Closes the loader, if one was opened.
 void mrhiCloseVulkan(mrhiVulkan* vulkan);
 
 #endif // MAUL_RHI_SRC_VULKAN_API_H

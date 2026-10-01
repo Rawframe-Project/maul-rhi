@@ -972,6 +972,18 @@ restricted or absent-rejected, with how.
 | `mrhiTexelLayout` | how the program's bytes lie; the library copies them into its staging ring laid out for the driver |
 | `mrhiTakeReadback` | copies bytes out of the library's readback ring, which the driver mapped when the frame finished |
 
+## vulkan: operations and structures
+
+| Concept | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhiInstanceVulkanAdopt` | direct: the instance XR_KHR_vulkan_enable2's xrCreateVulkanInstanceKHR made | absent-rejected: Vulkan only | absent-rejected: Vulkan only | absent-rejected: Vulkan only |
+| `mrhiInstanceVulkanExtensions` | direct: ppEnabledExtensionNames | absent-rejected: Vulkan only | absent-rejected: Vulkan only | absent-rejected: Vulkan only |
+| `mrhiDeviceVulkanAdopt` | direct: the device XR_KHR_vulkan_enable2's xrCreateVulkanDeviceKHR made | absent-rejected: Vulkan only | absent-rejected: Vulkan only | absent-rejected: Vulkan only |
+| `mrhiDeviceVulkanExtensions` | direct: ppEnabledExtensionNames | absent-rejected: Vulkan only | absent-rejected: Vulkan only | absent-rejected: Vulkan only |
+| `mrhiDescribeVulkanDevice` | direct: VkDeviceCreateInfo | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |
+| `mrhiGetVulkanPhysicalDevice` | direct: VkPhysicalDevice | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |
+| `mrhiGetVulkanQueue` | direct: queueFamilyIndex and queueIndex | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |
+
 ## test: the library's own
 
 | Concept | Why no API maps it |
