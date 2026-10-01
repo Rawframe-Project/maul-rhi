@@ -536,11 +536,17 @@ static void CheckRoundTrip(mrhiDevice* device)
               mrhiWriteBuffer(device, upload, b, 0, pattern, sizeof(pattern)) == mrhi_success &&
               mrhiWriteTexture(device, upload, &texels, pattern, sizeof(pattern), &layout,
                                &extent) == mrhi_success &&
+              // Empty writes copy nothing, as WebGPU allows.
+              mrhiWriteBuffer(device, upload, b, 0, nullptr, 0) == mrhi_success &&
+              mrhiWriteTexture(device, upload, &texels, nullptr, 0, &layout,
+                               &(mrhiExtent3d){0, 1, 1}) == mrhi_success &&
               mrhiEndPass(device, upload) == mrhi_success,
           "uploaded");
     CHECK(mrhiBeginPass(device, move) == mrhi_success &&
               mrhiCopyBuffer(device, move, b, 256, x, 0, 256) == mrhi_success &&
               mrhiCopyBuffer(device, move, b, 768, y, 0, 256) == mrhi_success &&
+              // Zero bytes copy nothing, as WebGPU allows.
+              mrhiCopyBuffer(device, move, b, 0, y, 0, 0) == mrhi_success &&
               mrhiEndPass(device, move) == mrhi_success,
           "copied");
     CHECK(mrhiBeginPass(device, read) == mrhi_success &&

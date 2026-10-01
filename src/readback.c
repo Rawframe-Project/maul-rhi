@@ -146,6 +146,13 @@ mrhiResult mrhiReadBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId reso
         return mrhiDeviceMisuse(device);
     }
     mrhiReadback* readback = Reserve(device, size, size, 0, 0, 0);
+    // An empty read is answered with no bytes, and copies nothing:
+    // drivers never see it (Vulkan refuses empty regions).
+    if (readback != nullptr && size == 0)
+    {
+        *requestOut = (mrhiRequestId){readback->request, 1};
+        return mrhi_success;
+    }
     mrhiCommand* records = readback == nullptr
                                ? nullptr
                                : mrhiTakeCopy(device, pass, mrhiCommandReadBuffer, size, 1, 1);
@@ -204,6 +211,12 @@ mrhiResult mrhiReadTexture(mrhiDevice* device, mrhiPassId id, const mrhiTextureC
     }
     mrhiReadback* readback =
         Reserve(device, ringBytes, tight, (uint32_t)pitch, (uint32_t)rowBytes, (uint32_t)rows);
+    // An empty read is answered with no bytes, and copies nothing.
+    if (readback != nullptr && mrhiIsEmptyExtent(size))
+    {
+        *requestOut = (mrhiRequestId){readback->request, 1};
+        return mrhi_success;
+    }
     mrhiCommand* records = readback == nullptr
                                ? nullptr
                                : mrhiTakeCopy(device, pass, mrhiCommandReadTexture, size->width,

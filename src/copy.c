@@ -93,6 +93,12 @@ mrhiResult mrhiCopyBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId sour
     {
         return mrhiDeviceMisuse(device);
     }
+    // An empty copy is valid and copies nothing; drivers never see it
+    // (Vulkan refuses empty regions).
+    if (size == 0)
+    {
+        return mrhi_success;
+    }
     mrhiCommand* records = mrhiTakeCopy(device, pass, mrhiCommandCopyBuffer, size, 1, 1);
     if (records == nullptr)
     {
@@ -296,6 +302,12 @@ static mrhiResult CopyBufferTexture(mrhiDevice* device, mrhiPassId id, const mrh
     {
         return mrhiRefuse(device, status);
     }
+    // An empty copy is valid and copies nothing; drivers never see it
+    // (Vulkan refuses empty regions).
+    if (mrhiIsEmptyExtent(size))
+    {
+        return mrhi_success;
+    }
     mrhiCommandType type =
         fromTexture ? mrhiCommandCopyTextureToBuffer : mrhiCommandCopyBufferToTexture;
     mrhiCommand* records =
@@ -384,6 +396,12 @@ mrhiResult mrhiCopyTexture(mrhiDevice* device, mrhiPassId id, const mrhiTextureC
         !mrhiPassDeclares(device, pass, to.object, MRHI_KIND(mrhi_accessCopyDestination), &to.part))
     {
         return mrhiDeviceMisuse(device);
+    }
+    // An empty copy is valid and copies nothing; drivers never see it
+    // (Vulkan refuses empty regions).
+    if (mrhiIsEmptyExtent(size))
+    {
+        return mrhi_success;
     }
     mrhiCommand* records = mrhiTakeCopy(device, pass, mrhiCommandCopyTexture, size->width,
                                         size->height, size->depthOrLayers);

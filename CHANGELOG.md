@@ -26,6 +26,14 @@ format.
   views at most; and on Metal devices by vertex amplification, as many
   views as the device amplifies to (`tools/mrhi_msl.py` makes the view
   index's MSL).
+- The WebGPU CTS's validation cases with Maul RHI counterparts, as a
+  test on the test driver (mrhi-0021); buffer copies first.
+
+### Fixed
+
+- Empty copies, uploads and readbacks, which WebGPU allows, reached
+  Vulkan as empty regions, which it refuses; they now record nothing,
+  and an empty readback is answered with no bytes.
 
 ## [0.1.0] - 2026-10-01
 

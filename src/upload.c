@@ -68,6 +68,13 @@ mrhiResult mrhiWriteBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId res
     {
         return mrhiDeviceMisuse(device);
     }
+    // An empty write is valid and copies nothing; drivers never see it
+    // (Vulkan refuses empty regions). A pass whose staging overflowed
+    // refuses it too, as every write after.
+    if (size == 0)
+    {
+        return pass->overflowed ? mrhi_errorCapacity : mrhi_success;
+    }
     uint64_t staged = 0;
     uint8_t* staging = TakeStaging(device, pass, size, &staged);
     mrhiCommand* records = staging == nullptr
@@ -146,6 +153,11 @@ mrhiResult mrhiWriteTexture(mrhiDevice* device, mrhiPassId id, const mrhiTexture
     if (ckd_mul(&stagedBytes, pitch * rows, (uint64_t)size->depthOrLayers))
     {
         stagedBytes = UINT64_MAX;
+    }
+    // An empty write copies nothing, as above.
+    if (mrhiIsEmptyExtent(size))
+    {
+        return pass->overflowed ? mrhi_errorCapacity : mrhi_success;
     }
     uint64_t staged = 0;
     uint8_t* staging = TakeStaging(device, pass, stagedBytes, &staged);

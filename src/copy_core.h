@@ -33,6 +33,13 @@ uint32_t mrhiFindKind(const mrhiDevice* device, mrhiResourceId id, bool buffer,
 // Refuses a status, counting invalid input as misuse.
 mrhiResult mrhiRefuse(mrhiDevice* device, mrhiResult status);
 
+// Whether a transfer's extent holds no texels: valid, and copied by no
+// command, since Vulkan refuses empty regions.
+static inline bool mrhiIsEmptyExtent(const mrhiExtent3d* size)
+{
+    return size->width == 0 || size->height == 0 || size->depthOrLayers == 0;
+}
+
 // Takes a transfer's records, the command's and its two sides', filling
 // the command: the records, or NULL when the arena is full.
 mrhiCommand* mrhiTakeCopy(mrhiDevice* device, mrhiFramePass* pass, mrhiCommandType type,

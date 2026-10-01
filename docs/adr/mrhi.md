@@ -25,3 +25,4 @@ are listed in [README.md](README.md).
 | [mrhi-0018](mrhi-0018-external-vulkan.md) | External Vulkan objects for OpenXR | Accepted |
 | [mrhi-0019](mrhi-0019-native-passes.md) | Native passes for vendor upscalers | Accepted |
 | [mrhi-0020](mrhi-0020-multidraw-multiview.md) | Counted multi-draw indirect and multiview | Accepted |
+| [mrhi-0021](mrhi-0021-webgpu-cts.md) | The WebGPU CTS as the encoder's reference cases | Accepted |
