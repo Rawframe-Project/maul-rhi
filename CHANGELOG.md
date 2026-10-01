@@ -28,7 +28,8 @@ format.
   index's MSL).
 - The WebGPU CTS's validation cases with Maul RHI counterparts, as a
   test on the test driver (mrhi-0021): copies, image copy layouts,
-  indirect draws, dispatches, vertex and index buffers.
+  indirect draws, dispatches, vertex and index buffers, render pass
+  attachments and queries.
 
 ### Fixed
 

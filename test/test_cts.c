@@ -621,8 +621,9 @@ static uint32_t s_inexpressible;
 //   the CTS takes and Maul RHI refuses as a value missing where needed;
 // - a rowsPerImage of 0 for a copy of one layer with rows, which the CTS
 //   refuses as fewer than the rows and Maul RHI takes as absent;
-// and setIndexBuffer's ranges of part of an index, which Maul RHI
-// refuses (see TestVertexIndexBuffers).
+// setIndexBuffer's ranges of part of an index, which Maul RHI refuses
+// (see TestVertexIndexBuffers); and an occlusion query written in a
+// second pass of the frame (see TestQueries).
 static uint32_t s_differs;
 
 // The outcome Maul RHI owes a transfer case. Its layout value 0 is an
@@ -1219,6 +1220,346 @@ static void TestVertexIndexBuffers(void)
     }
 }
 
+// An attachment of a render pass case: its texture (square, of the
+// CTS's createTestTexture defaults when zero) and the mip and layer the
+// pass uses. A format of mrhi_formatNone is no attachment.
+typedef struct Attachment
+{
+    mrhiFormat format;
+    uint32_t size;
+    uint32_t layers;
+    uint32_t mips;
+    uint32_t samples;
+    mrhiTextureUsage usage;
+    uint32_t mip;
+    uint32_t layer;
+} Attachment;
+
+static mrhiTextureId MakeAttachment(const Attachment* a)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = a->format;
+    def.width = a->size != 0 ? a->size : 16;
+    def.height = def.width;
+    def.depthOrLayers = a->layers != 0 ? a->layers : 1;
+    def.kind = def.depthOrLayers > 1 ? mrhi_texture2dArray : mrhi_texture2d;
+    def.mipLevels = a->mips != 0 ? a->mips : 1;
+    def.sampleCount = a->samples != 0 ? a->samples : 1;
+    def.usage = a->usage != 0 ? a->usage : mrhi_textureRenderTarget;
+    mrhiTextureId texture = {0};
+    CHECK(mrhiCreateTexture(s_device, &def, &texture) == mrhi_success, "an attachment");
+    return texture;
+}
+
+// A render pass case: its color attachments, each with a resolve
+// target or none, and a depth attachment or none, declared; the pass's
+// refusal, or success. The CTS's loads clear and its stores store.
+static mrhiResult RenderPass(const Attachment* colors, const Attachment* resolves, uint32_t count,
+                             Attachment depth)
+{
+    mrhiTextureId textures[2 * MRHI_COLOR_TARGETS + 2] = {0};
+    uint32_t made = 0;
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success, "a frame");
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    for (uint32_t i = 0; i < count && i < MRHI_COLOR_TARGETS; ++i)
+    {
+        mrhiColorTarget* target = &def.colorTargets[i];
+        textures[made] = MakeAttachment(&colors[i]);
+        CHECK(mrhiImportTexture(s_device, textures[made++], &target->resource) == mrhi_success,
+              "imported");
+        target->mip = colors[i].mip;
+        target->layer = colors[i].layer;
+        target->load = mrhi_loadClear;
+        target->store = mrhi_storeKeep;
+        if (resolves != nullptr && resolves[i].format != mrhi_formatNone)
+        {
+            textures[made] = MakeAttachment(&resolves[i]);
+            CHECK(mrhiImportTexture(s_device, textures[made++], &target->resolve) == mrhi_success,
+                  "imported");
+            target->resolveMip = resolves[i].mip;
+            target->resolveLayer = resolves[i].layer;
+        }
+    }
+    def.colorTargetCount = count;
+    if (depth.format != mrhi_formatNone)
+    {
+        textures[made] = MakeAttachment(&depth);
+        CHECK(mrhiImportTexture(s_device, textures[made++], &def.depthTarget.resource) ==
+                  mrhi_success,
+              "imported");
+        def.depthTarget.depthLoad = mrhi_loadClear;
+        def.depthTarget.depthStore = mrhi_storeKeep;
+        def.depthTarget.clearDepth = 1.0F;
+        def.depthTarget.stencilLoad = mrhi_loadClear;
+        def.depthTarget.stencilStore = mrhi_storeKeep;
+    }
+    mrhiPassId pass = {0};
+    mrhiResult status = mrhiAddPass(s_device, &def, &pass);
+    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    for (uint32_t i = 0; i < made; ++i)
+    {
+        CHECK(mrhiDestroyTexture(s_device, textures[i]) == mrhi_success, "destroyed");
+    }
+    return status;
+}
+
+#define RGBA8 mrhi_formatRgba8Unorm
+#define DEPTH mrhi_formatDepthStencil
+static const Attachment s_none = {0};
+
+// api,validation,render_pass,render_pass_descriptor: the cases whose
+// attachments Maul RHI's targets express. Its targets name one mip and
+// one layer, so the cases of views of several (attachments,layer_count
+// and mip_level_count, resolveTarget,array_layer_count and
+// mipmap_level_count) have no counterpart; nor have those of depth
+// slices, of texture views or bundles, or of a pass without targets,
+// which is a compute pass in Maul RHI.
+static void TestRenderPasses(void)
+{
+    char name[128];
+    const Attachment r8 = {.format = mrhi_formatR8Unorm};
+    const Attachment one = {.format = RGBA8, .size = 1};
+    const Attachment two = {.format = RGBA8, .size = 2};
+    const Attachment color = {.format = RGBA8};
+    const Attachment multi = {.format = RGBA8, .samples = 4};
+    const Attachment depth = {.format = DEPTH};
+    const Attachment multiDepth = {.format = DEPTH, .samples = 4};
+    // attachments,one_color_attachment and one_depth_stencil_attachment.
+    Expect("render_pass_descriptor:attachments,one_color_attachment",
+           RenderPass(&color, nullptr, 1, s_none), true);
+    Expect("render_pass_descriptor:attachments,one_depth_stencil_attachment",
+           RenderPass(nullptr, nullptr, 0, depth), true);
+    // color_attachments,limits,maxColorAttachments.
+    const Attachment many[MRHI_COLOR_TARGETS + 1] = {r8, r8, r8, r8, r8, r8, r8, r8, r8};
+    Expect("render_pass_descriptor:color_attachments,limits,maxColorAttachments 8",
+           RenderPass(many, nullptr, MRHI_COLOR_TARGETS, s_none), true);
+    Expect("render_pass_descriptor:color_attachments,limits,maxColorAttachments 9",
+           RenderPass(many, nullptr, MRHI_COLOR_TARGETS + 1, s_none), false);
+    // attachments,same_size.
+    const Attachment ones[2] = {one, one};
+    const Attachment oneTwo[2] = {one, two};
+    Expect("render_pass_descriptor:attachments,same_size all 1x1",
+           RenderPass(ones, nullptr, 2, (Attachment){.format = DEPTH, .size = 1}), true);
+    Expect("render_pass_descriptor:attachments,same_size a color 2x2",
+           RenderPass(oneTwo, nullptr, 2, s_none), false);
+    Expect("render_pass_descriptor:attachments,same_size the depth 2x2",
+           RenderPass(ones, nullptr, 2, (Attachment){.format = DEPTH, .size = 2}), false);
+    // attachments,color_depth_mismatch.
+    Expect("render_pass_descriptor:attachments,color_depth_mismatch depth as color",
+           RenderPass(&depth, nullptr, 1, s_none), false);
+    Expect("render_pass_descriptor:attachments,color_depth_mismatch color as depth",
+           RenderPass(nullptr, nullptr, 0, color), false);
+    // color_attachments,sample_count.
+    const Attachment mixed[2] = {color, multi};
+    Expect("render_pass_descriptor:color_attachments,sample_count multisampled alone",
+           RenderPass(&multi, nullptr, 1, s_none), true);
+    Expect("render_pass_descriptor:color_attachments,sample_count 1 and 4",
+           RenderPass(mixed, nullptr, 2, s_none), false);
+    // resolveTarget,sample_count, error_state, single_sample_count,
+    // different_format, different_size.
+    Expect("render_pass_descriptor:resolveTarget,sample_count",
+           RenderPass(&multi, &multi, 1, s_none), false);
+    Expect("render_pass_descriptor:resolveTarget,error_state",
+           RenderPass(&multi, &(Attachment){.format = RGBA8, .layer = 2}, 1, s_none), false);
+    Expect("render_pass_descriptor:resolveTarget,single_sample_count",
+           RenderPass(&multi, &color, 1, s_none), true);
+    Expect("render_pass_descriptor:resolveTarget,different_format",
+           RenderPass(&multi, &(Attachment){.format = mrhi_formatBgra8Unorm}, 1, s_none), false);
+    const Attachment larger = {.format = RGBA8, .size = 32, .mips = 2};
+    const Attachment largerMip1 = {.format = RGBA8, .size = 32, .mips = 2, .mip = 1};
+    Expect("render_pass_descriptor:resolveTarget,different_size mip 0",
+           RenderPass(&multi, &larger, 1, s_none), false);
+    Expect("render_pass_descriptor:resolveTarget,different_size mip 1",
+           RenderPass(&multi, &largerMip1, 1, s_none), true);
+    // resolveTarget,usage.
+    static const mrhiTextureUsage usages[] = {
+        mrhi_textureCopySource | mrhi_textureCopyDestination,
+        mrhi_textureStorage | mrhi_textureSampled,
+        mrhi_textureStorage,
+        mrhi_textureRenderTarget | mrhi_textureSampled,
+    };
+    for (size_t i = 0; i < 4; ++i)
+    {
+        snprintf(name, sizeof(name), "render_pass_descriptor:resolveTarget,usage %#x",
+                 (unsigned)usages[i]);
+        Expect(name,
+               RenderPass(&multi, &(Attachment){.format = RGBA8, .usage = usages[i]}, 1, s_none),
+               (usages[i] & mrhi_textureRenderTarget) != 0);
+    }
+    // depth_stencil_attachment,sample_counts_mismatch.
+    Expect("render_pass_descriptor:depth_stencil_attachment,sample_counts_mismatch 4 and 1",
+           RenderPass(&multi, nullptr, 1, depth), false);
+    Expect("render_pass_descriptor:depth_stencil_attachment,sample_counts_mismatch 1 and 4",
+           RenderPass(&color, nullptr, 1, multiDepth), false);
+}
+
+static mrhiQuerySetId MakeQuerySet(mrhiQueryType type, uint32_t count)
+{
+    mrhiQuerySetDef def = mrhiDefaultQuerySetDef();
+    def.type = type;
+    def.count = count;
+    mrhiQuerySetId set = {0};
+    CHECK(mrhiCreateQuerySet(s_device, &def, &set) == mrhi_success, "a query set");
+    return set;
+}
+
+// A resolveQuerySet case: an occlusion set of the count, resolved into
+// a buffer of the size and usage from a pass without targets.
+static mrhiResult Resolve(uint32_t setCount, uint64_t size, mrhiBufferUsage usage, uint32_t first,
+                          uint32_t count, uint64_t offset)
+{
+    mrhiQuerySetId set = MakeQuerySet(mrhi_queryOcclusion, setCount);
+    mrhiBufferId buffer = MakeBuffer(size, usage);
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId destination = {0};
+    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportBuffer(s_device, buffer, &destination) == mrhi_success,
+          "a frame of the buffer");
+    const mrhiAccess access = {.resource = destination, .kind = mrhi_accessQueryResolve};
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    def.accesses = &access;
+    def.accessCount = 1;
+    mrhiPassId pass = {0};
+    mrhiResult status = mrhiAddPass(s_device, &def, &pass);
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
+                  mrhiBeginPass(s_device, pass) == mrhi_success,
+              "the pass begun");
+        status = mrhiResolveQueries(s_device, pass, set, first, count, destination, offset);
+    }
+    CHECK(mrhiDropFrame(s_device) == mrhi_success &&
+              mrhiDestroyBuffer(s_device, buffer) == mrhi_success &&
+              mrhiDestroyQuerySet(s_device, set) == mrhi_success,
+          "dropped");
+    return status;
+}
+
+// An occlusion query case: render passes of a 16 by 16 target and an
+// occlusion set of the count, each making its calls (a query begun, or
+// END) and ended; the first refusal, or success.
+#define END UINT32_MAX
+
+static mrhiResult Occlusion(uint32_t setCount, const uint32_t* calls, size_t callCount,
+                            uint32_t passes)
+{
+    mrhiQuerySetId set = MakeQuerySet(mrhi_queryOcclusion, setCount);
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId target = {0};
+    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportTexture(s_device, s_target, &target) == mrhi_success,
+          "a frame of the target");
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    def.colorTargets[0] = (mrhiColorTarget){.resource = target, .load = mrhi_loadClear};
+    def.colorTargetCount = 1;
+    def.occlusionQuerySet = set;
+    mrhiPassId ids[2] = {0};
+    for (uint32_t i = 0; i < passes; ++i)
+    {
+        CHECK(mrhiAddPass(s_device, &def, &ids[i]) == mrhi_success, "a pass");
+    }
+    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    mrhiResult status = mrhi_success;
+    for (uint32_t i = 0; i < passes && status == mrhi_success; ++i)
+    {
+        CHECK(mrhiBeginPass(s_device, ids[i]) == mrhi_success, "the pass begun");
+        for (size_t c = 0; c < callCount && status == mrhi_success; ++c)
+        {
+            status = calls[c] == END ? mrhiEndOcclusionQuery(s_device, ids[i])
+                                     : mrhiBeginOcclusionQuery(s_device, ids[i], calls[c]);
+        }
+        status = status == mrhi_success ? mrhiEndPass(s_device, ids[i]) : status;
+    }
+    CHECK(mrhiDropFrame(s_device) == mrhi_success &&
+              mrhiDestroyQuerySet(s_device, set) == mrhi_success,
+          "dropped");
+    return status;
+}
+
+// api,validation,encoding,queries.
+static void TestQueries(void)
+{
+    char name[128];
+    // resolveQuerySet, kQueryCount 2.
+    static const uint32_t ranges[][2] = {{0, 2}, {0, 3}, {1, 2}, {2, 1}};
+    for (size_t i = 0; i < 4; ++i)
+    {
+        snprintf(name, sizeof(name), "resolveQuerySet:first_query_and_query_count %u,%u",
+                 ranges[i][0], ranges[i][1]);
+        Expect(name, Resolve(2, 16, mrhi_bufferQueryResolve, ranges[i][0], ranges[i][1], 0),
+               ranges[i][0] + ranges[i][1] <= 2);
+    }
+    Expect("resolveQuerySet:destination_buffer_usage STORAGE",
+           Resolve(2, 16, mrhi_bufferStorage, 0, 2, 0), false);
+    Expect("resolveQuerySet:destination_buffer_usage QUERY_RESOLVE",
+           Resolve(2, 16, mrhi_bufferQueryResolve, 0, 2, 0), true);
+    for (uint64_t offset = 0; offset <= 384; offset += 128)
+    {
+        snprintf(name, sizeof(name), "resolveQuerySet:destination_offset_alignment %llu",
+                 (unsigned long long)offset);
+        Expect(name, Resolve(2, 512, mrhi_bufferQueryResolve, 0, 2, offset), offset % 256 == 0);
+    }
+    static const struct
+    {
+        uint32_t count;
+        uint64_t size;
+        uint64_t offset;
+        bool succeeds;
+    } bounds[] = {
+        {2, 16, 0, true},    {3, 16, 0, false},    {2, 16, 256, false},
+        {2, 272, 256, true}, {2, 264, 256, false},
+    };
+    for (size_t i = 0; i < 5; ++i)
+    {
+        snprintf(name, sizeof(name), "resolveQuerySet:resolve_buffer_oob %u,%llu,%llu",
+                 bounds[i].count, (unsigned long long)bounds[i].size,
+                 (unsigned long long)bounds[i].offset);
+        Expect(name,
+               Resolve(bounds[i].count, bounds[i].size, mrhi_bufferQueryResolve, 0, bounds[i].count,
+                       bounds[i].offset),
+               bounds[i].succeeds);
+    }
+    // begin_end: occlusion_query,begin_end_balance.
+    static const uint32_t balance[][2] = {{0, 1}, {1, 0}, {1, 1}, {1, 2}, {2, 1}};
+    for (size_t i = 0; i < 5; ++i)
+    {
+        uint32_t calls[4];
+        size_t count = 0;
+        for (uint32_t b = 0; b < balance[i][0]; ++b)
+        {
+            calls[count++] = b;
+        }
+        for (uint32_t e = 0; e < balance[i][1]; ++e)
+        {
+            calls[count++] = END;
+        }
+        snprintf(name, sizeof(name), "begin_end:occlusion_query,begin_end_balance %u,%u",
+                 balance[i][0], balance[i][1]);
+        Expect(name, Occlusion(2, calls, count, 1), balance[i][0] == balance[i][1]);
+    }
+    // occlusion_query,begin_end_invalid_nesting.
+    static const uint32_t nesting[][4] = {{0, END, 1, END}, {0, 0, END, END}, {0, 1, END, END}};
+    for (size_t i = 0; i < 3; ++i)
+    {
+        snprintf(name, sizeof(name), "begin_end:occlusion_query,begin_end_invalid_nesting %zu", i);
+        Expect(name, Occlusion(2, nesting[i], 4, 1), i == 0);
+    }
+    // occlusion_query,disjoint_queries_with_same_query_index. Maul RHI
+    // writes a query at most once in a frame, where the CTS allows once
+    // a pass: a set is reset once, before the frame's first use, as
+    // Vulkan needs (mrhi-0012).
+    static const uint32_t twice[] = {0, END, 0, END};
+    Expect("begin_end:occlusion_query,disjoint_queries_with_same_query_index same pass",
+           Occlusion(1, twice, 4, 1), false);
+    s_differs += 1;
+    Expect("begin_end:occlusion_query,disjoint_queries_with_same_query_index other pass",
+           Occlusion(1, twice, 2, 2), false);
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -1240,6 +1581,9 @@ int main(void)
     TestDispatches();
     TestVertexIndexBuffers();
     CHECK(s_differs == 194 && s_inexpressible == 966, "the draw cases set aside");
+    TestRenderPasses();
+    TestQueries();
+    CHECK(s_differs == 195 && s_inexpressible == 966, "the pass and query cases set aside");
     Close(s_device);
     return s_failures == 0 ? 0 : 1;
 }
