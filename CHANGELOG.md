@@ -434,7 +434,11 @@ format.
   the library's command buffers with barriers around it; the device's
   native objects (`mrhiGetVulkanDevice`) and a texture's image
   (`mrhiGetVulkanTexture`); and feature structs enabled with a device's
-  extra extensions.
+  extra extensions. On D3D12 the same through `maul-rhi/d3d12.h`
+  (`mrhiSetD3d12PassCommands`, `mrhiGetD3d12Device`,
+  `mrhiGetD3d12Texture`), and on Metal through `maul-rhi/metal.h`
+  (`mrhiSetMetalPassCommands`, `mrhiGetMetalDevice`,
+  `mrhiGetMetalTexture`).
 - Swapchain images adopted as textures (mrhi-0018,
   `mrhiTextureVulkanAdopt`): never destroyed by the library, and left
   by every frame in the color or depth target layout OpenXR takes them

@@ -27,6 +27,11 @@ mrhiPassWork mrhiWorkOf(const mrhiFramePass* pass);
 // refusal.
 mrhiFramePass* mrhiRecordingPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut);
 
+// Hands a native pass the program's command buffer (mrhi-0019), once,
+// while it is recorded: success, mrhi_errorState, or a counted misuse
+// for a NULL buffer or a pass that is not native.
+mrhiResult mrhiSetNativeCommands(mrhiDevice* device, mrhiPassId id, void* commands);
+
 // The pass the id names, begun and not ended, native or not: NULL with
 // the refusal in statusOut otherwise.
 mrhiFramePass* mrhiOpenPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut);

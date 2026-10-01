@@ -989,6 +989,22 @@ restricted or absent-rejected, with how.
 | `mrhiGetVulkanTexture` | direct: VkImage | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |
 | `mrhiSetVulkanPassCommands` | direct: vkQueueSubmit2's command buffers, in order | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported | absent-rejected: Vulkan only: unsupported |
 
+## d3d12: operations and structures
+
+| Concept | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhiGetD3d12Device` | absent-rejected: D3D12 only: unsupported | direct: the device and its direct queue | absent-rejected: D3D12 only: unsupported | absent-rejected: D3D12 only: unsupported |
+| `mrhiGetD3d12Texture` | absent-rejected: D3D12 only: unsupported | direct: ID3D12Resource | absent-rejected: D3D12 only: unsupported | absent-rejected: D3D12 only: unsupported |
+| `mrhiSetD3d12PassCommands` | absent-rejected: D3D12 only: unsupported | direct: ExecuteCommandLists, in order | absent-rejected: D3D12 only: unsupported | absent-rejected: D3D12 only: unsupported |
+
+## metal: operations and structures
+
+| Concept | Vulkan | D3D12 | Metal | WebGPU |
+| --- | --- | --- | --- | --- |
+| `mrhiGetMetalDevice` | absent-rejected: Metal only: unsupported | absent-rejected: Metal only: unsupported | direct: the device and its queue | absent-rejected: Metal only: unsupported |
+| `mrhiGetMetalTexture` | absent-rejected: Metal only: unsupported | absent-rejected: Metal only: unsupported | direct: MTLTexture | absent-rejected: Metal only: unsupported |
+| `mrhiSetMetalPassCommands` | absent-rejected: Metal only: unsupported | absent-rejected: Metal only: unsupported | direct: command buffers committed in order | absent-rejected: Metal only: unsupported |
+
 ## test: the library's own
 
 | Concept | Why no API maps it |

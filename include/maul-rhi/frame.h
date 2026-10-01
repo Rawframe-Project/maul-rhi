@@ -469,10 +469,10 @@ extern "C"
         // outside the frame.
         bool neverCull;
         // Whether the program records the pass's commands itself, in a native
-        // command buffer it hands over (maul-rhi/vulkan.h); its accesses name
-        // imported resources only, it has no targets, query sets or heap, and
-        // no encoder call records into it. The library orders it against all
-        // commands before and after it.
+        // command buffer it hands over (maul-rhi/vulkan.h, d3d12.h, metal.h);
+        // its accesses name imported resources only, it has no targets, query
+        // sets or heap, and no encoder call records into it. The library orders
+        // it against all commands before and after it.
         bool native;
         // The resources it uses besides its targets; NULL when accessCount is
         // 0. Only read during the call.

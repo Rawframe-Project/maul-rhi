@@ -34,7 +34,15 @@ typedef struct mrhiD3d12Retiree
 typedef struct mrhiD3d12Slot
 {
     ID3D12CommandAllocator* allocator;
-    ID3D12GraphicsCommandList* list;
+    // The lists the frame records into, one after another on the
+    // allocator: the first, then after each native pass the next
+    // (mrhi-0019).
+    ID3D12GraphicsCommandList* parts[1 + MRHI_NATIVE_PASSES];
+    uint32_t partsUsed;
+    // The lists the frame runs, in order, each in its own
+    // ExecuteCommandLists: its parts with the native passes' between.
+    ID3D12CommandList* runs[1 + 2 * MRHI_NATIVE_PASSES];
+    uint32_t runCount;
     // The core's tag while its frame runs; 0 when idle.
     uint64_t tag;
     // The frame's serial, the fence value its end signals.

@@ -157,13 +157,19 @@ static bool OpenSlot(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot)
     ID3D12Device* device = frames->device;
     if (FAILED(ID3D12Device_CreateCommandAllocator(device, D3D12_COMMAND_LIST_TYPE_DIRECT,
                                                    &IID_ID3D12CommandAllocator,
-                                                   (void**)&slot->allocator)) ||
-        FAILED(ID3D12Device_CreateCommandList(
-            device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, slot->allocator, nullptr,
-            &IID_ID3D12GraphicsCommandList, (void**)&slot->list)) ||
-        FAILED(ID3D12GraphicsCommandList_Close(slot->list)))
+                                                   (void**)&slot->allocator)))
     {
         return false;
+    }
+    for (uint32_t i = 0; i < 1 + MRHI_NATIVE_PASSES; ++i)
+    {
+        if (FAILED(ID3D12Device_CreateCommandList(
+                device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, slot->allocator, nullptr,
+                &IID_ID3D12GraphicsCommandList, (void**)&slot->parts[i])) ||
+            FAILED(ID3D12GraphicsCommandList_Close(slot->parts[i])))
+        {
+            return false;
+        }
     }
     slot->targetHeap = MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
                                 frames->targetLimit > 0 ? frames->targetLimit : 1, false);
@@ -351,7 +357,10 @@ void mrhiD3d12CloseFrames(mrhiD3d12Frames* frames)
         Drop(slot->depthHeap);
         Drop(slot->viewHeap);
         Drop(slot->samplerHeap);
-        Drop(slot->list);
+        for (uint32_t part = 0; part < 1 + MRHI_NATIVE_PASSES; ++part)
+        {
+            Drop(slot->parts[part]);
+        }
         Drop(slot->allocator);
     }
     for (int i = 0; i < mrhiD3d12IndirectCount; ++i)
@@ -506,6 +515,64 @@ static mrhiD3d12GpuRing GpuRingOf(ID3D12Device* device, ID3D12DescriptorHeap* he
     return ring;
 }
 
+// Starts a part of the frame's recording: the slot's shader-visible
+// heaps set, and its sealed buffers moved into every read a heap may
+// make of them, since a heap may read one in any pass without it being
+// declared; buffers start each part in the common state they decayed
+// to.
+static void StartPart(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot)
+{
+    mrhiD3d12Recorder* recorder = &frames->recorder;
+    const mrhiDriverFrame* frame = recorder->frame;
+    ID3D12DescriptorHeap* heaps[] = {slot->viewHeap, slot->samplerHeap};
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(recorder->list, 2, heaps);
+    for (uint32_t i = 0; i < frame->resourceCount; ++i)
+    {
+        if (frame->resources[i].sealed && frames->table[i].resource != nullptr &&
+            frames->table[i].texture == nullptr)
+        {
+            mrhiD3d12Use(recorder, i + 1, mrhiD3d12BufferState(mrhi_stateSealed));
+        }
+    }
+    mrhiD3d12FlushBarriers(recorder);
+}
+
+// Places a native pass (mrhi-0019): its textures moved into their
+// accesses' states, the part recorded so far closed and queued with the
+// program's list, and the next part begun. Each list runs in its own
+// ExecuteCommandLists, after which D3D12 has finished the earlier ones'
+// work and buffers have decayed to the common state.
+static void RunNative(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrhiDriverPass* pass)
+{
+    mrhiD3d12Recorder* recorder = &frames->recorder;
+    mrhiD3d12RecordBarriers(recorder, pass->id);
+    mrhiD3d12FlushBarriers(recorder);
+    MRHI_ASSERT(slot->partsUsed < 1 + MRHI_NATIVE_PASSES);
+    HRESULT result = ID3D12GraphicsCommandList_Close(recorder->list);
+    slot->runs[slot->runCount++] = (ID3D12CommandList*)recorder->list;
+    if (pass->nativeCommands != nullptr)
+    {
+        slot->runs[slot->runCount++] = (ID3D12CommandList*)pass->nativeCommands;
+    }
+    recorder->list = slot->parts[slot->partsUsed++];
+    if (SUCCEEDED(result))
+    {
+        result = ID3D12GraphicsCommandList_Reset(recorder->list, slot->allocator, nullptr);
+    }
+    if (FAILED(result))
+    {
+        recorder->status = mrhi_errorDeviceLost;
+        return;
+    }
+    for (uint32_t i = 0; i < recorder->frame->resourceCount; ++i)
+    {
+        mrhiD3d12Object* object = &frames->table[i];
+        object->state = object->texture == nullptr ? D3D12_RESOURCE_STATE_COMMON : object->state;
+    }
+    recorder->scratchState = D3D12_RESOURCE_STATE_COMMON;
+    StartPart(frames, slot);
+}
+
 // Records a frame into its slot's list: its passes, each after its
 // barriers, then the barriers at its end. Answers success,
 // mrhi_errorCapacity when a descriptor ring or the scratch buffer ran
@@ -513,9 +580,11 @@ static mrhiD3d12GpuRing GpuRingOf(ID3D12Device* device, ID3D12DescriptorHeap* he
 static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrhiDriverFrame* frame)
 {
     HRESULT result = ID3D12CommandAllocator_Reset(slot->allocator);
+    slot->partsUsed = 1;
+    slot->runCount = 0;
     if (SUCCEEDED(result))
     {
-        result = ID3D12GraphicsCommandList_Reset(slot->list, slot->allocator, nullptr);
+        result = ID3D12GraphicsCommandList_Reset(slot->parts[0], slot->allocator, nullptr);
     }
     if (FAILED(result))
     {
@@ -524,7 +593,7 @@ static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrh
     mrhiD3d12Recorder* recorder = &frames->recorder;
     *recorder = (mrhiD3d12Recorder){
         .device = frames->device,
-        .list = slot->list,
+        .list = slot->parts[0],
         .objects = frames->objects,
         .pipelines = frames->pipelines,
         .frame = frame,
@@ -551,22 +620,14 @@ static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrh
         .scratchState = D3D12_RESOURCE_STATE_COMMON,
         .status = mrhi_success,
     };
-    ID3D12DescriptorHeap* heaps[] = {slot->viewHeap, slot->samplerHeap};
-    ID3D12GraphicsCommandList_SetDescriptorHeaps(slot->list, 2, heaps);
-    // A heap may read a sealed buffer in any pass without it being
-    // declared, so it starts the frame in every read it allows rather
-    // than be promoted there.
-    for (uint32_t i = 0; i < frame->resourceCount; ++i)
-    {
-        if (frame->resources[i].sealed && frames->table[i].resource != nullptr &&
-            frames->table[i].texture == nullptr)
-        {
-            mrhiD3d12Use(recorder, i + 1, mrhiD3d12BufferState(mrhi_stateSealed));
-        }
-    }
-    mrhiD3d12FlushBarriers(recorder);
+    StartPart(frames, slot);
     for (uint32_t i = 0; i < frame->passCount && recorder->status == mrhi_success; ++i)
     {
+        if (frame->passes[i].native)
+        {
+            RunNative(frames, slot, &frame->passes[i]);
+            continue;
+        }
         mrhiD3d12RecordPass(recorder, &frame->passes[i]);
     }
     if (recorder->status == mrhi_success)
@@ -576,7 +637,8 @@ static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrh
     }
     slot->readbackCount = recorder->readbackCount;
     // A list is closed even when it is not run, so that it resets.
-    result = ID3D12GraphicsCommandList_Close(slot->list);
+    result = ID3D12GraphicsCommandList_Close(recorder->list);
+    slot->runs[slot->runCount++] = (ID3D12CommandList*)recorder->list;
     return FAILED(result) ? mrhi_errorDeviceLost : recorder->status;
 }
 
@@ -629,8 +691,10 @@ mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame
     mrhiResult status = Record(frames, slot, frame);
     if (status == mrhi_success)
     {
-        ID3D12CommandList* lists[] = {(ID3D12CommandList*)slot->list};
-        ID3D12CommandQueue_ExecuteCommandLists(frames->queue, 1, lists);
+        for (uint32_t i = 0; i < slot->runCount; ++i)
+        {
+            ID3D12CommandQueue_ExecuteCommandLists(frames->queue, 1, &slot->runs[i]);
+        }
         status = Present(frames, frame);
     }
     if (status == mrhi_success &&

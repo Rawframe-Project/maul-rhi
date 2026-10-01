@@ -33,6 +33,35 @@ mrhiResult mrhiMetalOpenFrames(mrhiMetalFrames* frames)
     return frames->noDepth != nil ? mrhi_success : mrhi_errorPlatform;
 }
 
+// Releases the command buffers a slot's frame committed.
+static void Release(mrhiMetalSlot* slot)
+{
+    for (uint32_t i = 0; i < slot->runCount; ++i)
+    {
+        [slot->runs[i] release];
+        slot->runs[i] = nil;
+    }
+    slot->runCount = 0;
+}
+
+// The slot's state: the first command buffer that failed, else whether
+// all have completed.
+static MTLCommandBufferStatus StatusOf(const mrhiMetalSlot* slot, uint32_t* failedOut)
+{
+    MTLCommandBufferStatus status = MTLCommandBufferStatusCompleted;
+    for (uint32_t i = 0; i < slot->runCount; ++i)
+    {
+        MTLCommandBufferStatus one = slot->runs[i].status;
+        if (one == MTLCommandBufferStatusError)
+        {
+            *failedOut = i;
+            return one;
+        }
+        status = one != MTLCommandBufferStatusCompleted ? one : status;
+    }
+    return status;
+}
+
 static void Finish(mrhiMetalSlot* slot)
 {
     if (slot->high > slot->low)
@@ -40,9 +69,8 @@ static void Finish(mrhiMetalSlot* slot)
         memcpy(slot->ring + slot->low, (const uint8_t*)slot->readback.contents + slot->low,
                (size_t)(slot->high - slot->low));
     }
-    [slot->commands release];
+    Release(slot);
     dispatch_release(slot->done);
-    slot->commands = nil;
     slot->done = nullptr;
     slot->tag = 0;
 }
@@ -52,8 +80,11 @@ void mrhiMetalCloseFrames(mrhiMetalFrames* frames)
     for (uint64_t serial = frames->reported; serial < frames->submitted; ++serial)
     {
         mrhiMetalSlot* slot = &frames->slots[serial % MRHI_METAL_FRAMES];
-        [slot->commands waitUntilCompleted];
-        [slot->commands release];
+        for (uint32_t i = 0; i < slot->runCount; ++i)
+        {
+            [slot->runs[i] waitUntilCompleted];
+        }
+        Release(slot);
         dispatch_release(slot->done);
     }
     for (int i = 0; i < MRHI_METAL_FRAMES; ++i)
@@ -187,8 +218,26 @@ static void ClearQueries(id<MTLCommandBuffer> commands, const mrhiDriverFrame* f
     [blit endEncoding];
 }
 
-// Encodes the frame's passes into a command buffer and commits it, its
-// completion signalling the slot's semaphore.
+// Commits a command buffer of the slot's frame, retained, its
+// completion counted.
+static void Commit(mrhiMetalSlot* slot, id<MTLCommandBuffer> commands)
+{
+    MRHI_ASSERT(slot->runCount < 1 + 2 * MRHI_NATIVE_PASSES);
+    dispatch_semaphore_t done = slot->done;
+    atomic_fetch_add_explicit(&slot->running, 1, memory_order_relaxed);
+    [commands addCompletedHandler:^(id<MTLCommandBuffer> finished) {
+      (void)finished;
+      if (atomic_fetch_sub_explicit(&slot->running, 1, memory_order_acq_rel) == 1)
+      {
+          dispatch_semaphore_signal(done);
+      }
+    }];
+    slot->runs[slot->runCount++] = [commands retain];
+    [commands commit];
+}
+
+// Encodes the frame's passes into command buffers and commits them, the
+// last completion signalling the slot's semaphore.
 static void Record(mrhiMetalFrames* frames, mrhiMetalSlot* slot, const mrhiDriverFrame* frame)
 {
     id<MTLCommandBuffer> commands = [frames->queue commandBuffer];
@@ -203,9 +252,29 @@ static void Record(mrhiMetalFrames* frames, mrhiMetalSlot* slot, const mrhiDrive
         .low = UINT64_MAX,
     };
     ClearQueries(commands, frame);
+    dispatch_semaphore_t done = dispatch_semaphore_create(0);
+    slot->done = done;
+    slot->runCount = 0;
+    // One more than the buffers committed, so that the frame is not done
+    // before its last buffer is committed.
+    atomic_store_explicit(&slot->running, 1, memory_order_relaxed);
     for (uint32_t p = 0; p < frame->passCount; ++p)
     {
-        mrhiMetalEncodePass(encoder, &frame->passes[p]);
+        const mrhiDriverPass* pass = &frame->passes[p];
+        if (pass->native)
+        {
+            // The native pass's buffer runs between the frame's own
+            // (mrhi-0019); Metal tracks the resources they share.
+            Commit(slot, commands);
+            if (pass->nativeCommands != nullptr)
+            {
+                Commit(slot, (id<MTLCommandBuffer>)pass->nativeCommands);
+            }
+            commands = [frames->queue commandBuffer];
+            encoder->commands = commands;
+            continue;
+        }
+        mrhiMetalEncodePass(encoder, pass);
     }
     // Every image the frame acquired is presented after its work, used or
     // not, as the core expects.
@@ -216,14 +285,11 @@ static void Record(mrhiMetalFrames* frames, mrhiMetalSlot* slot, const mrhiDrive
             mrhiMetalPresent(commands, frame->resources[i].image);
         }
     }
-    dispatch_semaphore_t done = dispatch_semaphore_create(0);
-    [commands addCompletedHandler:^(id<MTLCommandBuffer> finished) {
-      (void)finished;
-      dispatch_semaphore_signal(done);
-    }];
-    [commands commit];
-    slot->commands = [commands retain];
-    slot->done = done;
+    Commit(slot, commands);
+    if (atomic_fetch_sub_explicit(&slot->running, 1, memory_order_acq_rel) == 1)
+    {
+        dispatch_semaphore_signal(done);
+    }
     slot->ring = frame->readbackRing;
     slot->low = encoder->low;
     slot->high = encoder->high;
@@ -260,12 +326,12 @@ mrhiResult mrhiMetalSubmitFrame(mrhiMetalFrames* frames, const mrhiDriverFrame* 
 }
 
 // Keeps the failed command buffer's error as the loss's message.
-static void Lose(mrhiMetalFrames* frames, const mrhiMetalSlot* slot)
+static void Lose(mrhiMetalFrames* frames, const mrhiMetalSlot* slot, uint32_t failed)
 {
     frames->lost = true;
     @autoreleasepool
     {
-        const char* text = slot->commands.error.localizedDescription.UTF8String;
+        const char* text = slot->runs[failed].error.localizedDescription.UTF8String;
         size_t length = text != nullptr ? strlen(text) : 0;
         length = length < MRHI_LOSS_MESSAGE_BYTES ? length : MRHI_LOSS_MESSAGE_BYTES;
         while (length > 0 && length < strlen(text) && ((unsigned char)text[length] & 0xC0) == 0x80)
@@ -286,10 +352,11 @@ size_t mrhiMetalPollFrames(mrhiMetalFrames* frames, mrhiDriverEvent* events, siz
     while (moved < capacity && !frames->lost && frames->reported < frames->submitted)
     {
         mrhiMetalSlot* slot = &frames->slots[frames->reported % MRHI_METAL_FRAMES];
-        MTLCommandBufferStatus status = slot->commands.status;
+        uint32_t failed = 0;
+        MTLCommandBufferStatus status = StatusOf(slot, &failed);
         if (status == MTLCommandBufferStatusError)
         {
-            Lose(frames, slot);
+            Lose(frames, slot, failed);
             events[moved++] = (mrhiDriverEvent){.tag = 0, .outcome = mrhi_errorDeviceLost};
             break;
         }

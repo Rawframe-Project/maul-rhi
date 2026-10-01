@@ -54,7 +54,7 @@ static bool FirstAdapter(mrhiInstance* instance, mrhiAdapterId* adapterOut)
     size_t count = 0;
     return mrhiRequestAdapters(instance, &request, &id) == mrhi_success &&
            mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
-           mrhiGetAdapters(instance, adapterOut, 1, &count) == mrhi_success && count == 1;
+           mrhiGetAdapters(instance, adapterOut, 1, &count) == mrhi_success && count >= 1;
 }
 
 // Opens a device for a def and takes its readiness.

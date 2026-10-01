@@ -84,6 +84,8 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/cache.c
     src/chain.c
     src/vulkan_external.c
+    src/d3d12_external.c
+    src/metal_external.c
     src/compile.c
     src/container.c
     src/device.c
@@ -197,6 +199,26 @@ if(MAUL_RHI_BUILD_TESTS)
                                            ${PROJECT_SOURCE_DIR}/khronos)
             endif()
         endforeach()
+    endif()
+    if(MAUL_RHI_METAL_DRIVER)
+        # A native pass on Metal (mrhi-0019), in Objective-C as the driver
+        # is, without ARC.
+        add_executable(test_metal_native test/test_metal_native.m)
+        target_link_libraries(test_metal_native PRIVATE maul-rhi "-framework Metal"
+                              "-framework Foundation")
+        set_target_properties(test_metal_native PROPERTIES OBJC_STANDARD 23
+                                                           OBJC_STANDARD_REQUIRED ON)
+        target_compile_options(test_metal_native PRIVATE -fno-objc-arc)
+        maul_apply_flags(test_metal_native)
+        add_test(NAME metal_native COMMAND test_metal_native)
+    endif()
+    if(MAUL_RHI_D3D12_DRIVER)
+        # A native pass on D3D12, under the debug layer and the Agility
+        # SDK the exe exports (mrhi-0019).
+        maul_add_test(d3d12_native)
+        target_sources(test_d3d12_native PRIVATE test/d3d12_debug.c)
+        target_include_directories(test_d3d12_native SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
+        target_link_libraries(test_d3d12_native PRIVATE d3d12 dxgi)
     endif()
     maul_add_test(instance)
     if(MAUL_RHI_TEST_DRIVER)

@@ -132,3 +132,9 @@ edit the contract, not this file.
 | `mrhiGetVulkanDevice` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiGetVulkanTexture` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiSetVulkanPassCommands` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiGetD3d12Device` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiGetD3d12Texture` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiSetD3d12PassCommands` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiGetMetalDevice` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiGetMetalTexture` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiSetMetalPassCommands` | Safe from any thread; the device is used by one thread at a time. |

@@ -463,12 +463,14 @@ static uint32_t MakeUses(const mrhiDevice* device, const mrhiPassDef* def, mrhiR
 }
 
 // Checks what a def says before its uses: success, or the refusal.
-// Checks a native pass's def (mrhi-0018): on a Vulkan device, without
+// Checks a native pass's def (mrhi-0019): on a Vulkan, D3D12 or Metal device, without
 // targets, queries or a heap, its accesses to imported resources only,
 // and room for it in the frame.
 static mrhiResult CheckNative(mrhiDevice* device, const mrhiPassDef* def)
 {
-    if (device->adapterInfo.driver != mrhi_driverVulkan)
+    if (device->adapterInfo.driver != mrhi_driverVulkan &&
+        device->adapterInfo.driver != mrhi_driverD3d12 &&
+        device->adapterInfo.driver != mrhi_driverMetal)
     {
         return mrhi_errorUnsupported;
     }

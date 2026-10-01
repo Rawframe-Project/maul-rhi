@@ -12164,7 +12164,7 @@
             {
               "name": "native",
               "type": "bool",
-              "doc": "Whether the program records the pass's commands itself, in a native command buffer it hands over (maul-rhi/vulkan.h); its accesses name imported resources only, it has no targets, query sets or heap, and no encoder call records into it. The library orders it against all commands before and after it."
+              "doc": "Whether the program records the pass's commands itself, in a native command buffer it hands over (maul-rhi/vulkan.h, d3d12.h, metal.h); its accesses name imported resources only, it has no targets, query sets or heap, and no encoder call records into it. The library orders it against all commands before and after it."
             },
             {
               "name": "accesses",
@@ -20405,6 +20405,326 @@
             "web_gpu": {
               "class": "absent_rejected",
               "note": "Vulkan only: unsupported"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "d3d12",
+      "doc": "D3D12 objects for vendor upscalers (mrhi-0019): the device's native objects, a texture's resource, and the command list a native pass runs. Every other driver answers the functions unsupported.",
+      "includes": [
+        "frame"
+      ],
+      "items": [
+        {
+          "kind": "function",
+          "name": "get_d3d12_device",
+          "doc": "Reads a D3D12 device's native objects, borrowed for the device's life with no reference added: what an upscaler's context is made from (the FidelityFX SDK's backend, XeSS's xessD3D12CreateContext).",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` where the device's driver is not D3D12; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "device_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the ID3D12Device*."
+            },
+            {
+              "name": "queue_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the ID3D12CommandQueue* the device submits on."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "d3d12": {
+              "class": "direct",
+              "note": "the device and its direct queue"
+            },
+            "vulkan": {
+              "class": "absent_rejected",
+              "note": "D3D12 only: unsupported"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "D3D12 only: unsupported"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "D3D12 only: unsupported"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_d3d12_texture",
+          "doc": "Reads a device texture's ID3D12Resource, borrowed with no reference added. In a native pass the texture is in the state its access puts it in: D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE for mrhi_accessSampled, D3D12_RESOURCE_STATE_UNORDERED_ACCESS for the storage accesses, D3D12_RESOURCE_STATE_COPY_SOURCE and D3D12_RESOURCE_STATE_COPY_DEST for the copies; a buffer is in D3D12_RESOURCE_STATE_COMMON, promoted on its first use, as buffers decay between command lists.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` where the device's driver is not D3D12; `mrhi_errorStale` for a texture the device no longer has; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "texture",
+              "type": "id.texture_id",
+              "doc": "The texture."
+            },
+            {
+              "name": "resource_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the ID3D12Resource*."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "d3d12": {
+              "class": "direct",
+              "note": "ID3D12Resource"
+            },
+            "vulkan": {
+              "class": "absent_rejected",
+              "note": "D3D12 only: unsupported"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "D3D12 only: unsupported"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "D3D12 only: unsupported"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "set_d3d12_pass_commands",
+          "doc": "Hands a native pass the command list the program recorded for it: an ID3D12GraphicsCommandList of the direct type, closed and not executed. The library executes it at the pass's place in the frame, after the library's lists before it and before those after it, each in its own ExecuteCommandLists; it must leave every declared texture in its access's state (mrhiGetD3d12Texture), and may change any other state, its descriptor heaps and root signatures included. The program keeps it alive until the frame is done.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` where the device's driver is not D3D12; `mrhi_errorState` outside the pass's recording, or for a pass that already has one; `mrhi_errorInvalid` for a NULL list or a pass that is not native."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The native pass, begun."
+            },
+            {
+              "name": "command_list",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The ID3D12GraphicsCommandList*."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "d3d12": {
+              "class": "direct",
+              "note": "ExecuteCommandLists, in order"
+            },
+            "vulkan": {
+              "class": "absent_rejected",
+              "note": "D3D12 only: unsupported"
+            },
+            "metal": {
+              "class": "absent_rejected",
+              "note": "D3D12 only: unsupported"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "D3D12 only: unsupported"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "metal",
+      "doc": "Metal objects for vendor upscalers and MetalFX (mrhi-0019): the device's native objects, a texture, and the command buffer a native pass runs. Every other driver answers the functions unsupported.",
+      "includes": [
+        "frame"
+      ],
+      "items": [
+        {
+          "kind": "function",
+          "name": "get_metal_device",
+          "doc": "Reads a Metal device's native objects, borrowed for the device's life with no reference added: what an upscaler is made from (MetalFX's MTLFXTemporalScalerDescriptor makes its scaler from the MTLDevice).",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` where the device's driver is not Metal; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "device_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the id<MTLDevice>."
+            },
+            {
+              "name": "queue_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the id<MTLCommandQueue> the device commits to."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "metal": {
+              "class": "direct",
+              "note": "the device and its queue"
+            },
+            "vulkan": {
+              "class": "absent_rejected",
+              "note": "Metal only: unsupported"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Metal only: unsupported"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Metal only: unsupported"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "get_metal_texture",
+          "doc": "Reads a device texture's id<MTLTexture>, borrowed with no reference added. Metal tracks its hazards, so a native pass needs no state.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` where the device's driver is not Metal; `mrhi_errorStale` for a texture the device no longer has; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "texture",
+              "type": "id.texture_id",
+              "doc": "The texture."
+            },
+            {
+              "name": "texture_out",
+              "type": "void",
+              "pointer": "out",
+              "doc": "Receives the id<MTLTexture>."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "metal": {
+              "class": "direct",
+              "note": "MTLTexture"
+            },
+            "vulkan": {
+              "class": "absent_rejected",
+              "note": "Metal only: unsupported"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Metal only: unsupported"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Metal only: unsupported"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "set_metal_pass_commands",
+          "doc": "Hands a native pass the command buffer the program encoded for it: an id<MTLCommandBuffer> from the device's queue (mrhiGetMetalDevice), with no encoder open, neither enqueued nor committed. The library commits it at the pass's place in the frame, after the library's command buffer before it and before the one after it, and the frame is done only once it has completed too. The program keeps it alive until then.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` where the device's driver is not Metal; `mrhi_errorState` outside the pass's recording, or for a pass that already has one; `mrhi_errorInvalid` for a NULL command buffer or a pass that is not native."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The native pass, begun."
+            },
+            {
+              "name": "command_buffer",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The id<MTLCommandBuffer>."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "metal": {
+              "class": "direct",
+              "note": "command buffers committed in order"
+            },
+            "vulkan": {
+              "class": "absent_rejected",
+              "note": "Metal only: unsupported"
+            },
+            "d3d12": {
+              "class": "absent_rejected",
+              "note": "Metal only: unsupported"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "Metal only: unsupported"
             }
           }
         }

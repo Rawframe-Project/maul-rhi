@@ -50,7 +50,7 @@ d3d12_view: d3d12_names d3d12_resource d3d12_slots driver invariant
 d3d12_names: capabilities_core d3d12_api driver invariant
 d3d12_api:
 driver_metal: allocator driver format_caps invariant metal_device metal_frame metal_surface
-metal_device: allocator driver invariant metal_frame metal_pipeline metal_resource metal_surface
+metal_device: allocator driver invariant metal_frame metal_native metal_pipeline metal_resource metal_surface
 metal_surface: allocator driver invariant metal_names
 metal_frame: invariant metal_encode metal_resource metal_state metal_surface
 metal_encode: capabilities_core invariant metal_copy metal_names metal_resource metal_state
@@ -108,3 +108,6 @@ pipeline_core: device_core
 graphics: capabilities_core pipeline_core
 vulkan_recipe: allocator chain vulkan_adapter vulkan_api
 vulkan_external: device_core driver_vulkan encoder_core instance_core pool vulkan_device
+d3d12_external: d3d12_device device_core encoder_core pool
+metal_external: device_core encoder_core metal_native pool
+metal_native: driver

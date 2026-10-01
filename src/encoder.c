@@ -82,6 +82,26 @@ mrhiFramePass* mrhiOpenPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statu
     return pass;
 }
 
+mrhiResult mrhiSetNativeCommands(mrhiDevice* device, mrhiPassId id, void* commands)
+{
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = mrhiOpenPass(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (commands == nullptr || !pass->native)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    if (pass->nativeCommands != nullptr)
+    {
+        return mrhi_errorState;
+    }
+    pass->nativeCommands = commands;
+    return mrhi_success;
+}
+
 mrhiFramePass* mrhiRecordingPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
 {
     mrhiFramePass* pass = mrhiOpenPass(device, id, statusOut);

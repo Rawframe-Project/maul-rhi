@@ -10,6 +10,10 @@
 
 #include "metal_state.h"
 
+#include "maul-rhi/frame.h"
+
+#include <stdatomic.h>
+
 // The frames a device lets run at once.
 #define MRHI_METAL_FRAMES 3
 
@@ -20,7 +24,13 @@
 typedef struct mrhiMetalSlot
 {
     uint64_t tag;
-    id<MTLCommandBuffer> commands;
+    // The command buffers the frame committed, retained, in order: its
+    // own, with each native pass's between them (mrhi-0019). The frame is
+    // done when all have completed; the last completion handler to run
+    // signals done.
+    id<MTLCommandBuffer> runs[1 + 2 * MRHI_NATIVE_PASSES];
+    uint32_t runCount;
+    _Atomic uint32_t running;
     dispatch_semaphore_t done;
     id<MTLBuffer> staging;
     id<MTLBuffer> readback;

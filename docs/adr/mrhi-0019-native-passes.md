@@ -43,8 +43,25 @@ of the library's exists while the program records a pass.
   a features chain whose core feature structs are merged into the
   library's; any other struct is refused, since the library cannot
   place a struct of unknown size.
-- **Other drivers**: D3D12 and Metal follow with their own headers;
-  until then, and on WebGPU, a native pass is refused as unsupported.
+- **D3D12** (`maul-rhi/d3d12.h`): `mrhiSetD3d12PassCommands` takes a
+  closed direct `ID3D12GraphicsCommandList`. The driver records its own
+  lists one after another on its allocator and runs each list, its own
+  and the program's, in its own `ExecuteCommandLists`, after which
+  D3D12 has finished the earlier work and buffers have decayed to the
+  common state: a native pass finds its textures in their accesses'
+  states and its buffers in `D3D12_RESOURCE_STATE_COMMON`, and the
+  driver tracks its buffers from the common state again after it.
+  `mrhiGetD3d12Device` and `mrhiGetD3d12Texture` give the device, its
+  queue and a texture's resource.
+- **Metal** (`maul-rhi/metal.h`): `mrhiSetMetalPassCommands` takes an
+  `MTLCommandBuffer` from the device's queue, with no encoder open and
+  not committed. The driver commits its own command buffer, the
+  program's, and its next one in order; Metal tracks the hazards
+  between them, as the driver's resources are tracked. A frame is done
+  when every command buffer it committed has completed, the program's
+  included. `mrhiGetMetalDevice` and `mrhiGetMetalTexture` give the
+  device, its queue and a texture, as MetalFX's scaler takes them.
+- **WebGPU** refuses a native pass as unsupported.
 
 ## Consequences
 

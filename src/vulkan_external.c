@@ -177,20 +177,5 @@ mrhiResult mrhiSetVulkanPassCommands(mrhiDevice* device, mrhiPassId pass, void* 
     {
         return mrhi_errorUnsupported;
     }
-    mrhiResult status = mrhi_success;
-    mrhiFramePass* open = mrhiOpenPass(device, pass, &status);
-    if (open == nullptr)
-    {
-        return status;
-    }
-    if (commandBuffer == nullptr || !open->native)
-    {
-        return mrhiDeviceMisuse(device);
-    }
-    if (open->nativeCommands != nullptr)
-    {
-        return mrhi_errorState;
-    }
-    open->nativeCommands = commandBuffer;
-    return mrhi_success;
+    return mrhiSetNativeCommands(device, pass, commandBuffer);
 }
