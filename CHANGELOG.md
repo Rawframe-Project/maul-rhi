@@ -8,6 +8,23 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- Counted multi-draw indirect (mrhi-0020): `mrhiDrawIndirectCount` and
+  `mrhiDrawIndexedIndirectCount`, up to `MRHI_INDIRECT_DRAWS` draws
+  whose number is read on the GPU, on Vulkan devices with the
+  `multiDrawIndirectCount` feature, on every Direct3D 12 and Metal
+  device (emulated in part, see the mappings); a frame's counted draws in all are
+  bounded by the device limit `frameIndirectDraws`.
+- Multiview (mrhi-0020): `mrhiPassDef::viewCount` renders a pass into a
+  layer of its targets per view, with pipelines made for as many
+  (`mrhiGraphicsPipelineDef::viewCount`), up to the adapter limit
+  `multiviewViews`; shader entries read the view index
+  (`mrhi_builtinViewIndex`, in vertex entries too), their containers
+  without WGSL. On Vulkan devices with the `multiview` feature, and on
+  Direct3D 12 devices with view instancing and shader model 6.1, four
+  views at most.
+
 ## [0.1.0] - 2026-10-01
 
 The first release: the whole contract on Vulkan, Direct3D 12, Metal and

@@ -349,6 +349,44 @@ static void TestPrimitive(void)
     def = Def();
     def.unclippedDepth = true;
     CHECK(Made(device, &def) == mrhi_success, "unclipped depth with it");
+    def = Def();
+    def.viewCount = 2;
+    CHECK(Made(device, &def) == mrhi_errorUnsupported, "two views without multiview");
+    def.viewCount = 1;
+    CHECK(Made(device, &def) == mrhi_success, "one view");
+    Close(device);
+    // Views within the device's multiview limit (mrhi-0020).
+    ResetAdapter();
+    s_adapter.features.multiview = true;
+    s_adapter.limits.multiviewViews = 4;
+    deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.features.multiview = true;
+    deviceDef.limits.multiviewViews = 2;
+    Reset();
+    device = OpenWithShader(deviceDef);
+    def = Def();
+    def.viewCount = 2;
+    CHECK(Made(device, &def) == mrhi_success, "two views with multiview");
+    Close(device);
+    ResetAdapter();
+    s_adapter.limits.multiviewViews = 2;
+    deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.limits.multiviewViews = 2;
+    Reset();
+    device = OpenWithShader(deviceDef);
+    CHECK(Made(device, &def) == mrhi_errorUnsupported, "two views in the limit, without multiview");
+    Close(device);
+    ResetAdapter();
+    s_adapter.features.multiview = true;
+    s_adapter.limits.multiviewViews = 4;
+    deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.features.multiview = true;
+    deviceDef.limits.multiviewViews = 2;
+    Reset();
+    device = OpenWithShader(deviceDef);
+    def.viewCount = 3;
+    CHECK(Made(device, &def) == mrhi_errorUnsupported, "past the device's limit");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "neither is misuse");
     Close(device);
 }
 

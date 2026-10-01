@@ -402,6 +402,82 @@ extern "C"
                                                                mrhiResourceId resource,
                                                                uint64_t offset);
 
+// The draws a counted multi-draw makes at most (mrhiDrawIndirectCount's
+// maxCount).
+#define MRHI_INDIRECT_DRAWS 65535
+
+    /// Draws up to maxCount non-indexed draws with the pass's pipeline, tables
+    /// and buffers, each from its own record of the single indirect draw's
+    /// layout (16 bytes, packed one after another), the number drawn read on
+    /// the GPU from a 32-bit count and clamped to maxCount. Each record follows
+    /// the single draw's rules. Needs the multi_draw_indirect_count feature.
+    ///
+    /// @param device         The device.
+    /// @param pass           The pass, recording, with a graphics pipeline set.
+    /// @param resource       A buffer of the open frame the pass declares with
+    ///                       the indirect access, holding the records.
+    /// @param offset         The first record's first byte, a multiple of 4,
+    ///                       with maxCount records after it in the buffer.
+    /// @param countResource  A buffer of the open frame the pass declares with
+    ///                       the indirect access, holding the count; it may be
+    ///                       the records' buffer.
+    /// @param countOffset    The count's first byte, a multiple of 4, with 4
+    ///                       bytes after it in the buffer.
+    /// @param maxCount       The draws made at most, 1 to MRHI_INDIRECT_DRAWS.
+    /// @return `mrhi_success`; `mrhi_errorUnsupported` for a device without the
+    /// multi_draw_indirect_count feature; `mrhi_errorInvalid` for a NULL
+    /// device, a maxCount of 0 or past MRHI_INDIRECT_DRAWS, a pass without
+    /// targets, or an arguments or count resource that is not a buffer the pass
+    /// declares with the indirect access, or an offset not a multiple of 4 or
+    /// without maxCount records, or the count's 4 bytes, after it;
+    /// `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or
+    /// a resource that is not live; `mrhi_errorState` for a pass that is not
+    /// recording, has no pipeline set, or lacks a table or vertex buffer the
+    /// pipeline reads; `mrhi_errorCapacity` when the frame's commands are full,
+    /// or its counted draws would pass the device's frameIndirectDraws.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDrawIndirectCount(
+        mrhiDevice* device, mrhiPassId pass, mrhiResourceId resource, uint64_t offset,
+        mrhiResourceId countResource, uint64_t countOffset, uint32_t maxCount);
+
+    /// Draws up to maxCount indexed draws with the pass's pipeline, tables and
+    /// buffers, each from its own record of the single indirect draw's layout
+    /// (20 bytes, packed one after another), the number drawn read on the GPU
+    /// from a 32-bit count and clamped to maxCount. Each record follows the
+    /// single draw's rules. Needs the multi_draw_indirect_count feature.
+    ///
+    /// @param device         The device.
+    /// @param pass           The pass, recording, with a graphics pipeline and
+    ///                       an index buffer set.
+    /// @param resource       A buffer of the open frame the pass declares with
+    ///                       the indirect access, holding the records.
+    /// @param offset         The first record's first byte, a multiple of 4,
+    ///                       with maxCount records after it in the buffer.
+    /// @param countResource  A buffer of the open frame the pass declares with
+    ///                       the indirect access, holding the count; it may be
+    ///                       the records' buffer.
+    /// @param countOffset    The count's first byte, a multiple of 4, with 4
+    ///                       bytes after it in the buffer.
+    /// @param maxCount       The draws made at most, 1 to MRHI_INDIRECT_DRAWS.
+    /// @return `mrhi_success`; `mrhi_errorUnsupported` for a device without the
+    /// multi_draw_indirect_count feature; `mrhi_errorInvalid` for a NULL
+    /// device, a maxCount of 0 or past MRHI_INDIRECT_DRAWS, a pass without
+    /// targets, or an arguments or count resource that is not a buffer the pass
+    /// declares with the indirect access, or an offset not a multiple of 4 or
+    /// without maxCount records, or the count's 4 bytes, after it;
+    /// `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or
+    /// a resource that is not live; `mrhi_errorState` for a pass that is not
+    /// recording, has no pipeline set, lacks a table or vertex buffer the
+    /// pipeline reads, or has no index buffer of the pipeline's strip index
+    /// format; `mrhi_errorCapacity` when the frame's commands are full, or its
+    /// counted draws would pass the device's frameIndirectDraws.
+    /// @par Thread safety
+    /// Safe from any thread; the pass is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDrawIndexedIndirectCount(
+        mrhiDevice* device, mrhiPassId pass, mrhiResourceId resource, uint64_t offset,
+        mrhiResourceId countResource, uint64_t countOffset, uint32_t maxCount);
+
     /// Dispatches workgroups with the pass's compute pipeline and tables, the
     /// counts in x, y and z read on the GPU, 32-bit each. A count past the
     /// device's workgroupsPerDimension makes the dispatch do nothing.

@@ -219,6 +219,7 @@ mrhiResult mrhiBeginFrame(mrhiDevice* device, const mrhiFrameDef* def)
     device->stagingRegion = FreeRegion(device);
     mrhiMarkReadbacks(device);
     atomic_store_explicit(&device->stagingTaken, 0, memory_order_relaxed);
+    atomic_store_explicit(&device->countedTaken, 0, memory_order_relaxed);
     device->frameSerial = device->frameSerial == UINT32_MAX ? 1 : device->frameSerial + 1;
     ++device->frameNumber;
     device->frameCompiled = false;

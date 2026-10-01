@@ -1273,20 +1273,21 @@
             {
               "name": "multi_draw_indirect_count",
               "type": "bool",
-              "doc": "Multi-draw indirect with a GPU-written count.",
+              "doc": "Counted multi-draw indirect (mrhiDrawIndirectCount, mrhiDrawIndexedIndirectCount): up to a maximum of indirect draws, the number drawn written on the GPU.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
-                  "note": "drawIndirectCount (1.2)"
+                  "note": "vkCmdDrawIndirectCount, with drawIndirectCount (1.2) and multiDrawIndirect"
                 },
                 "d3d12": {
-                  "class": "direct",
-                  "note": "ExecuteIndirect with a count buffer"
+                  "class": "emulated",
+                  "note": "ExecuteIndirect with a count buffer, records first expanded by a compute pass for pipelines reading their first vertex or instance",
+                  "cost": "for such pipelines, a dispatch and scratch per draw"
                 },
                 "metal": {
                   "class": "emulated",
-                  "note": "an indirect command buffer filled by a compute pass",
-                  "cost": "a compute dispatch per multi-draw, and an indirect command buffer of the largest count"
+                  "note": "a compute pass copying the records into scratch with every record past the count drawing no instances, then the most draws from the scratch",
+                  "cost": "a dispatch and the most draws encoded, whatever the count"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -1297,19 +1298,20 @@
             {
               "name": "multiview",
               "type": "bool",
-              "doc": "Rendering several views in one pass.",
+              "doc": "Rendering several views in one pass (mrhiPassDef's viewCount), each into a layer of the targets.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
-                  "note": "multiview (1.1)"
+                  "note": "multiview (1.1) with the rendering view mask"
                 },
                 "d3d12": {
                   "class": "restricted",
-                  "note": "view instancing tiers"
+                  "note": "view instancing, tier 1 or more, with shader model 6.1; 4 views"
                 },
                 "metal": {
-                  "class": "restricted",
-                  "note": "vertex amplification"
+                  "class": "emulated",
+                  "note": "instanced views written to the render target array index; not granted yet",
+                  "cost": "the views times the instances per draw, and a buffer slot"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -2164,6 +2166,30 @@
                   "class": "emulated",
                   "note": "submitted-work-done promises",
                   "cost": "a promise per frame, settled only when the browser runs its event loop"
+                }
+              }
+            },
+            {
+              "name": "multiview_views",
+              "type": "uint32",
+              "default": 1,
+              "doc": "The views a multiview pass renders at most (mrhiPassDef's viewCount); 1 without the multiview feature.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "maxMultiviewViewCount"
+                },
+                "d3d12": {
+                  "class": "restricted",
+                  "note": "D3D12_MAX_VIEW_INSTANCE_COUNT, 4"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "instanced views; not granted yet"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "no multiview"
                 }
               }
             }
@@ -5782,6 +5808,11 @@
               "name": "heaps",
               "type": "uint32",
               "doc": "Bindless heaps the device holds at once; 4 by default, 0 for none."
+            },
+            {
+              "name": "frame_indirect_draws",
+              "type": "uint32",
+              "doc": "The draws one frame's counted multi-draws make at most, their maxCounts in all; 262144 by default, 0 for none."
             }
           ],
           "library": "sizes of the library's own tables and rings"
@@ -12217,6 +12248,11 @@
               "name": "heap",
               "type": "id.heap_id",
               "doc": "The bindless heap every draw and dispatch of the pass reads; a null id for none."
+            },
+            {
+              "name": "view_count",
+              "type": "uint32",
+              "doc": "The views the pass renders, each into the next layer of every target from the target's layer: 0 and 1 mean one view. More needs the multiview feature, at most the device's multiviewViews limit, a pipeline made for as many, and targets with the layers."
             }
           ],
           "mapping": {
@@ -12258,7 +12294,7 @@
           "doc": "Declares a pass of the open frame, after the passes declared before it in its class.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an unknown class, kind, aspect or operation, an access or target its resource cannot take (a kind for the other resource type, a range outside the texture, a use an imported object was not made with, a target that does not render or depth-test, a use of a sealed resource other than the reads its sealed state allows), targets of different sizes or sample counts, a resolve that does not match, a subresource written and used otherwise in the pass, an access the class does not allow, a declared resource read before any pass wrote it, an occlusion query set that is not one or is named by a pass without targets, or timestamps of a set that is not a timestamp set, on a pass not of the graphics class, without a set, with neither query, with both the same, or with a query past the set's count or already written in this frame; `mrhi_errorStale` for a resource of another frame, an imported object destroyed since, or a query set or heap the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorCapacity` when the device's framePasses or frameAccesses limit is reached."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an unknown class, kind, aspect or operation, an access or target its resource cannot take (a kind for the other resource type, a range outside the texture, a use an imported object was not made with, a target that does not render or depth-test, a use of a sealed resource other than the reads its sealed state allows), targets of different sizes or sample counts, views past one on a native pass or one without targets, targets without a layer for each view or of a 3D texture with views past one, a resolve that does not match, a subresource written and used otherwise in the pass, an access the class does not allow, a declared resource read before any pass wrote it, an occlusion query set that is not one or is named by a pass without targets, or timestamps of a set that is not a timestamp set, on a pass not of the graphics class, without a set, with neither query, with both the same, or with a query past the set's count or already written in this frame; `mrhi_errorStale` for a resource of another frame, an imported object destroyed since, or a query set or heap the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know, or views past one without the multiview feature or past its limit; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorCapacity` when the device's framePasses or frameAccesses limit is reached."
           },
           "args": [
             {
@@ -13889,7 +13925,7 @@
           "name": "shader_builtins",
           "width": "uint32",
           "mapped": true,
-          "doc": "The fragment builtins an entry point uses that constrain its pipelines.",
+          "doc": "The builtins an entry point uses that constrain its pipelines: the fragment builtins, and the view index.",
           "values": [
             {
               "name": "builtin_frag_depth",
@@ -14026,6 +14062,29 @@
                 "web_gpu": {
                   "class": "direct",
                   "note": "primitive_index"
+                }
+              }
+            },
+            {
+              "name": "builtin_view_index",
+              "value": 64,
+              "doc": "Reads the view index of a multiview pass, in a vertex or fragment entry; its container has no WGSL, and its device needs the multiview feature.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "ViewIndex"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SV_ViewID (shader model 6.1)"
+                },
+                "metal": {
+                  "class": "restricted",
+                  "note": "SPIRV-Cross's view index; not granted yet"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "WGSL has no view index"
                 }
               }
             }
@@ -17205,6 +17264,11 @@
               "name": "constant_count",
               "type": "uint32",
               "doc": "The values."
+            },
+            {
+              "name": "view_count",
+              "type": "uint32",
+              "doc": "The views of the passes the pipeline draws in, as mrhiPassDef's viewCount: 0 and 1 mean one view. More needs the multiview feature and at most the device's multiviewViews limit."
             }
           ],
           "mapping": {
@@ -17246,7 +17310,7 @@
           "doc": "Makes a graphics pipeline on a ready device, checked against its shader's reflection and the device as WebGPU checks it. It returns at once with the pipeline pending, and the device's queue answers the request with mrhi_devicePipelineReady; a pipeline is usable once that answer is mrhi_success.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` with the pipeline pending; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, entries the shader has not as vertex and fragment entries, constants as for compute pipelines, or state that contradicts itself, the reflection or WebGPU's rules; `mrhi_errorStale` for a shader the device no longer has; `mrhi_errorUnsupported` for vertex buffers, attributes, strides, inter-stage variables or color bytes past the device's limits, target formats the device cannot render, blend or multisample as asked, unclipped depth without its feature, a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's pipeline limit is reached or its queue has no room for the answer; `mrhi_errorPlatform` when the driver refuses at once."
+            "doc": "`mrhi_success` with the pipeline pending; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, entries the shader has not as vertex and fragment entries, constants as for compute pipelines, or state that contradicts itself, the reflection or WebGPU's rules; `mrhi_errorStale` for a shader the device no longer has; `mrhi_errorUnsupported` for vertex buffers, attributes, strides, inter-stage variables or color bytes past the device's limits, target formats the device cannot render, blend or multisample as asked, unclipped depth without its feature, views past one without multiview or past its limit, a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's pipeline limit is reached or its queue has no room for the answer; `mrhi_errorPlatform` when the driver refuses at once."
           },
           "args": [
             {
@@ -18619,6 +18683,154 @@
             "web_gpu": {
               "class": "direct",
               "note": "drawIndexedIndirect"
+            }
+          }
+        },
+        {
+          "kind": "constant",
+          "name": "indirect_draws",
+          "value": 65535,
+          "doc": "The draws a counted multi-draw makes at most (mrhiDrawIndirectCount's maxCount)."
+        },
+        {
+          "kind": "function",
+          "name": "draw_indirect_count",
+          "doc": "Draws up to maxCount non-indexed draws with the pass's pipeline, tables and buffers, each from its own record of the single indirect draw's layout (16 bytes, packed one after another), the number drawn read on the GPU from a 32-bit count and clamped to maxCount. Each record follows the single draw's rules. Needs the multi_draw_indirect_count feature.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` for a device without the multi_draw_indirect_count feature; `mrhi_errorInvalid` for a NULL device, a maxCount of 0 or past MRHI_INDIRECT_DRAWS, a pass without targets, or an arguments or count resource that is not a buffer the pass declares with the indirect access, or an offset not a multiple of 4 or without maxCount records, or the count's 4 bytes, after it; `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or a resource that is not live; `mrhi_errorState` for a pass that is not recording, has no pipeline set, or lacks a table or vertex buffer the pipeline reads; `mrhi_errorCapacity` when the frame's commands are full, or its counted draws would pass the device's frameIndirectDraws."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, with a graphics pipeline set."
+            },
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "A buffer of the open frame the pass declares with the indirect access, holding the records."
+            },
+            {
+              "name": "offset",
+              "type": "uint64",
+              "doc": "The first record's first byte, a multiple of 4, with maxCount records after it in the buffer."
+            },
+            {
+              "name": "count_resource",
+              "type": "id.resource_id",
+              "doc": "A buffer of the open frame the pass declares with the indirect access, holding the count; it may be the records' buffer."
+            },
+            {
+              "name": "count_offset",
+              "type": "uint64",
+              "doc": "The count's first byte, a multiple of 4, with 4 bytes after it in the buffer."
+            },
+            {
+              "name": "max_count",
+              "type": "uint32",
+              "doc": "The draws made at most, 1 to MRHI_INDIRECT_DRAWS."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdDrawIndirectCount (drawIndirectCount and multiDrawIndirect)"
+            },
+            "d3d12": {
+              "class": "emulated",
+              "note": "ExecuteIndirect with the count buffer; for a pipeline reading its vertex or instance index, the records first expanded by a compute pass of the library's, each after its first vertex and instance",
+              "cost": "for such a pipeline, a dispatch and the most records' scratch per draw"
+            },
+            "metal": {
+              "class": "emulated",
+              "note": "a compute pass before the pass clamping the records into scratch, every record past the count drawing no instances, then the most indirect draws from the scratch",
+              "cost": "a dispatch per pass with counted draws, and the most draws encoded whatever the count"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "no multi-draw indirect"
+            }
+          }
+        },
+        {
+          "kind": "function",
+          "name": "draw_indexed_indirect_count",
+          "doc": "Draws up to maxCount indexed draws with the pass's pipeline, tables and buffers, each from its own record of the single indirect draw's layout (20 bytes, packed one after another), the number drawn read on the GPU from a 32-bit count and clamped to maxCount. Each record follows the single draw's rules. Needs the multi_draw_indirect_count feature.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` for a device without the multi_draw_indirect_count feature; `mrhi_errorInvalid` for a NULL device, a maxCount of 0 or past MRHI_INDIRECT_DRAWS, a pass without targets, or an arguments or count resource that is not a buffer the pass declares with the indirect access, or an offset not a multiple of 4 or without maxCount records, or the count's 4 bytes, after it; `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or a resource that is not live; `mrhi_errorState` for a pass that is not recording, has no pipeline set, lacks a table or vertex buffer the pipeline reads, or has no index buffer of the pipeline's strip index format; `mrhi_errorCapacity` when the frame's commands are full, or its counted draws would pass the device's frameIndirectDraws."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, with a graphics pipeline and an index buffer set."
+            },
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "A buffer of the open frame the pass declares with the indirect access, holding the records."
+            },
+            {
+              "name": "offset",
+              "type": "uint64",
+              "doc": "The first record's first byte, a multiple of 4, with maxCount records after it in the buffer."
+            },
+            {
+              "name": "count_resource",
+              "type": "id.resource_id",
+              "doc": "A buffer of the open frame the pass declares with the indirect access, holding the count; it may be the records' buffer."
+            },
+            {
+              "name": "count_offset",
+              "type": "uint64",
+              "doc": "The count's first byte, a multiple of 4, with 4 bytes after it in the buffer."
+            },
+            {
+              "name": "max_count",
+              "type": "uint32",
+              "doc": "The draws made at most, 1 to MRHI_INDIRECT_DRAWS."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdDrawIndexedIndirectCount (drawIndirectCount and multiDrawIndirect)"
+            },
+            "d3d12": {
+              "class": "emulated",
+              "note": "ExecuteIndirect with the count buffer; for a pipeline reading its vertex or instance index, the records first expanded by a compute pass of the library's, each after its first vertex and instance",
+              "cost": "for such a pipeline, a dispatch and the most records' scratch per draw"
+            },
+            "metal": {
+              "class": "emulated",
+              "note": "a compute pass before the pass clamping the records into scratch, every record past the count drawing no instances, then the most indirect draws from the scratch",
+              "cost": "a dispatch per pass with counted draws, and the most draws encoded whatever the count"
+            },
+            "web_gpu": {
+              "class": "absent_rejected",
+              "note": "no multi-draw indirect"
             }
           }
         },

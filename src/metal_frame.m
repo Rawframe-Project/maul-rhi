@@ -22,6 +22,42 @@
 
 #include <string.h>
 
+// Clamps counted multi-draws' records (mrhi-0020): each thread copies a
+// record of `words` words, setting the instance count of a record at or
+// past the count to zero.
+static const char s_clampSource[] =
+    "#include <metal_stdlib>\n"
+    "using namespace metal;\n"
+    "struct Shape { uint most; uint words; };\n"
+    "kernel void clampRecords(device const uint* records [[buffer(0)]],\n"
+    "                         device const uint* count [[buffer(1)]],\n"
+    "                         device uint* clamped [[buffer(2)]],\n"
+    "                         constant Shape& shape [[buffer(3)]],\n"
+    "                         uint record [[thread_position_in_grid]])\n"
+    "{\n"
+    "    if (record >= shape.most) { return; }\n"
+    "    uint at = record * shape.words;\n"
+    "    for (uint word = 0; word < shape.words; ++word) {\n"
+    "        clamped[at + word] = records[at + word];\n"
+    "    }\n"
+    "    if (record >= min(count[0], shape.most)) { clamped[at + 1] = 0; }\n"
+    "}\n";
+
+// Makes the kernel clamping counted draws' records: nil when Metal does
+// not.
+static id<MTLComputePipelineState> MakeClamp(id<MTLDevice> device)
+{
+    NSError* error = nil;
+    NSString* source = [NSString stringWithUTF8String:s_clampSource];
+    id<MTLLibrary> library = [device newLibraryWithSource:source options:nil error:&error];
+    id<MTLFunction> function = [library newFunctionWithName:@"clampRecords"];
+    id<MTLComputePipelineState> state =
+        function == nil ? nil : [device newComputePipelineStateWithFunction:function error:&error];
+    [function release];
+    [library release];
+    return state;
+}
+
 mrhiResult mrhiMetalOpenFrames(mrhiMetalFrames* frames)
 {
     @autoreleasepool
@@ -29,8 +65,11 @@ mrhiResult mrhiMetalOpenFrames(mrhiMetalFrames* frames)
         MTLDepthStencilDescriptor* descriptor =
             [[[MTLDepthStencilDescriptor alloc] init] autorelease];
         frames->noDepth = [frames->device newDepthStencilStateWithDescriptor:descriptor];
+        frames->clamp = frames->counted ? MakeClamp(frames->device) : nil;
     }
-    return frames->noDepth != nil ? mrhi_success : mrhi_errorPlatform;
+    return frames->noDepth != nil && (frames->clamp != nil || !frames->counted)
+               ? mrhi_success
+               : mrhi_errorPlatform;
 }
 
 // Releases the command buffers a slot's frame committed.
@@ -91,7 +130,9 @@ void mrhiMetalCloseFrames(mrhiMetalFrames* frames)
     {
         [frames->slots[i].staging release];
         [frames->slots[i].readback release];
+        [frames->slots[i].clamped release];
     }
+    [frames->clamp release];
     [frames->noDepth release];
 }
 
@@ -247,6 +288,8 @@ static void Record(mrhiMetalFrames* frames, mrhiMetalSlot* slot, const mrhiDrive
         .objects = frames->objects,
         .staging = slot->staging,
         .readback = slot->readback,
+        .clamp = frames->clamp,
+        .clamped = slot->clamped,
         .commands = commands,
         .noDepth = frames->noDepth,
         .low = UINT64_MAX,
@@ -304,6 +347,7 @@ mrhiResult mrhiMetalSubmitFrame(mrhiMetalFrames* frames, const mrhiDriverFrame* 
     {
         made = Reserve(frames->device, &slot->staging, frame->stagingBytes) &&
                Reserve(frames->device, &slot->readback, frame->readbackBytes) &&
+               Reserve(frames->device, &slot->clamped, mrhiMetalClampedBytes(frame)) &&
                TakeObjects(frames, frame);
         if (made)
         {

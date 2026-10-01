@@ -159,6 +159,7 @@ static mrhiFeatures FeaturesOf(id<MTLDevice> device)
         .subgroups = apple7 || mac2,
         .shaderInt64 = apple7 || mac2,
         .indirectFirstInstance = true,
+        .multiDrawIndirectCount = true,
     };
 }
 

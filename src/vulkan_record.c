@@ -455,6 +455,18 @@ static void Draw(const mrhiVulkanRecording* recording, const mrhiCommand* comman
         api->vkCmdDrawIndexedIndirect(commands, mrhiVulkanFrameBuffer(recording, command->a),
                                       command->c, 1, 0);
         break;
+    case mrhiCommandDrawIndirectCount:
+        api->vkCmdDrawIndirectCount(commands, mrhiVulkanFrameBuffer(recording, command->a),
+                                    command->c,
+                                    mrhiVulkanFrameBuffer(recording, (uint32_t)command->b),
+                                    command->d, (uint32_t)(command->b >> 32), 16);
+        break;
+    case mrhiCommandDrawIndexedIndirectCount:
+        api->vkCmdDrawIndexedIndirectCount(commands, mrhiVulkanFrameBuffer(recording, command->a),
+                                           command->c,
+                                           mrhiVulkanFrameBuffer(recording, (uint32_t)command->b),
+                                           command->d, (uint32_t)(command->b >> 32), 20);
+        break;
     default:
         MRHI_ASSERT(command->type == mrhiCommandDispatchIndirect);
         api->vkCmdDispatchIndirect(commands, mrhiVulkanFrameBuffer(recording, command->a),
@@ -491,6 +503,8 @@ static void RecordCommand(mrhiVulkanRecording* recording, const mrhiCommand* com
     case mrhiCommandDrawIndirect:
     case mrhiCommandDrawIndexedIndirect:
     case mrhiCommandDispatchIndirect:
+    case mrhiCommandDrawIndirectCount:
+    case mrhiCommandDrawIndexedIndirectCount:
         Draw(recording, command);
         break;
     case mrhiCommandCopyBuffer:

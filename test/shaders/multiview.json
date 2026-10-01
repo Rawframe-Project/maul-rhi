@@ -1,0 +1,12 @@
+{
+  "root_block_bytes": 0,
+  "entries": [
+    {"name": "vs", "stage": "vertex", "builtins": ["view_index"],
+     "variables": [{"location": 0, "type": "float32", "components": 4}]},
+    {"name": "fs", "stage": "fragment",
+     "outputs": [{"location": 0, "type": "float32", "components": 4}],
+     "variables": [{"location": 0, "type": "float32", "components": 4}]}
+  ],
+  "bindings": [],
+  "constants": []
+}

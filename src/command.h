@@ -51,6 +51,11 @@ typedef enum mrhiCommandType
     mrhiCommandDrawIndirect,
     mrhiCommandDrawIndexedIndirect,
     mrhiCommandDispatchIndirect,
+    // A counted multi-draw (mrhi-0020). a: the records' frame resource's slot
+    // plus one; b: the count's slot plus one, and the most draws in the
+    // upper half; c: the records' offset; d: the count's offset.
+    mrhiCommandDrawIndirectCount,
+    mrhiCommandDrawIndexedIndirectCount,
     // a: the query; b: the query set's driver handle.
     mrhiCommandBeginOcclusionQuery,
     mrhiCommandEndOcclusionQuery,

@@ -129,6 +129,10 @@ static void CheckCommand(Walk* walk, const mrhiCommand* command)
     case mrhiCommandDispatchIndirect:
         WALK_CHECK(Names(walk, command->a, true));
         break;
+    case mrhiCommandDrawIndirectCount:
+    case mrhiCommandDrawIndexedIndirectCount:
+        WALK_CHECK(Names(walk, command->a, true) && Names(walk, (uint32_t)command->b, true));
+        break;
     case mrhiCommandBeginOcclusionQuery:
         WALK_CHECK(IsHandle(walk, command->b));
         break;

@@ -226,7 +226,7 @@ static bool AreTargetsEqual(const mrhiRenderLayout* a, const mrhiRenderLayout* b
             return false;
         }
     }
-    return a->depth == b->depth && a->samples == b->samples;
+    return a->depth == b->depth && a->samples == b->samples && a->views == b->views;
 }
 
 // The pipeline slot a live, ready id of a kind names: or NULL with the

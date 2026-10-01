@@ -34,6 +34,8 @@ typedef struct mrhiMetalSlot
     dispatch_semaphore_t done;
     id<MTLBuffer> staging;
     id<MTLBuffer> readback;
+    // The records counted multi-draws draw from, clamped (mrhi-0020).
+    id<MTLBuffer> clamped;
     uint8_t* ring;
     uint64_t low;
     uint64_t high;
@@ -45,6 +47,10 @@ typedef struct mrhiMetalFrames
     id<MTLCommandQueue> queue;
     // The depth and stencil state of a pipeline without one.
     id<MTLDepthStencilState> noDepth;
+    // Whether the device draws counted multi-draws, and the kernel that
+    // clamps their records (mrhi-0020), made when it does.
+    bool counted;
+    id<MTLComputePipelineState> clamp;
     mrhiMetalSlot slots[MRHI_METAL_FRAMES];
     uint64_t submitted;
     uint64_t reported;

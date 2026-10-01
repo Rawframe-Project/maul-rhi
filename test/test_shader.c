@@ -441,9 +441,28 @@ static mrhiResult EntryWith(uint32_t index, size_t at, uint32_t value)
     return Built();
 }
 
+// Resets, then gives entry index builtins, without the WGSL the view
+// index excludes.
+static mrhiResult NativeEntryWith(uint32_t index, uint32_t builtins)
+{
+    Reset();
+    Put32(Record(ENTRIES, index, 48) + 36, builtins);
+    s_sections[WGSL].size = 0;
+    return Built();
+}
+
 static void TestBuiltinsAndStorage(void)
 {
-    CHECK(EntryWith(1, 36, mrhiShaderBuiltinsKnown) == mrhi_success, "every builtin");
+    uint32_t fragment = mrhiShaderBuiltinsKnown & ~(uint32_t)mrhi_builtinViewIndex;
+    CHECK(EntryWith(1, 36, fragment) == mrhi_success, "every fragment builtin");
+    CHECK(NativeEntryWith(1, mrhiShaderBuiltinsKnown) == mrhi_success,
+          "every builtin, without WGSL");
+    CHECK(EntryWith(1, 36, mrhi_builtinViewIndex) == mrhi_errorInvalid, "the view index with WGSL");
+    CHECK(NativeEntryWith(0, mrhi_builtinViewIndex) == mrhi_success, "a vertex entry's view index");
+    CHECK(NativeEntryWith(0, mrhi_builtinViewIndex | mrhi_builtinFrontFacing) == mrhi_errorInvalid,
+          "but no other vertex builtin");
+    CHECK(NativeEntryWith(2, mrhi_builtinViewIndex) == mrhi_errorInvalid,
+          "a compute entry's view index");
     CHECK(EntryWith(1, 36, mrhiShaderBuiltinsKnown + 1) == mrhi_errorInvalid, "an unknown builtin");
     CHECK(EntryWith(0, 36, mrhi_builtinFragDepth) == mrhi_errorInvalid, "a vertex builtin");
     CHECK(EntryWith(2, 36, mrhi_builtinSampleIndex) == mrhi_errorInvalid, "a compute builtin");
@@ -965,6 +984,22 @@ static void TestFeatures(void)
     Assemble();
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported, "the primitive index");
     CHECK(mrhiGetDeviceMisuse(device) == 0, "neither is misuse");
+    Close(device);
+    // The view index needs multiview (mrhi-0020).
+    Reset();
+    Put32(Record(ENTRIES, 0, 48) + 36, mrhi_builtinViewIndex);
+    s_sections[WGSL].size = 0;
+    Assemble();
+    def = Def();
+    device = Open(2, true);
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported,
+          "the view index without multiview");
+    Close(device);
+    s_adapter.features.multiview = true;
+    deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.features.multiview = true;
+    device = OpenWith(deviceDef, true);
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "with it");
     Close(device);
 }
 

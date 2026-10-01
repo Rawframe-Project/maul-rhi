@@ -84,7 +84,7 @@ has MSL, a metallib, or both, and none of its entries uses a heap.
 | 30 | u16 | its color output count, 0 unless it is a fragment entry |
 | 32 | u16 | its first inter-stage variable |
 | 34 | u16 | its inter-stage variable count: a vertex entry's outputs or a fragment entry's inputs; 0 for compute |
-| 36 | u32 | the builtins it uses, some `mrhiShaderBuiltins` bits; 0 unless it is a fragment entry |
+| 36 | u32 | the builtins it uses, some `mrhiShaderBuiltins` bits: a fragment entry's any, a vertex entry's only the view index, a compute entry's none |
 | 40 | u32 | its workgroup storage in bytes; 0 unless it is a compute entry |
 | 44 | u32 | the heaps it reads, some `mrhiShaderHeapUses` bits |
 
@@ -98,9 +98,15 @@ with a storage kind, and never in a vertex entry, as WebGPU requires of
 bound storage. SPIR-V reads the resource heap at set 4 binding 0, with
 the types an entry reads aliased there, and the sampler heap at set 4
 binding 1; DXC places SM 6.6 heaps there with
-`-fvk-bind-resource-heap 0 4 -fvk-bind-sampler-heap 1 4`. WGSL reads no
-heaps yet, so a container has a WGSL section exactly when none of its
-entries uses a heap.
+`-fvk-bind-resource-heap 0 4 -fvk-bind-sampler-heap 1 4`.
+
+An entry that reads the view index of a multiview pass (record
+mrhi-0020) has the `mrhi_builtinViewIndex` bit, in a vertex or fragment
+entry; SPIR-V reads it as the `ViewIndex` builtin with the `MultiView`
+capability, and a device loads the container only with the multiview
+feature. WGSL reads no heaps yet and has no view index, so a container
+has a WGSL section exactly when none of its entries uses a heap or the
+view index.
 
 ## Bindings
 

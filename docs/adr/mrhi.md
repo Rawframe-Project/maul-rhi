@@ -24,3 +24,4 @@ are listed in [README.md](README.md).
 | [mrhi-0017](mrhi-0017-android.md) | Android: the Vulkan driver in the emulator | Accepted |
 | [mrhi-0018](mrhi-0018-external-vulkan.md) | External Vulkan objects for OpenXR | Accepted |
 | [mrhi-0019](mrhi-0019-native-passes.md) | Native passes for vendor upscalers | Accepted |
+| [mrhi-0020](mrhi-0020-multidraw-multiview.md) | Counted multi-draw indirect and multiview | Accepted |

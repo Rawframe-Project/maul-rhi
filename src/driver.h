@@ -129,6 +129,9 @@ typedef struct mrhiDriverPass
     mrhiStoreOp stencilStore;
     uint32_t width;
     uint32_t height;
+    // The views it renders (mrhi-0020), each into the next layer of every
+    // target: 1 without multiview.
+    uint32_t viewCount;
     uint64_t occlusionSet;
     uint64_t timestampSet;
     uint32_t timestampBegin;

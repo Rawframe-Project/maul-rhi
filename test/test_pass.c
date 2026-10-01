@@ -621,6 +621,71 @@ static void TestStaleAndLimits(void)
     s_instance = instance;
 }
 
+// Multiview passes (mrhi-0020): unsupported without the feature or past
+// its limit; refused without targets, on targets without a layer per
+// view from theirs, and on 3D ones; a target's use spans a layer per
+// view, so that sampling the second layer beside it is refused.
+static void TestViews(void)
+{
+    Begin();
+    mrhiPassDef def =
+        Pass(Color(DeclareSized(mrhi_texture2dArray, 16, 16, 2, 1), mrhi_loadClear), nullptr, 0);
+    def.viewCount = 2;
+    CHECK(Add(def) == mrhi_errorUnsupported, "no multiview");
+    Drop();
+    mrhiInstance* instance = s_instance;
+    mrhiDevice* previous = s_device;
+    // Views in the limit, but not the feature.
+    s_adapter.limits.multiviewViews = 2;
+    mrhiDeviceDef limited = mrhiDefaultDeviceDef();
+    limited.limits.multiviewViews = 2;
+    s_device = OpenWith(limited, true);
+    Begin();
+    def.colorTargets[0].resource = DeclareSized(mrhi_texture2dArray, 16, 16, 2, 1);
+    CHECK(Add(def) == mrhi_errorUnsupported, "views without the feature");
+    Drop();
+    Close(s_device);
+    s_adapter.features.multiview = true;
+    s_adapter.limits.multiviewViews = 2;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.features.multiview = true;
+    deviceDef.limits.multiviewViews = 2;
+    s_device = OpenWith(deviceDef, true);
+    Begin();
+    mrhiResourceId two = DeclareSized(mrhi_texture2dArray, 16, 16, 2, 1);
+    mrhiResourceId three = DeclareSized(mrhi_texture2dArray, 16, 16, 3, 1);
+    mrhiResourceId one = Declare(mrhi_formatRgba8Unorm, 16, 1);
+    mrhiResourceId volume = DeclareSized(mrhi_texture3d, 16, 16, 2, 1);
+    def = Pass(Color(two, mrhi_loadClear), nullptr, 0);
+    def.viewCount = 3;
+    CHECK(Add(def) == mrhi_errorUnsupported, "past the limit");
+    def.viewCount = 2;
+    CHECK(Add(def) == mrhi_success, "two views on two layers");
+    def.colorTargets[0].layer = 1;
+    CHECK(Add(def) == mrhi_errorInvalid, "a view past the layers");
+    def.colorTargets[0].resource = three;
+    CHECK(Add(def) == mrhi_success, "two views from the second of three layers");
+    def.colorTargets[0] = Color(one, mrhi_loadClear);
+    CHECK(Add(def) == mrhi_errorInvalid, "one layer");
+    def.colorTargets[0] = Color(volume, mrhi_loadClear);
+    CHECK(Add(def) == mrhi_errorInvalid, "a 3D target");
+    mrhiAccess second = Access(two, mrhi_accessSampled);
+    second.range.baseLayer = 1;
+    second.range.layerCount = 1;
+    def = Pass(Color(two, mrhi_loadClear), &second, 1);
+    CHECK(Add(def) == mrhi_success, "the second layer sampled beside one view");
+    def.viewCount = 2;
+    CHECK(Add(def) == mrhi_errorInvalid, "but not beside two");
+    mrhiAccess copy = Access(DeclareBuffer(), mrhi_accessCopyDestination);
+    def = Pass(Color((mrhiResourceId){0}, mrhi_loadClear), &copy, 1);
+    def.viewCount = 2;
+    CHECK(Add(def) == mrhi_errorInvalid, "no targets");
+    Drop();
+    Close(s_device);
+    s_device = previous;
+    s_instance = instance;
+}
+
 static void TestRefusals(void)
 {
     mrhiPassDef def = mrhiDefaultPassDef();
@@ -653,6 +718,7 @@ int main(void)
     TestTargets();
     TestImports();
     TestStaleAndLimits();
+    TestViews();
     TestRefusals();
     s_instance = instance;
     CHECK(mrhiGetDeviceMisuse(s_device) > 30, "the refusals were counted");

@@ -27,12 +27,13 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Each container: its directory, its name, its stages' sources and
 # entries, and whether it has WGSL, and so MSL (a container reading
-# heaps has neither); every container has DXIL.
+# heaps or the view index has neither); every container has DXIL.
 CONTAINERS = (
     ("test/shaders", "conformance", (("vert", "vs"), ("frag", "fs"), ("comp", "cs"),
                                      ("placed.vert", "vp"), ("root.frag", "fr"),
                                      ("add.comp", "ca")), True),
     ("test/shaders", "bindless", (("comp", "cs"),), False),
+    ("test/shaders", "multiview", (("vert", "vs"), ("frag", "fs")), False),
     ("samples/shaders", "triangle", (("vert", "vs"), ("frag", "fs")), True),
     ("samples/shaders", "textured", (("vert", "vs"), ("frag", "fs")), True),
     ("samples/shaders", "compute_plan", (("comp", "plan"),), True),

@@ -46,6 +46,7 @@ mrhiDeviceDef mrhiDefaultDeviceDef(void)
     def.deviceLimits.querySets = 16;
     def.deviceLimits.queries = 4096;
     def.deviceLimits.heaps = 4;
+    def.deviceLimits.frameIndirectDraws = 1u << 18;
     return def;
 }
 

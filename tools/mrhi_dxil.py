@@ -16,7 +16,8 @@
 # space 5, since D3D12's vertex and instance ids leave them out. Each
 # constant the SPIR-V does not size anything with is defined as a read
 # of b1 of space 5, where the driver writes the pipeline's values; a
-# fixed one keeps its default. DXC compiles each entry for SHADER_MODEL
+# fixed one keeps its default. DXC compiles each entry for SHADER_MODEL,
+# 6.1 for one reading the view index (record mrhi-0020),
 # to DIR/NAME.dxil without reflection or debug data. spirv-cross and dxc
 # must be on the path.
 #
@@ -158,8 +159,10 @@ def main():
         try:
             for entry in entries:
                 stage, profile = STAGES[entry["stage"]]
+                # SV_ViewID, the view index (record mrhi-0020), needs 6.1.
+                model = "6_1" if "view_index" in entry.get("builtins", []) else SHADER_MODEL
                 hlsl = os.path.join(work, entry["name"] + ".hlsl")
-                run(["spirv-cross", module, "--hlsl", "--shader-model", SHADER_MODEL.replace("_", ""),
+                run(["spirv-cross", module, "--hlsl", "--shader-model", model.replace("_", ""),
                      "--hlsl-support-nonzero-basevertex-baseinstance",
                      "--hlsl-basevertex-baseinstance-binding", str(writer.D3D12_VERTEX_INFO),
                      str(writer.D3D12_SPACE), "--entry", entry["name"], "--stage", stage,
@@ -168,7 +171,7 @@ def main():
                     source = f.read()
                 with open(hlsl, "w", encoding="utf-8") as f:
                     f.write(declaration + source)
-                run(["dxc", "-T", f"{profile}_{SHADER_MODEL}", "-E", "main", "-Qstrip_reflect",
+                run(["dxc", "-T", f"{profile}_{model}", "-E", "main", "-Qstrip_reflect",
                      "-Qstrip_debug", *defines, "-Fo",
                      os.path.join(folder, entry["name"] + ".dxil"), hlsl],
                     f"dxc on {entry['name']}")

@@ -354,6 +354,30 @@ static mrhiResult RecordIndirect(mrhiDevice* device, mrhiFramePass* pass, mrhiCo
     return mrhi_success;
 }
 
+// The pass of an indirect draw, recording, with what the draw reads set:
+// a pipeline, each vertex buffer (no counts, so only whether each is
+// set) and, for an indexed draw, an index buffer of the pipeline's strip
+// index format.
+static mrhiFramePass* IndirectPass(mrhiDevice* device, mrhiPassId id, bool indexed,
+                                   mrhiResult* statusOut)
+{
+    const mrhiPipelineSlot* slot = nullptr;
+    mrhiFramePass* pass = DrawPass(device, id, &slot, statusOut);
+    if (pass == nullptr)
+    {
+        return nullptr;
+    }
+    if (indexed &&
+        (pass->indexFormat == mrhi_indexNone ||
+         (slot->stripIndexFormat != mrhi_indexNone && slot->stripIndexFormat != pass->indexFormat)))
+    {
+        *statusOut = mrhi_errorState;
+        return nullptr;
+    }
+    *statusOut = CheckVertexBuffers(device, id, slot, 0, 0, 0, 0);
+    return *statusOut == mrhi_success ? pass : nullptr;
+}
+
 mrhiResult mrhiDrawIndirect(mrhiDevice* device, mrhiPassId id, mrhiResourceId resource,
                             uint64_t offset)
 {
@@ -362,19 +386,10 @@ mrhiResult mrhiDrawIndirect(mrhiDevice* device, mrhiPassId id, mrhiResourceId re
         return mrhi_errorInvalid;
     }
     mrhiResult status = mrhi_success;
-    const mrhiPipelineSlot* slot = nullptr;
-    mrhiFramePass* pass = DrawPass(device, id, &slot, &status);
-    if (pass == nullptr)
-    {
-        return status;
-    }
-    // No counts, so only whether each vertex buffer is set.
-    status = CheckVertexBuffers(device, id, slot, 0, 0, 0, 0);
-    if (status != mrhi_success)
-    {
-        return status;
-    }
-    return RecordIndirect(device, pass, mrhiCommandDrawIndirect, resource, offset, 16);
+    mrhiFramePass* pass = IndirectPass(device, id, false, &status);
+    return pass == nullptr
+               ? status
+               : RecordIndirect(device, pass, mrhiCommandDrawIndirect, resource, offset, 16);
 }
 
 mrhiResult mrhiDrawIndexedIndirect(mrhiDevice* device, mrhiPassId id, mrhiResourceId resource,
@@ -385,23 +400,93 @@ mrhiResult mrhiDrawIndexedIndirect(mrhiDevice* device, mrhiPassId id, mrhiResour
         return mrhi_errorInvalid;
     }
     mrhiResult status = mrhi_success;
-    const mrhiPipelineSlot* slot = nullptr;
-    mrhiFramePass* pass = DrawPass(device, id, &slot, &status);
+    mrhiFramePass* pass = IndirectPass(device, id, true, &status);
+    return pass == nullptr
+               ? status
+               : RecordIndirect(device, pass, mrhiCommandDrawIndexedIndirect, resource, offset, 20);
+}
+
+// Records a counted multi-draw (mrhi-0020): maxCount packed records and a
+// 32-bit count, each in a buffer the pass declares with the indirect
+// access.
+static mrhiResult RecordCounted(mrhiDevice* device, mrhiPassId id, bool indexed,
+                                mrhiResourceId resource, uint64_t offset,
+                                mrhiResourceId countResource, uint64_t countOffset,
+                                uint32_t maxCount)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (!device->features.multiDrawIndirectCount)
+    {
+        return mrhi_errorUnsupported;
+    }
+    if (maxCount == 0 || maxCount > MRHI_INDIRECT_DRAWS)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = IndirectPass(device, id, indexed, &status);
     if (pass == nullptr)
     {
         return status;
     }
-    if (pass->indexFormat == mrhi_indexNone ||
-        (slot->stripIndexFormat != mrhi_indexNone && slot->stripIndexFormat != pass->indexFormat))
+    uint64_t bytes = (uint64_t)maxCount * (indexed ? 20 : 16);
+    uint64_t four = 4;
+    uint32_t object = offset % 4 != 0 ? 0
+                                      : DeclaredRange(device, pass, resource, mrhi_accessIndirect,
+                                                      offset, &bytes, &status);
+    uint32_t count = object == 0 || countOffset % 4 != 0
+                         ? 0
+                         : DeclaredRange(device, pass, countResource, mrhi_accessIndirect,
+                                         countOffset, &four, &status);
+    if (count == 0)
     {
-        return mrhi_errorState;
+        return status == mrhi_errorStale ? status : mrhiDeviceMisuse(device);
     }
-    status = CheckVertexBuffers(device, id, slot, 0, 0, 0, 0);
-    if (status != mrhi_success)
+    // The frame's counted draws stay within the limit, whatever other
+    // passes take meanwhile; draws taken by a call that then finds the
+    // commands full stay taken, the frame being full anyway.
+    uint64_t taken = atomic_load_explicit(&device->countedTaken, memory_order_relaxed);
+    do
     {
-        return status;
+        if (maxCount > device->deviceLimits.frameIndirectDraws - taken)
+        {
+            return mrhi_errorCapacity;
+        }
+    } while (!atomic_compare_exchange_weak_explicit(&device->countedTaken, &taken, taken + maxCount,
+                                                    memory_order_relaxed, memory_order_relaxed));
+    mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
+    if (record == nullptr)
+    {
+        return mrhi_errorCapacity;
     }
-    return RecordIndirect(device, pass, mrhiCommandDrawIndexedIndirect, resource, offset, 20);
+    *record = (mrhiCommand){
+        .type = indexed ? mrhiCommandDrawIndexedIndirectCount : mrhiCommandDrawIndirectCount,
+        .a = object,
+        .b = (uint64_t)maxCount << 32 | count,
+        .c = offset,
+        .d = countOffset,
+    };
+    return mrhi_success;
+}
+
+mrhiResult mrhiDrawIndirectCount(mrhiDevice* device, mrhiPassId pass, mrhiResourceId resource,
+                                 uint64_t offset, mrhiResourceId countResource,
+                                 uint64_t countOffset, uint32_t maxCount)
+{
+    return RecordCounted(device, pass, false, resource, offset, countResource, countOffset,
+                         maxCount);
+}
+
+mrhiResult mrhiDrawIndexedIndirectCount(mrhiDevice* device, mrhiPassId pass,
+                                        mrhiResourceId resource, uint64_t offset,
+                                        mrhiResourceId countResource, uint64_t countOffset,
+                                        uint32_t maxCount)
+{
+    return RecordCounted(device, pass, true, resource, offset, countResource, countOffset,
+                         maxCount);
 }
 
 mrhiResult mrhiDispatchIndirect(mrhiDevice* device, mrhiPassId id, mrhiResourceId resource,

@@ -17,6 +17,8 @@
 #include "d3d12_record.h"
 #include "invariant.h"
 
+#include "generated/d3d12_expand.h"
+
 #include <stdalign.h>
 #include <string.h>
 
@@ -133,8 +135,14 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
     frames->viewLimit = records < views ? records : views;
     frames->samplerLimit = records < samplers ? records : samplers;
     // Each indirect draw is a record, larger than the arguments it
-    // copies.
+    // copies; each counted draw expanded takes an indexed draw's
+    // arguments and the vertex information.
     frames->scratchBytes = limits->frameCommandBytes;
+    if (frames->counted)
+    {
+        frames->scratchBytes += (uint64_t)limits->frameIndirectDraws *
+                                (sizeof(D3D12_DRAW_INDEXED_ARGUMENTS) + 2 * sizeof(uint32_t));
+    }
     frames->zeroBytes = (uint64_t)limits->queries * sizeof(uint64_t);
     frames->readbackLimit = limits->readbacks;
     frames->uploadBytes = limits->frameUploadBytes;
@@ -216,7 +224,26 @@ static ID3D12CommandSignature* SignatureOf(ID3D12Device* device, mrhiD3d12Indire
                : nullptr;
 }
 
-// Makes the command signatures and, for a device with queries, the
+// Makes the kernel expanding counted draws' records, its root signature
+// embedded in its DXIL.
+static bool MakeExpand(mrhiD3d12Frames* frames)
+{
+    if (FAILED(ID3D12Device_CreateRootSignature(
+            frames->device, 0, mrhiD3d12ExpandDxil, sizeof(mrhiD3d12ExpandDxil),
+            &IID_ID3D12RootSignature, (void**)&frames->expandRoot)))
+    {
+        return false;
+    }
+    const D3D12_COMPUTE_PIPELINE_STATE_DESC desc = {
+        .pRootSignature = frames->expandRoot,
+        .CS = {mrhiD3d12ExpandDxil, sizeof(mrhiD3d12ExpandDxil)},
+    };
+    return SUCCEEDED(ID3D12Device_CreateComputePipelineState(
+        frames->device, &desc, &IID_ID3D12PipelineState, (void**)&frames->expand));
+}
+
+// Makes the command signatures, the kernel of a device drawing counted
+// multi-draws and, for a device with queries, the
 // zeros their resolves copy, which D3D12 zeroes as it commits them.
 static bool OpenShared(mrhiD3d12Frames* frames)
 {
@@ -225,6 +252,10 @@ static bool OpenShared(mrhiD3d12Frames* frames)
     {
         frames->signatures[i] = SignatureOf(frames->device, (mrhiD3d12Indirect)i);
         made = made && frames->signatures[i] != nullptr;
+    }
+    if (made && frames->counted)
+    {
+        made = MakeExpand(frames);
     }
     if (made && frames->zeroBytes > 0)
     {
@@ -367,6 +398,8 @@ void mrhiD3d12CloseFrames(mrhiD3d12Frames* frames)
     {
         Drop(frames->signatures[i]);
     }
+    Drop(frames->expand);
+    Drop(frames->expandRoot);
     Drop(frames->zeros);
     Drop(frames->readback);
     if (frames->event != nullptr)
@@ -617,6 +650,8 @@ static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrh
         .zeros = frames->zeros,
         .scratch = &slot->scratch,
         .scratchBytes = frames->scratchBytes,
+        .expandRoot = frames->expandRoot,
+        .expand = frames->expand,
         .scratchState = D3D12_RESOURCE_STATE_COMMON,
         .status = mrhi_success,
     };

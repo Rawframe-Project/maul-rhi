@@ -89,6 +89,9 @@ extern "C"
         uint32_t queries;
         // Bindless heaps the device holds at once; 4 by default, 0 for none.
         uint32_t heaps;
+        // The draws one frame's counted multi-draws make at most, their
+        // maxCounts in all; 262144 by default, 0 for none.
+        uint32_t frameIndirectDraws;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the

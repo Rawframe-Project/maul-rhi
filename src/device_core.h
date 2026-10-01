@@ -247,6 +247,8 @@ typedef struct mrhiRenderLayout
     mrhiFormat colors[MRHI_COLOR_TARGETS];
     mrhiFormat depth;
     uint32_t samples;
+    // The views rendered (mrhi-0020): 1 without multiview.
+    uint32_t views;
     bool writesDepth;
     bool writesStencil;
 } mrhiRenderLayout;
@@ -275,6 +277,8 @@ typedef struct mrhiFramePass
     mrhiColorTarget colorTargets[MRHI_COLOR_TARGETS];
     uint32_t colorTargetCount;
     mrhiDepthTarget depthTarget;
+    // The views it renders (mrhi-0020): 1 without multiview.
+    uint32_t viewCount;
     // The stores the compile derived for its targets.
     mrhiStoreOp colorStores[MRHI_COLOR_TARGETS];
     mrhiStoreOp depthStore;
@@ -486,6 +490,9 @@ struct mrhiDevice
     uint8_t* frameStaging;
     uint32_t stagingRegion;
     _Atomic uint64_t stagingTaken;
+    // The draws the open frame's counted multi-draws make at most, in all
+    // (mrhi-0020), never past frameIndirectDraws.
+    _Atomic uint64_t countedTaken;
     uint32_t* runningRegions;
     // Each pass's vertex buffers' bytes plus one (0 for unset),
     // vertexBuffers per pass.

@@ -217,6 +217,8 @@ static bool Describe(const WebGpuDriver* driver, mrhiDriverAdapter* adapterOut)
                            mrhiJsAdapterLimit(driver->state, mrhiWebGpuLimits[i].name));
     }
     adapterOut->limits.framesInFlight = WEBGPU_FRAMES_IN_FLIGHT;
+    // WebGPU has no multiview: one view.
+    adapterOut->limits.multiviewViews = 1;
     return true;
 }
 

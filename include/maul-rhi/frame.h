@@ -498,6 +498,11 @@ extern "C"
         // The bindless heap every draw and dispatch of the pass reads; a null
         // id for none.
         mrhiHeapId heap;
+        // The views the pass renders, each into the next layer of every target
+        // from the target's layer: 0 and 1 mean one view. More needs the
+        // multiview feature, at most the device's multiviewViews limit, a
+        // pipeline made for as many, and targets with the layers.
+        uint32_t viewCount;
     } mrhiPassDef;
 
     /// Returns the default pass def: a graphics pass with no accesses, targets
@@ -520,18 +525,21 @@ extern "C"
     /// other resource type, a range outside the texture, a use an imported
     /// object was not made with, a target that does not render or depth-test, a
     /// use of a sealed resource other than the reads its sealed state allows),
-    /// targets of different sizes or sample counts, a resolve that does not
-    /// match, a subresource written and used otherwise in the pass, an access
-    /// the class does not allow, a declared resource read before any pass wrote
-    /// it, an occlusion query set that is not one or is named by a pass without
+    /// targets of different sizes or sample counts, views past one on a native
+    /// pass or one without targets, targets without a layer for each view or of
+    /// a 3D texture with views past one, a resolve that does not match, a
+    /// subresource written and used otherwise in the pass, an access the class
+    /// does not allow, a declared resource read before any pass wrote it, an
+    /// occlusion query set that is not one or is named by a pass without
     /// targets, or timestamps of a set that is not a timestamp set, on a pass
     /// not of the graphics class, without a set, with neither query, with both
     /// the same, or with a query past the set's count or already written in
     /// this frame; `mrhi_errorStale` for a resource of another frame, an
     /// imported object destroyed since, or a query set or heap the device no
     /// longer has; `mrhi_errorUnsupported` for a critical extension the library
-    /// does not know; `mrhi_errorState` for a device without an open frame, or
-    /// a frame already compiled; `mrhi_errorCapacity` when the device's
+    /// does not know, or views past one without the multiview feature or past
+    /// its limit; `mrhi_errorState` for a device without an open frame, or a
+    /// frame already compiled; `mrhi_errorCapacity` when the device's
     /// framePasses or frameAccesses limit is reached.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.

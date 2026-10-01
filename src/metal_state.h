@@ -45,6 +45,12 @@ typedef struct mrhiMetalEncoder
     id* objects;
     id<MTLBuffer> staging;
     id<MTLBuffer> readback;
+    // The kernel clamping counted multi-draws' records, the buffer they
+    // are clamped into, and where the next counted draw's records lie in
+    // it (mrhi-0020).
+    id<MTLComputePipelineState> clamp;
+    id<MTLBuffer> clamped;
+    uint64_t clampedAt;
     id<MTLCommandBuffer> commands;
     id<MTLDepthStencilState> noDepth;
     id<MTLRenderCommandEncoder> render;

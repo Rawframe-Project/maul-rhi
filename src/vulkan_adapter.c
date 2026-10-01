@@ -439,6 +439,10 @@ static mrhiLimits LimitsOf(const DeviceFacts* facts)
         .framesInFlight = VULKAN_FRAMES_IN_FLIGHT,
         .heapSize = HeapSize(facts),
         .samplerHeapSize = SamplerHeapSize(facts),
+        // A view mask holds 32 views.
+        .multiviewViews = facts->features11.multiview
+                              ? Smaller(facts->properties11.maxMultiviewViewCount, 32)
+                              : 1,
     };
     mrhiVulkanBindingLimits(limits, &granted);
     return granted;

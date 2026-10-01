@@ -108,6 +108,8 @@
     X(vkCmdDrawIndirect)                                                                           \
     X(vkCmdDrawIndexedIndirect)                                                                    \
     X(vkCmdDispatchIndirect)                                                                       \
+    X(vkCmdDrawIndirectCount)                                                                      \
+    X(vkCmdDrawIndexedIndirectCount)                                                               \
     X(vkCmdResetQueryPool)                                                                         \
     X(vkCmdBeginQuery)                                                                             \
     X(vkCmdEndQuery)                                                                               \

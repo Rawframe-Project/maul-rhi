@@ -122,6 +122,7 @@ static bool IsWithin(const mrhiDevice* device, const mrhiContainer* container)
         (container->float16 && !device->features.shaderF16) ||
         (container->builtins & mrhi_builtinPrimitiveIndex) != 0 ||
         (container->heapUses != 0 && !device->features.bindlessSampling) ||
+        ((container->builtins & mrhi_builtinViewIndex) != 0 && !device->features.multiview) ||
         ((container->heapUses & (mrhi_heapUseStorageTextures | mrhi_heapUseStorageBuffers)) != 0 &&
          !device->features.bindlessHeterogeneous) ||
         !AreBindingsWithin(&device->limits, container))

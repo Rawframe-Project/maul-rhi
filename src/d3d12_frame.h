@@ -103,6 +103,12 @@ typedef struct mrhiD3d12Frames
     uint8_t* readbackBytes;
     uint64_t readbackSize;
     ID3D12CommandSignature* signatures[mrhiD3d12IndirectCount];
+    // Whether the device draws counted multi-draws, and the kernel that
+    // expands their records for pipelines reading the vertex information
+    // (mrhi-0020), made when it does.
+    bool counted;
+    ID3D12RootSignature* expandRoot;
+    ID3D12PipelineState* expand;
     ID3D12Resource* zeros;
     uint64_t zeroBytes;
     // The frame being recorded's state, kept here for its size.

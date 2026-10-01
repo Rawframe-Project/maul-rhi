@@ -384,6 +384,46 @@ static void TestTargets(void)
     Close2();
 }
 
+// A pipeline is set only in passes of its views (mrhi-0020).
+static void TestViews(void)
+{
+    s_adapter.features.multiview = true;
+    s_adapter.limits.multiviewViews = 2;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.features.multiview = true;
+    deviceDef.limits.multiviewViews = 2;
+    OpenOn(deviceDef);
+    mrhiGraphicsPipelineDef def = GraphicsDef();
+    def.viewCount = 2;
+    mrhiGraphicsPipelineId two = Graphics(&def);
+    mrhiFrameDef frameDef = mrhiDefaultFrameDef();
+    mrhiTextureDef textureDef = mrhiDefaultTextureDef();
+    textureDef.kind = mrhi_texture2dArray;
+    textureDef.format = mrhi_formatRgba8Unorm;
+    textureDef.width = 16;
+    textureDef.height = 16;
+    textureDef.depthOrLayers = 2;
+    mrhiResourceId layers = {0};
+    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success &&
+              mrhiDeclareTexture(s_device, &textureDef, &layers) == mrhi_success,
+          "two layers");
+    mrhiPassDef passDef = mrhiDefaultPassDef();
+    passDef.colorTargets[0] = (mrhiColorTarget){.resource = layers, .load = mrhi_loadClear};
+    passDef.colorTargetCount = 1;
+    passDef.neverCull = true;
+    passDef.viewCount = 2;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(s_device, &passDef, &pass) == mrhi_success &&
+              mrhiCompileFrame(s_device) == mrhi_success &&
+              mrhiBeginPass(s_device, pass) == mrhi_success,
+          "a pass of two views");
+    CHECK(mrhiSetGraphicsPipeline(s_device, pass, s_graphics) == mrhi_errorInvalid,
+          "a pipeline of one view");
+    CHECK(mrhiSetGraphicsPipeline(s_device, pass, two) == mrhi_success, "one of two");
+    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    Close2();
+}
+
 static void TestViewport(void)
 {
     Open(4);
@@ -807,6 +847,7 @@ int main(void)
     TestPhases();
     TestPipelines();
     TestTargets();
+    TestViews();
     TestViewport();
     TestScissorAndState();
     TestRootBlock();

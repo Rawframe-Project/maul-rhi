@@ -158,6 +158,10 @@ typedef struct mrhiD3d12Recorder
     uint64_t scratchBytes;
     uint64_t scratchUsed;
     D3D12_RESOURCE_STATES scratchState;
+    // The kernel expanding counted draws' records (mrhi-0020), on a
+    // device that draws them.
+    ID3D12RootSignature* expandRoot;
+    ID3D12PipelineState* expand;
     // mrhi_errorCapacity once a descriptor ring or the scratch buffer
     // runs out, which fails the frame.
     mrhiResult status;

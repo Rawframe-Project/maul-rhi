@@ -611,6 +611,169 @@ static void TestIndirectDraws(void)
     CloseDevice();
 }
 
+// Opens a frame whose render pass alone declares the vertex and index
+// buffers and two indirect ones, records and counts, compiled and begun.
+static void CountedFrame(mrhiBufferId records, mrhiBufferId counts, mrhiResourceId* recordsOut,
+                         mrhiResourceId* countsOut)
+{
+    mrhiFrameDef frameDef = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    s_v = Import(s_vertices);
+    s_i = Import(s_instances);
+    s_x = Import(s_indices);
+    *recordsOut = Import(records);
+    *countsOut = Import(counts);
+    mrhiResourceId target = {0};
+    CHECK(mrhiImportTexture(s_device, s_target, &target) == mrhi_success, "imported");
+    mrhiAccess accesses[] = {
+        Access(s_v, mrhi_accessVertex),          Access(s_i, mrhi_accessVertex),
+        Access(s_x, mrhi_accessIndex),           Access(*recordsOut, mrhi_accessIndirect),
+        Access(*countsOut, mrhi_accessIndirect),
+    };
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.colorTargets[0] = (mrhiColorTarget){.resource = target, .load = mrhi_loadClear};
+    def.colorTargetCount = 1;
+    def.accesses = accesses;
+    def.accessCount = 5;
+    CHECK(mrhiAddPass(s_device, &def, &s_render) == mrhi_success &&
+              mrhiCompileFrame(s_device) == mrhi_success &&
+              mrhiBeginPass(s_device, s_render) == mrhi_success,
+          "the render pass begun");
+}
+
+// Counted multi-draws (mrhi-0020): unsupported without their feature; with it,
+// recorded with both buffers, the offsets and the most draws, and refused
+// for records or a count outside their buffers, offsets off 4, a most of
+// 0 or past MRHI_INDIRECT_DRAWS, and buffers the pass does not declare
+// as indirect.
+static void TestCountedDraws(void)
+{
+    Open();
+    mrhiGraphicsPipelineId pipeline = MakeGraphics();
+    Frame();
+    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+    SetVertices();
+    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) == mrhi_errorUnsupported &&
+              mrhiDrawIndexedIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) ==
+                  mrhi_errorUnsupported &&
+              mrhiGetDeviceMisuse(s_device) == 0,
+          "unsupported without the feature, and no misuse");
+    Drop();
+    CloseDevice();
+    s_adapter.features.multiDrawIndirectCount = true;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.features.multiDrawIndirectCount = true;
+    OpenLimited(deviceDef);
+    pipeline = MakeGraphics();
+    Frame();
+    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) == mrhi_errorState,
+          "no pipeline set");
+    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+    SetVertices();
+    CHECK(mrhiDrawIndexedIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) == mrhi_errorState,
+          "no indices");
+    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+              mrhi_success,
+          "indices");
+    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 3) == mrhi_success,
+          "three records and the count after them");
+    const mrhiCommand* command = Nth(s_render, 4);
+    CHECK(command != nullptr && command->type == mrhiCommandDrawIndirectCount &&
+              command->a == s_a.index1 && command->b == ((uint64_t)3 << 32 | s_a.index1) &&
+              command->c == 0 && command->d == 60,
+          "recorded");
+    CHECK(mrhiDrawIndexedIndirectCount(s_device, s_render, s_a, 4, s_a, 0, 3) == mrhi_success,
+          "three indexed records to the end");
+    command = Nth(s_render, 5);
+    CHECK(command != nullptr && command->type == mrhiCommandDrawIndexedIndirectCount &&
+              command->a == s_a.index1 && command->b == ((uint64_t)3 << 32 | s_a.index1) &&
+              command->c == 4 && command->d == 0,
+          "recorded");
+    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 5) == mrhi_errorInvalid &&
+              mrhiDrawIndexedIndirectCount(s_device, s_render, s_a, 8, s_a, 0, 3) ==
+                  mrhi_errorInvalid,
+          "records past the buffer");
+    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 64, 1) == mrhi_errorInvalid &&
+              mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, UINT64_MAX - 3, 1) ==
+                  mrhi_errorInvalid,
+          "a count past the buffer");
+    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 2, s_a, 60, 1) == mrhi_errorInvalid &&
+              mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 58, 1) == mrhi_errorInvalid,
+          "offsets off 4");
+    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 0) == mrhi_errorInvalid &&
+              mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, MRHI_INDIRECT_DRAWS + 1) ==
+                  mrhi_errorInvalid,
+          "no draws, or too many");
+    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_v, 0, s_a, 60, 1) == mrhi_errorInvalid &&
+              mrhiDrawIndexedIndirectCount(s_device, s_render, s_a, 0, s_u, 0, 1) ==
+                  mrhi_errorInvalid,
+          "a buffer declared for another access");
+    CHECK(mrhiDrawIndirectCount(s_device, s_compute, s_a, 0, s_a, 60, 1) == mrhi_errorInvalid,
+          "a pass without targets");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 11, "each counted");
+    mrhiResourceId none = {0};
+    CHECK(mrhiDrawIndirectCount(s_device, s_render, none, 0, s_a, 60, 1) == mrhi_errorStale &&
+              mrhiDrawIndexedIndirectCount(s_device, s_render, s_a, 0, none, 0, 1) ==
+                  mrhi_errorStale,
+          "none");
+    CHECK(mrhiDrawIndirectCount(nullptr, s_render, s_a, 0, s_a, 60, 1) == mrhi_errorInvalid &&
+              mrhiDrawIndexedIndirectCount(nullptr, s_render, s_a, 0, s_a, 60, 1) ==
+                  mrhi_errorInvalid,
+          "no device");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 11, "neither counted");
+    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success &&
+              mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) == mrhi_errorState,
+          "not recording");
+    Drop();
+    // The most draws, in a buffer with room for one more, and the count in
+    // a buffer of its own.
+    mrhiBufferId records =
+        MakeBuffer((uint64_t)(MRHI_INDIRECT_DRAWS + 1) * 20 + 20, mrhi_bufferIndirect);
+    mrhiBufferId counts = MakeBuffer(8, mrhi_bufferIndirect);
+    mrhiResourceId r = {0};
+    mrhiResourceId c = {0};
+    CountedFrame(records, counts, &r, &c);
+    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+    SetVertices();
+    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+                  mrhi_success &&
+              mrhiDrawIndexedIndirectCount(s_device, s_render, r, 20, c, 4, MRHI_INDIRECT_DRAWS) ==
+                  mrhi_success,
+          "the most draws");
+    command = Nth(s_render, 4);
+    CHECK(command != nullptr && command->a == r.index1 &&
+              command->b == ((uint64_t)MRHI_INDIRECT_DRAWS << 32 | c.index1) && command->c == 20 &&
+              command->d == 4,
+          "recorded with the count's own buffer");
+    CHECK(mrhiDrawIndexedIndirectCount(s_device, s_render, r, 0, c, 4, MRHI_INDIRECT_DRAWS + 1) ==
+              mrhi_errorInvalid,
+          "one past the most, though the buffer has room");
+    Drop();
+    CloseDevice();
+    // A frame's counted draws in all stay within frameIndirectDraws, and
+    // the next frame starts again.
+    s_adapter.features.multiDrawIndirectCount = true;
+    deviceDef.deviceLimits.frameIndirectDraws = 5;
+    OpenLimited(deviceDef);
+    pipeline = MakeGraphics();
+    for (int frame = 0; frame < 2; ++frame)
+    {
+        Frame();
+        CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+        SetVertices();
+        CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 3) == mrhi_success &&
+                  mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 3) ==
+                      mrhi_errorCapacity &&
+                  mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 2) == mrhi_success &&
+                  mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) ==
+                      mrhi_errorCapacity,
+              "five draws in a frame");
+        Drop();
+    }
+    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "the limit is no misuse");
+    CloseDevice();
+}
+
 static void TestIndirectDispatch(void)
 {
     Open();
@@ -734,6 +897,7 @@ int main(void)
     TestTables();
     TestDispatch();
     TestIndirectDraws();
+    TestCountedDraws();
     TestIndirectDispatch();
     TestSubmitted();
     TestArena();

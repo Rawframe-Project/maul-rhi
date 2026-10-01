@@ -405,6 +405,7 @@ mrhiResult mrhiCreateMetalDevice(const mrhiAllocator* allocator, id<MTLDevice> d
         };
     }
     Lay(made, &room, &def->deviceLimits);
+    made->frames.counted = def->features.multiDrawIndirectCount;
     if (mrhiMetalOpenFrames(&made->frames) != mrhi_success)
     {
         Destroy(made);

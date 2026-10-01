@@ -26,6 +26,7 @@
 #include "maul-rhi/test.h"
 #include "shaders/bindless_container.h"
 #include "shaders/conformance_container.h"
+#include "shaders/multiview_container.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -1342,17 +1343,30 @@ static bool IsBlack(const uint8_t* pixel)
     return pixel[0] == 0 && pixel[1] == 0 && pixel[2] == 0 && pixel[3] == 255;
 }
 
+// How a frame of CheckDrawFrame draws.
+typedef enum DrawMode
+{
+    DRAW_DIRECT,
+    DRAW_INDIRECT,
+    // Two counted multi-draws over two records, the second record
+    // covering the whole target: one with a count of 7 clamped to a
+    // maxCount of 1, one with a count of 1 under a maxCount of 2, so that
+    // only the first record draws.
+    DRAW_COUNTED,
+} DrawMode;
+
 // One frame uploads the scene, draws the upper left half of the target
-// (vertices 2 to 4, the triangle y > x with +Y up), directly or from
-// indirect arguments, scales the storage buffer in a compute pass and
-// reads both back. The vertex entry reads its vertex index, which
-// includes the first vertex either way.
-static void CheckDrawFrame(Scene* scene, bool indirect)
+// (vertices 2 to 4, the triangle y > x with +Y up), directly, from
+// indirect arguments or by counted multi-draws, scales the storage
+// buffer in a compute pass and reads both back. The vertex entry reads
+// its vertex index, which includes the first vertex either way.
+static void CheckDrawFrame(Scene* scene, DrawMode mode)
 {
     mrhiDevice* device = scene->device;
+    bool indirect = mode != DRAW_DIRECT;
     BeginScene(scene);
     mrhiBufferDef argumentsDef = mrhiDefaultBufferDef();
-    argumentsDef.size = 16;
+    argumentsDef.size = mode == DRAW_COUNTED ? 40 : 16;
     mrhiResourceId a = {0};
     CHECK(!indirect || mrhiDeclareBuffer(device, &argumentsDef, &a) == mrhi_success,
           "an arguments buffer");
@@ -1375,8 +1389,9 @@ static void CheckDrawFrame(Scene* scene, bool indirect)
     CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
     const uint8_t white[4] = {255, 255, 255, 255};
     uint32_t values[8] = {1, 2, 3, 4, 5, 6, 7, 8};
-    // Three vertices from vertex 2, one instance from instance 0.
-    const uint32_t arguments[4] = {3, 1, 2, 0};
+    // Three vertices from vertex 2, one instance from instance 0; then
+    // the whole target, and the two counts.
+    const uint32_t arguments[10] = {3, 1, 2, 0, 3, 1, 0, 0, 7, 1};
     const mrhiTextureCopy texel = {.resource = scene->w};
     const mrhiTexelLayout layout = {.bytesPerRow = 4, .rowsPerImage = 1};
     const mrhiExtent3d one = {1, 1, 1};
@@ -1386,7 +1401,7 @@ static void CheckDrawFrame(Scene* scene, bool indirect)
             mrhiWriteTexture(device, upload, &texel, white, 4, &layout, &one) == mrhi_success &&
             mrhiWriteBuffer(device, upload, scene->d, 0, values, sizeof(values)) == mrhi_success &&
             (!indirect ||
-             mrhiWriteBuffer(device, upload, a, 0, arguments, sizeof(arguments)) == mrhi_success) &&
+             mrhiWriteBuffer(device, upload, a, 0, arguments, argumentsDef.size) == mrhi_success) &&
             mrhiEndPass(device, upload) == mrhi_success,
         "uploaded");
     const float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -1395,11 +1410,29 @@ static void CheckDrawFrame(Scene* scene, bool indirect)
               mrhiSetRootBlock(device, draw, 0, tint, sizeof(tint)) == mrhi_success,
           "a pipeline set");
     BindScene(scene, draw);
+    mrhiFeatures features = {0};
+    CHECK(mrhiGetDeviceFeatures(device, &features) == mrhi_success, "the device's features");
+    CHECK(mode != DRAW_INDIRECT || features.multiDrawIndirectCount ||
+              mrhiDrawIndirectCount(device, draw, a, 0, a, 0, 1) == mrhi_errorUnsupported,
+          "no counted multi-draw without its feature");
     CHECK(mrhiPushDebugGroup(device, draw, "half", 4) == mrhi_success &&
-              mrhiInsertDebugMarker(device, draw, "upper left", 10) == mrhi_success &&
-              (indirect ? mrhiDrawIndirect(device, draw, a, 0)
-                        : mrhiDraw(device, draw, 3, 1, 2, 0)) == mrhi_success &&
-              mrhiPopDebugGroup(device, draw) == mrhi_success &&
+              mrhiInsertDebugMarker(device, draw, "upper left", 10) == mrhi_success,
+          "a debug group");
+    bool drawn = false;
+    switch (mode)
+    {
+    case DRAW_DIRECT:
+        drawn = mrhiDraw(device, draw, 3, 1, 2, 0) == mrhi_success;
+        break;
+    case DRAW_INDIRECT:
+        drawn = mrhiDrawIndirect(device, draw, a, 0) == mrhi_success;
+        break;
+    case DRAW_COUNTED:
+        drawn = mrhiDrawIndirectCount(device, draw, a, 0, a, 32, 1) == mrhi_success &&
+                mrhiDrawIndirectCount(device, draw, a, 0, a, 36, 2) == mrhi_success;
+        break;
+    }
+    CHECK(drawn && mrhiPopDebugGroup(device, draw) == mrhi_success &&
               mrhiEndPass(device, draw) == mrhi_success,
           "drawn");
     CHECK(mrhiBeginPass(device, compute) == mrhi_success &&
@@ -1893,12 +1926,112 @@ static void CheckComputeSplit(Scene* scene, bool timestamps)
     CHECK(!timestamps || mrhiDestroyQuerySet(device, times) == mrhi_success, "destroyed");
 }
 
+// A multiview pass (mrhi-0020): one draw into two layers of a target,
+// red in view 0 and green in view 1; on a device without multiview, the
+// shader reading the view index and a pass of two views refused.
+static void CheckMultiview(mrhiDevice* device)
+{
+    mrhiFeatures features = {0};
+    mrhiLimits limits;
+    CHECK(mrhiGetDeviceFeatures(device, &features) == mrhi_success &&
+              mrhiGetDeviceLimits(device, &limits) == mrhi_success,
+          "the device's features and limits");
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_multiviewContainer;
+    shaderDef.byteCount = sizeof(s_multiviewContainer);
+    LABEL(shaderDef, "multiview");
+    mrhiShaderId shader = {0};
+    mrhiResult made = mrhiCreateShader(device, &shaderDef, &shader);
+    mrhiTextureDef textureDef = mrhiDefaultTextureDef();
+    textureDef.kind = mrhi_texture2dArray;
+    textureDef.format = mrhi_formatRgba8Unorm;
+    textureDef.width = 8;
+    textureDef.height = 8;
+    textureDef.depthOrLayers = 2;
+    textureDef.usage = mrhi_textureRenderTarget | mrhi_textureCopySource;
+    mrhiTextureId texture = {0};
+    CHECK(mrhiCreateTexture(device, &textureDef, &texture) == mrhi_success, "two layers");
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId t = {0};
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportTexture(device, texture, &t) == mrhi_success,
+          "a frame with them");
+    mrhiPassDef drawDef = mrhiDefaultPassDef();
+    drawDef.colorTargets[0] = (mrhiColorTarget){
+        .resource = t,
+        .load = mrhi_loadClear,
+        .store = mrhi_storeKeep,
+        .clear = {0.0f, 0.0f, 1.0f, 1.0f},
+    };
+    drawDef.colorTargetCount = 1;
+    drawDef.viewCount = 2;
+    mrhiPassId draw = {0};
+    // Vulkan's multiview has six views at least; every driver's two.
+    CHECK(!features.multiview || limits.multiviewViews >= 2, "multiview with two views");
+    if (!features.multiview || limits.multiviewViews < 2)
+    {
+        CHECK(features.multiview || made == mrhi_errorUnsupported,
+              "no view index without multiview");
+        CHECK(!features.multiview || made != mrhi_success ||
+                  mrhiDestroyShader(device, shader) == mrhi_success,
+              "the shader destroyed");
+        CHECK(mrhiAddPass(device, &drawDef, &draw) == mrhi_errorUnsupported,
+              "no two views without multiview");
+        CHECK(mrhiDropFrame(device) == mrhi_success &&
+                  mrhiDestroyTexture(device, texture) == mrhi_success,
+              "dropped");
+        return;
+    }
+    CHECK(made == mrhi_success, "a shader reading the view index");
+    mrhiGraphicsPipelineDef pipelineDef = GraphicsDef(shader);
+    pipelineDef.viewCount = 2;
+    LABEL(pipelineDef, "two views");
+    mrhiGraphicsPipelineId pipeline = {0};
+    mrhiRequestId request = {0};
+    CHECK(mrhiCreateGraphicsPipeline(device, &pipelineDef, &pipeline, &request) == mrhi_success,
+          "a pipeline of two views");
+    AwaitPipelines(device, 1, 0);
+    LABEL(drawDef, "two views");
+    CHECK(mrhiAddPass(device, &drawDef, &draw) == mrhi_success, "a pass of two views");
+    mrhiAccess read = Whole(t, mrhi_accessCopySource);
+    mrhiPassId reading = CopyPass(device, &read, 1);
+    const mrhiTextureCopy source = {.resource = t};
+    const mrhiExtent3d extent = {8, 8, 2};
+    mrhiRequestId pixels = {0};
+    CHECK(mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, draw) == mrhi_success &&
+              mrhiSetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
+              mrhiDraw(device, draw, 3, 1, 0, 0) == mrhi_success &&
+              mrhiEndPass(device, draw) == mrhi_success &&
+              mrhiBeginPass(device, reading) == mrhi_success &&
+              mrhiReadTexture(device, reading, &source, &extent, &pixels) == mrhi_success &&
+              mrhiEndPass(device, reading) == mrhi_success,
+          "drawn in two views and read");
+    Finish(device, 1);
+    uint8_t expected[2 * 8 * 8 * 4];
+    static const uint8_t kRed[4] = {255, 0, 0, 255};
+    static const uint8_t kGreen[4] = {0, 255, 0, 255};
+    for (size_t i = 0; i < sizeof(expected); i += 4)
+    {
+        memcpy(&expected[i], i < sizeof(expected) / 2 ? kRed : kGreen, 4);
+    }
+    CHECK(Taken(device, pixels, expected, sizeof(expected)), "red in view 0, green in view 1");
+    CHECK(mrhiDestroyGraphicsPipeline(device, pipeline) == mrhi_success &&
+              mrhiDestroyShader(device, shader) == mrhi_success &&
+              mrhiDestroyTexture(device, texture) == mrhi_success,
+          "destroyed");
+}
+
 static void CheckDrawing(mrhiDevice* device, bool timestamps)
 {
     Scene scene = {.device = device};
     MakeScene(&scene);
-    CheckDrawFrame(&scene, false);
-    CheckDrawFrame(&scene, true);
+    CheckDrawFrame(&scene, DRAW_DIRECT);
+    CheckDrawFrame(&scene, DRAW_INDIRECT);
+    mrhiFeatures features = {0};
+    if (mrhiGetDeviceFeatures(device, &features) == mrhi_success && features.multiDrawIndirectCount)
+    {
+        CheckDrawFrame(&scene, DRAW_COUNTED);
+    }
     CheckClear(&scene);
     CheckCulling(&scene);
     CheckQueries(&scene, timestamps);
@@ -1929,6 +2062,10 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
     def.features = *asked;
+    // Multiview asked for with the adapter's views.
+    mrhiLimits limits;
+    CHECK(mrhiGetAdapterLimits(instance, adapter, &limits) == mrhi_success, "limits");
+    def.limits.multiviewViews = asked->multiview ? limits.multiviewViews : 1;
     LABEL(def, "conformance");
     mrhiDevice* device = nullptr;
     mrhiRequestId request;
@@ -1955,6 +2092,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CheckAliasing(device);
     CheckFeatureFormats(device, asked);
     CheckDrawing(device, asked->timestampQuery);
+    CheckMultiview(device);
     mrhiDestroyDevice(device);
 }
 
