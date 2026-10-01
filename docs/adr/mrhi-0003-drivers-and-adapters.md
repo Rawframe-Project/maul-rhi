@@ -115,14 +115,23 @@ ids, requests, the frame graph) can be tested without a GPU.
   with manual retain and release so that Metal objects sit in plain C
   structs, released where the SPI destroys them; every entry point that
   touches Objective-C objects drains its own autorelease pool. A search
-  lists every Metal device (the default one outside macOS) under its
-  registry id. Limits are WebGPU's floor, raised where Metal's feature
+  lists every Metal device (the default one outside macOS) that meets
+  the contract's floor, under its registry id: cube array textures,
+  which Apple's GPUs have from the Apple4 family (A11) and every Mac's
+  have, as the Vulkan driver asks `imageCubeArray`. Limits are WebGPU's floor, raised where Metal's feature
   set tables promise more for the device's family and where the device
   reports its own; features are granted as the driver comes to run
   them. MoltenVK and KosmicKrisp stay usable under the Vulkan driver
   where a program builds it and loads one, but are neither tested nor
   promised. CI runs the conformance suite and the samples on the macOS
   runner's device under `MTL_DEBUG_LAYER` and `MTL_SHADER_VALIDATION`.
+  The same driver builds for iOS (15 and later): what iOS has later is
+  used where it has it (BC compression from 16.4, extended range
+  surfaces from 16), and presenting immediately is macOS's alone.
+  `cmake/ios-simulator.cmake` builds for the iOS simulator and runs
+  every test there through `simctl spawn`, which CI does; the
+  simulator's GPU has no cube arrays, so the conformance suite's native
+  part skips there, and the driver's own runs are the macOS runner's.
 - **Metal objects:** buffers, textures, views, samplers and query sets
   are Metal objects whose retained pointers are their handles, released
   as soon as the core destroys them, since command buffers retain what

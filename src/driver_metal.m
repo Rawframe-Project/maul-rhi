@@ -39,18 +39,36 @@ typedef struct MetalDriver
     uint32_t pendingLimit;
 } MetalDriver;
 
-// The system's Metal devices, retained by the array the caller releases.
+// Whether a device meets the contract's floor beyond what every Metal
+// device has: cube array textures, which Apple's GPUs have from the
+// Apple4 family on and every Mac's have; the iOS simulator's lacks them.
+static bool MeetsFloor(id<MTLDevice> device)
+{
+    return [device supportsFamily:MTLGPUFamilyApple4] || [device supportsFamily:MTLGPUFamilyMac2];
+}
+
+// The system's Metal devices that meet the floor, retained by the array
+// the caller releases.
 static NSArray<id<MTLDevice>>* CopyDevices(void)
 {
 #if TARGET_OS_OSX
-    return MTLCopyAllDevices();
+    NSArray<id<MTLDevice>>* all = MTLCopyAllDevices();
 #else
     id<MTLDevice> device = MTLCreateSystemDefaultDevice();
-    NSArray<id<MTLDevice>>* devices =
+    NSArray<id<MTLDevice>>* all =
         device == nil ? [[NSArray alloc] init] : [[NSArray alloc] initWithObjects:device, nil];
     [device release];
-    return devices;
 #endif
+    NSMutableArray<id<MTLDevice>>* devices = [[NSMutableArray alloc] init];
+    for (id<MTLDevice> candidate in all)
+    {
+        if (MeetsFloor(candidate))
+        {
+            [devices addObject:candidate];
+        }
+    }
+    [all release];
+    return devices;
 }
 
 // A device's adapter handle: its registry id, never zero.
@@ -115,12 +133,22 @@ static mrhiLimits LimitsOf(id<MTLDevice> device)
     return limits;
 }
 
+// BC compression, which iOS reports from 16.4.
+static bool HasBc(id<MTLDevice> device)
+{
+    if (@available(macOS 11.0, iOS 16.4, *))
+    {
+        return device.supportsBCTextureCompression;
+    }
+    return false;
+}
+
 static mrhiFeatures FeaturesOf(id<MTLDevice> device)
 {
     bool apple7 = [device supportsFamily:MTLGPUFamilyApple7];
     bool mac2 = [device supportsFamily:MTLGPUFamilyMac2];
     return (mrhiFeatures){
-        .textureCompressionBc = device.supportsBCTextureCompression,
+        .textureCompressionBc = HasBc(device),
         .textureCompressionEtc2 = [device supportsFamily:MTLGPUFamilyApple2],
         .textureCompressionAstc = [device supportsFamily:MTLGPUFamilyApple2],
         .float32Filterable = device.supports32BitFloatFiltering,

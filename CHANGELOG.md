@@ -399,6 +399,12 @@ format.
 - The conformance suite (`test_conformance`): the same checks through
   the public API on the test driver and every native adapter, run on
   lavapipe under the Khronos validation layer in Linux CI.
+- The Metal driver built for iOS 15 and later, with BC compression
+  from iOS 16.4 and extended range surfaces from 16, and
+  `cmake/ios-simulator.cmake`, with which CI builds for the iOS
+  simulator and runs every test there (mrhi-0003). Metal devices without
+  cube array textures (Apple GPUs before the A11, the simulator's) are
+  not listed.
 - The web without Emscripten (mrhi-0016): a `wasm32-wasi` build
   imports the WebGPU driver's JavaScript from `maul-rhi.mjs`, which the
   build writes from the same `EM_JS` functions (`maulRhiImports`), with

@@ -149,6 +149,33 @@ jobs:
 
   # Each fuzz target runs for one minute on every push, over the bytes
   # programs load from disk and hand the library, from its seed.
+  ios:
+    # The Metal driver built for iOS, every test in the simulator through
+    # simctl spawn, on an iPhone of the newest runtime.
+    name: ios-simulator
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Boot a simulator
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          runtimes = sorted((r for r in devices if ".iOS-" in r),
+                            key=lambda r: [int(p) for p in r.rsplit("iOS-", 1)[1].split("-")])
+          print(next(d["udid"] for d in devices[runtimes[-1]] if d["name"].startswith("iPhone")))')
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          echo "MWIN_IOS_DEVICE=$udid" >> "$GITHUB_ENV"
+      - name: Configure
+        run: >
+          cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/ios-simulator.cmake
+          -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_WERROR=ON
+      - name: Build
+        run: cmake --build build -j 4
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --timeout 240
+
   fuzz:
     name: fuzz
     runs-on: ubuntu-24.04
