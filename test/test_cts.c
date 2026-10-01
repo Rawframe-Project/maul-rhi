@@ -433,12 +433,452 @@ static void TestTextureCopies(void)
     }
 }
 
+// api,validation,image_copy,layout_related: WebGPU's texel block facts
+// as the CTS's tables give them (the oracle never asks the library), and
+// the features a compressed format needs.
+typedef struct Block
+{
+    mrhiFormat format;
+    uint32_t bytes;
+    uint32_t width;
+    uint32_t height;
+    bool compressed;
+} Block;
+
+static const Block s_blocks[] = {
+    {mrhi_formatR8Unorm, 1, 1, 1, false},      {mrhi_formatRg8Unorm, 2, 1, 1, false},
+    {mrhi_formatRgba8Unorm, 4, 1, 1, false},   {mrhi_formatRgba16Float, 8, 1, 1, false},
+    {mrhi_formatRgba32Float, 16, 1, 1, false}, {mrhi_formatBc1RgbaUnorm, 8, 4, 4, true},
+    {mrhi_formatBc7RgbaUnorm, 16, 4, 4, true}, {mrhi_formatEtc2Rgb8Unorm, 8, 4, 4, true},
+    {mrhi_formatAstc8x6Unorm, 16, 8, 6, true},
+};
+
+// The CTS's three copy methods.
+typedef enum Method
+{
+    WRITE_TEXTURE,
+    BUFFER_TO_TEXTURE,
+    TEXTURE_TO_BUFFER,
+} Method;
+
+static const char* const s_methods[] = {"WriteTexture", "CopyB2T", "CopyT2B"};
+
+// A layout value the CTS leaves undefined.
+#define ABSENT INT64_C(-1)
+
+// The CTS's dataBytesForCopyOrOverestimate: the bytes a copy needs from
+// its offset (an overestimate where the layout is invalid) and whether
+// the layout is valid. Layout values may be ABSENT.
+typedef struct Need
+{
+    uint64_t bytes;
+    bool valid;
+} Need;
+
+static Need DataBytes(Method method, const Block* block, uint64_t offset, int64_t bytesPerRow,
+                      int64_t rowsPerImage, mrhiExtent3d size)
+{
+    uint64_t width = size.width / block->width;
+    uint64_t height = size.height / block->height;
+    uint64_t depth = size.depthOrLayers;
+    uint64_t lastRow = width * block->bytes;
+    bool valid = true;
+    if (method != WRITE_TEXTURE &&
+        (offset % block->bytes != 0 || (bytesPerRow > 0 && bytesPerRow % 256 != 0)))
+    {
+        valid = false;
+    }
+    if ((bytesPerRow != ABSENT && (uint64_t)bytesPerRow < lastRow) ||
+        (bytesPerRow == ABSENT && (height > 1 || depth > 1)))
+    {
+        bytesPerRow = ABSENT;
+        valid = false;
+    }
+    if ((rowsPerImage != ABSENT && (uint64_t)rowsPerImage < height) ||
+        (rowsPerImage == ABSENT && depth > 1))
+    {
+        rowsPerImage = ABSENT;
+        valid = false;
+    }
+    uint64_t perRow =
+        bytesPerRow != ABSENT ? (uint64_t)bytesPerRow : (block->bytes * width + 255) / 256 * 256;
+    uint64_t perImage = rowsPerImage != ABSENT ? (uint64_t)rowsPerImage : height;
+    uint64_t required = 0;
+    if (depth > 1)
+    {
+        required += perRow * perImage * (depth - 1);
+    }
+    if (depth > 0)
+    {
+        required += height > 1 ? perRow * (height - 1) : 0;
+        required += height > 0 ? lastRow : 0;
+    }
+    return (Need){offset + required, valid};
+}
+
+// What a transfer case comes to: the library's outcome, or none where
+// Maul RHI cannot express its data. The CTS's buffers take any size,
+// Maul RHI's a positive multiple of 4: a case runs with its size rounded
+// up when the copy's need does not fall between the two, which keeps
+// its outcome.
+#define INEXPRESSIBLE ((mrhiResult)1000)
+
+static uint8_t s_data[4u << 20];
+
+// A transfer case in a frame: a texture of the block's format, its
+// buffer or bytes of dataSize, a transfer pass declaring both, and the
+// copy at the texture's origin.
+static mrhiResult Transfer(Method method, const Block* block, mrhiTextureKind kind,
+                           mrhiExtent3d textureSize, uint64_t offset, uint32_t bytesPerRow,
+                           uint32_t rowsPerImage, uint64_t dataSize, mrhiExtent3d size)
+{
+    if (method != WRITE_TEXTURE && (dataSize == 0 || dataSize % 4 != 0))
+    {
+        uint64_t rounded = dataSize == 0 ? 4 : (dataSize + 3) / 4 * 4;
+        Need need = DataBytes(method, block, offset, bytesPerRow == 0 ? ABSENT : bytesPerRow,
+                              rowsPerImage == 0 ? ABSENT : rowsPerImage, size);
+        if (need.valid && dataSize < need.bytes && need.bytes <= rounded)
+        {
+            return INEXPRESSIBLE;
+        }
+        dataSize = rounded;
+    }
+    mrhiTextureDef textureDef = mrhiDefaultTextureDef();
+    textureDef.kind = kind;
+    textureDef.format = block->format;
+    textureDef.width = textureSize.width;
+    textureDef.height = textureSize.height;
+    textureDef.depthOrLayers = textureSize.depthOrLayers;
+    textureDef.usage = mrhi_textureCopySource | mrhi_textureCopyDestination;
+    mrhiTextureId texture = {0};
+    CHECK(mrhiCreateTexture(s_device, &textureDef, &texture) == mrhi_success, "a texture");
+    mrhiBufferId buffer = {0};
+    if (method != WRITE_TEXTURE)
+    {
+        buffer = MakeBuffer(dataSize, mrhi_bufferCopySource | mrhi_bufferCopyDestination);
+    }
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId t = {0};
+    mrhiResourceId b = {0};
+    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportTexture(s_device, texture, &t) == mrhi_success &&
+              (method == WRITE_TEXTURE || mrhiImportBuffer(s_device, buffer, &b) == mrhi_success),
+          "a frame of them");
+    bool intoTexture = method != TEXTURE_TO_BUFFER;
+    const mrhiAccess accesses[2] = {
+        Whole(t, intoTexture ? mrhi_accessCopyDestination : mrhi_accessCopySource),
+        Whole(b, intoTexture ? mrhi_accessCopySource : mrhi_accessCopyDestination)};
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.passClass = mrhi_passTransfer;
+    def.neverCull = true;
+    def.accesses = accesses;
+    def.accessCount = method == WRITE_TEXTURE ? 1 : 2;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success &&
+              mrhiCompileFrame(s_device) == mrhi_success &&
+              mrhiBeginPass(s_device, pass) == mrhi_success,
+          "the pass begun");
+    const mrhiTextureCopy at = {.resource = t};
+    const mrhiBufferCopy side = {
+        .resource = b, .offset = offset, .bytesPerRow = bytesPerRow, .rowsPerImage = rowsPerImage};
+    const mrhiTexelLayout layout = {
+        .offset = offset, .bytesPerRow = bytesPerRow, .rowsPerImage = rowsPerImage};
+    mrhiResult status = mrhi_success;
+    switch (method)
+    {
+    case WRITE_TEXTURE:
+        status = mrhiWriteTexture(s_device, pass, &at, dataSize > 0 ? s_data : nullptr, dataSize,
+                                  &layout, &size);
+        break;
+    case BUFFER_TO_TEXTURE:
+        status = mrhiCopyBufferToTexture(s_device, pass, &side, &at, &size);
+        break;
+    case TEXTURE_TO_BUFFER:
+        status = mrhiCopyTextureToBuffer(s_device, pass, &at, &side, &size);
+        break;
+    }
+    CHECK(mrhiDropFrame(s_device) == mrhi_success &&
+              mrhiDestroyTexture(s_device, texture) == mrhi_success &&
+              (method == WRITE_TEXTURE || mrhiDestroyBuffer(s_device, buffer) == mrhi_success),
+          "dropped");
+    return status;
+}
+
+// Counts the cases Maul RHI cannot express, which are counted rather
+// than run: required_bytes_in_copy's data one byte short of a buffer's
+// need that is a multiple of 4, and bound_on_offset's offset past
+// data of 0 bytes, in copies with a buffer.
+static uint32_t s_inexpressible;
+
+// Counts the cases Maul RHI decides otherwise than the CTS, all from
+// its layout value 0 being absent (see Owed):
+// - an empty copy of several layers giving 0 for a layout value, which
+//   the CTS takes and Maul RHI refuses as a value missing where needed;
+// - a rowsPerImage of 0 for a copy of one layer with rows, which the CTS
+//   refuses as fewer than the rows and Maul RHI takes as absent.
+static uint32_t s_differs;
+
+// The outcome Maul RHI owes a transfer case. Its layout value 0 is an
+// absent one, which the web driver passes as undefined, where the CTS's
+// 0 is a value: a case giving 0 is owed the outcome of the layout
+// without it, and counted when that differs from the CTS's.
+static bool Owed(Method method, const Block* block, uint64_t offset, int64_t bytesPerRow,
+                 int64_t rowsPerImage, uint64_t dataSize, mrhiExtent3d size, bool cts)
+{
+    if (bytesPerRow != 0 && rowsPerImage != 0)
+    {
+        return cts;
+    }
+    Need need = DataBytes(method, block, offset, bytesPerRow == 0 ? ABSENT : bytesPerRow,
+                          rowsPerImage == 0 ? ABSENT : rowsPerImage, size);
+    bool owed = need.valid && need.bytes <= dataSize;
+    s_differs += owed != cts ? 1 : 0;
+    return owed;
+}
+
+// A CTS layout value as Maul RHI's: absent is 0.
+static uint32_t Value(int64_t value)
+{
+    return value == ABSENT ? 0 : (uint32_t)value;
+}
+
+static void ExpectTransfer(const char* test, mrhiResult result, bool succeeds)
+{
+    if (result == INEXPRESSIBLE)
+    {
+        ++s_inexpressible;
+        return;
+    }
+    Expect(test, result, succeeds);
+}
+
+// The CTS's createAlignedTexture: the copy's size, at least one texel,
+// in whole blocks.
+static mrhiExtent3d AlignedSize(const Block* block, mrhiExtent3d size)
+{
+    uint32_t width = size.width > 0 ? size.width : 1;
+    uint32_t height = size.height > 0 ? size.height : 1;
+    return (mrhiExtent3d){(width + block->width - 1) / block->width * block->width,
+                          (height + block->height - 1) / block->height * block->height,
+                          size.depthOrLayers > 0 ? size.depthOrLayers : 1};
+}
+
+// The CTS's 2D dimension as a 2D texture, or a 2D array of its layers.
+static mrhiTextureKind KindOf(bool volume, uint32_t layers)
+{
+    return volume ? mrhi_texture3d : layers > 1 ? mrhi_texture2dArray : mrhi_texture2d;
+}
+
+static void TestLayouts(void)
+{
+    char name[160];
+    const Block* rgba8 = &s_blocks[2];
+    for (int m = 0; m < 3; ++m)
+    {
+        Method method = (Method)m;
+        // bound_on_rows_per_image.
+        static const struct
+        {
+            bool volume;
+            uint32_t layers;
+        } shapes[] = {{false, 1}, {false, 3}, {true, 3}};
+        static const int64_t imageRows[] = {ABSENT, 0, 1, 2, 1024};
+        for (size_t s = 0; s < 3; ++s)
+        {
+            for (size_t r = 0; r < 5; ++r)
+            {
+                for (uint32_t rows = 0; rows <= 2; ++rows)
+                {
+                    for (uint32_t depth = 1; depth <= 3; depth += 2)
+                    {
+                        if (depth > shapes[s].layers)
+                        {
+                            continue;
+                        }
+                        const mrhiExtent3d size = {0, rows, depth};
+                        Need need = DataBytes(method, rgba8, 0, 1024, imageRows[r], size);
+                        snprintf(name, sizeof(name),
+                                 "layout_related:bound_on_rows_per_image %s %s rpi=%lld h=%u d=%u",
+                                 s_methods[m], shapes[s].volume ? "3d" : "2d",
+                                 (long long)imageRows[r], rows, depth);
+                        ExpectTransfer(name,
+                                       Transfer(method, rgba8,
+                                                KindOf(shapes[s].volume, shapes[s].layers),
+                                                (mrhiExtent3d){4, 4, shapes[s].layers}, 0, 1024,
+                                                Value(imageRows[r]), need.bytes, size),
+                                       Owed(method, rgba8, 0, 1024, imageRows[r], need.bytes, size,
+                                            need.valid));
+                    }
+                }
+            }
+        }
+        // copy_end_overflows_u64.
+        for (uint32_t depth = 1; depth <= 16; depth += 15)
+        {
+            snprintf(name, sizeof(name), "layout_related:copy_end_overflows_u64 %s d=%u",
+                     s_methods[m], depth);
+            ExpectTransfer(name,
+                           Transfer(method, rgba8, KindOf(false, depth),
+                                    (mrhiExtent3d){1, 1, depth}, 0, 1u << 31, 1u << 31, 10000,
+                                    (mrhiExtent3d){1, 1, depth}),
+                           depth == 1);
+        }
+        // bound_on_offset: an empty copy, whose offset still may not pass
+        // the data.
+        for (uint64_t offset = 0; offset <= 8; offset += 4)
+        {
+            for (uint64_t data = 0; data <= 8; data += 4)
+            {
+                snprintf(name, sizeof(name), "layout_related:bound_on_offset %s %llu,%llu",
+                         s_methods[m], (unsigned long long)offset, (unsigned long long)data);
+                ExpectTransfer(name,
+                               Transfer(method, rgba8, mrhi_texture2d, (mrhiExtent3d){4, 4, 1},
+                                        offset, 0, 0, data, (mrhiExtent3d){0, 0, 0}),
+                               Owed(method, rgba8, offset, 0, ABSENT, data, (mrhiExtent3d){0, 0, 0},
+                                    offset <= data));
+            }
+        }
+        for (size_t f = 0; f < sizeof(s_blocks) / sizeof(s_blocks[0]); ++f)
+        {
+            const Block* block = &s_blocks[f];
+            const mrhiExtent3d one = {block->width, block->height, 1};
+            // rows_per_image_alignment: no alignment beyond the block.
+            for (uint32_t rows = 0; rows <= 3 * block->height; ++rows)
+            {
+                if ((rows > 2 * block->height && rows != 3 * block->height) || rows < block->height)
+                {
+                    continue;
+                }
+                snprintf(name, sizeof(name), "layout_related:rows_per_image_alignment %s f=%zu %u",
+                         s_methods[m], f, rows);
+                ExpectTransfer(
+                    name,
+                    Transfer(method, block, mrhi_texture2d, one, 0, 256, rows, block->bytes, one),
+                    true);
+            }
+            // offset_alignment.
+            for (uint32_t offset = 0; offset <= 3 * block->bytes; ++offset)
+            {
+                if (offset > 2 * block->bytes && offset != 3 * block->bytes)
+                {
+                    continue;
+                }
+                snprintf(name, sizeof(name), "layout_related:offset_alignment %s f=%zu %u",
+                         s_methods[m], f, offset);
+                ExpectTransfer(name,
+                               Transfer(method, block, mrhi_texture2d, one, offset, 256, 0,
+                                        offset + block->bytes, one),
+                               method == WRITE_TEXTURE || offset % block->bytes == 0);
+            }
+            // bound_on_bytes_per_row.
+            for (uint32_t rows = 1; rows <= 2; ++rows)
+            {
+                for (uint32_t depth = 1; depth <= 2; ++depth)
+                {
+                    uint32_t b = block->bytes;
+                    const struct
+                    {
+                        int64_t bytesPerRow;
+                        uint32_t width;
+                        uint32_t copyWidth;
+                        bool succeeds;
+                    } rows_[] = {
+                        {256, 256 / b, 256 / b, true},
+                        {256, 256 / b, 256 / b - 1, true},
+                        {128, 128 / b, 128 / b, method == WRITE_TEXTURE},
+                        {384, 384 / b, 384 / b, method == WRITE_TEXTURE},
+                        {256, 512 / b, 512 / b, false},
+                        {ABSENT, 256 / b, 256 / b, !(rows > 1 || depth > 1)},
+                    };
+                    for (size_t c = 0; c < 6; ++c)
+                    {
+                        const mrhiExtent3d size = {rows_[c].copyWidth * block->width,
+                                                   rows * block->height, depth};
+                        Need need = DataBytes(method, block, 0, rows_[c].bytesPerRow, rows, size);
+                        snprintf(
+                            name, sizeof(name),
+                            "layout_related:bound_on_bytes_per_row %s f=%zu h=%u d=%u case=%zu",
+                            s_methods[m], f, rows, depth, c);
+                        ExpectTransfer(name,
+                                       Transfer(method, block, KindOf(false, depth),
+                                                (mrhiExtent3d){rows_[c].width * block->width,
+                                                               rows * block->height, depth},
+                                                0, Value(rows_[c].bytesPerRow), rows, need.bytes,
+                                                size),
+                                       rows_[c].succeeds);
+                    }
+                }
+            }
+            // required_bytes_in_copy: the least data succeeds, one byte
+            // less fails.
+            static const uint32_t paddings[][2] = {{0, 0}, {0, 6}, {6, 0}, {15, 17}};
+            static const uint32_t copies[][4] = {
+                {3, 4, 5, 0},  {5, 4, 3, 11}, {256, 3, 2, 0}, {0, 4, 5, 0}, {3, 0, 5, 0},
+                {3, 4, 0, 13}, {1, 4, 5, 0},  {3, 1, 5, 15},  {5, 4, 1, 0}, {7, 1, 1, 0},
+            };
+            uint32_t alignment = method == WRITE_TEXTURE ? 1 : 256;
+            for (int volume = 0; volume <= (block->compressed ? 0 : 1); ++volume)
+            {
+                for (size_t p = 0; p < 4; ++p)
+                {
+                    for (size_t c = 0; c < 10; ++c)
+                    {
+                        const mrhiExtent3d size = {copies[c][0] * block->width,
+                                                   copies[c][1] * block->height, copies[c][2]};
+                        uint64_t offset = (uint64_t)copies[c][3] * block->bytes;
+                        uint32_t rowsPerImage = size.height + paddings[p][1] * block->height;
+                        uint32_t row = copies[c][0] * block->bytes;
+                        uint32_t bytesPerRow = (row + alignment - 1) / alignment * alignment +
+                                               paddings[p][0] * alignment;
+                        Need need =
+                            DataBytes(method, block, offset, bytesPerRow, rowsPerImage, size);
+                        mrhiExtent3d textureSize = AlignedSize(block, size);
+                        mrhiTextureKind kind = KindOf(volume != 0, textureSize.depthOrLayers);
+                        snprintf(name, sizeof(name),
+                                 "layout_related:required_bytes_in_copy %s f=%zu %s pad=%zu "
+                                 "copy=%zu",
+                                 s_methods[m], f, volume ? "3d" : "2d", p, c);
+                        ExpectTransfer(name,
+                                       Transfer(method, block, kind, textureSize, offset,
+                                                bytesPerRow, rowsPerImage, need.bytes, size),
+                                       Owed(method, block, offset, bytesPerRow, rowsPerImage,
+                                            need.bytes, size, true));
+                        if (need.bytes > 0)
+                        {
+                            snprintf(name, sizeof(name),
+                                     "layout_related:required_bytes_in_copy %s f=%zu %s pad=%zu "
+                                     "copy=%zu short",
+                                     s_methods[m], f, volume ? "3d" : "2d", p, c);
+                            ExpectTransfer(name,
+                                           Transfer(method, block, kind, textureSize, offset,
+                                                    bytesPerRow, rowsPerImage, need.bytes - 1,
+                                                    size),
+                                           Owed(method, block, offset, bytesPerRow, rowsPerImage,
+                                                need.bytes - 1, size, false));
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 int main(void)
 {
     ResetAdapter();
-    s_device = OpenWith(mrhiDefaultDeviceDef(), true);
+    // The compressed families, for their formats' layouts.
+    s_adapter.features.textureCompressionBc = true;
+    s_adapter.features.textureCompressionEtc2 = true;
+    s_adapter.features.textureCompressionAstc = true;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.features = s_adapter.features;
+    s_device = OpenWith(deviceDef, true);
     TestBufferCopies();
     TestTextureCopies();
+    TestLayouts();
+    // The counts are pinned so that a change of either is seen.
+    CHECK(s_differs == 192, "the cases decided otherwise");
+    CHECK(s_inexpressible == 962, "the cases not expressible");
     Close(s_device);
     return s_failures == 0 ? 0 : 1;
 }
