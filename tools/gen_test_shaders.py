@@ -19,6 +19,7 @@
 #
 # usage: gen_test_shaders.py
 
+import json
 import os
 import subprocess
 import sys
@@ -26,8 +27,9 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Each container: its directory, its name, its stages' sources and
-# entries, and whether it has WGSL, and so MSL (a container reading
-# heaps or the view index has neither); every container has DXIL.
+# entries, and whether it has WGSL (a container reading heaps or the
+# view index has none); a container reading no heap has MSL, and every
+# container has DXIL.
 CONTAINERS = (
     ("test/shaders", "conformance", (("vert", "vs"), ("frag", "fs"), ("comp", "cs"),
                                      ("placed.vert", "vp"), ("root.frag", "fr"),
@@ -66,7 +68,9 @@ def build(work, shaders, name, stages, wgsl):
     dxil = os.path.join(work, "dxil")
     run(sys.executable, os.path.join(ROOT, "tools", "mrhi_dxil.py"), linked, reflection, dxil)
     code = ["--dxil", dxil]
-    if wgsl:
+    with open(reflection, encoding="utf-8") as file:
+        heaps = any(e.get("heap_uses") for e in json.load(file)["entries"])
+    if not heaps:
         msl = os.path.join(work, "msl")
         run(sys.executable, os.path.join(ROOT, "tools", "mrhi_msl.py"), linked, reflection, msl)
         code += ["--msl", msl]

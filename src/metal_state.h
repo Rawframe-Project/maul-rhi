@@ -24,6 +24,8 @@
 #define MRHI_METAL_LABELS 32
 // The root block's bytes at most.
 #define MRHI_METAL_ROOT_BYTES 256
+// The views a multiview pass amplifies to at most (mrhi-0020).
+#define MRHI_METAL_VIEWS 32
 
 // A table's binding as bound: its slot, kind, Metal object (a buffer, a
 // texture or its view, or a sampler state), and a buffer's offset and

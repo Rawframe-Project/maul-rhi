@@ -23,7 +23,9 @@ format.
   (`mrhi_builtinViewIndex`, in vertex entries too), their containers
   without WGSL. On Vulkan devices with the `multiview` feature, and on
   Direct3D 12 devices with view instancing and shader model 6.1, four
-  views at most.
+  views at most; and on Metal devices by vertex amplification, as many
+  views as the device amplifies to (`tools/mrhi_msl.py` makes the view
+  index's MSL).
 
 ## [0.1.0] - 2026-10-01
 

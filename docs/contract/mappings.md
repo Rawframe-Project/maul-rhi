@@ -22,7 +22,7 @@ restricted or absent-rejected, with how.
 | `shaderInt64` | restricted: shaderInt64 | restricted: Int64ShaderOps | direct: long | absent-rejected: no 64-bit integers in WGSL |
 | `indirectFirstInstance` | restricted: drawIndirectFirstInstance | direct: indirect arguments | direct: indirect arguments | restricted: indirect-first-instance |
 | `multiDrawIndirectCount` | direct: vkCmdDrawIndirectCount, with drawIndirectCount (1.2) and multiDrawIndirect | emulated: ExecuteIndirect with a count buffer, records first expanded by a compute pass for pipelines reading their first vertex or instance (cost: for such pipelines, a dispatch and scratch per draw) | emulated: a compute pass copying the records into scratch with every record past the count drawing no instances, then the most draws from the scratch (cost: a dispatch and the most draws encoded, whatever the count) | absent-rejected: no multi-draw indirect |
-| `multiview` | direct: multiview (1.1) with the rendering view mask | restricted: view instancing, tier 1 or more, with shader model 6.1; 4 views | emulated: instanced views written to the render target array index; not granted yet (cost: the views times the instances per draw, and a buffer slot) | absent-rejected: no multiview |
+| `multiview` | direct: multiview (1.1) with the rendering view mask | restricted: view instancing, tier 1 or more, with shader model 6.1; 4 views | restricted: vertex amplification onto layers, where the device amplifies to 2 and renders layers | absent-rejected: no multiview |
 | `bindlessSampling` | restricted: descriptor indexing or descriptor heaps | restricted: resource binding tier 3 | restricted: MTLGPUFamilyMetal3: descriptors in a plain buffer (not granted yet) | absent-rejected: until the resource table draft ships (sampling-resource-table) |
 | `bindlessHeterogeneous` | restricted: descriptor heaps, or descriptor indexing over the storage types | restricted: resource binding tier 3 | restricted: MTLGPUFamilyMetal3: descriptors in a plain buffer (not granted yet) | absent-rejected: until heterogeneous-resource-table ships |
 | `presentTiming` | restricted: VK_EXT_present_timing | direct: DXGI frame statistics | direct: a drawable's presented time | absent-rejected: the browser paces presentation |
@@ -63,7 +63,7 @@ restricted or absent-rejected, with how.
 | `heapSize` | restricted: descriptor indexing counts or the heap's size | restricted: 65536 at resource binding tier 3 | restricted: MTLGPUFamilyMetal3 (not granted yet) | absent-rejected: until resource tables ship |
 | `samplerHeapSize` | restricted: maxDescriptorSetUpdateAfterBindSamplers | restricted: 256: the heaps and the frames' rings share 2048 samplers | restricted: MTLGPUFamilyMetal3 (not granted yet) | absent-rejected: until resource tables ship |
 | `framesInFlight` | direct: the core's timeline semaphores | direct: the core's fences | direct: command buffer completion | emulated: submitted-work-done promises (cost: a promise per frame, settled only when the browser runs its event loop) |
-| `multiviewViews` | direct: maxMultiviewViewCount | restricted: D3D12_MAX_VIEW_INSTANCE_COUNT, 4 | restricted: instanced views; not granted yet | absent-rejected: no multiview |
+| `multiviewViews` | direct: maxMultiviewViewCount | restricted: D3D12_MAX_VIEW_INSTANCE_COUNT, 4 | restricted: the largest supportsVertexAmplificationCount: (2 on the CI runner) | absent-rejected: no multiview |
 
 ## mrhiFormat
 
@@ -538,7 +538,7 @@ restricted or absent-rejected, with how.
 | `mrhi_builtinSampleIndex` | direct: SampleId | direct: SV_SampleIndex | direct: [[sample_id]] | direct: sample_index |
 | `mrhi_builtinSampleMaskIn` | direct: SampleMask input | direct: SV_Coverage input | direct: [[sample_mask]] input | direct: sample_mask input |
 | `mrhi_builtinPrimitiveIndex` | direct: PrimitiveId | direct: SV_PrimitiveID | direct: [[primitive_id]] | direct: primitive_index |
-| `mrhi_builtinViewIndex` | direct: ViewIndex | direct: SV_ViewID (shader model 6.1) | restricted: SPIRV-Cross's view index; not granted yet | absent-rejected: WGSL has no view index |
+| `mrhi_builtinViewIndex` | direct: ViewIndex | direct: SV_ViewID (shader model 6.1) | direct: [[amplification_id]] in a vertex entry, [[render_target_array_index]] in a fragment one | absent-rejected: WGSL has no view index |
 
 ## mrhiShaderHeapUses
 

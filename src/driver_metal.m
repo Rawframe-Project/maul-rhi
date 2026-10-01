@@ -116,6 +116,21 @@ static uint32_t Clamp32(uint64_t value)
     return value < UINT32_MAX ? (uint32_t)value : UINT32_MAX;
 }
 
+// The views a multiview pass may render, by vertex amplification onto
+// layers (mrhi-0020): the largest count the device amplifies to, where
+// it renders layers; 1 otherwise.
+static uint32_t ViewsOf(id<MTLDevice> device)
+{
+    bool layered =
+        [device supportsFamily:MTLGPUFamilyMac2] || [device supportsFamily:MTLGPUFamilyApple5];
+    uint32_t views = 1;
+    for (uint32_t count = 2; layered && count <= MRHI_METAL_VIEWS; ++count)
+    {
+        views = [device supportsVertexAmplificationCount:count] ? count : views;
+    }
+    return views;
+}
+
 // WebGPU's floor, raised where Metal's feature set tables promise more
 // for the device's family and where the device reports its own.
 static mrhiLimits LimitsOf(id<MTLDevice> device)
@@ -130,6 +145,7 @@ static mrhiLimits LimitsOf(id<MTLDevice> device)
     limits.workgroupStorageBytes = Clamp32(device.maxThreadgroupMemoryLength);
     limits.rootBlockBytes = METAL_ROOT_BLOCK_BYTES;
     limits.framesInFlight = MRHI_METAL_FRAMES;
+    limits.multiviewViews = ViewsOf(device);
     return limits;
 }
 
@@ -160,6 +176,7 @@ static mrhiFeatures FeaturesOf(id<MTLDevice> device)
         .shaderInt64 = apple7 || mac2,
         .indirectFirstInstance = true,
         .multiDrawIndirectCount = true,
+        .multiview = ViewsOf(device) > 1,
     };
 }
 

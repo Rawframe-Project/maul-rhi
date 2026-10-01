@@ -205,12 +205,30 @@ static void StartRender(mrhiMetalEncoder* encoder)
     }
     descriptor.renderTargetWidth = pass->width;
     descriptor.renderTargetHeight = pass->height;
+    if (pass->viewCount > 1)
+    {
+        // A layer per view from the attachments' slices (mrhi-0020).
+        descriptor.renderTargetArrayLength = pass->viewCount;
+    }
     if (pass->occlusionSet != 0)
     {
         descriptor.visibilityResultBuffer = mrhiMetalObject(pass->occlusionSet);
     }
     encoder->render = [encoder->commands renderCommandEncoderWithDescriptor:descriptor];
     Opened(encoder, encoder->render);
+    if (pass->viewCount > 1)
+    {
+        // View i amplifies the vertices onto the i-th layer.
+        MTLVertexAmplificationViewMapping mappings[MRHI_METAL_VIEWS];
+        for (uint32_t view = 0; view < pass->viewCount; ++view)
+        {
+            mappings[view] = (MTLVertexAmplificationViewMapping){
+                .viewportArrayIndexOffset = 0,
+                .renderTargetArrayIndexOffset = view,
+            };
+        }
+        [encoder->render setVertexAmplificationCount:pass->viewCount viewMappings:mappings];
+    }
 }
 
 // The texture a binding sees: the texture itself when the binding sees

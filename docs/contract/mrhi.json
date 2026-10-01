@@ -1309,9 +1309,8 @@
                   "note": "view instancing, tier 1 or more, with shader model 6.1; 4 views"
                 },
                 "metal": {
-                  "class": "emulated",
-                  "note": "instanced views written to the render target array index; not granted yet",
-                  "cost": "the views times the instances per draw, and a buffer slot"
+                  "class": "restricted",
+                  "note": "vertex amplification onto layers, where the device amplifies to 2 and renders layers"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -2185,7 +2184,7 @@
                 },
                 "metal": {
                   "class": "restricted",
-                  "note": "instanced views; not granted yet"
+                  "note": "the largest supportsVertexAmplificationCount: (2 on the CI runner)"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
@@ -14079,8 +14078,8 @@
                   "note": "SV_ViewID (shader model 6.1)"
                 },
                 "metal": {
-                  "class": "restricted",
-                  "note": "SPIRV-Cross's view index; not granted yet"
+                  "class": "direct",
+                  "note": "[[amplification_id]] in a vertex entry, [[render_target_array_index]] in a fragment one"
                 },
                 "web_gpu": {
                   "class": "absent_rejected",
