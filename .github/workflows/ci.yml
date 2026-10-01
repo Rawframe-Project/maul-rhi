@@ -123,6 +123,94 @@ jobs:
           }
           EOF
           clang -fobjc-arc probe.m -framework Metal -framework Foundation -o probe && ./probe
+      - name: Probe presentation timing
+        # Whether a drawable shown in a window reports when it was
+        # presented, which present timing needs.
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        run: |
+          cat > present.m <<'EOF'
+          #import <Cocoa/Cocoa.h>
+          #import <Metal/Metal.h>
+          #import <QuartzCore/CAMetalLayer.h>
+          #include <stdatomic.h>
+          #include <stdio.h>
+          int main(void)
+          {
+              @autoreleasepool
+              {
+                  [NSApplication sharedApplication];
+                  [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+                  [NSApp finishLaunching];
+                  [NSApp activateIgnoringOtherApps:YES];
+                  printf("%lu screens\n", (unsigned long)NSScreen.screens.count);
+                  NSWindow* window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 256, 256)
+                                                                 styleMask:NSWindowStyleMaskTitled
+                                                                   backing:NSBackingStoreBuffered
+                                                                     defer:NO];
+                  id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+                  CAMetalLayer* layer = [CAMetalLayer layer];
+                  layer.device = device;
+                  layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
+                  layer.drawableSize = CGSizeMake(256, 256);
+                  window.contentView.wantsLayer = YES;
+                  window.contentView.layer = layer;
+                  [window makeKeyAndOrderFront:nil];
+                  for (int spin = 0; spin < 50; ++spin)
+                  {
+                      NSEvent* event = [NSApp nextEventMatchingMask:NSEventMaskAny
+                                                          untilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]
+                                                             inMode:NSDefaultRunLoopMode
+                                                            dequeue:YES];
+                      if (event != nil)
+                      {
+                          [NSApp sendEvent:event];
+                      }
+                  }
+                  printf("window visible %d, occlusion visible %d, on screen %d\n", (int)window.isVisible,
+                         (int)((window.occlusionState & NSWindowOcclusionStateVisible) != 0),
+                         (int)(window.screen != nil));
+                  id<MTLCommandQueue> queue = [device newCommandQueue];
+                  static atomic_int handled;
+                  for (int i = 0; i < 30; ++i)
+                  {
+                      id<CAMetalDrawable> drawable = [layer nextDrawable];
+                      if (drawable == nil)
+                      {
+                          printf("no drawable at %d\n", i);
+                          continue;
+                      }
+                      CFTimeInterval asked = CACurrentMediaTime() + 0.05;
+                      bool timed = i % 2 == 1;
+                      [drawable addPresentedHandler:^(id<MTLDrawable> shown) {
+                          printf("drawable %lu presented at %.6f (asked %.6f)\n",
+                                 (unsigned long)shown.drawableID, shown.presentedTime, timed ? asked : 0.0);
+                          atomic_fetch_add(&handled, 1);
+                      }];
+                      id<MTLCommandBuffer> commands = [queue commandBuffer];
+                      MTLRenderPassDescriptor* pass = [MTLRenderPassDescriptor renderPassDescriptor];
+                      pass.colorAttachments[0].texture = drawable.texture;
+                      pass.colorAttachments[0].loadAction = MTLLoadActionClear;
+                      pass.colorAttachments[0].storeAction = MTLStoreActionStore;
+                      [[commands renderCommandEncoderWithDescriptor:pass] endEncoding];
+                      if (timed)
+                      {
+                          [commands presentDrawable:drawable atTime:asked];
+                      }
+                      else
+                      {
+                          [commands presentDrawable:drawable];
+                      }
+                      [commands commit];
+                      [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.02]];
+                  }
+                  [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1.0]];
+                  printf("%d presented handlers ran\n", atomic_load(&handled));
+              }
+              return 0;
+          }
+          EOF
+          clang -fobjc-arc present.m -framework Cocoa -framework Metal -framework QuartzCore -o present && ./present
       - name: Test
         # Linux runs Vulkan on lavapipe, which must be found, under the
         # validation layer, whose errors in a test's output fail it,
@@ -287,6 +375,86 @@ jobs:
             mkdir -p "$dir/D3D12"
             cp agility/build/native/bin/x64/*.dll "$dir/D3D12/"
           done
+      - name: Probe presentation timing
+        # Whether a flip-model swapchain on WARP in the runner's desktop
+        # reports frame statistics, which present timing needs.
+        continue-on-error: true
+        run: |
+          mkdir -p probe
+          cat > probe/present.c <<'EOF'
+          #define COBJMACROS
+          #include <windows.h>
+          #include <d3d12.h>
+          #include <dxgi1_6.h>
+          #include <stdio.h>
+          static LRESULT CALLBACK Proc(HWND window, UINT message, WPARAM w, LPARAM l)
+          {
+              return DefWindowProcW(window, message, w, l);
+          }
+          int main(void)
+          {
+              IDXGIFactory4* factory = NULL;
+              IDXGIAdapter* warp = NULL;
+              ID3D12Device* device = NULL;
+              ID3D12CommandQueue* queue = NULL;
+              IDXGISwapChain1* chain = NULL;
+              HRESULT hr = CreateDXGIFactory2(0, &IID_IDXGIFactory4, (void**)&factory);
+              hr = SUCCEEDED(hr) ? IDXGIFactory4_EnumWarpAdapter(factory, &IID_IDXGIAdapter, (void**)&warp) : hr;
+              hr = SUCCEEDED(hr) ? D3D12CreateDevice((IUnknown*)warp, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device, (void**)&device) : hr;
+              D3D12_COMMAND_QUEUE_DESC queueDesc = {0};
+              hr = SUCCEEDED(hr) ? ID3D12Device_CreateCommandQueue(device, &queueDesc, &IID_ID3D12CommandQueue, (void**)&queue) : hr;
+              WNDCLASSW type = {0};
+              type.lpfnWndProc = Proc;
+              type.hInstance = GetModuleHandleW(NULL);
+              type.lpszClassName = L"probe";
+              RegisterClassW(&type);
+              HWND window = CreateWindowExW(0, L"probe", L"probe", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 256, 256, NULL, NULL, type.hInstance, NULL);
+              DXGI_SWAP_CHAIN_DESC1 desc = {0};
+              desc.Width = 256;
+              desc.Height = 256;
+              desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+              desc.SampleDesc.Count = 1;
+              desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+              desc.BufferCount = 2;
+              desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+              hr = SUCCEEDED(hr) ? IDXGIFactory4_CreateSwapChainForHwnd(factory, (IUnknown*)queue, window, &desc, NULL, NULL, &chain) : hr;
+              printf("setup 0x%08lx window %p\n", (unsigned long)hr, (void*)window);
+              if (FAILED(hr))
+              {
+                  return 0;
+              }
+              for (int i = 0; i < 30; ++i)
+              {
+                  MSG message;
+                  while (PeekMessageW(&message, NULL, 0, 0, PM_REMOVE))
+                  {
+                      TranslateMessage(&message);
+                      DispatchMessageW(&message);
+                  }
+                  HRESULT presented = IDXGISwapChain1_Present(chain, 1, 0);
+                  DXGI_FRAME_STATISTICS stats = {0};
+                  HRESULT read = IDXGISwapChain1_GetFrameStatistics(chain, &stats);
+                  UINT last = 0;
+                  IDXGISwapChain1_GetLastPresentCount(chain, &last);
+                  printf("present %2d: 0x%08lx stats 0x%08lx PresentCount %u PresentRefreshCount %u "
+                         "SyncRefreshCount %u SyncQPCTime %lld last %u\n",
+                         i, (unsigned long)presented, (unsigned long)read, stats.PresentCount,
+                         stats.PresentRefreshCount, stats.SyncRefreshCount,
+                         (long long)stats.SyncQPCTime.QuadPart, last);
+                  Sleep(16);
+              }
+              return 0;
+          }
+          EOF
+          cat > probe/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.25)
+          project(probe C)
+          add_executable(present present.c)
+          target_link_libraries(present d3d12 dxgi dxguid)
+          EOF
+          cmake -S probe -B probe/build -T ClangCL
+          cmake --build probe/build --config Release
+          probe/build/Release/present.exe
       - name: Test
         env:
           MAUL_RHI_REQUIRE_D3D12: "1"
