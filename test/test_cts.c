@@ -628,6 +628,83 @@ static mrhiResult RunTransfer(const TransferCase* c)
     return status;
 }
 
+// A clearBuffer case: a buffer of the size and usage, declared as a copy
+// destination by a transfer pass, and the clear.
+static mrhiResult Clear(uint64_t bufferSize, mrhiBufferUsage usage, uint64_t offset, uint64_t size)
+{
+    mrhiBufferId buffer = MakeBuffer(bufferSize, usage);
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId resource = {0};
+    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportBuffer(s_device, buffer, &resource) == mrhi_success,
+          "a frame of the buffer");
+    const mrhiAccess access = Whole(resource, mrhi_accessCopyDestination);
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.passClass = mrhi_passTransfer;
+    def.neverCull = true;
+    def.accesses = &access;
+    def.accessCount = 1;
+    mrhiPassId pass = {0};
+    mrhiResult status = mrhiAddPass(s_device, &def, &pass);
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
+                  mrhiBeginPass(s_device, pass) == mrhi_success,
+              "the pass begun");
+        status = mrhiClearBuffer(s_device, pass, resource, offset, size);
+    }
+    CHECK(mrhiDropFrame(s_device) == mrhi_success &&
+              mrhiDestroyBuffer(s_device, buffer) == mrhi_success,
+          "dropped");
+    return status;
+}
+
+// api,validation,encoding,cmds,clearBuffer: an absent offset is 0, an
+// absent size MRHI_WHOLE_SIZE.
+static void TestClears(void)
+{
+    char name[96];
+    static const uint64_t sizes[][2] = {
+        {0, 1}, {2, 0}, {4, 1}, {5, 0}, {8, 1}, {20, 0}, {MRHI_WHOLE_SIZE, 1}};
+    for (size_t i = 0; i < 7; ++i)
+    {
+        snprintf(name, sizeof(name), "clearBuffer:size_alignment %lld", (long long)sizes[i][0]);
+        Expect(name, Clear(16, COPY_DST, 0, sizes[i][0]), sizes[i][1] != 0);
+    }
+    static const uint64_t offsets[][2] = {{0, 1}, {2, 0}, {4, 1}, {5, 0}, {8, 1}, {20, 0}};
+    for (size_t i = 0; i < 6; ++i)
+    {
+        snprintf(name, sizeof(name), "clearBuffer:offset_alignment %llu",
+                 (unsigned long long)offsets[i][0]);
+        Expect(name, Clear(16, COPY_DST, offsets[i][0], 8), offsets[i][1] != 0);
+    }
+    Expect("clearBuffer:default_args both", Clear(16, COPY_DST, 0, MRHI_WHOLE_SIZE), true);
+    Expect("clearBuffer:default_args offset 4", Clear(16, COPY_DST, 4, MRHI_WHOLE_SIZE), true);
+    Expect("clearBuffer:default_args size 8", Clear(16, COPY_DST, 0, 8), true);
+    static const uint64_t overflows[][2] = {{0, MAX_SAFE_MULTIPLE_OF_8},
+                                            {16, MAX_SAFE_MULTIPLE_OF_8},
+                                            {MAX_SAFE_MULTIPLE_OF_8, 16},
+                                            {MAX_SAFE_MULTIPLE_OF_8, MAX_SAFE_MULTIPLE_OF_8}};
+    for (size_t i = 0; i < 4; ++i)
+    {
+        snprintf(name, sizeof(name), "clearBuffer:overflow %zu", i);
+        Expect(name, Clear(16, COPY_DST, overflows[i][0], overflows[i][1]), false);
+    }
+    static const uint64_t bounds[][3] = {{0, 32, 1}, {0, 36, 0}, {32, 0, 1},  {32, 4, 0},
+                                         {36, 4, 0}, {36, 0, 0}, {20, 16, 0}, {20, 12, 1}};
+    for (size_t i = 0; i < 8; ++i)
+    {
+        snprintf(name, sizeof(name), "clearBuffer:out_of_bounds %llu,%llu",
+                 (unsigned long long)bounds[i][0], (unsigned long long)bounds[i][1]);
+        Expect(name, Clear(32, COPY_DST, bounds[i][0], bounds[i][1]), bounds[i][2] != 0);
+    }
+    for (size_t i = 0; i < sizeof(s_usages) / sizeof(s_usages[0]); ++i)
+    {
+        snprintf(name, sizeof(name), "clearBuffer:buffer_usage %#x", (unsigned)s_usages[i]);
+        Expect(name, Clear(16, s_usages[i], 0, 16), s_usages[i] == COPY_DST);
+    }
+}
+
 // A def of a texture of the block's format, the kind and size, for
 // copies both ways.
 static mrhiTextureDef CopyTexture(const Block* block, mrhiTextureKind kind, mrhiExtent3d size)
@@ -1874,6 +1951,7 @@ int main(void)
     deviceDef.features = s_adapter.features;
     s_device = OpenWith(deviceDef, true);
     TestBufferCopies();
+    TestClears();
     TestTextureCopies();
     TestLayouts();
     // The counts are pinned so that a change of either is seen.

@@ -57,7 +57,9 @@ static const Use s_uses[] = {
                                     VK_IMAGE_LAYOUT_GENERAL},
     [mrhi_stateCopySource] = {VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL},
-    [mrhi_stateCopyDestination] = {VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+    // Copies and clears (mrhi-0022) write a copy destination.
+    [mrhi_stateCopyDestination] = {VK_PIPELINE_STAGE_2_COPY_BIT | VK_PIPELINE_STAGE_2_CLEAR_BIT,
+                                   VK_ACCESS_2_TRANSFER_WRITE_BIT,
                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL},
     [mrhi_stateColorTarget] = {VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                                VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
@@ -520,6 +522,11 @@ static void RecordCommand(mrhiVulkanRecording* recording, const mrhiCommand* com
         break;
     case mrhiCommandCopyTexture:
         CopyTextures(recording, command);
+        break;
+    case mrhiCommandClearBuffer:
+        recording->frames->api->vkCmdFillBuffer(recording->slot->commands,
+                                                mrhiVulkanFrameBuffer(recording, command->a),
+                                                command->c, command->d, 0);
         break;
     case mrhiCommandBeginOcclusionQuery:
     case mrhiCommandEndOcclusionQuery:

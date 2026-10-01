@@ -79,6 +79,9 @@ typedef enum mrhiCommandType
     // device's readback ring (object 0), placed and pitched as uploads.
     mrhiCommandReadBuffer,
     mrhiCommandReadTexture,
+    // Zeros a buffer's range (mrhi-0022). a: the frame resource's slot
+    // plus one; c: the offset; d: the bytes, a positive multiple of 4.
+    mrhiCommandClearBuffer,
     // One past the last type.
     mrhiCommandTypeEnd,
 } mrhiCommandType;

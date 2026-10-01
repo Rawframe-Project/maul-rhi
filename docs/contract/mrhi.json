@@ -19121,6 +19121,66 @@
         },
         {
           "kind": "function",
+          "name": "clear_buffer",
+          "doc": "Writes zeros into a range of a buffer of the frame (mrhi-0022).",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass with targets, an offset or a size not a multiple of 4, a range past the buffer, or a resource that is not a buffer the pass declares a covering copy destination access of; `mrhi_errorStale` for a pass of another frame or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "pass",
+              "type": "id.pass_id",
+              "doc": "The pass, recording, without targets."
+            },
+            {
+              "name": "resource",
+              "type": "id.resource_id",
+              "doc": "The buffer."
+            },
+            {
+              "name": "offset",
+              "type": "uint64",
+              "doc": "The range's first byte, a multiple of 4."
+            },
+            {
+              "name": "size",
+              "type": "uint64",
+              "doc": "Its bytes, a multiple of 4, or MRHI_WHOLE_SIZE for the rest; 0 writes nothing."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the pass"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkCmdFillBuffer with 0"
+            },
+            "d3d12": {
+              "class": "emulated",
+              "note": "CopyBufferRegion from a device-owned buffer of zeros, in 64 KiB pieces",
+              "cost": "64 KiB per device and one copy per 64 KiB cleared"
+            },
+            "metal": {
+              "class": "direct",
+              "note": "fillBuffer:range:value: with 0"
+            },
+            "web_gpu": {
+              "class": "direct",
+              "note": "clearBuffer"
+            }
+          }
+        },
+        {
+          "kind": "function",
           "name": "copy_buffer_to_texture",
           "doc": "Copies texels from a buffer of the frame into a texture's mip.",
           "returns": {

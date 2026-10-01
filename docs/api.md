@@ -214,6 +214,11 @@ MRHI_NODISCARD MRHI_API mrhiResult mrhiCopyBuffer(mrhiDevice* device, mrhiPassId
 Copies bytes from one buffer of the frame to another.  @param device             The device. @param pass               The pass, recording, without targets. @param source             The buffer copied from. @param sourceOffset       Its first byte, a multiple of 4. @param destination        The buffer copied to, another one. @param destinationOffset  Its first byte, a multiple of 4. @param size               The bytes, a multiple of 4. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass with targets, offsets or a size not a multiple of 4, a range past either buffer, or one buffer as both, or a resource the pass declares no covering copy source or destination access of; `mrhi_errorStale` for a pass of another frame or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full. @par Thread safety Safe from any thread; the pass is used by one thread at a time.
 
 ```c
+MRHI_NODISCARD MRHI_API mrhiResult mrhiClearBuffer(mrhiDevice* device, mrhiPassId pass, mrhiResourceId resource, uint64_t offset, uint64_t size);
+```
+Writes zeros into a range of a buffer of the frame (mrhi-0022).  @param device    The device. @param pass      The pass, recording, without targets. @param resource  The buffer. @param offset    The range's first byte, a multiple of 4. @param size      Its bytes, a multiple of 4, or MRHI_WHOLE_SIZE for the rest; 0 writes nothing. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass with targets, an offset or a size not a multiple of 4, a range past the buffer, or a resource that is not a buffer the pass declares a covering copy destination access of; `mrhi_errorStale` for a pass of another frame or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full. @par Thread safety Safe from any thread; the pass is used by one thread at a time.
+
+```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiCopyBufferToTexture(mrhiDevice* device, mrhiPassId pass, const mrhiBufferCopy* source, const mrhiTextureCopy* destination, const mrhiExtent3d* size);
 ```
 Copies texels from a buffer of the frame into a texture's mip.  @param device       The device. @param pass         The pass, recording, without targets. @param source       The buffer and its layout. Only read during the call. @param destination  The texture, mip, origin and aspect. Only read during the call. @param size         The texels. Only read during the call. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass with targets, a layout that is not aligned, is not given where needed, or does not fit the buffer, a region off the texture's blocks or past its mip, a multisampled texture, or an aspect that cannot be copied to, or a resource the pass declares no covering copy source or destination access of; `mrhi_errorStale` for a pass of another frame or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full. @par Thread safety Safe from any thread; the pass is used by one thread at a time.
@@ -721,4 +726,4 @@ Hands a native pass the command buffer the program recorded for it: a primary Vk
 
 ---
 
-132 functions across 15 headers.
+133 functions across 15 headers.

@@ -143,7 +143,10 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
         frames->scratchBytes += (uint64_t)limits->frameIndirectDraws *
                                 (sizeof(D3D12_DRAW_INDEXED_ARGUMENTS) + 2 * sizeof(uint32_t));
     }
-    frames->zeroBytes = (uint64_t)limits->queries * sizeof(uint64_t);
+    // Clears copy from the zeros too (mrhi-0022), so every device has
+    // them, at least a placement's 64 KiB.
+    uint64_t queryZeros = (uint64_t)limits->queries * sizeof(uint64_t);
+    frames->zeroBytes = queryZeros > MRHI_D3D12_ZERO_BYTES ? queryZeros : MRHI_D3D12_ZERO_BYTES;
     frames->readbackLimit = limits->readbacks;
     frames->uploadBytes = limits->frameUploadBytes;
     frames->readbackSize = limits->readbackBytes;
@@ -243,8 +246,8 @@ static bool MakeExpand(mrhiD3d12Frames* frames)
 }
 
 // Makes the command signatures, the kernel of a device drawing counted
-// multi-draws and, for a device with queries, the
-// zeros their resolves copy, which D3D12 zeroes as it commits them.
+// multi-draws and the zeros resolves and clears copy, which D3D12 zeroes
+// as it commits them.
 static bool OpenShared(mrhiD3d12Frames* frames)
 {
     bool made = true;
@@ -257,7 +260,7 @@ static bool OpenShared(mrhiD3d12Frames* frames)
     {
         made = MakeExpand(frames);
     }
-    if (made && frames->zeroBytes > 0)
+    if (made)
     {
         const mrhiBufferDef def = {.size = frames->zeroBytes};
         frames->zeros = mrhiD3d12CommitBuffer(frames->objects, &def);

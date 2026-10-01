@@ -201,6 +201,10 @@ mrhiSubmitFrame(device, &token);
   `mrhiReadBuffer` and `mrhiReadTexture` answer with
   `mrhi_deviceReadbackReady` once the frame has finished, and
   `mrhiTakeReadback` copies the bytes out.
+- **Clears.** `mrhiClearBuffer` zeros a range of a buffer in a pass
+  that declares it a copy destination, without staging: counters,
+  indirect arguments and a culling pass's output start from zero this
+  way.
 - **Counted draws.** Where the device has `multiDrawIndirectCount`,
   `mrhiDrawIndirectCount` and `mrhiDrawIndexedIndirectCount` make up to
   `maxCount` indirect draws from packed records, the number drawn read

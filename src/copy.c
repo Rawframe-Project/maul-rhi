@@ -61,6 +61,51 @@ mrhiCommand* mrhiTakeCopy(mrhiDevice* device, mrhiFramePass* pass, mrhiCommandTy
     return records;
 }
 
+mrhiResult mrhiClearBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId resource,
+                           uint64_t offset, uint64_t size)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = mrhiCopyPass(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    uint32_t object = mrhiFindKind(device, resource, true, &status);
+    if (object == 0)
+    {
+        return mrhiRefuse(device, status);
+    }
+    uint64_t total = mrhiBufferBytesOf(&device->frameResources[object - 1]);
+    uint64_t bytes = size == MRHI_WHOLE_SIZE && offset <= total ? total - offset : size;
+    if (offset % 4 != 0 || bytes % 4 != 0 || offset > total || bytes > total - offset ||
+        !mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessCopyDestination), nullptr))
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    // An empty clear writes nothing; drivers never see it (Vulkan refuses
+    // an empty fill).
+    if (bytes == 0)
+    {
+        return mrhi_success;
+    }
+    mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
+    if (record == nullptr)
+    {
+        return mrhi_errorCapacity;
+    }
+    record[0] = (mrhiCommand){
+        .type = mrhiCommandClearBuffer,
+        .a = object,
+        .c = offset,
+        .d = bytes,
+    };
+    return mrhi_success;
+}
+
 mrhiResult mrhiCopyBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId source,
                           uint64_t sourceOffset, mrhiResourceId destination,
                           uint64_t destinationOffset, uint64_t size)

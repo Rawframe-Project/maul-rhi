@@ -10,6 +10,9 @@ format.
 
 ### Added
 
+- `mrhiClearBuffer` zeros a range of a frame buffer (mrhi-0022): a fill
+  on Vulkan and Metal, `clearBuffer` on WebGPU, copies from a 64 KiB
+  buffer of zeros on Direct3D 12.
 - Counted multi-draw indirect (mrhi-0020): `mrhiDrawIndirectCount` and
   `mrhiDrawIndexedIndirectCount`, up to `MRHI_INDIRECT_DRAWS` draws
   whose number is read on the GPU, on Vulkan devices with the

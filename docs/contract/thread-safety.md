@@ -112,6 +112,7 @@ edit the contract, not this file.
 | `mrhiEndOcclusionQuery` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiResolveQueries` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiCopyBuffer` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiClearBuffer` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiCopyBufferToTexture` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiCopyTextureToBuffer` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiCopyTexture` | Safe from any thread; the pass is used by one thread at a time. |

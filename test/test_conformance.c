@@ -569,15 +569,30 @@ static void CheckRoundTrip(mrhiDevice* device)
     CHECK(Taken(device, fromT, pattern, sizeof(pattern)), "the texture's texels");
     CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "another frame");
     CHECK(mrhiImportBuffer(device, buffer, &b) == mrhi_success, "imported again");
+    // Two ranges cleared first (mrhi-0022), one to the buffer's end.
+    mrhiAccess cleared = Whole(b, mrhi_accessCopyDestination);
+    mrhiPassId clear = CopyPass(device, &cleared, 1);
     mrhiAccess again = Whole(b, mrhi_accessCopySource);
     read = CopyPass(device, &again, 1);
-    CHECK(mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, read) == mrhi_success &&
+    CHECK(mrhiCompileFrame(device) == mrhi_success &&
+              mrhiBeginPass(device, clear) == mrhi_success &&
+              mrhiClearBuffer(device, clear, b, 576, 128) == mrhi_success &&
+              mrhiClearBuffer(device, clear, b, 1008, MRHI_WHOLE_SIZE) == mrhi_success &&
+              mrhiClearBuffer(device, clear, b, 1024, MRHI_WHOLE_SIZE) == mrhi_success &&
+              mrhiEndPass(device, clear) == mrhi_success,
+          "cleared");
+    CHECK(mrhiBeginPass(device, read) == mrhi_success &&
               mrhiReadBuffer(device, read, b, 512, 512, &fromX) == mrhi_success &&
               mrhiEndPass(device, read) == mrhi_success,
           "read again");
     CHECK(mrhiDestroyBuffer(device, buffer) == mrhi_success, "destroyed while recorded");
     Finish(device, 1);
-    CHECK(Taken(device, fromX, pattern + 512, 512), "kept across frames and until the end");
+    uint8_t expected[512];
+    memcpy(expected, pattern + 512, sizeof(expected));
+    memset(expected + 64, 0, 128);
+    memset(expected + 496, 0, 16);
+    CHECK(Taken(device, fromX, expected, sizeof(expected)),
+          "kept across frames and until the end, the cleared ranges zero");
 }
 
 // A texture of a format for the feature format check.

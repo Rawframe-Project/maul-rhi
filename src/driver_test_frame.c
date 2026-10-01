@@ -155,6 +155,10 @@ static void CheckCommand(Walk* walk, const mrhiCommand* command)
     case mrhiCommandCopyTexture:
         CheckCopy(walk, command, false, false);
         break;
+    case mrhiCommandClearBuffer:
+        WALK_CHECK(Names(walk, command->a, true) && command->c % 4 == 0 && command->d > 0 &&
+                   command->d % 4 == 0);
+        break;
     default:
         WALK_CHECK(command->type != 0 && command->type < mrhiCommandTypeEnd);
         break;

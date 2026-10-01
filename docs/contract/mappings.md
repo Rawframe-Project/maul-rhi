@@ -953,6 +953,7 @@ restricted or absent-rejected, with how.
 | `mrhiEndOcclusionQuery` | direct: vkCmdEndQuery | direct: EndQuery | direct: setVisibilityResultMode disabled | direct: endOcclusionQuery |
 | `mrhiResolveQueries` | direct: vkCmdCopyQueryPoolResults with 64-bit results and wait | direct: ResolveQueryData | emulated: a blit copy from the visibility buffer, or resolveCounters for timestamps (cost: a blit copy per resolve) | direct: resolveQuerySet |
 | `mrhiCopyBuffer` | direct: vkCmdCopyBuffer | direct: CopyBufferRegion | direct: copyFromBuffer:sourceOffset:toBuffer: | direct: copyBufferToBuffer |
+| `mrhiClearBuffer` | direct: vkCmdFillBuffer with 0 | emulated: CopyBufferRegion from a device-owned buffer of zeros, in 64 KiB pieces (cost: 64 KiB per device and one copy per 64 KiB cleared) | direct: fillBuffer:range:value: with 0 | direct: clearBuffer |
 | `mrhiCopyBufferToTexture` | direct: vkCmdCopyBufferToImage | direct: CopyTextureRegion from a placed footprint | direct: copyFromBuffer:toTexture: | direct: copyBufferToTexture |
 | `mrhiCopyTextureToBuffer` | direct: vkCmdCopyImageToBuffer | direct: CopyTextureRegion into a placed footprint | direct: copyFromTexture:toBuffer: | direct: copyTextureToBuffer |
 | `mrhiCopyTexture` | direct: vkCmdCopyImage | direct: CopyTextureRegion | direct: copyFromTexture:toTexture: | direct: copyTextureToTexture |
