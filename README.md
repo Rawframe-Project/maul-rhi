@@ -6,7 +6,7 @@ and submits every pass, surfaces and presentation. Written in C23 with
 public headers any C17 or C++17 program can include, drivers over each
 GPU API directly, and an MIT license.
 
-It will own:
+It owns:
 
 - instances, adapters and devices, and the capabilities a program
   requests from them;
@@ -23,11 +23,18 @@ shader containers built offline. Every request that completes later
 answers with exactly one record in a queue the program drains; no
 library thread runs, and no callback delivers a result.
 
+[The guide](docs/guide.md) walks through each part, and
+[the API reference](docs/api.md) lists all 130 public functions,
+generated from the headers.
+
 ## Status
 
-Not released. The contract, the Vulkan, Direct3D 12, WebGPU and Metal
-drivers, the conformance suite and the samples are in place; the Metal
-driver still lacks heaps, timestamps, present timing and multiview.
+0.1.0 is the first release. It has the whole contract on four drivers,
+Vulkan, Direct3D 12, Metal and WebGPU, and a test driver without a GPU,
+with the conformance suite, the samples and the benchmarks. Not yet
+granted anywhere: present timing (no CI device times its presents),
+counted multi-draw indirect and multiview; on Metal, also bindless
+heaps and timestamps, which wait for a Metal 3 device to test on.
 Each build has one native driver: Metal on Apple systems, Direct3D 12
 on Windows (or Vulkan, with `MAUL_RHI_VULKAN_DRIVER=ON` and
 `MAUL_RHI_D3D12_DRIVER=OFF`), Vulkan on the others, WebGPU on the web,

@@ -8,6 +8,12 @@ format.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-01
+
+The first release: the whole contract on Vulkan, Direct3D 12, Metal and
+WebGPU, a test driver without a GPU, the conformance suite on every
+platform the drivers serve, the samples, and the benchmarks.
+
 ### Added
 
 - The library skeleton: the build, the family rules and tools, the

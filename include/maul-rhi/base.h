@@ -22,8 +22,8 @@ extern "C"
 
 // The library version. CMake reads it from here.
 #define MRHI_VERSION_MAJOR 0
-#define MRHI_VERSION_MINOR 0
-#define MRHI_VERSION_PATCH 1
+#define MRHI_VERSION_MINOR 1
+#define MRHI_VERSION_PATCH 0
 
 // The contract version a program is built against. An instance refuses any
 // other before 1.0.
