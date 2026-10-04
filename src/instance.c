@@ -103,9 +103,7 @@ static mrhiResult CheckDef(const mrhiInstanceDef* def)
     {
         return chain;
     }
-    const mrhiExternalDriverDef* external =
-        (const mrhiExternalDriverDef*)mrhiFindStruct(def->next, mrhi_structExternalDriver);
-    if (!AreVulkanStructsValid(def) || (external != nullptr && external->vtable == nullptr))
+    if (!AreVulkanStructsValid(def))
     {
         return mrhi_errorInvalid;
     }
