@@ -2,9 +2,11 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Query sets on a test driver device: the def's checks, the timestamp
-// feature, the device's state, and its two limits: sets, and runs of
-// queries. Occlusion queries in render passes: the pass's set, one open
-// query at a time, and each query written once a frame.
+// and statistics features, the device's state, and its two limits:
+// sets, and runs of queries. Occlusion queries in render passes: the
+// pass's set, one open query at a time, and each query written once a
+// frame. Statistics queries (mrhi-0023) in passes of the graphics class,
+// beside them.
 
 #include "device_core.h"
 #include "test_device_setup.h"
@@ -61,7 +63,7 @@ static void TestInvalidDefs(void)
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorInvalid, "no queries");
     def.count = 4097;
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorInvalid, "past 4096");
-    def = Def(2, 1);
+    def = Def(3, 1);
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorInvalid, "a type");
     def = mrhiDefaultQuerySetDef();
     def.cookie = 0;
@@ -77,6 +79,9 @@ static void TestInvalidDefs(void)
     def = Def(mrhi_queryTimestamp, 1);
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorUnsupported,
           "timestamps without the feature");
+    def = Def(mrhi_queryPipelineStatistics, 1);
+    CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorUnsupported,
+          "statistics without theirs");
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def = mrhiDefaultQuerySetDef();
     def.next = &critical;
@@ -188,13 +193,19 @@ static mrhiResourceId s_r;
 static mrhiPassId s_render;
 static mrhiPassId s_compute;
 
-// Opens a ready device with timestamps and a render target, its
-// commands limited to bytes.
+// Opens a ready device with timestamps, statistics, two views and a
+// render target, its commands limited to bytes.
 static void OpenFrames(uint32_t commandBytes)
 {
     s_adapter.features.timestampQuery = true;
+    s_adapter.features.pipelineStatisticsQuery = true;
+    s_adapter.features.multiview = true;
+    s_adapter.limits.multiviewViews = 2;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.features.timestampQuery = true;
+    def.features.pipelineStatisticsQuery = true;
+    def.features.multiview = true;
+    def.limits.multiviewViews = 2;
     def.deviceLimits.frameCommandBytes = commandBytes;
     s_device = OpenWith(def, true);
     mrhiTextureDef textureDef = mrhiDefaultTextureDef();
@@ -680,6 +691,111 @@ static void TestOcclusionCapacity(void)
     Close(s_device);
 }
 
+// In a render pass beside an occlusion query and in a pass without
+// targets, one open at a time, each query written once a frame; a
+// resolve writes 88 bytes a query.
+static void TestStatistics(void)
+{
+    OpenFrames(1u << 20);
+    mrhiQuerySetId occlusion = MakeSet(mrhi_queryOcclusion, 4);
+    mrhiQuerySetId set = MakeSet(mrhi_queryPipelineStatistics, 4);
+    uint64_t handle = s_device->querySetSlots[set.index1 - 1].handle;
+    Frame(occlusion);
+    CHECK(mrhiBeginStatisticsQuery(s_device, s_render, set, 1) == mrhi_success &&
+              mrhiBeginOcclusionQuery(s_device, s_render, 0) == mrhi_success,
+          "begun beside an occlusion query");
+    const mrhiCommand* command = Nth(s_render, 0);
+    CHECK(command != nullptr && command->type == mrhiCommandBeginStatisticsQuery &&
+              command->a == 1 && command->b == handle,
+          "recorded with the set's handle");
+    uint32_t misuse = 0;
+    CHECK(mrhiBeginStatisticsQuery(s_device, s_render, set, 2) == mrhi_errorInvalid, "one open");
+    CHECK(mrhiEndOcclusionQuery(s_device, s_render) == mrhi_success &&
+              mrhiEndPass(s_device, s_render) == mrhi_errorInvalid,
+          "no end while open");
+    misuse += 2;
+    CHECK(mrhiEndStatisticsQuery(s_device, s_render) == mrhi_success, "ended");
+    command = Nth(s_render, 3);
+    CHECK(command != nullptr && command->type == mrhiCommandEndStatisticsQuery && command->a == 1 &&
+              command->b == handle,
+          "recorded with its query");
+    CHECK(mrhiEndStatisticsQuery(s_device, s_render) == mrhi_errorInvalid, "none open");
+    CHECK(mrhiBeginStatisticsQuery(s_device, s_compute, set, 1) == mrhi_errorInvalid,
+          "written this frame");
+    CHECK(mrhiBeginStatisticsQuery(s_device, s_compute, set, 4) == mrhi_errorInvalid,
+          "past the set");
+    CHECK(mrhiBeginStatisticsQuery(s_device, s_compute, occlusion, 3) == mrhi_errorInvalid,
+          "an occlusion set");
+    misuse += 4;
+    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "each counted");
+    CHECK(Nth(s_render, 4) == nullptr, "the refused ones recorded nothing");
+    CHECK(mrhiBeginStatisticsQuery(s_device, s_compute, set, 0) == mrhi_success &&
+              mrhiEndStatisticsQuery(s_device, s_compute) == mrhi_success,
+          "in a pass without targets");
+    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success, "the render pass ended");
+    CHECK(mrhiBeginStatisticsQuery(s_device, s_render, set, 2) == mrhi_errorState &&
+              mrhiEndStatisticsQuery(s_device, s_render) == mrhi_errorState,
+          "not recording");
+    CHECK(mrhiBeginStatisticsQuery(nullptr, s_compute, set, 2) == mrhi_errorInvalid &&
+              mrhiEndStatisticsQuery(nullptr, s_compute) == mrhi_errorInvalid,
+          "no device");
+    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 4, s_r, 0) == mrhi_success &&
+              mrhiResolveQueries(s_device, s_compute, set, 2, 2, s_r, 768) == mrhi_success,
+          "88 bytes a query");
+    CHECK(mrhiResolveQueries(s_device, s_compute, set, 1, 3, s_r, 768) == mrhi_errorInvalid,
+          "not three in the last 256 bytes");
+    misuse += 1;
+    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "counted");
+    Drop();
+    Frame(occlusion);
+    CHECK(mrhiBeginStatisticsQuery(s_device, s_render, set, 1) == mrhi_success &&
+              mrhiEndStatisticsQuery(s_device, s_render) == mrhi_success,
+          "written again in the next frame");
+    CHECK(mrhiDestroyQuerySet(s_device, set) == mrhi_success &&
+              mrhiBeginStatisticsQuery(s_device, s_compute, set, 0) == mrhi_errorStale,
+          "a destroyed set");
+    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "not counted");
+    Drop();
+    Close(s_device);
+}
+
+// Not in a pass of async compute, of transfers, or of several views.
+static void TestStatisticsPasses(void)
+{
+    OpenFrames(1u << 20);
+    mrhiQuerySetId set = MakeSet(mrhi_queryPipelineStatistics, 4);
+    BeginFrame();
+    mrhiTextureDef layers = mrhiDefaultTextureDef();
+    layers.kind = mrhi_texture2dArray;
+    layers.format = mrhi_formatRgba8Unorm;
+    layers.width = 16;
+    layers.height = 16;
+    layers.depthOrLayers = 2;
+    mrhiResourceId target = {0};
+    CHECK(mrhiDeclareTexture(s_device, &layers, &target) == mrhi_success, "two layers");
+    mrhiPassDef def = RenderDef(target, (mrhiQuerySetId){0});
+    def.viewCount = 2;
+    def.neverCull = true;
+    mrhiPassId passes[3];
+    CHECK(mrhiAddPass(s_device, &def, &passes[0]) == mrhi_success, "two views");
+    def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    def.passClass = mrhi_passAsyncCompute;
+    CHECK(mrhiAddPass(s_device, &def, &passes[1]) == mrhi_success, "async compute");
+    def.passClass = mrhi_passTransfer;
+    CHECK(mrhiAddPass(s_device, &def, &passes[2]) == mrhi_success, "transfers");
+    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    for (uint32_t i = 0; i < 3; ++i)
+    {
+        CHECK(mrhiBeginPass(s_device, passes[i]) == mrhi_success &&
+                  mrhiBeginStatisticsQuery(s_device, passes[i], set, i) == mrhi_errorInvalid,
+              "refused");
+    }
+    CHECK(mrhiGetDeviceMisuse(s_device) == 3, "each counted");
+    Drop();
+    Close(s_device);
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -697,5 +813,7 @@ int main(void)
     TestPeriod();
     TestResolveAccess();
     TestResolve();
+    TestStatistics();
+    TestStatisticsPasses();
     return s_failures == 0 ? 0 : 1;
 }

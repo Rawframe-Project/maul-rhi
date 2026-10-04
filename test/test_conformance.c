@@ -2050,6 +2050,102 @@ static void CheckMultiview(mrhiDevice* device)
           "destroyed");
 }
 
+// Pipeline statistics (mrhi-0023): a query around a triangle drawn,
+// one around two dispatches of 8 invocations, and a third left
+// unwritten, resolved over bytes set to 0xFF. The triangle's input
+// assembly counts are exact; the stages after it ran at least once;
+// the stages Maul RHI lacks and those outside each query count 0.
+static void CheckStatistics(Scene* scene)
+{
+    enum
+    {
+        COUNTERS = 11,
+    };
+    mrhiDevice* device = scene->device;
+    mrhiQuerySetId set = MakeQuerySet(device, mrhi_queryPipelineStatistics, 3);
+    mrhiBufferDef resultsDef = mrhiDefaultBufferDef();
+    resultsDef.size = 512;
+    resultsDef.usage = mrhi_bufferQueryResolve | mrhi_bufferCopySource | mrhi_bufferCopyDestination;
+    mrhiBufferId results = {0};
+    CHECK(mrhiCreateBuffer(device, &resultsDef, &results) == mrhi_success, "a results buffer");
+    BeginScene(scene);
+    mrhiResourceId r = {0};
+    CHECK(mrhiImportBuffer(device, results, &r) == mrhi_success, "imported");
+    mrhiAccess fill = Whole(r, mrhi_accessCopyDestination);
+    mrhiPassId filled = CopyPass(device, &fill, 1);
+    mrhiAccess uses[3] = {Whole(scene->u, mrhi_accessUniform),
+                          Whole(scene->d, mrhi_accessStorageReadWrite),
+                          Whole(scene->w, mrhi_accessSampled)};
+    mrhiPassId draw = DrawPass(scene, uses);
+    mrhiPassId dispatch = CopyPass(device, uses, 3);
+    mrhiAccess resolves = Whole(r, mrhi_accessQueryResolve);
+    mrhiPassId resolve = CopyPass(device, &resolves, 1);
+    mrhiAccess reads = Whole(r, mrhi_accessCopySource);
+    mrhiPassId read = CopyPass(device, &reads, 1);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    uint8_t ones[3 * COUNTERS * sizeof(uint64_t)];
+    memset(ones, 0xFF, sizeof(ones));
+    CHECK(mrhiBeginPass(device, filled) == mrhi_success &&
+              mrhiWriteBuffer(device, filled, r, 0, ones, sizeof(ones)) == mrhi_success &&
+              mrhiEndPass(device, filled) == mrhi_success,
+          "filled");
+    CHECK(mrhiBeginPass(device, draw) == mrhi_success &&
+              mrhiBeginStatisticsQuery(device, draw, set, 0) == mrhi_success,
+          "query 0 begun");
+    DrawWith(scene, draw, scene->draw, 2);
+    CHECK(mrhiEndStatisticsQuery(device, draw) == mrhi_success &&
+              mrhiEndPass(device, draw) == mrhi_success,
+          "drawn");
+    const float five[4] = {5.0f, 0.0f, 0.0f, 0.0f};
+    CHECK(mrhiBeginPass(device, dispatch) == mrhi_success &&
+              mrhiBeginStatisticsQuery(device, dispatch, set, 1) == mrhi_success &&
+              mrhiSetComputePipeline(device, dispatch, scene->adding) == mrhi_success &&
+              mrhiSetRootBlock(device, dispatch, 0, five, sizeof(five)) == mrhi_success,
+          "query 1 begun");
+    BindScene(scene, dispatch);
+    CHECK(mrhiDispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
+              mrhiDispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
+              mrhiEndStatisticsQuery(device, dispatch) == mrhi_success &&
+              mrhiEndPass(device, dispatch) == mrhi_success,
+          "dispatched");
+    mrhiRequestId request = {0};
+    CHECK(mrhiBeginPass(device, resolve) == mrhi_success &&
+              mrhiResolveQueries(device, resolve, set, 0, 3, r, 0) == mrhi_success &&
+              mrhiEndPass(device, resolve) == mrhi_success &&
+              mrhiBeginPass(device, read) == mrhi_success &&
+              mrhiReadBuffer(device, read, r, 0, sizeof(ones), &request) == mrhi_success &&
+              mrhiEndPass(device, read) == mrhi_success,
+          "resolved");
+    Finish(device, 1);
+    uint64_t values[3][COUNTERS];
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, request, values, sizeof(values), &size) == mrhi_success &&
+              size == sizeof(values),
+          "the counters");
+    const uint64_t* drawn = values[0];
+    CHECK(!s_runs || (drawn[0] == 3 && drawn[1] == 1), "three vertices, one triangle");
+    CHECK(!s_runs || (drawn[2] > 0 && drawn[5] > 0 && drawn[6] > 0 && drawn[7] > 0),
+          "vertex, clipping and fragment work");
+    CHECK(!s_runs ||
+              (drawn[3] == 0 && drawn[4] == 0 && drawn[8] == 0 && drawn[9] == 0 && drawn[10] == 0),
+          "no geometry, tessellation or compute work");
+    bool dispatched = true;
+    bool unwritten = true;
+    for (int i = 0; i < COUNTERS - 1; ++i)
+    {
+        dispatched = dispatched && values[1][i] == 0;
+    }
+    for (int i = 0; i < COUNTERS; ++i)
+    {
+        unwritten = unwritten && values[2][i] == 0;
+    }
+    CHECK(!s_runs || (dispatched && values[1][10] == 16), "16 compute invocations, nothing else");
+    CHECK(!s_runs || unwritten, "eleven zeros for the query left unwritten");
+    CHECK(mrhiDestroyQuerySet(device, set) == mrhi_success &&
+              mrhiDestroyBuffer(device, results) == mrhi_success,
+          "destroyed");
+}
+
 static void CheckDrawing(mrhiDevice* device, bool timestamps)
 {
     Scene scene = {.device = device};
@@ -2057,7 +2153,8 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     CheckDrawFrame(&scene, DRAW_DIRECT);
     CheckDrawFrame(&scene, DRAW_INDIRECT);
     mrhiFeatures features = {0};
-    if (mrhiGetDeviceFeatures(device, &features) == mrhi_success && features.multiDrawIndirectCount)
+    CHECK(mrhiGetDeviceFeatures(device, &features) == mrhi_success, "its features");
+    if (features.multiDrawIndirectCount)
     {
         CheckDrawFrame(&scene, DRAW_COUNTED);
     }
@@ -2066,6 +2163,10 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     CheckQueries(&scene, timestamps);
     CheckRenderState(&scene);
     CheckComputeSplit(&scene, timestamps);
+    if (features.pipelineStatisticsQuery)
+    {
+        CheckStatistics(&scene);
+    }
 }
 
 // A device made with the cache the last one exported takes it.
@@ -2108,8 +2209,6 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CHECK(mrhiGetDeviceFeatures(device, &granted) == mrhi_success &&
               memcmp(&granted, asked, sizeof(granted)) == 0,
           "granted as asked");
-    // No query type reads statistics yet, so no driver may claim them.
-    CHECK(!granted.pipelineStatisticsQuery, "no pipeline statistics without their queries");
     double period = 0.0;
     mrhiResult status = mrhiGetDeviceTimestampPeriod(device, &period);
     CHECK(asked->timestampQuery ? status == mrhi_success && period > 0.0

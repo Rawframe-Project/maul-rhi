@@ -143,10 +143,6 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
         frames->scratchBytes += (uint64_t)limits->frameIndirectDraws *
                                 (sizeof(D3D12_DRAW_INDEXED_ARGUMENTS) + 2 * sizeof(uint32_t));
     }
-    // Clears copy from the zeros too (mrhi-0022), so every device has
-    // them, at least a placement's 64 KiB.
-    uint64_t queryZeros = (uint64_t)limits->queries * sizeof(uint64_t);
-    frames->zeroBytes = queryZeros > MRHI_D3D12_ZERO_BYTES ? queryZeros : MRHI_D3D12_ZERO_BYTES;
     frames->readbackLimit = limits->readbacks;
     frames->uploadBytes = limits->frameUploadBytes;
     frames->readbackSize = limits->readbackBytes;
@@ -262,7 +258,7 @@ static bool OpenShared(mrhiD3d12Frames* frames)
     }
     if (made)
     {
-        const mrhiBufferDef def = {.size = frames->zeroBytes};
+        const mrhiBufferDef def = {.size = MRHI_D3D12_ZERO_BYTES};
         frames->zeros = mrhiD3d12CommitBuffer(frames->objects, &def);
         made = frames->zeros != nullptr;
     }

@@ -270,8 +270,11 @@ device presents to many surfaces, each with its own present mode.
 
 ## 10. Queries and timing
 
-Query sets hold occlusion results and timestamps; a pass names the sets
-it writes, and `mrhiResolveQueries` writes results into a buffer.
+Query sets hold occlusion results, timestamps or pipeline statistics;
+a pass names the occlusion and timestamp sets it writes, statistics
+queries name theirs as they begin (`mrhiBeginStatisticsQuery`, on
+Vulkan and Direct3D 12), and `mrhiResolveQueries` writes results into
+a buffer.
 `mrhiGetDeviceTimestampPeriod` converts timestamps to nanoseconds.
 Present timing is a capability no driver grants yet.
 

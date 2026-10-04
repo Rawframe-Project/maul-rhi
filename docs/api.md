@@ -126,7 +126,7 @@ Begins recording a kept pass of the compiled open frame. It records until mrhiEn
 ```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiEndPass(mrhiDevice* device, mrhiPassId pass);
 ```
-Ends recording a pass. Its debug groups must be closed.  @param device  The device. @param pass    The pass, recording. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, open debug groups, or an open occlusion query; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording. @par Thread safety Safe from any thread; the pass is used by one thread at a time.
+Ends recording a pass. Its debug groups must be closed.  @param device  The device. @param pass    The pass, recording. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, open debug groups, or an open occlusion or statistics query; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording. @par Thread safety Safe from any thread; the pass is used by one thread at a time.
 
 ```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiSetGraphicsPipeline(mrhiDevice* device, mrhiPassId pass, mrhiGraphicsPipelineId pipeline);
@@ -204,9 +204,19 @@ MRHI_NODISCARD MRHI_API mrhiResult mrhiEndOcclusionQuery(mrhiDevice* device, mrh
 Ends the pass's open occlusion query. One refused for capacity still ends it, so the pass can end.  @param device  The device. @param pass    The pass, recording, with an occlusion query open. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or a pass without an open occlusion query; `mrhi_errorStale` for a pass of another frame; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full. @par Thread safety Safe from any thread; the pass is used by one thread at a time.
 
 ```c
+MRHI_NODISCARD MRHI_API mrhiResult mrhiBeginStatisticsQuery(mrhiDevice* device, mrhiPassId pass, mrhiQuerySetId set, uint32_t query);
+```
+Begins a pipeline statistics query: the pass's work until its end is counted. A query is written at most once in a frame.  @param device  The device. @param pass    The pass, recording, of the graphics class, rendering one view. @param set     A query set of pipeline statistics queries. @param query   The query, below the set's count. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass not of the graphics class or rendering several views, a set that is not of statistics queries, a query past the set's count or already written in this frame, or a statistics query already open in the pass; `mrhi_errorStale` for a pass of another frame or a destroyed query set; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full. @par Thread safety Safe from any thread; the pass is used by one thread at a time.
+
+```c
+MRHI_NODISCARD MRHI_API mrhiResult mrhiEndStatisticsQuery(mrhiDevice* device, mrhiPassId pass);
+```
+Ends the pass's open statistics query. One refused for capacity still ends it, so the pass can end.  @param device  The device. @param pass    The pass, recording, with a statistics query open. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or a pass without an open statistics query; `mrhi_errorStale` for a pass of another frame; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full. @par Thread safety Safe from any thread; the pass is used by one thread at a time.
+
+```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiResolveQueries(mrhiDevice* device, mrhiPassId pass, mrhiQuerySetId set, uint32_t first, uint32_t count, mrhiResourceId resource, uint64_t offset);
 ```
-Writes queries of a set into a buffer as 64-bit values: an occlusion query's result, or a timestamp in ticks. A query not written earlier in the frame reads 0.  @param device    The device. @param pass      The pass, recording, of the graphics class without targets. @param set       The query set. @param first     The first query, below the set's count. @param count     The queries from it. @param resource  A buffer of the open frame the pass declares with the query resolve access. @param offset    Where the first value goes, a multiple of 256. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass with targets or not of the graphics class, queries past the set's count or a first query at or past it, a resource that is not a buffer the pass declares with the query resolve access, or an offset not a multiple of 256 or without 8 bytes per query after it; `mrhi_errorStale` for a pass of another frame, a destroyed query set, or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full. @par Thread safety Safe from any thread; the pass is used by one thread at a time.
+Writes queries of a set into a buffer as 64-bit values: an occlusion query's result, a timestamp in ticks, or a statistics query's eleven counters. A query not written earlier in the frame reads zeros.  @param device    The device. @param pass      The pass, recording, of the graphics class without targets. @param set       The query set. @param first     The first query, below the set's count. @param count     The queries from it. @param resource  A buffer of the open frame the pass declares with the query resolve access. @param offset    Where the first value goes, a multiple of 256. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass with targets or not of the graphics class, queries past the set's count or a first query at or past it, a resource that is not a buffer the pass declares with the query resolve access, or an offset not a multiple of 256 or without the queries' bytes after it (88 per statistics query, 8 per other); `mrhi_errorStale` for a pass of another frame, a destroyed query set, or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full. @par Thread safety Safe from any thread; the pass is used by one thread at a time.
 
 ```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiCopyBuffer(mrhiDevice* device, mrhiPassId pass, mrhiResourceId source, uint64_t sourceOffset, mrhiResourceId destination, uint64_t destinationOffset, uint64_t size);
@@ -615,7 +625,7 @@ Returns the default query set def: one occlusion query.  @return The def, with a
 ```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateQuerySet(mrhiDevice* device, const mrhiQuerySetDef* def, mrhiQuerySetId* setOut);
 ```
-Makes a query set on a ready device.  @param device  The device. @param def     The query set to make. @param setOut  Receives the query set. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, an unknown type, or a count of 0 or past 4096; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know, or timestamps without the timestamp_query feature; `mrhi_errorCapacity` when the device's querySets limit is reached or its queries limit lacks a run of count queries. @par Thread safety Safe from any thread; the device is used by one thread at a time.
+Makes a query set on a ready device.  @param device  The device. @param def     The query set to make. @param setOut  Receives the query set. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, an unknown type, or a count of 0 or past 4096; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know, timestamps without the timestamp_query feature, or pipeline statistics without the pipeline_statistics_query feature; `mrhi_errorCapacity` when the device's querySets limit is reached or its queries limit lacks a run of count queries. @par Thread safety Safe from any thread; the device is used by one thread at a time.
 
 ```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyQuerySet(mrhiDevice* device, mrhiQuerySetId set);
@@ -726,4 +736,4 @@ Hands a native pass the command buffer the program recorded for it: a primary Vk
 
 ---
 
-133 functions across 15 headers.
+135 functions across 15 headers.

@@ -37,7 +37,7 @@ d3d12_heap: d3d12_frame d3d12_resource d3d12_slots driver invariant
 d3d12_frame: allocator d3d12_barrier d3d12_pipeline d3d12_record d3d12_resource d3d12_state d3d12_swapchain invariant
 d3d12_record: capabilities_core d3d12_barrier d3d12_bind d3d12_copy d3d12_draw d3d12_names d3d12_state invariant
 d3d12_bind: command d3d12_barrier d3d12_state invariant
-d3d12_draw: command d3d12_barrier d3d12_bind d3d12_resource d3d12_state invariant
+d3d12_draw: command d3d12_barrier d3d12_bind d3d12_copy d3d12_resource d3d12_state invariant
 d3d12_copy: capabilities_core d3d12_barrier d3d12_names d3d12_state invariant
 d3d12_barrier: capabilities_core d3d12_state invariant
 d3d12_state: d3d12_pipeline d3d12_resource driver

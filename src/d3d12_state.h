@@ -27,8 +27,9 @@
 // list finishes. A texture's undefined parts are in the initial state;
 // a placed target is discarded at its first use, which D3D12 asks of
 // placed render target and depth textures before anything else.
-// The least bytes of a device's zeros: D3D12's placement alignment, so
-// no smaller buffer takes less memory.
+// The bytes of a device's zeros, which resolves and clears copy in
+// pieces (mrhi-0022, mrhi-0023): D3D12's placement alignment, so no
+// smaller buffer takes less memory.
 #define MRHI_D3D12_ZERO_BYTES UINT64_C(65536)
 
 typedef struct mrhiD3d12Object
@@ -154,7 +155,7 @@ typedef struct mrhiD3d12Recorder
     uint32_t openQuery;
     ID3D12CommandSignature* const* signatures;
     // The zeros a resolve copies for queries the frame did not write,
-    // and a clear copies (mrhi-0022), at least MRHI_D3D12_ZERO_BYTES.
+    // and a clear copies (mrhi-0022), MRHI_D3D12_ZERO_BYTES of them.
     ID3D12Resource* zeros;
     // The slot's buffer that indirect draws setting the vertex
     // information copy their arguments into, made at its first use, and

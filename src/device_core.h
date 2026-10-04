@@ -311,6 +311,11 @@ typedef struct mrhiFramePass
     uint32_t occlusionGeneration;
     uint64_t occlusionHandle;
     bool occlusionOpen;
+    // Its open statistics query (mrhi-0023): the query and its set's
+    // driver handle, which its end records.
+    uint32_t statisticsQuery;
+    uint64_t statisticsSet;
+    bool statisticsOpen;
     // Its timestamp query set's driver handle (0 for none) and the
     // queries written at its start and end (MRHI_NO_QUERY for none).
     uint64_t timestampSet;

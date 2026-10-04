@@ -530,6 +530,8 @@ static void RecordCommand(mrhiVulkanRecording* recording, const mrhiCommand* com
         break;
     case mrhiCommandBeginOcclusionQuery:
     case mrhiCommandEndOcclusionQuery:
+    case mrhiCommandBeginStatisticsQuery:
+    case mrhiCommandEndStatisticsQuery:
     case mrhiCommandResolveQueries:
         mrhiVulkanQuery(recording, command);
         break;

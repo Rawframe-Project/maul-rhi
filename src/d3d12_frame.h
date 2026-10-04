@@ -110,7 +110,6 @@ typedef struct mrhiD3d12Frames
     ID3D12RootSignature* expandRoot;
     ID3D12PipelineState* expand;
     ID3D12Resource* zeros;
-    uint64_t zeroBytes;
     // The frame being recorded's state, kept here for its size.
     mrhiD3d12Recorder recorder;
     // Frames submitted, and frames reported finished.

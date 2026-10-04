@@ -17,6 +17,17 @@
 // The SPI version a driver's vtable must carry.
 #define MRHI_SPI_VERSION 3
 
+// The 64-bit counters a pipeline statistics query writes (mrhi-0023).
+#define MRHI_STATISTICS_COUNTERS 11
+
+// The bytes a resolve writes per query of a type: eleven counters for a
+// statistics query, one value for another.
+static inline uint64_t mrhiQueryBytes(mrhiQueryType type)
+{
+    return (type == mrhi_queryPipelineStatistics ? MRHI_STATISTICS_COUNTERS : 1u) *
+           sizeof(uint64_t);
+}
+
 // An adapter as a driver reports it: its handle, never zero, its facts,
 // and the features and limits it can grant.
 typedef struct mrhiDriverAdapter

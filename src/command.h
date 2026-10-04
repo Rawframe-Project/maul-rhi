@@ -59,6 +59,10 @@ typedef enum mrhiCommandType
     // a: the query; b: the query set's driver handle.
     mrhiCommandBeginOcclusionQuery,
     mrhiCommandEndOcclusionQuery,
+    // a: the query; b: the query set's driver handle, at its begin and
+    // its end.
+    mrhiCommandBeginStatisticsQuery,
+    mrhiCommandEndStatisticsQuery,
     // a: the frame resource's slot plus one; b: the query set's driver
     // handle; c: the first query, and the count in the upper half; d: the
     // offset.

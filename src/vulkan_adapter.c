@@ -300,9 +300,7 @@ static mrhiFeatures FeaturesOf(const mrhiVulkan* vulkan, VkPhysicalDevice device
     return (mrhiFeatures){
         .timestampQuery = facts->properties.properties.limits.timestampComputeAndGraphics &&
                           facts->familyTimestampBits > 0,
-        // No query type reads statistics yet, so the feature is not
-        // claimed: a granted feature must be usable.
-        .pipelineStatisticsQuery = false,
+        .pipelineStatisticsQuery = core->pipelineStatisticsQuery,
         .textureCompressionBc = core->textureCompressionBC,
         .textureCompressionEtc2 = core->textureCompressionETC2,
         .textureCompressionAstc = core->textureCompressionASTC_LDR,

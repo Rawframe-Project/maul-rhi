@@ -287,6 +287,8 @@ static void Record(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
         break;
     case mrhiCommandBeginOcclusionQuery:
     case mrhiCommandEndOcclusionQuery:
+    case mrhiCommandBeginStatisticsQuery:
+    case mrhiCommandEndStatisticsQuery:
     case mrhiCommandResolveQueries:
         mrhiD3d12Query(recorder, command);
         break;

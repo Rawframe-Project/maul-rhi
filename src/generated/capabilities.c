@@ -80,6 +80,7 @@ void mrhiMaskFeatures(mrhiFeatures* features, mrhiDriverKind driver)
         features->textureCompressionAstc = false;
         break;
     case mrhi_driverMetal:
+        features->pipelineStatisticsQuery = false;
         break;
     case mrhi_driverWebGpu:
         features->pipelineStatisticsQuery = false;

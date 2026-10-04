@@ -134,6 +134,8 @@ static void CheckCommand(Walk* walk, const mrhiCommand* command)
         WALK_CHECK(Names(walk, command->a, true) && Names(walk, (uint32_t)command->b, true));
         break;
     case mrhiCommandBeginOcclusionQuery:
+    case mrhiCommandBeginStatisticsQuery:
+    case mrhiCommandEndStatisticsQuery:
         WALK_CHECK(IsHandle(walk, command->b));
         break;
     case mrhiCommandResolveQueries:

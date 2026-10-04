@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Query sets (mrhi-0012): device objects of occlusion or timestamp
-// queries, each holding a run of the device's query marks, which record
-// the frame that last wrote each query; and the occlusion queries a
-// render pass brackets its draws with.
+// Query sets (mrhi-0012): device objects of occlusion, timestamp or
+// pipeline statistics queries (mrhi-0023), each holding a run of the
+// device's query marks, which record the frame that last wrote each
+// query; the occlusion queries a render pass brackets its draws with;
+// and the statistics queries a pass of the graphics class brackets its
+// work with.
 
 #include "encoder_core.h"
 
@@ -68,11 +70,12 @@ mrhiResult mrhiCreateQuerySet(mrhiDevice* device, const mrhiQuerySetDef* def,
     {
         return status;
     }
-    if (def->type > mrhi_queryTimestamp || def->count == 0 || def->count > MOST_QUERIES)
+    if (def->type > mrhi_queryPipelineStatistics || def->count == 0 || def->count > MOST_QUERIES)
     {
         return mrhiDeviceMisuse(device);
     }
-    if (def->type == mrhi_queryTimestamp && !device->features.timestampQuery)
+    if ((def->type == mrhi_queryTimestamp && !device->features.timestampQuery) ||
+        (def->type == mrhi_queryPipelineStatistics && !device->features.pipelineStatisticsQuery))
     {
         return mrhi_errorUnsupported;
     }
@@ -278,6 +281,75 @@ mrhiResult mrhiEndOcclusionQuery(mrhiDevice* device, mrhiPassId id)
     return mrhi_success;
 }
 
+mrhiResult mrhiBeginStatisticsQuery(mrhiDevice* device, mrhiPassId id, mrhiQuerySetId set,
+                                    uint32_t query)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (!mrhiPoolIsLive(&device->querySets, set.index1, set.generation))
+    {
+        return mrhi_errorStale;
+    }
+    // Vulkan counts graphics stages only on a graphics queue, and spreads
+    // a query over the views of a multiview pass.
+    const mrhiQuerySetSlot* slot = &device->querySetSlots[set.index1 - 1];
+    if (pass->passClass != mrhi_passGraphics || mrhiWorkOf(pass) == mrhiWorkTransfer ||
+        pass->viewCount > 1 || pass->statisticsOpen || slot->type != mrhi_queryPipelineStatistics ||
+        query >= slot->count || !MarkWritten(device, slot, query))
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    // Open even when refused for capacity, so that its end is not misuse.
+    pass->statisticsOpen = true;
+    pass->statisticsQuery = query;
+    pass->statisticsSet = slot->handle;
+    mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
+    if (record == nullptr)
+    {
+        return mrhi_errorCapacity;
+    }
+    *record = (mrhiCommand){.type = mrhiCommandBeginStatisticsQuery, .a = query, .b = slot->handle};
+    return mrhi_success;
+}
+
+mrhiResult mrhiEndStatisticsQuery(mrhiDevice* device, mrhiPassId id)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    mrhiResult status = mrhi_success;
+    mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);
+    if (pass == nullptr)
+    {
+        return status;
+    }
+    if (!pass->statisticsOpen)
+    {
+        return mrhiDeviceMisuse(device);
+    }
+    pass->statisticsOpen = false;
+    mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
+    if (record == nullptr)
+    {
+        return mrhi_errorCapacity;
+    }
+    *record = (mrhiCommand){
+        .type = mrhiCommandEndStatisticsQuery,
+        .a = pass->statisticsQuery,
+        .b = pass->statisticsSet,
+    };
+    return mrhi_success;
+}
+
 mrhiResult mrhiResolveQueries(mrhiDevice* device, mrhiPassId id, mrhiQuerySetId set, uint32_t first,
                               uint32_t count, mrhiResourceId resource, uint64_t offset)
 {
@@ -305,8 +377,9 @@ mrhiResult mrhiResolveQueries(mrhiDevice* device, mrhiPassId id, mrhiQuerySetId 
     }
     const mrhiQuerySetSlot* slot = &device->querySetSlots[set.index1 - 1];
     uint64_t total = mrhiBufferBytesOf(&device->frameResources[object - 1]);
+    uint64_t bytes = mrhiQueryBytes(slot->type);
     if (first >= slot->count || count > slot->count - first || offset % 256 != 0 ||
-        offset > total || (uint64_t)count * 8 > total - offset)
+        offset > total || count * bytes > total - offset)
     {
         return mrhiDeviceMisuse(device);
     }

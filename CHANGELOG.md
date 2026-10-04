@@ -10,6 +10,12 @@ format.
 
 ### Added
 
+- Pipeline statistics queries (mrhi-0023): query sets of type
+  `mrhi_queryPipelineStatistics`, bracketed by
+  `mrhiBeginStatisticsQuery` and `mrhiEndStatisticsQuery` in passes of
+  the graphics class, resolved as eleven 64-bit counters in Vulkan's
+  and Direct3D 12's order; on Vulkan devices with the
+  `pipelineStatisticsQuery` feature and every Direct3D 12 device.
 - `mrhiClearBuffer` zeros a range of a frame buffer (mrhi-0022): a fill
   on Vulkan and Metal, `clearBuffer` on WebGPU, copies from a 64 KiB
   buffer of zeros on Direct3D 12.
@@ -38,8 +44,8 @@ format.
 
 ### Fixed
 
-- The Vulkan driver granted `pipelineStatisticsQuery`, which no query
-  type reads yet; no driver grants it now.
+- The Vulkan driver granted `pipelineStatisticsQuery` while no query
+  type read it; it is granted with the queries now (mrhi-0023).
 - Empty copies, uploads and readbacks, which WebGPU allows, reached
   Vulkan as empty regions, which it refuses; they now record nothing,
   and an empty readback is answered with no bytes.

@@ -207,7 +207,7 @@ mrhiResult mrhiEndPass(mrhiDevice* device, mrhiPassId id)
     {
         return status;
     }
-    if (pass->debugDepth > 0 || pass->occlusionOpen)
+    if (pass->debugDepth > 0 || pass->occlusionOpen || pass->statisticsOpen)
     {
         return mrhiDeviceMisuse(device);
     }

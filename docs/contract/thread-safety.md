@@ -110,6 +110,8 @@ edit the contract, not this file.
 | `mrhiDispatchIndirect` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiBeginOcclusionQuery` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiEndOcclusionQuery` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiBeginStatisticsQuery` | Safe from any thread; the pass is used by one thread at a time. |
+| `mrhiEndStatisticsQuery` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiResolveQueries` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiCopyBuffer` | Safe from any thread; the pass is used by one thread at a time. |
 | `mrhiClearBuffer` | Safe from any thread; the pass is used by one thread at a time. |

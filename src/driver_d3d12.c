@@ -126,6 +126,7 @@ static mrhiAdapterInfo InfoOf(const DXGI_ADAPTER_DESC1* desc, ID3D12Device* devi
 // all that formats' caps depend on.
 static const mrhiFeatures s_floorFeatures = {
     .timestampQuery = true,
+    .pipelineStatisticsQuery = true,
     .textureCompressionBc = true,
     .float32Filterable = true,
     .rg11b10Renderable = true,

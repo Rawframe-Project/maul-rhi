@@ -27,3 +27,4 @@ are listed in [README.md](README.md).
 | [mrhi-0020](mrhi-0020-multidraw-multiview.md) | Counted multi-draw indirect and multiview | Accepted |
 | [mrhi-0021](mrhi-0021-webgpu-cts.md) | The WebGPU CTS as the encoder's reference cases | Accepted |
 | [mrhi-0022](mrhi-0022-buffer-clears.md) | Buffer clears to zero | Accepted |
+| [mrhi-0023](mrhi-0023-pipeline-statistics.md) | Pipeline statistics queries | Accepted |

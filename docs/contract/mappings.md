@@ -9,7 +9,7 @@ restricted or absent-rejected, with how.
 | Member | Vulkan | D3D12 | Metal | WebGPU |
 | --- | --- | --- | --- | --- |
 | `timestampQuery` | restricted: timestampComputeAndGraphics and the queue's valid bits | direct: timestamp queries | restricted: the timestamp counter set, sampled at stage or encoder boundaries (not granted yet) | restricted: timestamp-query, pass boundaries only |
-| `pipelineStatisticsQuery` | restricted: pipelineStatisticsQuery | direct: pipeline statistics queries | restricted: a statistic counter set on some Macs, none on Apple GPUs | absent-rejected: no pipeline statistics |
+| `pipelineStatisticsQuery` | restricted: pipelineStatisticsQuery | direct: pipeline statistics queries | absent-rejected: not granted: a statistic counter set on some Macs only, sampled at encoder boundaries | absent-rejected: no pipeline statistics |
 | `textureCompressionBc` | restricted: textureCompressionBC | direct: BC formats | restricted: supportsBCTextureCompression (Macs; Apple9 and later) | restricted: texture-compression-bc |
 | `textureCompressionEtc2` | restricted: textureCompressionETC2 | absent-rejected: no ETC2 formats | restricted: Apple GPU families | restricted: texture-compression-etc2 |
 | `textureCompressionAstc` | restricted: textureCompressionASTC_LDR | absent-rejected: no ASTC formats | restricted: Apple GPU families | restricted: texture-compression-astc |
@@ -296,6 +296,7 @@ restricted or absent-rejected, with how.
 | --- | --- | --- | --- | --- |
 | `mrhi_queryOcclusion` | direct: VK_QUERY_TYPE_OCCLUSION | direct: D3D12_QUERY_HEAP_TYPE_OCCLUSION, as D3D12_QUERY_TYPE_BINARY_OCCLUSION | direct: a visibility result buffer, MTLVisibilityResultModeBoolean | direct: occlusion |
 | `mrhi_queryTimestamp` | direct: VK_QUERY_TYPE_TIMESTAMP | direct: D3D12_QUERY_HEAP_TYPE_TIMESTAMP | direct: a counter sample buffer of the timestamp counter set | direct: timestamp |
+| `mrhi_queryPipelineStatistics` | direct: VK_QUERY_TYPE_PIPELINE_STATISTICS, every counter | direct: D3D12_QUERY_HEAP_TYPE_PIPELINE_STATISTICS | absent-rejected: no pipeline statistics | absent-rejected: no pipeline statistics |
 
 ## mrhiQuerySetDef
 
@@ -951,6 +952,8 @@ restricted or absent-rejected, with how.
 | `mrhiDispatchIndirect` | direct: vkCmdDispatchIndirect | direct: ExecuteIndirect with a dispatch command signature | direct: dispatchThreadgroupsWithIndirectBuffer: | direct: dispatchWorkgroupsIndirect |
 | `mrhiBeginOcclusionQuery` | direct: vkCmdBeginQuery | direct: BeginQuery | direct: setVisibilityResultMode with the query's offset | direct: beginOcclusionQuery |
 | `mrhiEndOcclusionQuery` | direct: vkCmdEndQuery | direct: EndQuery | direct: setVisibilityResultMode disabled | direct: endOcclusionQuery |
+| `mrhiBeginStatisticsQuery` | direct: vkCmdBeginQuery | direct: BeginQuery | absent-rejected: no pipeline statistics | absent-rejected: no pipeline statistics |
+| `mrhiEndStatisticsQuery` | direct: vkCmdEndQuery | direct: EndQuery | absent-rejected: no pipeline statistics | absent-rejected: no pipeline statistics |
 | `mrhiResolveQueries` | direct: vkCmdCopyQueryPoolResults with 64-bit results and wait | direct: ResolveQueryData | emulated: a blit copy from the visibility buffer, or resolveCounters for timestamps (cost: a blit copy per resolve) | direct: resolveQuerySet |
 | `mrhiCopyBuffer` | direct: vkCmdCopyBuffer | direct: CopyBufferRegion | direct: copyFromBuffer:sourceOffset:toBuffer: | direct: copyBufferToBuffer |
 | `mrhiClearBuffer` | direct: vkCmdFillBuffer with 0 | emulated: CopyBufferRegion from a device-owned buffer of zeros, in 64 KiB pieces (cost: 64 KiB per device and one copy per 64 KiB cleared) | direct: fillBuffer:range:value: with 0 | direct: clearBuffer |

@@ -16,6 +16,7 @@
 
 #include "d3d12_barrier.h"
 #include "d3d12_bind.h"
+#include "d3d12_copy.h"
 #include "d3d12_resource.h"
 #include "invariant.h"
 
@@ -295,6 +296,7 @@ static void Resolve(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
     ID3D12Resource* buffer = recorder->table[object - 1].resource;
     uint32_t first = (uint32_t)command->c;
     uint32_t count = (uint32_t)(command->c >> 32);
+    uint64_t stride = set->stride;
     uint32_t i = 0;
     while (i < count)
     {
@@ -304,7 +306,7 @@ static void Resolve(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
         {
             ++run;
         }
-        uint64_t offset = command->d + (uint64_t)i * sizeof(uint64_t);
+        uint64_t offset = command->d + i * stride;
         if (written)
         {
             ID3D12GraphicsCommandList_ResolveQueryData(recorder->list, set->heap, set->type,
@@ -312,9 +314,7 @@ static void Resolve(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
         }
         else
         {
-            ID3D12GraphicsCommandList_CopyBufferRegion(recorder->list, buffer, offset,
-                                                       recorder->zeros, 0,
-                                                       (uint64_t)run * sizeof(uint64_t));
+            mrhiD3d12CopyZeros(recorder, buffer, offset, run * stride);
         }
         i += run;
     }
@@ -351,6 +351,18 @@ void mrhiD3d12Query(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
         ID3D12GraphicsCommandList_EndQuery(recorder->list,
                                            SetOf(recorder, recorder->pass->occlusionSet)->heap,
                                            D3D12_QUERY_TYPE_BINARY_OCCLUSION, recorder->openQuery);
+        break;
+    case mrhiCommandBeginStatisticsQuery:
+    {
+        mrhiD3d12QuerySet* set = SetOf(recorder, command->b);
+        Mark(recorder, set, command->a);
+        ID3D12GraphicsCommandList_BeginQuery(recorder->list, set->heap,
+                                             D3D12_QUERY_TYPE_PIPELINE_STATISTICS, command->a);
+        break;
+    }
+    case mrhiCommandEndStatisticsQuery:
+        ID3D12GraphicsCommandList_EndQuery(recorder->list, SetOf(recorder, command->b)->heap,
+                                           D3D12_QUERY_TYPE_PIPELINE_STATISTICS, command->a);
         break;
     default:
         Resolve(recorder, command);
