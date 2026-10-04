@@ -271,6 +271,15 @@ range as separate fields), present modes, sizes.
 `mrhiSuggestSurfaceColor` picks a color in the library's fallback
 order, and `mrhiConfigureSurface` configures it on a device.
 
+On the web the library can run in a dedicated worker, leaving the main
+thread to the page (mrhi-0026). The page transfers the canvas's control
+(`transferControlToOffscreen()`) and posts the OffscreenCanvas to the
+worker, which puts it in `Module.mrhiCanvases` under a name (the
+module object it passes to `maulRhiImports` without Emscripten); a
+canvas source naming it makes the surface. Maul Window stays on the
+main thread: the program forwards size changes, and the worker resizes
+the OffscreenCanvas and configures the surface again.
+
 In a frame, `mrhiAcquireSurfaceImage` gives the next image as a frame
 resource that begins undefined and is presented when the frame is
 submitted. It may answer `mrhi_occluded` (no image while the window is

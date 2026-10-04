@@ -12,8 +12,13 @@
 // environment, the clocks, random bytes and exit), the driver's imports
 // from maul-rhi.mjs beside it, a sleep through JSPI and the canvas's
 // resizing, and calls its main.
+// With --worker the test runs in a dedicated worker instead (mrhi-0026):
+// the page transfers both canvases' control to it, and the worker
+// registers the OffscreenCanvases under their selectors in
+// Module.mrhiCanvases and sends back its output, its status and the
+// driver's WebGPU errors.
 //
-// usage: node web_runner.cjs <test.js | test.wasm>
+// usage: node web_runner.cjs [--worker] <test.js | test.wasm>
 
 const http = require('http');
 const fs = require('fs');
@@ -27,7 +32,8 @@ try {
     process.exit(77);
 }
 
-const script = path.resolve(process.argv[2]);
+const inWorker = process.argv[2] === '--worker';
+const script = path.resolve(process.argv[inWorker ? 3 : 2]);
 // A WebAssembly module, by its first bytes: CMake names one with or
 // without .wasm, as its version's WASI platform does.
 const wasi = fs.readFileSync(script).subarray(0, 4).equals(Buffer.from([0, 0x61, 0x73, 0x6d]));
@@ -37,10 +43,55 @@ const root = path.dirname(script);
 // The test's output reaches the runner through the console, its exit
 // status as a line of its own; the MAUL_RHI_ variables of the runner's
 // environment reach its getenv.
+// In a worker, the page hands over the canvases and relays what the
+// worker sends: its output, its errors as the browser's, and its status
+// last, with the driver's WebGPU errors kept for the runner.
+const workerPage = `<script>
+const canvases = {};
+for (const id of ['mrhi-canvas', 'mrhi-canvas-2']) {
+    canvases['#' + id] = document.getElementById(id).transferControlToOffscreen();
+}
+const worker = new Worker(${wasi ? "'/__wasi.mjs', {type: 'module'}" : "'/__worker.js'"});
+worker.onmessage = event => {
+    const message = event.data;
+    if ('log' in message) {
+        console.log(message.log);
+    }
+    if ('status' in message) {
+        globalThis.mrhiWorkerErrors = message.errors;
+        console.log('mrhi-test: exit ' + message.status);
+    }
+};
+worker.onerror = event => console.error('worker error: ' + event.message);
+worker.postMessage({canvases}, Object.values(canvases));
+</script>`;
+// What a worker sends when its test ends: the status, and the driver's
+// WebGPU errors once its devices still closing have read theirs.
+const finish = `async function finish(status) {
+    const gpu = globalThis.Module.mrhiGpu;
+    for (let waited = 0; gpu && gpu.closing > 0 && waited < 10000; waited += 10) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    postMessage({status, errors: (gpu && gpu.errors) || []});
+}`;
+// The worker of a test built with Emscripten, which loads it as a page
+// would.
+const emscriptenWorker = `${finish}
+self.onmessage = event => {
+    self.Module = {
+        mrhiCanvases: event.data.canvases,
+        print: text => postMessage({log: text}),
+        printErr: text => postMessage({log: text}),
+        onExit: status => finish(status),
+        preRun: [() => Object.assign(Module.ENV, ${JSON.stringify(environment)})],
+    };
+    importScripts('/${path.basename(script)}');
+};
+`;
 const page = `<!doctype html><html><head><meta charset="utf-8"><link rel="icon" href="data:,"></head><body>
 <canvas id="mrhi-canvas" width="64" height="48"></canvas>
 <canvas id="mrhi-canvas-2" width="64" height="48"></canvas>
-${wasi ? '<script type="module" src="/__wasi.mjs"></script>' : `<script>
+${inWorker ? workerPage : wasi ? '<script type="module" src="/__wasi.mjs"></script>' : `<script>
 var Module = {
     print: text => console.log(text),
     printErr: text => console.log(text),
@@ -51,10 +102,18 @@ var Module = {
 <script src="${path.basename(script)}"></script>`}</body></html>`;
 const types = {'.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm'};
 
-// The page of a test without Emscripten.
+// The page of a test without Emscripten, or its worker: its output goes
+// to the console or to the page, and its canvases are the page's or the
+// ones it was given.
+const say = inWorker ? 'text => postMessage({log: text})' : 'text => console.log(text)';
+const end = inWorker ? 'status => finish(status)' : "status => console.log('mrhi-test: exit ' + status)";
 const wasiPage = `import {maulRhiImports} from './maul-rhi.mjs';
+${inWorker ? finish : ''}
+const say = ${say};
+const end = ${end};
+async function run(canvases) {
 // The driver keeps its state here, where the runner reads its errors.
-globalThis.Module = {};
+globalThis.Module = {mrhiCanvases: canvases};
 let instance = null;
 const memory = () => instance.exports.memory.buffer;
 const view = () => new DataView(memory());
@@ -71,9 +130,9 @@ const system = {
             line += decoder.decode(new Uint8Array(memory(), at, length));
             total += length;
         }
-        for (let end = line.indexOf('\\n'); end >= 0; end = line.indexOf('\\n')) {
-            console.log(line.slice(0, end));
-            line = line.slice(end + 1);
+        for (let cut = line.indexOf('\\n'); cut >= 0; cut = line.indexOf('\\n')) {
+            say(line.slice(0, cut));
+            line = line.slice(cut + 1);
         }
         view().setUint32(written, total, true);
         return 0;
@@ -111,7 +170,7 @@ const system = {
         return 0;
     },
     proc_exit(status) {
-        console.log('mrhi-test: exit ' + status);
+        end(status);
         throw new Error('exit ' + status);
     },
 };
@@ -121,20 +180,26 @@ const bytes = await (await fetch('./${path.basename(script)}')).arrayBuffer();
     env: Object.assign(maulRhiImports(() => instance.exports, globalThis.Module), {
         mrhiTestSleep: new WebAssembly.Suspending(() => new Promise(resolve => setTimeout(resolve, 1))),
         mrhiTestResizeCanvas: width => {
-            document.querySelector('#mrhi-canvas').width = width;
+            (canvases['#mrhi-canvas'] || document.querySelector('#mrhi-canvas')).width = width;
         },
     }),
     wasi_snapshot_preview1: wasiImports,
 }));
 instance.exports._initialize();
-const status = await WebAssembly.promising(instance.exports.main)();
-console.log('mrhi-test: exit ' + status);
+end(await WebAssembly.promising(instance.exports.main)());
+}
+${inWorker ? 'self.onmessage = event => run(event.data.canvases);' : 'await run({});'}
 `;
 
 const server = http.createServer((request, response) => {
     if (request.url === '/') {
         response.writeHead(200, {'Content-Type': 'text/html'});
         response.end(page);
+        return;
+    }
+    if (!wasi && inWorker && request.url === '/__worker.js') {
+        response.writeHead(200, {'Content-Type': 'text/javascript'});
+        response.end(emscriptenWorker);
         return;
     }
     if (wasi && request.url === '/__wasi.mjs') {
@@ -204,6 +269,9 @@ server.listen(0, async () => {
     // The driver keeps every device's uncaptured WebGPU errors: any fails
     // the test, as validation errors do on Vulkan.
     const errors = await tab.evaluate(async () => {
+        if (globalThis.mrhiWorkerErrors) {
+            return globalThis.mrhiWorkerErrors;
+        }
         const gpu = typeof Module === 'undefined' ? null : Module.mrhiGpu;
         // Devices still closing read their error scopes first.
         for (let waited = 0; gpu && gpu.closing > 0 && waited < 10000; waited += 10) {

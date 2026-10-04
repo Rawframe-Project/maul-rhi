@@ -46,9 +46,11 @@ static void Sleep(void)
     emscripten_sleep(1);
 }
 // clang-format off
-// Resizes the runner's canvas as a page would.
+// Resizes the runner's canvas as a page would, or as a worker resizes
+// the OffscreenCanvas it was given (mrhi-0026).
 EM_JS(void, ResizeCanvas, (int width), {
-    document.querySelector('#mrhi-canvas').width = width;
+    const canvases = Module.mrhiCanvases || {};
+    (canvases['#mrhi-canvas'] || document.querySelector('#mrhi-canvas')).width = width;
 });
 // clang-format on
 #elif defined(__wasi__)

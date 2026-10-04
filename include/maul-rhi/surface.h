@@ -184,8 +184,10 @@ extern "C"
     typedef struct mrhiSurfaceSourceCanvas
     {
         mrhiChain chain;
-        // The canvas's CSS selector, UTF-8, selectorLength bytes. Only read
-        // during the call.
+        // The canvas's name, UTF-8, selectorLength bytes: first a key of the
+        // program's Module.mrhiCanvases (an OffscreenCanvas in a worker,
+        // mrhi-0026), else a CSS selector of the document. Only read during the
+        // call.
         const char* selector;
         // The selector's bytes.
         size_t selectorLength;

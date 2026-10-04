@@ -304,7 +304,12 @@ if(MAUL_RHI_BUILD_TESTS)
         add_test(NAME conformance
                  COMMAND node ${PROJECT_SOURCE_DIR}/test/web_runner.cjs
                          $<TARGET_FILE:test_conformance>)
-        set_tests_properties(conformance PROPERTIES SKIP_RETURN_CODE 77)
+        # Again in a dedicated worker, on the canvases' OffscreenCanvases
+        # (mrhi-0026).
+        add_test(NAME conformance_worker
+                 COMMAND node ${PROJECT_SOURCE_DIR}/test/web_runner.cjs --worker
+                         $<TARGET_FILE:test_conformance>)
+        set_tests_properties(conformance conformance_worker PROPERTIES SKIP_RETURN_CODE 77)
     else()
         maul_add_test(conformance)
         if(MAUL_RHI_METAL_DRIVER)

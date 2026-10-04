@@ -10,6 +10,10 @@ format.
 
 ### Added
 
+- The WebGPU driver in a dedicated worker (mrhi-0026): a canvas
+  source's selector first names a canvas the program registered in
+  `Module.mrhiCanvases`, such as an OffscreenCanvas; the conformance
+  suite also runs in a worker, with Emscripten and without.
 - The validation layer (mrhi-0025): `MAUL_RHI_VALIDATION` builds a
   layer around the driver SPI that walks every submitted frame and
   checks every driver answer, counting breaches for

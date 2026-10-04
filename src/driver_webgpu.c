@@ -163,12 +163,16 @@ EM_JS(int, mrhiJsAdapterName, (int state, char* out, int capacity), {
 
 // A canvas the selector names and its WebGPU context, kept as a state of
 // its own so that any device reaches it by handle: the handle, or 0 for a
-// selector naming no canvas, or a canvas without a WebGPU context.
+// selector naming no canvas, or a canvas without a WebGPU context. The
+// program's registered canvases come first (mrhi-0026): in a worker,
+// which has no document, an OffscreenCanvas.
 EM_JS(int, mrhiJsCreateCanvas, (const char* selector, int selectorLength), {
-    let canvas = null;
+    const name = UTF8ToString(selector, selectorLength);
+    const registered = Module.mrhiCanvases;
+    let canvas = registered && Object.prototype.hasOwnProperty.call(registered, name) ?
+        registered[name] : null;
     try {
-        canvas = typeof document === 'undefined' ? null :
-            document.querySelector(UTF8ToString(selector, selectorLength));
+        canvas = canvas || (typeof document === 'undefined' ? null : document.querySelector(name));
     } catch (error) {
         canvas = null;
     }

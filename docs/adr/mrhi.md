@@ -30,3 +30,4 @@ are listed in [README.md](README.md).
 | [mrhi-0023](mrhi-0023-pipeline-statistics.md) | Pipeline statistics queries | Accepted |
 | [mrhi-0024](mrhi-0024-external-drivers.md) | Drivers built outside the tree | Accepted |
 | [mrhi-0025](mrhi-0025-validation-layer.md) | The validation layer wraps the driver SPI | Accepted |
+| [mrhi-0026](mrhi-0026-workers.md) | The WebGPU driver in a worker | Accepted |
