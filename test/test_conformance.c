@@ -2246,6 +2246,12 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         CheckDevice(instance, ids[i], &none);
         mrhiFeatures all;
         CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
+        // Where MAUL_RHI_REQUIRE_STATISTICS is set, every native adapter
+        // counts pipeline statistics, so that their check runs.
+        const char* statistics = getenv("MAUL_RHI_REQUIRE_STATISTICS");
+        CHECK(all.pipelineStatisticsQuery || !s_runs || statistics == nullptr ||
+                  statistics[0] == '\0',
+              "pipeline statistics, required");
         CheckDevice(instance, ids[i], &all);
         CheckCacheImport(instance, ids[i]);
         CheckRetirement(instance, ids[i]);

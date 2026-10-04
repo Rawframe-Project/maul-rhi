@@ -221,12 +221,14 @@ jobs:
       - name: Test
         # Linux runs Vulkan on lavapipe, which must be found, under the
         # validation layer, whose errors in a test's output fail it,
-        # presents to an XCB window on Xvfb, and reads heaps (mrhi-0003).
+        # presents to an XCB window on Xvfb, reads heaps (mrhi-0003) and
+        # counts pipeline statistics (mrhi-0023).
         # macOS runs Metal in its own cell.
         env:
           MAUL_RHI_REQUIRE_VULKAN: ${{ runner.os == 'Linux' && '1' || '' }}
           MAUL_RHI_REQUIRE_SURFACE: ${{ runner.os != 'Windows' && '1' || '' }}
           MAUL_RHI_REQUIRE_BINDLESS: ${{ runner.os == 'Linux' && '1' || '' }}
+          MAUL_RHI_REQUIRE_STATISTICS: ${{ runner.os == 'Linux' && '1' || '' }}
           # macOS must find the runner's Metal device, under Metal's API
           # and shader validation, which stop a test on misuse.
           MAUL_RHI_REQUIRE_METAL: ${{ runner.os == 'macOS' && '1' || '' }}
@@ -467,6 +469,7 @@ jobs:
           MAUL_RHI_REQUIRE_D3D12: "1"
           MAUL_RHI_REQUIRE_SURFACE: "1"
           MAUL_RHI_REQUIRE_BINDLESS: "1"
+          MAUL_RHI_REQUIRE_STATISTICS: "1"
           MAUL_RHI_D3D12_DEBUG: "1"
         run: ctest --test-dir build -C Debug --output-on-failure
 

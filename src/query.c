@@ -301,9 +301,9 @@ mrhiResult mrhiBeginStatisticsQuery(mrhiDevice* device, mrhiPassId id, mrhiQuery
     // Vulkan counts graphics stages only on a graphics queue, and spreads
     // a query over the views of a multiview pass.
     const mrhiQuerySetSlot* slot = &device->querySetSlots[set.index1 - 1];
-    if (pass->passClass != mrhi_passGraphics || mrhiWorkOf(pass) == mrhiWorkTransfer ||
-        pass->viewCount > 1 || pass->statisticsOpen || slot->type != mrhi_queryPipelineStatistics ||
-        query >= slot->count || !MarkWritten(device, slot, query))
+    if (pass->passClass != mrhi_passGraphics || pass->viewCount > 1 || pass->statisticsOpen ||
+        slot->type != mrhi_queryPipelineStatistics || query >= slot->count ||
+        !MarkWritten(device, slot, query))
     {
         return mrhiDeviceMisuse(device);
     }
