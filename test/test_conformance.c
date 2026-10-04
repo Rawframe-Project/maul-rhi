@@ -82,9 +82,15 @@ static void ResizeCanvas(int width)
 #endif
 #ifdef MAUL_RHI_D3D12_DRIVER
 #include "d3d12_debug.h"
+#endif
+// Threads for threads.recording: Windows's or POSIX's; the web builds
+// have none.
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#elif !defined(MRHI_TEST_WEB)
+#include <pthread.h>
 #endif
 
 // A label from a string literal, for a def's label and labelLength.
@@ -491,10 +497,7 @@ typedef struct Case
 } Case;
 
 // The cases, by category, in the order of the requirements'
-// conformance section; categories without a case yet are named in
-// s_empty. Device-loss injection needs a way into a driver the SPI has
-// not got, and multi-threaded recording runs on the test driver only
-// (test_encoder), so neither has a case on every driver yet.
+// conformance section.
 static Case s_cases[] = {
     {"api.adapters", 0, 0},
     {"api.devices", 0, 0},
@@ -520,10 +523,11 @@ static Case s_cases[] = {
     {"transfers.clear", 0, 0},
     {"swapchain.foreign_sources", 0, 0},
     {"swapchain.present", 0, 0},
+    {"loss.simulated", 0, 0},
+    {"threads.recording", 0, 0},
     {"limits.retirement", 0, 0},
     {"validation.clean", 0, 0},
 };
-static const char* const s_empty[] = {"loss", "threads"};
 
 // The one case --case runs, or NULL for all.
 static const char* s_only;
@@ -2252,6 +2256,210 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     }
 }
 
+// One of two passes recorded at once (threads.recording): its device
+// and pass, the buffer it uploads its value to, the steps it has
+// recorded, and whether every call held. A thread records it, so it
+// counts no failure itself.
+typedef struct Recorder
+{
+    mrhiDevice* device;
+    mrhiPassId pass;
+    mrhiResourceId buffer;
+    uint32_t value;
+    int step;
+    bool held;
+} Recorder;
+
+// Records a pass's next step: its begin, an upload of 64 words of its
+// value, its end.
+static void RecordStep(Recorder* recorder)
+{
+    uint32_t words[64];
+    for (size_t i = 0; i < 64; ++i)
+    {
+        words[i] = recorder->value;
+    }
+    switch (recorder->step++)
+    {
+    case 0:
+        recorder->held = mrhiBeginPass(recorder->device, recorder->pass) == mrhi_success;
+        break;
+    case 1:
+        recorder->held =
+            recorder->held && mrhiWriteBuffer(recorder->device, recorder->pass, recorder->buffer, 0,
+                                              words, sizeof(words)) == mrhi_success;
+        break;
+    default:
+        recorder->held =
+            recorder->held && mrhiEndPass(recorder->device, recorder->pass) == mrhi_success;
+        break;
+    }
+}
+
+#ifdef MRHI_TEST_WEB
+// No threads in the web builds: the passes record interleaved, call by
+// call.
+static void RecordBoth(Recorder* first, Recorder* second)
+{
+    for (int i = 0; i < 3; ++i)
+    {
+        RecordStep(first);
+        RecordStep(second);
+    }
+}
+#elif defined(_WIN32)
+static DWORD WINAPI RecordAll(void* recorder)
+{
+    for (int i = 0; i < 3; ++i)
+    {
+        RecordStep(recorder);
+    }
+    return 0;
+}
+
+// The second pass on a thread of its own while this one records the
+// first.
+static void RecordBoth(Recorder* first, Recorder* second)
+{
+    HANDLE thread = CreateThread(nullptr, 0, RecordAll, second, 0, nullptr);
+    CHECK(thread != nullptr, "a thread");
+    RecordAll(first);
+    if (thread != nullptr)
+    {
+        WaitForSingleObject(thread, INFINITE);
+        CloseHandle(thread);
+    }
+}
+#else
+static void* RecordAll(void* recorder)
+{
+    for (int i = 0; i < 3; ++i)
+    {
+        RecordStep(recorder);
+    }
+    return nullptr;
+}
+
+// The second pass on a thread of its own while this one records the
+// first.
+static void RecordBoth(Recorder* first, Recorder* second)
+{
+    pthread_t thread;
+    bool started = pthread_create(&thread, nullptr, RecordAll, second) == 0;
+    CHECK(started, "a thread");
+    RecordAll(first);
+    if (started)
+    {
+        pthread_join(thread, nullptr);
+    }
+}
+#endif
+
+// Two passes of one frame recorded at once, each uploading its own value
+// to its own buffer, then both read back (mrhi-0011's threading).
+static void CheckThreads(mrhiDevice* device)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    Recorder recorders[2] = {
+        {.device = device, .buffer = Declared(device, 256), .value = 0x11111111u},
+        {.device = device, .buffer = Declared(device, 256), .value = 0x22222222u},
+    };
+    for (int i = 0; i < 2; ++i)
+    {
+        mrhiAccess fill = Whole(recorders[i].buffer, mrhi_accessCopyDestination);
+        recorders[i].pass = CopyPass(device, &fill, 1);
+    }
+    mrhiAccess reads[2] = {Whole(recorders[0].buffer, mrhi_accessCopySource),
+                           Whole(recorders[1].buffer, mrhi_accessCopySource)};
+    mrhiPassId read = CopyPass(device, reads, 2);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    RecordBoth(&recorders[0], &recorders[1]);
+    CHECK(recorders[0].held && recorders[1].held, "both recorded");
+    mrhiRequestId requests[2] = {{0}, {0}};
+    CHECK(mrhiBeginPass(device, read) == mrhi_success &&
+              mrhiReadBuffer(device, read, recorders[0].buffer, 0, 256, &requests[0]) ==
+                  mrhi_success &&
+              mrhiReadBuffer(device, read, recorders[1].buffer, 0, 256, &requests[1]) ==
+                  mrhi_success &&
+              mrhiEndPass(device, read) == mrhi_success,
+          "read");
+    Finish(device, 2);
+    for (int i = 0; i < 2; ++i)
+    {
+        uint32_t expected[64];
+        for (size_t j = 0; j < 64; ++j)
+        {
+            expected[j] = recorders[i].value;
+        }
+        CHECK(Taken(device, requests[i], (const uint8_t*)expected, sizeof(expected)),
+              "each pass's own upload");
+    }
+}
+
+// A device lost through mrhiSimulateDeviceLoss with a frame and its
+// readback running (mrhi-0014, R67): the notice, then both answered
+// lost, the report, calls answering lost, a clean destroy, and a new
+// device on the same adapter.
+static void CheckLoss(mrhiInstance* instance, mrhiAdapterId adapter)
+{
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.adapter = adapter;
+    mrhiDevice* device = nullptr;
+    mrhiRequestId request;
+    mrhiInstanceNotification record;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success &&
+              NextInstance(instance, &record) == mrhi_success && record.outcome == mrhi_success,
+          "a device");
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiResourceId buffer = Declared(device, 256);
+    mrhiAccess fill = Whole(buffer, mrhi_accessCopyDestination);
+    mrhiPassId filled = CopyPass(device, &fill, 1);
+    mrhiAccess reads = Whole(buffer, mrhi_accessCopySource);
+    mrhiPassId read = CopyPass(device, &reads, 1);
+    const uint32_t words[4] = {1, 2, 3, 4};
+    mrhiRequestId readback = {0};
+    mrhiRequestId token = {0};
+    CHECK(mrhiCompileFrame(device) == mrhi_success &&
+              mrhiBeginPass(device, filled) == mrhi_success &&
+              mrhiWriteBuffer(device, filled, buffer, 0, words, sizeof(words)) == mrhi_success &&
+              mrhiEndPass(device, filled) == mrhi_success &&
+              mrhiBeginPass(device, read) == mrhi_success &&
+              mrhiReadBuffer(device, read, buffer, 0, sizeof(words), &readback) == mrhi_success &&
+              mrhiEndPass(device, read) == mrhi_success &&
+              mrhiSubmitFrame(device, &token) == mrhi_success,
+          "a frame running");
+    CHECK(mrhiSimulateDeviceLoss(device) == mrhi_success &&
+              mrhiGetDeviceState(device) == mrhi_deviceLost,
+          "lost at once");
+    mrhiDeviceNotification notice;
+    CHECK(mrhiNextDeviceNotification(device, &notice) == mrhi_success &&
+              notice.kind == mrhi_deviceLostNotice,
+          "the notice first");
+    CHECK(mrhiNextDeviceNotification(device, &notice) == mrhi_success &&
+              notice.kind == mrhi_deviceFrameDone && notice.requestId.index1 == token.index1 &&
+              notice.outcome == mrhi_errorDeviceLost,
+          "the frame answered lost");
+    CHECK(mrhiNextDeviceNotification(device, &notice) == mrhi_success &&
+              notice.kind == mrhi_deviceReadbackReady &&
+              notice.requestId.index1 == readback.index1 && notice.outcome == mrhi_errorDeviceLost,
+          "its readback answered lost");
+    mrhiDeviceLossReport report;
+    CHECK(mrhiGetDeviceLossReport(device, &report) == mrhi_success &&
+              report.reason == mrhi_lossSimulated && report.lastSubmitted.index1 == token.index1,
+          "the report");
+    CHECK(mrhiSimulateDeviceLoss(device) == mrhi_errorDeviceLost &&
+              mrhiBeginFrame(device, &frame) == mrhi_errorDeviceLost,
+          "lost from then on");
+    mrhiDestroyDevice(device);
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success &&
+              NextInstance(instance, &record) == mrhi_success && record.outcome == mrhi_success &&
+              mrhiGetDeviceState(device) == mrhi_deviceReady,
+          "a new device on the adapter");
+    mrhiDestroyDevice(device);
+}
+
 // A device made with the cache the last one exported takes it.
 static void CheckCacheImport(mrhiInstance* instance, mrhiAdapterId adapter)
 {
@@ -2313,6 +2521,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     RUN("capabilities.feature_formats", CheckFeatureFormats(device, asked));
     CheckDrawing(device, asked->timestampQuery);
     RUN("capabilities.multiview", CheckMultiview(device));
+    RUN("threads.recording", CheckThreads(device));
     mrhiDestroyDevice(device);
 }
 
@@ -2356,6 +2565,7 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         RUN("api.cache_import", CheckCacheImport(instance, ids[i]));
         RUN("limits.retirement", CheckRetirement(instance, ids[i]));
         RUN("binding.heaps", CheckHeaps(instance, ids[i], driver != mrhi_driverTest));
+        RUN("loss.simulated", CheckLoss(instance, ids[i]));
     }
     mrhiAdapterId again[16];
     RUN("api.adapters", CHECK(Search(instance, again, 16) == count &&
@@ -2980,18 +3190,13 @@ static void TestNativeDriver(void)
     mrhiDestroyInstance(instance);
 }
 
-// Prints the mustpass list of this SPI version: the cases by category,
-// and the categories that have none yet. Unused where the runner calls
-// main without arguments.
+// Prints the mustpass list of this SPI version: the cases by category. Unused where the runner
+// calls main without arguments.
 [[maybe_unused]] static void List(void)
 {
     printf("# Maul RHI conformance cases, SPI version %d (mrhi-0024).\n"
            "# A driver is admitted on a run that passes every case listed.\n",
            MRHI_TEST_SPI_VERSION);
-    for (size_t i = 0; i < sizeof(s_empty) / sizeof(s_empty[0]); ++i)
-    {
-        printf("# %s: no case yet\n", s_empty[i]);
-    }
     for (size_t i = 0; i < sizeof(s_cases) / sizeof(s_cases[0]); ++i)
     {
         printf("%s\n", s_cases[i].name);

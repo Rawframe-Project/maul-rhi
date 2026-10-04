@@ -337,6 +337,11 @@ if(MAUL_RHI_BUILD_TESTS)
     file(STRINGS src/driver.h maul_rhi_spi REGEX "^#define MRHI_SPI_VERSION ")
     string(REGEX REPLACE ".* ([0-9]+)$" "\\1" maul_rhi_spi "${maul_rhi_spi}")
     target_compile_definitions(test_conformance PRIVATE MRHI_TEST_SPI_VERSION=${maul_rhi_spi})
+    # threads.recording records on a second thread, except on the web.
+    if(NOT maul_rhi_web)
+        find_package(Threads REQUIRED)
+        target_link_libraries(test_conformance PRIVATE Threads::Threads)
+    endif()
     if(NOT maul_rhi_web AND NOT CMAKE_CROSSCOMPILING)
         add_test(NAME mustpass
                  COMMAND ${CMAKE_COMMAND} -DSUITE=$<TARGET_FILE:test_conformance>
@@ -394,7 +399,8 @@ if(MAUL_RHI_BUILD_TESTS)
     endif()
     if(maul_rhi_outside AND NOT maul_rhi_web)
         add_executable(test_conformance_external test/test_conformance.c)
-        target_link_libraries(test_conformance_external PRIVATE maul-rhi ${maul_rhi_outside})
+        target_link_libraries(test_conformance_external PRIVATE maul-rhi ${maul_rhi_outside}
+                                                                Threads::Threads)
         target_compile_definitions(test_conformance_external
                                    PRIVATE MRHI_TEST_EXTERNAL MRHI_TEST_SPI_VERSION=${maul_rhi_spi})
         maul_apply_flags(test_conformance_external)

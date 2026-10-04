@@ -40,8 +40,10 @@ is a typed failure, and for mustpass lists per SPI version.
   version, `conformance/mustpass/spi-4.txt`, must match the suite's
   listing (the `mustpass` test); lists of earlier versions stay as
   they were. A driver is admitted on a run that passes every case of
-  its version's list. Device-loss injection and multi-threaded
-  recording have no case on every driver yet, and the list says so.
+  its version's list. Device loss is injected with
+  `mrhiSimulateDeviceLoss` (`loss.simulated`), and two passes record
+  at once on two threads (`threads.recording`; interleaved on one in
+  the web builds, which have no threads).
 - `MAUL_RHI_CONFORMANCE_DRIVER` names a target that defines
   `mrhiResult mrhiConformanceDriver(mrhiExternalDriverDef* driverOut)`;
   the suite is then built again as `test_conformance_external` and run
