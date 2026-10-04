@@ -1,0 +1,30 @@
+# Maul RHI conformance cases, SPI version 4 (mrhi-0024).
+# A driver is admitted on a run that passes every case listed.
+# loss: no case yet
+# threads: no case yet
+api.adapters
+api.devices
+api.objects
+api.pipelines
+api.cache_import
+api.queries
+api.statistics
+capabilities.limits
+capabilities.formats
+capabilities.feature_formats
+capabilities.multiview
+capabilities.required
+binding.draws
+binding.culling
+binding.render_state
+binding.compute_split
+binding.heaps
+hazards.aliasing
+hazards.transient_twin
+hazards.frame_memory
+transfers.round_trip
+transfers.clear
+swapchain.foreign_sources
+swapchain.present
+limits.retirement
+validation.clean

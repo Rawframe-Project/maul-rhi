@@ -33,8 +33,20 @@ is a typed failure, and for mustpass lists per SPI version.
   `container.h`) are installed as `maul-rhi/spi/`. Their types are the
   SPI; any change to them raises `MRHI_SPI_VERSION`, now 4, the first
   installed. The core functions they declare are not part of it.
-- Mustpass lists of the conformance suite's named cases per SPI
-  version follow in a later change.
+- The conformance suite's checks are named cases in the ten categories
+  of the requirements (`api.objects`, `binding.heaps`, ...).
+  `test_conformance --list` prints them, `--case <name>` runs one, and
+  every run ends with each case's outcome. The list of the current SPI
+  version, `conformance/mustpass/spi-4.txt`, must match the suite's
+  listing (the `mustpass` test); lists of earlier versions stay as
+  they were. A driver is admitted on a run that passes every case of
+  its version's list. Device-loss injection and multi-threaded
+  recording have no case on every driver yet, and the list says so.
+- `MAUL_RHI_CONFORMANCE_DRIVER` names a target that defines
+  `mrhiResult mrhiConformanceDriver(mrhiExternalDriverDef* driverOut)`;
+  the suite is then built again as `test_conformance_external` and run
+  on that driver. Without one, Linux builds hand the suite their own
+  Vulkan driver through this path, so it runs in CI.
 
 ## Consequences
 

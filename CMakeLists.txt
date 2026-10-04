@@ -19,6 +19,8 @@ option(MAUL_RHI_BUILD_BENCH "Build the benchmarks" ${PROJECT_IS_TOP_LEVEL})
 option(MAUL_RHI_BUILD_SAMPLES "Build the samples" ${PROJECT_IS_TOP_LEVEL})
 option(MAUL_RHI_BUILD_SHARED "Build a shared library instead of a static one" OFF)
 option(MAUL_RHI_INSTALL "Generate install rules" ${PROJECT_IS_TOP_LEVEL})
+set(MAUL_RHI_CONFORMANCE_DRIVER "" CACHE STRING
+    "A target defining mrhiConformanceDriver, to run the conformance suite on (mrhi-0024)")
 option(MAUL_RHI_WERROR "Treat compiler warnings as errors" OFF)
 option(MAUL_RHI_SANITIZE "Instrument with AddressSanitizer and UBSan" OFF)
 option(MAUL_RHI_TSAN "Instrument with ThreadSanitizer" OFF)
@@ -311,6 +313,18 @@ if(MAUL_RHI_BUILD_TESTS)
             target_link_libraries(test_conformance PRIVATE d3d12 dxgi)
         endif()
     endif()
+    # The suite's cases are the mustpass list of the SPI version
+    # (mrhi-0024), conformance/mustpass/spi-<N>.txt, which must match
+    # what the suite lists.
+    file(STRINGS src/driver.h maul_rhi_spi REGEX "^#define MRHI_SPI_VERSION ")
+    string(REGEX REPLACE ".* ([0-9]+)$" "\\1" maul_rhi_spi "${maul_rhi_spi}")
+    target_compile_definitions(test_conformance PRIVATE MRHI_TEST_SPI_VERSION=${maul_rhi_spi})
+    if(NOT maul_rhi_web AND NOT CMAKE_CROSSCOMPILING)
+        add_test(NAME mustpass
+                 COMMAND ${CMAKE_COMMAND} -DSUITE=$<TARGET_FILE:test_conformance>
+                         -DLIST=${PROJECT_SOURCE_DIR}/conformance/mustpass/spi-${maul_rhi_spi}.txt
+                         -P ${PROJECT_SOURCE_DIR}/test/mustpass.cmake)
+    endif()
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND AND MAUL_RHI_VULKAN_DRIVER AND NOT CMAKE_CROSSCOMPILING)
         pkg_check_modules(MAUL_RHI_XCB QUIET IMPORTED_TARGET xcb)
@@ -327,7 +341,8 @@ if(MAUL_RHI_BUILD_TESTS)
         add_library(test_conformance_app SHARED test/test_conformance.c test/android_activity.c)
         target_link_libraries(test_conformance_app PRIVATE maul-rhi android)
         target_include_directories(test_conformance_app PRIVATE ${PROJECT_SOURCE_DIR}/test)
-        target_compile_definitions(test_conformance_app PRIVATE MRHI_TEST_ANDROID)
+        target_compile_definitions(test_conformance_app PRIVATE MRHI_TEST_ANDROID
+                                                                MRHI_TEST_SPI_VERSION=${maul_rhi_spi})
         maul_apply_flags(test_conformance_app)
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/test_conformance_app.apk
             COMMAND ${CMAKE_COMMAND} -E env ANDROID_HOME=$ENV{ANDROID_HOME}
@@ -346,6 +361,31 @@ if(MAUL_RHI_BUILD_TESTS)
                              ENVIRONMENT MAUL_RHI_REQUIRE_SURFACE=1)
     endif()
     maul_add_header_tests()
+    # The suite on a driver from outside the tree (mrhi-0024): a target
+    # defining mrhiConformanceDriver(mrhiExternalDriverDef*), named by
+    # MAUL_RHI_CONFORMANCE_DRIVER. Without one, a Linux build hands the
+    # suite its own Vulkan driver through the external path.
+    set(maul_rhi_outside "${MAUL_RHI_CONFORMANCE_DRIVER}")
+    if(NOT maul_rhi_outside AND MAUL_RHI_VULKAN_DRIVER AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
+       AND NOT MAUL_RHI_BUILD_SHARED)
+        add_library(conformance_vulkan_external STATIC test/conformance_vulkan_external.c)
+        target_link_libraries(conformance_vulkan_external PRIVATE maul-rhi)
+        target_include_directories(conformance_vulkan_external PRIVATE ${PROJECT_SOURCE_DIR}/src)
+        maul_apply_flags(conformance_vulkan_external)
+        set(maul_rhi_outside conformance_vulkan_external)
+    endif()
+    if(maul_rhi_outside AND NOT maul_rhi_web)
+        add_executable(test_conformance_external test/test_conformance.c)
+        target_link_libraries(test_conformance_external PRIVATE maul-rhi ${maul_rhi_outside})
+        target_compile_definitions(test_conformance_external
+                                   PRIVATE MRHI_TEST_EXTERNAL MRHI_TEST_SPI_VERSION=${maul_rhi_spi})
+        maul_apply_flags(test_conformance_external)
+        if(MAUL_RHI_XCB_FOUND)
+            target_link_libraries(test_conformance_external PRIVATE PkgConfig::MAUL_RHI_XCB)
+            target_compile_definitions(test_conformance_external PRIVATE MRHI_TEST_XCB)
+        endif()
+        add_test(NAME conformance_external COMMAND test_conformance_external)
+    endif()
     # The Vulkan loader keeps drivers loaded after an instance ends, so
     # that LeakSanitizer reads their memory as held, not lost. Where the
     # validation layer runs, it logs to the test's output, and a

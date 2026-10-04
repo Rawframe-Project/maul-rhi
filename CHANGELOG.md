@@ -16,6 +16,12 @@ format.
   `mrhi_driverExternal`. The SPI handshake refuses another version with
   `mrhi_errorVersion` and a short or incomplete vtable with
   `mrhi_errorInvalid`, for device vtables too.
+- Mustpass lists (mrhi-0024): the conformance suite's checks are named
+  cases in the requirements' ten categories, listed with `--list`, run
+  alone with `--case` and reported one by one;
+  `conformance/mustpass/spi-4.txt` is the list of SPI version 4, kept
+  equal to the suite's by a test. `MAUL_RHI_CONFORMANCE_DRIVER` runs the
+  suite on a driver built outside the tree.
 - Pipeline statistics queries (mrhi-0023): query sets of type
   `mrhi_queryPipelineStatistics`, bracketed by
   `mrhiBeginStatisticsQuery` and `mrhiEndStatisticsQuery` in passes of

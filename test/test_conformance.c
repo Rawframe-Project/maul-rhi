@@ -5,7 +5,10 @@
 // only, on every driver: the test driver, and each adapter of the
 // build's native driver. A host without native adapters skips them,
 // unless MAUL_RHI_REQUIRE_VULKAN (or _WEBGPU, _METAL or _D3D12, for the
-// build's driver) is set and not empty.
+// build's driver) is set and not empty. The checks are named cases in
+// the requirements' ten categories (mrhi-0024): --list prints them, the
+// mustpass list of the SPI version, and --case runs one; every run
+// ends with each case's outcome.
 
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
@@ -475,6 +478,82 @@ static void Finish(mrhiDevice* device, uint32_t readbacks)
 // Whether the device's driver runs work: the test driver moves no
 // bytes, so only its answers are checked.
 static bool s_runs;
+
+// A named case: its runs, over adapters and devices, and the failures
+// counted in them.
+typedef struct Case
+{
+    const char* name;
+    int runs;
+    int failures;
+} Case;
+
+// The cases, by category, in the order of the requirements'
+// conformance section; categories without a case yet are named in
+// s_empty. Device-loss injection needs a way into a driver the SPI has
+// not got, and multi-threaded recording runs on the test driver only
+// (test_encoder), so neither has a case on every driver yet.
+static Case s_cases[] = {
+    {"api.adapters", 0, 0},
+    {"api.devices", 0, 0},
+    {"api.objects", 0, 0},
+    {"api.pipelines", 0, 0},
+    {"api.cache_import", 0, 0},
+    {"api.queries", 0, 0},
+    {"api.statistics", 0, 0},
+    {"capabilities.limits", 0, 0},
+    {"capabilities.formats", 0, 0},
+    {"capabilities.feature_formats", 0, 0},
+    {"capabilities.multiview", 0, 0},
+    {"capabilities.required", 0, 0},
+    {"binding.draws", 0, 0},
+    {"binding.culling", 0, 0},
+    {"binding.render_state", 0, 0},
+    {"binding.compute_split", 0, 0},
+    {"binding.heaps", 0, 0},
+    {"hazards.aliasing", 0, 0},
+    {"hazards.transient_twin", 0, 0},
+    {"hazards.frame_memory", 0, 0},
+    {"transfers.round_trip", 0, 0},
+    {"transfers.clear", 0, 0},
+    {"swapchain.foreign_sources", 0, 0},
+    {"swapchain.present", 0, 0},
+    {"limits.retirement", 0, 0},
+    {"validation.clean", 0, 0},
+};
+static const char* const s_empty[] = {"loss", "threads"};
+
+// The one case --case runs, or NULL for all.
+static const char* s_only;
+
+// The case named, when it is to run: NULL for one --case leaves out. A
+// name missing from the table fails.
+static Case* BeginCase(const char* name)
+{
+    for (size_t i = 0; i < sizeof(s_cases) / sizeof(s_cases[0]); ++i)
+    {
+        if (strcmp(s_cases[i].name, name) == 0)
+        {
+            return s_only == nullptr || strcmp(s_only, name) == 0 ? &s_cases[i] : nullptr;
+        }
+    }
+    CHECK(false, "a listed case");
+    return nullptr;
+}
+
+// Runs a call as a case, counting its failures against it.
+#define RUN(name, call)                                                                            \
+    do                                                                                             \
+    {                                                                                              \
+        Case* run_ = BeginCase(name);                                                              \
+        if (run_ != nullptr)                                                                       \
+        {                                                                                          \
+            int before_ = s_failures;                                                              \
+            call;                                                                                  \
+            run_->runs += 1;                                                                       \
+            run_->failures += s_failures - before_;                                                \
+        }                                                                                          \
+    } while (0)
 
 static bool Taken(mrhiDevice* device, mrhiRequestId request, const uint8_t* expected, size_t size)
 {
@@ -2150,22 +2229,24 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
 {
     Scene scene = {.device = device};
     MakeScene(&scene);
-    CheckDrawFrame(&scene, DRAW_DIRECT);
-    CheckDrawFrame(&scene, DRAW_INDIRECT);
     mrhiFeatures features = {0};
     CHECK(mrhiGetDeviceFeatures(device, &features) == mrhi_success, "its features");
-    if (features.multiDrawIndirectCount)
-    {
-        CheckDrawFrame(&scene, DRAW_COUNTED);
-    }
-    CheckClear(&scene);
-    CheckCulling(&scene);
-    CheckQueries(&scene, timestamps);
-    CheckRenderState(&scene);
-    CheckComputeSplit(&scene, timestamps);
+    RUN("binding.draws", {
+        CheckDrawFrame(&scene, DRAW_DIRECT);
+        CheckDrawFrame(&scene, DRAW_INDIRECT);
+        if (features.multiDrawIndirectCount)
+        {
+            CheckDrawFrame(&scene, DRAW_COUNTED);
+        }
+    });
+    RUN("transfers.clear", CheckClear(&scene));
+    RUN("binding.culling", CheckCulling(&scene));
+    RUN("api.queries", CheckQueries(&scene, timestamps));
+    RUN("binding.render_state", CheckRenderState(&scene));
+    RUN("binding.compute_split", CheckComputeSplit(&scene, timestamps));
     if (features.pipelineStatisticsQuery)
     {
-        CheckStatistics(&scene);
+        RUN("api.statistics", CheckStatistics(&scene));
     }
 }
 
@@ -2187,6 +2268,21 @@ static void CheckCacheImport(mrhiInstance* instance, mrhiAdapterId adapter)
 
 // Opens a device on an adapter with the features asked for, which it
 // answers ready at the next poll with them granted.
+// A device opened with features: granted as asked, with a timestamp
+// period where it has timestamps.
+static void CheckOpened(mrhiDevice* device, const mrhiFeatures* asked)
+{
+    mrhiFeatures granted;
+    CHECK(mrhiGetDeviceFeatures(device, &granted) == mrhi_success &&
+              memcmp(&granted, asked, sizeof(granted)) == 0,
+          "granted as asked");
+    double period = 0.0;
+    mrhiResult status = mrhiGetDeviceTimestampPeriod(device, &period);
+    CHECK(asked->timestampQuery ? status == mrhi_success && period > 0.0
+                                : status == mrhi_errorUnsupported,
+          "a timestamp period with timestamps");
+}
+
 static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrhiFeatures* asked)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
@@ -2205,25 +2301,36 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
               record.kind == mrhi_instanceDeviceReady && record.outcome == mrhi_success,
           "ready at the next poll");
     CHECK(mrhiGetDeviceState(device) == mrhi_deviceReady, "ready");
-    mrhiFeatures granted;
-    CHECK(mrhiGetDeviceFeatures(device, &granted) == mrhi_success &&
-              memcmp(&granted, asked, sizeof(granted)) == 0,
-          "granted as asked");
-    double period = 0.0;
-    mrhiResult status = mrhiGetDeviceTimestampPeriod(device, &period);
-    CHECK(asked->timestampQuery ? status == mrhi_success && period > 0.0
-                                : status == mrhi_errorUnsupported,
-          "a timestamp period with timestamps");
-    CheckObjects(device, asked->timestampQuery);
-    CheckFrameMemory(device);
-    CheckTransientTwin(device);
-    CheckPipelines(device);
-    CheckRoundTrip(device);
-    CheckAliasing(device);
-    CheckFeatureFormats(device, asked);
+    RUN("api.devices", CheckOpened(device, asked));
+    RUN("api.objects", CheckObjects(device, asked->timestampQuery));
+    RUN("hazards.frame_memory", CheckFrameMemory(device));
+    RUN("hazards.transient_twin", CheckTransientTwin(device));
+    RUN("api.pipelines", CheckPipelines(device));
+    RUN("transfers.round_trip", CheckRoundTrip(device));
+    RUN("hazards.aliasing", CheckAliasing(device));
+    RUN("capabilities.feature_formats", CheckFeatureFormats(device, asked));
     CheckDrawing(device, asked->timestampQuery);
-    CheckMultiview(device);
+    RUN("capabilities.multiview", CheckMultiview(device));
     mrhiDestroyDevice(device);
+}
+
+// An adapter's facts: of the driver, of a known kind, with a name.
+static void CheckInfo(mrhiInstance* instance, mrhiAdapterId adapter, mrhiDriverKind driver)
+{
+    mrhiAdapterInfo info;
+    CHECK(mrhiGetAdapterInfo(instance, adapter, &info) == mrhi_success, "info");
+    CHECK(info.driver == driver, "the driver's adapter");
+    CHECK(info.kind <= mrhi_adapterSoftware, "a kind");
+    CHECK(info.nameLength > 0 && info.nameLength <= MRHI_ADAPTER_NAME_BYTES, "a name");
+}
+
+// Where MAUL_RHI_REQUIRE_STATISTICS is set, every native adapter counts
+// pipeline statistics, so that their case runs.
+static void CheckRequired(const mrhiFeatures* all)
+{
+    const char* statistics = getenv("MAUL_RHI_REQUIRE_STATISTICS");
+    CHECK(all->pipelineStatisticsQuery || !s_runs || statistics == nullptr || statistics[0] == '\0',
+          "pipeline statistics, required");
 }
 
 // Checks every adapter an instance lists, and that a second search
@@ -2235,31 +2342,23 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
     s_runs = driver != mrhi_driverTest;
     for (size_t i = 0; i < count; ++i)
     {
-        mrhiAdapterInfo info;
-        CHECK(mrhiGetAdapterInfo(instance, ids[i], &info) == mrhi_success, "info");
-        CHECK(info.driver == driver, "the driver's adapter");
-        CHECK(info.kind <= mrhi_adapterSoftware, "a kind");
-        CHECK(info.nameLength > 0 && info.nameLength <= MRHI_ADAPTER_NAME_BYTES, "a name");
-        CheckLimits(instance, ids[i]);
-        CheckFormats(instance, ids[i]);
+        RUN("api.adapters", CheckInfo(instance, ids[i], driver));
+        RUN("capabilities.limits", CheckLimits(instance, ids[i]));
+        RUN("capabilities.formats", CheckFormats(instance, ids[i]));
         mrhiFeatures none = {0};
         CheckDevice(instance, ids[i], &none);
         mrhiFeatures all;
         CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
-        // Where MAUL_RHI_REQUIRE_STATISTICS is set, every native adapter
-        // counts pipeline statistics, so that their check runs.
-        const char* statistics = getenv("MAUL_RHI_REQUIRE_STATISTICS");
-        CHECK(all.pipelineStatisticsQuery || !s_runs || statistics == nullptr ||
-                  statistics[0] == '\0',
-              "pipeline statistics, required");
+        RUN("capabilities.required", CheckRequired(&all));
         CheckDevice(instance, ids[i], &all);
-        CheckCacheImport(instance, ids[i]);
-        CheckRetirement(instance, ids[i]);
-        CheckHeaps(instance, ids[i], driver != mrhi_driverTest);
+        RUN("api.cache_import", CheckCacheImport(instance, ids[i]));
+        RUN("limits.retirement", CheckRetirement(instance, ids[i]));
+        RUN("binding.heaps", CheckHeaps(instance, ids[i], driver != mrhi_driverTest));
     }
     mrhiAdapterId again[16];
-    CHECK(Search(instance, again, 16) == count && memcmp(ids, again, count * sizeof(ids[0])) == 0,
-          "the same adapters, in the same order");
+    RUN("api.adapters", CHECK(Search(instance, again, 16) == count &&
+                                  memcmp(ids, again, count * sizeof(ids[0])) == 0,
+                              "the same adapters, in the same order"));
     return count;
 }
 
@@ -2794,36 +2893,61 @@ static void CheckMetalSurface(mrhiInstance* instance, const mrhiAdapterId* ids, 
 // Surfaces on the native driver's adapters.
 static void CheckSurfaces(mrhiInstance* instance)
 {
-    CheckForeignSources(instance);
+    RUN("swapchain.foreign_sources", CheckForeignSources(instance));
     mrhiAdapterId ids[16];
     size_t count = Search(instance, ids, 16);
 #if defined(MRHI_TEST_XCB)
-    CheckXcbSurface(instance, ids, count);
+    RUN("swapchain.present", CheckXcbSurface(instance, ids, count));
 #elif defined(MRHI_TEST_ANDROID)
-    CheckAndroidSurface(instance, ids, count);
+    RUN("swapchain.present", CheckAndroidSurface(instance, ids, count));
 #elif defined(MRHI_TEST_WEB)
-    CheckCanvasSurface(instance, ids, count);
+    RUN("swapchain.present", CheckCanvasSurface(instance, ids, count));
 #elif defined(MAUL_RHI_METAL_DRIVER)
-    CheckMetalSurface(instance, ids, count);
+    RUN("swapchain.present", CheckMetalSurface(instance, ids, count));
 #elif defined(MAUL_RHI_D3D12_DRIVER)
-    CheckWin32Surface(instance, ids, count);
+    RUN("swapchain.present", CheckWin32Surface(instance, ids, count));
 #else
     (void)count;
     CHECK(!IsSet("MAUL_RHI_REQUIRE_SURFACE"), "a window system where required");
 #endif
 }
 
+#ifdef MRHI_TEST_EXTERNAL
+// Made by the driver built outside the tree that the suite is linked
+// with (MAUL_RHI_CONFORMANCE_DRIVER, mrhi-0024): its def, or a failure.
+mrhiResult mrhiConformanceDriver(mrhiExternalDriverDef* driverOut);
+#endif
+
 static void TestNativeDriver(void)
 {
+#ifdef MRHI_TEST_EXTERNAL
+    // An outside driver that finds no API to run on is skipped, unless
+    // MAUL_RHI_REQUIRE_EXTERNAL is set and not empty.
+    mrhiExternalDriverDef external;
+    mrhiResult made = mrhiConformanceDriver(&external);
+    if (made != mrhi_success)
+    {
+        CHECK(made == mrhi_errorUnsupported && !IsSet("MAUL_RHI_REQUIRE_EXTERNAL"),
+              "the outside driver");
+        printf("skip: the outside driver has no adapter here\n");
+        return;
+    }
+    mrhiInstance* instance = Create(&external.chain);
+#else
     mrhiInstance* instance = Create(nullptr);
+#endif
     CHECK(instance != nullptr, "an instance");
     if (instance == nullptr)
     {
         return;
     }
-    // The build's native driver: WebGPU on the web, Metal or D3D12 where
-    // the build chose it, Vulkan elsewhere.
-#ifdef MRHI_TEST_WEB
+    // The outside driver the suite is linked with, or else the build's
+    // native driver: WebGPU on the web, Metal or D3D12 where the build
+    // chose it, Vulkan elsewhere.
+#ifdef MRHI_TEST_EXTERNAL
+    size_t count = CheckDriver(instance, mrhi_driverExternal);
+    const char* required = getenv("MAUL_RHI_REQUIRE_EXTERNAL");
+#elif defined(MRHI_TEST_WEB)
     size_t count = CheckDriver(instance, mrhi_driverWebGpu);
     const char* required = getenv("MAUL_RHI_REQUIRE_WEBGPU");
 #elif defined(MAUL_RHI_METAL_DRIVER)
@@ -2848,7 +2972,42 @@ static void TestNativeDriver(void)
     mrhiDestroyInstance(instance);
 }
 
-int main(void)
+// Prints the mustpass list of this SPI version: the cases by category,
+// and the categories that have none yet. Unused where the runner calls
+// main without arguments.
+[[maybe_unused]] static void List(void)
+{
+    printf("# Maul RHI conformance cases, SPI version %d (mrhi-0024).\n"
+           "# A driver is admitted on a run that passes every case listed.\n",
+           MRHI_TEST_SPI_VERSION);
+    for (size_t i = 0; i < sizeof(s_empty) / sizeof(s_empty[0]); ++i)
+    {
+        printf("# %s: no case yet\n", s_empty[i]);
+    }
+    for (size_t i = 0; i < sizeof(s_cases) / sizeof(s_cases[0]); ++i)
+    {
+        printf("%s\n", s_cases[i].name);
+    }
+}
+
+// Each case's outcome, and failures outside any case (setting one up).
+static void Report(void)
+{
+    int counted = 0;
+    for (size_t i = 0; i < sizeof(s_cases) / sizeof(s_cases[0]); ++i)
+    {
+        const Case* run = &s_cases[i];
+        const char* outcome = run->runs == 0 ? "not run" : run->failures > 0 ? "fail" : "pass";
+        printf("case %s: %s\n", run->name, outcome);
+        counted += run->failures;
+    }
+    if (s_failures > counted)
+    {
+        printf("setup: %d failures outside the cases\n", s_failures - counted);
+    }
+}
+
+static int Run(void)
 {
 #ifdef MAUL_RHI_D3D12_DRIVER
     // Before the library opens a device, as the debug layer needs.
@@ -2856,8 +3015,40 @@ int main(void)
 #endif
     TestTestDriver();
     TestNativeDriver();
+    // The D3D12 debug layer's errors are counted here; the Vulkan
+    // validation layer's messages fail the test through CTest.
 #ifdef MAUL_RHI_D3D12_DRIVER
-    CHECK(mrhiTestD3d12Errors() == 0, "no D3D12 debug layer error");
+    RUN("validation.clean", CHECK(mrhiTestD3d12Errors() == 0, "no D3D12 debug layer error"));
+#else
+    RUN("validation.clean", (void)0);
 #endif
+    Report();
     return s_failures == 0 ? 0 : 1;
 }
+
+// On the web and on Android the runner calls main without arguments.
+#if defined(MRHI_TEST_WEB) || defined(MRHI_TEST_ANDROID)
+int main(void)
+{
+    return Run();
+}
+#else
+int main(int argc, char** argv)
+{
+    if (argc == 2 && strcmp(argv[1], "--list") == 0)
+    {
+        List();
+        return 0;
+    }
+    if (argc == 3 && strcmp(argv[1], "--case") == 0)
+    {
+        s_only = argv[2];
+    }
+    else if (argc != 1)
+    {
+        printf("usage: test_conformance [--list | --case <name>]\n");
+        return 2;
+    }
+    return Run();
+}
+#endif
