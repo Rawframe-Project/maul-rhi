@@ -7,6 +7,12 @@
 // core could trust. Counts a driver could make the core overrun are
 // clamped; everything else passes through as the driver gave it.
 
+// Built only with the layer; defined here too for tools that read the
+// file alone, outside such a build.
+#ifndef MAUL_RHI_VALIDATION
+#define MAUL_RHI_VALIDATION
+#endif
+
 #include "validation.h"
 
 #include "allocator.h"

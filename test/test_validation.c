@@ -7,6 +7,7 @@
 // on; and a malformed frame, whose faults the walk counts without
 // reading past what it checked.
 
+#include "device_core.h"
 #include "driver_test.h"
 #include "frame_walk.h"
 #include "test_harness.h"
@@ -94,6 +95,17 @@ static size_t ListTwice(const void* self, mrhiDriverAdapter* adapters, size_t ca
     return total;
 }
 
+// Claims more events than the room given: the layer must not let the
+// core read past its array.
+static size_t OverReport(void* self, mrhiDriverEvent* events, size_t capacity)
+{
+    for (size_t i = 0; i < capacity; ++i)
+    {
+        events[i] = (mrhiDriverEvent){0};
+    }
+    return s_made.vtable->poll(self, events, capacity) > 0 ? capacity + 1 : 0;
+}
+
 static void TestInstanceAnswers(void)
 {
     Open();
@@ -109,6 +121,12 @@ static void TestInstanceAnswers(void)
     Search(instance, &adapter);
     CHECK(mrhiGetDriverFaults(instance) == 1, "an adapter listed twice");
     mrhiDestroyInstance(instance);
+    Open();
+    s_vtable.poll = OverReport;
+    instance = Start();
+    Search(instance, &adapter);
+    CHECK(mrhiGetDriverFaults(instance) >= 1, "more events than room, clamped");
+    mrhiDestroyInstance(instance);
 }
 
 static mrhiResult MakeNothing(void* self, const mrhiBufferDef* def, uint64_t* handleOut)
@@ -116,6 +134,15 @@ static mrhiResult MakeNothing(void* self, const mrhiBufferDef* def, uint64_t* ha
     mrhiResult status = s_deviceInner->createBuffer(self, def, handleOut);
     *handleOut = 0;
     return status;
+}
+
+// Takes any frame without the test driver's own walk, which would trap.
+static mrhiResult TakeAnything(void* self, const mrhiDriverFrame* frame, uint64_t tag)
+{
+    (void)self;
+    (void)frame;
+    (void)tag;
+    return mrhi_success;
 }
 
 static mrhiResult CreateBreakingDevice(void* self, uint64_t adapter, const mrhiDeviceDef* def,
@@ -127,6 +154,7 @@ static mrhiResult CreateBreakingDevice(void* self, uint64_t adapter, const mrhiD
         s_deviceInner = deviceOut->vtable;
         s_deviceVtable = *deviceOut->vtable;
         s_deviceVtable.createBuffer = MakeNothing;
+        s_deviceVtable.submitFrame = TakeAnything;
         deviceOut->vtable = &s_deviceVtable;
     }
     return status;
@@ -151,6 +179,13 @@ static void TestDeviceAnswers(void)
     mrhiBufferId buffer;
     CHECK(mrhiCreateBuffer(device, &bufferDef, &buffer) == mrhi_success, "the call goes on");
     CHECK(mrhiGetDriverFaults(instance) == 1, "a buffer whose handle is zero");
+    // A frame no driver could translate, handed to the layer as the core
+    // hands frames: one pass whose chunk the frame lacks.
+    mrhiDriverPass pass = {.id = {1, 1}, .firstChunk = 1};
+    mrhiDriverFrame frame = {.passes = &pass, .passCount = 1};
+    CHECK(device->driver.vtable->submitFrame(device->driver.self, &frame, 1) == mrhi_success &&
+              mrhiGetDriverFaults(instance) == 2,
+          "a frame walked and found wanting");
     mrhiDestroyDevice(device);
     mrhiDestroyInstance(instance);
 }
