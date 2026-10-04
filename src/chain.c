@@ -7,11 +7,14 @@
 
 #include <string.h>
 
+// Whether a def accepts a type: one it lists, or any driver-defined
+// type where it lists MRHI_STRUCT_DRIVER_DEFINED itself.
 static bool IsKnown(mrhiStructType type, const mrhiStructType* known, size_t knownCount)
 {
     for (size_t i = 0; i < knownCount; ++i)
     {
-        if (known[i] == type)
+        if (known[i] == type ||
+            (known[i] == MRHI_STRUCT_DRIVER_DEFINED && (type & MRHI_STRUCT_DRIVER_DEFINED) != 0))
         {
             return true;
         }

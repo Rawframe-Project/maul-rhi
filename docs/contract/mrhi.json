@@ -180,7 +180,7 @@
           "kind": "enum",
           "name": "struct_type",
           "width": "uint32",
-          "doc": "The type of a chained struct. Bit 31 clear marks a critical extension, which a library that does not know it refuses; bit 31 set marks a hint it may skip.",
+          "doc": "The type of a chained struct. Bit 31 clear marks a critical extension, which a library that does not know it refuses; bit 31 set marks a hint it may skip. Types with bit 30 set (MRHI_STRUCT_DRIVER_DEFINED) belong to drivers built outside the tree (mrhi-0024).",
           "values": [
             {
               "name": "struct_none",
@@ -259,6 +259,12 @@
             }
           ],
           "library": "tags of the library's extension chain"
+        },
+        {
+          "kind": "constant",
+          "name": "struct_driver_defined",
+          "value": 1073741824,
+          "doc": "The bit of a chained struct type defined by a driver built outside the tree: such a struct is a surface's source on an instance of that driver, handed to it unexamined, and refused everywhere else (mrhi-0024)."
         },
         {
           "kind": "struct",

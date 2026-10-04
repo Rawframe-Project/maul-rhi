@@ -15,15 +15,22 @@
 
 // The chained structs a surface def accepts: the sources.
 static const mrhiStructType s_sources[] = {
-    mrhi_structSurfaceSourceWin32,      mrhi_structSurfaceSourceWayland,
-    mrhi_structSurfaceSourceXcb,        mrhi_structSurfaceSourceAndroid,
-    mrhi_structSurfaceSourceMetalLayer, mrhi_structSurfaceSourceCanvas,
+    mrhi_structSurfaceSourceWin32,
+    mrhi_structSurfaceSourceWayland,
+    mrhi_structSurfaceSourceXcb,
+    mrhi_structSurfaceSourceAndroid,
+    mrhi_structSurfaceSourceMetalLayer,
+    mrhi_structSurfaceSourceCanvas,
 #ifdef MAUL_RHI_TEST_DRIVER
     mrhi_structSurfaceSourceTest,
 #endif
+    // Last: an outside driver's own sources (mrhi-0024), which only an
+    // instance of such a driver accepts.
+    MRHI_STRUCT_DRIVER_DEFINED,
 };
 
-#define SOURCE_COUNT (sizeof(s_sources) / sizeof(s_sources[0]))
+// The sources every instance accepts.
+#define SOURCE_COUNT (sizeof(s_sources) / sizeof(s_sources[0]) - 1)
 
 mrhiSurfaceDef mrhiDefaultSurfaceDef(void)
 {
@@ -32,8 +39,14 @@ mrhiSurfaceDef mrhiDefaultSurfaceDef(void)
     return def;
 }
 
-static bool IsSource(mrhiStructType type)
+// Whether a type is a source: one of the library's, or, for an instance
+// of an outside driver, a critical driver-defined one.
+static bool IsSource(mrhiStructType type, bool external)
 {
+    if (external && (type & MRHI_STRUCT_DRIVER_DEFINED) != 0 && (type & MRHI_CHAIN_HINT) == 0)
+    {
+        return true;
+    }
     for (size_t i = 0; i < SOURCE_COUNT; ++i)
     {
         if (s_sources[i] == type)
@@ -46,12 +59,12 @@ static bool IsSource(mrhiStructType type)
 
 // The one source on a checked chain, or NULL when there is none or
 // more than one.
-static const mrhiChain* FindSource(const mrhiChain* head)
+static const mrhiChain* FindSource(const mrhiChain* head, bool external)
 {
     const mrhiChain* source = nullptr;
     for (const mrhiChain* node = head; node != nullptr; node = node->next)
     {
-        if (IsSource(node->type))
+        if (IsSource(node->type, external))
         {
             if (source != nullptr)
             {
@@ -68,8 +81,8 @@ static const mrhiChain* FindSource(const mrhiChain* head)
 static const mrhiChain* CheckDef(mrhiInstance* instance, const mrhiSurfaceDef* def,
                                  mrhiResult* statusOut)
 {
-    mrhiResult chain =
-        mrhiCheckChain(def->next, s_sources, SOURCE_COUNT, instance->limits.chainDepth);
+    size_t accepted = instance->external ? SOURCE_COUNT + 1 : SOURCE_COUNT;
+    mrhiResult chain = mrhiCheckChain(def->next, s_sources, accepted, instance->limits.chainDepth);
     if (def->cookie != SURFACE_DEF_COOKIE || chain == mrhi_errorInvalid ||
         !mrhiIsLabelValid(def->label, def->labelLength))
     {
@@ -81,7 +94,7 @@ static const mrhiChain* CheckDef(mrhiInstance* instance, const mrhiSurfaceDef* d
         *statusOut = chain;
         return nullptr;
     }
-    const mrhiChain* source = FindSource(def->next);
+    const mrhiChain* source = FindSource(def->next, instance->external);
     if (source == nullptr)
     {
         *statusOut = mrhiMisuse(instance);

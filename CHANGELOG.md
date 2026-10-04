@@ -24,7 +24,9 @@ format.
   installed as `maul-rhi/spi/` at SPI version 4; its adapters report
   `mrhi_driverExternal`. The SPI handshake refuses another version with
   `mrhi_errorVersion` and a short or incomplete vtable with
-  `mrhi_errorInvalid`, for device vtables too.
+  `mrhi_errorInvalid`, for device vtables too. Struct types with
+  `MRHI_STRUCT_DRIVER_DEFINED` set are such a driver's own surface
+  sources, which its instance hands it unexamined.
 - Mustpass lists (mrhi-0024): the conformance suite's checks are named
   cases in the requirements' ten categories, listed with `--list`, run
   alone with `--case` and reported one by one;

@@ -48,13 +48,20 @@ is a typed failure, and for mustpass lists per SPI version.
   `mrhiResult mrhiConformanceDriver(mrhiExternalDriverDef* driverOut)`;
   the suite is then built again as `test_conformance_external` and run
   on that driver. Without one, Linux builds hand the suite their own
-  Vulkan driver through this path, so it runs in CI.
+  Vulkan driver through this path, so it runs in CI. The target also
+  defines `const mrhiChain* mrhiConformanceSurface(bool* fixedSizeOut)`:
+  the source of a window its harness made, presented to by
+  `swapchain.present`, or NULL for the build platform's window system.
+- Chained struct types with bit 30 set (`MRHI_STRUCT_DRIVER_DEFINED`)
+  belong to outside drivers: an instance of such a driver takes one as
+  a surface's source and hands it to the driver unexamined; every other
+  instance and def refuses it as an unknown critical struct.
 
 ## Consequences
 
 A console driver is a library of its own, built against an install of
 Maul RHI and linked into the program, with no file of this repository
-replaced. A test builds such a driver against an install alone. The
+replaced, and presents through source structs of its own. A test builds such a driver against an install alone. The
 shader container carries code for the four open APIs only; a driver
 of another API needs its own code in containers, decided when one
 exists.

@@ -7,13 +7,14 @@
 // version, a short vtable or a missing function, of the instance
 // driver and of its devices; a refused driver stays the program's, and
 // an accepted one is destroyed with the instance (the sanitizers see
-// either mistake).
+// either mistake); its own surface sources reach it unexamined.
 
 #include "driver_test.h"
 #include "test_harness.h"
 
 #include "maul-rhi/device.h"
 #include "maul-rhi/instance.h"
+#include "maul-rhi/surface.h"
 
 #include <string.h>
 
@@ -161,10 +162,90 @@ static void TestDeviceHandshake(void)
     mrhiDestroyInstance(instance);
 }
 
+// A source struct an outside driver defines: a type with bit 30 set.
+#define OWN_SOURCE (MRHI_STRUCT_DRIVER_DEFINED | 1u)
+
+typedef struct OwnSource
+{
+    mrhiChain chain;
+    uint32_t presentingAdapters;
+} OwnSource;
+
+// The outside driver reads its own source, here by making the test
+// driver's from it, and refuses any other it cannot use.
+static mrhiResult CreateOwnSurface(void* self, const mrhiChain* source, const mrhiSurfaceDef* def,
+                                   uint64_t* handleOut)
+{
+    if (source->type != OWN_SOURCE)
+    {
+        return mrhi_errorUnsupported;
+    }
+    const OwnSource* own = (const OwnSource*)source;
+    mrhiSurfaceSourceTest test = {
+        .chain = {.next = nullptr, .type = mrhi_structSurfaceSourceTest},
+        .presentingAdapters = own->presentingAdapters,
+    };
+    return s_made.vtable->createSurface(self, &test.chain, def, handleOut);
+}
+
+static mrhiResult MakeSurface(mrhiInstance* instance, const mrhiChain* source,
+                              mrhiSurfaceId* surfaceOut)
+{
+    mrhiSurfaceDef def = mrhiDefaultSurfaceDef();
+    def.next = source;
+    return mrhiCreateSurface(instance, &def, surfaceOut);
+}
+
+// Driver-defined sources (mrhi-0024): an outside driver's instance hands
+// its own to it unexamined; every other instance refuses them as
+// unknown critical structs.
+static void TestOwnSources(void)
+{
+    mrhiExternalDriverDef external = MakeDriver();
+    s_vtable.createSurface = CreateOwnSurface;
+    mrhiInstance* instance = nullptr;
+    CHECK(Create(&external, &instance) == mrhi_success, "taken");
+    mrhiAdapterId adapter = FindAdapter(instance);
+    OwnSource own = {.chain = {.next = nullptr, .type = OWN_SOURCE}, .presentingAdapters = 1};
+    mrhiSurfaceId surface = {0};
+    CHECK(MakeSurface(instance, &own.chain, &surface) == mrhi_success, "its own source");
+    mrhiSurfaceCaps caps;
+    CHECK(mrhiGetSurfaceCaps(instance, surface, adapter, &caps) == mrhi_success && caps.presentable,
+          "presenting there");
+    CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "destroyed");
+    own.chain.type = MRHI_STRUCT_DRIVER_DEFINED | 2u;
+    CHECK(MakeSurface(instance, &own.chain, &surface) == mrhi_errorUnsupported,
+          "one the driver cannot use");
+    uint64_t misuse = mrhiGetInstanceMisuse(instance);
+    own.chain.type = OWN_SOURCE | 0x80000000u;
+    CHECK(MakeSurface(instance, &own.chain, &surface) == mrhi_errorInvalid,
+          "a hint, skipped: no source");
+    own.chain.type = OWN_SOURCE;
+    OwnSource second = {.chain = {.next = nullptr, .type = OWN_SOURCE | 2u}};
+    own.chain.next = &second.chain;
+    CHECK(MakeSurface(instance, &own.chain, &surface) == mrhi_errorInvalid, "two sources");
+    CHECK(mrhiGetInstanceMisuse(instance) == misuse + 2, "both counted");
+    mrhiDestroyInstance(instance);
+    // The test driver's own instance knows no driver-defined struct.
+    mrhiTestDriverDef test = {
+        .chain = {.next = nullptr, .type = mrhi_structTestDriver},
+        .adapters = &s_adapter,
+        .adapterCount = 1,
+    };
+    mrhiInstanceDef def = mrhiDefaultInstanceDef();
+    def.next = &test.chain;
+    CHECK(mrhiCreateInstance(&def, &instance) == mrhi_success, "a test driver instance");
+    own.chain.next = nullptr;
+    CHECK(MakeSurface(instance, &own.chain, &surface) == mrhi_errorUnsupported,
+          "refused as unknown");
+    mrhiDestroyInstance(instance);
+}
+
 int main(void)
 {
     TestAccepted();
     TestRefused();
     TestDeviceHandshake();
+    TestOwnSources();
     return s_failures == 0 ? 0 : 1;
 }

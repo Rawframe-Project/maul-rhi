@@ -16,7 +16,9 @@
 // Checks a chain against the struct types its def accepts: success, or
 // mrhi_errorInvalid for a node without a type, mrhi_errorUnsupported
 // for an unknown critical type, mrhi_errorCapacity for more than
-// depthLimit nodes. known may be NULL when knownCount is 0.
+// depthLimit nodes. known may be NULL when knownCount is 0; listing
+// MRHI_STRUCT_DRIVER_DEFINED accepts every driver-defined type
+// (mrhi-0024).
 mrhiResult mrhiCheckChain(const mrhiChain* head, const mrhiStructType* known, size_t knownCount,
                           uint32_t depthLimit);
 

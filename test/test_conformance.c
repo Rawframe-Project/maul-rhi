@@ -3108,11 +3108,49 @@ static void CheckMetalSurface(mrhiInstance* instance, const mrhiAdapterId* ids, 
 #endif
 
 // Surfaces on the native driver's adapters.
+#ifdef MRHI_TEST_EXTERNAL
+// The window of the outside driver's harness (mrhi-0024): its surface
+// source, or NULL for the build platform's window system, and whether
+// the window fixes its images' size.
+const mrhiChain* mrhiConformanceSurface(bool* fixedSizeOut);
+
+// Presents to the outside driver's window from each adapter that can.
+static void CheckOutsideSurface(mrhiInstance* instance, const mrhiAdapterId* ids, size_t count,
+                                const mrhiChain* source, bool fixedSize)
+{
+    mrhiSurfaceId surface = {0};
+    CHECK(MakeSurface(instance, source, &surface) == mrhi_success, "the outside driver's surface");
+    size_t presenting = 0;
+    for (size_t i = 0; i < count; ++i)
+    {
+        mrhiSurfaceCaps caps;
+        CHECK(mrhiGetSurfaceCaps(instance, surface, ids[i], &caps) == mrhi_success, "caps");
+        CHECK(!caps.presentable || MeetsFloors(&caps), "the floors where it presents");
+        if (caps.presentable)
+        {
+            CheckPresenting(instance, ids[i], surface, &caps, fixedSize);
+        }
+        presenting += caps.presentable ? 1 : 0;
+    }
+    CHECK(presenting > 0, "an adapter presents there");
+    CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "the surface destroyed");
+}
+#endif
+
 static void CheckSurfaces(mrhiInstance* instance)
 {
     RUN("swapchain.foreign_sources", CheckForeignSources(instance));
     mrhiAdapterId ids[16];
     size_t count = Search(instance, ids, 16);
+#ifdef MRHI_TEST_EXTERNAL
+    bool fixedSize = true;
+    const mrhiChain* outside = mrhiConformanceSurface(&fixedSize);
+    if (outside != nullptr)
+    {
+        RUN("swapchain.present", CheckOutsideSurface(instance, ids, count, outside, fixedSize));
+        return;
+    }
+#endif
 #if defined(MRHI_TEST_XCB)
     RUN("swapchain.present", CheckXcbSurface(instance, ids, count));
 #elif defined(MRHI_TEST_ANDROID)

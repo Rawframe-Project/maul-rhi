@@ -11,6 +11,7 @@
 #include "maul-rhi/instance.h"
 
 mrhiResult mrhiConformanceDriver(mrhiExternalDriverDef* driverOut);
+const mrhiChain* mrhiConformanceSurface(bool* fixedSizeOut);
 
 mrhiResult mrhiConformanceDriver(mrhiExternalDriverDef* driverOut)
 {
@@ -29,4 +30,11 @@ mrhiResult mrhiConformanceDriver(mrhiExternalDriverDef* driverOut)
         .driver = driver.self,
     };
     return mrhi_success;
+}
+
+// The suite's own window on the build's platform, as for the native run.
+const mrhiChain* mrhiConformanceSurface(bool* fixedSizeOut)
+{
+    (void)fixedSizeOut;
+    return nullptr;
 }

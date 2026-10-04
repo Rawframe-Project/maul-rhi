@@ -118,7 +118,8 @@ extern "C"
 
     // The type of a chained struct. Bit 31 clear marks a critical extension,
     // which a library that does not know it refuses; bit 31 set marks a hint it
-    // may skip.
+    // may skip. Types with bit 30 set (MRHI_STRUCT_DRIVER_DEFINED) belong to
+    // drivers built outside the tree (mrhi-0024).
     typedef uint32_t mrhiStructType;
 
     enum
@@ -160,6 +161,11 @@ extern "C"
         // library (mrhi-0024).
         mrhi_structExternalDriver = 14,
     };
+
+// The bit of a chained struct type defined by a driver built outside the tree:
+// such a struct is a surface's source on an instance of that driver, handed to
+// it unexamined, and refused everywhere else (mrhi-0024).
+#define MRHI_STRUCT_DRIVER_DEFINED 0x40000000u
 
     // The header every chained struct opens with. A def's next field, or a
     // chained struct's chain.next, points at the next struct of the chain, or
