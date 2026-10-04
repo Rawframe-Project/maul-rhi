@@ -34,6 +34,7 @@
 
 // The chained structs an instance def accepts.
 static const mrhiStructType s_instanceStructs[] = {
+    mrhi_structExternalDriver,
 #ifdef MAUL_RHI_TEST_DRIVER
     mrhi_structTestDriver,
 #endif
@@ -60,13 +61,15 @@ static bool AreVulkanStructsValid(const mrhiInstanceDef* def)
     return adopted && extended && (adopt == nullptr || extra == nullptr);
 }
 
-// Whether the def asks for the test driver along with Vulkan structs,
-// which only the Vulkan driver takes.
+// Whether the def asks for more than one driver: the test driver, an
+// external one (mrhi-0024), or the Vulkan driver through its structs.
 static bool MixesDrivers(const mrhiInstanceDef* def)
 {
     bool vulkan = mrhiFindStruct(def->next, mrhi_structInstanceVulkanAdopt) != nullptr ||
                   mrhiFindStruct(def->next, mrhi_structInstanceVulkanExtensions) != nullptr;
-    return vulkan && mrhiFindStruct(def->next, mrhi_structTestDriver) != nullptr;
+    bool test = mrhiFindStruct(def->next, mrhi_structTestDriver) != nullptr;
+    bool external = mrhiFindStruct(def->next, mrhi_structExternalDriver) != nullptr;
+    return (vulkan && test) || (external && (vulkan || test));
 }
 
 mrhiInstanceDef mrhiDefaultInstanceDef(void)
@@ -100,7 +103,9 @@ static mrhiResult CheckDef(const mrhiInstanceDef* def)
     {
         return chain;
     }
-    if (!AreVulkanStructsValid(def))
+    const mrhiExternalDriverDef* external =
+        (const mrhiExternalDriverDef*)mrhiFindStruct(def->next, mrhi_structExternalDriver);
+    if (!AreVulkanStructsValid(def) || (external != nullptr && external->vtable == nullptr))
     {
         return mrhi_errorInvalid;
     }
@@ -162,13 +167,27 @@ static mrhiResult StartDriver(mrhiInstance* instance, const mrhiInstanceDef* def
 {
     for (const mrhiChain* node = def->next; node != nullptr; node = node->next)
     {
+        if (node->type == mrhi_structExternalDriver)
+        {
+            // Owned from here only when it passes the handshake.
+            const mrhiExternalDriverDef* external = (const mrhiExternalDriverDef*)node;
+            const mrhiInstanceDriverVtable* vtable = external->vtable;
+            mrhiResult status = mrhiCheckInstanceVtable(vtable);
+            if (status == mrhi_success)
+            {
+                instance->driver = (mrhiInstanceDriver){vtable, external->driver};
+                instance->external = true;
+            }
+            return status;
+        }
 #ifdef MAUL_RHI_TEST_DRIVER
         if (node->type == mrhi_structTestDriver)
         {
             mrhiResult status =
                 mrhiCreateTestDriver(&instance->allocator, (const mrhiTestDriverDef*)node,
                                      def->limits.notifications, &instance->driver);
-            MRHI_ASSERT(status != mrhi_success || mrhiIsDriverVtableValid(instance->driver.vtable));
+            MRHI_ASSERT(status != mrhi_success ||
+                        mrhiCheckInstanceVtable(instance->driver.vtable) == mrhi_success);
             return status;
         }
 #endif
@@ -184,7 +203,7 @@ static mrhiResult StartDriver(mrhiInstance* instance, const mrhiInstanceDef* def
         mrhiCreateVulkanDriver(&instance->allocator, def->next, def->limits.notifications,
                                def->limits.adapters, &instance->driver);
     MRHI_ASSERT(instance->driver.vtable == nullptr ||
-                mrhiIsDriverVtableValid(instance->driver.vtable));
+                mrhiCheckInstanceVtable(instance->driver.vtable) == mrhi_success);
     return status;
 #elif defined(MAUL_RHI_WEBGPU_DRIVER)
     return mrhiCreateWebGpuDriver(&instance->allocator, def->limits.notifications,

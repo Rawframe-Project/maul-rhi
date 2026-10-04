@@ -463,7 +463,7 @@ Returns the default instance def: the contract version the program is built agai
 ```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateInstance(const mrhiInstanceDef* def, mrhiInstance** instanceOut);
 ```
-Makes an instance.  @param def          The instance to make. @param instanceOut  Receives the instance; set to NULL on failure. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a zero limit or an allocator with one function; `mrhi_errorVersion` when the def's contract version is not the library's; `mrhi_errorUnsupported` for a critical extension the library does not know, such as mrhiTestDriverDef in a build without the test driver; `mrhi_errorCapacity` when the chain is deeper than the limit or the allocator fails. @par Thread safety Safe from any thread.
+Makes an instance.  @param def          The instance to make. @param instanceOut  Receives the instance; set to NULL on failure. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a zero limit, an allocator with one function, an external driver without a vtable or with one smaller than the library knows or lacking a function, or an external driver beside the test driver or Vulkan structs; `mrhi_errorVersion` when the def's contract version is not the library's, or an external driver's SPI version is not its; `mrhi_errorUnsupported` for a critical extension the library does not know, such as mrhiTestDriverDef in a build without the test driver; `mrhi_errorCapacity` when the chain is deeper than the limit or the allocator fails. @par Thread safety Safe from any thread.
 
 ```c
 void mrhiDestroyInstance(mrhiInstance* instance);

@@ -60,8 +60,10 @@ struct mrhiInstance
     size_t bytes;
     // Calls refused as invalid input.
     uint64_t misuse;
-    // No driver when its vtable is NULL.
+    // No driver when its vtable is NULL; external for one the program
+    // made (mrhi-0024), whose adapters the core reports as such.
     mrhiInstanceDriver driver;
+    bool external;
     uint32_t nextRequest;
     uint32_t deviceCount;
     // A ring of limits.notifications records.

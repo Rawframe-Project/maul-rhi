@@ -3,7 +3,10 @@
 //
 // The driver SPI at the instance level (mrhi-0003), as the core calls
 // it. A driver reports finished work only when the core polls it, and
-// never calls the core.
+// never calls the core. Installed as maul-rhi/spi/driver.h, with
+// command.h, reflection.h and container.h, for drivers built outside
+// the tree (mrhi-0024): their types are the SPI, while the core
+// functions they declare are not.
 
 #ifndef MAUL_RHI_SRC_DRIVER_H
 #define MAUL_RHI_SRC_DRIVER_H
@@ -14,8 +17,9 @@
 #include "maul-rhi/heap.h"
 #include "maul-rhi/pipeline.h"
 
-// The SPI version a driver's vtable must carry.
-#define MRHI_SPI_VERSION 3
+// The SPI version a driver's vtable must carry. Any change to the SPI
+// headers raises it (mrhi-0024); 4 is the first installed.
+#define MRHI_SPI_VERSION 4
 
 // The 64-bit counters a pipeline statistics query writes (mrhi-0023).
 #define MRHI_STATISTICS_COUNTERS 11
@@ -208,6 +212,8 @@ typedef struct mrhiDeviceDriverVtable
 {
     uint32_t spiVersion;
     uint32_t size;
+    // First in every SPI version, so that the core can destroy a device
+    // whose vtable fails the handshake.
     void (*destroy)(void* self);
     // Makes a sampler the core has checked; its handle, never zero.
     mrhiResult (*createSampler)(void* self, const mrhiSamplerDef* def, uint64_t* handleOut);
@@ -349,8 +355,11 @@ typedef struct mrhiInstanceDriver
     void* self;
 } mrhiInstanceDriver;
 
-// Whether a driver's vtable passes the handshake: this SPI version, and
-// at least the size the core knows.
-bool mrhiIsDriverVtableValid(const mrhiInstanceDriverVtable* vtable);
+// The handshake (mrhi-0024): success for a vtable of this SPI version,
+// at least the size the core knows, with every function; otherwise
+// mrhi_errorVersion for another version, or mrhi_errorInvalid. A
+// driver's own functions are not checked further.
+mrhiResult mrhiCheckInstanceVtable(const mrhiInstanceDriverVtable* vtable);
+mrhiResult mrhiCheckDeviceVtable(const mrhiDeviceDriverVtable* vtable);
 
 #endif // MAUL_RHI_SRC_DRIVER_H

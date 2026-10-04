@@ -140,6 +140,10 @@ mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search
     for (size_t i = 0; i < count; ++i)
     {
         mrhiDriverAdapter* adapter = &instance->found[i];
+        if (instance->external)
+        {
+            adapter->info.driver = mrhi_driverExternal;
+        }
         mrhiMaskFeatures(&adapter->features, adapter->info.driver);
         if ((!search->allowSoftware && adapter->info.kind == mrhi_adapterSoftware) ||
             !MeetsFloor(instance, adapter) || !Presents(instance, search, adapter))

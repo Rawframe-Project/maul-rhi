@@ -260,6 +260,7 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(submit WHITEBOX)
         maul_add_test(acquire WHITEBOX)
         maul_add_test(loss WHITEBOX)
+        maul_add_test(external WHITEBOX)
         # The container writer against the reader, where Python runs.
         find_package(Python3 COMPONENTS Interpreter)
         if(TARGET test_shader AND Python3_Interpreter_FOUND AND NOT CMAKE_CROSSCOMPILING)
@@ -397,4 +398,17 @@ endif()
 
 if(MAUL_RHI_INSTALL)
     include(cmake/Install.cmake)
+    # The driver SPI, for drivers built outside the tree (mrhi-0024).
+    install(FILES src/driver.h src/command.h src/reflection.h src/container.h
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}/spi)
+    # Such a driver, built against an install of this build alone; not
+    # under the sanitizers, whose flags the package does not carry.
+    if(MAUL_RHI_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING AND NOT WIN32 AND NOT MAUL_RHI_SANITIZE
+       AND NOT MAUL_RHI_TSAN)
+        add_test(NAME external_build
+                 COMMAND ${CMAKE_COMMAND} -DBUILD=${PROJECT_BINARY_DIR}
+                         -DSOURCE=${PROJECT_SOURCE_DIR}/test/external -DGENERATOR=${CMAKE_GENERATOR}
+                         -DCC=${CMAKE_C_COMPILER} -DCONFIG=$<CONFIG> -P
+                         ${PROJECT_SOURCE_DIR}/test/external/run.cmake)
+    endif()
 endif()

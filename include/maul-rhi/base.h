@@ -156,6 +156,9 @@ extern "C"
         mrhi_structDeviceVulkanExtensions = 12,
         // mrhiTextureVulkanAdopt, on a texture def: a VkImage made elsewhere.
         mrhi_structTextureVulkanAdopt = 13,
+        // mrhiExternalDriverDef, on an instance def: a driver made outside the
+        // library (mrhi-0024).
+        mrhi_structExternalDriver = 14,
     };
 
     // The header every chained struct opens with. A def's next field, or a

@@ -408,6 +408,16 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     MRHI_ASSERT(instance->driver.vtable != nullptr);
     status = instance->driver.vtable->createDevice(instance->driver.self, adapter->handle, def,
                                                    device->request, &device->driver);
+    if (status == mrhi_success)
+    {
+        // The handshake (mrhi-0024); destroy comes first in every version.
+        status = mrhiCheckDeviceVtable(device->driver.vtable);
+        if (status != mrhi_success && device->driver.vtable != nullptr &&
+            device->driver.vtable->destroy != nullptr)
+        {
+            device->driver.vtable->destroy(device->driver.self);
+        }
+    }
     if (status != mrhi_success)
     {
         mrhiRelease(&device->allocator, device, device->bytes, alignof(mrhiDevice));

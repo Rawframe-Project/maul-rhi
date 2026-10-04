@@ -10,6 +10,12 @@ format.
 
 ### Added
 
+- Drivers built outside the tree (mrhi-0024): `mrhiExternalDriverDef`
+  hands an instance a driver made against the SPI headers, now
+  installed as `maul-rhi/spi/` at SPI version 4; its adapters report
+  `mrhi_driverExternal`. The SPI handshake refuses another version with
+  `mrhi_errorVersion` and a short or incomplete vtable with
+  `mrhi_errorInvalid`, for device vtables too.
 - Pipeline statistics queries (mrhi-0023): query sets of type
   `mrhi_queryPipelineStatistics`, bracketed by
   `mrhiBeginStatisticsQuery` and `mrhiEndStatisticsQuery` in passes of

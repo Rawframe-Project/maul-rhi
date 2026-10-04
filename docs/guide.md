@@ -61,7 +61,10 @@ The build has one native driver: Metal on Apple systems, Direct3D 12 on
 Windows (or Vulkan, with `MAUL_RHI_VULKAN_DRIVER=ON` and
 `MAUL_RHI_D3D12_DRIVER=OFF`), Vulkan on Linux and Android, WebGPU on
 the web. The test driver (`maul-rhi/test.h`) runs without a GPU, for a
-program's own tests (section 12).
+program's own tests (section 12). A driver built outside the tree, such
+as a console's, is compiled against the installed SPI headers
+(`maul-rhi/spi/`), linked into the program and handed to the instance
+with `mrhiExternalDriverDef` (mrhi-0024).
 
 ## 2. Results, ids and defs
 

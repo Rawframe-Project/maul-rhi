@@ -251,6 +251,11 @@
               "name": "struct_texture_vulkan_adopt",
               "value": 13,
               "doc": "mrhiTextureVulkanAdopt, on a texture def: a VkImage made elsewhere."
+            },
+            {
+              "name": "struct_external_driver",
+              "value": 14,
+              "doc": "mrhiExternalDriverDef, on an instance def: a driver made outside the library (mrhi-0024)."
             }
           ],
           "library": "tags of the library's extension chain"
@@ -372,6 +377,11 @@
               "name": "driver_d3d12",
               "value": 4,
               "doc": "Direct3D 12."
+            },
+            {
+              "name": "driver_external",
+              "value": 5,
+              "doc": "A driver made outside the library and handed to the instance (mrhi-0024); its adapters' names tell such drivers apart."
             }
           ],
           "library": "names the library's drivers, one per API"
@@ -639,6 +649,27 @@
         },
         {
           "kind": "struct",
+          "name": "external_driver_def",
+          "chained": true,
+          "doc": "A driver made outside the library against its SPI headers (maul-rhi/spi, mrhi-0024), chained on an instance def with the type mrhi_structExternalDriver. The instance starts it instead of the build's own driver. From a successful create the instance owns it and destroys it at its end; when the create fails, the program still owns it.",
+          "members": [
+            {
+              "name": "vtable",
+              "type": "void",
+              "pointer": "const",
+              "doc": "The driver's mrhiInstanceDriverVtable, of this library's MRHI_SPI_VERSION."
+            },
+            {
+              "name": "driver",
+              "type": "void",
+              "pointer": "mutable",
+              "doc": "The driver's own pointer, passed to each of its functions."
+            }
+          ],
+          "library": "hands the library a driver of its SPI, whatever API that driver speaks"
+        },
+        {
+          "kind": "struct",
           "name": "instance_def",
           "def": true,
           "doc": "How an instance is made. Build it with mrhiDefaultInstanceDef.",
@@ -696,7 +727,7 @@
           "doc": "Makes an instance.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a zero limit or an allocator with one function; `mrhi_errorVersion` when the def's contract version is not the library's; `mrhi_errorUnsupported` for a critical extension the library does not know, such as mrhiTestDriverDef in a build without the test driver; `mrhi_errorCapacity` when the chain is deeper than the limit or the allocator fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a zero limit, an allocator with one function, an external driver without a vtable or with one smaller than the library knows or lacking a function, or an external driver beside the test driver or Vulkan structs; `mrhi_errorVersion` when the def's contract version is not the library's, or an external driver's SPI version is not its; `mrhi_errorUnsupported` for a critical extension the library does not know, such as mrhiTestDriverDef in a build without the test driver; `mrhi_errorCapacity` when the chain is deeper than the limit or the allocator fails."
           },
           "args": [
             {
