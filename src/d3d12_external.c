@@ -7,6 +7,7 @@
 
 #include "device_core.h"
 #include "encoder_core.h"
+#include "validation.h"
 
 #include "maul-rhi/d3d12.h"
 
@@ -27,7 +28,7 @@ mrhiResult mrhiGetD3d12Device(mrhiDevice* device, void** deviceOut, void** queue
 #ifdef MAUL_RHI_D3D12_DRIVER
     ID3D12Device* native = nullptr;
     ID3D12CommandQueue* queue = nullptr;
-    if (!mrhiD3d12DeviceNative(&device->driver, &native, &queue))
+    if (!mrhiD3d12DeviceNative(mrhiInnerDevice(&device->driver), &native, &queue))
     {
         return mrhi_errorUnsupported;
     }
@@ -59,8 +60,8 @@ mrhiResult mrhiGetD3d12Texture(mrhiDevice* device, mrhiTextureId texture, void**
         return mrhi_errorStale;
     }
     ID3D12Resource* resource = nullptr;
-    if (!mrhiD3d12DeviceTexture(&device->driver, device->textureSlots[texture.index1 - 1].handle,
-                                &resource))
+    if (!mrhiD3d12DeviceTexture(mrhiInnerDevice(&device->driver),
+                                device->textureSlots[texture.index1 - 1].handle, &resource))
     {
         return mrhi_errorUnsupported;
     }

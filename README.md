@@ -24,7 +24,7 @@ answers with exactly one record in a queue the program drains; no
 library thread runs, and no callback delivers a result.
 
 [The guide](docs/guide.md) walks through each part, and
-[the API reference](docs/api.md) lists all 135 public functions,
+[the API reference](docs/api.md) lists all 136 public functions,
 generated from the headers.
 
 ## Status

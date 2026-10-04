@@ -9,6 +9,7 @@
 #include "chain.h"
 #include "instance_core.h"
 #include "invariant.h"
+#include "validation.h"
 
 #include "maul-rhi/vulkan.h"
 
@@ -234,6 +235,18 @@ mrhiResult mrhiCreateInstance(const mrhiInstanceDef* def, mrhiInstance** instanc
         return mrhi_errorCapacity;
     }
     status = StartDriver(instance, def);
+#ifdef MAUL_RHI_VALIDATION
+    if (status == mrhi_success && instance->driver.vtable != nullptr)
+    {
+        status = mrhiWrapDriver(&instance->allocator, def->limits.notifications,
+                                &instance->driverFaults, &instance->driver);
+        // An external driver stays the program's when the instance fails.
+        if (status != mrhi_success && instance->external)
+        {
+            instance->driver = (mrhiInstanceDriver){0};
+        }
+    }
+#endif
     if (status != mrhi_success)
     {
         mrhiDestroyInstance(instance);
@@ -272,4 +285,11 @@ mrhiResult mrhiMisuse(mrhiInstance* instance)
 uint64_t mrhiGetInstanceMisuse(mrhiInstance* instance)
 {
     return instance == nullptr ? 0 : instance->misuse;
+}
+
+uint64_t mrhiGetDriverFaults(const mrhiInstance* instance)
+{
+    return instance == nullptr
+               ? 0
+               : atomic_load_explicit(&instance->driverFaults, memory_order_relaxed);
 }

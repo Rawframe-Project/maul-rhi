@@ -824,6 +824,27 @@
         },
         {
           "kind": "function",
+          "name": "get_driver_faults",
+          "doc": "Returns how many breaches of the driver SPI the validation layer has found on the instance and its devices (mrhi-0025): frames no driver could translate, and driver answers no core could trust. Builds without the layer (MAUL_RHI_VALIDATION) find none.",
+          "returns": {
+            "type": "uint64",
+            "doc": "The count; 0 for a NULL instance or a build without the layer."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "const",
+              "doc": "The instance."
+            }
+          ],
+          "thread_safety": {
+            "class": "any"
+          },
+          "library": "reads the library's validation layer count"
+        },
+        {
+          "kind": "function",
           "name": "default_adapter_request_def",
           "doc": "Returns the default adapter request def: the driver's own order, software rasterizers allowed.",
           "returns": {

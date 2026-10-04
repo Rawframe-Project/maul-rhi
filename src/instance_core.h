@@ -64,6 +64,9 @@ struct mrhiInstance
     // made (mrhi-0024), whose adapters the core reports as such.
     mrhiInstanceDriver driver;
     bool external;
+    // Breaches of the SPI the validation layer found (mrhi-0025), its
+    // devices' included, which may count on their threads.
+    _Atomic uint64_t driverFaults;
     uint32_t nextRequest;
     uint32_t deviceCount;
     // A ring of limits.notifications records.

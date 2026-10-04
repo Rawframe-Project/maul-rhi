@@ -82,7 +82,10 @@ for an instance def built against another contract version,
 `mrhi_errorOutOfDate` for a surface to configure again,
 `mrhi_errorPlatform`, `mrhi_errorDeviceLost`. `mrhiResultName` names each. Every
 `mrhi_errorInvalid` also counts one misuse (`mrhiGetInstanceMisuse`,
-`mrhiGetDeviceMisuse`), which a release build can watch.
+`mrhiGetDeviceMisuse`), which a release build can watch. A build with
+`MAUL_RHI_VALIDATION` also checks the driver under the library and
+counts its breaches (`mrhiGetDriverFaults`, mrhi-0025): a driver built
+outside the tree should run its conformance suite that way.
 
 Objects are ids with a generation: an id outlives its object
 harmlessly, and using it afterwards answers `mrhi_errorStale`. Defs

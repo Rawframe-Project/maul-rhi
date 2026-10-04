@@ -8,8 +8,8 @@
 
 #include "allocator.h"
 #include "capabilities_core.h"
-#include "driver_test_frame.h"
 #include "format_caps.h"
+#include "frame_walk.h"
 #include "invariant.h"
 
 #include <stdalign.h>
@@ -396,8 +396,8 @@ static void DestroyHeap(void* self, uint64_t handle)
     --device->heaps;
 }
 
-// Whether a handle is one the device made (used only by asserts).
-[[maybe_unused]] static bool IsMade(const TestDevice* device, uint64_t handle)
+// Whether a handle is one the device made.
+static bool IsMade(const TestDevice* device, uint64_t handle)
 {
     return handle > HANDLE_BASE && handle <= device->nextHandle;
 }
@@ -625,6 +625,12 @@ static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* b
     *alignmentOut = 256;
 }
 
+// IsMade, as a frame walk checks handles.
+static bool IsHandleOf(const void* self, uint64_t handle)
+{
+    return IsMade(self, handle);
+}
+
 // Walks the frame as a driver would translate it, then runs it at once.
 static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag)
 {
@@ -635,8 +641,14 @@ static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t
         device->lossTold = true;
         return mrhi_errorDeviceLost;
     }
+    // A fault means the core recorded what no driver could translate:
+    // the walk is kept in every build the test driver is part of, since
+    // a program's own tests rely on it whatever NDEBUG says.
     mrhiTestFrameLog log = {0};
-    mrhiWalkTestFrame(frame, HANDLE_BASE + 1, device->nextHandle, &log);
+    if (mrhiWalkFrame(frame, IsHandleOf, device, &log) != 0)
+    {
+        __builtin_trap();
+    }
     // Every image the frame acquired is presented.
     MRHI_ASSERT(log.presented <= device->imagesOut);
     device->imagesOut -= log.presented;

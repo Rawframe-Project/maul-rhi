@@ -24,6 +24,7 @@ set(MAUL_RHI_CONFORMANCE_DRIVER "" CACHE STRING
 option(MAUL_RHI_WERROR "Treat compiler warnings as errors" OFF)
 option(MAUL_RHI_SANITIZE "Instrument with AddressSanitizer and UBSan" OFF)
 option(MAUL_RHI_TSAN "Instrument with ThreadSanitizer" OFF)
+option(MAUL_RHI_VALIDATION "Build the validation layer around the driver SPI (mrhi-0025)" OFF)
 option(MAUL_RHI_COVERAGE "Instrument for gcov coverage" OFF)
 option(MAUL_RHI_FUZZ "Build the libFuzzer targets (Clang)" OFF)
 # The tests run on the test driver, and so does fuzz_cache.
@@ -134,8 +135,17 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/view.c)
 maul_configure_library(maul-rhi)
 if(MAUL_RHI_TEST_DRIVER)
-    target_sources(maul-rhi PRIVATE src/driver_test.c src/driver_test_frame.c)
+    target_sources(maul-rhi PRIVATE src/driver_test.c)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_TEST_DRIVER)
+endif()
+if(MAUL_RHI_VALIDATION)
+    target_sources(maul-rhi PRIVATE src/validation.c)
+    target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_VALIDATION)
+endif()
+# The frame walk: the test driver traps on its faults, the validation
+# layer counts them.
+if(MAUL_RHI_TEST_DRIVER OR MAUL_RHI_VALIDATION)
+    target_sources(maul-rhi PRIVATE src/frame_walk.c)
 endif()
 if(MAUL_RHI_VULKAN_DRIVER)
     target_sources(maul-rhi PRIVATE src/driver_vulkan.c src/vulkan_adapter.c src/vulkan_api.c
@@ -263,6 +273,9 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(acquire WHITEBOX)
         maul_add_test(loss WHITEBOX)
         maul_add_test(external WHITEBOX)
+        if(MAUL_RHI_VALIDATION)
+            maul_add_test(validation WHITEBOX)
+        endif()
         # The container writer against the reader, where Python runs.
         find_package(Python3 COMPONENTS Interpreter)
         if(TARGET test_shader AND Python3_Interpreter_FOUND AND NOT CMAKE_CROSSCOMPILING)

@@ -2362,6 +2362,10 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
     return count;
 }
 
+// The breaches of the driver SPI the validation layer found on the
+// instances the suite made (mrhi-0025); none in builds without it.
+static uint64_t s_driverFaults;
+
 static void TestTestDriver(void)
 {
     mrhiTestAdapter adapter = {
@@ -2380,6 +2384,7 @@ static void TestTestDriver(void)
         return;
     }
     CHECK(CheckDriver(instance, mrhi_driverTest) == 1, "the test adapter");
+    s_driverFaults += mrhiGetDriverFaults(instance);
     mrhiDestroyInstance(instance);
 }
 
@@ -2969,6 +2974,7 @@ static void TestNativeDriver(void)
     {
         CheckSurfaces(instance);
     }
+    s_driverFaults += mrhiGetDriverFaults(instance);
     mrhiDestroyInstance(instance);
 }
 
@@ -3015,13 +3021,15 @@ static int Run(void)
 #endif
     TestTestDriver();
     TestNativeDriver();
-    // The D3D12 debug layer's errors are counted here; the Vulkan
-    // validation layer's messages fail the test through CTest.
+    // The library's layer counts breaches of the SPI; the D3D12 debug
+    // layer's errors are counted here; the Vulkan validation layer's
+    // messages fail the test through CTest.
+    RUN("validation.clean", {
+        CHECK(s_driverFaults == 0, "no breach of the driver SPI");
 #ifdef MAUL_RHI_D3D12_DRIVER
-    RUN("validation.clean", CHECK(mrhiTestD3d12Errors() == 0, "no D3D12 debug layer error"));
-#else
-    RUN("validation.clean", (void)0);
+        CHECK(mrhiTestD3d12Errors() == 0, "no D3D12 debug layer error");
 #endif
+    });
     Report();
     return s_failures == 0 ? 0 : 1;
 }

@@ -8,6 +8,7 @@
 #include "device_core.h"
 #include "encoder_core.h"
 #include "instance_core.h"
+#include "validation.h"
 
 #include "maul-rhi/vulkan.h"
 
@@ -32,12 +33,12 @@ mrhiResult mrhiDescribeVulkanDevice(mrhiInstance* instance, const mrhiDeviceDef*
     *createInfoOut = nullptr;
     *physicalDeviceOut = nullptr;
 #ifdef MAUL_RHI_VULKAN_DRIVER
-    if (!mrhiIsVulkanDriver(&instance->driver))
+    if (!mrhiIsVulkanDriver(mrhiInnerDriver(&instance->driver)))
     {
         return mrhi_errorUnsupported;
     }
     // Each description ends the one before, even one refused.
-    mrhiForgetVulkanDevice(&instance->driver);
+    mrhiForgetVulkanDevice(mrhiInnerDriver(&instance->driver));
     mrhiResult status = mrhi_success;
     const mrhiDriverAdapter* adapter = mrhiCheckDeviceDef(instance, def, &status);
     if (adapter == nullptr)
@@ -45,7 +46,8 @@ mrhiResult mrhiDescribeVulkanDevice(mrhiInstance* instance, const mrhiDeviceDef*
         return status;
     }
     void* info = nullptr;
-    status = mrhiDescribeVulkanDriverDevice(&instance->driver, adapter->handle, def, &info);
+    status = mrhiDescribeVulkanDriverDevice(mrhiInnerDriver(&instance->driver), adapter->handle,
+                                            def, &info);
     if (status == mrhi_success)
     {
         *createInfoOut = info;
@@ -70,7 +72,7 @@ mrhiResult mrhiGetVulkanPhysicalDevice(mrhiInstance* instance, mrhiAdapterId ada
     }
     *physicalDeviceOut = nullptr;
 #ifdef MAUL_RHI_VULKAN_DRIVER
-    if (!mrhiIsVulkanDriver(&instance->driver))
+    if (!mrhiIsVulkanDriver(mrhiInnerDriver(&instance->driver)))
     {
         return mrhi_errorUnsupported;
     }
@@ -98,8 +100,9 @@ mrhiResult mrhiGetVulkanQueue(mrhiDevice* device, uint32_t* familyOut, uint32_t*
         return mrhiDeviceMisuse(device);
     }
 #ifdef MAUL_RHI_VULKAN_DRIVER
-    return mrhiVulkanDeviceQueue(&device->driver, familyOut, indexOut) ? mrhi_success
-                                                                       : mrhi_errorUnsupported;
+    return mrhiVulkanDeviceQueue(mrhiInnerDevice(&device->driver), familyOut, indexOut)
+               ? mrhi_success
+               : mrhi_errorUnsupported;
 #else
     return mrhi_errorUnsupported;
 #endif
@@ -120,7 +123,7 @@ mrhiResult mrhiGetVulkanDevice(mrhiDevice* device, void** instanceOut, void** ph
     }
 #ifdef MAUL_RHI_VULKAN_DRIVER
     mrhiVulkanNative native;
-    if (!mrhiVulkanDeviceNative(&device->driver, &native))
+    if (!mrhiVulkanDeviceNative(mrhiInnerDevice(&device->driver), &native))
     {
         return mrhi_errorUnsupported;
     }
@@ -158,7 +161,8 @@ mrhiResult mrhiGetVulkanTexture(mrhiDevice* device, mrhiTextureId texture,
         return mrhi_errorStale;
     }
     const mrhiTextureSlot* slot = &device->textureSlots[texture.index1 - 1];
-    return mrhiVulkanDeviceTexture(&device->driver, slot->handle, &slot->def, textureOut)
+    return mrhiVulkanDeviceTexture(mrhiInnerDevice(&device->driver), slot->handle, &slot->def,
+                                   textureOut)
                ? mrhi_success
                : mrhi_errorUnsupported;
 #else

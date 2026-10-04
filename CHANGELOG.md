@@ -10,6 +10,11 @@ format.
 
 ### Added
 
+- The validation layer (mrhi-0025): `MAUL_RHI_VALIDATION` builds a
+  layer around the driver SPI that walks every submitted frame and
+  checks every driver answer, counting breaches for
+  `mrhiGetDriverFaults`; the conformance suite's `validation.clean`
+  case requires none.
 - Drivers built outside the tree (mrhi-0024): `mrhiExternalDriverDef`
   hands an instance a driver made against the SPI headers, now
   installed as `maul-rhi/spi/` at SPI version 4; its adapters report

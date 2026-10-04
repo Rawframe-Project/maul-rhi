@@ -730,6 +730,7 @@ restricted or absent-rejected, with how.
 | `mrhiExternalDriverDef` | hands the library a driver of its SPI, whatever API that driver speaks |
 | `mrhiDefaultInstanceDef` | fills a def with the library's defaults |
 | `mrhiGetInstanceMisuse` | reads the library's misuse count |
+| `mrhiGetDriverFaults` | reads the library's validation layer count |
 | `mrhiDefaultAdapterRequestDef` | fills a def with the library's defaults |
 | `mrhiNextInstanceNotification` | reads the library's own notification queue |
 | `mrhiGetAdapters` | reads the adapters the library found |

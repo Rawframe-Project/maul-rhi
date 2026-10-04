@@ -7,6 +7,7 @@
 
 #include "device_core.h"
 #include "encoder_core.h"
+#include "validation.h"
 
 #include "maul-rhi/metal.h"
 
@@ -25,8 +26,9 @@ mrhiResult mrhiGetMetalDevice(mrhiDevice* device, void** deviceOut, void** queue
         return mrhiDeviceMisuse(device);
     }
 #ifdef MAUL_RHI_METAL_DRIVER
-    return mrhiMetalDeviceNative(&device->driver, deviceOut, queueOut) ? mrhi_success
-                                                                       : mrhi_errorUnsupported;
+    return mrhiMetalDeviceNative(mrhiInnerDevice(&device->driver), deviceOut, queueOut)
+               ? mrhi_success
+               : mrhi_errorUnsupported;
 #else
     return mrhi_errorUnsupported;
 #endif

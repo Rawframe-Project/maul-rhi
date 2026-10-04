@@ -476,6 +476,11 @@ uint64_t mrhiGetInstanceMisuse(mrhiInstance* instance);
 Returns how many calls the instance has refused as invalid input (mrhi_errorInvalid): a count release builds can watch to catch a caller's bugs. Stale ids are not misuse.  @param instance  The instance. @return The count; 0 for a NULL instance. @par Thread safety Safe from any thread; the instance is used by one thread at a time.
 
 ```c
+uint64_t mrhiGetDriverFaults(const mrhiInstance* instance);
+```
+Returns how many breaches of the driver SPI the validation layer has found on the instance and its devices (mrhi-0025): frames no driver could translate, and driver answers no core could trust. Builds without the layer (MAUL_RHI_VALIDATION) find none.  @param instance  The instance. @return The count; 0 for a NULL instance or a build without the layer. @par Thread safety Safe from any thread.
+
+```c
 mrhiAdapterRequestDef mrhiDefaultAdapterRequestDef(void);
 ```
 Returns the default adapter request def: the driver's own order, software rasterizers allowed.  @return The def, with a valid cookie. @par Thread safety Safe from any thread.
@@ -736,4 +741,4 @@ Hands a native pass the command buffer the program recorded for it: a primary Vk
 
 ---
 
-135 functions across 15 headers.
+136 functions across 15 headers.

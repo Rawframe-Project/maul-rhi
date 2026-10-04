@@ -231,6 +231,17 @@ extern "C"
     /// Safe from any thread; the instance is used by one thread at a time.
     MRHI_API uint64_t mrhiGetInstanceMisuse(mrhiInstance* instance);
 
+    /// Returns how many breaches of the driver SPI the validation layer has
+    /// found on the instance and its devices (mrhi-0025): frames no driver
+    /// could translate, and driver answers no core could trust. Builds without
+    /// the layer (MAUL_RHI_VALIDATION) find none.
+    ///
+    /// @param instance  The instance.
+    /// @return The count; 0 for a NULL instance or a build without the layer.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MRHI_API uint64_t mrhiGetDriverFaults(const mrhiInstance* instance);
+
     /// Returns the default adapter request def: the driver's own order,
     /// software rasterizers allowed.
     ///
