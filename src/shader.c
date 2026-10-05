@@ -151,12 +151,12 @@ static mrhiResult CheckShaderDef(mrhiDevice* device, const mrhiShaderDef* def,
     }
     if (def->bytes == nullptr || (uintptr_t)def->bytes % 8 != 0)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticShaderBytes);
     }
     status = mrhiParseContainer(def->bytes, def->byteCount, containerOut);
     if (status == mrhi_errorInvalid)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticShaderContainer);
     }
     return status == mrhi_success && !IsWithin(device, containerOut) ? mrhi_errorUnsupported
                                                                      : status;
@@ -170,7 +170,7 @@ mrhiResult mrhiCreateShader(mrhiDevice* device, const mrhiShaderDef* def, mrhiSh
     }
     if (def == nullptr || shaderOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     mrhiContainer container = {0};
     mrhiResult status = CheckShaderDef(device, def, &container);
@@ -235,7 +235,7 @@ mrhiResult mrhiGetShaderInfo(mrhiDevice* device, mrhiShaderId shader, mrhiShader
     }
     if (infoOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     if (!mrhiPoolIsLive(&device->shaders, shader.index1, shader.generation))
     {

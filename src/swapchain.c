@@ -115,7 +115,7 @@ static mrhiResult CheckNames(mrhiDevice* device, const mrhiSurfaceConfig* config
     }
     if (!IsWellFormed(config))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticSurfaceConfig);
     }
     status = mrhiDeviceUsable(device);
     if (status != mrhi_success)
@@ -170,7 +170,7 @@ mrhiResult mrhiConfigureSurface(mrhiDevice* device, const mrhiSurfaceConfig* con
     }
     if (config == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     mrhiResult status = mrhi_success;
     mrhiSurfaceSlot* surface = CheckConfig(device, config, &status);

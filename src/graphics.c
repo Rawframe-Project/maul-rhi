@@ -492,7 +492,9 @@ static mrhiShaderSlot* CheckGraphicsDef(mrhiDevice* device, const mrhiGraphicsPi
         status = Worse(status, CheckMultisample(device, def, *stagesOut));
         status = Worse(status, CheckInterface(device, def, *stagesOut));
     }
-    *statusOut = status == mrhi_errorInvalid ? mrhiDeviceMisuse(device) : status;
+    *statusOut = status == mrhi_errorInvalid
+                     ? mrhiDeviceMisuse(device, mrhi_diagnosticGraphicsPipelineDef)
+                     : status;
     return status == mrhi_success ? shader : nullptr;
 }
 
@@ -506,7 +508,7 @@ mrhiResult mrhiCreateGraphicsPipeline(mrhiDevice* device, const mrhiGraphicsPipe
     }
     if (def == nullptr || pipelineOut == nullptr || requestOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     Stages stages;
     mrhiResult status = mrhi_success;

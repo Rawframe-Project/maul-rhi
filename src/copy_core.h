@@ -30,8 +30,8 @@ mrhiFramePass* mrhiCopyPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statu
 uint32_t mrhiFindKind(const mrhiDevice* device, mrhiResourceId id, bool buffer,
                       mrhiResult* statusOut);
 
-// Refuses a status, counting invalid input as misuse.
-mrhiResult mrhiRefuse(mrhiDevice* device, mrhiResult status);
+// Refuses a status, counting invalid input as misuse refused by a check.
+mrhiResult mrhiRefuse(mrhiDevice* device, mrhiResult status, mrhiDiagnosticCode code);
 
 // Whether a transfer's extent holds no texels: valid, and copied by no
 // command, since Vulkan refuses empty regions.

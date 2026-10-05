@@ -28,7 +28,7 @@ mrhiResult mrhiDescribeVulkanDevice(mrhiInstance* instance, const mrhiDeviceDef*
     }
     if (def == nullptr || createInfoOut == nullptr || physicalDeviceOut == nullptr)
     {
-        return mrhiMisuse(instance);
+        return mrhiMisuse(instance, mrhi_diagnosticNullArgument);
     }
     *createInfoOut = nullptr;
     *physicalDeviceOut = nullptr;
@@ -68,7 +68,7 @@ mrhiResult mrhiGetVulkanPhysicalDevice(mrhiInstance* instance, mrhiAdapterId ada
     }
     if (physicalDeviceOut == nullptr)
     {
-        return mrhiMisuse(instance);
+        return mrhiMisuse(instance, mrhi_diagnosticNullArgument);
     }
     *physicalDeviceOut = nullptr;
 #ifdef MAUL_RHI_VULKAN_DRIVER
@@ -97,7 +97,7 @@ mrhiResult mrhiGetVulkanQueue(mrhiDevice* device, uint32_t* familyOut, uint32_t*
     }
     if (familyOut == nullptr || indexOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
 #ifdef MAUL_RHI_VULKAN_DRIVER
     return mrhiVulkanDeviceQueue(mrhiInnerDevice(&device->driver), familyOut, indexOut)
@@ -119,7 +119,7 @@ mrhiResult mrhiGetVulkanDevice(mrhiDevice* device, void** instanceOut, void** ph
     if (instanceOut == nullptr || physicalDeviceOut == nullptr || deviceOut == nullptr ||
         getInstanceProcAddrOut == nullptr || getDeviceProcAddrOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
 #ifdef MAUL_RHI_VULKAN_DRIVER
     mrhiVulkanNative native;
@@ -149,7 +149,7 @@ mrhiResult mrhiGetVulkanTexture(mrhiDevice* device, mrhiTextureId texture,
     }
     if (textureOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
 #ifdef MAUL_RHI_VULKAN_DRIVER
     if (device->adapterInfo.driver != mrhi_driverVulkan)

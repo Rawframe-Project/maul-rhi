@@ -9,6 +9,7 @@
 
 #include "capabilities_core.h"
 #include "command.h"
+#include "diagnostics.h"
 #include "driver.h"
 #include "pool.h"
 #include "reflection.h"
@@ -406,8 +407,10 @@ struct mrhiDevice
     mrhiDeviceState state;
     // The open request, answered when the device leaves opening.
     uint32_t request;
-    // Calls refused as invalid input, counted from any recording thread.
+    // Calls refused as invalid input, counted from any recording thread,
+    // and the records of those refusals.
     _Atomic uint64_t misuse;
+    mrhiDiagnosticQueue diagnostics;
     mrhiDeviceDriver driver;
     // Who made the device, for its pipeline cache's envelope, and what
     // became of the cache its def gave.
@@ -540,8 +543,9 @@ mrhiResult mrhiDeviceUsable(const mrhiDevice* device);
 const mrhiDriverAdapter* mrhiCheckDeviceDef(mrhiInstance* instance, const mrhiDeviceDef* def,
                                             mrhiResult* statusOut);
 
-// Counts one misuse on the device and returns mrhi_errorInvalid.
-mrhiResult mrhiDeviceMisuse(mrhiDevice* device);
+// Counts one misuse refused by a check on the device, records it, and
+// returns mrhi_errorInvalid.
+mrhiResult mrhiDeviceMisuse(mrhiDevice* device, mrhiDiagnosticCode code);
 
 // The head every object def opens with.
 typedef struct mrhiDefHead

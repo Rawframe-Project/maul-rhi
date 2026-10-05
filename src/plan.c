@@ -425,7 +425,7 @@ mrhiResult mrhiGetFrameBarriers(mrhiDevice* device, mrhiBarrier* barriers, size_
     }
     if (countOut == nullptr || (barriers == nullptr && capacity > 0))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     if (!device->frameOpen || !device->frameCompiled)
     {
@@ -449,7 +449,7 @@ mrhiResult mrhiGetResourcePlan(mrhiDevice* device, mrhiResourceId resource,
     }
     if (planOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     if (!device->frameOpen || !device->frameCompiled)
     {

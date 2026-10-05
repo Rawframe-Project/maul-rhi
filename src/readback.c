@@ -126,7 +126,7 @@ mrhiResult mrhiReadBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId reso
     }
     if (requestOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     mrhiResult status = mrhi_success;
     mrhiFramePass* pass = mrhiCopyPass(device, id, &status);
@@ -137,13 +137,13 @@ mrhiResult mrhiReadBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId reso
     uint32_t object = mrhiFindKind(device, resource, true, &status);
     if (object == 0)
     {
-        return mrhiRefuse(device, status);
+        return mrhiRefuse(device, status, mrhi_diagnosticResourceKind);
     }
     uint64_t total = mrhiBufferBytesOf(&device->frameResources[object - 1]);
     if (offset % 4 != 0 || size % 4 != 0 || offset > total || size > total - offset ||
         !mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessCopySource), nullptr))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticReadBufferRange);
     }
     mrhiReadback* readback = Reserve(device, size, size, 0, 0, 0);
     // An empty read is answered with no bytes, and copies nothing:
@@ -178,7 +178,7 @@ mrhiResult mrhiReadTexture(mrhiDevice* device, mrhiPassId id, const mrhiTextureC
     }
     if (source == nullptr || size == nullptr || requestOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     mrhiResult status = mrhi_success;
     mrhiFramePass* pass = mrhiCopyPass(device, id, &status);
@@ -191,11 +191,11 @@ mrhiResult mrhiReadTexture(mrhiDevice* device, mrhiPassId id, const mrhiTextureC
     status = mrhiCheckTextureTransfer(device, source, size, true, &side, &facts);
     if (status != mrhi_success)
     {
-        return mrhiRefuse(device, status);
+        return mrhiRefuse(device, status, mrhi_diagnosticTextureRegion);
     }
     if (!mrhiPassDeclares(device, pass, side.object, MRHI_KIND(mrhi_accessCopySource), &side.part))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticReadTextureAccess);
     }
     mrhiFormatBlock block = mrhiGetFormatBlock(side.def->format);
     uint64_t rows = size->height / block.height;
@@ -281,7 +281,7 @@ mrhiResult mrhiTakeReadback(mrhiDevice* device, mrhiRequestId request, void* byt
     }
     if (sizeOut == nullptr || (bytes == nullptr && capacity > 0))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     mrhiReadback* readback = Find(device, request);
     if (readback == nullptr)

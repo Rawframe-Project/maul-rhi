@@ -487,7 +487,7 @@ static mrhiResult CheckNative(mrhiDevice* device, const mrhiPassDef* def)
         def->occlusionQuerySet.index1 != 0 || def->timestampQuerySet.index1 != 0 ||
         def->heap.index1 != 0)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNativePassDef);
     }
     for (uint32_t i = 0; i < def->accessCount; ++i)
     {
@@ -495,7 +495,7 @@ static mrhiResult CheckNative(mrhiDevice* device, const mrhiPassDef* def)
         if (def->accesses[i].kind == mrhi_accessQueryResolve ||
             (slot != 0 && !mrhiIsImported(&device->frameResources[slot - 1])))
         {
-            return mrhiDeviceMisuse(device);
+            return mrhiDeviceMisuse(device, mrhi_diagnosticNativePassDef);
         }
     }
     uint32_t natives = 0;
@@ -518,7 +518,7 @@ static mrhiResult CheckDef(mrhiDevice* device, const mrhiPassDef* def)
         def->colorTargetCount > MRHI_COLOR_TARGETS ||
         (ViewsOf(def) > 1 && (def->native || !targets)))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticPassDef);
     }
     if (ViewsOf(def) > 1 &&
         (!device->features.multiview || ViewsOf(def) > device->limits.multiviewViews))
@@ -575,7 +575,7 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
     }
     if (def == nullptr || passOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     mrhiResult status = CheckDef(device, def);
     if (status != mrhi_success)
@@ -591,7 +591,8 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
     uint32_t count = status == mrhi_success ? MakeUses(device, def, &status) : 0;
     if (status != mrhi_success)
     {
-        return status == mrhi_errorInvalid ? mrhiDeviceMisuse(device) : status;
+        return status == mrhi_errorInvalid ? mrhiDeviceMisuse(device, mrhi_diagnosticPassUses)
+                                           : status;
     }
     const mrhiFrameUse* uses = &device->frameUses[device->frameUseCount];
     for (uint32_t i = 0; i < count; ++i)

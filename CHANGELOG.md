@@ -10,6 +10,12 @@ format.
 
 ### Added
 
+- Diagnostics (mrhi-0027): every refusal of invalid input names its
+  check with an `mrhiDiagnosticCode`, whose text `mrhiDiagnosticText`
+  gives; an instance or device whose `diagnostics` limit is above 0
+  keeps a queue of such records (repeats folded into one, the first
+  kept when full), taken with `mrhiNextInstanceDiagnostic` and
+  `mrhiNextDeviceDiagnostic`.
 - The WebGPU driver in a dedicated worker (mrhi-0026): a canvas
   source's selector first names a canvas the program registered in
   `Module.mrhiCanvases`, such as an OffscreenCanvas; the conformance

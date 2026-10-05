@@ -63,7 +63,7 @@ mrhiResult mrhiCreateQuerySet(mrhiDevice* device, const mrhiQuerySetDef* def,
     }
     if (def == nullptr || setOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     mrhiResult status = mrhiCheckObjectDef(device, MRHI_DEF_HEAD(def), QUERY_SET_DEF_COOKIE);
     if (status != mrhi_success)
@@ -72,7 +72,7 @@ mrhiResult mrhiCreateQuerySet(mrhiDevice* device, const mrhiQuerySetDef* def,
     }
     if (def->type > mrhi_queryPipelineStatistics || def->count == 0 || def->count > MOST_QUERIES)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticQuerySetDef);
     }
     if ((def->type == mrhi_queryTimestamp && !device->features.timestampQuery) ||
         (def->type == mrhi_queryPipelineStatistics && !device->features.pipelineStatisticsQuery))
@@ -233,7 +233,7 @@ mrhiResult mrhiBeginOcclusionQuery(mrhiDevice* device, mrhiPassId id, uint32_t q
     }
     if (pass->occlusionSet == 0 || pass->occlusionOpen)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticOcclusionQuery);
     }
     if (!mrhiPoolIsLive(&device->querySets, pass->occlusionSet, pass->occlusionGeneration))
     {
@@ -242,7 +242,7 @@ mrhiResult mrhiBeginOcclusionQuery(mrhiDevice* device, mrhiPassId id, uint32_t q
     const mrhiQuerySetSlot* set = &device->querySetSlots[pass->occlusionSet - 1];
     if (query >= set->count || !MarkWritten(device, set, query))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticOcclusionQuery);
     }
     // Open even when refused for capacity, so that its end is not misuse.
     pass->occlusionOpen = true;
@@ -269,7 +269,7 @@ mrhiResult mrhiEndOcclusionQuery(mrhiDevice* device, mrhiPassId id)
     }
     if (!pass->occlusionOpen)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticOcclusionQuery);
     }
     pass->occlusionOpen = false;
     mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
@@ -305,7 +305,7 @@ mrhiResult mrhiBeginStatisticsQuery(mrhiDevice* device, mrhiPassId id, mrhiQuery
         slot->type != mrhi_queryPipelineStatistics || query >= slot->count ||
         !MarkWritten(device, slot, query))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticStatisticsQuery);
     }
     // Open even when refused for capacity, so that its end is not misuse.
     pass->statisticsOpen = true;
@@ -334,7 +334,7 @@ mrhiResult mrhiEndStatisticsQuery(mrhiDevice* device, mrhiPassId id)
     }
     if (!pass->statisticsOpen)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticStatisticsQuery);
     }
     pass->statisticsOpen = false;
     mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
@@ -373,7 +373,7 @@ mrhiResult mrhiResolveQueries(mrhiDevice* device, mrhiPassId id, mrhiQuerySetId 
     if (mrhiWorkOf(pass) != mrhiWorkCompute ||
         !mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessQueryResolve), nullptr))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticResolveQueries);
     }
     const mrhiQuerySetSlot* slot = &device->querySetSlots[set.index1 - 1];
     uint64_t total = mrhiBufferBytesOf(&device->frameResources[object - 1]);
@@ -381,7 +381,7 @@ mrhiResult mrhiResolveQueries(mrhiDevice* device, mrhiPassId id, mrhiQuerySetId 
     if (first >= slot->count || count > slot->count - first || offset % 256 != 0 ||
         offset > total || count * bytes > total - offset)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticResolveQueries);
     }
     mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
     if (record == nullptr)

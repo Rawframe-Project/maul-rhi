@@ -132,6 +132,8 @@ static mrhiInstance* Allocate(const mrhiInstanceDef* def)
         mrhiLayoutAdd(&layout, limits->surfaces, sizeof(uint32_t), alignof(uint32_t));
     size_t surfaceSlotsAt =
         mrhiLayoutAdd(&layout, limits->surfaces, sizeof(mrhiSurfaceSlot), alignof(mrhiSurfaceSlot));
+    size_t diagnosticsAt = mrhiLayoutAdd(&layout, limits->diagnostics, sizeof(mrhiDiagnostic),
+                                         alignof(mrhiDiagnostic));
     unsigned char* block = layout.overflow
                                ? nullptr
                                : mrhiAllocate(&def->allocator, layout.size, alignof(mrhiInstance));
@@ -153,6 +155,8 @@ static mrhiInstance* Allocate(const mrhiInstanceDef* def)
     };
     mrhiPoolInit(&instance->surfaces, limits->surfaces, (uint32_t*)(block + generationsAt),
                  (uint32_t*)(block + nextFreeAt));
+    mrhiInitDiagnostics(&instance->diagnostics, (mrhiDiagnostic*)(block + diagnosticsAt),
+                        limits->diagnostics);
     for (uint32_t i = 0; i < limits->adapters; ++i)
     {
         instance->slots[i] = (mrhiAdapterSlot){.generation = 1};
@@ -264,7 +268,7 @@ void mrhiDestroyInstance(mrhiInstance* instance)
     }
     if (instance->deviceCount > 0)
     {
-        mrhiMisuse(instance);
+        mrhiMisuse(instance, mrhi_diagnosticInstanceHasDevices);
         return;
     }
     if (instance->driver.vtable != nullptr)
@@ -276,10 +280,24 @@ void mrhiDestroyInstance(mrhiInstance* instance)
     mrhiRelease(&allocator, instance, instance->bytes, alignof(mrhiInstance));
 }
 
-mrhiResult mrhiMisuse(mrhiInstance* instance)
+mrhiResult mrhiMisuse(mrhiInstance* instance, mrhiDiagnosticCode code)
 {
     ++instance->misuse;
+    mrhiRecordDiagnostic(&instance->diagnostics, code);
     return mrhi_errorInvalid;
+}
+
+mrhiResult mrhiNextInstanceDiagnostic(mrhiInstance* instance, mrhiDiagnostic* diagnosticOut)
+{
+    if (instance == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (diagnosticOut == nullptr)
+    {
+        return mrhiMisuse(instance, mrhi_diagnosticNullArgument);
+    }
+    return mrhiTakeDiagnostic(&instance->diagnostics, diagnosticOut);
 }
 
 uint64_t mrhiGetInstanceMisuse(mrhiInstance* instance)

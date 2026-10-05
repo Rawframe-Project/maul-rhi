@@ -91,7 +91,7 @@ const mrhiDriverAdapter* mrhiCheckDeviceDef(mrhiInstance* instance, const mrhiDe
         (def->pipelineCache == nullptr && def->pipelineCacheBytes > 0) ||
         !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
     {
-        *statusOut = mrhiMisuse(instance);
+        *statusOut = mrhiMisuse(instance, mrhi_diagnosticDeviceDef);
         return nullptr;
     }
     const mrhiDriverAdapter* adapter = mrhiFindAdapter(instance, def->adapter);
@@ -335,6 +335,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     FrameParts frame = AddFrameParts(&layout, def);
     size_t queueAt = mrhiLayoutAdd(&layout, limits->notifications, sizeof(mrhiDeviceNotification),
                                    alignof(mrhiDeviceNotification));
+    size_t diagnosticsAt = mrhiLayoutAdd(&layout, limits->diagnostics, sizeof(mrhiDiagnostic),
+                                         alignof(mrhiDiagnostic));
     unsigned char* block =
         layout.overflow ? nullptr : mrhiAllocate(&def->allocator, layout.size, alignof(mrhiDevice));
     if (block == nullptr)
@@ -357,6 +359,8 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
         device->readbacks[i] = (mrhiReadback){0};
     }
     device->queue = (mrhiDeviceNotification*)(block + queueAt);
+    mrhiInitDiagnostics(&device->diagnostics, (mrhiDiagnostic*)(block + diagnosticsAt),
+                        limits->diagnostics);
     PlaceFrameParts(device, block, &frame);
     return device;
 }
@@ -374,7 +378,7 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
         {
             *deviceOut = nullptr;
         }
-        return mrhiMisuse(instance);
+        return mrhiMisuse(instance, mrhi_diagnosticNullArgument);
     }
     *deviceOut = nullptr;
     mrhiResult status = mrhi_success;
@@ -476,9 +480,10 @@ mrhiDeviceState mrhiGetDeviceState(mrhiDevice* device)
     return device == nullptr ? mrhi_deviceFailed : device->state;
 }
 
-mrhiResult mrhiDeviceMisuse(mrhiDevice* device)
+mrhiResult mrhiDeviceMisuse(mrhiDevice* device, mrhiDiagnosticCode code)
 {
     atomic_fetch_add_explicit(&device->misuse, 1, memory_order_relaxed);
+    mrhiRecordDiagnostic(&device->diagnostics, code);
     return mrhi_errorInvalid;
 }
 
@@ -495,7 +500,8 @@ mrhiResult mrhiGetDeviceFeatures(mrhiDevice* device, mrhiFeatures* featuresOut)
 {
     if (device == nullptr || featuresOut == nullptr)
     {
-        return device == nullptr ? mrhi_errorInvalid : mrhiDeviceMisuse(device);
+        return device == nullptr ? mrhi_errorInvalid
+                                 : mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     *featuresOut = device->features;
     return mrhi_success;
@@ -505,7 +511,8 @@ mrhiResult mrhiGetDeviceLimits(mrhiDevice* device, mrhiLimits* limitsOut)
 {
     if (device == nullptr || limitsOut == nullptr)
     {
-        return device == nullptr ? mrhi_errorInvalid : mrhiDeviceMisuse(device);
+        return device == nullptr ? mrhi_errorInvalid
+                                 : mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     *limitsOut = device->limits;
     return mrhi_success;
@@ -515,7 +522,8 @@ mrhiResult mrhiGetDeviceTimestampPeriod(mrhiDevice* device, double* periodOut)
 {
     if (device == nullptr || periodOut == nullptr)
     {
-        return device == nullptr ? mrhi_errorInvalid : mrhiDeviceMisuse(device);
+        return device == nullptr ? mrhi_errorInvalid
+                                 : mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     mrhiResult status = mrhiDeviceUsable(device);
     if (status != mrhi_success)
@@ -534,7 +542,8 @@ mrhiResult mrhiGetDeviceLossReport(mrhiDevice* device, mrhiDeviceLossReport* rep
 {
     if (device == nullptr || reportOut == nullptr)
     {
-        return device == nullptr ? mrhi_errorInvalid : mrhiDeviceMisuse(device);
+        return device == nullptr ? mrhi_errorInvalid
+                                 : mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     if (device->state != mrhi_deviceLost)
     {
@@ -547,6 +556,19 @@ mrhiResult mrhiGetDeviceLossReport(mrhiDevice* device, mrhiDeviceLossReport* rep
 uint64_t mrhiGetDeviceMisuse(mrhiDevice* device)
 {
     return device == nullptr ? 0 : atomic_load_explicit(&device->misuse, memory_order_relaxed);
+}
+
+mrhiResult mrhiNextDeviceDiagnostic(mrhiDevice* device, mrhiDiagnostic* diagnosticOut)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (diagnosticOut == nullptr)
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
+    }
+    return mrhiTakeDiagnostic(&device->diagnostics, diagnosticOut);
 }
 
 mrhiResult mrhiCheckObjectDef(mrhiDevice* device, mrhiDefHead head, uint32_t expected)
@@ -562,7 +584,7 @@ mrhiResult mrhiCheckObjectDefWith(mrhiDevice* device, mrhiDefHead head, uint32_t
     if (head.cookie != expected || chain == mrhi_errorInvalid ||
         !mrhiIsLabelValid(head.label, head.labelLength))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticDefHeader);
     }
     return chain;
 }

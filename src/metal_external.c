@@ -23,7 +23,7 @@ mrhiResult mrhiGetMetalDevice(mrhiDevice* device, void** deviceOut, void** queue
     }
     if (deviceOut == nullptr || queueOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
 #ifdef MAUL_RHI_METAL_DRIVER
     return mrhiMetalDeviceNative(mrhiInnerDevice(&device->driver), deviceOut, queueOut)
@@ -42,7 +42,7 @@ mrhiResult mrhiGetMetalTexture(mrhiDevice* device, mrhiTextureId texture, void**
     }
     if (textureOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
 #ifdef MAUL_RHI_METAL_DRIVER
     if (device->adapterInfo.driver != mrhi_driverMetal)

@@ -58,13 +58,15 @@ mrhiResult mrhiSetVertexBuffer(mrhiDevice* device, mrhiPassId id, uint32_t slot,
     if (mrhiWorkOf(pass) != mrhiWorkRender || slot >= device->limits.vertexBuffers ||
         offset % 4 != 0)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticVertexBufferSlot);
     }
     uint32_t object =
         DeclaredRange(device, pass, resource, mrhi_accessVertex, offset, &size, &status);
     if (object == 0)
     {
-        return status == mrhi_errorInvalid ? mrhiDeviceMisuse(device) : status;
+        return status == mrhi_errorInvalid
+                   ? mrhiDeviceMisuse(device, mrhi_diagnosticVertexBufferRange)
+                   : status;
     }
     mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
     if (record == nullptr)
@@ -100,17 +102,19 @@ mrhiResult mrhiSetIndexBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId 
     if (mrhiWorkOf(pass) != mrhiWorkRender || format == mrhi_indexNone ||
         format > mrhi_indexUint32 || offset % width != 0)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticIndexBufferFormat);
     }
     uint32_t object =
         DeclaredRange(device, pass, resource, mrhi_accessIndex, offset, &size, &status);
     if (object == 0)
     {
-        return status == mrhi_errorInvalid ? mrhiDeviceMisuse(device) : status;
+        return status == mrhi_errorInvalid
+                   ? mrhiDeviceMisuse(device, mrhi_diagnosticIndexBufferRange)
+                   : status;
     }
     if (size % width != 0)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticIndexBufferRange);
     }
     mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
     if (record == nullptr)
@@ -215,7 +219,7 @@ static mrhiFramePass* DrawPass(mrhiDevice* device, mrhiPassId id, const mrhiPipe
     }
     if (mrhiWorkOf(pass) != mrhiWorkRender)
     {
-        *statusOut = mrhiDeviceMisuse(device);
+        *statusOut = mrhiDeviceMisuse(device, mrhi_diagnosticRenderStateOutsideRenderPass);
         return nullptr;
     }
     *slotOut = ReadyToRun(device, pass, statusOut);
@@ -240,7 +244,9 @@ mrhiResult mrhiDraw(mrhiDevice* device, mrhiPassId id, uint32_t vertexCount, uin
                                 instanceCount);
     if (status != mrhi_success)
     {
-        return status == mrhi_errorInvalid ? mrhiDeviceMisuse(device) : status;
+        return status == mrhi_errorInvalid
+                   ? mrhiDeviceMisuse(device, mrhi_diagnosticVertexBufferTooSmall)
+                   : status;
     }
     mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
     if (record == nullptr)
@@ -285,7 +291,9 @@ mrhiResult mrhiDrawIndexed(mrhiDevice* device, mrhiPassId id, uint32_t indexCoun
     }
     if (status != mrhi_success)
     {
-        return status == mrhi_errorInvalid ? mrhiDeviceMisuse(device) : status;
+        return status == mrhi_errorInvalid
+                   ? mrhiDeviceMisuse(device, mrhi_diagnosticVertexBufferTooSmall)
+                   : status;
     }
     mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
     if (record == nullptr)
@@ -317,7 +325,7 @@ mrhiResult mrhiDispatch(mrhiDevice* device, mrhiPassId id, uint32_t x, uint32_t 
     uint32_t most = device->limits.workgroupsPerDimension;
     if (mrhiWorkOf(pass) != mrhiWorkCompute || x > most || y > most || z > most)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticDispatchSize);
     }
     if (ReadyToRun(device, pass, &status) == nullptr)
     {
@@ -343,7 +351,9 @@ static mrhiResult RecordIndirect(mrhiDevice* device, mrhiFramePass* pass, mrhiCo
                                                       offset, &bytes, &status);
     if (object == 0)
     {
-        return status == mrhi_errorStale ? status : mrhiDeviceMisuse(device);
+        return status == mrhi_errorStale
+                   ? status
+                   : mrhiDeviceMisuse(device, mrhi_diagnosticIndirectArguments);
     }
     mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
     if (record == nullptr)
@@ -424,7 +434,7 @@ static mrhiResult RecordCounted(mrhiDevice* device, mrhiPassId id, bool indexed,
     }
     if (maxCount == 0 || maxCount > MRHI_INDIRECT_DRAWS)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticIndirectCountLimit);
     }
     mrhiResult status = mrhi_success;
     mrhiFramePass* pass = IndirectPass(device, id, indexed, &status);
@@ -443,7 +453,9 @@ static mrhiResult RecordCounted(mrhiDevice* device, mrhiPassId id, bool indexed,
                                          countOffset, &four, &status);
     if (count == 0)
     {
-        return status == mrhi_errorStale ? status : mrhiDeviceMisuse(device);
+        return status == mrhi_errorStale
+                   ? status
+                   : mrhiDeviceMisuse(device, mrhi_diagnosticIndirectArguments);
     }
     // The frame's counted draws stay within the limit, whatever other
     // passes take meanwhile; draws taken by a call that then finds the
@@ -504,7 +516,7 @@ mrhiResult mrhiDispatchIndirect(mrhiDevice* device, mrhiPassId id, mrhiResourceI
     }
     if (mrhiWorkOf(pass) != mrhiWorkCompute)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticComputeOutsideComputePass);
     }
     if (ReadyToRun(device, pass, &status) == nullptr)
     {

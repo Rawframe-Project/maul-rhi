@@ -193,7 +193,7 @@ mrhiResult mrhiBeginFrame(mrhiDevice* device, const mrhiFrameDef* def)
     }
     if (def == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     mrhiDefHead head = {def->cookie, def->next, nullptr, 0};
     mrhiResult status = mrhiCheckObjectDef(device, head, FRAME_DEF_COOKIE);
@@ -254,7 +254,7 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     }
     if (tokenOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     if (!device->frameOpen)
     {
@@ -319,7 +319,7 @@ mrhiResult mrhiWaitFrame(mrhiDevice* device, mrhiRequestId token, uint64_t timeo
     }
     if (token.index1 == 0 || token.index1 > device->lastRequest || token.generation != 1)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticFrameToken);
     }
     bool running = false;
     for (uint32_t i = 0; i < device->runningCount; ++i)
@@ -340,7 +340,8 @@ mrhiResult mrhiNextDeviceNotification(mrhiDevice* device, mrhiDeviceNotification
 {
     if (device == nullptr || notificationOut == nullptr)
     {
-        return device == nullptr ? mrhi_errorInvalid : mrhiDeviceMisuse(device);
+        return device == nullptr ? mrhi_errorInvalid
+                                 : mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     if (device->queueCount == 0)
     {

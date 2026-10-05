@@ -86,7 +86,7 @@ static const mrhiChain* CheckDef(mrhiInstance* instance, const mrhiSurfaceDef* d
     if (def->cookie != SURFACE_DEF_COOKIE || chain == mrhi_errorInvalid ||
         !mrhiIsLabelValid(def->label, def->labelLength))
     {
-        *statusOut = mrhiMisuse(instance);
+        *statusOut = mrhiMisuse(instance, mrhi_diagnosticDefHeader);
         return nullptr;
     }
     if (chain != mrhi_success)
@@ -97,7 +97,7 @@ static const mrhiChain* CheckDef(mrhiInstance* instance, const mrhiSurfaceDef* d
     const mrhiChain* source = FindSource(def->next, instance->external);
     if (source == nullptr)
     {
-        *statusOut = mrhiMisuse(instance);
+        *statusOut = mrhiMisuse(instance, mrhi_diagnosticSurfaceSource);
         return nullptr;
     }
     if (instance->driver.vtable == nullptr)
@@ -117,7 +117,7 @@ mrhiResult mrhiCreateSurface(mrhiInstance* instance, const mrhiSurfaceDef* def,
     }
     if (def == nullptr || surfaceOut == nullptr)
     {
-        return mrhiMisuse(instance);
+        return mrhiMisuse(instance, mrhi_diagnosticNullArgument);
     }
     mrhiResult status = mrhi_success;
     const mrhiChain* source = CheckDef(instance, def, &status);
@@ -195,7 +195,8 @@ mrhiResult mrhiGetSurfaceCaps(mrhiInstance* instance, mrhiSurfaceId surface, mrh
 {
     if (instance == nullptr || capsOut == nullptr)
     {
-        return instance == nullptr ? mrhi_errorInvalid : mrhiMisuse(instance);
+        return instance == nullptr ? mrhi_errorInvalid
+                                   : mrhiMisuse(instance, mrhi_diagnosticNullArgument);
     }
     uint64_t handle = mrhiFindSurface(instance, surface);
     const mrhiDriverAdapter* found = mrhiFindAdapter(instance, adapter);

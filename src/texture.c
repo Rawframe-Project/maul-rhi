@@ -164,7 +164,7 @@ mrhiResult mrhiCheckTextureShape(mrhiDevice* device, const mrhiTextureDef* def, 
     if (!mrhiIsFormatKnown(def->format) || !IsShapeValid(def) || !AreSamplesValid(def) ||
         !AreViewFormatsValid(def))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticTextureShape);
     }
     if (!FitsLimits(def, &device->limits) ||
         !mrhiFormatFamilyGranted(def->format, &device->features))
@@ -178,7 +178,7 @@ mrhiResult mrhiCheckTextureUsage(mrhiDevice* device, const mrhiTextureDef* def)
 {
     if (!IsUsageValid(def))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticTextureUsage);
     }
     return IsGranted(device, def) ? mrhi_success : mrhi_errorUnsupported;
 }
@@ -206,7 +206,7 @@ static mrhiResult CheckTexture(mrhiDevice* device, const mrhiTextureDef* def)
     if (adopt != nullptr &&
         (adopt->image == nullptr || (def->usage & mrhi_textureRenderTarget) == 0))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticTextureAdopt);
     }
     return mrhiDeviceUsable(device);
 }
@@ -231,7 +231,7 @@ mrhiResult mrhiCreateTexture(mrhiDevice* device, const mrhiTextureDef* def,
     }
     if (def == nullptr || textureOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     mrhiResult status = CheckTexture(device, def);
     if (status != mrhi_success)

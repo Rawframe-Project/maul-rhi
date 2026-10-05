@@ -49,7 +49,7 @@ mrhiResult mrhiWriteBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId res
     }
     if (bytes == nullptr && size > 0)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     mrhiResult status = mrhi_success;
     mrhiFramePass* pass = mrhiCopyPass(device, id, &status);
@@ -60,13 +60,13 @@ mrhiResult mrhiWriteBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId res
     uint32_t object = mrhiFindKind(device, resource, true, &status);
     if (object == 0)
     {
-        return mrhiRefuse(device, status);
+        return mrhiRefuse(device, status, mrhi_diagnosticResourceKind);
     }
     uint64_t total = mrhiBufferBytesOf(&device->frameResources[object - 1]);
     if (offset % 4 != 0 || size % 4 != 0 || offset > total || size > total - offset ||
         !mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessCopyDestination), nullptr))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticWriteBufferRange);
     }
     // An empty write is valid and copies nothing; drivers never see it
     // (Vulkan refuses empty regions). A pass whose staging overflowed
@@ -122,7 +122,7 @@ mrhiResult mrhiWriteTexture(mrhiDevice* device, mrhiPassId id, const mrhiTexture
     if (destination == nullptr || layout == nullptr || size == nullptr ||
         (bytes == nullptr && byteCount > 0))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     mrhiResult status = mrhi_success;
     mrhiFramePass* pass = mrhiCopyPass(device, id, &status);
@@ -135,7 +135,7 @@ mrhiResult mrhiWriteTexture(mrhiDevice* device, mrhiPassId id, const mrhiTexture
     status = mrhiCheckTextureTransfer(device, destination, size, false, &side, &facts);
     if (status != mrhi_success)
     {
-        return mrhiRefuse(device, status);
+        return mrhiRefuse(device, status, mrhi_diagnosticTextureRegion);
     }
     mrhiFormatBlock block = mrhiGetFormatBlock(side.def->format);
     if (!mrhiIsLayoutValid(layout->offset, layout->bytesPerRow, layout->rowsPerImage, byteCount,
@@ -143,7 +143,7 @@ mrhiResult mrhiWriteTexture(mrhiDevice* device, mrhiPassId id, const mrhiTexture
         !mrhiPassDeclares(device, pass, side.object, MRHI_KIND(mrhi_accessCopyDestination),
                           &side.part))
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticWriteTextureLayout);
     }
     uint64_t rows = size->height / block.height;
     uint64_t rowBytes = (uint64_t)(size->width / block.width) * facts.bytes;

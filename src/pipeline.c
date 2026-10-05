@@ -163,7 +163,7 @@ static mrhiShaderSlot* CheckComputeDef(mrhiDevice* device, const mrhiComputePipe
     if (*entryOut == reflection->entryCount ||
         !mrhiAreConstantsValid(reflection, def->constants, def->constantCount))
     {
-        *statusOut = mrhiDeviceMisuse(device);
+        *statusOut = mrhiDeviceMisuse(device, mrhi_diagnosticComputePipelineDef);
         return nullptr;
     }
     return shader;
@@ -178,7 +178,7 @@ mrhiResult mrhiCreateComputePipeline(mrhiDevice* device, const mrhiComputePipeli
     }
     if (def == nullptr || pipelineOut == nullptr || requestOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
     uint32_t entry = 0;
     mrhiResult status = mrhi_success;

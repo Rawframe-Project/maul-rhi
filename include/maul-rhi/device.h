@@ -92,6 +92,8 @@ extern "C"
         // The draws one frame's counted multi-draws make at most, their
         // maxCounts in all; 262144 by default, 0 for none.
         uint32_t frameIndirectDraws;
+        // Records the diagnostic queue holds; 0 by default, keeping none.
+        uint32_t diagnostics;
     } mrhiDeviceLimits;
 
     // How a device is made. Build it with mrhiDefaultDeviceDef and set the
@@ -216,6 +218,21 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_API uint64_t mrhiGetDeviceMisuse(mrhiDevice* device);
+
+    /// Takes the oldest record from the device's diagnostic queue (mrhi-0027),
+    /// which holds a record for each call the device refused as invalid input,
+    /// up to the diagnostics limit; refusals past it are counted but not
+    /// recorded.
+    ///
+    /// @param device         The device.
+    /// @param diagnosticOut  Receives the record; untouched unless one is
+    ///                       taken.
+    /// @return `mrhi_success` with a record; `mrhi_empty` when the queue is
+    /// drained or keeps none; `mrhi_errorInvalid` for a NULL argument.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiNextDeviceDiagnostic(mrhiDevice* device,
+                                                                mrhiDiagnostic* diagnosticOut);
 
     // Why a device was lost.
     typedef uint8_t mrhiDeviceLossReason;

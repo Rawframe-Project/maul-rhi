@@ -156,6 +156,8 @@ extern "C"
         uint32_t adapters;
         // Surfaces the instance holds at once; 16 by default.
         uint32_t surfaces;
+        // Records the diagnostic queue holds; 0 by default, keeping none.
+        uint32_t diagnostics;
     } mrhiInstanceLimits;
 
     // A driver made outside the library against its SPI headers (maul-rhi/spi,
@@ -230,6 +232,21 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the instance is used by one thread at a time.
     MRHI_API uint64_t mrhiGetInstanceMisuse(mrhiInstance* instance);
+
+    /// Takes the oldest record from the instance's diagnostic queue
+    /// (mrhi-0027), which holds a record for each call the instance refused as
+    /// invalid input, up to the diagnostics limit; refusals past it are counted
+    /// but not recorded.
+    ///
+    /// @param instance       The instance.
+    /// @param diagnosticOut  Receives the record; untouched unless one is
+    ///                       taken.
+    /// @return `mrhi_success` with a record; `mrhi_empty` when the queue is
+    /// drained or keeps none; `mrhi_errorInvalid` for a NULL argument.
+    /// @par Thread safety
+    /// Safe from any thread; the instance is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiNextInstanceDiagnostic(mrhiInstance* instance,
+                                                                  mrhiDiagnostic* diagnosticOut);
 
     /// Returns how many breaches of the driver SPI the validation layer has
     /// found on the instance and its devices (mrhi-0025): frames no driver

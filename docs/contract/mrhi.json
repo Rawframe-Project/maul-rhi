@@ -327,6 +327,408 @@
             "class": "any"
           },
           "library": "names the library's result codes"
+        },
+        {
+          "kind": "enum",
+          "name": "diagnostic_code",
+          "width": "uint16",
+          "doc": "The check a diagnostic record reports (mrhi-0027): one check of the core that refused a call as invalid input. Codes are only ever added; mrhiDiagnosticText gives each one's text.",
+          "values": [
+            {
+              "name": "diagnostic_null_argument",
+              "value": 1,
+              "doc": "A required pointer is NULL, or an array is NULL with a nonzero count."
+            },
+            {
+              "name": "diagnostic_def_header",
+              "value": 2,
+              "doc": "A def lacks its cookie (start from its default def), carries a malformed extension chain or one deeper than the chainDepth limit, or a label that is not UTF-8 of at most MRHI_LABEL_BYTES."
+            },
+            {
+              "name": "diagnostic_adapter_request_def",
+              "value": 3,
+              "doc": "An adapter request def is NULL, lacks its cookie or names an unknown power preference."
+            },
+            {
+              "name": "diagnostic_device_def",
+              "value": 4,
+              "doc": "A device def lacks its cookie, has a malformed chain, label, allocator or Vulkan struct, a device limit of zero (fewer than 2 notifications, a command arena under one chunk, readback bytes not a multiple of 512), limits under the floor, or a cache size without bytes."
+            },
+            {
+              "name": "diagnostic_instance_has_devices",
+              "value": 5,
+              "doc": "An instance was destroyed while devices made on it live; nothing was destroyed."
+            },
+            {
+              "name": "diagnostic_surface_source",
+              "value": 6,
+              "doc": "A surface def names no surface source, or more than one."
+            },
+            {
+              "name": "diagnostic_surface_config",
+              "value": 7,
+              "doc": "A surface config names an unknown format, primaries, transfer or range, or a view format that is not its format's twin."
+            },
+            {
+              "name": "diagnostic_native_commands",
+              "value": 8,
+              "doc": "Native commands set without a command buffer, or on a pass not added as native."
+            },
+            {
+              "name": "diagnostic_recorded_in_native_pass",
+              "value": 9,
+              "doc": "A command recorded through the library in a native pass, whose commands are the program's own."
+            },
+            {
+              "name": "diagnostic_native_pass_def",
+              "value": 10,
+              "doc": "A native pass def with targets, query sets or a heap, or with an access that resolves queries or names a resource that is not imported."
+            },
+            {
+              "name": "diagnostic_pass_def",
+              "value": 11,
+              "doc": "A pass def with an unknown class, an access array that is NULL with a count, more than MRHI_COLOR_TARGETS targets, or several views on a native pass or one without targets."
+            },
+            {
+              "name": "diagnostic_pass_uses",
+              "value": 12,
+              "doc": "A pass's heap, query sets or accesses do not fit: a heap or set that is not live or of the wrong type, or accesses that name a resource twice, a usage it lacks, or a range past it."
+            },
+            {
+              "name": "diagnostic_pass_end_open",
+              "value": 13,
+              "doc": "A pass ended with a debug group or a query still open."
+            },
+            {
+              "name": "diagnostic_render_state_outside_render_pass",
+              "value": 14,
+              "doc": "A draw, a graphics pipeline or other draw state recorded in a pass without targets."
+            },
+            {
+              "name": "diagnostic_compute_outside_compute_pass",
+              "value": 15,
+              "doc": "A dispatch or a compute pipeline recorded in a pass that is not a compute pass."
+            },
+            {
+              "name": "diagnostic_transfer_in_render_pass",
+              "value": 16,
+              "doc": "A copy, clear, upload or readback recorded in a pass with targets."
+            },
+            {
+              "name": "diagnostic_graphics_pipeline_mismatch",
+              "value": 17,
+              "doc": "A graphics pipeline whose targets differ from the pass's, which writes depth or stencil the pass only reads, or which uses a heap the pass has none of."
+            },
+            {
+              "name": "diagnostic_compute_pipeline_heap",
+              "value": 18,
+              "doc": "A compute pipeline that uses a heap, set in a pass without one."
+            },
+            {
+              "name": "diagnostic_bindings_table",
+              "value": 19,
+              "doc": "Bindings set in a transfer pass, or for a table past the bindingTables limit."
+            },
+            {
+              "name": "diagnostic_bindings_count",
+              "value": 20,
+              "doc": "A binding count that is not the number of slots the pipeline's reflection gives the table."
+            },
+            {
+              "name": "diagnostic_bindings_slot",
+              "value": 21,
+              "doc": "A binding naming a slot the table lacks, or one already bound in the same call."
+            },
+            {
+              "name": "diagnostic_binding_resource",
+              "value": 22,
+              "doc": "A binding whose resource does not fit its slot: its kind, usage, range, format or the access the pass declares."
+            },
+            {
+              "name": "diagnostic_root_block",
+              "value": 23,
+              "doc": "A root block set in a transfer pass, empty, or at an offset or size not a multiple of 4."
+            },
+            {
+              "name": "diagnostic_vertex_buffer_slot",
+              "value": 24,
+              "doc": "A vertex buffer set outside a render pass, at a slot past the vertexBuffers limit, or at an offset not a multiple of 4."
+            },
+            {
+              "name": "diagnostic_vertex_buffer_range",
+              "value": 25,
+              "doc": "A vertex buffer range past its buffer, or without a vertex access the pass declares."
+            },
+            {
+              "name": "diagnostic_vertex_buffer_too_small",
+              "value": 26,
+              "doc": "A draw reading vertices or instances past the end of a vertex buffer it uses."
+            },
+            {
+              "name": "diagnostic_index_buffer_format",
+              "value": 27,
+              "doc": "An index buffer set outside a render pass, with an unknown format, or at an offset not a multiple of the index size."
+            },
+            {
+              "name": "diagnostic_index_buffer_range",
+              "value": 28,
+              "doc": "An index buffer range past its buffer, not a whole number of indices, or without an index access the pass declares."
+            },
+            {
+              "name": "diagnostic_dispatch_size",
+              "value": 29,
+              "doc": "A dispatch outside a compute pass, or of more workgroups in a dimension than the workgroupsPerDimension limit."
+            },
+            {
+              "name": "diagnostic_indirect_arguments",
+              "value": 30,
+              "doc": "Indirect arguments or a draw count at an offset not a multiple of 4, past their buffer, or without an indirect access the pass declares."
+            },
+            {
+              "name": "diagnostic_indirect_count_limit",
+              "value": 31,
+              "doc": "A counted indirect draw whose maxCount is zero or past MRHI_INDIRECT_DRAWS."
+            },
+            {
+              "name": "diagnostic_viewport",
+              "value": 32,
+              "doc": "A viewport wider or taller than the textureDimension2d limit, outside twice that range, or with depths outside [0, 1] or in reverse order."
+            },
+            {
+              "name": "diagnostic_scissor",
+              "value": 33,
+              "doc": "A scissor rectangle reaching past the pass's targets."
+            },
+            {
+              "name": "diagnostic_blend_constant",
+              "value": 34,
+              "doc": "A blend constant that is not finite."
+            },
+            {
+              "name": "diagnostic_debug_label",
+              "value": 35,
+              "doc": "A debug label that is empty, not UTF-8, or longer than MRHI_LABEL_BYTES."
+            },
+            {
+              "name": "diagnostic_debug_group_underflow",
+              "value": 36,
+              "doc": "A debug group popped with none open."
+            },
+            {
+              "name": "diagnostic_resource_kind",
+              "value": 37,
+              "doc": "A texture given where a buffer is wanted, or a buffer where a texture is."
+            },
+            {
+              "name": "diagnostic_clear_buffer_range",
+              "value": 38,
+              "doc": "A buffer clear at an offset or of a size not a multiple of 4, past the buffer, or without a copy destination access the pass declares."
+            },
+            {
+              "name": "diagnostic_copy_buffer_range",
+              "value": 39,
+              "doc": "A buffer copy at an offset or of a size not a multiple of 4, past either buffer, or without the accesses the pass declares."
+            },
+            {
+              "name": "diagnostic_buffer_texture_copy",
+              "value": 40,
+              "doc": "A copy between a buffer and a texture whose layout the buffer cannot hold, whose region is off the texture's blocks or past its mip, or without the accesses the pass declares."
+            },
+            {
+              "name": "diagnostic_texture_region",
+              "value": 41,
+              "doc": "A texture region off the format's blocks or past the mip, of a multisampled texture, or of an aspect that cannot be copied, or a buffer named as the texture."
+            },
+            {
+              "name": "diagnostic_copy_texture_mismatch",
+              "value": 42,
+              "doc": "A texture copy between formats or sample counts that differ, of part of an aspect, or without the accesses the pass declares."
+            },
+            {
+              "name": "diagnostic_write_buffer_range",
+              "value": 43,
+              "doc": "A buffer write at an offset or of a size not a multiple of 4, past the buffer, or without a copy destination access the pass declares."
+            },
+            {
+              "name": "diagnostic_write_texture_layout",
+              "value": 44,
+              "doc": "A texture write whose layout the bytes cannot hold, or without a copy destination access the pass declares."
+            },
+            {
+              "name": "diagnostic_read_buffer_range",
+              "value": 45,
+              "doc": "A buffer readback at an offset or of a size not a multiple of 4, past the buffer, or without a copy source access the pass declares."
+            },
+            {
+              "name": "diagnostic_read_texture_access",
+              "value": 46,
+              "doc": "A texture readback without a covering copy source access the pass declares."
+            },
+            {
+              "name": "diagnostic_frame_token",
+              "value": 47,
+              "doc": "A frame token this device never returned."
+            },
+            {
+              "name": "diagnostic_transient_usage",
+              "value": 48,
+              "doc": "A transient resource declared with a usage; the frame derives its usages from the passes' accesses."
+            },
+            {
+              "name": "diagnostic_seal_not_imported",
+              "value": 49,
+              "doc": "A resource sealed or unsealed that is not imported."
+            },
+            {
+              "name": "diagnostic_seal_texture",
+              "value": 50,
+              "doc": "A texture sealed without sampled usage, or an adopted image, which rests as a target."
+            },
+            {
+              "name": "diagnostic_graphics_pipeline_def",
+              "value": 51,
+              "doc": "A graphics pipeline def that does not fit its shaders: stages, constants, vertex layout, primitive, depth and stencil, targets, multisampling or the interface between stages."
+            },
+            {
+              "name": "diagnostic_compute_pipeline_def",
+              "value": 52,
+              "doc": "A compute pipeline def naming an entry its shader lacks, or constants it does not declare."
+            },
+            {
+              "name": "diagnostic_heap_def",
+              "value": 53,
+              "doc": "A heap def with no entries."
+            },
+            {
+              "name": "diagnostic_heap_index",
+              "value": 54,
+              "doc": "A heap index past the heap's entries or samplers."
+            },
+            {
+              "name": "diagnostic_heap_entry",
+              "value": 55,
+              "doc": "A heap entry of an unknown kind."
+            },
+            {
+              "name": "diagnostic_heap_view",
+              "value": 56,
+              "doc": "A heap entry's view without the usage its kind needs, a storage view of more than one mip, or a sampled view marked writable."
+            },
+            {
+              "name": "diagnostic_heap_buffer",
+              "value": 57,
+              "doc": "A heap entry's buffer without storage usage, or a range misaligned, empty, not a multiple of 4 or past the buffer."
+            },
+            {
+              "name": "diagnostic_query_set_def",
+              "value": 58,
+              "doc": "A query set def of an unknown type, or of zero or too many queries."
+            },
+            {
+              "name": "diagnostic_occlusion_query",
+              "value": 59,
+              "doc": "An occlusion query begun in a pass without an occlusion set, while one is open, past the set or written twice in a frame; or ended with none open."
+            },
+            {
+              "name": "diagnostic_statistics_query",
+              "value": 60,
+              "doc": "A statistics query begun outside a graphics-class pass of one view, while one is open, on a set of another type, past the set or written twice in a frame; or ended with none open."
+            },
+            {
+              "name": "diagnostic_resolve_queries",
+              "value": 61,
+              "doc": "A query resolve outside a compute-class pass, without a resolve access the pass declares, of a range past the set or the buffer, or at an offset not a multiple of 256."
+            },
+            {
+              "name": "diagnostic_sampler_def",
+              "value": 62,
+              "doc": "A sampler def with an unknown filter, address mode or compare function, a negative or reversed level of detail range, or anisotropy outside 1 to 16 or above 1 without linear filtering."
+            },
+            {
+              "name": "diagnostic_buffer_size",
+              "value": 63,
+              "doc": "A buffer size of zero or not a multiple of 4."
+            },
+            {
+              "name": "diagnostic_buffer_usage",
+              "value": 64,
+              "doc": "A buffer def with no usage, or an unknown one."
+            },
+            {
+              "name": "diagnostic_shader_bytes",
+              "value": 65,
+              "doc": "Shader bytes that are NULL or not 8-byte aligned."
+            },
+            {
+              "name": "diagnostic_shader_container",
+              "value": 66,
+              "doc": "Shader bytes that are not a well-formed container: its bounds, version, digest or reflection."
+            },
+            {
+              "name": "diagnostic_texture_shape",
+              "value": 67,
+              "doc": "A texture def with an unknown format, a size, layer, mip or sample count out of range, or view formats that are not the format's twin."
+            },
+            {
+              "name": "diagnostic_texture_usage",
+              "value": 68,
+              "doc": "A texture def with a usage that is unknown or that its format, kind or sample count cannot take."
+            },
+            {
+              "name": "diagnostic_texture_adopt",
+              "value": 69,
+              "doc": "A texture adopting a Vulkan image without an image, or without render target usage."
+            },
+            {
+              "name": "diagnostic_view_def",
+              "value": 70,
+              "doc": "A view def with an unknown kind or aspect."
+            },
+            {
+              "name": "diagnostic_view_range",
+              "value": 71,
+              "doc": "A view whose mips, layers, format, aspect or kind its texture cannot give."
+            }
+          ],
+          "library": "names the library's own checks"
+        },
+        {
+          "kind": "struct",
+          "name": "diagnostic",
+          "doc": "A record from an instance's or a device's diagnostic queue.",
+          "members": [
+            {
+              "name": "code",
+              "type": "enum.diagnostic_code",
+              "doc": "The check that refused the call."
+            },
+            {
+              "name": "count",
+              "type": "uint32",
+              "doc": "How many refusals in a row the record stands for: a refusal by the newest record's check adds to its count instead of taking room."
+            }
+          ],
+          "library": "a record of the library's own diagnostic queue"
+        },
+        {
+          "kind": "function",
+          "name": "diagnostic_text",
+          "doc": "Returns the text of a diagnostic code, for people; programs compare codes, never texts.",
+          "returns": {
+            "type": "static_cstring",
+            "doc": "A static, NUL-terminated English sentence."
+          },
+          "args": [
+            {
+              "name": "code",
+              "type": "enum.diagnostic_code",
+              "doc": "Any value; an unknown one has a text saying so."
+            }
+          ],
+          "thread_safety": {
+            "class": "any"
+          },
+          "library": "names the library's own checks"
         }
       ]
     },
@@ -649,6 +1051,11 @@
               "name": "surfaces",
               "type": "uint32",
               "doc": "Surfaces the instance holds at once; 16 by default."
+            },
+            {
+              "name": "diagnostics",
+              "type": "uint32",
+              "doc": "Records the diagnostic queue holds; 0 by default, keeping none."
             }
           ],
           "library": "sizes of the library's own tables"
@@ -827,6 +1234,34 @@
             "object": "the instance"
           },
           "library": "reads the library's misuse count"
+        },
+        {
+          "kind": "function",
+          "name": "next_instance_diagnostic",
+          "doc": "Takes the oldest record from the instance's diagnostic queue (mrhi-0027), which holds a record for each call the instance refused as invalid input, up to the diagnostics limit; refusals past it are counted but not recorded.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` with a record; `mrhi_empty` when the queue is drained or keeps none; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "instance",
+              "type": "opaque.instance",
+              "pointer": "mutable",
+              "doc": "The instance."
+            },
+            {
+              "name": "diagnostic_out",
+              "type": "struct.diagnostic",
+              "pointer": "mutable",
+              "doc": "Receives the record; untouched unless one is taken."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the instance"
+          },
+          "library": "reads the library's own diagnostic queue"
         },
         {
           "kind": "function",
@@ -5870,6 +6305,11 @@
               "name": "frame_indirect_draws",
               "type": "uint32",
               "doc": "The draws one frame's counted multi-draws make at most, their maxCounts in all; 262144 by default, 0 for none."
+            },
+            {
+              "name": "diagnostics",
+              "type": "uint32",
+              "doc": "Records the diagnostic queue holds; 0 by default, keeping none."
             }
           ],
           "library": "sizes of the library's own tables and rings"
@@ -6197,6 +6637,34 @@
             "object": "the device"
           },
           "library": "reads the library's misuse count"
+        },
+        {
+          "kind": "function",
+          "name": "next_device_diagnostic",
+          "doc": "Takes the oldest record from the device's diagnostic queue (mrhi-0027), which holds a record for each call the device refused as invalid input, up to the diagnostics limit; refusals past it are counted but not recorded.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` with a record; `mrhi_empty` when the queue is drained or keeps none; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "diagnostic_out",
+              "type": "struct.diagnostic",
+              "pointer": "mutable",
+              "doc": "Receives the record; untouched unless one is taken."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "library": "reads the library's own diagnostic queue"
         },
         {
           "kind": "enum",

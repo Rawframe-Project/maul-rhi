@@ -98,6 +98,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/compile.c
     src/container.c
     src/device.c
+    src/diagnostics.c
     src/binding.c
     src/copy.c
     src/upload.c
@@ -113,6 +114,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/driver.c
     src/generated/capabilities.c
     src/generated/defaults.c
+    src/generated/diagnostic_texts.c
     src/generated/result_names.c
     src/graphics.c
     src/instance.c
@@ -242,6 +244,11 @@ if(MAUL_RHI_BUILD_TESTS)
     if(MAUL_RHI_TEST_DRIVER)
         maul_add_test(adapter)
         maul_add_test(device)
+        maul_add_test(diagnostics)
+        if(NOT maul_rhi_web AND NOT WIN32)
+            find_package(Threads REQUIRED)
+            target_link_libraries(test_diagnostics PRIVATE Threads::Threads)
+        endif()
         maul_add_test(format)
         maul_add_test(sampler)
         maul_add_test(buffer)

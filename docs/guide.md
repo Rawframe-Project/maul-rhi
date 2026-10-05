@@ -83,7 +83,13 @@ for an instance def built against another contract version,
 `mrhi_errorOutOfDate` for a surface to configure again,
 `mrhi_errorPlatform`, `mrhi_errorDeviceLost`. `mrhiResultName` names each. Every
 `mrhi_errorInvalid` also counts one misuse (`mrhiGetInstanceMisuse`,
-`mrhiGetDeviceMisuse`), which a release build can watch. A build with
+`mrhiGetDeviceMisuse`), which a release build can watch. To learn
+why, give the instance's or device's limits a `diagnostics` capacity:
+each refusal is then also a record naming its check, an
+`mrhiDiagnosticCode` whose sentence `mrhiDiagnosticText` returns, taken
+with `mrhiNextInstanceDiagnostic` or `mrhiNextDeviceDiagnostic`
+(mrhi-0027). Compare codes, not texts. A refusal by the newest record's
+check adds to its count, and a full queue keeps its first records. A build with
 `MAUL_RHI_VALIDATION` also checks the driver under the library and
 counts its breaches (`mrhiGetDriverFaults`, mrhi-0025): a driver built
 outside the tree should run its conformance suite that way.

@@ -7,10 +7,12 @@ edit the contract, not this file.
 | --- | --- |
 | `mrhiGetVersion` | Safe from any thread. |
 | `mrhiResultName` | Safe from any thread. |
+| `mrhiDiagnosticText` | Safe from any thread. |
 | `mrhiDefaultInstanceDef` | Safe from any thread. |
 | `mrhiCreateInstance` | Safe from any thread. |
 | `mrhiDestroyInstance` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiGetInstanceMisuse` | Safe from any thread; the instance is used by one thread at a time. |
+| `mrhiNextInstanceDiagnostic` | Safe from any thread; the instance is used by one thread at a time. |
 | `mrhiGetDriverFaults` | Safe from any thread. |
 | `mrhiDefaultAdapterRequestDef` | Safe from any thread. |
 | `mrhiRequestAdapters` | Safe from any thread; the instance is used by one thread at a time. |
@@ -29,6 +31,7 @@ edit the contract, not this file.
 | `mrhiGetDeviceLimits` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiGetDeviceTimestampPeriod` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiGetDeviceMisuse` | Safe from any thread; the device is used by one thread at a time. |
+| `mrhiNextDeviceDiagnostic` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiGetDeviceLossReport` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiSimulateDeviceLoss` | Safe from any thread; the device is used by one thread at a time. |
 | `mrhiDefaultSamplerDef` | Safe from any thread. |

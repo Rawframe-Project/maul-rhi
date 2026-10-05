@@ -705,6 +705,9 @@ restricted or absent-rejected, with how.
 | `mrhiChain` | the library's extension chain |
 | `mrhiGetVersion` | reads the library's version |
 | `mrhiResultName` | names the library's result codes |
+| `mrhiDiagnosticCode` | names the library's own checks |
+| `mrhiDiagnostic` | a record of the library's own diagnostic queue |
+| `mrhiDiagnosticText` | names the library's own checks |
 
 ## instance: operations and structures
 
@@ -730,6 +733,7 @@ restricted or absent-rejected, with how.
 | `mrhiExternalDriverDef` | hands the library a driver of its SPI, whatever API that driver speaks |
 | `mrhiDefaultInstanceDef` | fills a def with the library's defaults |
 | `mrhiGetInstanceMisuse` | reads the library's misuse count |
+| `mrhiNextInstanceDiagnostic` | reads the library's own diagnostic queue |
 | `mrhiGetDriverFaults` | reads the library's validation layer count |
 | `mrhiDefaultAdapterRequestDef` | fills a def with the library's defaults |
 | `mrhiNextInstanceNotification` | reads the library's own notification queue |
@@ -771,6 +775,7 @@ restricted or absent-rejected, with how.
 | `mrhiGetDeviceFeatures` | reads what the library granted |
 | `mrhiGetDeviceLimits` | reads what the library granted |
 | `mrhiGetDeviceMisuse` | reads the library's misuse count |
+| `mrhiNextDeviceDiagnostic` | reads the library's own diagnostic queue |
 | `mrhiGetDeviceLossReport` | reads what the library kept of the loss |
 | `mrhiSimulateDeviceLoss` | the core loses the device as a driver's report would |
 

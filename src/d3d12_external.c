@@ -23,7 +23,7 @@ mrhiResult mrhiGetD3d12Device(mrhiDevice* device, void** deviceOut, void** queue
     }
     if (deviceOut == nullptr || queueOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
 #ifdef MAUL_RHI_D3D12_DRIVER
     ID3D12Device* native = nullptr;
@@ -48,7 +48,7 @@ mrhiResult mrhiGetD3d12Texture(mrhiDevice* device, mrhiTextureId texture, void**
     }
     if (resourceOut == nullptr)
     {
-        return mrhiDeviceMisuse(device);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
 #ifdef MAUL_RHI_D3D12_DRIVER
     if (device->adapterInfo.driver != mrhi_driverD3d12)
