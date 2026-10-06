@@ -29,7 +29,7 @@ generated from the headers.
 
 ## Status
 
-0.2.0 is the current release. It has the whole contract on four
+0.3.0 is the current release. It has the whole contract on four
 drivers, Vulkan, Direct3D 12, Metal and WebGPU, and a test driver
 without a GPU, with the conformance suite, the samples and the
 benchmarks. Since 0.1.0: counted multi-draw indirect and multiview on
@@ -37,8 +37,10 @@ every native driver (mrhi-0020), buffer clears (mrhi-0022), pipeline
 statistics on Vulkan and Direct3D 12 (mrhi-0023), drivers built outside
 the tree against the installed SPI headers with a mustpass list
 (mrhi-0024), a validation layer around the SPI (mrhi-0025), the WebGPU
-driver in a worker (mrhi-0026), and diagnostics naming the check behind
-every refusal (mrhi-0027). Not yet granted anywhere: present timing (no
+driver in a worker (mrhi-0026), diagnostics naming the check behind
+every refusal (mrhi-0027), a check that Maul Window's windows present
+through it (mrhi-0028), and debug labels a build compiles out
+(mrhi-0029). Not yet granted anywhere: present timing (no
 CI device times its presents); on Metal, also bindless heaps and
 timestamps, which wait for a Metal 3 device to test on.
 Each build has one native driver: Metal on Apple systems, Direct3D 12

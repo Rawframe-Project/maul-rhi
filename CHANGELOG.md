@@ -8,6 +8,12 @@ format.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-06
+
+Debug labels a shipping build compiles out, a check that Maul Window's
+windows present through the library on X11, Windows and the web, and
+an API reference that lists every function.
+
 ### Added
 
 - `MAUL_RHI_LABELS` (mrhi-0029), on by default: off, debug labels
@@ -15,6 +21,27 @@ format.
   build with them, then dropped: drivers name nothing, passes keep no
   label, frames allocate no label storage, and debug groups and markers
   record nothing.
+- The test driver's frame log counts the device's objects made with a
+  label (`mrhiTestFrameLog.named`).
+- A check against Maul Window (mrhi-0028, `-DMAUL_RHI_SEAM=ON`, tests
+  only): a window's handle bundle copied into the platform's surface
+  source presents and resizes on X11 with lavapipe, Win32 with WARP and
+  the web in headless Chrome. The library itself gains no glue and no
+  dependency.
+
+### Changed
+
+- The contract version is 3 (`MRHI_CONTRACT_VERSION`):
+  `mrhiTestFrameLog` gained a field, so an instance refuses a program
+  built against 0.2.0's headers with `mrhi_errorVersion`. The driver
+  SPI stays at version 4.
+
+### Fixed
+
+- The API reference lists `mrhiNextDeviceNotification`,
+  `mrhiNextInstanceNotification` and `mrhiCreateGraphicsPipeline`,
+  which its generator had missed where a declaration breaks after its
+  result type.
 
 ## [0.2.0] - 2026-10-06
 
