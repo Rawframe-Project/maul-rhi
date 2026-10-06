@@ -69,9 +69,10 @@ jobs:
           - { name: linux-clang-20-tsan, os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Debug,   extra: "-DMAUL_RHI_TSAN=ON" }
           - { name: linux-shared,        os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Release, extra: "-DMAUL_RHI_BUILD_SHARED=ON" }
           # The Metal driver on the runner's paravirtual device (mrhi-0003),
-          # as released on macOS 15 and with assertions on macOS 26.
-          - { name: macos-clang,         os: macos-15,     cc: clang,    cxx: clang++,    config: Release, extra: "" }
-          - { name: macos-clang-debug,   os: macos-26,     cc: clang,    cxx: clang++,    config: Debug,   extra: "" }
+          # as released on macOS 15 and with assertions on macOS 26, each
+          # with the seam check on the runner's window server (mrhi-0028).
+          - { name: macos-clang,         os: macos-15,     cc: clang,    cxx: clang++,    config: Release, extra: "-DMAUL_RHI_SEAM=ON" }
+          - { name: macos-clang-debug,   os: macos-26,     cc: clang,    cxx: clang++,    config: Debug,   extra: "-DMAUL_RHI_SEAM=ON" }
     steps:
       - uses: actions/checkout@v4
       - name: Install compilers, lavapipe, the validation layer and Xvfb
