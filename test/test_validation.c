@@ -3,7 +3,8 @@
 //
 // The validation layer (mrhi-0025), in builds with MAUL_RHI_VALIDATION:
 // the test driver handed in from outside with one function broken at a
-// time, each breach counted by mrhiGetDriverFaults while the call goes
+// time, each breach counted by mrhiGetDriverFaults and recorded in the
+// instance's diagnostic queue with its rule's code while the call goes
 // on; and a malformed frame, whose faults the walk counts without
 // reading past what it checked.
 
@@ -48,9 +49,17 @@ static mrhiInstance* Start(void)
     };
     mrhiInstanceDef def = mrhiDefaultInstanceDef();
     def.next = &external.chain;
+    def.limits.diagnostics = 8;
     mrhiInstance* instance = nullptr;
     CHECK(mrhiCreateInstance(&def, &instance) == mrhi_success, "an instance");
     return instance;
+}
+
+// The code of the instance's oldest diagnostic, or 0 when there is none.
+static mrhiDiagnosticCode Recorded(mrhiInstance* instance)
+{
+    mrhiDiagnostic record = {0};
+    return mrhiNextInstanceDiagnostic(instance, &record) == mrhi_success ? record.code : 0;
 }
 
 // Searches, answering at the next poll: the adapters listed.
@@ -76,6 +85,7 @@ static void TestClean(void)
     CHECK(Search(instance, &adapter) == 1, "one adapter");
     CHECK(mrhiGetDriverFaults(instance) == 0, "none from a driver that keeps the contract");
     CHECK(mrhiGetDriverFaults(nullptr) == 0, "no instance");
+    CHECK(Recorded(instance) == 0, "nothing recorded");
     mrhiDestroyInstance(instance);
 }
 
@@ -114,18 +124,22 @@ static void TestInstanceAnswers(void)
     mrhiAdapterId adapter = {0};
     CHECK(Search(instance, &adapter) == 0, "a search answered for another request");
     CHECK(mrhiGetDriverFaults(instance) == 1, "counted");
+    CHECK(Recorded(instance) == mrhi_diagnosticDriverUnaskedAnswer, "recorded");
     mrhiDestroyInstance(instance);
     Open();
     s_vtable.getAdapters = ListTwice;
     instance = Start();
     Search(instance, &adapter);
-    CHECK(mrhiGetDriverFaults(instance) == 1, "an adapter listed twice");
+    CHECK(mrhiGetDriverFaults(instance) == 1 && Recorded(instance) == mrhi_diagnosticDriverAdapter,
+          "an adapter listed twice");
     mrhiDestroyInstance(instance);
     Open();
     s_vtable.poll = OverReport;
     instance = Start();
     Search(instance, &adapter);
-    CHECK(mrhiGetDriverFaults(instance) >= 1, "more events than room, clamped");
+    CHECK(mrhiGetDriverFaults(instance) >= 1 &&
+              Recorded(instance) == mrhi_diagnosticDriverEventsOverrun,
+          "more events than room, clamped");
     mrhiDestroyInstance(instance);
 }
 
@@ -178,13 +192,16 @@ static void TestDeviceAnswers(void)
     bufferDef.usage = mrhi_bufferCopyDestination;
     mrhiBufferId buffer;
     CHECK(mrhiCreateBuffer(device, &bufferDef, &buffer) == mrhi_success, "the call goes on");
-    CHECK(mrhiGetDriverFaults(instance) == 1, "a buffer whose handle is zero");
+    CHECK(mrhiGetDriverFaults(instance) == 1 &&
+              Recorded(instance) == mrhi_diagnosticDriverZeroHandle,
+          "a buffer whose handle is zero");
     // A frame no driver could translate, handed to the layer as the core
     // hands frames: one pass whose chunk the frame lacks.
     mrhiDriverPass pass = {.id = {1, 1}, .firstChunk = 1};
     mrhiDriverFrame frame = {.passes = &pass, .passCount = 1};
     CHECK(device->driver.vtable->submitFrame(device->driver.self, &frame, 1) == mrhi_success &&
-              mrhiGetDriverFaults(instance) == 2,
+              mrhiGetDriverFaults(instance) == 2 &&
+              Recorded(instance) == mrhi_diagnosticDriverFrameWalk,
           "a frame walked and found wanting");
     mrhiDestroyDevice(device);
     mrhiDestroyInstance(instance);

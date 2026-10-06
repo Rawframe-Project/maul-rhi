@@ -235,8 +235,9 @@ extern "C"
 
     /// Takes the oldest record from the instance's diagnostic queue
     /// (mrhi-0027), which holds a record for each call the instance refused as
-    /// invalid input, up to the diagnostics limit; refusals past it are counted
-    /// but not recorded.
+    /// invalid input and, in a build with the validation layer, for each rule
+    /// of the driver SPI its driver or its devices' drivers broke, up to the
+    /// diagnostics limit; those past it are counted but not recorded.
     ///
     /// @param instance       The instance.
     /// @param diagnosticOut  Receives the record; untouched unless one is

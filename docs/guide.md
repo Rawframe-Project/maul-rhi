@@ -91,8 +91,9 @@ with `mrhiNextInstanceDiagnostic` or `mrhiNextDeviceDiagnostic`
 (mrhi-0027). Compare codes, not texts. A refusal by the newest record's
 check adds to its count, and a full queue keeps its first records. A build with
 `MAUL_RHI_VALIDATION` also checks the driver under the library and
-counts its breaches (`mrhiGetDriverFaults`, mrhi-0025): a driver built
-outside the tree should run its conformance suite that way.
+counts its breaches (`mrhiGetDriverFaults`, mrhi-0025), each also a
+record in the instance's diagnostic queue under a driver code: a driver
+built outside the tree should run its conformance suite that way.
 
 Objects are ids with a generation: an id outlives its object
 harmlessly, and using it afterwards answers `mrhi_errorStale`. Defs

@@ -488,7 +488,7 @@ Returns how many calls the instance has refused as invalid input (mrhi_errorInva
 ```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiNextInstanceDiagnostic(mrhiInstance* instance, mrhiDiagnostic* diagnosticOut);
 ```
-Takes the oldest record from the instance's diagnostic queue (mrhi-0027), which holds a record for each call the instance refused as invalid input, up to the diagnostics limit; refusals past it are counted but not recorded.  @param instance       The instance. @param diagnosticOut  Receives the record; untouched unless one is taken. @return `mrhi_success` with a record; `mrhi_empty` when the queue is drained or keeps none; `mrhi_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread; the instance is used by one thread at a time.
+Takes the oldest record from the instance's diagnostic queue (mrhi-0027), which holds a record for each call the instance refused as invalid input and, in a build with the validation layer, for each rule of the driver SPI its driver or its devices' drivers broke, up to the diagnostics limit; those past it are counted but not recorded.  @param instance       The instance. @param diagnosticOut  Receives the record; untouched unless one is taken. @return `mrhi_success` with a record; `mrhi_empty` when the queue is drained or keeps none; `mrhi_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread; the instance is used by one thread at a time.
 
 ```c
 uint64_t mrhiGetDriverFaults(const mrhiInstance* instance);

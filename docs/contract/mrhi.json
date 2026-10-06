@@ -332,7 +332,7 @@
           "kind": "enum",
           "name": "diagnostic_code",
           "width": "uint16",
-          "doc": "The check a diagnostic record reports (mrhi-0027): one check of the core that refused a call as invalid input. Codes are only ever added; mrhiDiagnosticText gives each one's text.",
+          "doc": "The check a diagnostic record reports (mrhi-0027): one check of the core that refused a call as invalid input, or, in a build with the validation layer, one rule of the driver SPI that the driver broke (the driver codes, recorded in the instance's queue). Codes are only ever added; mrhiDiagnosticText gives each one's text.",
           "values": [
             {
               "name": "diagnostic_null_argument",
@@ -688,6 +688,61 @@
               "name": "diagnostic_view_range",
               "value": 71,
               "doc": "A view whose mips, layers, format, aspect or kind its texture cannot give."
+            },
+            {
+              "name": "diagnostic_driver_request_tags",
+              "value": 72,
+              "doc": "A request reached the driver past the notifications limit, so its answer could not be matched."
+            },
+            {
+              "name": "diagnostic_driver_unasked_answer",
+              "value": 73,
+              "doc": "A driver answered a request it was never asked, or answered one twice."
+            },
+            {
+              "name": "diagnostic_driver_events_overrun",
+              "value": 74,
+              "doc": "A driver reported more events than the room it was given; the layer kept the room's worth."
+            },
+            {
+              "name": "diagnostic_driver_event_tag",
+              "value": 75,
+              "doc": "A device driver reported an event without a tag that is not a device loss."
+            },
+            {
+              "name": "diagnostic_driver_adapter",
+              "value": 76,
+              "doc": "A driver listed an adapter with a zero or repeated handle, a name longer than MRHI_ADAPTER_NAME_BYTES, or an unknown kind."
+            },
+            {
+              "name": "diagnostic_driver_sample_counts",
+              "value": 77,
+              "doc": "A driver reported format caps naming sample counts other than 1, 2 and 4."
+            },
+            {
+              "name": "diagnostic_driver_zero_handle",
+              "value": 78,
+              "doc": "A driver reported success for an object, surface or surface image with a zero handle."
+            },
+            {
+              "name": "diagnostic_driver_device_handshake",
+              "value": 79,
+              "doc": "A driver made a device whose vtable fails the SPI version and size handshake."
+            },
+            {
+              "name": "diagnostic_driver_timestamp_period",
+              "value": 80,
+              "doc": "A driver reported a negative timestamp period."
+            },
+            {
+              "name": "diagnostic_driver_memory_alignment",
+              "value": 81,
+              "doc": "A driver reported a memory alignment of zero or not a power of two."
+            },
+            {
+              "name": "diagnostic_driver_frame_walk",
+              "value": 82,
+              "doc": "A submitted frame failed the layer's walk: a handle, payload or range no driver could translate."
             }
           ],
           "library": "names the library's own checks"
@@ -1238,7 +1293,7 @@
         {
           "kind": "function",
           "name": "next_instance_diagnostic",
-          "doc": "Takes the oldest record from the instance's diagnostic queue (mrhi-0027), which holds a record for each call the instance refused as invalid input, up to the diagnostics limit; refusals past it are counted but not recorded.",
+          "doc": "Takes the oldest record from the instance's diagnostic queue (mrhi-0027), which holds a record for each call the instance refused as invalid input and, in a build with the validation layer, for each rule of the driver SPI its driver or its devices' drivers broke, up to the diagnostics limit; those past it are counted but not recorded.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success` with a record; `mrhi_empty` when the queue is drained or keeps none; `mrhi_errorInvalid` for a NULL argument."

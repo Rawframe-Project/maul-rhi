@@ -26,6 +26,9 @@ filter by identity and leave the text to people.
 - A record holds the code and a count: a refusal by the newest record's
   check adds to its count. A full queue drops new records, keeping the
   first ones; the misuse counters stay exact.
+- In a build with the validation layer (mrhi-0025), each breach of the
+  driver SPI it counts is also a record in the instance's queue, under
+  a driver code naming the rule broken.
 - Refusals come from any recording thread, so recording and taking hold
   a short lock.
 
@@ -33,7 +36,7 @@ filter by identity and leave the text to people.
 
 A program that asks for a queue learns why each call failed without a
 debugger or a log; one that does not pays a branch on the refusal path.
-The texts and codes cost about 9 KiB of wasm (100 871 bytes against
+The texts and codes cost about 10 KiB of wasm (101 807 bytes against
 the 131 072 budget, from 92 082). Some codes still cover a helper that
 judges several conditions at once; finer codes can be added later
 without breaking programs.

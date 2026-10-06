@@ -15,7 +15,8 @@ format.
   gives; an instance or device whose `diagnostics` limit is above 0
   keeps a queue of such records (repeats folded into one, the first
   kept when full), taken with `mrhiNextInstanceDiagnostic` and
-  `mrhiNextDeviceDiagnostic`.
+  `mrhiNextDeviceDiagnostic`. Under the validation layer, each driver
+  fault is also a record in the instance's queue, under a driver code.
 - The WebGPU driver in a dedicated worker (mrhi-0026): a canvas
   source's selector first names a canvas the program registered in
   `Module.mrhiCanvases`, such as an OffscreenCanvas; the conformance

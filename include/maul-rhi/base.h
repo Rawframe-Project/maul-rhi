@@ -203,7 +203,9 @@ extern "C"
     MRHI_API const char* mrhiResultName(mrhiResult result);
 
     // The check a diagnostic record reports (mrhi-0027): one check of the core
-    // that refused a call as invalid input. Codes are only ever added;
+    // that refused a call as invalid input, or, in a build with the validation
+    // layer, one rule of the driver SPI that the driver broke (the driver
+    // codes, recorded in the instance's queue). Codes are only ever added;
     // mrhiDiagnosticText gives each one's text.
     typedef uint16_t mrhiDiagnosticCode;
 
@@ -419,6 +421,37 @@ extern "C"
         // A view whose mips, layers, format, aspect or kind its texture cannot
         // give.
         mrhi_diagnosticViewRange = 71,
+        // A request reached the driver past the notifications limit, so its
+        // answer could not be matched.
+        mrhi_diagnosticDriverRequestTags = 72,
+        // A driver answered a request it was never asked, or answered one
+        // twice.
+        mrhi_diagnosticDriverUnaskedAnswer = 73,
+        // A driver reported more events than the room it was given; the layer
+        // kept the room's worth.
+        mrhi_diagnosticDriverEventsOverrun = 74,
+        // A device driver reported an event without a tag that is not a device
+        // loss.
+        mrhi_diagnosticDriverEventTag = 75,
+        // A driver listed an adapter with a zero or repeated handle, a name
+        // longer than MRHI_ADAPTER_NAME_BYTES, or an unknown kind.
+        mrhi_diagnosticDriverAdapter = 76,
+        // A driver reported format caps naming sample counts other than 1, 2
+        // and 4.
+        mrhi_diagnosticDriverSampleCounts = 77,
+        // A driver reported success for an object, surface or surface image
+        // with a zero handle.
+        mrhi_diagnosticDriverZeroHandle = 78,
+        // A driver made a device whose vtable fails the SPI version and size
+        // handshake.
+        mrhi_diagnosticDriverDeviceHandshake = 79,
+        // A driver reported a negative timestamp period.
+        mrhi_diagnosticDriverTimestampPeriod = 80,
+        // A driver reported a memory alignment of zero or not a power of two.
+        mrhi_diagnosticDriverMemoryAlignment = 81,
+        // A submitted frame failed the layer's walk: a handle, payload or range
+        // no driver could translate.
+        mrhi_diagnosticDriverFrameWalk = 82,
     };
 
     // A record from an instance's or a device's diagnostic queue.

@@ -243,7 +243,7 @@ mrhiResult mrhiCreateInstance(const mrhiInstanceDef* def, mrhiInstance** instanc
     if (status == mrhi_success && instance->driver.vtable != nullptr)
     {
         status = mrhiWrapDriver(&instance->allocator, def->limits.notifications,
-                                &instance->driverFaults, &instance->driver);
+                                &instance->driverFaults, &instance->diagnostics, &instance->driver);
         // An external driver stays the program's when the instance fails.
         if (status != mrhi_success && instance->external)
         {

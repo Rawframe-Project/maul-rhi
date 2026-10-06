@@ -154,6 +154,28 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "A view def with an unknown kind or aspect.";
     case mrhi_diagnosticViewRange:
         return "A view whose mips, layers, format, aspect or kind its texture cannot give.";
+    case mrhi_diagnosticDriverRequestTags:
+        return "A request reached the driver past the notifications limit, so its answer could not be matched.";
+    case mrhi_diagnosticDriverUnaskedAnswer:
+        return "A driver answered a request it was never asked, or answered one twice.";
+    case mrhi_diagnosticDriverEventsOverrun:
+        return "A driver reported more events than the room it was given; the layer kept the room's worth.";
+    case mrhi_diagnosticDriverEventTag:
+        return "A device driver reported an event without a tag that is not a device loss.";
+    case mrhi_diagnosticDriverAdapter:
+        return "A driver listed an adapter with a zero or repeated handle, a name longer than MRHI_ADAPTER_NAME_BYTES, or an unknown kind.";
+    case mrhi_diagnosticDriverSampleCounts:
+        return "A driver reported format caps naming sample counts other than 1, 2 and 4.";
+    case mrhi_diagnosticDriverZeroHandle:
+        return "A driver reported success for an object, surface or surface image with a zero handle.";
+    case mrhi_diagnosticDriverDeviceHandshake:
+        return "A driver made a device whose vtable fails the SPI version and size handshake.";
+    case mrhi_diagnosticDriverTimestampPeriod:
+        return "A driver reported a negative timestamp period.";
+    case mrhi_diagnosticDriverMemoryAlignment:
+        return "A driver reported a memory alignment of zero or not a power of two.";
+    case mrhi_diagnosticDriverFrameWalk:
+        return "A submitted frame failed the layer's walk: a handle, payload or range no driver could translate.";
     default:
         return "An unknown diagnostic code.";
     }

@@ -20,14 +20,22 @@
 
 #include <stdalign.h>
 
+// Where breaches go: the instance's fault count and its diagnostic
+// queue (mrhi-0027).
+typedef struct Watch
+{
+    _Atomic uint64_t* faults;
+    mrhiDiagnosticQueue* diagnostics;
+} Watch;
+
 // The instance driver's layer: the driver, the allocator the layer
-// came from, the instance's fault count, and the tags of the requests
-// the driver has not answered yet, at most tagLimit.
+// came from, where its breaches go, and the tags of the requests the
+// driver has not answered yet, at most tagLimit.
 typedef struct Layer
 {
     mrhiInstanceDriver inner;
     mrhiAllocator allocator;
-    _Atomic uint64_t* faults;
+    Watch watch;
     uint32_t tagLimit;
     uint32_t tagCount;
     uint64_t* tags;
@@ -38,15 +46,16 @@ typedef struct DeviceLayer
 {
     mrhiDeviceDriver inner;
     mrhiAllocator allocator;
-    _Atomic uint64_t* faults;
+    Watch watch;
 } DeviceLayer;
 
-// Counts a fault when a check fails.
-static void Expect(_Atomic uint64_t* faults, bool held)
+// Counts and records a fault when a check fails.
+static void Expect(const Watch* watch, bool held, mrhiDiagnosticCode code)
 {
     if (!held)
     {
-        atomic_fetch_add_explicit(faults, 1, memory_order_relaxed);
+        atomic_fetch_add_explicit(watch->faults, 1, memory_order_relaxed);
+        mrhiRecordDiagnostic(watch->diagnostics, code);
     }
 }
 
@@ -54,7 +63,8 @@ static void Expect(_Atomic uint64_t* faults, bool held)
 // fault, since the core keeps no more pending.
 static void Ask(Layer* layer, uint64_t tag)
 {
-    Expect(layer->faults, tag != 0 && layer->tagCount < layer->tagLimit);
+    Expect(&layer->watch, tag != 0 && layer->tagCount < layer->tagLimit,
+           mrhi_diagnosticDriverRequestTags);
     if (tag != 0 && layer->tagCount < layer->tagLimit)
     {
         layer->tags[layer->tagCount++] = tag;
@@ -90,11 +100,11 @@ static size_t Poll(void* self, mrhiDriverEvent* events, size_t capacity)
 {
     Layer* layer = self;
     size_t moved = layer->inner.vtable->poll(layer->inner.self, events, capacity);
-    Expect(layer->faults, moved <= capacity);
+    Expect(&layer->watch, moved <= capacity, mrhi_diagnosticDriverEventsOverrun);
     moved = moved <= capacity ? moved : capacity;
     for (size_t i = 0; i < moved; ++i)
     {
-        Expect(layer->faults, Answer(layer, events[i].tag));
+        Expect(&layer->watch, Answer(layer, events[i].tag), mrhi_diagnosticDriverUnaskedAnswer);
     }
     return moved;
 }
@@ -112,8 +122,10 @@ static size_t GetAdapters(const void* self, mrhiDriverAdapter* adapters, size_t 
         {
             distinct = distinct && adapters[j].handle != adapter->handle;
         }
-        Expect(layer->faults, distinct && adapter->info.nameLength <= MRHI_ADAPTER_NAME_BYTES &&
-                                  adapter->info.kind <= mrhi_adapterSoftware);
+        Expect(&layer->watch,
+               distinct && adapter->info.nameLength <= MRHI_ADAPTER_NAME_BYTES &&
+                   adapter->info.kind <= mrhi_adapterSoftware,
+               mrhi_diagnosticDriverAdapter);
     }
     return total;
 }
@@ -124,7 +136,7 @@ static void GetFormatCaps(const void* self, uint64_t adapter, mrhiFormat format,
     const Layer* layer = self;
     layer->inner.vtable->getFormatCaps(layer->inner.self, adapter, format, capsOut);
     // One, two and four samples are all a cap can name.
-    Expect(layer->faults, (capsOut->sampleCounts & ~0x7u) == 0);
+    Expect(&layer->watch, (capsOut->sampleCounts & ~0x7u) == 0, mrhi_diagnosticDriverSampleCounts);
 }
 
 static mrhiResult CreateSurface(void* self, const mrhiChain* source, const mrhiSurfaceDef* def,
@@ -133,7 +145,8 @@ static mrhiResult CreateSurface(void* self, const mrhiChain* source, const mrhiS
     Layer* layer = self;
     mrhiResult status =
         layer->inner.vtable->createSurface(layer->inner.self, source, def, handleOut);
-    Expect(layer->faults, status != mrhi_success || *handleOut != 0);
+    Expect(&layer->watch, status != mrhi_success || *handleOut != 0,
+           mrhi_diagnosticDriverZeroHandle);
     return status;
 }
 
@@ -166,7 +179,7 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
     // refuses it.
     if (mrhiCheckDeviceVtable(deviceOut->vtable) != mrhi_success)
     {
-        Expect(layer->faults, false);
+        Expect(&layer->watch, false, mrhi_diagnosticDriverDeviceHandshake);
         return status;
     }
     DeviceLayer* device =
@@ -177,7 +190,7 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
         return mrhi_errorCapacity;
     }
     *device =
-        (DeviceLayer){.inner = *deviceOut, .allocator = layer->allocator, .faults = layer->faults};
+        (DeviceLayer){.inner = *deviceOut, .allocator = layer->allocator, .watch = layer->watch};
     *deviceOut = (mrhiDeviceDriver){.vtable = &s_deviceVtable, .self = device};
     Ask(layer, tag);
     return mrhi_success;
@@ -207,7 +220,8 @@ static const mrhiInstanceDriverVtable s_vtable = {
 };
 
 mrhiResult mrhiWrapDriver(const mrhiAllocator* allocator, uint32_t tagLimit,
-                          _Atomic uint64_t* faults, mrhiInstanceDriver* driver)
+                          _Atomic uint64_t* faults, mrhiDiagnosticQueue* diagnostics,
+                          mrhiInstanceDriver* driver)
 {
     size_t bytes = sizeof(Layer) + tagLimit * sizeof(uint64_t);
     Layer* layer = mrhiAllocate(allocator, bytes, alignof(Layer));
@@ -218,7 +232,7 @@ mrhiResult mrhiWrapDriver(const mrhiAllocator* allocator, uint32_t tagLimit,
     *layer = (Layer){
         .inner = *driver,
         .allocator = *allocator,
-        .faults = faults,
+        .watch = {.faults = faults, .diagnostics = diagnostics},
         .tagLimit = tagLimit,
         .tags = (uint64_t*)(layer + 1),
     };
@@ -240,7 +254,8 @@ static void DestroyDevice(void* self)
 // Checks a made object's handle, which is never zero.
 static mrhiResult Made(const DeviceLayer* device, mrhiResult status, const uint64_t* handleOut)
 {
-    Expect(device->faults, status != mrhi_success || *handleOut != 0);
+    Expect(&device->watch, status != mrhi_success || *handleOut != 0,
+           mrhi_diagnosticDriverZeroHandle);
     return status;
 }
 
@@ -367,7 +382,7 @@ static mrhiResult AcquireImage(void* self, uint64_t swapchain, uint64_t* imageOu
     mrhiResult status = device->inner.vtable->acquireImage(device->inner.self, swapchain, imageOut);
     // An image comes with every acquire that gives one.
     bool given = status == mrhi_success || status == mrhi_suboptimal;
-    Expect(device->faults, !given || *imageOut != 0);
+    Expect(&device->watch, !given || *imageOut != 0, mrhi_diagnosticDriverZeroHandle);
     return status;
 }
 
@@ -395,7 +410,7 @@ static double TimestampPeriod(void* self)
     DeviceLayer* device = self;
     double period = device->inner.vtable->timestampPeriod(device->inner.self);
     // Zero for a driver that does not say; never negative or NaN.
-    Expect(device->faults, period >= 0.0);
+    Expect(&device->watch, period >= 0.0, mrhi_diagnosticDriverTimestampPeriod);
     return period;
 }
 
@@ -416,7 +431,8 @@ static void TextureMemory(const void* self, const mrhiTextureDef* def, uint64_t*
 {
     const DeviceLayer* device = self;
     device->inner.vtable->textureMemory(device->inner.self, def, bytesOut, alignmentOut);
-    Expect(device->faults, *alignmentOut != 0 && (*alignmentOut & (*alignmentOut - 1)) == 0);
+    Expect(&device->watch, *alignmentOut != 0 && (*alignmentOut & (*alignmentOut - 1)) == 0,
+           mrhi_diagnosticDriverMemoryAlignment);
 }
 
 static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* bytesOut,
@@ -424,7 +440,8 @@ static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* b
 {
     const DeviceLayer* device = self;
     device->inner.vtable->bufferMemory(device->inner.self, def, bytesOut, alignmentOut);
-    Expect(device->faults, *alignmentOut != 0 && (*alignmentOut & (*alignmentOut - 1)) == 0);
+    Expect(&device->watch, *alignmentOut != 0 && (*alignmentOut & (*alignmentOut - 1)) == 0,
+           mrhi_diagnosticDriverMemoryAlignment);
 }
 
 // Handles a frame names are never zero; the layer does not track which
@@ -438,7 +455,8 @@ static bool IsHandle(const void* handles, uint64_t handle)
 static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag)
 {
     DeviceLayer* device = self;
-    Expect(device->faults, mrhiWalkFrame(frame, IsHandle, nullptr, nullptr) == 0);
+    Expect(&device->watch, mrhiWalkFrame(frame, IsHandle, nullptr, nullptr) == 0,
+           mrhi_diagnosticDriverFrameWalk);
     return device->inner.vtable->submitFrame(device->inner.self, frame, tag);
 }
 
@@ -446,12 +464,13 @@ static size_t PollDevice(void* self, mrhiDriverEvent* events, size_t capacity)
 {
     DeviceLayer* device = self;
     size_t moved = device->inner.vtable->poll(device->inner.self, events, capacity);
-    Expect(device->faults, moved <= capacity);
+    Expect(&device->watch, moved <= capacity, mrhi_diagnosticDriverEventsOverrun);
     moved = moved <= capacity ? moved : capacity;
     for (size_t i = 0; i < moved; ++i)
     {
         // Tag 0 is the device's loss, and only that.
-        Expect(device->faults, events[i].tag != 0 || events[i].outcome == mrhi_errorDeviceLost);
+        Expect(&device->watch, events[i].tag != 0 || events[i].outcome == mrhi_errorDeviceLost,
+               mrhi_diagnosticDriverEventTag);
     }
     return moved;
 }

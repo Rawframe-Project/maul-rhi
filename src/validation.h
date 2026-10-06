@@ -9,16 +9,19 @@
 #ifndef MAUL_RHI_SRC_VALIDATION_H
 #define MAUL_RHI_SRC_VALIDATION_H
 
+#include "diagnostics.h"
 #include "driver.h"
 
 #include <stdatomic.h>
 
 // Wraps a started driver in place, with room for tagLimit unanswered
-// requests and breaches counted into faults: success, or
+// requests and breaches counted into faults and recorded in diagnostics:
+// success, or
 // mrhi_errorCapacity when the allocator fails, which leaves the driver
 // as it was.
 mrhiResult mrhiWrapDriver(const mrhiAllocator* allocator, uint32_t tagLimit,
-                          _Atomic uint64_t* faults, mrhiInstanceDriver* driver);
+                          _Atomic uint64_t* faults, mrhiDiagnosticQueue* diagnostics,
+                          mrhiInstanceDriver* driver);
 
 // The driver under the layer, for the native doors, which reach their
 // own driver's objects; the driver itself in builds without the layer.
