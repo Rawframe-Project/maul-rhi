@@ -12,34 +12,52 @@ Direct3D 12, Metal and WebGPU; the design records in
 ## 1. The model
 
 A program opens an instance, asks it for adapters, opens a device on
-one, and sends work to the device as frames:
+one, and sends work to the device as frames. With
+`maul-rhi/instance.h` and `maul-rhi/device.h` included:
 
 ```c
-#include "maul-rhi/device.h"
-#include "maul-rhi/instance.h"
-
-mrhiInstanceDef instanceDef = mrhiDefaultInstanceDef();
-mrhiInstance* instance = NULL;
-mrhiCreateInstance(&instanceDef, &instance);
-
-mrhiAdapterRequestDef request = mrhiDefaultAdapterRequestDef();
-mrhiRequestId searched;
-mrhiRequestAdapters(instance, &request, &searched);
-mrhiInstanceNotification record;
-while (mrhiNextInstanceNotification(instance, &record) != mrhi_success)
+// Opens a device on the best adapter, software rasterizers allowed.
+// The caller destroys what it got, the device first: *deviceOut when
+// not NULL, then *instanceOut when not NULL.
+static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
 {
-    // On the web the browser answers between the page's tasks.
-}
-mrhiAdapterId adapter;
-size_t count = 0;
-mrhiGetAdapters(instance, &adapter, 1, &count);
+    *instanceOut = NULL;
+    *deviceOut = NULL;
+    mrhiInstanceDef instanceDef = mrhiDefaultInstanceDef();
+    if (mrhiCreateInstance(&instanceDef, instanceOut) != mrhi_success)
+    {
+        return false;
+    }
+    mrhiInstance* instance = *instanceOut;
 
-mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-deviceDef.adapter = adapter;
-mrhiDevice* device = NULL;
-mrhiRequestId opened;
-mrhiCreateDevice(instance, &deviceDef, &device, &opened);
-// mrhi_instanceDeviceReady answers the opening.
+    // Natively each answer is queued by the time the call returns; on
+    // the web it comes between the page's tasks, so a page looks again
+    // on a later frame.
+    mrhiAdapterRequestDef request = mrhiDefaultAdapterRequestDef();
+    request.allowSoftware = true;
+    mrhiRequestId searched;
+    mrhiInstanceNotification record;
+    mrhiAdapterId adapter;
+    size_t count = 0;
+    if (mrhiRequestAdapters(instance, &request, &searched) != mrhi_success ||
+        mrhiNextInstanceNotification(instance, &record) != mrhi_success ||
+        record.outcome != mrhi_success ||
+        mrhiGetAdapters(instance, &adapter, 1, &count) != mrhi_success || count == 0)
+    {
+        return false;
+    }
+
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.adapter = adapter;
+    mrhiRequestId opened;
+    if (mrhiCreateDevice(instance, &deviceDef, deviceOut, &opened) != mrhi_success)
+    {
+        return false;
+    }
+    // mrhi_instanceDeviceReady answers the opening.
+    return mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+           record.kind == mrhi_instanceDeviceReady && record.outcome == mrhi_success;
+}
 ```
 
 Three rules hold everywhere:
@@ -153,49 +171,62 @@ discarded on chip.
 A frame is begun, built, compiled, recorded and submitted:
 
 ```c
-mrhiFrameDef frame = mrhiDefaultFrameDef();
-mrhiBeginFrame(device, &frame);
+// Draws a triangle in a color its pipeline's root block takes into a
+// 64x64 target the frame alone holds, and reads the target back: the
+// pixels answer *pixelsOut once the frame *tokenOut has finished.
+static bool DrawAndRead(mrhiDevice* device, mrhiGraphicsPipelineId pipeline, const float color[4],
+                        mrhiRequestId* pixelsOut, mrhiRequestId* tokenOut)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    if (mrhiBeginFrame(device, &frame) != mrhi_success)
+    {
+        return false;
+    }
 
-mrhiTextureDef targetDef = mrhiDefaultTextureDef();
-targetDef.format = mrhi_formatRgba8Unorm;
-targetDef.width = 64;
-targetDef.height = 64;
-mrhiResourceId target;
-mrhiDeclareTexture(device, &targetDef, &target);
+    mrhiTextureDef targetDef = mrhiDefaultTextureDef();
+    targetDef.format = mrhi_formatRgba8Unorm;
+    targetDef.width = 64;
+    targetDef.height = 64;
+    mrhiResourceId target = {0};
+    bool built = mrhiDeclareTexture(device, &targetDef, &target) == mrhi_success;
 
-mrhiPassDef drawDef = mrhiDefaultPassDef();
-drawDef.colorTargets[0] = (mrhiColorTarget){
-    .resource = target, .load = mrhi_loadClear, .store = mrhi_storeKeep};
-drawDef.colorTargetCount = 1;
-mrhiPassId draw;
-mrhiAddPass(device, &drawDef, &draw);
+    mrhiPassDef drawDef = mrhiDefaultPassDef();
+    drawDef.colorTargets[0] =
+        (mrhiColorTarget){.resource = target, .load = mrhi_loadClear, .store = mrhi_storeKeep};
+    drawDef.colorTargetCount = 1;
+    mrhiPassId draw = {0};
+    built = built && mrhiAddPass(device, &drawDef, &draw) == mrhi_success;
 
-const mrhiAccess read = {.resource = target, .kind = mrhi_accessCopySource,
-                         .range = {.mipCount = 1, .layerCount = 1}};
-mrhiPassDef readDef = mrhiDefaultPassDef();
-readDef.passClass = mrhi_passTransfer;
-readDef.accesses = &read;
-readDef.accessCount = 1;
-readDef.neverCull = true;
-mrhiPassId reading;
-mrhiAddPass(device, &readDef, &reading);
+    const mrhiAccess read = {.resource = target,
+                             .kind = mrhi_accessCopySource,
+                             .range = {.mipCount = 1, .layerCount = 1}};
+    mrhiPassDef readDef = mrhiDefaultPassDef();
+    readDef.passClass = mrhi_passTransfer;
+    readDef.accesses = &read;
+    readDef.accessCount = 1;
+    readDef.neverCull = true;
+    mrhiPassId reading = {0};
+    built = built && mrhiAddPass(device, &readDef, &reading) == mrhi_success &&
+            mrhiCompileFrame(device) == mrhi_success;
 
-mrhiCompileFrame(device);
-
-mrhiBeginPass(device, draw);
-mrhiSetGraphicsPipeline(device, draw, pipeline);
-mrhiDraw(device, draw, 3, 1, 0, 0);
-mrhiEndPass(device, draw);
-
-mrhiRequestId pixels;
-const mrhiTextureCopy source = {.resource = target};
-const mrhiExtent3d extent = {64, 64, 1};
-mrhiBeginPass(device, reading);
-mrhiReadTexture(device, reading, &source, &extent, &pixels);
-mrhiEndPass(device, reading);
-
-mrhiRequestId token;
-mrhiSubmitFrame(device, &token);
+    const mrhiTextureCopy source = {.resource = target};
+    const mrhiExtent3d extent = {64, 64, 1};
+    bool recorded = built && mrhiBeginPass(device, draw) == mrhi_success &&
+                    mrhiSetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
+                    mrhiSetRootBlock(device, draw, 0, color, 4 * sizeof(float)) == mrhi_success &&
+                    mrhiDraw(device, draw, 3, 1, 0, 0) == mrhi_success &&
+                    mrhiEndPass(device, draw) == mrhi_success &&
+                    mrhiBeginPass(device, reading) == mrhi_success &&
+                    mrhiReadTexture(device, reading, &source, &extent, pixelsOut) == mrhi_success &&
+                    mrhiEndPass(device, reading) == mrhi_success;
+    if (!recorded)
+    {
+        // Nothing of the frame runs.
+        (void)mrhiDropFrame(device);
+        return false;
+    }
+    return mrhiSubmitFrame(device, tokenOut) == mrhi_success;
+}
 ```
 
 - **Building.** Each pass names what it touches: its accesses
@@ -282,6 +313,7 @@ order, and `mrhiConfigureSurface` configures it on a device.
 A program on Maul Window copies the window's native handle bundle into
 the source of its platform; nothing else crosses (mrhi-0028):
 
+<!-- guide: not run: Maul Window's types; test/seam/seam.c runs the whole copy against Maul Window -->
 ```c
 static const mrhiChain* SourceFrom(const mwinNativeHandles* handles, SeamSource* source)
 {

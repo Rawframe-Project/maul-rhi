@@ -33,6 +33,7 @@ jobs:
           python3 tools/check_modules.py
           python3 tools/check_docs.py
           python3 tools/check_lengths.py
+          python3 tools/check_guide.py
       - name: API reference
         # docs/api.md is what the generator makes from the headers, and
         # the README gives its function count.

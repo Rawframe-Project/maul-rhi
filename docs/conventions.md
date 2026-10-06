@@ -347,8 +347,12 @@ completion pairing.
   and ThreadSanitizer, with warnings as errors on GCC and Clang.
 - Long-running soaks and fuzzing campaigns stay out of the default
   CTest set and run on a schedule.
+- Every C snippet of `docs/guide.md` is built and run by a test, as
+  written, in `test/test_guide*.c` (a whole program waiting for its
+  user is built only); a fragment no test can build everywhere is
+  marked `<!-- guide: not run: REASON -->` right above its fence.
 
-Checked by: CI.
+Checked by: CI; `tools/check_guide.py` for the guide's snippets.
 
 ## 14. Performance
 

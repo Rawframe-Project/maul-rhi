@@ -473,6 +473,18 @@ if(MAUL_RHI_BUILD_SAMPLES)
     add_subdirectory(samples)
 endif()
 
+# The guide's C snippets as written (family record 0019), run natively on
+# the samples' harness and triangle; the web's waits are a later frame's.
+if(MAUL_RHI_BUILD_TESTS AND NOT (EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "WASI"))
+    add_executable(test_guide test/test_guide.c samples/harness.c)
+    target_link_libraries(test_guide PRIVATE maul-rhi)
+    target_include_directories(test_guide PRIVATE ${PROJECT_SOURCE_DIR}/samples)
+    maul_apply_flags(test_guide)
+    add_test(NAME guide COMMAND test_guide)
+    set_tests_properties(guide PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "${maul_rhi_test_env}"
+                         FAIL_REGULAR_EXPRESSION "Validation Error")
+endif()
+
 # The seam with Maul Window, test only (mrhi-0028).
 if(MAUL_RHI_SEAM AND MAUL_RHI_BUILD_TESTS)
     add_subdirectory(test/seam)
