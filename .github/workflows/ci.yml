@@ -409,7 +409,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Configure
-        run: cmake -B build -T ClangCL -D${PREFIX}_WERROR=ON
+        # With the seam check: a Maul Window window on WARP (mrhi-0028).
+        run: cmake -B build -T ClangCL -D${PREFIX}_WERROR=ON -DMAUL_RHI_SEAM=ON
       - name: Build
         run: cmake --build build --config Debug -j 4
       - name: Place the Agility SDK beside the tests
