@@ -288,8 +288,9 @@ mrhiResult mrhiCheckTextureTransfer(const mrhiDevice* device, const mrhiTextureC
 }
 
 // Checks a copy between a buffer and a texture, the texture being the
-// source when asked: success with the sides resolved, or the refusal.
-static mrhiResult CheckBufferTexture(const mrhiDevice* device, const mrhiFramePass* pass,
+// source when asked: success with the sides resolved, or the refusal,
+// invalid input counted as misuse under its check.
+static mrhiResult CheckBufferTexture(mrhiDevice* device, const mrhiFramePass* pass,
                                      const mrhiBufferCopy* buffer, const mrhiTextureCopy* texture,
                                      const mrhiExtent3d* size, bool fromTexture,
                                      uint32_t* bufferOut, mrhiTextureSide* textureOut)
@@ -298,13 +299,13 @@ static mrhiResult CheckBufferTexture(const mrhiDevice* device, const mrhiFramePa
     uint32_t object = mrhiFindKind(device, buffer->resource, true, &status);
     if (object == 0)
     {
-        return status;
+        return mrhiRefuse(device, status, mrhi_diagnosticResourceKind);
     }
     mrhiFormatCopy facts;
     status = mrhiCheckTextureTransfer(device, texture, size, fromTexture, textureOut, &facts);
     if (status != mrhi_success)
     {
-        return status;
+        return mrhiRefuse(device, status, mrhi_diagnosticTextureRegion);
     }
     const mrhiTextureDef* def = textureOut->def;
     uint32_t alignment = mrhiFormatHasDepth(def->format) ? 4 : facts.bytes;
@@ -314,11 +315,15 @@ static mrhiResult CheckBufferTexture(const mrhiDevice* device, const mrhiFramePa
                                    mrhiGetFormatBlock(def->format), facts.bytes, size, true);
     mrhiAccessKind bufferKind = fromTexture ? mrhi_accessCopyDestination : mrhi_accessCopySource;
     mrhiAccessKind textureKind = fromTexture ? mrhi_accessCopySource : mrhi_accessCopyDestination;
-    if (!valid || !mrhiPassDeclares(device, pass, object, MRHI_KIND(bufferKind), nullptr) ||
+    if (!valid)
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticBufferTextureCopy);
+    }
+    if (!mrhiPassDeclares(device, pass, object, MRHI_KIND(bufferKind), nullptr) ||
         !mrhiPassDeclares(device, pass, textureOut->object, MRHI_KIND(textureKind),
                           &textureOut->part))
     {
-        return mrhi_errorInvalid;
+        return mrhiDeviceMisuse(device, mrhi_diagnosticUndeclaredAccess);
     }
     *bufferOut = object;
     return mrhi_success;
@@ -349,7 +354,7 @@ static mrhiResult CopyBufferTexture(mrhiDevice* device, mrhiPassId id, const mrh
     status = CheckBufferTexture(device, pass, buffer, texture, size, fromTexture, &object, &side);
     if (status != mrhi_success)
     {
-        return mrhiRefuse(device, status, mrhi_diagnosticBufferTextureCopy);
+        return status;
     }
     // An empty copy is valid and copies nothing; drivers never see it
     // (Vulkan refuses empty regions).
@@ -439,12 +444,15 @@ mrhiResult mrhiCopyTexture(mrhiDevice* device, mrhiPassId id, const mrhiTextureC
     mrhiFormat b = to.def->format;
     bool compatible = a == b || mrhiFormatSrgbPair(a) == b;
     if (!compatible || from.def->sampleCount != to.def->sampleCount || !IsEveryAspect(&from) ||
-        !IsEveryAspect(&to) ||
-        !mrhiPassDeclares(device, pass, from.object, MRHI_KIND(mrhi_accessCopySource),
+        !IsEveryAspect(&to))
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticCopyTextureMismatch);
+    }
+    if (!mrhiPassDeclares(device, pass, from.object, MRHI_KIND(mrhi_accessCopySource),
                           &from.part) ||
         !mrhiPassDeclares(device, pass, to.object, MRHI_KIND(mrhi_accessCopyDestination), &to.part))
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticCopyTextureMismatch);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticUndeclaredAccess);
     }
     // An empty copy is valid and copies nothing; drivers never see it
     // (Vulkan refuses empty regions).

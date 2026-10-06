@@ -75,13 +75,13 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticResourceKind:
         return "A texture given where a buffer is wanted, or a buffer where a texture is.";
     case mrhi_diagnosticBufferTextureCopy:
-        return "A copy between a buffer and a texture whose layout the buffer cannot hold, whose region is off the texture's blocks or past its mip, or without the accesses the pass declares.";
+        return "A copy between a buffer and a texture whose layout the buffer cannot hold: an offset not a multiple of the texel block's bytes (4 for depth), bytes per row not a multiple of 256, rows or images shorter than the copy needs, or a region past the buffer.";
     case mrhi_diagnosticTextureRegion:
         return "A texture region off the format's blocks or past the mip, of a multisampled texture, or of an aspect that cannot be copied, or a buffer named as the texture.";
     case mrhi_diagnosticCopyTextureMismatch:
-        return "A texture copy between formats or sample counts that differ, of part of an aspect, or without the accesses the pass declares.";
+        return "A texture copy between formats that are neither equal nor sRGB twins, between sample counts that differ, or naming one aspect of a format that has two.";
     case mrhi_diagnosticWriteTextureLayout:
-        return "A texture write whose layout the bytes cannot hold, or without a copy destination access the pass declares.";
+        return "A texture write whose layout the bytes cannot hold: rows or images shorter than the write needs, or a region past the bytes given.";
     case mrhi_diagnosticFrameToken:
         return "A frame token this device never returned.";
     case mrhi_diagnosticTransientUsage:

@@ -141,11 +141,14 @@ mrhiResult mrhiWriteTexture(mrhiDevice* device, mrhiPassId id, const mrhiTexture
     }
     mrhiFormatBlock block = mrhiGetFormatBlock(side.def->format);
     if (!mrhiIsLayoutValid(layout->offset, layout->bytesPerRow, layout->rowsPerImage, byteCount,
-                           block, facts.bytes, size, false) ||
-        !mrhiPassDeclares(device, pass, side.object, MRHI_KIND(mrhi_accessCopyDestination),
-                          &side.part))
+                           block, facts.bytes, size, false))
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticWriteTextureLayout);
+    }
+    if (!mrhiPassDeclares(device, pass, side.object, MRHI_KIND(mrhi_accessCopyDestination),
+                          &side.part))
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticUndeclaredAccess);
     }
     uint64_t rows = size->height / block.height;
     uint64_t rowBytes = (uint64_t)(size->width / block.width) * facts.bytes;

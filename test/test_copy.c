@@ -638,10 +638,12 @@ static void TestTextures(void)
               to->object == s_r[ARRAY].index1,
           "recorded");
     size.width = 13;
-    CHECK(mrhiCopyTexture(s_device, s_pass, &source, &destination, &size) == mrhi_errorInvalid,
+    CHECK(mrhiCopyTexture(s_device, s_pass, &source, &destination, &size) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticTextureRegion,
           "past the source");
     size.width = 12;
-    CHECK(mrhiCopyTexture(s_device, s_pass, &destination, &source, &size) == mrhi_errorInvalid,
+    CHECK(mrhiCopyTexture(s_device, s_pass, &destination, &source, &size) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticUndeclaredAccess,
           "the other way than declared");
     mrhiTextureCopy layer1 = Texture(ARRAY, 0, 1);
     CHECK(mrhiCopyTexture(s_device, s_pass, &layer1, &destination, &size) == mrhi_errorInvalid,
@@ -673,7 +675,9 @@ static void TestTextures(void)
     CHECK(Between(ARRAY, all, SRGB, all, layer) == mrhi_success &&
               Between(SRGB, all, ARRAY, all, layer) == mrhi_success,
           "between sRGB twins");
-    CHECK(Between(ARRAY, all, HALF, all, layer) == mrhi_errorInvalid, "not another format");
+    CHECK(Between(ARRAY, all, HALF, all, layer) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticCopyTextureMismatch,
+          "not another format");
     mrhiExtent3d whole = {8, 8, 1};
     CHECK(Between(MULTI, all, MULTI_OTHER, all, whole) == mrhi_success, "multisampled, whole");
     CHECK(Between(MULTI, all, MULTI_OTHER, all, (mrhiExtent3d){4, 8, 1}) == mrhi_errorInvalid,

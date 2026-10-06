@@ -301,18 +301,20 @@ extern "C"
         // is.
         mrhi_diagnosticResourceKind = 37,
         // A copy between a buffer and a texture whose layout the buffer cannot
-        // hold, whose region is off the texture's blocks or past its mip, or
-        // without the accesses the pass declares.
+        // hold: an offset not a multiple of the texel block's bytes (4 for
+        // depth), bytes per row not a multiple of 256, rows or images shorter
+        // than the copy needs, or a region past the buffer.
         mrhi_diagnosticBufferTextureCopy = 40,
         // A texture region off the format's blocks or past the mip, of a
         // multisampled texture, or of an aspect that cannot be copied, or a
         // buffer named as the texture.
         mrhi_diagnosticTextureRegion = 41,
-        // A texture copy between formats or sample counts that differ, of part
-        // of an aspect, or without the accesses the pass declares.
+        // A texture copy between formats that are neither equal nor sRGB twins,
+        // between sample counts that differ, or naming one aspect of a format
+        // that has two.
         mrhi_diagnosticCopyTextureMismatch = 42,
-        // A texture write whose layout the bytes cannot hold, or without a copy
-        // destination access the pass declares.
+        // A texture write whose layout the bytes cannot hold: rows or images
+        // shorter than the write needs, or a region past the bytes given.
         mrhi_diagnosticWriteTextureLayout = 44,
         // A frame token this device never returned.
         mrhi_diagnosticFrameToken = 47,

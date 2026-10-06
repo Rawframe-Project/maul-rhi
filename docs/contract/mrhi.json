@@ -492,7 +492,7 @@
             {
               "name": "diagnostic_buffer_texture_copy",
               "value": 40,
-              "doc": "A copy between a buffer and a texture whose layout the buffer cannot hold, whose region is off the texture's blocks or past its mip, or without the accesses the pass declares."
+              "doc": "A copy between a buffer and a texture whose layout the buffer cannot hold: an offset not a multiple of the texel block's bytes (4 for depth), bytes per row not a multiple of 256, rows or images shorter than the copy needs, or a region past the buffer."
             },
             {
               "name": "diagnostic_texture_region",
@@ -502,12 +502,12 @@
             {
               "name": "diagnostic_copy_texture_mismatch",
               "value": 42,
-              "doc": "A texture copy between formats or sample counts that differ, of part of an aspect, or without the accesses the pass declares."
+              "doc": "A texture copy between formats that are neither equal nor sRGB twins, between sample counts that differ, or naming one aspect of a format that has two."
             },
             {
               "name": "diagnostic_write_texture_layout",
               "value": 44,
-              "doc": "A texture write whose layout the bytes cannot hold, or without a copy destination access the pass declares."
+              "doc": "A texture write whose layout the bytes cannot hold: rows or images shorter than the write needs, or a region past the bytes given."
             },
             {
               "name": "diagnostic_frame_token",
