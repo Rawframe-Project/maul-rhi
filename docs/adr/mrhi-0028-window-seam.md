@@ -23,9 +23,13 @@ graphics header into Maul Window, which both libraries rule out.
   window, a surface from its bundle, presents, resizes the window,
   configures and presents at the new size, and ends the surface before
   the window.
-- It runs on X11 under Xvfb with lavapipe in its own CI job and in the
-  gate first; Win32 with D3D12 and the web canvas follow as their own
-  slices. The tag moves by hand with each Maul Window release.
+- Its frames never wait for the GPU: each takes the answers that came
+  and submits a frame when the device has room, as a program on the
+  browser's frames must, so one check runs everywhere.
+- It runs on X11 under Xvfb with lavapipe (its own CI job and the
+  gate), on Win32 with D3D12's WARP device, and on the web in headless
+  Chrome with WebGPU, Maul Window's own canvas named by the window's
+  handles. The tag moves by hand with each Maul Window release.
 
 ## Consequences
 

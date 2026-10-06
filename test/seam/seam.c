@@ -4,10 +4,12 @@
 // The seam with Maul Window (mrhi-0028): a window made with Maul
 // Window, a surface made from its native handles, frames presented;
 // the window resized, the surface configured again at the new size and
-// presented to; the surface ended before the window. Maul Window is
-// fetched for this check alone (test/seam/CMakeLists.txt). Exits 77
-// without a window system or an adapter unless MAUL_RHI_REQUIRE_SURFACE
-// is set.
+// presented to; the surface ended before the window. The frames never
+// wait for the GPU: each frame takes the answers that came and submits
+// a new frame when the device has room, as a program on the browser's
+// frames must. Maul Window is fetched for this check alone
+// (test/seam/CMakeLists.txt). Exits 77 without a window system or an
+// adapter unless MAUL_RHI_REQUIRE_SURFACE is set.
 
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
@@ -23,7 +25,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define FRAMES_TO_GIVE 600
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
+// The frames the window program gives the check, and the frames
+// presented at each size before it goes on.
+#define FRAMES_TO_GIVE 1200
+#define PRESENTS       3
 
 // One surface source of each kind, the one a bundle fills.
 typedef union SeamSource
@@ -95,6 +104,7 @@ typedef enum Phase
     phaseShown,
     phasePresent,
     phaseResized,
+    phaseDrain,
     phaseDone,
 } Phase;
 
@@ -105,20 +115,22 @@ typedef struct Program
     mwinWindowId window;
     bool shown;
     // The surface, the bundle's generation it was made from, its color,
-    // and the pixel size it is configured at.
+    // the pixel size it is configured at, and the size first configured.
     mrhiSurfaceId surface;
     bool hasSurface;
     uint32_t generation;
     mrhiSurfaceColor color;
     mwinPixelSize configured;
-    // The size first configured, and the frames presented before and
-    // after the resize.
     mwinPixelSize initial;
-    int presented;
-    int resizedPresents;
+    // Frames submitted and finished, and the frames submitted before the
+    // first configuration at another size than the first.
+    int submitted;
+    int finished;
+    int resizedFrom;
     int frames;
     // Why the check could not run: a window system or surface missing.
     const char* missing;
+    int status;
 } Program;
 
 static mwinPixelSize PixelSize(mwinContext* context, mwinWindowId window)
@@ -178,36 +190,55 @@ static bool Configure(Program* program, mwinPixelSize size)
     config.height = size.height;
     program->configured = size;
     program->initial = program->initial.width == 0 ? size : program->initial;
+    if (program->resizedFrom < 0 &&
+        (size.width != program->initial.width || size.height != program->initial.height))
+    {
+        program->resizedFrom = program->submitted;
+    }
     return SampleCheck(program->sample,
                        mrhiConfigureSurface(program->sample->device, &config) == mrhi_success,
                        "configured at the window's pixel size");
 }
 
-// A frame cleared and presented: whether it was, after configuring at
-// the window's pixel size when it differs or the surface says so.
-static bool Present(Program* program, mwinContext* context)
+// Takes the answers that came: each frame that finished, a success.
+static void TakeAnswers(Program* program)
+{
+    mrhiDeviceNotification record;
+    while (mrhiNextDeviceNotification(program->sample->device, &record) == mrhi_success)
+    {
+        program->finished +=
+            SampleCheck(program->sample, record.outcome == mrhi_success, "a frame finished");
+    }
+}
+
+// Submits a frame that clears the window's image, after configuring at
+// the window's pixel size when it differs or the surface said so; none
+// while the device's frames are all running or the window has no image.
+static void Present(Program* program, mwinContext* context)
 {
     Sample* sample = program->sample;
     mwinPixelSize size = PixelSize(context, program->window);
-    if (size.width == 0 || size.height == 0)
+    if (size.width == 0 || size.height == 0 ||
+        ((size.width != program->configured.width || size.height != program->configured.height) &&
+         !Configure(program, size)))
     {
-        return false;
-    }
-    if ((size.width != program->configured.width || size.height != program->configured.height) &&
-        !Configure(program, size))
-    {
-        return false;
+        return;
     }
     mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResult begun = mrhiBeginFrame(sample->device, &frame);
+    if (begun == mrhi_errorCapacity)
+    {
+        return;
+    }
+    SampleCheck(sample, begun == mrhi_success, "a frame");
     mrhiResourceId image = {0};
-    SampleCheck(sample, mrhiBeginFrame(sample->device, &frame) == mrhi_success, "a frame");
     mrhiResult acquired = mrhiAcquireSurfaceImage(sample->device, program->surface, &image);
     if (acquired != mrhi_success)
     {
         SampleCheck(sample, mrhiDropFrame(sample->device) == mrhi_success, "the frame dropped");
         // Out of date or suboptimal: configure again at the next frame.
         program->configured = (mwinPixelSize){0};
-        return false;
+        return;
     }
     mrhiPassDef def = mrhiDefaultPassDef();
     def.colorTargets[0] = (mrhiColorTarget){
@@ -219,14 +250,13 @@ static bool Present(Program* program, mwinContext* context)
     def.colorTargetCount = 1;
     mrhiPassId pass = {0};
     mrhiRequestId token = {0};
-    bool submitted = SampleCheck(sample,
-                                 mrhiAddPass(sample->device, &def, &pass) == mrhi_success &&
-                                     mrhiCompileFrame(sample->device) == mrhi_success &&
-                                     mrhiBeginPass(sample->device, pass) == mrhi_success &&
-                                     mrhiEndPass(sample->device, pass) == mrhi_success &&
-                                     mrhiSubmitFrame(sample->device, &token) == mrhi_success,
-                                 "the image cleared and submitted");
-    return submitted && SampleWait(sample, token);
+    program->submitted += SampleCheck(sample,
+                                      mrhiAddPass(sample->device, &def, &pass) == mrhi_success &&
+                                          mrhiCompileFrame(sample->device) == mrhi_success &&
+                                          mrhiBeginPass(sample->device, pass) == mrhi_success &&
+                                          mrhiEndPass(sample->device, pass) == mrhi_success &&
+                                          mrhiSubmitFrame(sample->device, &token) == mrhi_success,
+                                      "the image cleared and submitted");
 }
 
 static void Collect(Program* program, mwinContext* context)
@@ -246,31 +276,22 @@ static mwinResult Init(mwinContext* context, void* user)
     return mwinCreateWindow(context, &def, &program->window, nullptr);
 }
 
-static mwinFrameResult Frame(mwinContext* context, void* user)
+// Moves the check on by one of the window program's frames.
+static void Step(Program* program, mwinContext* context)
 {
-    Program* program = user;
     Sample* sample = program->sample;
-    Collect(program, context);
-    if (++program->frames > FRAMES_TO_GIVE)
-    {
-        SampleCheck(sample, false, "every phase within its frames");
-        return mwin_frameStop;
-    }
     switch (program->phase)
     {
     case phaseShown:
-        if (program->shown && EnsureSurface(program, context))
-        {
-            program->phase = phasePresent;
-        }
-        else if (program->missing != nullptr)
-        {
-            return mwin_frameStop;
-        }
+        program->phase =
+            program->shown && EnsureSurface(program, context) ? phasePresent : phaseShown;
         break;
     case phasePresent:
-        program->presented += EnsureSurface(program, context) && Present(program, context);
-        if (program->presented == 3)
+        if (EnsureSurface(program, context))
+        {
+            Present(program, context);
+        }
+        if (program->finished >= PRESENTS)
         {
             SampleCheck(sample,
                         mwinRequestSize(context, program->window, (mwinSize){200.0f, 150.0f},
@@ -280,57 +301,110 @@ static mwinFrameResult Frame(mwinContext* context, void* user)
         }
         break;
     case phaseResized:
-        // Frames present on until three have at the new size.
-        if (EnsureSurface(program, context) && Present(program, context) &&
-            (program->configured.width != program->initial.width ||
-             program->configured.height != program->initial.height) &&
-            ++program->resizedPresents == 3)
+        if (EnsureSurface(program, context))
         {
-            program->phase = phaseDone;
+            Present(program, context);
+        }
+        // Frames finish in order: those past the mark were at the new size.
+        if (program->resizedFrom >= 0 && program->finished - program->resizedFrom >= PRESENTS)
+        {
+            program->phase = phaseDrain;
         }
         break;
+    case phaseDrain:
+        program->phase = program->finished == program->submitted ? phaseDone : phaseDrain;
+        break;
     default:
-        SampleCheck(sample, mrhiDestroySurface(sample->instance, program->surface) == mrhi_success,
-                    "the surface destroyed before the window");
-        program->hasSurface = false;
-        SampleCheck(sample, mwinDestroyWindow(context, program->window) == mwin_success,
-                    "the window destroyed");
+        break;
+    }
+}
+
+static mwinFrameResult Frame(mwinContext* context, void* user)
+{
+    Program* program = user;
+    Collect(program, context);
+    TakeAnswers(program);
+    if (++program->frames > FRAMES_TO_GIVE)
+    {
+        SampleCheck(program->sample, false, "every phase within its frames");
         return mwin_frameStop;
     }
-    return mwin_frameContinue;
+    Step(program, context);
+    if (program->missing != nullptr)
+    {
+        return mwin_frameStop;
+    }
+    if (program->phase != phaseDone)
+    {
+        return mwin_frameContinue;
+    }
+    SampleCheck(program->sample,
+                mrhiDestroySurface(program->sample->instance, program->surface) == mrhi_success,
+                "the surface destroyed before the window");
+    program->hasSurface = false;
+    SampleCheck(program->sample, mwinDestroyWindow(context, program->window) == mwin_success,
+                "the window destroyed");
+    return mwin_frameStop;
+}
+
+// Ends the check once the window program stops: its status, and on the
+// web, where mwinRun returned at once, the page's exit.
+static void Quit(mwinContext* context, mwinResult status, void* user)
+{
+    (void)context;
+    Program* program = user;
+    Sample* sample = program->sample;
+    const char* required = getenv("MAUL_RHI_REQUIRE_SURFACE");
+    bool require = required != nullptr && required[0] != '\0';
+    if (program->hasSurface)
+    {
+        (void)mrhiDestroySurface(sample->instance, program->surface);
+    }
+    if (program->missing != nullptr)
+    {
+        printf("%s: %s\n", require ? "FAIL" : "skip", program->missing);
+        SampleClose(sample);
+        program->status = require ? 1 : SAMPLE_SKIPPED;
+    }
+    else
+    {
+        printf("presented %d frames, the first at %ux%u, the last %d at %ux%u\n", program->finished,
+               program->initial.width, program->initial.height,
+               program->finished - program->resizedFrom, program->configured.width,
+               program->configured.height);
+        SampleCheck(sample, status == mwin_success, "the window program ran");
+        SampleCheck(sample, program->phase == phaseDone, "every phase ran");
+        program->status = SampleClose(sample);
+    }
+#ifdef __EMSCRIPTEN__
+    exit(program->status);
+#endif
 }
 
 int main(void)
 {
-    Sample sample;
+    static Sample sample;
     int opened = SampleOpen(&sample, nullptr);
     if (opened != 0)
     {
         return opened;
     }
-    Program program = {.sample = &sample};
+    static Program program;
+    program = (Program){.sample = &sample, .resizedFrom = -1, .status = -1};
     mwinAppDef def = mwinDefaultAppDef();
     def.init = Init;
     def.frame = Frame;
+    def.quit = Quit;
     def.user = &program;
     mwinResult ran = mwinRun(&def);
+    if (program.status >= 0)
+    {
+        return program.status;
+    }
+    // The window program never started: no window system here.
     const char* required = getenv("MAUL_RHI_REQUIRE_SURFACE");
     bool require = required != nullptr && required[0] != '\0';
-    if (ran == mwin_errorUnsupported || program.missing != nullptr)
-    {
-        printf("%s: %s\n", require ? "FAIL" : "skip",
-               program.missing != nullptr ? program.missing : "no window system");
-        SampleClose(&sample);
-        return require ? 1 : SAMPLE_SKIPPED;
-    }
-    printf("presented %d frames at %ux%u, then %d at %ux%u\n", program.presented,
-           program.initial.width, program.initial.height, program.resizedPresents,
-           program.configured.width, program.configured.height);
-    SampleCheck(&sample, ran == mwin_success, "the window program ran");
-    SampleCheck(&sample, program.phase == phaseDone, "every phase ran");
-    if (program.hasSurface)
-    {
-        (void)mrhiDestroySurface(sample.instance, program.surface);
-    }
-    return SampleClose(&sample);
+    printf("%s: the window program did not start (%d)\n", require ? "FAIL" : "skip", (int)ran);
+    SampleClose(&sample);
+    return require ? 1 : SAMPLE_SKIPPED;
 }

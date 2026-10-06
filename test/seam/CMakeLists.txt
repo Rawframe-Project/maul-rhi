@@ -14,6 +14,13 @@ add_executable(test_seam seam.c ${PROJECT_SOURCE_DIR}/samples/harness.c)
 target_include_directories(test_seam PRIVATE ${PROJECT_SOURCE_DIR}/samples)
 target_link_libraries(test_seam PRIVATE maul-rhi maul-window::maul-window)
 maul_apply_flags(test_seam)
-add_test(NAME seam COMMAND test_seam)
+if(EMSCRIPTEN)
+    # In headless Chrome on the runner's page, as the samples run.
+    target_link_options(test_seam PRIVATE -sJSPI -sEXIT_RUNTIME -sEXPORTED_RUNTIME_METHODS=ENV)
+    add_test(NAME seam COMMAND node ${PROJECT_SOURCE_DIR}/test/web_runner.cjs
+                               $<TARGET_FILE:test_seam>)
+else()
+    add_test(NAME seam COMMAND test_seam)
+endif()
 set_tests_properties(seam PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "${maul_rhi_test_env}"
                      FAIL_REGULAR_EXPRESSION "Validation Error")

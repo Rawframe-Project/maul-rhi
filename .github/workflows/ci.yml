@@ -545,7 +545,7 @@ jobs:
       - name: Configure
         run: |
           emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_WERROR=ON \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DMAUL_RHI_SEAM=ON
       - name: Build
         run: cmake --build build -j 4
       - name: clang-tidy
@@ -566,6 +566,14 @@ jobs:
           MRHI_NODE_MODULES: /tmp/browser/node_modules
           MAUL_RHI_REQUIRE_WEBGPU: "1"
         run: ctest --test-dir build --output-on-failure
+      - name: Seam
+        # The seam with Maul Window (mrhi-0028): its canvas, named by the
+        # window's handles, presented to; it must not be skipped.
+        env:
+          MRHI_NODE_MODULES: /tmp/browser/node_modules
+          MAUL_RHI_REQUIRE_WEBGPU: "1"
+          MAUL_RHI_REQUIRE_SURFACE: "1"
+        run: ctest --test-dir build -R '^seam$' --output-on-failure
       - name: Size
         # The wasm budget (mrhi-0001): the library at -Oz without its
         # tests, every public function kept.
