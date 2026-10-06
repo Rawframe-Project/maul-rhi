@@ -348,6 +348,11 @@ MRHI_NODISCARD MRHI_API mrhiResult mrhiWaitFrame(mrhiDevice* device, mrhiRequest
 Waits until a submitted frame finishes on the GPU, or the deadline passes. On the web, where nothing may block, a frame not yet finished times out at once.  @param device     The device. @param token      The frame's token. @param timeoutNs  The longest wait in nanoseconds; 0 only checks. @return `mrhi_success` once the frame has finished; `mrhi_timeout` when the deadline passed first; `mrhi_errorInvalid` for a NULL device or a token the device never gave. @par Thread safety Safe from any thread; the device is used by one thread at a time.
 
 ```c
+MRHI_NODISCARD MRHI_API mrhiResult mrhiNextDeviceNotification(mrhiDevice* device, mrhiDeviceNotification* notificationOut);
+```
+Takes the oldest record from the device's notification queue, first taking in the frames the GPU finished.  @param device           The device. @param notificationOut  Receives the record. @return `mrhi_success` with a record; `mrhi_empty` when the queue is drained; `mrhi_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread; the device is used by one thread at a time.
+
+```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiDeclareTexture(mrhiDevice* device, const mrhiTextureDef* def, mrhiResourceId* resourceOut);
 ```
 Declares a texture the open frame's graph makes, aliases and ends with the frame. Its usages are derived from the passes that use it, and checked against its format when the frame is compiled.  @param device       The device. @param def          The texture, with a usage of 0. @param resourceOut  Receives the frame's id for it. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a usage other than 0, or a shape mrhiCreateTexture refuses as invalid; `mrhi_errorUnsupported` for a size past the device's limits, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's frameResources limit is reached. @par Thread safety Safe from any thread; the device is used by one thread at a time.
@@ -506,6 +511,11 @@ MRHI_NODISCARD MRHI_API mrhiResult mrhiRequestAdapters(mrhiInstance* instance, c
 Asks the instance's drivers for adapters. The request is answered by one mrhi_instanceAdaptersFound record; until then, mrhiGetAdapters lists the adapters found before.  @param instance    The instance. @param def         The adapters to look for. @param requestOut  Receives the request's id. @return `mrhi_success` with the request accepted; `mrhi_errorInvalid` for a NULL argument or a def without its cookie; `mrhi_errorStale` for a compatible surface the instance no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the notification queue has no room for the answer. @par Thread safety Safe from any thread; the instance is used by one thread at a time.
 
 ```c
+MRHI_NODISCARD MRHI_API mrhiResult mrhiNextInstanceNotification(mrhiInstance* instance, mrhiInstanceNotification* notificationOut);
+```
+Takes the oldest record from the instance's notification queue, first polling its drivers for finished work.  @param instance         The instance. @param notificationOut  Receives the record. @return `mrhi_success` with a record; `mrhi_empty` when the queue is drained; `mrhi_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread; the instance is used by one thread at a time.
+
+```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiGetAdapters(mrhiInstance* instance, mrhiAdapterId* adapters, size_t capacity, size_t* countOut);
 ```
 Lists the adapters the last answered request found, best first by its preference.  @param instance  The instance. @param adapters  Receives up to capacity ids. May be NULL when capacity is 0. @param capacity  The ids adapters holds. @param countOut  Receives the number of adapters, which may exceed capacity. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL instance or count, or a NULL array with a capacity. @par Thread safety Safe from any thread; the instance is used by one thread at a time.
@@ -542,6 +552,11 @@ Pipelines: a shader container's entry points with everything fixed for them, mad
 mrhiGraphicsPipelineDef mrhiDefaultGraphicsPipelineDef(void);
 ```
 Returns the default graphics pipeline def: triangle lists, no culling, no depth or stencil target, one sample, and color targets that write every channel without blending; its shader and entries must be set.  @return The def, with a valid cookie. @par Thread safety Safe from any thread.
+
+```c
+MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateGraphicsPipeline(mrhiDevice* device, const mrhiGraphicsPipelineDef* def, mrhiGraphicsPipelineId* pipelineOut, mrhiRequestId* requestOut);
+```
+Makes a graphics pipeline on a ready device, checked against its shader's reflection and the device as WebGPU checks it. It returns at once with the pipeline pending, and the device's queue answers the request with mrhi_devicePipelineReady; a pipeline is usable once that answer is mrhi_success.  @param device       The device. @param def          The pipeline to make. @param pipelineOut  Receives the pipeline. @param requestOut   Receives the id its ready record answers. @return `mrhi_success` with the pipeline pending; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, entries the shader has not as vertex and fragment entries, constants as for compute pipelines, or state that contradicts itself, the reflection or WebGPU's rules; `mrhi_errorStale` for a shader the device no longer has; `mrhi_errorUnsupported` for vertex buffers, attributes, strides, inter- stage variables or color bytes past the device's limits, target formats the device cannot render, blend or multisample as asked, unclipped depth without its feature, views past one without multiview or past its limit, a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's pipeline limit is reached or its queue has no room for the answer; `mrhi_errorPlatform` when the driver refuses at once. @par Thread safety Safe from any thread; the device is used by one thread at a time.
 
 ```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyGraphicsPipeline(mrhiDevice* device, mrhiGraphicsPipelineId pipeline);
@@ -756,4 +771,4 @@ Hands a native pass the command buffer the program recorded for it: a primary Vk
 
 ---
 
-139 functions across 15 headers.
+142 functions across 15 headers.
