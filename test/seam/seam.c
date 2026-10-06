@@ -102,6 +102,30 @@ static const mrhiChain* SourceFrom(const mwinNativeHandles* handles, SeamSource*
     }
 }
 
+// The window system a bundle names, for the summary.
+static const char* PlatformName(mwinPlatform platform)
+{
+    switch (platform)
+    {
+    case mwin_platformWin32:
+        return "Win32";
+    case mwin_platformWayland:
+        return "Wayland";
+    case mwin_platformX11:
+        return "X11";
+    case mwin_platformAndroid:
+        return "Android";
+    case mwin_platformMacOS:
+        return "macOS";
+    case mwin_platformIOS:
+        return "iOS";
+    case mwin_platformWeb:
+        return "the web";
+    default:
+        return "an unknown platform";
+    }
+}
+
 typedef enum Phase
 {
     phaseShown,
@@ -131,6 +155,8 @@ typedef struct Program
     int finished;
     int resizedFrom;
     time_t deadline;
+    // The window system the surface came from.
+    const char* platform;
     // Why the check could not run: a window system or surface missing.
     const char* missing;
     int status;
@@ -173,6 +199,7 @@ static bool EnsureSurface(Program* program, mwinContext* context)
         return false;
     }
     program->hasSurface = true;
+    program->platform = PlatformName(handles.platform);
     program->generation = handles.surfaceGeneration;
     program->configured = (mwinPixelSize){0};
     mrhiSurfaceCaps caps;
@@ -371,7 +398,8 @@ static void Quit(mwinContext* context, mwinResult status, void* user)
     }
     else
     {
-        printf("presented %d frames, the first at %ux%u, the last %d at %ux%u\n", program->finished,
+        printf("presented %d frames on %s, the first at %ux%u, the last %d at %ux%u\n",
+               program->finished, program->platform != nullptr ? program->platform : "nothing",
                program->initial.width, program->initial.height,
                program->finished - program->resizedFrom, program->configured.width,
                program->configured.height);

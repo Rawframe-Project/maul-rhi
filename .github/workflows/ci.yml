@@ -268,23 +268,24 @@ jobs:
 
   seam:
     # The seam with Maul Window (mrhi-0028): Maul Window fetched at its
-    # release tag for this check alone, its X11 window on Xvfb made into
-    # a surface on lavapipe, under the validation layer.
-    name: seam-x11
+    # release tag for this check alone, its X11 window on Xvfb and its
+    # Wayland window on weston's headless compositor made into surfaces
+    # on lavapipe, under the validation layer.
+    name: seam-linux
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install the compiler, lavapipe, Xvfb and Maul Window's X11 files
+      - name: Install the compiler, lavapipe, Xvfb, weston and Maul Window's files
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q clang-20 ninja-build mesa-vulkan-drivers \
-            vulkan-validationlayers xvfb libxcb1-dev libxcb-randr0-dev libxcb-xkb-dev \
-            libxcb-cursor-dev libxcb-render0-dev libxcb-xinput-dev libxkbcommon-dev \
-            libxkbcommon-x11-dev
+            vulkan-validationlayers xvfb weston libwayland-dev wayland-protocols \
+            libxcb1-dev libxcb-randr0-dev libxcb-xkb-dev libxcb-cursor-dev \
+            libxcb-render0-dev libxcb-xinput-dev libxkbcommon-dev libxkbcommon-x11-dev
       - name: Configure
         run: |
           cmake -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -DMAUL_RHI_WERROR=ON \
-            -DMAUL_RHI_SEAM=ON -DMAUL_WINDOW_WAYLAND=OFF
+            -DMAUL_RHI_SEAM=ON
       - name: Build
         run: cmake --build build --target test_seam
       - name: Test
@@ -292,7 +293,14 @@ jobs:
           MAUL_RHI_REQUIRE_VULKAN: "1"
           MAUL_RHI_REQUIRE_SURFACE: "1"
           VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
-        run: xvfb-run -a ctest --test-dir build -R '^seam$' --output-on-failure
+        run: |
+          echo "== X11"
+          xvfb-run -a ctest --test-dir build -R '^seam$' --output-on-failure
+          echo "== Wayland"
+          export XDG_RUNTIME_DIR=$(mktemp -d)
+          weston --backend=headless --socket=wayland-seam --idle-time=0 &
+          for i in $(seq 1 40); do [ -S "$XDG_RUNTIME_DIR/wayland-seam" ] && break; sleep 0.25; done
+          WAYLAND_DISPLAY=wayland-seam ctest --test-dir build -R '^seam$' --output-on-failure
 
   # Each fuzz target runs for one minute on every push, over the bytes
   # programs load from disk and hand the library, from its seed.

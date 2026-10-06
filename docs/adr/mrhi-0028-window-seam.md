@@ -26,8 +26,8 @@ graphics header into Maul Window, which both libraries rule out.
 - Its frames never wait for the GPU: each takes the answers that came
   and submits a frame when the device has room, as a program on the
   browser's frames must, so one check runs everywhere.
-- It runs on X11 under Xvfb with lavapipe (its own CI job and the
-  gate), on Win32 with D3D12's WARP device, on the web in headless
+- It runs on X11 under Xvfb and on Wayland under weston's headless
+  compositor, both with lavapipe (its own CI job and the gate), on Win32 with D3D12's WARP device, on the web in headless
   Chrome with WebGPU, Maul Window's own canvas named by the window's
   handles, and on macOS 15 and 26 with Metal, Maul Window's layer on
   the runner's window server. The tag moves by hand with each Maul
