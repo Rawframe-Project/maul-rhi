@@ -17,8 +17,9 @@ filter by identity and leave the text to people.
 
 - Each refusal of invalid input names its check with an
   `mrhiDiagnosticCode`, a closed enum generated from the contract;
-  `mrhiDiagnosticText` returns the check's English sentence. Codes are
-  only added, never renumbered.
+  `mrhiDiagnosticText` returns the check's English sentence. A code is
+  fixed from the first release that carries it, and codes are only added
+  after it; before that release the list may still be reshaped.
 - An instance and a device each keep a diagnostic queue of at most
   `diagnostics` records, a named limit in `mrhiInstanceLimits` and
   `mrhiDeviceLimits`, 0 by default (no queue). `mrhiNextInstanceDiagnostic`
@@ -37,6 +38,6 @@ filter by identity and leave the text to people.
 A program that asks for a queue learns why each call failed without a
 debugger or a log; one that does not pays a branch on the refusal path.
 The texts and codes cost about 10 KiB of wasm (101 807 bytes against
-the 131 072 budget, from 92 082). Some codes still cover a helper that
-judges several conditions at once; finer codes can be added later
-without breaking programs.
+the 131 072 budget, from 92 082). Transfers share three codes (alignment,
+range, undeclared access) rather than a set per command: the program
+knows which call it made, and the code says what failed.

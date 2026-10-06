@@ -13,9 +13,10 @@
 #include <string.h>
 
 // A buffer of the open frame a pass declares with an access kind,
-// resolving a range of it: its slot, or 0 with the refusal.
-static uint32_t DeclaredRange(const mrhiDevice* device, const mrhiFramePass* pass,
-                              mrhiResourceId id, uint8_t kind, uint64_t offset, uint64_t* sizeInOut,
+// resolving a range of it: its slot, or 0 with the refusal, misuse
+// counted under its check.
+static uint32_t DeclaredRange(mrhiDevice* device, const mrhiFramePass* pass, mrhiResourceId id,
+                              uint8_t kind, uint64_t offset, uint64_t* sizeInOut,
                               mrhiResult* statusOut)
 {
     uint32_t object = mrhiFindFrameResource(device, id);
@@ -27,15 +28,14 @@ static uint32_t DeclaredRange(const mrhiDevice* device, const mrhiFramePass* pas
     // Only a buffer is declared with the vertex or index access.
     bool declared = mrhiPassDeclares(device, pass, object, MRHI_KIND(kind), nullptr);
     uint64_t total = declared ? mrhiBufferBytesOf(&device->frameResources[object - 1]) : 0;
-    if (!declared || offset > total)
+    uint64_t size = *sizeInOut == MRHI_WHOLE_SIZE && offset <= total ? total - offset : *sizeInOut;
+    mrhiDiagnosticCode fault = !declared ? mrhi_diagnosticUndeclaredAccess
+                               : offset > total || size > total - offset
+                                   ? mrhi_diagnosticTransferRange
+                                   : 0;
+    if (fault != 0)
     {
-        *statusOut = mrhi_errorInvalid;
-        return 0;
-    }
-    uint64_t size = *sizeInOut == MRHI_WHOLE_SIZE ? total - offset : *sizeInOut;
-    if (size > total - offset)
-    {
-        *statusOut = mrhi_errorInvalid;
+        *statusOut = mrhiDeviceMisuse(device, fault);
         return 0;
     }
     *sizeInOut = size;
@@ -55,18 +55,23 @@ mrhiResult mrhiSetVertexBuffer(mrhiDevice* device, mrhiPassId id, uint32_t slot,
     {
         return status;
     }
-    if (mrhiWorkOf(pass) != mrhiWorkRender || slot >= device->limits.vertexBuffers ||
-        offset % 4 != 0)
+    if (mrhiWorkOf(pass) != mrhiWorkRender)
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticRenderStateOutsideRenderPass);
+    }
+    if (slot >= device->limits.vertexBuffers)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticVertexBufferSlot);
+    }
+    if (offset % 4 != 0)
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticTransferAlignment);
     }
     uint32_t object =
         DeclaredRange(device, pass, resource, mrhi_accessVertex, offset, &size, &status);
     if (object == 0)
     {
-        return status == mrhi_errorInvalid
-                   ? mrhiDeviceMisuse(device, mrhi_diagnosticVertexBufferRange)
-                   : status;
+        return status;
     }
     mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
     if (record == nullptr)
@@ -99,22 +104,27 @@ mrhiResult mrhiSetIndexBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId 
         return status;
     }
     uint64_t width = format == mrhi_indexUint16 ? 2 : 4;
-    if (mrhiWorkOf(pass) != mrhiWorkRender || format == mrhi_indexNone ||
-        format > mrhi_indexUint32 || offset % width != 0)
+    if (mrhiWorkOf(pass) != mrhiWorkRender)
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticRenderStateOutsideRenderPass);
+    }
+    if (format == mrhi_indexNone || format > mrhi_indexUint32)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticIndexBufferFormat);
+    }
+    if (offset % width != 0)
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticTransferAlignment);
     }
     uint32_t object =
         DeclaredRange(device, pass, resource, mrhi_accessIndex, offset, &size, &status);
     if (object == 0)
     {
-        return status == mrhi_errorInvalid
-                   ? mrhiDeviceMisuse(device, mrhi_diagnosticIndexBufferRange)
-                   : status;
+        return status;
     }
     if (size % width != 0)
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticIndexBufferRange);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticTransferAlignment);
     }
     mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
     if (record == nullptr)
@@ -323,7 +333,11 @@ mrhiResult mrhiDispatch(mrhiDevice* device, mrhiPassId id, uint32_t x, uint32_t 
         return status;
     }
     uint32_t most = device->limits.workgroupsPerDimension;
-    if (mrhiWorkOf(pass) != mrhiWorkCompute || x > most || y > most || z > most)
+    if (mrhiWorkOf(pass) != mrhiWorkCompute)
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticComputeOutsideComputePass);
+    }
+    if (x > most || y > most || z > most)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticDispatchSize);
     }
@@ -346,14 +360,15 @@ static mrhiResult RecordIndirect(mrhiDevice* device, mrhiFramePass* pass, mrhiCo
                                  mrhiResourceId resource, uint64_t offset, uint64_t bytes)
 {
     mrhiResult status = mrhi_success;
-    uint32_t object = offset % 4 != 0 ? 0
-                                      : DeclaredRange(device, pass, resource, mrhi_accessIndirect,
-                                                      offset, &bytes, &status);
+    if (offset % 4 != 0)
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticTransferAlignment);
+    }
+    uint32_t object =
+        DeclaredRange(device, pass, resource, mrhi_accessIndirect, offset, &bytes, &status);
     if (object == 0)
     {
-        return status == mrhi_errorStale
-                   ? status
-                   : mrhiDeviceMisuse(device, mrhi_diagnosticIndirectArguments);
+        return status;
     }
     mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
     if (record == nullptr)
@@ -444,18 +459,18 @@ static mrhiResult RecordCounted(mrhiDevice* device, mrhiPassId id, bool indexed,
     }
     uint64_t bytes = (uint64_t)maxCount * (indexed ? 20 : 16);
     uint64_t four = 4;
-    uint32_t object = offset % 4 != 0 ? 0
-                                      : DeclaredRange(device, pass, resource, mrhi_accessIndirect,
-                                                      offset, &bytes, &status);
-    uint32_t count = object == 0 || countOffset % 4 != 0
-                         ? 0
-                         : DeclaredRange(device, pass, countResource, mrhi_accessIndirect,
-                                         countOffset, &four, &status);
+    if (offset % 4 != 0 || countOffset % 4 != 0)
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticTransferAlignment);
+    }
+    uint32_t object =
+        DeclaredRange(device, pass, resource, mrhi_accessIndirect, offset, &bytes, &status);
+    uint32_t count = object == 0 ? 0
+                                 : DeclaredRange(device, pass, countResource, mrhi_accessIndirect,
+                                                 countOffset, &four, &status);
     if (count == 0)
     {
-        return status == mrhi_errorStale
-                   ? status
-                   : mrhiDeviceMisuse(device, mrhi_diagnosticIndirectArguments);
+        return status;
     }
     // The frame's counted draws stay within the limit, whatever other
     // passes take meanwhile; draws taken by a call that then finds the

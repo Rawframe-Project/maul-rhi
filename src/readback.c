@@ -140,10 +140,12 @@ mrhiResult mrhiReadBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId reso
         return mrhiRefuse(device, status, mrhi_diagnosticResourceKind);
     }
     uint64_t total = mrhiBufferBytesOf(&device->frameResources[object - 1]);
-    if (offset % 4 != 0 || size % 4 != 0 || offset > total || size > total - offset ||
-        !mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessCopySource), nullptr))
+    mrhiDiagnosticCode fault = mrhiRangeFault(
+        offset % 4 == 0 && size % 4 == 0, offset <= total && size <= total - offset,
+        mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessCopySource), nullptr));
+    if (fault != 0)
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticReadBufferRange);
+        return mrhiDeviceMisuse(device, fault);
     }
     mrhiReadback* readback = Reserve(device, size, size, 0, 0, 0);
     // An empty read is answered with no bytes, and copies nothing:
@@ -195,7 +197,7 @@ mrhiResult mrhiReadTexture(mrhiDevice* device, mrhiPassId id, const mrhiTextureC
     }
     if (!mrhiPassDeclares(device, pass, side.object, MRHI_KIND(mrhi_accessCopySource), &side.part))
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticReadTextureAccess);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticUndeclaredAccess);
     }
     mrhiFormatBlock block = mrhiGetFormatBlock(side.def->format);
     uint64_t rows = size->height / block.height;

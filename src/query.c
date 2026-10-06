@@ -370,18 +370,21 @@ mrhiResult mrhiResolveQueries(mrhiDevice* device, mrhiPassId id, mrhiQuerySetId 
     }
     // Only a graphics pass declares a buffer with the query resolve access
     // (mrhi-0012), so the pass is one without targets of that class.
-    if (mrhiWorkOf(pass) != mrhiWorkCompute ||
-        !mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessQueryResolve), nullptr))
+    if (mrhiWorkOf(pass) != mrhiWorkCompute)
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticResolveQueries);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticComputeOutsideComputePass);
     }
     const mrhiQuerySetSlot* slot = &device->querySetSlots[set.index1 - 1];
     uint64_t total = mrhiBufferBytesOf(&device->frameResources[object - 1]);
     uint64_t bytes = mrhiQueryBytes(slot->type);
-    if (first >= slot->count || count > slot->count - first || offset % 256 != 0 ||
-        offset > total || count * bytes > total - offset)
+    mrhiDiagnosticCode fault = mrhiRangeFault(
+        offset % 256 == 0,
+        first < slot->count && count <= slot->count - first && offset <= total &&
+            count * bytes <= total - offset,
+        mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessQueryResolve), nullptr));
+    if (fault != 0)
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticResolveQueries);
+        return mrhiDeviceMisuse(device, fault);
     }
     mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
     if (record == nullptr)

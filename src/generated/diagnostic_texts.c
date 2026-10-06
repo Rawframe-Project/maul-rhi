@@ -18,8 +18,6 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "A def lacks its cookie (start from its default def), carries a malformed extension chain or one deeper than the chainDepth limit, or a label that is not UTF-8 of at most MRHI_LABEL_BYTES.";
     case mrhi_diagnosticAdapterRequestDef:
         return "An adapter request def is NULL, lacks its cookie or names an unknown power preference.";
-    case mrhi_diagnosticDeviceDef:
-        return "A device def lacks its cookie, has a malformed chain, label, allocator or Vulkan struct, a device limit of zero (fewer than 2 notifications, a command arena under one chunk, readback bytes not a multiple of 512), limits under the floor, or a cache size without bytes. No longer recorded: split into def_header, chained_struct, device_limits, limits_floor, allocator and pipeline_cache_bytes.";
     case mrhi_diagnosticInstanceHasDevices:
         return "An instance was destroyed while devices made on it live; nothing was destroyed.";
     case mrhi_diagnosticSurfaceSource:
@@ -32,16 +30,12 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "A command recorded through the library in a native pass, whose commands are the program's own.";
     case mrhi_diagnosticNativePassDef:
         return "A native pass def with targets, query sets or a heap, or with an access that resolves queries or names a resource that is not imported.";
-    case mrhi_diagnosticPassDef:
-        return "A pass def with an unknown class, an access array that is NULL with a count, more than MRHI_COLOR_TARGETS targets, or several views on a native pass or one without targets.";
-    case mrhi_diagnosticPassUses:
-        return "A pass's heap, query sets or accesses do not fit: a heap or set that is not live or of the wrong type, or accesses that name a resource twice, a usage it lacks, or a range past it.";
     case mrhi_diagnosticPassEndOpen:
         return "A pass ended with a debug group or a query still open.";
     case mrhi_diagnosticRenderStateOutsideRenderPass:
         return "A draw, a graphics pipeline or other draw state recorded in a pass without targets.";
     case mrhi_diagnosticComputeOutsideComputePass:
-        return "A dispatch or a compute pipeline recorded in a pass that is not a compute pass.";
+        return "A dispatch, a compute pipeline or a query resolve recorded in a pass that is not a compute pass.";
     case mrhi_diagnosticTransferInRenderPass:
         return "A copy, clear, upload or readback recorded in a pass with targets.";
     case mrhi_diagnosticGraphicsPipelineMismatch:
@@ -59,19 +53,13 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticRootBlock:
         return "A root block set in a transfer pass, empty, or at an offset or size not a multiple of 4.";
     case mrhi_diagnosticVertexBufferSlot:
-        return "A vertex buffer set outside a render pass, at a slot past the vertexBuffers limit, or at an offset not a multiple of 4.";
-    case mrhi_diagnosticVertexBufferRange:
-        return "A vertex buffer range past its buffer, or without a vertex access the pass declares.";
+        return "A vertex buffer set at a slot past the vertexBuffers limit.";
     case mrhi_diagnosticVertexBufferTooSmall:
         return "A draw reading vertices or instances past the end of a vertex buffer it uses.";
     case mrhi_diagnosticIndexBufferFormat:
-        return "An index buffer set outside a render pass, with an unknown format, or at an offset not a multiple of the index size.";
-    case mrhi_diagnosticIndexBufferRange:
-        return "An index buffer range past its buffer, not a whole number of indices, or without an index access the pass declares.";
+        return "An index buffer set with an unknown format.";
     case mrhi_diagnosticDispatchSize:
-        return "A dispatch outside a compute pass, or of more workgroups in a dimension than the workgroupsPerDimension limit.";
-    case mrhi_diagnosticIndirectArguments:
-        return "Indirect arguments or a draw count at an offset not a multiple of 4, past their buffer, or without an indirect access the pass declares.";
+        return "A dispatch of more workgroups in a dimension than the workgroupsPerDimension limit.";
     case mrhi_diagnosticIndirectCountLimit:
         return "A counted indirect draw whose maxCount is zero or past MRHI_INDIRECT_DRAWS.";
     case mrhi_diagnosticViewport:
@@ -86,24 +74,14 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "A debug group popped with none open.";
     case mrhi_diagnosticResourceKind:
         return "A texture given where a buffer is wanted, or a buffer where a texture is.";
-    case mrhi_diagnosticClearBufferRange:
-        return "A buffer clear at an offset or of a size not a multiple of 4, past the buffer, or without a copy destination access the pass declares.";
-    case mrhi_diagnosticCopyBufferRange:
-        return "A buffer copy at an offset or of a size not a multiple of 4, past either buffer, or without the accesses the pass declares.";
     case mrhi_diagnosticBufferTextureCopy:
         return "A copy between a buffer and a texture whose layout the buffer cannot hold, whose region is off the texture's blocks or past its mip, or without the accesses the pass declares.";
     case mrhi_diagnosticTextureRegion:
         return "A texture region off the format's blocks or past the mip, of a multisampled texture, or of an aspect that cannot be copied, or a buffer named as the texture.";
     case mrhi_diagnosticCopyTextureMismatch:
         return "A texture copy between formats or sample counts that differ, of part of an aspect, or without the accesses the pass declares.";
-    case mrhi_diagnosticWriteBufferRange:
-        return "A buffer write at an offset or of a size not a multiple of 4, past the buffer, or without a copy destination access the pass declares.";
     case mrhi_diagnosticWriteTextureLayout:
         return "A texture write whose layout the bytes cannot hold, or without a copy destination access the pass declares.";
-    case mrhi_diagnosticReadBufferRange:
-        return "A buffer readback at an offset or of a size not a multiple of 4, past the buffer, or without a copy source access the pass declares.";
-    case mrhi_diagnosticReadTextureAccess:
-        return "A texture readback without a covering copy source access the pass declares.";
     case mrhi_diagnosticFrameToken:
         return "A frame token this device never returned.";
     case mrhi_diagnosticTransientUsage:
@@ -112,10 +90,6 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "A resource sealed or unsealed that is not imported.";
     case mrhi_diagnosticSealTexture:
         return "A texture sealed without sampled usage, or an adopted image, which rests as a target.";
-    case mrhi_diagnosticGraphicsPipelineDef:
-        return "A graphics pipeline def that does not fit its shaders: stages, constants, vertex layout, primitive, depth and stencil, targets, multisampling or the interface between stages. No longer recorded: split into the pipeline entry, constants and graphics state codes.";
-    case mrhi_diagnosticComputePipelineDef:
-        return "A compute pipeline def naming an entry its shader lacks, or constants it does not declare. No longer recorded: split into the pipeline entry and constants codes.";
     case mrhi_diagnosticHeapDef:
         return "A heap def with no entries.";
     case mrhi_diagnosticHeapIndex:
@@ -132,8 +106,6 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "An occlusion query begun in a pass without an occlusion set, while one is open, past the set or written twice in a frame; or ended with none open.";
     case mrhi_diagnosticStatisticsQuery:
         return "A statistics query begun outside a graphics-class pass of one view, while one is open, on a set of another type, past the set or written twice in a frame; or ended with none open.";
-    case mrhi_diagnosticResolveQueries:
-        return "A query resolve outside a compute-class pass, without a resolve access the pass declares, of a range past the set or the buffer, or at an offset not a multiple of 256.";
     case mrhi_diagnosticSamplerDef:
         return "A sampler def with an unknown filter, address mode or compare function, a negative or reversed level of detail range, or anisotropy outside 1 to 16 or above 1 without linear filtering.";
     case mrhi_diagnosticBufferSize:
@@ -144,8 +116,6 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "Shader bytes that are NULL or not 8-byte aligned.";
     case mrhi_diagnosticShaderContainer:
         return "Shader bytes that are not a well-formed container: its bounds, version, digest or reflection.";
-    case mrhi_diagnosticTextureShape:
-        return "A texture def with an unknown format, a size, layer, mip or sample count out of range, or view formats that are not the format's twin. No longer recorded: split into the texture format, size, samples and view formats codes.";
     case mrhi_diagnosticTextureUsage:
         return "A texture def with a usage that is unknown or that its format, kind or sample count cannot take.";
     case mrhi_diagnosticTextureAdopt:
@@ -210,6 +180,22 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "A texture def's sample count is not 1, 2 or 4, or several samples are asked for a texture that is not 2D with one mip.";
     case mrhi_diagnosticTextureViewFormats:
         return "A texture def's view format is neither unused nor its format's twin.";
+    case mrhi_diagnosticTransferAlignment:
+        return "An offset or size not a multiple of what the command needs: 4 for buffer copies, clears, uploads, readbacks, vertex buffers and indirect arguments, the index size for index buffers, 256 for query resolves.";
+    case mrhi_diagnosticTransferRange:
+        return "A range reaching past the end of its buffer, or past its query set.";
+    case mrhi_diagnosticUndeclaredAccess:
+        return "A command reaching a resource the pass declares no covering access of the kind it needs.";
+    case mrhi_diagnosticPassClass:
+        return "A pass def with an unknown pass class.";
+    case mrhi_diagnosticPassColorTargets:
+        return "A pass def with more than MRHI_COLOR_TARGETS color targets.";
+    case mrhi_diagnosticPassViews:
+        return "A pass def with several views on a native pass or on one without targets.";
+    case mrhi_diagnosticPassQueries:
+        return "A pass def's query sets do not fit: an occlusion set that is not one or on a pass without targets, or timestamps that are not a graphics pass's two different queries, in range and not yet written this frame.";
+    case mrhi_diagnosticPassUses:
+        return "A pass def's accesses or targets do not fit: a kind the resource's usage lacks, a range past it, a write to a sealed resource, targets whose sizes, samples, mips or layers disagree, uses that conflict within the pass, or a read of a declared resource no earlier pass wrote.";
     default:
         return "An unknown diagnostic code.";
     }

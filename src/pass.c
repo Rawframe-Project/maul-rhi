@@ -514,11 +514,21 @@ static mrhiResult CheckDef(mrhiDevice* device, const mrhiPassDef* def)
         return status;
     }
     bool targets = def->colorTargetCount > 0 || def->depthTarget.resource.index1 != 0;
-    if (def->passClass > mrhi_passTransfer || (def->accesses == nullptr && def->accessCount > 0) ||
-        def->colorTargetCount > MRHI_COLOR_TARGETS ||
-        (ViewsOf(def) > 1 && (def->native || !targets)))
+    if (def->passClass > mrhi_passTransfer)
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticPassDef);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticPassClass);
+    }
+    if (def->accesses == nullptr && def->accessCount > 0)
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
+    }
+    if (def->colorTargetCount > MRHI_COLOR_TARGETS)
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticPassColorTargets);
+    }
+    if (ViewsOf(def) > 1 && (def->native || !targets))
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticPassViews);
     }
     if (ViewsOf(def) > 1 &&
         (!device->features.multiview || ViewsOf(def) > device->limits.multiviewViews))
@@ -587,6 +597,10 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
     if (status == mrhi_success)
     {
         status = mrhiCheckPassQueries(device, def);
+        if (status == mrhi_errorInvalid)
+        {
+            return mrhiDeviceMisuse(device, mrhi_diagnosticPassQueries);
+        }
     }
     uint32_t count = status == mrhi_success ? MakeUses(device, def, &status) : 0;
     if (status != mrhi_success)

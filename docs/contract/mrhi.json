@@ -332,7 +332,7 @@
           "kind": "enum",
           "name": "diagnostic_code",
           "width": "uint16",
-          "doc": "The check a diagnostic record reports (mrhi-0027): one check of the core that refused a call as invalid input, or, in a build with the validation layer, one rule of the driver SPI that the driver broke (the driver codes, recorded in the instance's queue). Codes are only ever added; mrhiDiagnosticText gives each one's text.",
+          "doc": "The check a diagnostic record reports (mrhi-0027): one check of the core that refused a call as invalid input, or, in a build with the validation layer, one rule of the driver SPI that the driver broke (the driver codes, recorded in the instance's queue). Codes are fixed from the first release that carries them, and only added after it; mrhiDiagnosticText gives each one's text.",
           "values": [
             {
               "name": "diagnostic_null_argument",
@@ -348,11 +348,6 @@
               "name": "diagnostic_adapter_request_def",
               "value": 3,
               "doc": "An adapter request def is NULL, lacks its cookie or names an unknown power preference."
-            },
-            {
-              "name": "diagnostic_device_def",
-              "value": 4,
-              "doc": "A device def lacks its cookie, has a malformed chain, label, allocator or Vulkan struct, a device limit of zero (fewer than 2 notifications, a command arena under one chunk, readback bytes not a multiple of 512), limits under the floor, or a cache size without bytes. No longer recorded: split into def_header, chained_struct, device_limits, limits_floor, allocator and pipeline_cache_bytes."
             },
             {
               "name": "diagnostic_instance_has_devices",
@@ -385,16 +380,6 @@
               "doc": "A native pass def with targets, query sets or a heap, or with an access that resolves queries or names a resource that is not imported."
             },
             {
-              "name": "diagnostic_pass_def",
-              "value": 11,
-              "doc": "A pass def with an unknown class, an access array that is NULL with a count, more than MRHI_COLOR_TARGETS targets, or several views on a native pass or one without targets."
-            },
-            {
-              "name": "diagnostic_pass_uses",
-              "value": 12,
-              "doc": "A pass's heap, query sets or accesses do not fit: a heap or set that is not live or of the wrong type, or accesses that name a resource twice, a usage it lacks, or a range past it."
-            },
-            {
               "name": "diagnostic_pass_end_open",
               "value": 13,
               "doc": "A pass ended with a debug group or a query still open."
@@ -407,7 +392,7 @@
             {
               "name": "diagnostic_compute_outside_compute_pass",
               "value": 15,
-              "doc": "A dispatch or a compute pipeline recorded in a pass that is not a compute pass."
+              "doc": "A dispatch, a compute pipeline or a query resolve recorded in a pass that is not a compute pass."
             },
             {
               "name": "diagnostic_transfer_in_render_pass",
@@ -452,12 +437,7 @@
             {
               "name": "diagnostic_vertex_buffer_slot",
               "value": 24,
-              "doc": "A vertex buffer set outside a render pass, at a slot past the vertexBuffers limit, or at an offset not a multiple of 4."
-            },
-            {
-              "name": "diagnostic_vertex_buffer_range",
-              "value": 25,
-              "doc": "A vertex buffer range past its buffer, or without a vertex access the pass declares."
+              "doc": "A vertex buffer set at a slot past the vertexBuffers limit."
             },
             {
               "name": "diagnostic_vertex_buffer_too_small",
@@ -467,22 +447,12 @@
             {
               "name": "diagnostic_index_buffer_format",
               "value": 27,
-              "doc": "An index buffer set outside a render pass, with an unknown format, or at an offset not a multiple of the index size."
-            },
-            {
-              "name": "diagnostic_index_buffer_range",
-              "value": 28,
-              "doc": "An index buffer range past its buffer, not a whole number of indices, or without an index access the pass declares."
+              "doc": "An index buffer set with an unknown format."
             },
             {
               "name": "diagnostic_dispatch_size",
               "value": 29,
-              "doc": "A dispatch outside a compute pass, or of more workgroups in a dimension than the workgroupsPerDimension limit."
-            },
-            {
-              "name": "diagnostic_indirect_arguments",
-              "value": 30,
-              "doc": "Indirect arguments or a draw count at an offset not a multiple of 4, past their buffer, or without an indirect access the pass declares."
+              "doc": "A dispatch of more workgroups in a dimension than the workgroupsPerDimension limit."
             },
             {
               "name": "diagnostic_indirect_count_limit",
@@ -520,16 +490,6 @@
               "doc": "A texture given where a buffer is wanted, or a buffer where a texture is."
             },
             {
-              "name": "diagnostic_clear_buffer_range",
-              "value": 38,
-              "doc": "A buffer clear at an offset or of a size not a multiple of 4, past the buffer, or without a copy destination access the pass declares."
-            },
-            {
-              "name": "diagnostic_copy_buffer_range",
-              "value": 39,
-              "doc": "A buffer copy at an offset or of a size not a multiple of 4, past either buffer, or without the accesses the pass declares."
-            },
-            {
               "name": "diagnostic_buffer_texture_copy",
               "value": 40,
               "doc": "A copy between a buffer and a texture whose layout the buffer cannot hold, whose region is off the texture's blocks or past its mip, or without the accesses the pass declares."
@@ -545,24 +505,9 @@
               "doc": "A texture copy between formats or sample counts that differ, of part of an aspect, or without the accesses the pass declares."
             },
             {
-              "name": "diagnostic_write_buffer_range",
-              "value": 43,
-              "doc": "A buffer write at an offset or of a size not a multiple of 4, past the buffer, or without a copy destination access the pass declares."
-            },
-            {
               "name": "diagnostic_write_texture_layout",
               "value": 44,
               "doc": "A texture write whose layout the bytes cannot hold, or without a copy destination access the pass declares."
-            },
-            {
-              "name": "diagnostic_read_buffer_range",
-              "value": 45,
-              "doc": "A buffer readback at an offset or of a size not a multiple of 4, past the buffer, or without a copy source access the pass declares."
-            },
-            {
-              "name": "diagnostic_read_texture_access",
-              "value": 46,
-              "doc": "A texture readback without a covering copy source access the pass declares."
             },
             {
               "name": "diagnostic_frame_token",
@@ -583,16 +528,6 @@
               "name": "diagnostic_seal_texture",
               "value": 50,
               "doc": "A texture sealed without sampled usage, or an adopted image, which rests as a target."
-            },
-            {
-              "name": "diagnostic_graphics_pipeline_def",
-              "value": 51,
-              "doc": "A graphics pipeline def that does not fit its shaders: stages, constants, vertex layout, primitive, depth and stencil, targets, multisampling or the interface between stages. No longer recorded: split into the pipeline entry, constants and graphics state codes."
-            },
-            {
-              "name": "diagnostic_compute_pipeline_def",
-              "value": 52,
-              "doc": "A compute pipeline def naming an entry its shader lacks, or constants it does not declare. No longer recorded: split into the pipeline entry and constants codes."
             },
             {
               "name": "diagnostic_heap_def",
@@ -635,11 +570,6 @@
               "doc": "A statistics query begun outside a graphics-class pass of one view, while one is open, on a set of another type, past the set or written twice in a frame; or ended with none open."
             },
             {
-              "name": "diagnostic_resolve_queries",
-              "value": 61,
-              "doc": "A query resolve outside a compute-class pass, without a resolve access the pass declares, of a range past the set or the buffer, or at an offset not a multiple of 256."
-            },
-            {
               "name": "diagnostic_sampler_def",
               "value": 62,
               "doc": "A sampler def with an unknown filter, address mode or compare function, a negative or reversed level of detail range, or anisotropy outside 1 to 16 or above 1 without linear filtering."
@@ -663,11 +593,6 @@
               "name": "diagnostic_shader_container",
               "value": 66,
               "doc": "Shader bytes that are not a well-formed container: its bounds, version, digest or reflection."
-            },
-            {
-              "name": "diagnostic_texture_shape",
-              "value": 67,
-              "doc": "A texture def with an unknown format, a size, layer, mip or sample count out of range, or view formats that are not the format's twin. No longer recorded: split into the texture format, size, samples and view formats codes."
             },
             {
               "name": "diagnostic_texture_usage",
@@ -828,6 +753,46 @@
               "name": "diagnostic_texture_view_formats",
               "value": 99,
               "doc": "A texture def's view format is neither unused nor its format's twin."
+            },
+            {
+              "name": "diagnostic_transfer_alignment",
+              "value": 100,
+              "doc": "An offset or size not a multiple of what the command needs: 4 for buffer copies, clears, uploads, readbacks, vertex buffers and indirect arguments, the index size for index buffers, 256 for query resolves."
+            },
+            {
+              "name": "diagnostic_transfer_range",
+              "value": 101,
+              "doc": "A range reaching past the end of its buffer, or past its query set."
+            },
+            {
+              "name": "diagnostic_undeclared_access",
+              "value": 102,
+              "doc": "A command reaching a resource the pass declares no covering access of the kind it needs."
+            },
+            {
+              "name": "diagnostic_pass_class",
+              "value": 103,
+              "doc": "A pass def with an unknown pass class."
+            },
+            {
+              "name": "diagnostic_pass_color_targets",
+              "value": 104,
+              "doc": "A pass def with more than MRHI_COLOR_TARGETS color targets."
+            },
+            {
+              "name": "diagnostic_pass_views",
+              "value": 105,
+              "doc": "A pass def with several views on a native pass or on one without targets."
+            },
+            {
+              "name": "diagnostic_pass_queries",
+              "value": 106,
+              "doc": "A pass def's query sets do not fit: an occlusion set that is not one or on a pass without targets, or timestamps that are not a graphics pass's two different queries, in range and not yet written this frame."
+            },
+            {
+              "name": "diagnostic_pass_uses",
+              "value": 107,
+              "doc": "A pass def's accesses or targets do not fit: a kind the resource's usage lacks, a range past it, a write to a sealed resource, targets whose sizes, samples, mips or layers disagree, uses that conflict within the pass, or a read of a declared resource no earlier pass wrote."
             }
           ],
           "library": "names the library's own checks"

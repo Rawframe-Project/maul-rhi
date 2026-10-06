@@ -81,10 +81,12 @@ mrhiResult mrhiClearBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId res
     }
     uint64_t total = mrhiBufferBytesOf(&device->frameResources[object - 1]);
     uint64_t bytes = size == MRHI_WHOLE_SIZE && offset <= total ? total - offset : size;
-    if (offset % 4 != 0 || bytes % 4 != 0 || offset > total || bytes > total - offset ||
-        !mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessCopyDestination), nullptr))
+    mrhiDiagnosticCode fault = mrhiRangeFault(
+        offset % 4 == 0 && bytes % 4 == 0, offset <= total && bytes <= total - offset,
+        mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessCopyDestination), nullptr));
+    if (fault != 0)
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticClearBufferRange);
+        return mrhiDeviceMisuse(device, fault);
     }
     // An empty clear writes nothing; drivers never see it (Vulkan refuses
     // an empty fill).
@@ -130,13 +132,15 @@ mrhiResult mrhiCopyBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId sour
     uint64_t toBytes = mrhiBufferBytesOf(&device->frameResources[to - 1]);
     // One buffer as both is refused by the pass's declarations: a pass
     // never declares a buffer as both a copy source and destination.
-    if (size % 4 != 0 || sourceOffset % 4 != 0 || destinationOffset % 4 != 0 ||
-        sourceOffset > fromBytes || size > fromBytes - sourceOffset ||
-        destinationOffset > toBytes || size > toBytes - destinationOffset ||
-        !mrhiPassDeclares(device, pass, from, MRHI_KIND(mrhi_accessCopySource), nullptr) ||
-        !mrhiPassDeclares(device, pass, to, MRHI_KIND(mrhi_accessCopyDestination), nullptr))
+    mrhiDiagnosticCode fault = mrhiRangeFault(
+        size % 4 == 0 && sourceOffset % 4 == 0 && destinationOffset % 4 == 0,
+        sourceOffset <= fromBytes && size <= fromBytes - sourceOffset &&
+            destinationOffset <= toBytes && size <= toBytes - destinationOffset,
+        mrhiPassDeclares(device, pass, from, MRHI_KIND(mrhi_accessCopySource), nullptr) &&
+            mrhiPassDeclares(device, pass, to, MRHI_KIND(mrhi_accessCopyDestination), nullptr));
+    if (fault != 0)
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticCopyBufferRange);
+        return mrhiDeviceMisuse(device, fault);
     }
     // An empty copy is valid and copies nothing; drivers never see it
     // (Vulkan refuses empty regions).

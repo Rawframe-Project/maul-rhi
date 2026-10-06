@@ -74,6 +74,7 @@ static void Open(void)
     s_adapter.features.textureCompressionBc = true;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.features.textureCompressionBc = true;
+    def.deviceLimits.diagnostics = 8;
     s_device = OpenWith(def, true);
     for (uint32_t i = 0; i < 2; ++i)
     {
@@ -179,6 +180,19 @@ static mrhiBufferCopy Buffer(uint32_t resource, uint64_t offset, uint32_t perRow
 
 // Clears of a buffer (mrhi-0022): recorded as one command, the size
 // resolved, nothing for an empty one, and every refusal.
+// The check that refused the device's latest refusal, draining its
+// diagnostics (mrhi-0027); 0 when there is none.
+static mrhiDiagnosticCode Refusal(void)
+{
+    mrhiDiagnosticCode code = 0;
+    mrhiDiagnostic record;
+    while (mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success)
+    {
+        code = record.code;
+    }
+    return code;
+}
+
 static void TestClears(void)
 {
     Open();
@@ -203,16 +217,22 @@ static void TestClears(void)
               mrhiClearBuffer(s_device, s_pass, to, 0, 0) == mrhi_success && Nth(2) == nullptr,
           "nothing recorded for an empty clear");
     CHECK(mrhiClearBuffer(s_device, s_pass, to, 2, 4) == mrhi_errorInvalid &&
-              mrhiClearBuffer(s_device, s_pass, to, 0, 6) == mrhi_errorInvalid,
+              mrhiClearBuffer(s_device, s_pass, to, 0, 6) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticTransferAlignment,
           "an offset or size not a multiple of 4");
     CHECK(mrhiClearBuffer(s_device, s_pass, to, 8, 4092) == mrhi_errorInvalid &&
               mrhiClearBuffer(s_device, s_pass, to, 4100, MRHI_WHOLE_SIZE) == mrhi_errorInvalid &&
-              mrhiClearBuffer(s_device, s_pass, to, UINT64_MAX - 3, 8) == mrhi_errorInvalid,
+              mrhiClearBuffer(s_device, s_pass, to, UINT64_MAX - 3, 8) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticTransferRange,
           "past the end");
-    CHECK(mrhiClearBuffer(s_device, s_pass, from, 0, 4) == mrhi_errorInvalid,
+    CHECK(mrhiClearBuffer(s_device, s_pass, from, 0, 4) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticUndeclaredAccess,
           "a buffer declared only as a copy source");
-    CHECK(mrhiClearBuffer(s_device, s_pass, s_r[ARRAY], 0, 4) == mrhi_errorInvalid, "a texture");
-    CHECK(mrhiClearBuffer(s_device, s_render, to, 0, 4) == mrhi_errorInvalid,
+    CHECK(mrhiClearBuffer(s_device, s_pass, s_r[ARRAY], 0, 4) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticResourceKind,
+          "a texture");
+    CHECK(mrhiClearBuffer(s_device, s_render, to, 0, 4) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticTransferInRenderPass,
           "a pass with targets");
     CHECK(mrhiGetDeviceMisuse(s_device) == 8, "each counted");
     mrhiResourceId none = {0};

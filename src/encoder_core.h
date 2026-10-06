@@ -54,4 +54,19 @@ bool mrhiPassDeclares(const mrhiDevice* device, const mrhiFramePass* pass, uint3
 // The bytes of a buffer of the open frame, declared or imported.
 uint64_t mrhiBufferBytesOf(const mrhiFrameResource* resource);
 
+// The check a range a command reaches fails first: its alignment, its
+// extent, then the access the pass declares; 0 when it holds.
+static inline mrhiDiagnosticCode mrhiRangeFault(bool aligned, bool within, bool declared)
+{
+    if (!aligned)
+    {
+        return mrhi_diagnosticTransferAlignment;
+    }
+    if (!within)
+    {
+        return mrhi_diagnosticTransferRange;
+    }
+    return declared ? 0 : mrhi_diagnosticUndeclaredAccess;
+}
+
 #endif // MAUL_RHI_SRC_ENCODER_CORE_H

@@ -63,10 +63,12 @@ mrhiResult mrhiWriteBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId res
         return mrhiRefuse(device, status, mrhi_diagnosticResourceKind);
     }
     uint64_t total = mrhiBufferBytesOf(&device->frameResources[object - 1]);
-    if (offset % 4 != 0 || size % 4 != 0 || offset > total || size > total - offset ||
-        !mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessCopyDestination), nullptr))
+    mrhiDiagnosticCode fault = mrhiRangeFault(
+        offset % 4 == 0 && size % 4 == 0, offset <= total && size <= total - offset,
+        mrhiPassDeclares(device, pass, object, MRHI_KIND(mrhi_accessCopyDestination), nullptr));
+    if (fault != 0)
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticWriteBufferRange);
+        return mrhiDeviceMisuse(device, fault);
     }
     // An empty write is valid and copies nothing; drivers never see it
     // (Vulkan refuses empty regions). A pass whose staging overflowed

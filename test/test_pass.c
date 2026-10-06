@@ -236,6 +236,19 @@ static void TestDerivedUsages(void)
 }
 
 // Accesses a pass may not make.
+// The check that refused the device's latest refusal, draining its
+// diagnostics (mrhi-0027); 0 when there is none.
+static mrhiDiagnosticCode Refusal(void)
+{
+    mrhiDiagnosticCode code = 0;
+    mrhiDiagnostic record;
+    while (mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success)
+    {
+        code = record.code;
+    }
+    return code;
+}
+
 static void TestAccesses(void)
 {
     mrhiTextureId copyOnly = MakeTexture(mrhi_textureCopyDestination);
@@ -251,7 +264,9 @@ static void TestAccesses(void)
     CHECK(Add(def) == mrhi_success, "an upload");
     mrhiAccess one;
     one = Access(buffer, mrhi_accessSampled);
-    CHECK(Add(Pass((mrhiColorTarget){0}, &one, 1)) == mrhi_errorInvalid, "a sampled buffer");
+    CHECK(Add(Pass((mrhiColorTarget){0}, &one, 1)) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticPassUses,
+          "a sampled buffer");
     one = Access(texture, mrhi_accessUniform);
     CHECK(Add(Pass((mrhiColorTarget){0}, &one, 1)) == mrhi_errorInvalid, "a uniform texture");
     one = Access(texture, 10);
@@ -291,13 +306,16 @@ static void TestAccesses(void)
     CHECK(Add(def) == mrhi_errorInvalid, "a target in async compute");
     def = mrhiDefaultPassDef();
     def.passClass = 3;
-    CHECK(Add(def) == mrhi_errorInvalid, "an unknown class");
+    CHECK(Add(def) == mrhi_errorInvalid && Refusal() == mrhi_diagnosticPassClass,
+          "an unknown class");
     def = mrhiDefaultPassDef();
     def.accessCount = 1;
-    CHECK(Add(def) == mrhi_errorInvalid, "a count without accesses");
+    CHECK(Add(def) == mrhi_errorInvalid && Refusal() == mrhi_diagnosticNullArgument,
+          "a count without accesses");
     def = mrhiDefaultPassDef();
     def.colorTargetCount = MRHI_COLOR_TARGETS + 1;
-    CHECK(Add(def) == mrhi_errorInvalid, "too many color targets");
+    CHECK(Add(def) == mrhi_errorInvalid && Refusal() == mrhi_diagnosticPassColorTargets,
+          "too many color targets");
     def.cookie = 0;
     CHECK(Add(def) == mrhi_errorInvalid, "no cookie");
     Drop();
@@ -709,7 +727,9 @@ static void TestRefusals(void)
 int main(void)
 {
     ResetAdapter();
-    s_device = OpenWith(mrhiDefaultDeviceDef(), true);
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.deviceLimits.diagnostics = 8;
+    s_device = OpenWith(deviceDef, true);
     mrhiInstance* instance = s_instance;
     TestCulling();
     TestDerivedUsages();

@@ -131,10 +131,24 @@ static mrhiBufferId MakeBuffer(uint64_t size, mrhiBufferUsage usage)
 }
 
 // Opens a ready device with the buffers draws read: 10 vertices, 3
+// The check that refused the device's latest refusal, draining its
+// diagnostics (mrhi-0027); 0 when there is none.
+static mrhiDiagnosticCode Refusal(void)
+{
+    mrhiDiagnosticCode code = 0;
+    mrhiDiagnostic record;
+    while (mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success)
+    {
+        code = record.code;
+    }
+    return code;
+}
+
 // instances, 64 bytes of indices, a uniform buffer and 64 bytes of
 // indirect arguments; and a target.
 static void OpenLimited(mrhiDeviceDef deviceDef)
 {
+    deviceDef.deviceLimits.diagnostics = 8;
     s_device = OpenWith(deviceDef, true);
     s_vertices = MakeBuffer(120, mrhi_bufferVertex);
     s_instances = MakeBuffer(40, mrhi_bufferVertex);
@@ -291,21 +305,26 @@ static void TestVertexBuffers(void)
               mrhiDraw(s_device, s_render, 1, 3, 0, 0) == mrhi_errorInvalid,
           "the last instance needs its attribute's 8 bytes");
     CHECK(mrhiGetDeviceMisuse(s_device) == 8, "each counted");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 8, s_v, 0, 12) == mrhi_errorInvalid,
+    CHECK(mrhiSetVertexBuffer(s_device, s_render, 8, s_v, 0, 12) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticVertexBufferSlot,
           "past the device's vertex buffers");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 2, 12) == mrhi_errorInvalid,
+    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 2, 12) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticTransferAlignment,
           "an offset not a multiple of 4");
     CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 124, MRHI_WHOLE_SIZE) ==
               mrhi_errorInvalid,
           "an offset past it");
     CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 120, MRHI_WHOLE_SIZE) == mrhi_success,
           "nothing, at its end");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 4, 120) == mrhi_errorInvalid,
+    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 4, 120) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticTransferRange,
           "a size past it");
     CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_x, 0, 12) == mrhi_errorInvalid &&
-              mrhiSetVertexBuffer(s_device, s_render, 0, s_x, 0, 0) == mrhi_errorInvalid,
+              mrhiSetVertexBuffer(s_device, s_render, 0, s_x, 0, 0) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticUndeclaredAccess,
           "a buffer declared for indices");
-    CHECK(mrhiSetVertexBuffer(s_device, s_compute, 0, s_v, 0, 12) == mrhi_errorInvalid,
+    CHECK(mrhiSetVertexBuffer(s_device, s_compute, 0, s_v, 0, 12) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticRenderStateOutsideRenderPass,
           "a pass without targets");
     CHECK(mrhiGetDeviceMisuse(s_device) == 15, "each counted");
     mrhiResourceId none = {0};
