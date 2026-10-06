@@ -33,6 +33,8 @@ static void Open(void)
     textureDef.width = 16;
     textureDef.height = 8;
     textureDef.usage = mrhi_textureRenderTarget;
+    textureDef.label = "target";
+    textureDef.labelLength = 6;
     CHECK(mrhiCreateTexture(s_device, &textureDef, &s_target) == mrhi_success, "a target");
     mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
     bufferDef.size = 256;
@@ -164,6 +166,8 @@ static void TestView(void)
     CHECK(s_log.commands == (MAUL_RHI_LABELS ? 3u : 2u) &&
               s_log.records == (MAUL_RHI_LABELS ? 3u + 2u + 2u + 1u : 3u + 2u) && s_log.chunks == 2,
           "every command walked, the marker only where labels are kept");
+    CHECK(s_log.named == (MAUL_RHI_LABELS ? 1u : 0u),
+          "the labelled target named, but in a build without labels");
     CHECK(s_log.stagingBytes == 512 && s_log.uploadSum == 1 + 2 + 3 + 4,
           "one upload at a 512-byte boundary, its bytes");
     CHECK(s_log.occlusionPasses == 1 && s_log.timestampPasses == 1, "the passes' query sets");

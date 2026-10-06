@@ -21859,6 +21859,11 @@
               "name": "memory_bytes",
               "type": "uint64",
               "doc": "The bytes its transients take together."
+            },
+            {
+              "name": "named",
+              "type": "uint32",
+              "doc": "The device's objects made with a label, over its life: none in a build that compiles labels out (MAUL_RHI_LABELS)."
             }
           ],
           "library": "what the library's test driver saw of a submitted frame"
