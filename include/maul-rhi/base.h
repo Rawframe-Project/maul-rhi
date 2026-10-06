@@ -226,7 +226,8 @@ extern "C"
         // allocator or Vulkan struct, a device limit of zero (fewer than 2
         // notifications, a command arena under one chunk, readback bytes not a
         // multiple of 512), limits under the floor, or a cache size without
-        // bytes.
+        // bytes. No longer recorded: split into def_header, chained_struct,
+        // device_limits, limits_floor, allocator and pipeline_cache_bytes.
         mrhi_diagnosticDeviceDef = 4,
         // An instance was destroyed while devices made on it live; nothing was
         // destroyed.
@@ -365,10 +366,12 @@ extern "C"
         mrhi_diagnosticSealTexture = 50,
         // A graphics pipeline def that does not fit its shaders: stages,
         // constants, vertex layout, primitive, depth and stencil, targets,
-        // multisampling or the interface between stages.
+        // multisampling or the interface between stages. No longer recorded:
+        // split into the pipeline entry, constants and graphics state codes.
         mrhi_diagnosticGraphicsPipelineDef = 51,
         // A compute pipeline def naming an entry its shader lacks, or constants
-        // it does not declare.
+        // it does not declare. No longer recorded: split into the pipeline
+        // entry and constants codes.
         mrhi_diagnosticComputePipelineDef = 52,
         // A heap def with no entries.
         mrhi_diagnosticHeapDef = 53,
@@ -411,6 +414,8 @@ extern "C"
         mrhi_diagnosticShaderContainer = 66,
         // A texture def with an unknown format, a size, layer, mip or sample
         // count out of range, or view formats that are not the format's twin.
+        // No longer recorded: split into the texture format, size, samples and
+        // view formats codes.
         mrhi_diagnosticTextureShape = 67,
         // A texture def with a usage that is unknown or that its format, kind
         // or sample count cannot take.
@@ -454,6 +459,63 @@ extern "C"
         // A submitted frame failed the layer's walk: a handle, payload or range
         // no driver could translate.
         mrhi_diagnosticDriverFrameWalk = 82,
+        // A pipeline def names an entry point its shader lacks for the stage,
+        // gives a fragment entry length without a name, or names no vertex
+        // entry.
+        mrhi_diagnosticPipelineEntry = 83,
+        // A pipeline def's constant values name an id the shader lacks, give
+        // one twice, hold a value its type cannot, or leave out one without a
+        // default.
+        mrhi_diagnosticPipelineConstants = 84,
+        // A graphics pipeline's vertex state is malformed: its buffers or
+        // attributes, two attributes at one location, or a vertex input with no
+        // attribute of its scalar class.
+        mrhi_diagnosticGraphicsVertex = 85,
+        // A graphics pipeline's primitive state has an unknown value, a strip
+        // index format for a list, or more than one view without multiview.
+        mrhi_diagnosticGraphicsPrimitive = 86,
+        // A graphics pipeline's depth and stencil state has an unknown value,
+        // an aspect's fields set without the aspect in the format, a bias that
+        // is not finite or set for points and lines, or no depth format while
+        // the fragment entry writes depth.
+        mrhi_diagnosticGraphicsDepthStencil = 87,
+        // A graphics pipeline's color targets are more than MRHI_COLOR_TARGETS,
+        // present without a fragment entry, malformed (format, blend or
+        // writes), not written by the fragment entry's outputs as their types
+        // allow, or absent with no depth either.
+        mrhi_diagnosticGraphicsTargets = 88,
+        // A graphics pipeline's sample count is not a power of two, or alpha to
+        // coverage is asked single-sampled, without a first target that has
+        // alpha, or while the fragment entry writes the sample mask.
+        mrhi_diagnosticGraphicsMultisample = 89,
+        // A graphics pipeline's fragment input has no vertex output of the same
+        // location, type and interpolation, or a point list leaves no room for
+        // its point size.
+        mrhi_diagnosticGraphicsInterface = 90,
+        // A chained struct the def carries is malformed: an adopted Vulkan
+        // object that is NULL, or an extension list that is not a list of
+        // names.
+        mrhi_diagnosticChainedStruct = 91,
+        // A device def's device limits include a zero, fewer than 2
+        // notifications, a command arena under one chunk, or readback bytes not
+        // a multiple of 512.
+        mrhi_diagnosticDeviceLimits = 92,
+        // A device def asks for limits below the floor every adapter reaches.
+        mrhi_diagnosticLimitsFloor = 93,
+        // An allocator with one function set and the other not.
+        mrhi_diagnosticAllocator = 94,
+        // A pipeline cache size given without its bytes.
+        mrhi_diagnosticPipelineCacheBytes = 95,
+        // A texture def names an unknown format.
+        mrhi_diagnosticTextureFormat = 96,
+        // A texture def's size or layers do not fit its kind and its format's
+        // block, or its mips are more than a full chain.
+        mrhi_diagnosticTextureSize = 97,
+        // A texture def's sample count is not 1, 2 or 4, or several samples are
+        // asked for a texture that is not 2D with one mip.
+        mrhi_diagnosticTextureSamples = 98,
+        // A texture def's view format is neither unused nor its format's twin.
+        mrhi_diagnosticTextureViewFormats = 99,
     };
 
     // A record from an instance's or a device's diagnostic queue.

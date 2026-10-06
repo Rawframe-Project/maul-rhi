@@ -38,6 +38,7 @@ static mrhiShaderId Shader(mrhiDevice* device)
 // test changed them after Reset.
 static mrhiDevice* OpenWithShader(mrhiDeviceDef def)
 {
+    def.deviceLimits.diagnostics = 8;
     mrhiDevice* device = OpenWith(def, true);
     s_shader = Shader(device);
     return device;
@@ -85,6 +86,76 @@ static mrhiResult Made(mrhiDevice* device, const mrhiGraphicsPipelineDef* def)
               "answered stale");
     }
     return status;
+}
+
+// The check that refused the device's latest refusal, draining its
+// diagnostics (mrhi-0027); 0 when there is none.
+static mrhiDiagnosticCode Refusal(mrhiDevice* device)
+{
+    mrhiDiagnosticCode code = 0;
+    mrhiDiagnostic record;
+    while (mrhiNextDeviceDiagnostic(device, &record) == mrhi_success)
+    {
+        code = record.code;
+    }
+    return code;
+}
+
+// Each part of a def refused under its own code.
+static void TestCodes(void)
+{
+    mrhiDevice* device = Open();
+    mrhiGraphicsPipelineDef def = Def();
+    def.vertexEntry = "nope";
+    def.vertexEntryLength = 4;
+    CHECK(Made(device, &def) == mrhi_errorInvalid &&
+              Refusal(device) == mrhi_diagnosticPipelineEntry,
+          "an entry the shader lacks");
+    def = Def();
+    def.constantCount = 1;
+    CHECK(Made(device, &def) == mrhi_errorInvalid &&
+              Refusal(device) == mrhi_diagnosticPipelineConstants,
+          "constants without values");
+    def = Def();
+    s_buffers[0].stride = 13;
+    CHECK(Made(device, &def) == mrhi_errorInvalid &&
+              Refusal(device) == mrhi_diagnosticGraphicsVertex,
+          "a stride not a multiple of 4");
+    def = Def();
+    def.topology = 99;
+    CHECK(Made(device, &def) == mrhi_errorInvalid &&
+              Refusal(device) == mrhi_diagnosticGraphicsPrimitive,
+          "an unknown topology");
+    def = Def();
+    def.depthBiasSlopeScale = INFINITY;
+    CHECK(Made(device, &def) == mrhi_errorInvalid &&
+              Refusal(device) == mrhi_diagnosticGraphicsDepthStencil,
+          "an infinite bias");
+    def = Def();
+    def.colorTargetCount = MRHI_COLOR_TARGETS + 1;
+    CHECK(Made(device, &def) == mrhi_errorInvalid &&
+              Refusal(device) == mrhi_diagnosticGraphicsTargets,
+          "too many targets");
+    def = Def();
+    def.sampleCount = 3;
+    CHECK(Made(device, &def) == mrhi_errorInvalid &&
+              Refusal(device) == mrhi_diagnosticGraphicsMultisample,
+          "three samples");
+    mrhiComputePipelineDef compute = mrhiDefaultComputePipelineDef();
+    compute.shader = s_shader;
+    compute.entry = "vs";
+    compute.entryLength = 2;
+    mrhiComputePipelineId computeId;
+    mrhiRequestId request;
+    CHECK(mrhiCreateComputePipeline(device, &compute, &computeId, &request) == mrhi_errorInvalid &&
+              Refusal(device) == mrhi_diagnosticPipelineEntry,
+          "a vertex entry for compute");
+    compute.entry = "cs";
+    compute.constantCount = 1;
+    CHECK(mrhiCreateComputePipeline(device, &compute, &computeId, &request) == mrhi_errorInvalid &&
+              Refusal(device) == mrhi_diagnosticPipelineConstants,
+          "compute constants without values");
+    Close(device);
 }
 
 static void TestCreate(void)
@@ -741,7 +812,9 @@ static void TestInterface(void)
         mrhiDevice* device = WithInput(cases[i].type, cases[i].components, cases[i].interpolation,
                                        cases[i].sampling);
         mrhiGraphicsPipelineDef def = Def();
-        CHECK(Made(device, &def) == mrhi_errorInvalid, cases[i].what);
+        CHECK(Made(device, &def) == mrhi_errorInvalid &&
+                  Refusal(device) == mrhi_diagnosticGraphicsInterface,
+              cases[i].what);
         Close(device);
     }
     Reset();
@@ -849,6 +922,7 @@ static void TestConstantsAndMisuse(void)
 int main(void)
 {
     ResetAdapter();
+    TestCodes();
     TestCreate();
     TestEntries();
     TestVertexBuffers();

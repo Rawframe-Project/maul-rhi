@@ -161,10 +161,21 @@ mrhiResult mrhiCheckTextureShape(mrhiDevice* device, const mrhiTextureDef* def, 
     {
         return status;
     }
-    if (!mrhiIsFormatKnown(def->format) || !IsShapeValid(def) || !AreSamplesValid(def) ||
-        !AreViewFormatsValid(def))
+    if (!mrhiIsFormatKnown(def->format))
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticTextureShape);
+        return mrhiDeviceMisuse(device, mrhi_diagnosticTextureFormat);
+    }
+    if (!IsShapeValid(def))
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticTextureSize);
+    }
+    if (!AreSamplesValid(def))
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticTextureSamples);
+    }
+    if (!AreViewFormatsValid(def))
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticTextureViewFormats);
     }
     if (!FitsLimits(def, &device->limits) ||
         !mrhiFormatFamilyGranted(def->format, &device->features))

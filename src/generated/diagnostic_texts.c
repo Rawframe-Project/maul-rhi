@@ -19,7 +19,7 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticAdapterRequestDef:
         return "An adapter request def is NULL, lacks its cookie or names an unknown power preference.";
     case mrhi_diagnosticDeviceDef:
-        return "A device def lacks its cookie, has a malformed chain, label, allocator or Vulkan struct, a device limit of zero (fewer than 2 notifications, a command arena under one chunk, readback bytes not a multiple of 512), limits under the floor, or a cache size without bytes.";
+        return "A device def lacks its cookie, has a malformed chain, label, allocator or Vulkan struct, a device limit of zero (fewer than 2 notifications, a command arena under one chunk, readback bytes not a multiple of 512), limits under the floor, or a cache size without bytes. No longer recorded: split into def_header, chained_struct, device_limits, limits_floor, allocator and pipeline_cache_bytes.";
     case mrhi_diagnosticInstanceHasDevices:
         return "An instance was destroyed while devices made on it live; nothing was destroyed.";
     case mrhi_diagnosticSurfaceSource:
@@ -113,9 +113,9 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticSealTexture:
         return "A texture sealed without sampled usage, or an adopted image, which rests as a target.";
     case mrhi_diagnosticGraphicsPipelineDef:
-        return "A graphics pipeline def that does not fit its shaders: stages, constants, vertex layout, primitive, depth and stencil, targets, multisampling or the interface between stages.";
+        return "A graphics pipeline def that does not fit its shaders: stages, constants, vertex layout, primitive, depth and stencil, targets, multisampling or the interface between stages. No longer recorded: split into the pipeline entry, constants and graphics state codes.";
     case mrhi_diagnosticComputePipelineDef:
-        return "A compute pipeline def naming an entry its shader lacks, or constants it does not declare.";
+        return "A compute pipeline def naming an entry its shader lacks, or constants it does not declare. No longer recorded: split into the pipeline entry and constants codes.";
     case mrhi_diagnosticHeapDef:
         return "A heap def with no entries.";
     case mrhi_diagnosticHeapIndex:
@@ -145,7 +145,7 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticShaderContainer:
         return "Shader bytes that are not a well-formed container: its bounds, version, digest or reflection.";
     case mrhi_diagnosticTextureShape:
-        return "A texture def with an unknown format, a size, layer, mip or sample count out of range, or view formats that are not the format's twin.";
+        return "A texture def with an unknown format, a size, layer, mip or sample count out of range, or view formats that are not the format's twin. No longer recorded: split into the texture format, size, samples and view formats codes.";
     case mrhi_diagnosticTextureUsage:
         return "A texture def with a usage that is unknown or that its format, kind or sample count cannot take.";
     case mrhi_diagnosticTextureAdopt:
@@ -176,6 +176,40 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "A driver reported a memory alignment of zero or not a power of two.";
     case mrhi_diagnosticDriverFrameWalk:
         return "A submitted frame failed the layer's walk: a handle, payload or range no driver could translate.";
+    case mrhi_diagnosticPipelineEntry:
+        return "A pipeline def names an entry point its shader lacks for the stage, gives a fragment entry length without a name, or names no vertex entry.";
+    case mrhi_diagnosticPipelineConstants:
+        return "A pipeline def's constant values name an id the shader lacks, give one twice, hold a value its type cannot, or leave out one without a default.";
+    case mrhi_diagnosticGraphicsVertex:
+        return "A graphics pipeline's vertex state is malformed: its buffers or attributes, two attributes at one location, or a vertex input with no attribute of its scalar class.";
+    case mrhi_diagnosticGraphicsPrimitive:
+        return "A graphics pipeline's primitive state has an unknown value, a strip index format for a list, or more than one view without multiview.";
+    case mrhi_diagnosticGraphicsDepthStencil:
+        return "A graphics pipeline's depth and stencil state has an unknown value, an aspect's fields set without the aspect in the format, a bias that is not finite or set for points and lines, or no depth format while the fragment entry writes depth.";
+    case mrhi_diagnosticGraphicsTargets:
+        return "A graphics pipeline's color targets are more than MRHI_COLOR_TARGETS, present without a fragment entry, malformed (format, blend or writes), not written by the fragment entry's outputs as their types allow, or absent with no depth either.";
+    case mrhi_diagnosticGraphicsMultisample:
+        return "A graphics pipeline's sample count is not a power of two, or alpha to coverage is asked single-sampled, without a first target that has alpha, or while the fragment entry writes the sample mask.";
+    case mrhi_diagnosticGraphicsInterface:
+        return "A graphics pipeline's fragment input has no vertex output of the same location, type and interpolation, or a point list leaves no room for its point size.";
+    case mrhi_diagnosticChainedStruct:
+        return "A chained struct the def carries is malformed: an adopted Vulkan object that is NULL, or an extension list that is not a list of names.";
+    case mrhi_diagnosticDeviceLimits:
+        return "A device def's device limits include a zero, fewer than 2 notifications, a command arena under one chunk, or readback bytes not a multiple of 512.";
+    case mrhi_diagnosticLimitsFloor:
+        return "A device def asks for limits below the floor every adapter reaches.";
+    case mrhi_diagnosticAllocator:
+        return "An allocator with one function set and the other not.";
+    case mrhi_diagnosticPipelineCacheBytes:
+        return "A pipeline cache size given without its bytes.";
+    case mrhi_diagnosticTextureFormat:
+        return "A texture def names an unknown format.";
+    case mrhi_diagnosticTextureSize:
+        return "A texture def's size or layers do not fit its kind and its format's block, or its mips are more than a full chain.";
+    case mrhi_diagnosticTextureSamples:
+        return "A texture def's sample count is not 1, 2 or 4, or several samples are asked for a texture that is not 2D with one mip.";
+    case mrhi_diagnosticTextureViewFormats:
+        return "A texture def's view format is neither unused nor its format's twin.";
     default:
         return "An unknown diagnostic code.";
     }

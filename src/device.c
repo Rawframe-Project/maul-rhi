@@ -70,28 +70,56 @@ static bool AreVulkanStructsValid(const mrhiDeviceDef* def)
            (extra == nullptr || mrhiIsNameList(extra->extensions, extra->extensionsLength));
 }
 
+// Whether the def's own limits on the device's bookkeeping are usable.
+static bool AreDeviceLimitsValid(const mrhiDeviceLimits* limits)
+{
+    return limits->notifications >= 2 && limits->samplers != 0 && limits->buffers != 0 &&
+           limits->textures != 0 && limits->views != 0 && limits->surfaces != 0 &&
+           limits->frameResources != 0 && limits->framePasses != 0 && limits->frameAccesses != 0 &&
+           limits->frameBarriers != 0 && limits->shaders != 0 && limits->pipelines != 0 &&
+           limits->frameCommandBytes >= MRHI_CHUNK_BYTES && limits->readbackBytes % 512 == 0;
+}
+
+// The check a device def fails first, or 0 when it is well formed.
+static mrhiDiagnosticCode DeviceDefFault(const mrhiDeviceDef* def, mrhiResult chain)
+{
+    mrhiLimits floor = mrhiDefaultLimits();
+    if (def->cookie != DEVICE_DEF_COOKIE || chain == mrhi_errorInvalid ||
+        !mrhiIsLabelValid(def->label, def->labelLength))
+    {
+        return mrhi_diagnosticDefHeader;
+    }
+    if (chain == mrhi_success && !AreVulkanStructsValid(def))
+    {
+        return mrhi_diagnosticChainedStruct;
+    }
+    if (!AreDeviceLimitsValid(&def->deviceLimits))
+    {
+        return mrhi_diagnosticDeviceLimits;
+    }
+    if (!mrhiLimitsWithin(&floor, &def->limits))
+    {
+        return mrhi_diagnosticLimitsFloor;
+    }
+    if (!mrhiIsAllocatorValid(&def->allocator))
+    {
+        return mrhi_diagnosticAllocator;
+    }
+    return def->pipelineCache == nullptr && def->pipelineCacheBytes > 0
+               ? mrhi_diagnosticPipelineCacheBytes
+               : 0;
+}
+
 const mrhiDriverAdapter* mrhiCheckDeviceDef(mrhiInstance* instance, const mrhiDeviceDef* def,
                                             mrhiResult* statusOut)
 {
-    mrhiLimits floor = mrhiDefaultLimits();
     size_t accepted = sizeof(s_deviceStructs) / sizeof(s_deviceStructs[0]) - 1;
     mrhiResult chain =
         mrhiCheckChain(def->next, s_deviceStructs, accepted, instance->limits.chainDepth);
-    chain = chain == mrhi_success && !AreVulkanStructsValid(def) ? mrhi_errorInvalid : chain;
-    if (def->cookie != DEVICE_DEF_COOKIE || def->deviceLimits.notifications < 2 ||
-        def->deviceLimits.samplers == 0 || def->deviceLimits.buffers == 0 ||
-        def->deviceLimits.textures == 0 || def->deviceLimits.views == 0 ||
-        def->deviceLimits.surfaces == 0 || def->deviceLimits.frameResources == 0 ||
-        def->deviceLimits.framePasses == 0 || def->deviceLimits.frameAccesses == 0 ||
-        def->deviceLimits.frameBarriers == 0 || def->deviceLimits.shaders == 0 ||
-        def->deviceLimits.pipelines == 0 ||
-        def->deviceLimits.frameCommandBytes < MRHI_CHUNK_BYTES ||
-        def->deviceLimits.readbackBytes % 512 != 0 ||
-        !mrhiIsLabelValid(def->label, def->labelLength) || !mrhiIsAllocatorValid(&def->allocator) ||
-        (def->pipelineCache == nullptr && def->pipelineCacheBytes > 0) ||
-        !mrhiLimitsWithin(&floor, &def->limits) || chain == mrhi_errorInvalid)
+    mrhiDiagnosticCode fault = DeviceDefFault(def, chain);
+    if (fault != 0)
     {
-        *statusOut = mrhiMisuse(instance, mrhi_diagnosticDeviceDef);
+        *statusOut = mrhiMisuse(instance, fault);
         return nullptr;
     }
     const mrhiDriverAdapter* adapter = mrhiFindAdapter(instance, def->adapter);

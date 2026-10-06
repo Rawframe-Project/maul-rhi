@@ -481,20 +481,39 @@ static mrhiShaderSlot* CheckGraphicsDef(mrhiDevice* device, const mrhiGraphicsPi
     {
         return nullptr;
     }
-    mrhiResult status = mrhi_errorInvalid;
-    if (FindStages(shader, def, stagesOut) &&
-        mrhiAreConstantsValid(shader->reflection, def->constants, def->constantCount))
+    if (!FindStages(shader, def, stagesOut))
     {
-        status = CheckVertex(device, def, *stagesOut);
-        status = Worse(status, CheckPrimitive(device, def));
-        status = Worse(status, CheckDepthStencil(device, def, *stagesOut));
-        status = Worse(status, CheckTargets(device, def, *stagesOut));
-        status = Worse(status, CheckMultisample(device, def, *stagesOut));
-        status = Worse(status, CheckInterface(device, def, *stagesOut));
+        *statusOut = mrhiDeviceMisuse(device, mrhi_diagnosticPipelineEntry);
+        return nullptr;
     }
-    *statusOut = status == mrhi_errorInvalid
-                     ? mrhiDeviceMisuse(device, mrhi_diagnosticGraphicsPipelineDef)
-                     : status;
+    if (!mrhiAreConstantsValid(shader->reflection, def->constants, def->constantCount))
+    {
+        *statusOut = mrhiDeviceMisuse(device, mrhi_diagnosticPipelineConstants);
+        return nullptr;
+    }
+    // Every state is checked, and invalid input outranks what the device
+    // cannot do; the first invalid state names the refusal.
+    const mrhiResult states[] = {
+        CheckVertex(device, def, *stagesOut),       CheckPrimitive(device, def),
+        CheckDepthStencil(device, def, *stagesOut), CheckTargets(device, def, *stagesOut),
+        CheckMultisample(device, def, *stagesOut),  CheckInterface(device, def, *stagesOut),
+    };
+    static const mrhiDiagnosticCode codes[] = {
+        mrhi_diagnosticGraphicsVertex,       mrhi_diagnosticGraphicsPrimitive,
+        mrhi_diagnosticGraphicsDepthStencil, mrhi_diagnosticGraphicsTargets,
+        mrhi_diagnosticGraphicsMultisample,  mrhi_diagnosticGraphicsInterface,
+    };
+    mrhiResult status = mrhi_success;
+    for (size_t i = 0; i < sizeof(states) / sizeof(states[0]); ++i)
+    {
+        if (states[i] == mrhi_errorInvalid)
+        {
+            *statusOut = mrhiDeviceMisuse(device, codes[i]);
+            return nullptr;
+        }
+        status = Worse(status, states[i]);
+    }
+    *statusOut = status;
     return status == mrhi_success ? shader : nullptr;
 }
 

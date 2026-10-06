@@ -352,7 +352,7 @@
             {
               "name": "diagnostic_device_def",
               "value": 4,
-              "doc": "A device def lacks its cookie, has a malformed chain, label, allocator or Vulkan struct, a device limit of zero (fewer than 2 notifications, a command arena under one chunk, readback bytes not a multiple of 512), limits under the floor, or a cache size without bytes."
+              "doc": "A device def lacks its cookie, has a malformed chain, label, allocator or Vulkan struct, a device limit of zero (fewer than 2 notifications, a command arena under one chunk, readback bytes not a multiple of 512), limits under the floor, or a cache size without bytes. No longer recorded: split into def_header, chained_struct, device_limits, limits_floor, allocator and pipeline_cache_bytes."
             },
             {
               "name": "diagnostic_instance_has_devices",
@@ -587,12 +587,12 @@
             {
               "name": "diagnostic_graphics_pipeline_def",
               "value": 51,
-              "doc": "A graphics pipeline def that does not fit its shaders: stages, constants, vertex layout, primitive, depth and stencil, targets, multisampling or the interface between stages."
+              "doc": "A graphics pipeline def that does not fit its shaders: stages, constants, vertex layout, primitive, depth and stencil, targets, multisampling or the interface between stages. No longer recorded: split into the pipeline entry, constants and graphics state codes."
             },
             {
               "name": "diagnostic_compute_pipeline_def",
               "value": 52,
-              "doc": "A compute pipeline def naming an entry its shader lacks, or constants it does not declare."
+              "doc": "A compute pipeline def naming an entry its shader lacks, or constants it does not declare. No longer recorded: split into the pipeline entry and constants codes."
             },
             {
               "name": "diagnostic_heap_def",
@@ -667,7 +667,7 @@
             {
               "name": "diagnostic_texture_shape",
               "value": 67,
-              "doc": "A texture def with an unknown format, a size, layer, mip or sample count out of range, or view formats that are not the format's twin."
+              "doc": "A texture def with an unknown format, a size, layer, mip or sample count out of range, or view formats that are not the format's twin. No longer recorded: split into the texture format, size, samples and view formats codes."
             },
             {
               "name": "diagnostic_texture_usage",
@@ -743,6 +743,91 @@
               "name": "diagnostic_driver_frame_walk",
               "value": 82,
               "doc": "A submitted frame failed the layer's walk: a handle, payload or range no driver could translate."
+            },
+            {
+              "name": "diagnostic_pipeline_entry",
+              "value": 83,
+              "doc": "A pipeline def names an entry point its shader lacks for the stage, gives a fragment entry length without a name, or names no vertex entry."
+            },
+            {
+              "name": "diagnostic_pipeline_constants",
+              "value": 84,
+              "doc": "A pipeline def's constant values name an id the shader lacks, give one twice, hold a value its type cannot, or leave out one without a default."
+            },
+            {
+              "name": "diagnostic_graphics_vertex",
+              "value": 85,
+              "doc": "A graphics pipeline's vertex state is malformed: its buffers or attributes, two attributes at one location, or a vertex input with no attribute of its scalar class."
+            },
+            {
+              "name": "diagnostic_graphics_primitive",
+              "value": 86,
+              "doc": "A graphics pipeline's primitive state has an unknown value, a strip index format for a list, or more than one view without multiview."
+            },
+            {
+              "name": "diagnostic_graphics_depth_stencil",
+              "value": 87,
+              "doc": "A graphics pipeline's depth and stencil state has an unknown value, an aspect's fields set without the aspect in the format, a bias that is not finite or set for points and lines, or no depth format while the fragment entry writes depth."
+            },
+            {
+              "name": "diagnostic_graphics_targets",
+              "value": 88,
+              "doc": "A graphics pipeline's color targets are more than MRHI_COLOR_TARGETS, present without a fragment entry, malformed (format, blend or writes), not written by the fragment entry's outputs as their types allow, or absent with no depth either."
+            },
+            {
+              "name": "diagnostic_graphics_multisample",
+              "value": 89,
+              "doc": "A graphics pipeline's sample count is not a power of two, or alpha to coverage is asked single-sampled, without a first target that has alpha, or while the fragment entry writes the sample mask."
+            },
+            {
+              "name": "diagnostic_graphics_interface",
+              "value": 90,
+              "doc": "A graphics pipeline's fragment input has no vertex output of the same location, type and interpolation, or a point list leaves no room for its point size."
+            },
+            {
+              "name": "diagnostic_chained_struct",
+              "value": 91,
+              "doc": "A chained struct the def carries is malformed: an adopted Vulkan object that is NULL, or an extension list that is not a list of names."
+            },
+            {
+              "name": "diagnostic_device_limits",
+              "value": 92,
+              "doc": "A device def's device limits include a zero, fewer than 2 notifications, a command arena under one chunk, or readback bytes not a multiple of 512."
+            },
+            {
+              "name": "diagnostic_limits_floor",
+              "value": 93,
+              "doc": "A device def asks for limits below the floor every adapter reaches."
+            },
+            {
+              "name": "diagnostic_allocator",
+              "value": 94,
+              "doc": "An allocator with one function set and the other not."
+            },
+            {
+              "name": "diagnostic_pipeline_cache_bytes",
+              "value": 95,
+              "doc": "A pipeline cache size given without its bytes."
+            },
+            {
+              "name": "diagnostic_texture_format",
+              "value": 96,
+              "doc": "A texture def names an unknown format."
+            },
+            {
+              "name": "diagnostic_texture_size",
+              "value": 97,
+              "doc": "A texture def's size or layers do not fit its kind and its format's block, or its mips are more than a full chain."
+            },
+            {
+              "name": "diagnostic_texture_samples",
+              "value": 98,
+              "doc": "A texture def's sample count is not 1, 2 or 4, or several samples are asked for a texture that is not 2D with one mip."
+            },
+            {
+              "name": "diagnostic_texture_view_formats",
+              "value": 99,
+              "doc": "A texture def's view format is neither unused nor its format's twin."
             }
           ],
           "library": "names the library's own checks"

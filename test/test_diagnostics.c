@@ -109,6 +109,103 @@ static void TestInstance(void)
     mrhiDestroyInstance(instance);
 }
 
+static void* NoMemory(size_t size, size_t alignment, void* context)
+{
+    (void)size;
+    (void)alignment;
+    (void)context;
+    return nullptr;
+}
+
+// A device def refused for each of its parts, recorded on the instance.
+static void TestDeviceDef(void)
+{
+    mrhiInstanceDef def = mrhiDefaultInstanceDef();
+    def.limits.diagnostics = 8;
+    mrhiTestDriverDef driver = {.chain = {.next = nullptr, .type = mrhi_structTestDriver}};
+    def.next = &driver.chain;
+    mrhiInstance* instance = nullptr;
+    CHECK(mrhiCreateInstance(&def, &instance) == mrhi_success, "an instance");
+    struct
+    {
+        mrhiDeviceDef def;
+        mrhiDiagnosticCode code;
+        const char* what;
+    } cases[5];
+    for (size_t i = 0; i < 5; ++i)
+    {
+        cases[i].def = mrhiDefaultDeviceDef();
+    }
+    cases[0].def.labelLength = 1;
+    cases[0].code = mrhi_diagnosticDefHeader;
+    cases[0].what = "a label length without a label";
+    cases[1].def.deviceLimits.samplers = 0;
+    cases[1].code = mrhi_diagnosticDeviceLimits;
+    cases[1].what = "no samplers";
+    cases[2].def.limits.textureDimension2d = 1;
+    cases[2].code = mrhi_diagnosticLimitsFloor;
+    cases[2].what = "limits under the floor";
+    cases[3].def.allocator.alloc = NoMemory;
+    cases[3].code = mrhi_diagnosticAllocator;
+    cases[3].what = "half an allocator";
+    cases[4].def.pipelineCacheBytes = 4;
+    cases[4].code = mrhi_diagnosticPipelineCacheBytes;
+    cases[4].what = "a cache size without bytes";
+    for (size_t i = 0; i < 5; ++i)
+    {
+        mrhiDevice* device = nullptr;
+        mrhiRequestId request;
+        mrhiDiagnostic record = {0};
+        CHECK(mrhiCreateDevice(instance, &cases[i].def, &device, &request) == mrhi_errorInvalid &&
+                  mrhiNextInstanceDiagnostic(instance, &record) == mrhi_success &&
+                  record.code == cases[i].code,
+              cases[i].what);
+    }
+    mrhiDestroyInstance(instance);
+}
+
+// A texture def refused for each part of its shape.
+static void TestTextureShape(void)
+{
+    mrhiDevice* device = Open(8);
+    struct
+    {
+        mrhiTextureDef def;
+        mrhiDiagnosticCode code;
+        const char* what;
+    } cases[4];
+    for (size_t i = 0; i < 4; ++i)
+    {
+        cases[i].def = mrhiDefaultTextureDef();
+        cases[i].def.format = mrhi_formatRgba8Unorm;
+        cases[i].def.usage = mrhi_textureSampled;
+        cases[i].def.width = 16;
+        cases[i].def.height = 16;
+    }
+    cases[0].def.format = 0x7FFF;
+    cases[0].code = mrhi_diagnosticTextureFormat;
+    cases[0].what = "an unknown format";
+    cases[1].def.width = 0;
+    cases[1].code = mrhi_diagnosticTextureSize;
+    cases[1].what = "no width";
+    cases[2].def.sampleCount = 3;
+    cases[2].code = mrhi_diagnosticTextureSamples;
+    cases[2].what = "three samples";
+    cases[3].def.viewFormats[0] = mrhi_formatR8Unorm;
+    cases[3].code = mrhi_diagnosticTextureViewFormats;
+    cases[3].what = "a view format that is not the twin";
+    for (size_t i = 0; i < 4; ++i)
+    {
+        mrhiTextureId texture;
+        mrhiDiagnostic record = {0};
+        CHECK(mrhiCreateTexture(device, &cases[i].def, &texture) == mrhi_errorInvalid &&
+                  mrhiNextDeviceDiagnostic(device, &record) == mrhi_success &&
+                  record.code == cases[i].code,
+              cases[i].what);
+    }
+    Close(device);
+}
+
 static void TestTexts(void)
 {
     const char* text = mrhiDiagnosticText(mrhi_diagnosticBufferSize);
@@ -165,6 +262,8 @@ int main(void)
     TestDevice();
     TestNoneByDefault();
     TestInstance();
+    TestDeviceDef();
+    TestTextureShape();
     TestTexts();
 #ifdef TEST_THREADS
     TestThreads();
