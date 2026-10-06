@@ -325,6 +325,10 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           tools="$ANDROID_HOME/cmdline-tools/latest/bin"
           yes | "$tools/sdkmanager" --licenses >/dev/null 2>&1 || true
+          # Runner images move to newer NDKs: the pinned one is installed when
+          # the image lacks it.
+          [ -f "$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" ] ||
+            "$tools/sdkmanager" --install "ndk;${ANDROID_NDK_HOME##*/}" >/dev/null
           mkdir -p "$ANDROID_AVD_HOME"
           "$tools/sdkmanager" --install emulator "system-images;android-35;google_apis;x86_64" >/dev/null
           echo no | "$tools/avdmanager" create avd -n maul35 -k "system-images;android-35;google_apis;x86_64" -d pixel_5 >/dev/null
