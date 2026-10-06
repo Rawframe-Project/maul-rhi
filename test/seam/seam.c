@@ -9,6 +9,10 @@
 // without a window system or an adapter unless MAUL_RHI_REQUIRE_SURFACE
 // is set.
 
+#ifdef _WIN32
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include "harness.h"
 
 #include "maul-rhi/surface.h"
