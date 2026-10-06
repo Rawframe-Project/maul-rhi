@@ -240,7 +240,7 @@ def check_mapping(errors, where, mapping):
 
 
 # The kinds of concept that are mapped onto the APIs or declared the
-# library's own (R57's rule, in mrhi-0002).
+# library's own (mrhi-0002).
 CLASSED_KINDS = ("function", "struct", "enum", "bitflags")
 
 

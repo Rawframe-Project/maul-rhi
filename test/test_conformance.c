@@ -2398,7 +2398,7 @@ static void CheckThreads(mrhiDevice* device)
 }
 
 // A device lost through mrhiSimulateDeviceLoss with a frame and its
-// readback running (mrhi-0014, R67): the notice, then both answered
+// readback running (mrhi-0014): the notice, then both answered
 // lost, the report, calls answering lost, a clean destroy, and a new
 // device on the same adapter.
 static void CheckLoss(mrhiInstance* instance, mrhiAdapterId adapter)

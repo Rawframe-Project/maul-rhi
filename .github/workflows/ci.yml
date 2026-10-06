@@ -360,7 +360,7 @@ jobs:
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
       # The public headers alone under MSVC's cl, as C17 and C++17 with
-      # /W4 /WX, which cannot build the library itself (F26).
+      # /W4 /WX, which cannot build the library itself (family record 0008).
       - name: Headers under MSVC
         run: |
           cmake -S cmake/HeaderCheck -B build-headers
@@ -368,7 +368,7 @@ jobs:
 
   # The default Windows build, the D3D12 driver, on WARP, the runner's
   # software adapter, under the Agility SDK's debug layer with GPU-based
-  # validation, whose errors fail the suites (R69); the samples run
+  # validation, whose errors fail the suites (mrhi-0003); the samples run
   # there too. The SDK's NuGet package, the version the
   # directx/ headers are, goes beside each test in D3D12/, where the
   # tests' exports point.
