@@ -383,7 +383,10 @@ own results; `maul-rhi_bench` prints the CPU cost per draw and pass, a
 compile's time and the bytes of an instance and a device, with their
 ratio to `bench/baseline.txt`. `-DMAUL_RHI_SEAM=ON` adds the check
 against Maul Window (`test/seam/`), which fetches Maul Window at a
-release tag for that check alone.
+release tag for that check alone. `-DMAUL_RHI_LABELS=OFF` compiles
+debug labels out for a shipping build: they are still checked, then
+dropped, so nothing is named, copied or recorded and every call
+answers as before (mrhi-0029).
 
 A program's own tests can run on the test driver, built when
 `MAUL_RHI_TEST_DRIVER` is on (as it is with the library's tests): chain

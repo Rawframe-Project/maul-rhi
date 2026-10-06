@@ -7,6 +7,7 @@
 // full arena refusing the frame.
 
 #include "device_core.h"
+#include "label.h"
 #include "test_container.h"
 #include "test_device_setup.h"
 
@@ -609,6 +610,7 @@ static void TestDebugGroups(void)
               mrhiPushDebugGroup(s_device, s_copy, "inner", 5) == mrhi_success,
           "two groups in a transfer pass");
     CHECK(mrhiInsertDebugMarker(s_device, s_copy, "here", 4) == mrhi_success, "a marker");
+#if MAUL_RHI_LABELS
     const mrhiCommand* command = Nth(s_copy, 0);
     CHECK(command != nullptr && command->type == mrhiCommandPushDebugGroup && command->b == 6 &&
               command->payload == 1 && memcmp(Nth(s_copy, 1), "copies", 6) == 0,
@@ -617,14 +619,21 @@ static void TestDebugGroups(void)
     CHECK(command != nullptr && command->type == mrhiCommandDebugMarker && command->b == 4 &&
               memcmp(Nth(s_copy, 5), "here", 4) == 0,
           "the marker recorded");
+#else
+    CHECK(Nth(s_copy, 0) == nullptr, "nothing recorded in a build without labels");
+#endif
     CHECK(mrhiEndPass(s_device, s_copy) == mrhi_errorInvalid, "groups still open");
     CHECK(mrhiPopDebugGroup(s_device, s_copy) == mrhi_success, "one closed");
     CHECK(mrhiEndPass(s_device, s_copy) == mrhi_errorInvalid, "one still open");
     CHECK(mrhiPopDebugGroup(s_device, s_copy) == mrhi_success, "both closed");
+#if MAUL_RHI_LABELS
     command = Nth(s_copy, 7);
     CHECK(command != nullptr && command->type == mrhiCommandPopDebugGroup &&
               Nth(s_copy, 8) == nullptr,
           "the pops recorded");
+#else
+    CHECK(Nth(s_copy, 0) == nullptr, "the pops recorded nothing either");
+#endif
     CHECK(mrhiEndPass(s_device, s_copy) == mrhi_success, "ended");
     CHECK(mrhiGetDeviceMisuse(s_device) == 3, "each refusal counted");
     CHECK(mrhiBeginPass(s_device, s_dispatch) == mrhi_success, "another pass");
@@ -632,8 +641,10 @@ static void TestDebugGroups(void)
     memset(label, 'a', sizeof(label));
     CHECK(mrhiInsertDebugMarker(s_device, s_dispatch, label, 256) == mrhi_success,
           "the longest label");
-    command = Nth(s_dispatch, 0);
-    CHECK(command != nullptr && command->payload == 8, "in eight payload records");
+#if MAUL_RHI_LABELS
+    const mrhiCommand* longest = Nth(s_dispatch, 0);
+    CHECK(longest != nullptr && longest->payload == 8, "in eight payload records");
+#endif
     CHECK(mrhiInsertDebugMarker(s_device, s_dispatch, label, 257) == mrhi_errorInvalid &&
               mrhiPushDebugGroup(s_device, s_dispatch, label, 0) == mrhi_errorInvalid &&
               mrhiPushDebugGroup(s_device, s_dispatch, nullptr, 4) == mrhi_errorInvalid &&
@@ -691,6 +702,7 @@ static void TestArena(void)
     CHECK(mrhiGetDeviceMisuse(s_device) == 0, "not misuse");
     CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
     Frame(false);
+#if MAUL_RHI_LABELS
     CHECK(mrhiBeginPass(s_device, s_copy) == mrhi_success, "the arena again");
     // Markers of two records: 63 to a chunk, the last record of each
     // left unused rather than splitting one.
@@ -719,6 +731,16 @@ static void TestArena(void)
           "each frame takes the arena afresh");
     CHECK(s_device->framePasses[s_copy.index1 - 1].firstChunk == 1 && Nth(s_copy, 2) == nullptr,
           "from its first chunk, linked to nothing");
+#else
+    // Without labels a marker records nothing, so markers never fill it.
+    bool taken = mrhiBeginPass(s_device, s_copy) == mrhi_success;
+    for (uint32_t i = 0; i < 4 * perChunk; ++i)
+    {
+        taken = taken && mrhiInsertDebugMarker(s_device, s_copy, "m", 1) == mrhi_success;
+    }
+    CHECK(taken && mrhiEndPass(s_device, s_copy) == mrhi_success && Nth(s_copy, 0) == nullptr,
+          "markers take no room in a build without labels");
+#endif
     CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
     Close2();
 }

@@ -8,6 +8,14 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- `MAUL_RHI_LABELS` (mrhi-0029), on by default: off, debug labels
+  compile out. They are still checked, so every call answers as in a
+  build with them, then dropped: drivers name nothing, passes keep no
+  label, frames allocate no label storage, and debug groups and markers
+  record nothing.
+
 ## [0.2.0] - 2026-10-06
 
 Diagnostics, drivers built outside the tree with their SPI headers and

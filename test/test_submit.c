@@ -7,6 +7,7 @@
 // is open keeps its snapshot, its slot's next object untouched.
 
 #include "device_core.h"
+#include "label.h"
 #include "test_device_setup.h"
 
 #include "maul-rhi/encoder.h"
@@ -152,15 +153,17 @@ static void TestView(void)
               s_device->framePasses[draw.index1 - 1].height == 8,
           "a pass never begun measured");
     mrhiRequestId first = Submit();
-    CHECK(s_log.frames == 1 && s_log.passes == 4 && s_log.labeled == 2 && s_log.labelBytes == 10,
-          "the kept passes and their labels");
+    CHECK(s_log.frames == 1 && s_log.passes == 4 && s_log.labeled == (MAUL_RHI_LABELS ? 2u : 0u) &&
+              s_log.labelBytes == (MAUL_RHI_LABELS ? 10u : 0u),
+          "the kept passes and their labels, which a build without labels drops");
     CHECK(s_log.barriers == barriers && s_log.memoryBytes == memory, "the plan's barriers");
     CHECK(s_log.resources == 4 && s_log.needed == 3 && s_log.transients == 2,
           "four resources, the culled pass's not needed");
-    // An upload, then a marker with two label records, then a blend
-    // constant with its color.
-    CHECK(s_log.commands == 3 && s_log.records == 3 + 2 + 2 + 1 && s_log.chunks == 2,
-          "every command walked");
+    // An upload, then a marker with two label records (none in a build
+    // without labels), then a blend constant with its color.
+    CHECK(s_log.commands == (MAUL_RHI_LABELS ? 3u : 2u) &&
+              s_log.records == (MAUL_RHI_LABELS ? 3u + 2u + 2u + 1u : 3u + 2u) && s_log.chunks == 2,
+          "every command walked, the marker only where labels are kept");
     CHECK(s_log.stagingBytes == 512 && s_log.uploadSum == 1 + 2 + 3 + 4,
           "one upload at a 512-byte boundary, its bytes");
     CHECK(s_log.occlusionPasses == 1 && s_log.timestampPasses == 1, "the passes' query sets");

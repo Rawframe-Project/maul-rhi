@@ -10,6 +10,7 @@
 #include "capabilities_core.h"
 #include "device_core.h"
 #include "heap_core.h"
+#include "label.h"
 
 #include <string.h>
 
@@ -626,13 +627,13 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
         .occlusionSet = def->occlusionQuerySet.index1,
         .occlusionGeneration = def->occlusionQuerySet.generation,
         .heap = heap,
-        .labelLength = (uint32_t)def->labelLength,
+        .labelLength = MAUL_RHI_LABELS ? (uint32_t)def->labelLength : 0,
     };
     if (def->occlusionQuerySet.index1 != 0)
     {
         pass->occlusionHandle = device->querySetSlots[def->occlusionQuerySet.index1 - 1].handle;
     }
-    if (def->labelLength > 0)
+    if (pass->labelLength > 0)
     {
         memcpy(&device->frameLabels[(size_t)(device->framePassCount - 1) * MRHI_LABEL_BYTES],
                def->label, def->labelLength);

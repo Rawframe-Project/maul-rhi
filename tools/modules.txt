@@ -73,16 +73,16 @@ invariant:
 label:
 notify: instance_core
 pool:
-resources: capabilities_core device_core heap_core
-texture: capabilities_core chain device_core
-view: capabilities_core device_core heap_core
+resources: capabilities_core device_core heap_core label
+texture: capabilities_core chain device_core label
+view: capabilities_core device_core heap_core label
 surface: chain device_core instance_core invariant label
 swapchain: capabilities_core device_core instance_core
 frame: device_core invariant
 frame_resource: device_core instance_core
-heap: allocator device_core heap_core
+heap: allocator device_core heap_core label
 heap_core: device_core
-pass: capabilities_core device_core heap_core
+pass: capabilities_core device_core heap_core label
 compile: device_core
 plan: device_core
 memory: device_core
@@ -96,18 +96,18 @@ binding: capabilities_core encoder_core
 draw: encoder_core
 copy: copy_core
 upload: copy_core
-query: device_core encoder_core
+query: device_core encoder_core label
 readback: copy_core
 submit: device_core invariant
 copy_core: capabilities_core encoder_core
 cache: bytes device_core sha256
 bytes:
 container: bytes capabilities_core label sha256
-shader: container device_core
+shader: container device_core label
 reflection: allocator container
-pipeline: device_core invariant pipeline_core
+pipeline: device_core invariant label pipeline_core
 pipeline_core: device_core
-graphics: capabilities_core pipeline_core
+graphics: capabilities_core label pipeline_core
 vulkan_recipe: allocator chain vulkan_adapter vulkan_api
 vulkan_external: device_core driver_vulkan encoder_core instance_core pool vulkan_device validation
 d3d12_external: d3d12_device device_core encoder_core pool validation

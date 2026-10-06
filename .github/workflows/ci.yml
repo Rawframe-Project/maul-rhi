@@ -64,7 +64,7 @@ jobs:
       matrix:
         include:
           - { name: linux-gcc-14,        os: ubuntu-24.04, cc: gcc-14,   cxx: g++-14,     config: Release, extra: "" }
-          - { name: linux-clang-20,      os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Release, extra: "" }
+          - { name: linux-clang-20,      os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Release, extra: "-DMAUL_RHI_LABELS=OFF" }
           - { name: linux-clang-20-asan, os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Debug,   extra: "-DMAUL_RHI_SANITIZE=ON -DMAUL_RHI_VALIDATION=ON" }
           - { name: linux-clang-20-tsan, os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Debug,   extra: "-DMAUL_RHI_TSAN=ON" }
           - { name: linux-shared,        os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Release, extra: "-DMAUL_RHI_BUILD_SHARED=ON" }
