@@ -69,9 +69,9 @@ jobs:
           - { name: linux-clang-20-tsan, os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Debug,   extra: "-DMAUL_RHI_TSAN=ON" }
           - { name: linux-shared,        os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Release, extra: "-DMAUL_RHI_BUILD_SHARED=ON" }
           # The Metal driver on the runner's paravirtual device (mrhi-0003),
-          # as released and with assertions.
+          # as released on macOS 15 and with assertions on macOS 26.
           - { name: macos-clang,         os: macos-15,     cc: clang,    cxx: clang++,    config: Release, extra: "" }
-          - { name: macos-clang-debug,   os: macos-15,     cc: clang,    cxx: clang++,    config: Debug,   extra: "" }
+          - { name: macos-clang-debug,   os: macos-26,     cc: clang,    cxx: clang++,    config: Debug,   extra: "" }
     steps:
       - uses: actions/checkout@v4
       - name: Install compilers, lavapipe, the validation layer and Xvfb
@@ -218,6 +218,25 @@ jobs:
           }
           EOF
           clang -fobjc-arc present.m -framework Cocoa -framework Metal -framework QuartzCore -o present && ./present
+      - name: Check Metal's texture usage validation
+        # Shader validation's texture usage check zeroes a correctly made
+        # texture's samples on the macOS 26 image, which a program with no
+        # library code shows (test/metal_usage_check.m); where it does,
+        # the suite runs without that one check, and with it again once
+        # the platform is fixed.
+        if: runner.os == 'macOS'
+        env:
+          MTL_DEBUG_LAYER: "1"
+          MTL_SHADER_VALIDATION: "1"
+        run: |
+          clang -fobjc-arc test/metal_usage_check.m -framework Metal -framework Foundation -o usage_check
+          result=$(./usage_check)
+          echo "$result"
+          case "$result" in
+            *broken*)
+              echo "::warning::Metal's texture usage validation is broken on this image; the suite runs without it"
+              echo "MTL_SHADER_VALIDATION_TEXTURE_USAGE=0" >> "$GITHUB_ENV" ;;
+          esac
       - name: Test
         # Linux runs Vulkan on lavapipe, which must be found, under the
         # validation layer, whose errors in a test's output fail it,
