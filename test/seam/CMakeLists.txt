@@ -1,0 +1,19 @@
+# The seam with Maul Window (mrhi-0028), test only: Maul Window at its
+# release tag, fetched beside this check and linked into it alone (a
+# local copy may stand in through FETCHCONTENT_SOURCE_DIR_MAUL-WINDOW).
+# The library and its install never see it.
+
+include(FetchContent)
+FetchContent_Declare(maul-window
+    GIT_REPOSITORY https://github.com/Rawframe-Project/maul-window.git
+    GIT_TAG v0.6.0
+    GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(maul-window)
+
+add_executable(test_seam seam.c ${PROJECT_SOURCE_DIR}/samples/harness.c)
+target_include_directories(test_seam PRIVATE ${PROJECT_SOURCE_DIR}/samples)
+target_link_libraries(test_seam PRIVATE maul-rhi maul-window::maul-window)
+maul_apply_flags(test_seam)
+add_test(NAME seam COMMAND test_seam)
+set_tests_properties(seam PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "${maul_rhi_test_env}"
+                     FAIL_REGULAR_EXPRESSION "Validation Error")

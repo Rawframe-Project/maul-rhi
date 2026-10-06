@@ -32,3 +32,4 @@ are listed in [README.md](README.md).
 | [mrhi-0025](mrhi-0025-validation-layer.md) | The validation layer wraps the driver SPI | Accepted |
 | [mrhi-0026](mrhi-0026-workers.md) | The WebGPU driver in a worker | Accepted |
 | [mrhi-0027](mrhi-0027-diagnostics.md) | Diagnostics: coded records in opt-in queues | Accepted |
+| [mrhi-0028](mrhi-0028-window-seam.md) | The Maul Window seam: no glue, a test-only check | Accepted |

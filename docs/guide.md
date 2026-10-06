@@ -279,6 +279,43 @@ range as separate fields), present modes, sizes.
 `mrhiSuggestSurfaceColor` picks a color in the library's fallback
 order, and `mrhiConfigureSurface` configures it on a device.
 
+A program on Maul Window copies the window's native handle bundle into
+the source of its platform; nothing else crosses (mrhi-0028):
+
+```c
+static const mrhiChain* SourceFrom(const mwinNativeHandles* handles, SeamSource* source)
+{
+    switch (handles->platform)
+    {
+    case mwin_platformX11:
+        source->xcb = (mrhiSurfaceSourceXcb){
+            .chain = {.type = mrhi_structSurfaceSourceXcb},
+            .connection = handles->handles.x11.connection,
+            .window = handles->handles.x11.window,
+        };
+        return &source->chain;
+    case mwin_platformMacOS:
+    case mwin_platformIOS:
+        source->metal = (mrhiSurfaceSourceMetalLayer){
+            .chain = {.type = mrhi_structSurfaceSourceMetalLayer},
+            .layer = handles->handles.apple.layer,
+        };
+        return &source->chain;
+    // Win32 (hinstance, hwnd), Wayland (display, surface), Android
+    // (window) and the web (selector, selectorLength) copy the same way.
+    default:
+        return nullptr;
+    }
+}
+```
+
+`SeamSource` is a union of the source structs. When the bundle's
+`surfaceGeneration` changes (Android's surface going and coming, a
+canvas leaving the document), destroy the surface and make a new one;
+when the window's pixel size changes, configure again at it.
+`test/seam/seam.c` is the whole copy, checked against Maul Window in
+CI.
+
 On the web the library can run in a dedicated worker, leaving the main
 thread to the page (mrhi-0026). The page transfers the canvas's control
 (`transferControlToOffscreen()`) and posts the OffscreenCanvas to the
@@ -344,7 +381,9 @@ simulator has its own toolchain file. The conformance suite
 driver and on the test driver; the samples in `samples/` check their
 own results; `maul-rhi_bench` prints the CPU cost per draw and pass, a
 compile's time and the bytes of an instance and a device, with their
-ratio to `bench/baseline.txt`.
+ratio to `bench/baseline.txt`. `-DMAUL_RHI_SEAM=ON` adds the check
+against Maul Window (`test/seam/`), which fetches Maul Window at a
+release tag for that check alone.
 
 A program's own tests can run on the test driver, built when
 `MAUL_RHI_TEST_DRIVER` is on (as it is with the library's tests): chain

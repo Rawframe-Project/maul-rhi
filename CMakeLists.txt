@@ -27,6 +27,7 @@ option(MAUL_RHI_TSAN "Instrument with ThreadSanitizer" OFF)
 option(MAUL_RHI_VALIDATION "Build the validation layer around the driver SPI (mrhi-0025)" OFF)
 option(MAUL_RHI_COVERAGE "Instrument for gcov coverage" OFF)
 option(MAUL_RHI_FUZZ "Build the libFuzzer targets (Clang)" OFF)
+option(MAUL_RHI_SEAM "Build the check against Maul Window, fetched for it (test only)" OFF)
 # The tests run on the test driver, and so does fuzz_cache.
 if(MAUL_RHI_BUILD_TESTS OR MAUL_RHI_FUZZ)
     set(maul_rhi_test_driver ON)
@@ -465,6 +466,11 @@ endif()
 
 if(MAUL_RHI_BUILD_SAMPLES)
     add_subdirectory(samples)
+endif()
+
+# The seam with Maul Window, test only (mrhi-0028).
+if(MAUL_RHI_SEAM AND MAUL_RHI_BUILD_TESTS)
+    add_subdirectory(test/seam)
 endif()
 
 if(MAUL_RHI_INSTALL)
