@@ -76,6 +76,9 @@ format.
 
 ### Fixed
 
+- `MRHI_NODISCARD` is `[[nodiscard]]` under MSVC's C++17 compiler too,
+  which keeps `__cplusplus` at 199711L without `/Zc:__cplusplus`; CI
+  compiles every public header with MSVC as C17 and C++17.
 - The Vulkan driver granted `pipelineStatisticsQuery` while no query
   type read it; it is granted with the queries now (mrhi-0023).
 - Empty copies, uploads and readbacks, which WebGPU allows, reached
