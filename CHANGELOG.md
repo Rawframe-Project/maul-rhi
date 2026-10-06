@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-06
+
+Diagnostics, drivers built outside the tree with their SPI headers and
+mustpass list, a validation layer around the SPI, pipeline statistics,
+buffer clears, counted multi-draw and multiview, and the WebGPU driver
+in a worker.
+
 ### Added
 
 - Diagnostics (mrhi-0027): every refusal of invalid input names its
@@ -73,6 +80,13 @@ format.
   test on the test driver (mrhi-0021): copies, image copy layouts and
   texture rules, indirect draws, dispatches, vertex and index buffers,
   render pass attachments and queries.
+
+### Changed
+
+- The contract version is 2 (`MRHI_CONTRACT_VERSION`): defs and
+  limits gained fields since 0.1.0, so an instance refuses a program
+  built against 0.1.0's headers with `mrhi_errorVersion`. The driver
+  SPI is at version 4 (`MRHI_SPI_VERSION`).
 
 ### Fixed
 

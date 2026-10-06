@@ -6,7 +6,7 @@
   "guard": "MAUL_RHI",
   "version": {
     "major": 0,
-    "minor": 1,
+    "minor": 2,
     "patch": 0
   },
   "headers": [
@@ -21991,5 +21991,5 @@
       ]
     }
   ],
-  "contract_version": 1
+  "contract_version": 2
 }
