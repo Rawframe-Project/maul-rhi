@@ -24,15 +24,18 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #endif
 
-// The frames the window program gives the check, and the frames
-// presented at each size before it goes on.
-#define FRAMES_TO_GIVE 1200
-#define PRESENTS       3
+// How long the check may take, and the frames presented at each size
+// before it goes on. A window program's frames come as fast as the
+// platform gives them (Win32 does not wait for the display), so the
+// check is bounded by time, not by frames.
+#define DEADLINE_SECONDS 10
+#define PRESENTS         3
 
 // One surface source of each kind, the one a bundle fills.
 typedef union SeamSource
@@ -127,7 +130,7 @@ typedef struct Program
     int submitted;
     int finished;
     int resizedFrom;
-    int frames;
+    time_t deadline;
     // Why the check could not run: a window system or surface missing.
     const char* missing;
     int status;
@@ -324,9 +327,9 @@ static mwinFrameResult Frame(mwinContext* context, void* user)
     Program* program = user;
     Collect(program, context);
     TakeAnswers(program);
-    if (++program->frames > FRAMES_TO_GIVE)
+    if (time(nullptr) > program->deadline)
     {
-        SampleCheck(program->sample, false, "every phase within its frames");
+        SampleCheck(program->sample, false, "every phase in time");
         return mwin_frameStop;
     }
     Step(program, context);
@@ -390,7 +393,10 @@ int main(void)
         return opened;
     }
     static Program program;
-    program = (Program){.sample = &sample, .resizedFrom = -1, .status = -1};
+    program = (Program){.sample = &sample,
+                        .resizedFrom = -1,
+                        .deadline = time(nullptr) + DEADLINE_SECONDS,
+                        .status = -1};
     mwinAppDef def = mwinDefaultAppDef();
     def.init = Init;
     def.frame = Frame;
