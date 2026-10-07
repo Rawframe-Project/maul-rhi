@@ -378,6 +378,41 @@ static void TestStores(mrhiTextureId windowTexture)
     CHECK(plan.colorStores[0] == mrhi_storeDiscard,
           "its own load is no later read, and the reader after it is culled");
     Drop();
+    // A later read of the next mip or layer only is no read of the part
+    // rendered: each pass renders one part, a last one samples the second.
+    for (int layers = 0; layers < 2; ++layers)
+    {
+        Begin();
+        mrhiTextureDef twoParts = mrhiDefaultTextureDef();
+        twoParts.format = mrhi_formatRgba8Unorm;
+        twoParts.width = 64;
+        twoParts.height = 64;
+        twoParts.kind = layers ? mrhi_texture2dArray : mrhi_texture2d;
+        twoParts.depthOrLayers = layers ? 2 : 1;
+        twoParts.mipLevels = layers ? 1 : 2;
+        mrhiResourceId parts = {0};
+        CHECK(mrhiDeclareTexture(s_device, &twoParts, &parts) == mrhi_success, "two parts");
+        def = mrhiDefaultPassDef();
+        def.colorTargets[0] = (mrhiColorTarget){.resource = parts, .load = mrhi_loadClear};
+        def.colorTargetCount = 1;
+        def.neverCull = true;
+        mrhiPassId firstPart = AddPass(def);
+        def.colorTargets[0].mip = layers ? 0 : 1;
+        def.colorTargets[0].layer = layers ? 1 : 0;
+        AddPass(def);
+        mrhiAccess second = Access(parts, mrhi_accessSampled);
+        second.range = layers ? (mrhiTextureRange){.baseLayer = 1, .layerCount = 1, .mipCount = 1}
+                              : (mrhiTextureRange){.baseMip = 1, .mipCount = 1, .layerCount = 1};
+        mrhiPassDef reader = mrhiDefaultPassDef();
+        reader.accesses = &second;
+        reader.accessCount = 1;
+        reader.neverCull = true;
+        AddPass(reader);
+        CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+        CHECK(PassPlan(firstPart).colorStores[0] == mrhi_storeDiscard,
+              layers ? "the next layer read, not the first" : "the next mip read, not the first");
+        Drop();
+    }
 }
 
 static void TestRefusals(void)

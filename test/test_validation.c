@@ -18,6 +18,8 @@
 #include "maul-rhi/instance.h"
 #include "maul-rhi/resources.h"
 
+#include <string.h>
+
 static mrhiTestAdapter s_adapter;
 static mrhiInstanceDriver s_made;
 static mrhiInstanceDriverVtable s_vtable;
@@ -378,6 +380,65 @@ static void TestWalk(void)
     CHECK(mrhiWalkFrame(&frame, AnyHandle, nullptr, nullptr) == 0, "a frame that holds");
 }
 
+// Walks one pass over one chunk of a frame of a buffer (1) and a
+// texture (2): its faults.
+static uint64_t WalkOne(const mrhiCommandChunk* chunk, const mrhiDriverPass* pass)
+{
+    static const mrhiTextureDef texture = {.width = 4, .height = 4};
+    static const mrhiDriverResource resources[2] = {
+        {.kind = mrhiDriverDeviceBuffer, .handle = 1, .size = 256},
+        {.kind = mrhiDriverDeviceTexture, .handle = 2, .texture = &texture},
+    };
+    mrhiDriverFrame frame = {
+        .resources = resources,
+        .resourceCount = 2,
+        .passes = pass,
+        .passCount = 1,
+        .chunks = chunk,
+        .chunkCount = 1,
+    };
+    return mrhiWalkFrame(&frame, AnyHandle, nullptr, nullptr);
+}
+
+// The walk at its edges: the last binding kind, both objects of a
+// counted draw, a chunk of the most commands, a payload one past its
+// chunk, and a pass of the most color targets.
+static void TestWalkEdges(void)
+{
+    static mrhiCommandChunk chunk;
+    mrhiDriverPass pass = {.id = {1, 1}, .firstChunk = 1};
+    mrhiCommandBinding binding = {.object = 2, .kind = mrhi_bindingStorageTexture};
+    chunk = (mrhiCommandChunk){.count = 2};
+    chunk.commands[0] = (mrhiCommand){.type = mrhiCommandBindings, .payload = 1};
+    memcpy(&chunk.commands[1], &binding, sizeof(binding));
+    CHECK(WalkOne(&chunk, &pass) == 0, "a storage texture binding");
+    chunk = (mrhiCommandChunk){.count = 1};
+    chunk.commands[0] = (mrhiCommand){.type = mrhiCommandDrawIndirectCount, .a = 1, .b = 2};
+    CHECK(WalkOne(&chunk, &pass) == 1, "a counted draw whose count is a texture");
+    chunk.commands[0].a = 2;
+    chunk.commands[0].b = 1;
+    CHECK(WalkOne(&chunk, &pass) == 1, "and one whose arguments are");
+    chunk = (mrhiCommandChunk){.count = MRHI_CHUNK_COMMANDS};
+    for (uint32_t i = 0; i < MRHI_CHUNK_COMMANDS; ++i)
+    {
+        chunk.commands[i] = (mrhiCommand){.type = mrhiCommandDraw};
+    }
+    CHECK(WalkOne(&chunk, &pass) == 0, "a chunk of the most commands");
+    chunk = (mrhiCommandChunk){.count = 2};
+    chunk.commands[0] = (mrhiCommand){.type = mrhiCommandDraw};
+    chunk.commands[1] = (mrhiCommand){.type = mrhiCommandDraw, .payload = 1};
+    // The walk stops there, so the chunk counts as no pass's too.
+    CHECK(WalkOne(&chunk, &pass) == 2, "a payload one record past its chunk");
+    chunk = (mrhiCommandChunk){.count = 1};
+    chunk.commands[0] = (mrhiCommand){.type = mrhiCommandDraw};
+    pass.colorTargetCount = MRHI_COLOR_TARGETS;
+    for (uint32_t i = 0; i < MRHI_COLOR_TARGETS; ++i)
+    {
+        pass.colorTargets[i].resource = (mrhiResourceId){2, 1};
+    }
+    CHECK(WalkOne(&chunk, &pass) == 0, "a pass of the most color targets");
+}
+
 int main(void)
 {
     TestClean();
@@ -385,5 +446,6 @@ int main(void)
     TestDeviceAnswers();
     TestDeviceEdges();
     TestWalk();
+    TestWalkEdges();
     return s_failures == 0 ? 0 : 1;
 }

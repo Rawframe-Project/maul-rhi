@@ -726,9 +726,43 @@ static void TestNeighbourDeclares(void)
     CloseDevice();
 }
 
+// Each texture imported once a frame, whatever the order: forward then
+// backward, every id its own, and importing again gives the same.
+static void TestImportOrder(void)
+{
+    Open();
+    for (int backward = 0; backward < 2; ++backward)
+    {
+        mrhiFrameDef def = mrhiDefaultFrameDef();
+        CHECK(mrhiBeginFrame(s_device, &def) == mrhi_success, "begun");
+        mrhiResourceId ids[RESOURCES] = {0};
+        for (uint32_t n = 2; n < RESOURCES; ++n)
+        {
+            uint32_t i = backward ? RESOURCES + 1 - n : n;
+            CHECK(mrhiImportTexture(s_device, s_textures[i], &ids[i]) == mrhi_success, "imported");
+        }
+        bool distinct = true;
+        for (uint32_t i = 2; i < RESOURCES; ++i)
+        {
+            mrhiResourceId again = {0};
+            distinct = distinct &&
+                       mrhiImportTexture(s_device, s_textures[i], &again) == mrhi_success &&
+                       again.index1 == ids[i].index1;
+            for (uint32_t j = 2; j < i; ++j)
+            {
+                distinct = distinct && ids[i].index1 != ids[j].index1;
+            }
+        }
+        CHECK(distinct, backward ? "imported backward, each its own" : "forward, each its own");
+        Drop();
+    }
+    CloseDevice();
+}
+
 int main(void)
 {
     ResetAdapter();
+    TestImportOrder();
     TestBuffers();
     TestNeighbourDeclares();
     TestClears();

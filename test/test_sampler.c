@@ -34,6 +34,15 @@ static void TestMakeAndDestroy(void)
     def.maxAnisotropy = 16;
     def.compare = mrhi_compareGreater;
     CHECK(mrhiCreateSampler(device, &def, &b) == mrhi_success, "an anisotropic comparison");
+    mrhiSamplerDef last = mrhiDefaultSamplerDef();
+    last.addressU = mrhi_addressMirrorRepeat;
+    last.addressV = mrhi_addressMirrorRepeat;
+    last.addressW = mrhi_addressMirrorRepeat;
+    last.compare = mrhi_compareAlways;
+    mrhiSamplerId c = {0};
+    CHECK(mrhiCreateSampler(device, &last, &c) == mrhi_success &&
+              mrhiDestroySampler(device, c) == mrhi_success,
+          "the last address mode and comparison");
     CHECK(mrhiDestroySampler(device, a) == mrhi_success, "a destroyed");
     CHECK(mrhiDestroySampler(device, a) == mrhi_errorStale, "its id has ended");
     CHECK(mrhiDestroySampler(device, (mrhiSamplerId){0, 0}) == mrhi_errorStale, "the null id");
