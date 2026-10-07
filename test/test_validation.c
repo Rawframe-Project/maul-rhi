@@ -400,6 +400,31 @@ static uint64_t WalkOne(const mrhiCommandChunk* chunk, const mrhiDriverPass* pas
     return mrhiWalkFrame(&frame, AnyHandle, nullptr, nullptr);
 }
 
+// An instance with room for two answers over a driver with room for
+// sixteen: the instance itself refuses the third request.
+static void TestInstanceRoom(void)
+{
+    Open();
+    mrhiExternalDriverDef external = {
+        .chain = {.next = nullptr, .type = mrhi_structExternalDriver},
+        .vtable = &s_vtable,
+        .driver = s_made.self,
+    };
+    mrhiInstanceDef def = mrhiDefaultInstanceDef();
+    def.next = &external.chain;
+    def.limits.notifications = 2;
+    mrhiInstance* instance = nullptr;
+    CHECK(mrhiCreateInstance(&def, &instance) == mrhi_success, "an instance of two answers");
+    mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
+    mrhiRequestId request;
+    CHECK(mrhiRequestAdapters(instance, &search, &request) == mrhi_success &&
+              mrhiRequestAdapters(instance, &search, &request) == mrhi_success,
+          "two searches");
+    CHECK(mrhiRequestAdapters(instance, &search, &request) == mrhi_errorCapacity,
+          "no room for a third answer");
+    mrhiDestroyInstance(instance);
+}
+
 // The walk at its edges: the last binding kind, both objects of a
 // counted draw, a chunk of the most commands, a payload one past its
 // chunk, and a pass of the most color targets.
@@ -445,6 +470,7 @@ int main(void)
     TestInstanceAnswers();
     TestDeviceAnswers();
     TestDeviceEdges();
+    TestInstanceRoom();
     TestWalk();
     TestWalkEdges();
     return s_failures == 0 ? 0 : 1;
