@@ -630,7 +630,17 @@ static void TestStaleAndLimits(void)
     mrhiAccess many[3] = {Access(target, mrhi_accessCopyDestination)};
     CHECK(Add(Pass(Color(target, mrhi_loadClear), many, 3)) == mrhi_errorCapacity,
           "more than the frame's accesses");
-    CHECK(Add(Pass(Color(target, mrhi_loadClear), nullptr, 0)) == mrhi_success, "one pass");
+    // Three accesses and the depth target's room: the frame's four exactly.
+    mrhiAccess three[3] = {
+        Access(Declare(mrhi_formatRgba8Unorm, 64, 1), mrhi_accessCopyDestination),
+        Access(Declare(mrhi_formatRgba8Unorm, 64, 1), mrhi_accessCopyDestination),
+        Access(Declare(mrhi_formatRgba8Unorm, 64, 1), mrhi_accessCopyDestination),
+    };
+    mrhiPassDef exact = mrhiDefaultPassDef();
+    exact.passClass = mrhi_passTransfer;
+    exact.accesses = three;
+    exact.accessCount = 3;
+    CHECK(Add(exact) == mrhi_success, "one pass of the frame's accesses exactly");
     CHECK(Add(Pass(Color(target, mrhi_loadKeep), nullptr, 0)) == mrhi_errorCapacity,
           "the frame's passes");
     Drop();

@@ -3,8 +3,8 @@
 //
 // Copies on a test driver device: between buffers, buffers and
 // textures, and textures, each refused where WebGPU refuses it or where
-// the pass declares no covering copy access, and recorded with its two
-// sides otherwise.
+// the pass declares no covering copy access (one the next pass declares
+// included), and recorded with its two sides otherwise.
 
 #include "device_core.h"
 #include "test_device_setup.h"
@@ -697,10 +697,40 @@ static void TestTextures(void)
     CloseDevice();
 }
 
+// A pass declares only its own accesses: a buffer the next pass declares
+// is still undeclared in this one.
+static void TestNeighbourDeclares(void)
+{
+    Open();
+    BeginFrame();
+    mrhiAccess source = Access(SOURCE, mrhi_accessCopySource);
+    mrhiAccess destination = Access(DESTINATION, mrhi_accessCopyDestination);
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.passClass = mrhi_passTransfer;
+    def.neverCull = true;
+    def.accesses = &source;
+    def.accessCount = 1;
+    mrhiPassId first;
+    mrhiPassId second;
+    CHECK(mrhiAddPass(s_device, &def, &first) == mrhi_success, "a pass reading the source");
+    def.accesses = &destination;
+    CHECK(mrhiAddPass(s_device, &def, &second) == mrhi_success, "the next writing the destination");
+    CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
+              mrhiBeginPass(s_device, first) == mrhi_success,
+          "compiled and begun");
+    CHECK(mrhiCopyBuffer(s_device, first, s_r[SOURCE], 0, s_r[DESTINATION], 0, 4) ==
+                  mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticUndeclaredAccess,
+          "the destination undeclared in the first pass");
+    Drop();
+    CloseDevice();
+}
+
 int main(void)
 {
     ResetAdapter();
     TestBuffers();
+    TestNeighbourDeclares();
     TestClears();
     TestLayouts();
     TestRegions();

@@ -93,6 +93,13 @@ static void ReadBarriers(void)
 {
     CHECK(mrhiGetFrameBarriers(s_device, s_barriers, 32, &s_count) == mrhi_success, "read");
     CHECK(s_count <= 32, "room for them");
+    // Room for one more: nothing is written past the count.
+    static mrhiBarrier more[33];
+    size_t count = 0;
+    more[s_count].resource.index1 = 0xBEEF;
+    CHECK(mrhiGetFrameBarriers(s_device, more, s_count + 1, &count) == mrhi_success &&
+              count == s_count && more[s_count].resource.index1 == 0xBEEF,
+          "nothing past the count");
 }
 
 // Whether barrier i is the one described.

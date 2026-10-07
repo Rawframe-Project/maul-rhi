@@ -250,6 +250,9 @@ static void TestVertexBuffers(void)
     s_buffers[0].stride = limits.vertexStride + 4;
     CHECK(Made(device, &def) == mrhi_errorUnsupported, "a stride past the limit");
     def = Def();
+    s_buffers[0].stride = limits.vertexStride;
+    CHECK(Made(device, &def) == mrhi_success, "a stride at the limit");
+    def = Def();
     s_buffers[0].stride = limits.vertexStride + 4;
     s_attributes[0].buffer = 1;
     CHECK(Made(device, &def) == mrhi_errorInvalid, "invalid input wins over unsupported");
@@ -528,7 +531,7 @@ static void TestDepthStencil(void)
     def.stencilBack.depthFailOp = mrhi_stencilDecrementWrap;
     def.stencilBack.failOp = mrhi_stencilDecrementWrap + 1;
     CHECK(Made(device, &def) == mrhi_errorInvalid, "an unknown failing operation");
-    def.stencilBack.failOp = mrhi_stencilInvert;
+    def.stencilBack.failOp = mrhi_stencilDecrementWrap;
     def.stencilBack.passOp = mrhi_stencilDecrementWrap + 1;
     CHECK(Made(device, &def) == mrhi_errorInvalid, "an unknown passing operation");
     def.stencilBack.passOp = mrhi_stencilIncrementClamp;
@@ -662,6 +665,8 @@ static void TestBlend(void)
     CHECK(Made(device, &def) == mrhi_errorInvalid, "a minimum weighed otherwise");
     def.colorTargets[0].alpha = (mrhiBlendComponent){mrhi_blendSrc, mrhi_blendOne, mrhi_blendMax};
     CHECK(Made(device, &def) == mrhi_errorInvalid, "a maximum weighed otherwise");
+    def.colorTargets[0].alpha = (mrhiBlendComponent){mrhi_blendOne, mrhi_blendOne, mrhi_blendMax};
+    CHECK(Made(device, &def) == mrhi_success, "a maximum weighed by one");
     def = Def();
     def.colorTargets[0].format = mrhi_formatR32Float;
     def.colorTargets[0].blend = true;
@@ -734,6 +739,11 @@ static void TestMultisample(void)
     def.sampleCount = 4;
     def.colorTargets[0].format = mrhi_formatRgba32Float;
     CHECK(Made(device, &def) == mrhi_errorUnsupported, "a target that cannot multisample");
+    def = Def();
+    def.sampleCount = 4;
+    def.colorTargets[1].format = mrhi_formatRgba32Float;
+    CHECK(def.colorTargetCount == 1 && Made(device, &def) == mrhi_success,
+          "a format past the target count unread");
     def = Def();
     def.fragmentEntry = nullptr;
     def.fragmentEntryLength = 0;

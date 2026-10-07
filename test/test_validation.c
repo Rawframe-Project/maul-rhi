@@ -5,8 +5,9 @@
 // the test driver handed in from outside with one function broken at a
 // time, each breach counted by mrhiGetDriverFaults and recorded in the
 // instance's diagnostic queue with its rule's code while the call goes
-// on; and a malformed frame, whose faults the walk counts without
-// reading past what it checked.
+// on, and the edges a driver keeping the contract may reach left alone;
+// and a malformed frame, whose faults the walk counts without reading
+// past what it checked.
 
 #include "device_core.h"
 #include "driver_test.h"
@@ -22,6 +23,8 @@ static mrhiInstanceDriver s_made;
 static mrhiInstanceDriverVtable s_vtable;
 static mrhiDeviceDriverVtable s_deviceVtable;
 static const mrhiDeviceDriverVtable* s_deviceInner;
+// Whether the next driver lists its adapter with a name of the most bytes.
+static bool s_longName;
 
 // The test driver, its vtable copied for the test to break.
 static void Open(void)
@@ -30,6 +33,14 @@ static void Open(void)
         .info = {.driver = mrhi_driverTest, .kind = mrhi_adapterDiscrete},
         .limits = mrhiDefaultLimits(),
     };
+    if (s_longName)
+    {
+        s_adapter.info.nameLength = MRHI_ADAPTER_NAME_BYTES;
+        for (uint32_t i = 0; i < MRHI_ADAPTER_NAME_BYTES; ++i)
+        {
+            s_adapter.info.name[i] = 'a';
+        }
+    }
     mrhiTestDriverDef test = {
         .chain = {.next = nullptr, .type = mrhi_structTestDriver},
         .adapters = &s_adapter,
@@ -116,6 +127,18 @@ static size_t OverReport(void* self, mrhiDriverEvent* events, size_t capacity)
     return s_made.vtable->poll(self, events, capacity) > 0 ? capacity + 1 : 0;
 }
 
+// Answers a search twice: the second answers nothing asked.
+static size_t AnswerTwice(void* self, mrhiDriverEvent* events, size_t capacity)
+{
+    size_t moved = s_made.vtable->poll(self, events, capacity);
+    if (moved == 1 && capacity >= 2)
+    {
+        events[1] = events[0];
+        return 2;
+    }
+    return moved;
+}
+
 static void TestInstanceAnswers(void)
 {
     Open();
@@ -140,6 +163,125 @@ static void TestInstanceAnswers(void)
     CHECK(mrhiGetDriverFaults(instance) >= 1 &&
               Recorded(instance) == mrhi_diagnosticDriverEventsOverrun,
           "more events than room, clamped");
+    mrhiDestroyInstance(instance);
+    Open();
+    s_vtable.poll = AnswerTwice;
+    instance = Start();
+    Search(instance, &adapter);
+    CHECK(mrhiGetDriverFaults(instance) == 1 &&
+              Recorded(instance) == mrhi_diagnosticDriverUnaskedAnswer,
+          "a search answered twice");
+    mrhiDestroyInstance(instance);
+    // A name of the most bytes keeps the contract.
+    s_longName = true;
+    Open();
+    s_longName = false;
+    instance = Start();
+    CHECK(Search(instance, &adapter) == 1 && mrhiGetDriverFaults(instance) == 0,
+          "an adapter's name of the most bytes");
+    mrhiDestroyInstance(instance);
+}
+
+// A device whose acquire, timestamp period and events the test gives.
+static uint64_t s_image;
+static mrhiResult s_acquired;
+static double s_period;
+static mrhiDriverEvent s_events[2];
+static size_t s_eventCount;
+static bool s_inject;
+
+static mrhiResult AcquireGiven(void* self, uint64_t swapchain, uint64_t* imageOut)
+{
+    (void)self;
+    (void)swapchain;
+    *imageOut = s_image;
+    return s_acquired;
+}
+
+static double PeriodGiven(void* self)
+{
+    (void)self;
+    return s_period;
+}
+
+static size_t PollGiven(void* self, mrhiDriverEvent* events, size_t capacity)
+{
+    if (!s_inject)
+    {
+        return s_deviceInner->poll(self, events, capacity);
+    }
+    for (size_t i = 0; i < s_eventCount && i < capacity; ++i)
+    {
+        events[i] = s_events[i];
+    }
+    return s_eventCount;
+}
+
+static mrhiResult CreateGivenDevice(void* self, uint64_t adapter, const mrhiDeviceDef* def,
+                                    uint64_t tag, mrhiDeviceDriver* deviceOut)
+{
+    mrhiResult status = s_made.vtable->createDevice(self, adapter, def, tag, deviceOut);
+    if (status == mrhi_success)
+    {
+        s_deviceInner = deviceOut->vtable;
+        s_deviceVtable = *deviceOut->vtable;
+        s_deviceVtable.acquireImage = AcquireGiven;
+        s_deviceVtable.timestampPeriod = PeriodGiven;
+        s_deviceVtable.poll = PollGiven;
+        deviceOut->vtable = &s_deviceVtable;
+    }
+    return status;
+}
+
+// The layer's answers at their edges, called as the core calls them.
+static void TestDeviceEdges(void)
+{
+    Open();
+    s_vtable.createDevice = CreateGivenDevice;
+    mrhiInstance* instance = Start();
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    CHECK(Search(instance, &deviceDef.adapter) == 1, "one adapter");
+    mrhiDevice* device = nullptr;
+    mrhiRequestId request;
+    mrhiInstanceNotification record;
+    CHECK(mrhiCreateDevice(instance, &deviceDef, &device, &request) == mrhi_success &&
+              mrhiNextInstanceNotification(instance, &record) == mrhi_success,
+          "a device");
+    const mrhiDeviceDriverVtable* layer = device->driver.vtable;
+    void* self = device->driver.self;
+    uint64_t image = 1;
+    s_image = 0;
+    s_acquired = mrhi_errorDeviceLost;
+    CHECK(layer->acquireImage(self, 1, &image) == mrhi_errorDeviceLost &&
+              mrhiGetDriverFaults(instance) == 0,
+          "no image with a failed acquire");
+    s_acquired = mrhi_success;
+    CHECK(layer->acquireImage(self, 1, &image) == mrhi_success &&
+              mrhiGetDriverFaults(instance) == 1 &&
+              Recorded(instance) == mrhi_diagnosticDriverZeroHandle,
+          "an acquire that gives no image");
+    s_period = 0.0;
+    CHECK(layer->timestampPeriod(self) == 0.0 && mrhiGetDriverFaults(instance) == 1,
+          "a period of zero from a driver that does not say");
+    s_period = -1.0;
+    CHECK(layer->timestampPeriod(self) == -1.0 && mrhiGetDriverFaults(instance) == 2 &&
+              Recorded(instance) == mrhi_diagnosticDriverTimestampPeriod,
+          "a negative period");
+    // As many events as room, the last the device's loss under tag 0.
+    mrhiDriverEvent events[2];
+    s_events[0] = (mrhiDriverEvent){5, mrhi_success};
+    s_events[1] = (mrhiDriverEvent){0, mrhi_errorDeviceLost};
+    s_eventCount = 2;
+    s_inject = true;
+    CHECK(layer->poll(self, events, 2) == 2 && mrhiGetDriverFaults(instance) == 2,
+          "events that fill the room, and the loss under tag 0");
+    s_events[0] = (mrhiDriverEvent){0, mrhi_success};
+    s_eventCount = 1;
+    CHECK(layer->poll(self, events, 2) == 1 && mrhiGetDriverFaults(instance) == 3 &&
+              Recorded(instance) == mrhi_diagnosticDriverEventTag,
+          "tag 0 for anything but the loss");
+    s_inject = false;
+    mrhiDestroyDevice(device);
     mrhiDestroyInstance(instance);
 }
 
@@ -241,6 +383,7 @@ int main(void)
     TestClean();
     TestInstanceAnswers();
     TestDeviceAnswers();
+    TestDeviceEdges();
     TestWalk();
     return s_failures == 0 ? 0 : 1;
 }
