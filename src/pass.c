@@ -46,6 +46,14 @@ const mrhiTextureDef* mrhiFrameTextureOf(const mrhiFrameResource* resource)
     return &resource->texture;
 }
 
+void mrhiTrackedLayers(const mrhiFrameResource* resource, const mrhiFrameUse* use,
+                       uint32_t* baseOut, uint32_t* countOut)
+{
+    bool volume = !IsBuffer(resource) && resource->texture.kind == mrhi_texture3d;
+    *baseOut = volume ? 0 : use->baseLayer;
+    *countOut = volume ? 1 : use->layerCount;
+}
+
 uint32_t mrhiFindFrameResource(const mrhiDevice* device, mrhiResourceId id)
 {
     if (id.generation != device->frameSerial || id.index1 == 0 ||

@@ -594,6 +594,12 @@ bool mrhiIsRangeValid(uint32_t base, uint32_t count, uint32_t total);
 // texture's.
 const mrhiTextureDef* mrhiFrameTextureOf(const mrhiFrameResource* resource);
 
+// The layers a use's state lives in: its own, but a 3D texture's depth
+// slices share its one tracked layer, so a target on any slice covers
+// the volume at its mip.
+void mrhiTrackedLayers(const mrhiFrameResource* resource, const mrhiFrameUse* use,
+                       uint32_t* baseOut, uint32_t* countOut);
+
 // Finds a resource of the open frame whose imported object still lives:
 // its slot, or 0.
 uint32_t mrhiFindFrameResource(const mrhiDevice* device, mrhiResourceId id);

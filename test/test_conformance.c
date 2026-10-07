@@ -1641,7 +1641,8 @@ static void CheckDrawFrame(Scene* scene, DrawMode mode)
 }
 
 // A target cleared to a color whose channels all differ reads back as
-// that color, channel by channel.
+// that color, channel by channel; so does a depth slice of a volume
+// drawn to.
 static void CheckClear(Scene* scene)
 {
     mrhiDevice* device = scene->device;
@@ -1656,16 +1657,37 @@ static void CheckClear(Scene* scene)
     def.colorTargetCount = 1;
     mrhiPassId clear = {0};
     CHECK(mrhiAddPass(device, &def, &clear) == mrhi_success, "a clearing pass");
-    mrhiAccess reads = Whole(scene->t, mrhi_accessCopySource);
-    mrhiPassId read = CopyPass(device, &reads, 1);
+    mrhiTextureDef volumeDef = mrhiDefaultTextureDef();
+    volumeDef.kind = mrhi_texture3d;
+    volumeDef.format = mrhi_formatRgba8Unorm;
+    volumeDef.width = 4;
+    volumeDef.height = 4;
+    volumeDef.depthOrLayers = 3;
+    mrhiResourceId volume = {0};
+    CHECK(mrhiDeclareTexture(device, &volumeDef, &volume) == mrhi_success, "a volume");
+    def.colorTargets[0].resource = volume;
+    def.colorTargets[0].layer = 2;
+    def.colorTargets[0].clear = (mrhiClearColor){0.8f, 0.6f, 0.4f, 0.2f};
+    mrhiPassId slice = {0};
+    CHECK(mrhiAddPass(device, &def, &slice) == mrhi_success, "a pass clearing a depth slice");
+    mrhiAccess reads[2] = {Whole(scene->t, mrhi_accessCopySource),
+                           Whole(volume, mrhi_accessCopySource)};
+    mrhiPassId read = CopyPass(device, reads, 2);
     CHECK(mrhiCompileFrame(device) == mrhi_success &&
               mrhiBeginPass(device, clear) == mrhi_success &&
               mrhiEndPass(device, clear) == mrhi_success &&
+              mrhiBeginPass(device, slice) == mrhi_success &&
+              mrhiEndPass(device, slice) == mrhi_success &&
               mrhiBeginPass(device, read) == mrhi_success,
           "cleared");
     mrhiRequestId pixels = ReadTarget(scene, read);
+    const mrhiTextureCopy sliceAt = {.resource = volume, .z = 2};
+    mrhiRequestId slicePixels = {0};
+    CHECK(mrhiReadTexture(device, read, &sliceAt, &(mrhiExtent3d){4, 4, 1}, &slicePixels) ==
+              mrhi_success,
+          "the slice read");
     CHECK(mrhiEndPass(device, read) == mrhi_success, "read");
-    Finish(device, 1);
+    Finish(device, 2);
     uint8_t image[256];
     size_t size = 0;
     CHECK(mrhiTakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success &&
@@ -1674,6 +1696,13 @@ static void CheckClear(Scene* scene)
     static const uint8_t kCleared[4] = {51, 102, 153, 204};
     CHECK(!s_runs || (IsNear(&image[0], kCleared) && IsNear(&image[(7 * 8 + 7) * 4], kCleared)),
           "the clear color, channel by channel");
+    uint8_t texels[64];
+    CHECK(mrhiTakeReadback(device, slicePixels, texels, sizeof(texels), &size) == mrhi_success &&
+              size == sizeof(texels),
+          "the slice's texels");
+    static const uint8_t kSlice[4] = {204, 153, 102, 51};
+    CHECK(!s_runs || (IsNear(&texels[0], kSlice) && IsNear(&texels[60], kSlice)),
+          "a volume's depth slice cleared");
 }
 
 // A counter-clockwise triangle with clockwise front faces and back

@@ -8,6 +8,15 @@ format.
 
 ## [Unreleased]
 
+### Fixed
+
+- A pass drawing into a depth slice of a 3D texture other than the
+  first lost what it drew: the frame's plan tracked the slice as a
+  layer the volume does not have, so the barrier after the pass did not
+  wait for its writes, and a declared volume's store was dropped as if
+  nothing read it later. A volume's slices now share its one tracked
+  layer.
+
 ## [0.3.0] - 2026-10-06
 
 Debug labels a shipping build compiles out, a check that Maul Window's
