@@ -316,6 +316,7 @@ static mrhiTextureId MakeVolume(mrhiDevice* device)
 }
 
 static mrhiQuerySetId MakeQuerySet(mrhiDevice* device, mrhiQueryType type, uint32_t count);
+static bool IsNear(const uint8_t* pixel, const uint8_t* expected);
 
 // Objects of every kind: many buffers over more than one block, one
 // larger than half a block, textures and views of each shape, a
@@ -1089,20 +1090,30 @@ static mrhiTextureId MakeImage(mrhiDevice* device, uint32_t size, mrhiTextureUsa
 
 // Where the heap check's objects sit in its heaps: the sampler it reads,
 // and another it must not. The texture sits where the second descriptor
-// a frame binds lands if a driver's rings overlap its heaps.
+// a frame binds lands if a driver's rings overlap its heaps. A storage
+// texture sits beside it, unread, so that its view is checked as it is
+// written.
 enum
 {
     HEAP_TEXTURE = 1,
+    HEAP_STORAGE = 3,
     HEAP_SAMPLER = 2,
     HEAP_OTHER_SAMPLER = 0,
     HEAP_BUFFER = 7,
 };
 
 // Makes a heap of the heap check with its entries: the texture's view,
-// the buffer and two samplers, the one read clamping or repeating.
-static mrhiHeapId MakeHeap(mrhiDevice* device, mrhiTextureId texture, mrhiBufferId buffer,
-                           bool clamping)
+// the storage texture's, the buffer and two samplers, the one read
+// clamping and filtering linearly on minification, or repeating and
+// taking the nearest texel.
+static mrhiHeapId MakeHeap(mrhiDevice* device, mrhiTextureId texture, mrhiTextureId image,
+                           mrhiBufferId buffer, bool clamping)
 {
+    // The storage view made first, so that it is not the last.
+    mrhiViewDef storageDef = mrhiDefaultViewDef();
+    storageDef.texture = image;
+    mrhiViewId storageView = {0};
+    CHECK(mrhiCreateView(device, &storageDef, &storageView) == mrhi_success, "a storage view");
     mrhiViewDef viewDef = mrhiDefaultViewDef();
     viewDef.texture = texture;
     mrhiViewId view = {0};
@@ -1110,6 +1121,7 @@ static mrhiHeapId MakeHeap(mrhiDevice* device, mrhiTextureId texture, mrhiBuffer
     repeatDef.addressU = mrhi_addressRepeat;
     mrhiSamplerId repeat = {0};
     mrhiSamplerDef clampDef = mrhiDefaultSamplerDef();
+    clampDef.minFilter = mrhi_filterLinear;
     mrhiSamplerId clamp = {0};
     mrhiHeapDef heapDef = mrhiDefaultHeapDef();
     heapDef.entries = 16;
@@ -1122,6 +1134,7 @@ static mrhiHeapId MakeHeap(mrhiDevice* device, mrhiTextureId texture, mrhiBuffer
               mrhiCreateHeap(device, &heapDef, &heap) == mrhi_success,
           "a view, two samplers and a heap");
     const mrhiHeapEntry sampled = {.kind = mrhi_heapSampledTexture, .view = view};
+    const mrhiHeapEntry written = {.kind = mrhi_heapStorageTexture, .view = storageView};
     const mrhiHeapEntry storage = {
         .kind = mrhi_heapStorageBuffer,
         .buffer = buffer,
@@ -1129,6 +1142,7 @@ static mrhiHeapId MakeHeap(mrhiDevice* device, mrhiTextureId texture, mrhiBuffer
         .writable = true,
     };
     CHECK(mrhiSetHeapEntry(device, heap, HEAP_TEXTURE, &sampled) == mrhi_success &&
+              mrhiSetHeapEntry(device, heap, HEAP_STORAGE, &written) == mrhi_success &&
               mrhiSetHeapEntry(device, heap, HEAP_BUFFER, &storage) == mrhi_success &&
               mrhiSetHeapSampler(device, heap, HEAP_SAMPLER, clamping ? clamp : repeat) ==
                   mrhi_success &&
@@ -1142,9 +1156,10 @@ static mrhiHeapId MakeHeap(mrhiDevice* device, mrhiTextureId texture, mrhiBuffer
 // past its right edge by a compute pipeline in each of two passes, each
 // through its own heap, which holds a repeating or a clamping sampler
 // at the index read, and each writing the texel to a buffer from its
-// heap, then a word from a uniform buffer bound in a table: the sealed
-// texture undeclared, the buffers declared. Two heaps tell a driver's
-// regions apart. Needs heterogeneous heaps, which
+// heap, then a word from a uniform buffer bound in a table, then a texel
+// minified, the nearest or a linear blend as its sampler filters: the
+// sealed texture undeclared, the buffers declared. Two heaps tell a
+// driver's regions apart. Needs heterogeneous heaps, which
 // MAUL_RHI_REQUIRE_BINDLESS requires of every native adapter.
 static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool native)
 {
@@ -1183,6 +1198,7 @@ static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool nativ
           "a pipeline reading the heap");
     AwaitPipelines(device, 1, 0);
     mrhiTextureId texture = MakeImage(device, 2, mrhi_textureSampled | mrhi_textureCopyDestination);
+    mrhiTextureId storage = MakeImage(device, 2, mrhi_textureStorage);
     mrhiBufferId buffers[2] = {MakeBuffer(device, 256), MakeBuffer(device, 256)};
     mrhiBufferDef uniformDef = mrhiDefaultBufferDef();
     uniformDef.size = 16;
@@ -1191,8 +1207,8 @@ static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool nativ
     CHECK(mrhiCreateBuffer(device, &uniformDef, &uniform) == mrhi_success, "a uniform buffer");
     // The repeating heap first, so the clamping one is not the first
     // region.
-    mrhiHeapId heaps[2] = {MakeHeap(device, texture, buffers[0], false),
-                           MakeHeap(device, texture, buffers[1], true)};
+    mrhiHeapId heaps[2] = {MakeHeap(device, texture, storage, buffers[0], false),
+                           MakeHeap(device, texture, storage, buffers[1], true)};
     // Each row the texel a repeating sampler reads, then the one the
     // clamping sampler reads.
     static const uint8_t pixels[16] = {10, 20, 30, 255, 255, 51, 153, 255,
@@ -1259,19 +1275,29 @@ static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool nativ
     }
     mrhiRequestId written[2] = {{0}, {0}};
     CHECK(mrhiBeginPass(device, readPass) == mrhi_success &&
-              mrhiReadBuffer(device, readPass, b[0], 0, 8, &written[0]) == mrhi_success &&
-              mrhiReadBuffer(device, readPass, b[1], 0, 8, &written[1]) == mrhi_success &&
+              mrhiReadBuffer(device, readPass, b[0], 0, 12, &written[0]) == mrhi_success &&
+              mrhiReadBuffer(device, readPass, b[1], 0, 12, &written[1]) == mrhi_success &&
               mrhiEndPass(device, readPass) == mrhi_success,
           "read");
     Finish(device, 2);
-    uint8_t expected[2][8];
+    // Minified, the nearest texel, and three quarters of the first with
+    // a quarter of the second.
+    static const uint8_t kMinified[2][4] = {{10, 20, 30, 255}, {71, 28, 61, 255}};
+    uint8_t taken[2][12];
     for (int i = 0; i < 2; ++i)
     {
-        memcpy(expected[i], pixels + 4 * i, 4);
-        memcpy(expected[i] + 4, kWord, 4);
+        size_t size = 0;
+        CHECK(mrhiTakeReadback(device, written[i], taken[i], sizeof(taken[i]), &size) ==
+                      mrhi_success &&
+                  size == sizeof(taken[i]),
+              "the words");
     }
-    CHECK(Taken(device, written[0], expected[0], 8), "the repeated texel, through a heap");
-    CHECK(Taken(device, written[1], expected[1], 8), "the clamped texel, through the other");
+    CHECK(!s_runs || (memcmp(taken[0], pixels, 4) == 0 && memcmp(taken[0] + 4, kWord, 4) == 0),
+          "the repeated texel, through a heap");
+    CHECK(!s_runs || (memcmp(taken[1], pixels + 4, 4) == 0 && memcmp(taken[1] + 4, kWord, 4) == 0),
+          "the clamped texel, through the other");
+    CHECK(!s_runs || (IsNear(taken[0] + 8, kMinified[0]) && IsNear(taken[1] + 8, kMinified[1])),
+          "minified, the nearest texel, then a linear blend");
     CHECK(mrhiDestroyHeap(device, heaps[0]) == mrhi_success &&
               mrhiDestroyHeap(device, heaps[1]) == mrhi_success,
           "the heaps destroyed");
@@ -1279,7 +1305,8 @@ static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool nativ
 }
 
 // The placed pipelines: vertices of four floats each, depth and stencil
-// written, then tested.
+// written, with blend factors that would blank the target but blending
+// off, then tested.
 static void MakePlaced(Scene* scene, mrhiShaderId shader)
 {
     static const mrhiVertexBufferLayout buffer = {.stride = 16};
@@ -1297,6 +1324,11 @@ static void MakePlaced(Scene* scene, mrhiShaderId shader)
     def.stencilFront =
         (mrhiStencilFace){.compare = mrhi_compareAlways, .passOp = mrhi_stencilReplace};
     def.stencilBack = def.stencilFront;
+    def.colorTargets[0].color = (mrhiBlendComponent){
+        .srcFactor = mrhi_blendZero,
+        .dstFactor = mrhi_blendZero,
+        .operation = mrhi_blendAdd,
+    };
     LABEL(def, "placed");
     mrhiRequestId request = {0};
     CHECK(mrhiCreateGraphicsPipeline(scene->device, &def, &scene->placed, &request) == mrhi_success,

@@ -6,7 +6,9 @@
 // texture's right edge so that the sampler's addressing shows, and
 // writes the texel, packed, to a storage buffer from the same heap, all
 // three named by index in the root block (mrhi-0015), then a word from
-// a uniform buffer bound in table 0, so that tables and heaps meet.
+// a uniform buffer bound in table 0, so that tables and heaps meet, then
+// a texel a quarter of the way to the next, a level down from the
+// texture's only one, so that the sampler's filter on minification shows.
 
 #version 450
 #extension GL_EXT_nonuniform_qualifier : require
@@ -38,4 +40,7 @@ void main()
         textureLod(sampler2D(textures[root.image], samplers[root.sampling]), vec2(1.25, 0.25), 0.0);
     buffers[root.target].values[0] = packUnorm4x8(texel);
     buffers[root.target].values[1] = table.word.x;
+    vec4 minified = textureLod(sampler2D(textures[root.image], samplers[root.sampling]),
+                               vec2(0.375, 0.25), 1.0);
+    buffers[root.target].values[2] = packUnorm4x8(minified);
 }
