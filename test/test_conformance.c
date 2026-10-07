@@ -1306,7 +1306,9 @@ static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool nativ
 
 // The placed pipelines: vertices of four floats each, depth and stencil
 // written, with blend factors that would blank the target but blending
-// off, then tested.
+// off, and a constant depth bias that brings what is drawn at the far
+// plane in front of it (to 0.75 in a float format, 0.875 in a 24-bit
+// one), then tested, without a bias.
 static void MakePlaced(Scene* scene, mrhiShaderId shader)
 {
     static const mrhiVertexBufferLayout buffer = {.stride = 16};
@@ -1329,11 +1331,13 @@ static void MakePlaced(Scene* scene, mrhiShaderId shader)
         .dstFactor = mrhi_blendZero,
         .operation = mrhi_blendAdd,
     };
+    def.depthBias = -(1 << 21);
     LABEL(def, "placed");
     mrhiRequestId request = {0};
     CHECK(mrhiCreateGraphicsPipeline(scene->device, &def, &scene->placed, &request) == mrhi_success,
           "a pipeline writing depth and stencil");
     def.depthWrite = false;
+    def.depthBias = 0;
     def.stencilFront = (mrhiStencilFace){.compare = mrhi_compareEqual};
     def.stencilBack = def.stencilFront;
     def.colorTargets[0].blend = true;
@@ -1832,12 +1836,13 @@ static void CheckQueries(Scene* scene, bool timestamps)
 }
 
 // The placed checks' vertices: a spare, a quad at depth 0.5 drawn
-// indexed from vertex 1, and triangles over the target at 0.75 and 0.4.
+// indexed from vertex 1, and triangles over the target at the far plane
+// and at 0.4.
 static const float kPlaced[11][4] = {
-    {0.0f, 0.0f, 0.0f, 1.0f},   {-1.0f, -1.0f, 0.5f, 1.0f}, {1.0f, -1.0f, 0.5f, 1.0f},
-    {-1.0f, 1.0f, 0.5f, 1.0f},  {1.0f, 1.0f, 0.5f, 1.0f},   {-1.0f, -1.0f, 0.75f, 1.0f},
-    {3.0f, -1.0f, 0.75f, 1.0f}, {-1.0f, 3.0f, 0.75f, 1.0f}, {-1.0f, -1.0f, 0.4f, 1.0f},
-    {3.0f, -1.0f, 0.4f, 1.0f},  {-1.0f, 3.0f, 0.4f, 1.0f},
+    {0.0f, 0.0f, 0.0f, 1.0f},  {-1.0f, -1.0f, 0.5f, 1.0f}, {1.0f, -1.0f, 0.5f, 1.0f},
+    {-1.0f, 1.0f, 0.5f, 1.0f}, {1.0f, 1.0f, 0.5f, 1.0f},   {-1.0f, -1.0f, 1.0f, 1.0f},
+    {3.0f, -1.0f, 1.0f, 1.0f}, {-1.0f, 3.0f, 1.0f, 1.0f},  {-1.0f, -1.0f, 0.4f, 1.0f},
+    {3.0f, -1.0f, 0.4f, 1.0f}, {-1.0f, 3.0f, 0.4f, 1.0f},
 };
 
 static mrhiResourceId Declared(mrhiDevice* device, uint64_t size)
@@ -1881,8 +1886,9 @@ static mrhiPassId PlacedPass(const Scene* scene, mrhiResourceId depth, bool load
 
 // The first placed pass: red where the indexed quad covers the left half
 // through the viewport, stencil 1 there; then green over the lower right
-// quarter through the scissor, which starts off both edges, farther, so
-// only that quarter passes the depth test and takes stencil 2.
+// quarter through the scissor, which starts off both edges, at the far
+// plane but biased in front of it, farther than red, so only that
+// quarter passes the depth test and takes stencil 2.
 static void DrawPlaced(const Scene* scene, mrhiPassId pass, mrhiResourceId vertices,
                        mrhiResourceId indices)
 {
