@@ -1195,6 +1195,9 @@ static void TestEntryLimits(void)
           "a workgroup at the limits");
     CHECK(WithWorkgroup(device, limits.workgroupSizeX + 1, 1, 1, 0) == mrhi_errorUnsupported,
           "a workgroup past x");
+    CHECK(WithWorkgroup(device, 1, limits.workgroupSizeY, 1, 0) == mrhi_success &&
+              WithWorkgroup(device, 1, 1, limits.workgroupSizeZ, 0) == mrhi_success,
+          "a workgroup at the y and z limits");
     CHECK(WithWorkgroup(device, 1, limits.workgroupSizeY + 1, 1, 0) == mrhi_errorUnsupported,
           "a workgroup past y");
     CHECK(WithWorkgroup(device, 1, 1, limits.workgroupSizeZ + 1, 0) == mrhi_errorUnsupported,

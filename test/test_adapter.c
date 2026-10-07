@@ -223,7 +223,10 @@ static void TestFeaturesAreMaskedByTheApi(void)
     CHECK(!features.textureCompressionAstc && features.multiview, "no ASTC on D3D12");
     CHECK(mrhiGetAdapterFeatures(instance, (mrhiAdapterId){0, 0}, &features) == mrhi_errorStale,
           "a null id");
-    CHECK(mrhiGetAdapterFeatures(instance, ids[0], nullptr) == mrhi_errorInvalid, "no out");
+    uint64_t misuse = mrhiGetInstanceMisuse(instance);
+    CHECK(mrhiGetAdapterFeatures(instance, ids[0], nullptr) == mrhi_errorInvalid &&
+              mrhiGetInstanceMisuse(instance) == misuse + 1,
+          "no out, counted as misuse");
     mrhiLimits limits;
     CHECK(mrhiGetAdapterLimits(instance, (mrhiAdapterId){0, 0}, &limits) == mrhi_errorStale,
           "a null id's limits");

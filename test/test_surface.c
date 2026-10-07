@@ -177,6 +177,17 @@ static void TestCaps(void)
     CHECK(mrhiGetSurfaceCaps(instance, surface, adapters[0], &caps) == mrhi_errorStale,
           "a surface that ended");
     CHECK(mrhiGetInstanceMisuse(instance) == 1, "the missing out counted");
+    // A surface of the most colors.
+    test.caps.colorCount = MRHI_SURFACE_COLORS;
+    for (uint32_t i = 0; i < MRHI_SURFACE_COLORS; ++i)
+    {
+        test.caps.colors[i] = (mrhiSurfaceColor){.format = mrhi_formatBgra8Unorm};
+    }
+    CHECK(Make(instance, &test.chain, &surface) == mrhi_success &&
+              mrhiGetSurfaceCaps(instance, surface, adapters[0], &caps) == mrhi_success &&
+              caps.presentable && caps.colorCount == MRHI_SURFACE_COLORS,
+          "the most colors");
+    CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "destroyed");
     mrhiDestroyInstance(instance);
 }
 
@@ -273,6 +284,14 @@ static void TestSuggestion(void)
     caps.colorCount = MRHI_SURFACE_COLORS + 1;
     CHECK(mrhiSuggestSurfaceColor(&caps, &hdr, &color) == mrhi_errorInvalid,
           "caps past their array");
+    for (uint32_t i = 0; i < MRHI_SURFACE_COLORS; ++i)
+    {
+        caps.colors[i] = i + 1 == MRHI_SURFACE_COLORS ? hdr : pq;
+    }
+    caps.colorCount = MRHI_SURFACE_COLORS;
+    CHECK(mrhiSuggestSurfaceColor(&caps, &hdr, &color) == mrhi_success &&
+              memcmp(&color, &hdr, sizeof(color)) == 0,
+          "the most colors, the one asked for last");
     caps.colorCount = 1;
     CHECK(mrhiSuggestSurfaceColor(nullptr, &hdr, &color) == mrhi_errorInvalid &&
               mrhiSuggestSurfaceColor(&caps, nullptr, &color) == mrhi_errorInvalid &&

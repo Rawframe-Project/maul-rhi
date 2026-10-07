@@ -85,7 +85,11 @@ static void TestFeaturesAdd(void)
     mrhiAdapterId adapter;
     size_t count = 0;
     CHECK(mrhiGetAdapters(instance, &adapter, 1, &count) == mrhi_success, "listed");
-    CHECK(Caps(instance, adapter, mrhi_formatR32Float).filtering, "filtered with the feature");
+    CHECK(Caps(instance, adapter, mrhi_formatR32Float).filtering &&
+              Caps(instance, adapter, mrhi_formatRg32Float).filtering &&
+              Caps(instance, adapter, mrhi_formatRgba32Float).filtering,
+          "every 32-bit float filtered with the feature");
+    CHECK(!Caps(instance, adapter, mrhi_formatR32Uint).filtering, "integers still not");
     CHECK(Caps(instance, adapter, mrhi_formatRg11b10Ufloat).rendering, "rendered with it");
     CHECK(Caps(instance, adapter, mrhi_formatBc1RgbaUnormSrgb).sampling, "BC with it");
     CHECK(!Caps(instance, adapter, mrhi_formatAstc4x4Unorm).sampling,

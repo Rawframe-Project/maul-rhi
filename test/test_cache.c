@@ -95,6 +95,8 @@ static void TestRoundTrip(void)
     CHECK(mrhiGetPipelineCache(device, s_cache, size - 1, &size) == mrhi_errorCapacity &&
               size == 80,
           "too little room, with the size");
+    CHECK(mrhiGetPipelineCache(device, s_cache, size, &size) == mrhi_success && size == 80,
+          "room of the size exactly");
     MakePipelines(device, 3);
     Export(device);
     CHECK(s_cacheSize == 80 && memcmp(s_cache, "MRPC", 4) == 0 && CachedCount() == 3,
