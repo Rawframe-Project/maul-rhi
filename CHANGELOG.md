@@ -8,6 +8,11 @@ format.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-08
+
+A fix the mutation sweep of the Vulkan driver found, in the frame's
+plan every driver shares.
+
 ### Fixed
 
 - A pass drawing into a depth slice of a 3D texture other than the

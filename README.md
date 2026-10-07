@@ -29,7 +29,7 @@ generated from the headers.
 
 ## Status
 
-0.3.0 is the current release. It has the whole contract on four
+0.3.1 is the current release. It has the whole contract on four
 drivers, Vulkan, Direct3D 12, Metal and WebGPU, and a test driver
 without a GPU, with the conformance suite, the samples and the
 benchmarks. Since 0.1.0: counted multi-draw indirect and multiview on
