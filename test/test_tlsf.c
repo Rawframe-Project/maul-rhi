@@ -191,8 +191,26 @@ static void TestRandom(void)
     CHECK(pool.firstMap == 0, "no free list left");
 }
 
+// A size at the start of a class takes a free range of that class,
+// every one of which holds it, before a larger class's.
+static void TestClassStart(void)
+{
+    mrhiTlsfNodes store;
+    mrhiTlsf pool;
+    mrhiTlsfNodesInit(&store, s_nodes, NODES);
+    mrhiTlsfInit(&pool);
+    CHECK(mrhiTlsfAddBlock(&pool, &store, 1, 1024) != 0 &&
+              mrhiTlsfAddBlock(&pool, &store, 2, 4096) != 0,
+          "blocks of 1024 and 4096 bytes");
+    uint32_t id = 0;
+    uint64_t offset = 1;
+    CHECK(mrhiTlsfAllocate(&pool, &store, 1024, 1, &id, &offset) != 0 && id == 1 && offset == 0,
+          "1024 bytes from the block of 1024");
+}
+
 int main(void)
 {
+    TestClassStart();
     TestExact();
     TestAlignmentAndMerging();
     TestOutOfNodes();

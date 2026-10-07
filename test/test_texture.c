@@ -90,6 +90,13 @@ static void TestLimits(void)
     CHECK(Make(Def(mrhi_texture3d, mrhi_formatR8Unorm, 4, 4, 2049, kSampled)) ==
               mrhi_errorUnsupported,
           "past the 3D limit");
+    CHECK(Make(Def(mrhi_texture2dArray, mrhi_formatRgba8Unorm, 4, 4, 256, kSampled)) ==
+              mrhi_success,
+          "at the layer limit");
+    CHECK(Make(Def(mrhi_texture3d, mrhi_formatR8Unorm, 2048, 4, 4, kSampled)) == mrhi_success &&
+              Make(Def(mrhi_texture3d, mrhi_formatR8Unorm, 4, 2048, 4, kSampled)) == mrhi_success &&
+              Make(Def(mrhi_texture3d, mrhi_formatR8Unorm, 4, 4, 2048, kSampled)) == mrhi_success,
+          "at the 3D limit, each side");
 }
 
 static void TestSamplesAndUsages(void)

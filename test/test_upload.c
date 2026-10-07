@@ -22,6 +22,7 @@ enum
     STENCIL,
     MULTI,
     BLOCKS,
+    WIDE,
     TARGET,
     OUTSIDE,
     RESOURCES,
@@ -77,6 +78,7 @@ static void Open(uint32_t uploadBytes)
     s_textures[STENCIL] = MakeTexture(mrhi_texture2d, mrhi_formatDepthStencil, 8, 8, 1, 1);
     s_textures[MULTI] = MakeTexture(mrhi_texture2d, mrhi_formatRgba8Unorm, 8, 8, 1, 4);
     s_textures[BLOCKS] = MakeTexture(mrhi_texture2d, mrhi_formatBc1RgbaUnorm, 8, 8, 1, 1);
+    s_textures[WIDE] = MakeTexture(mrhi_texture2d, mrhi_formatRgba8Unorm, 64, 2, 1, 1);
     s_textures[TARGET] = MakeTexture(mrhi_texture2d, mrhi_formatRgba8Unorm, 8, 8, 1, 4);
     s_textures[OUTSIDE] = MakeTexture(mrhi_texture2d, mrhi_formatRgba8Unorm, 8, 8, 1, 1);
 }
@@ -422,10 +424,26 @@ static void TestTextures(void)
     CloseDevice();
 }
 
+// Rows of 256 bytes exactly stage at that pitch, no row more.
+static void TestWholePitch(void)
+{
+    Open(16384);
+    Frame();
+    CHECK(Write(At(WIDE, 0), 512, (mrhiTexelLayout){.bytesPerRow = 256},
+                (mrhiExtent3d){64, 2, 1}) == mrhi_success,
+          "two rows of 256 bytes");
+    const mrhiCommandBufferSide* from = (const mrhiCommandBufferSide*)Nth(1);
+    CHECK(from != nullptr && from->bytesPerRow == 256 && from->rowsPerImage == 2,
+          "staged at a pitch of 256");
+    Drop();
+    CloseDevice();
+}
+
 int main(void)
 {
     ResetAdapter();
     TestBuffers();
+    TestWholePitch();
     TestFull();
     TestRegions();
     TestTextures();
