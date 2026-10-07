@@ -220,8 +220,10 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(vulkan_limits WHITEBOX)
         maul_add_test(vulkan_facts WHITEBOX)
         maul_add_test(vulkan_surface WHITEBOX)
+        maul_add_test(vulkan_swapchain WHITEBOX)
         maul_add_test(vulkan_external WHITEBOX)
-        foreach(test vulkan_label vulkan_limits vulkan_facts vulkan_surface vulkan_external)
+        foreach(test vulkan_label vulkan_limits vulkan_facts vulkan_surface vulkan_swapchain
+                     vulkan_external)
             if(TARGET test_${test})
                 target_include_directories(test_${test} SYSTEM PRIVATE
                                            ${PROJECT_SOURCE_DIR}/khronos)

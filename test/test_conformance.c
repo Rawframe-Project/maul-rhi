@@ -571,7 +571,8 @@ static bool Taken(mrhiDevice* device, mrhiRequestId request, const uint8_t* expe
 }
 
 // Bytes and texels uploaded to device objects, copied through a
-// transient buffer and read back; then read again in a frame that
+// transient buffer, and from the texture into a layer of an array, and
+// read back; then read again in a frame that
 // destroys the buffer after recording, which it must keep until the
 // frame finishes.
 static void CheckRoundTrip(mrhiDevice* device)
@@ -589,28 +590,37 @@ static void CheckRoundTrip(mrhiDevice* device)
     textureDef.usage = mrhi_textureCopySource | mrhi_textureCopyDestination;
     mrhiTextureId texture = {0};
     CHECK(mrhiCreateTexture(device, &textureDef, &texture) == mrhi_success, "a texture");
+    textureDef.kind = mrhi_texture2dArray;
+    textureDef.width = 4;
+    textureDef.height = 4;
+    textureDef.depthOrLayers = 3;
+    mrhiTextureId array = {0};
+    CHECK(mrhiCreateTexture(device, &textureDef, &array) == mrhi_success, "an array");
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiResourceId b = {0};
     mrhiResourceId t = {0};
     mrhiResourceId x = {0};
     mrhiResourceId y = {0};
+    mrhiResourceId l = {0};
     mrhiBufferDef transient = mrhiDefaultBufferDef();
     transient.size = 256;
     CHECK(mrhiImportBuffer(device, buffer, &b) == mrhi_success &&
               mrhiImportTexture(device, texture, &t) == mrhi_success &&
+              mrhiImportTexture(device, array, &l) == mrhi_success &&
               mrhiDeclareBuffer(device, &transient, &x) == mrhi_success &&
               mrhiDeclareBuffer(device, &transient, &y) == mrhi_success,
           "the resources");
     mrhiAccess writes[2] = {Whole(b, mrhi_accessCopyDestination),
                             Whole(t, mrhi_accessCopyDestination)};
     mrhiPassId upload = CopyPass(device, writes, 2);
-    mrhiAccess moves[3] = {Whole(b, mrhi_accessCopySource), Whole(x, mrhi_accessCopyDestination),
-                           Whole(y, mrhi_accessCopyDestination)};
-    mrhiPassId move = CopyPass(device, moves, 3);
-    mrhiAccess reads[3] = {Whole(x, mrhi_accessCopySource), Whole(y, mrhi_accessCopySource),
-                           Whole(t, mrhi_accessCopySource)};
-    mrhiPassId read = CopyPass(device, reads, 3);
+    mrhiAccess moves[5] = {Whole(b, mrhi_accessCopySource), Whole(x, mrhi_accessCopyDestination),
+                           Whole(y, mrhi_accessCopyDestination), Whole(t, mrhi_accessCopySource),
+                           Whole(l, mrhi_accessCopyDestination)};
+    mrhiPassId move = CopyPass(device, moves, 5);
+    mrhiAccess reads[4] = {Whole(x, mrhi_accessCopySource), Whole(y, mrhi_accessCopySource),
+                           Whole(t, mrhi_accessCopySource), Whole(l, mrhi_accessCopySource)};
+    mrhiPassId read = CopyPass(device, reads, 4);
     CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
     const mrhiTextureCopy texels = {.resource = t};
     const mrhiTexelLayout layout = {.bytesPerRow = 64, .rowsPerImage = 16};
@@ -620,6 +630,10 @@ static void CheckRoundTrip(mrhiDevice* device)
     mrhiRequestId fromT = {0};
     mrhiRequestId empty = {0};
     mrhiRequestId emptyTexels = {0};
+    mrhiRequestId fromL = {0};
+    const mrhiTextureCopy corner = {.resource = t, .x = 4, .y = 4};
+    const mrhiTextureCopy layer = {.resource = l, .z = 2};
+    const mrhiExtent3d square = {4, 4, 1};
     CHECK(mrhiBeginPass(device, upload) == mrhi_success &&
               mrhiWriteBuffer(device, upload, b, 0, pattern, sizeof(pattern)) == mrhi_success &&
               mrhiWriteTexture(device, upload, &texels, pattern, sizeof(pattern), &layout,
@@ -635,6 +649,7 @@ static void CheckRoundTrip(mrhiDevice* device)
               mrhiCopyBuffer(device, move, b, 768, y, 0, 256) == mrhi_success &&
               // Zero bytes copy nothing, as WebGPU allows.
               mrhiCopyBuffer(device, move, b, 0, y, 0, 0) == mrhi_success &&
+              mrhiCopyTexture(device, move, &corner, &layer, &square) == mrhi_success &&
               mrhiEndPass(device, move) == mrhi_success,
           "copied");
     CHECK(mrhiBeginPass(device, read) == mrhi_success &&
@@ -645,14 +660,22 @@ static void CheckRoundTrip(mrhiDevice* device)
               mrhiReadBuffer(device, read, x, 0, 0, &empty) == mrhi_success &&
               mrhiReadTexture(device, read, &texels, &(mrhiExtent3d){0, 1, 1}, &emptyTexels) ==
                   mrhi_success &&
+              mrhiReadTexture(device, read, &layer, &square, &fromL) == mrhi_success &&
               mrhiEndPass(device, read) == mrhi_success,
           "read");
-    Finish(device, 5);
+    Finish(device, 6);
     CHECK(Taken(device, empty, pattern, 0) && Taken(device, emptyTexels, pattern, 0),
           "no bytes from empty reads");
     CHECK(Taken(device, fromX, pattern + 256, 256), "the buffer's bytes, through a transient");
     CHECK(Taken(device, fromY, pattern + 768, 256), "a second transient apart from the first");
     CHECK(Taken(device, fromT, pattern, sizeof(pattern)), "the texture's texels");
+    uint8_t square16[64];
+    for (int row = 0; row < 4; ++row)
+    {
+        memcpy(square16 + 16 * row, pattern + 64 * (4 + row) + 16, 16);
+    }
+    CHECK(Taken(device, fromL, square16, sizeof(square16)),
+          "a corner of the texture, copied into an array's third layer");
     CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "another frame");
     CHECK(mrhiImportBuffer(device, buffer, &b) == mrhi_success, "imported again");
     // Two ranges cleared first (mrhi-0022), one to the buffer's end.
