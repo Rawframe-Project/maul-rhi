@@ -157,7 +157,7 @@ if(MAUL_RHI_TEST_DRIVER OR MAUL_RHI_VALIDATION)
 endif()
 if(MAUL_RHI_VULKAN_DRIVER)
     target_sources(maul-rhi PRIVATE src/driver_vulkan.c src/vulkan_adapter.c src/vulkan_api.c
-                                   src/vulkan_device.c src/vulkan_frame.c src/vulkan_graphics.c
+                                   src/vulkan_device.c src/vulkan_facts.c src/vulkan_frame.c src/vulkan_graphics.c
                                    src/vulkan_heap.c src/vulkan_label.c src/vulkan_memory.c
                                    src/vulkan_object.c src/vulkan_pass.c src/vulkan_pipeline.c
                                    src/vulkan_query.c src/vulkan_recipe.c src/vulkan_record.c
@@ -218,9 +218,10 @@ if(MAUL_RHI_BUILD_TESTS)
     if(MAUL_RHI_VULKAN_DRIVER)
         maul_add_test(vulkan_label WHITEBOX)
         maul_add_test(vulkan_limits WHITEBOX)
+        maul_add_test(vulkan_facts WHITEBOX)
         maul_add_test(vulkan_surface WHITEBOX)
         maul_add_test(vulkan_external WHITEBOX)
-        foreach(test vulkan_label vulkan_limits vulkan_surface vulkan_external)
+        foreach(test vulkan_label vulkan_limits vulkan_facts vulkan_surface vulkan_external)
             if(TARGET test_${test})
                 target_include_directories(test_${test} SYSTEM PRIVATE
                                            ${PROJECT_SOURCE_DIR}/khronos)

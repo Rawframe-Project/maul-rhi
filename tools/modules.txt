@@ -26,7 +26,8 @@ vulkan_graphics: capabilities_core container invariant reflection vulkan_adapter
 vulkan_memory: invariant tlsf vulkan_api
 vulkan_object: capabilities_core chain invariant vulkan_adapter vulkan_api vulkan_label vulkan_memory vulkan_resource
 vulkan_resource: capabilities_core vulkan_adapter vulkan_api
-vulkan_adapter: allocator capabilities_core driver invariant stage_limits vulkan_api
+vulkan_adapter: allocator capabilities_core driver invariant vulkan_api vulkan_facts
+vulkan_facts: capabilities_core driver stage_limits vulkan_api
 vulkan_surface: capabilities_core vulkan_adapter vulkan_api
 vulkan_label: invariant vulkan_api
 vulkan_api:
