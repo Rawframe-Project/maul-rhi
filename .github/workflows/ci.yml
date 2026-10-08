@@ -8,6 +8,8 @@ on:
   workflow_dispatch:
 
 env:
+  # apt retries a stalled download and gives up on a dead one.
+  APT_OPTIONS: -o Acquire::Retries=3 -o Acquire::http::Timeout=30
   PREFIX: MAUL_RHI
 
 jobs:
@@ -19,11 +21,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install tools
+        timeout-minutes: 15
         run: |
-          sudo apt-get update -q
+          sudo apt-get $APT_OPTIONS update -q
           # clang without its recommends: llvm-20-dev alone is 50 MB.
-          sudo apt-get install -y -q --no-install-recommends clang-20 clang-tidy-20
-          sudo apt-get install -y -q ninja-build
+          sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends clang-20 clang-tidy-20
+          sudo apt-get $APT_OPTIONS install -y -q ninja-build
           pip install clang-format==22.1.5 >/dev/null
       - name: clang-format
         run: |
@@ -79,13 +82,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install compilers, lavapipe, the validation layer and Xvfb
+        timeout-minutes: 15
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update -q
+          sudo apt-get $APT_OPTIONS update -q
           # clang without its recommends (llvm-20-dev alone is 50 MB), with
           # the sanitizers' runtime.
-          sudo apt-get install -y -q --no-install-recommends clang-20 libclang-rt-20-dev
-          sudo apt-get install -y -q gcc-14 g++-14 ninja-build \
+          sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends clang-20 libclang-rt-20-dev
+          sudo apt-get $APT_OPTIONS install -y -q gcc-14 g++-14 ninja-build \
             mesa-vulkan-drivers vulkan-validationlayers libxcb1-dev xvfb
       - name: Configure
         run: |
@@ -282,10 +286,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install the compiler, lavapipe, Xvfb, weston and Maul Window's files
+        timeout-minutes: 15
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends clang-20 libclang-rt-20-dev
-          sudo apt-get install -y -q ninja-build mesa-vulkan-drivers \
+          sudo apt-get $APT_OPTIONS update -q
+          sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends clang-20 libclang-rt-20-dev
+          sudo apt-get $APT_OPTIONS install -y -q ninja-build mesa-vulkan-drivers \
             vulkan-validationlayers xvfb weston libwayland-dev wayland-protocols \
             libxcb1-dev libxcb-randr0-dev libxcb-xkb-dev libxcb-cursor-dev \
             libxcb-render0-dev libxcb-xinput-dev libxkbcommon-dev libxkbcommon-x11-dev
@@ -393,11 +398,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install compilers
+        timeout-minutes: 15
         run: |
-          sudo apt-get update -q
+          sudo apt-get $APT_OPTIONS update -q
           # libFuzzer's runtime, which clang only recommends.
-          sudo apt-get install -y -q --no-install-recommends clang-20 libclang-rt-20-dev
-          sudo apt-get install -y -q ninja-build
+          sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends clang-20 libclang-rt-20-dev
+          sudo apt-get $APT_OPTIONS install -y -q ninja-build
       - name: Build
         run: |
           cmake -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -D${PREFIX}_FUZZ=ON \
@@ -560,9 +566,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Toolchain
+        timeout-minutes: 15
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends clang-20 lld-20 wasi-libc \
+          sudo apt-get $APT_OPTIONS update -q
+          sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends clang-20 lld-20 wasi-libc \
             libclang-rt-20-dev-wasm32
       - name: Configure
         run: |
@@ -591,9 +598,10 @@ jobs:
       - name: Build
         run: cmake --build build -j 4
       - name: clang-tidy
+        timeout-minutes: 15
         # The web-only sources, against Emscripten's sysroot.
         run: |
-          sudo apt-get install -y -q clang-tidy-20
+          sudo apt-get $APT_OPTIONS install -y -q clang-tidy-20
           sysroot=$(em-config CACHE)/sysroot
           for f in $(grep -l '"web_js.h"' src/*.c); do
             clang-tidy-20 -p build --quiet --warnings-as-errors='*' --extra-arg=--sysroot=$sysroot \
