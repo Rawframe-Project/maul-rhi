@@ -2915,12 +2915,32 @@ static void CheckUnwrittenImages(mrhiDevice* device, mrhiSurfaceId surface)
     Finish(device, 0);
 }
 
+// Every color the surface lists configures it, and a frame clears and
+// presents on it: HDR10 and extended range as much as sRGB.
+static void CheckEveryColor(mrhiDevice* device, mrhiSurfaceId surface, const mrhiSurfaceCaps* caps)
+{
+    for (uint32_t i = 0; i < caps->colorCount; ++i)
+    {
+        mrhiSurfaceConfig config = mrhiDefaultSurfaceConfig();
+        config.surface = surface;
+        config.color = caps->colors[i];
+        config.usage = mrhi_textureRenderTarget;
+        config.width = 64;
+        config.height = 48;
+        uint8_t pixel[4];
+        CHECK(mrhiConfigureSurface(device, &config) == mrhi_success &&
+                  IsAcquired(PresentRed(device, surface, false, pixel)),
+              "every color listed presents");
+    }
+}
+
 // Presents to the surface from a device on an adapter that can: frames
 // cleared and read back, more than the images and their semaphores; an
 // image given back and taken again; one presented unwritten; a
-// reconfiguration; and, where the window fixes its images' size, a size
-// it does not take, which leaves the surface unconfigured until it is
-// configured again, or else a size of the program's own.
+// reconfiguration; every color listed; and, where the window fixes its
+// images' size, a size it does not take, which leaves the surface
+// unconfigured until it is configured again, or else a size of the
+// program's own.
 static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiSurfaceId surface,
                             const mrhiSurfaceCaps* caps, bool fixedSize)
 {
@@ -2949,6 +2969,7 @@ static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiS
     CHECK(Configure(device, surface, caps, 64, 48) == mrhi_success &&
               IsAcquired(PresentRed(device, surface, false, pixel)),
           "reconfigured");
+    CheckEveryColor(device, surface, caps);
     if (fixedSize)
     {
         CHECK(Configure(device, surface, caps, 32, 32) == mrhi_errorOutOfDate,

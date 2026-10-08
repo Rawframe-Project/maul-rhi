@@ -8,6 +8,15 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- Metal surfaces list HDR10 (10-bit, Rec. 2020 primaries, PQ) on macOS
+  11 and iOS 16 and later, as the mapping appendix said they did: the
+  layer takes the PQ color space with extended dynamic range, and the
+  system tone maps it to what the display shows.
+- Conformance configures every color a surface lists and presents a
+  frame on it, not the sRGB one alone.
+
 ## [0.3.1] - 2026-10-08
 
 A fix the mutation sweep of the Vulkan driver found, in the frame's
