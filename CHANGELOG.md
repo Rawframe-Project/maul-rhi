@@ -8,6 +8,11 @@ format.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-08
+
+HDR10 on Metal, which the mapping appendix had already promised, and a
+conformance check that every color a surface lists presents.
+
 ### Added
 
 - Metal surfaces list HDR10 (10-bit, Rec. 2020 primaries, PQ) on macOS
