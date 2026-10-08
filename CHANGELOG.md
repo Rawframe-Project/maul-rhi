@@ -8,6 +8,11 @@ format.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-08
+
+Color targets in a texture's view formats, so a renderer draws into a
+canvas's sRGB twin directly, and a getter for a device's own limits.
+
 ### Added
 
 - A color target renders in one of its texture's view formats
