@@ -411,9 +411,9 @@ static void CheckFrameMemory(mrhiDevice* device)
 }
 
 // A target with its twin among its view formats, only ever rendered to:
-// transient, so kept on chip where the GPU can, and made on every API
-// though no view takes the twin (WebGPU refuses view formats on a
-// transient attachment).
+// made on every API, and not transient, since a pass may render it
+// through the twin and WebGPU refuses view formats on a transient
+// attachment (mrhi-0008).
 static void CheckTransientTwin(mrhiDevice* device)
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
@@ -433,6 +433,9 @@ static void CheckTransientTwin(mrhiDevice* device)
     mrhiPassId id = {0};
     CHECK(mrhiAddPass(device, &pass, &id) == mrhi_success, "a pass");
     CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    mrhiResourcePlan plan = {0};
+    CHECK(mrhiGetResourcePlan(device, target, &plan) == mrhi_success && !plan.transient,
+          "not transient");
     CHECK(mrhiBeginPass(device, id) == mrhi_success && mrhiEndPass(device, id) == mrhi_success,
           "recorded");
     mrhiRequestId token = {0};
@@ -1640,6 +1643,124 @@ static void CheckDrawFrame(Scene* scene, DrawMode mode)
     CHECK(Taken(device, scaled, (const uint8_t*)values, sizeof(values)), "scaled by 3");
 }
 
+// The frame memory one declared 64 by 64 texture of 64 slices or
+// layers and 4 mips takes, copied to in a pass never culled.
+static uint64_t SlicedBytes(mrhiDevice* device, mrhiTextureKind kind)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.kind = kind;
+    def.format = mrhi_formatRgba8Unorm;
+    def.width = 64;
+    def.height = 64;
+    def.depthOrLayers = 64;
+    def.mipLevels = 4;
+    mrhiResourceId texture = {0};
+    CHECK(mrhiDeclareTexture(device, &def, &texture) == mrhi_success, "a texture");
+    mrhiAccess write = {.resource = texture,
+                        .kind = mrhi_accessCopyDestination,
+                        .range = {.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING}};
+    mrhiPassDef pass = mrhiDefaultPassDef();
+    pass.passClass = mrhi_passTransfer;
+    pass.accesses = &write;
+    pass.accessCount = 1;
+    pass.neverCull = true;
+    mrhiPassId id = {0};
+    uint64_t bytes = 0;
+    CHECK(mrhiAddPass(device, &pass, &id) == mrhi_success &&
+              mrhiCompileFrame(device) == mrhi_success &&
+              mrhiGetFrameMemory(device, &bytes) == mrhi_success &&
+              mrhiDropFrame(device) == mrhi_success,
+          "measured");
+    return bytes;
+}
+
+// A volume's mips halve its depth too, an array's keep their layers: at
+// 4 mips the volume takes 1,198,080 bytes of texels and the array
+// 1,392,640, apart by more than any alignment. The volume is declared
+// first, so a driver measuring every texture as one kind fails.
+static void CheckSlicedMemory(mrhiDevice* device)
+{
+    uint64_t volume = SlicedBytes(device, mrhi_texture3d);
+    uint64_t array = SlicedBytes(device, mrhi_texture2dArray);
+    // The test driver doubles any mipped texture's texels.
+    CHECK(!s_runs || (volume >= 1198080 && array >= 1392640 && volume < array),
+          "a volume's mips take less than an array's");
+}
+
+// A texel of 188 sampled through the texture's sRGB twin decodes to
+// about 0.503, where the texture's own format would give 0.737: the
+// triangle drawn with it is the scene's color at half strength.
+static void CheckSampledTwin(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    BeginScene(scene);
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = mrhi_formatRgba8Unorm;
+    def.width = 1;
+    def.height = 1;
+    def.viewFormats[0] = mrhi_formatRgba8UnormSrgb;
+    mrhiResourceId gray = {0};
+    CHECK(mrhiDeclareTexture(device, &def, &gray) == mrhi_success, "a texture with a twin");
+    mrhiAccess uploads[2] = {Whole(gray, mrhi_accessCopyDestination),
+                             Whole(scene->u, mrhi_accessCopyDestination)};
+    mrhiPassId copy = CopyPass(device, uploads, 2);
+    mrhiAccess draws[3] = {Whole(scene->u, mrhi_accessUniform),
+                           Whole(scene->d, mrhi_accessStorageReadWrite),
+                           Whole(gray, mrhi_accessSampled)};
+    mrhiPassId draw = DrawPass(scene, draws);
+    mrhiAccess reads = Whole(scene->t, mrhi_accessCopySource);
+    mrhiPassId read = CopyPass(device, &reads, 1);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    const uint8_t texel[4] = {188, 188, 188, 255};
+    const mrhiTexelLayout layout = {.bytesPerRow = 4, .rowsPerImage = 1};
+    CHECK(mrhiBeginPass(device, copy) == mrhi_success &&
+              mrhiWriteBuffer(device, copy, scene->u, 0, kColor, sizeof(kColor)) == mrhi_success &&
+              mrhiWriteTexture(device, copy, &(mrhiTextureCopy){.resource = gray}, texel, 4,
+                               &layout, &(mrhiExtent3d){1, 1, 1}) == mrhi_success &&
+              mrhiEndPass(device, copy) == mrhi_success,
+          "the color and the gray texel uploaded");
+    const float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    CHECK(mrhiBeginPass(device, draw) == mrhi_success &&
+              mrhiSetGraphicsPipeline(device, draw, scene->draw) == mrhi_success &&
+              mrhiSetRootBlock(device, draw, 0, tint, sizeof(tint)) == mrhi_success,
+          "a pipeline set");
+    const mrhiBinding buffers[2] = {
+        {.slot = 0, .resource = scene->u, .size = MRHI_WHOLE_SIZE},
+        {.slot = 1, .resource = scene->d, .size = MRHI_WHOLE_SIZE},
+    };
+    CHECK(mrhiSetBindings(device, draw, 0, buffers, 2) == mrhi_success, "table 0");
+    const mrhiBinding twin[2] = {
+        {.slot = 0,
+         .resource = gray,
+         .viewFormat = mrhi_formatRgba8UnormSrgb,
+         .range = {.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING}},
+        {.slot = 1, .sampler = scene->sampler},
+    };
+    CHECK(mrhiSetBindings(device, draw, 1, twin, 2) == mrhi_success, "the twin bound");
+    CHECK(mrhiDraw(device, draw, 3, 1, 2, 0) == mrhi_success &&
+              mrhiEndPass(device, draw) == mrhi_success &&
+              mrhiBeginPass(device, read) == mrhi_success,
+          "drawn");
+    mrhiRequestId pixels = ReadTarget(scene, read);
+    CHECK(mrhiEndPass(device, read) == mrhi_success, "read");
+    Finish(device, 1);
+    uint8_t image[256];
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success,
+          "the pixels");
+    // The scene's color, 1, 0.2, 0.6 and 1, times the decoded texel.
+    static const uint8_t kHalf[4] = {128, 26, 77, 255};
+    bool decoded = true;
+    for (int i = 0; i < 4; ++i)
+    {
+        int difference = image[4 + i] - kHalf[i];
+        decoded = decoded && difference >= -2 && difference <= 2;
+    }
+    CHECK(!s_runs || decoded, "a texture sampled through its sRGB twin decodes");
+}
+
 // A target cleared to a color whose channels all differ reads back as
 // that color, channel by channel; so does a depth slice of a volume
 // drawn to.
@@ -2402,6 +2523,7 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     CHECK(mrhiGetDeviceFeatures(device, &features) == mrhi_success, "its features");
     RUN("binding.draws", {
         CheckDrawFrame(&scene, DRAW_DIRECT);
+        CheckSampledTwin(&scene);
         CheckDrawFrame(&scene, DRAW_INDIRECT);
         if (features.multiDrawIndirectCount)
         {
@@ -2679,7 +2801,10 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CHECK(mrhiGetDeviceState(device) == mrhi_deviceReady, "ready");
     RUN("api.devices", CheckOpened(device, asked));
     RUN("api.objects", CheckObjects(device, asked->timestampQuery));
-    RUN("hazards.frame_memory", CheckFrameMemory(device));
+    RUN("hazards.frame_memory", {
+        CheckFrameMemory(device);
+        CheckSlicedMemory(device);
+    });
     RUN("hazards.transient_twin", CheckTransientTwin(device));
     RUN("api.pipelines", CheckPipelines(device));
     RUN("transfers.round_trip", CheckRoundTrip(device));
@@ -2810,20 +2935,29 @@ static void CheckForeignSources(mrhiInstance* instance)
 
 #if defined(MRHI_TEST_XCB) || defined(MRHI_TEST_WEB) || defined(MAUL_RHI_METAL_DRIVER) ||          \
     defined(MAUL_RHI_D3D12_DRIVER) || defined(MRHI_TEST_ANDROID)
-// Whether caps meet the floors and offer 8-bit sRGB in Rec. 709.
+// Whether caps meet the floors and offer 8-bit sRGB in Rec. 709, each
+// color listed once.
 static bool MeetsFloors(const mrhiSurfaceCaps* caps)
 {
     bool srgb = false;
-    for (uint32_t i = 0; i < caps->colorCount; ++i)
+    bool once = true;
+    for (uint32_t i = 0; i < caps->colorCount && i < MRHI_SURFACE_COLORS; ++i)
     {
         const mrhiSurfaceColor* color = &caps->colors[i];
+        for (uint32_t j = 0; j < i; ++j)
+        {
+            const mrhiSurfaceColor* other = &caps->colors[j];
+            once =
+                once && (other->format != color->format || other->primaries != color->primaries ||
+                         other->transfer != color->transfer || other->range != color->range);
+        }
         srgb =
             srgb ||
             ((color->format == mrhi_formatBgra8Unorm || color->format == mrhi_formatRgba8Unorm) &&
              color->primaries == mrhi_primariesBt709 && color->transfer == mrhi_transferSrgb &&
              color->range == mrhi_rangeStandard);
     }
-    return caps->colorCount >= 1 && caps->colorCount <= MRHI_SURFACE_COLORS && srgb &&
+    return caps->colorCount >= 1 && caps->colorCount <= MRHI_SURFACE_COLORS && srgb && once &&
            (caps->presentModes & mrhi_presentFifo) != 0 && (caps->twinViews || caps->twinImages) &&
            (caps->alphaModes & mrhi_alphaOpaque) != 0 &&
            (caps->usages & mrhi_textureRenderTarget) != 0;
