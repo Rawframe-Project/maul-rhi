@@ -8,6 +8,14 @@ format.
 
 ## [Unreleased]
 
+### Fixed
+
+- The D3D12 driver reported Microsoft's Basic Render Driver (WARP) as
+  a hardware adapter where DXGI listed it without its software flag,
+  as on GitHub's hosted Windows runner. WARP is now software by its
+  PCI identity (vendor 0x1414, device 0x8C) too, and conformance
+  checks it on every driver.
+
 ## [0.5.0] - 2026-10-08
 
 Color targets in a texture's view formats, so a renderer draws into a

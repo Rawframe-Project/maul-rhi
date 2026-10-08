@@ -2923,12 +2923,15 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
 }
 
 // An adapter's facts: of the driver, of a known kind, with a name.
+// Microsoft's WARP (PCI vendor 0x1414, device 0x8C) is software.
 static void CheckInfo(mrhiInstance* instance, mrhiAdapterId adapter, mrhiDriverKind driver)
 {
     mrhiAdapterInfo info;
     CHECK(mrhiGetAdapterInfo(instance, adapter, &info) == mrhi_success, "info");
     CHECK(info.driver == driver, "the driver's adapter");
     CHECK(info.kind <= mrhi_adapterSoftware, "a kind");
+    CHECK(info.vendorId != 0x1414 || info.deviceId != 0x8C || info.kind == mrhi_adapterSoftware,
+          "WARP, software");
     CHECK(info.nameLength > 0 && info.nameLength <= MRHI_ADAPTER_NAME_BYTES, "a name");
 }
 
