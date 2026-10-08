@@ -63,7 +63,8 @@ thread.
 - **Memory:** declared resources are placed in one frame memory by
   lifetime, first fit in first-use order, with sizes and alignments
   the driver reports (none for a transient texture a tile GPU keeps on
-  chip). A target's store is kept only when a later kept pass reads it
+  chip; a texture listing view formats is never transient, as WebGPU's
+  transient attachments take none). A target's store is kept only when a later kept pass reads it
   or the texture is imported.
 - **Aliasing** (amended when the D3D12 driver placed transients): the
   first use of a declared resource placed over memory that resources

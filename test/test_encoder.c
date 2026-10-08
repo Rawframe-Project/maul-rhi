@@ -385,6 +385,45 @@ static void TestTargets(void)
     Close2();
 }
 
+// A pass's layout takes its targets' view formats: a pipeline is set in
+// a pass rendering an rgba8 texture as its sRGB twin when it renders
+// the twin.
+static void TestViewFormats(void)
+{
+    Open(4);
+    mrhiGraphicsPipelineDef def = GraphicsDef();
+    mrhiGraphicsPipelineId own = Graphics(&def);
+    def.colorTargets[0].format = mrhi_formatRgba8UnormSrgb;
+    mrhiGraphicsPipelineId twin = Graphics(&def);
+    mrhiFrameDef frameDef = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    mrhiTextureDef textureDef = mrhiDefaultTextureDef();
+    textureDef.format = mrhi_formatRgba8Unorm;
+    textureDef.width = 64;
+    textureDef.height = 64;
+    textureDef.viewFormats[0] = mrhi_formatRgba8UnormSrgb;
+    mrhiResourceId texture = {0};
+    CHECK(mrhiDeclareTexture(s_device, &textureDef, &texture) == mrhi_success, "declared");
+    mrhiPassDef passDef = mrhiDefaultPassDef();
+    passDef.neverCull = true;
+    passDef.colorTargets[0] = (mrhiColorTarget){
+        .resource = texture,
+        .load = mrhi_loadClear,
+        .viewFormat = mrhi_formatRgba8UnormSrgb,
+    };
+    passDef.colorTargetCount = 1;
+    mrhiPassId pass = Add(passDef);
+    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiBeginPass(s_device, pass) == mrhi_success, "begun");
+    CHECK(mrhiSetGraphicsPipeline(s_device, pass, own) == mrhi_errorInvalid,
+          "not the texture's own format");
+    CHECK(mrhiSetGraphicsPipeline(s_device, pass, twin) == mrhi_success, "its view format");
+    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDestroyGraphicsPipeline(s_device, own) == mrhi_success, "destroyed");
+    CHECK(mrhiDestroyGraphicsPipeline(s_device, twin) == mrhi_success, "destroyed");
+    Close2();
+}
+
 // A pipeline is set only in passes of its views (mrhi-0020).
 static void TestViews(void)
 {
@@ -869,6 +908,7 @@ int main(void)
     TestPhases();
     TestPipelines();
     TestTargets();
+    TestViewFormats();
     TestViews();
     TestViewport();
     TestScissorAndState();

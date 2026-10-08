@@ -8,6 +8,15 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- A color target renders in one of its texture's view formats
+  (`mrhiColorTarget.viewFormat`), a surface image in one of its
+  configuration's: a renderer draws sRGB-encoded output into a surface
+  reached through its twin view, as a WebGPU canvas is, with no copy
+  through a staging texture. A pipeline matches the view format; a
+  resolve texture is viewed in it too. The struct grows.
+
 ## [0.4.0] - 2026-10-08
 
 HDR10 on Metal, which the mapping appendix had already promised, and a

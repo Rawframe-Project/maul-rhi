@@ -99,6 +99,12 @@ bool mrhiFormatHasAspect(mrhiFormat format, mrhiTextureAspect aspect)
     }
 }
 
+mrhiFormat mrhiViewFormatOf(const mrhiTextureDef* texture, mrhiFormat format)
+{
+    mrhiFormat viewed = format == mrhi_formatNone ? texture->format : format;
+    return IsFormatGiven(texture, viewed) ? viewed : mrhi_formatNone;
+}
+
 bool mrhiResolveView(const mrhiTextureDef* texture, const mrhiViewDef* def,
                      mrhiViewDef* resolvedOut)
 {

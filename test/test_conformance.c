@@ -1705,6 +1705,79 @@ static void CheckClear(Scene* scene)
           "a volume's depth slice cleared");
 }
 
+// An rgba8 texture of the samples, declared viewable as its sRGB twin.
+static mrhiResourceId DeclareTwin(mrhiDevice* device, uint32_t samples)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = mrhi_formatRgba8Unorm;
+    def.width = 4;
+    def.height = 4;
+    def.sampleCount = samples;
+    def.viewFormats[0] = mrhi_formatRgba8UnormSrgb;
+    mrhiResourceId resource = {0};
+    CHECK(mrhiDeclareTexture(device, &def, &resource) == mrhi_success, "a texture with a twin");
+    return resource;
+}
+
+// Targets rendered as their sRGB twin store the clear color encoded: a
+// texture cleared in the twin, and four samples cleared and resolved in
+// it.
+static void CheckViewFormat(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    BeginScene(scene);
+    mrhiResourceId single = DeclareTwin(device, 1);
+    mrhiResourceId resolved = DeclareTwin(device, 1);
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.colorTargets[0] = (mrhiColorTarget){
+        .resource = single,
+        .load = mrhi_loadClear,
+        .store = mrhi_storeKeep,
+        .clear = {0.2f, 0.4f, 0.6f, 0.8f},
+        .viewFormat = mrhi_formatRgba8UnormSrgb,
+    };
+    def.colorTargetCount = 1;
+    mrhiPassId clear = {0};
+    CHECK(mrhiAddPass(device, &def, &clear) == mrhi_success, "a pass clearing the twin");
+    def.colorTargets[0].resource = DeclareTwin(device, 4);
+    def.colorTargets[0].store = mrhi_storeDiscard;
+    def.colorTargets[0].resolve = resolved;
+    mrhiPassId resolve = {0};
+    CHECK(mrhiAddPass(device, &def, &resolve) == mrhi_success, "a pass resolving in the twin");
+    mrhiAccess reads[2] = {Whole(single, mrhi_accessCopySource),
+                           Whole(resolved, mrhi_accessCopySource)};
+    mrhiPassId read = CopyPass(device, reads, 2);
+    CHECK(mrhiCompileFrame(device) == mrhi_success &&
+              mrhiBeginPass(device, clear) == mrhi_success &&
+              mrhiEndPass(device, clear) == mrhi_success &&
+              mrhiBeginPass(device, resolve) == mrhi_success &&
+              mrhiEndPass(device, resolve) == mrhi_success &&
+              mrhiBeginPass(device, read) == mrhi_success,
+          "cleared in the twin");
+    const mrhiExtent3d extent = {4, 4, 1};
+    mrhiRequestId requests[2] = {0};
+    CHECK(mrhiReadTexture(device, read, &(mrhiTextureCopy){.resource = single}, &extent,
+                          &requests[0]) == mrhi_success &&
+              mrhiReadTexture(device, read, &(mrhiTextureCopy){.resource = resolved}, &extent,
+                              &requests[1]) == mrhi_success,
+          "both read");
+    CHECK(mrhiEndPass(device, read) == mrhi_success, "read");
+    Finish(device, 2);
+    // 0.2, 0.4 and 0.6 sRGB-encoded; alpha stays linear.
+    static const uint8_t kEncoded[4] = {124, 170, 203, 204};
+    for (int i = 0; i < 2; ++i)
+    {
+        uint8_t texels[64];
+        size_t size = 0;
+        CHECK(mrhiTakeReadback(device, requests[i], texels, sizeof(texels), &size) ==
+                      mrhi_success &&
+                  size == sizeof(texels),
+              "the texels");
+        CHECK(!s_runs || (IsNear(&texels[0], kEncoded) && IsNear(&texels[60], kEncoded)),
+              i == 0 ? "the clear color encoded" : "the resolved clear color encoded");
+    }
+}
+
 // A counter-clockwise triangle with clockwise front faces and back
 // faces culled draws nothing.
 static void CheckCulling(Scene* scene)
@@ -2335,7 +2408,10 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
             CheckDrawFrame(&scene, DRAW_COUNTED);
         }
     });
-    RUN("transfers.clear", CheckClear(&scene));
+    RUN("transfers.clear", {
+        CheckClear(&scene);
+        CheckViewFormat(&scene);
+    });
     RUN("binding.culling", CheckCulling(&scene));
     RUN("api.queries", CheckQueries(&scene, timestamps));
     RUN("binding.render_state", CheckRenderState(&scene));

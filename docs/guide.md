@@ -156,7 +156,11 @@ program recovers by destroying the device and opening another;
 Device objects outlive frames: buffers (`mrhiCreateBuffer`), textures
 (`mrhiCreateTexture`) and their views (`mrhiCreateView`), samplers,
 query sets. A texture's usages are fixed at creation, and its view
-formats may name only its sRGB or linear twin. Destroying an object a
+formats may name only its sRGB or linear twin. A binding reads a
+texture in one of them, and a color target renders in one
+(`viewFormat`): a surface whose twin is reached as a view
+(`twinViews`), as a WebGPU canvas's is, takes sRGB-encoded output
+straight through it. Destroying an object a
 submitted frame still uses is safe: the driver retires it once that
 frame has finished.
 

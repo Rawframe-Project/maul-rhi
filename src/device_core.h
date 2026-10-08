@@ -609,6 +609,11 @@ uint32_t mrhiFindFrameResource(const mrhiDevice* device, mrhiResourceId id);
 bool mrhiResolveView(const mrhiTextureDef* texture, const mrhiViewDef* def,
                      mrhiViewDef* resolvedOut);
 
+// The format a view of a texture takes: the one given, or the texture's
+// for mrhi_formatNone; mrhi_formatNone when the texture lists no such
+// format.
+mrhiFormat mrhiViewFormatOf(const mrhiTextureDef* texture, mrhiFormat format);
+
 // Whether a frame resource is an imported device object.
 bool mrhiIsImported(const mrhiFrameResource* resource);
 

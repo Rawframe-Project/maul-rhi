@@ -465,6 +465,26 @@ static void TestTransient(void)
     plan = Plan(resolved);
     CHECK(!plan.transient, "what they resolve to is read later");
     CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    // WebGPU's transient attachments take no view formats.
+    Begin();
+    mrhiTextureDef twinDef = mrhiDefaultTextureDef();
+    twinDef.format = mrhi_formatRgba8Unorm;
+    twinDef.width = 64;
+    twinDef.height = 64;
+    twinDef.viewFormats[0] = mrhi_formatRgba8UnormSrgb;
+    mrhiResourceId twin = {0};
+    CHECK(mrhiDeclareTexture(s_device, &twinDef, &twin) == mrhi_success, "declared");
+    def.colorTargets[0] = (mrhiColorTarget){
+        .resource = twin,
+        .load = mrhi_loadClear,
+        .store = mrhi_storeDiscard,
+        .viewFormat = mrhi_formatRgba8UnormSrgb,
+    };
+    def.neverCull = true;
+    AddPass(def);
+    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(!Plan(twin).transient, "a target listing view formats is never transient");
+    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
     Begin();
     samples = Declare(mrhi_formatRgba8Unorm, 1, 1);
     def = mrhiDefaultPassDef();

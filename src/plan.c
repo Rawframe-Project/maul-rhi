@@ -269,8 +269,10 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
                            uses[i].state});
         }
     }
-    resource->transient =
-        resource->kind == mrhiFrameTexture && resource->firstPass != 0 && targetsOnly;
+    // A texture with view formats may be rendered in one, which WebGPU's
+    // transient attachments refuse.
+    resource->transient = resource->kind == mrhiFrameTexture && resource->firstPass != 0 &&
+                          targetsOnly && resource->texture.viewFormats[0] == mrhi_formatNone;
     // A surface image ends ready to present, a sealed object sealed, and
     // an imported object otherwise in its last use's state.
     if (resource->kind == mrhiSurfaceImage)

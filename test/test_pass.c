@@ -540,6 +540,51 @@ static void TestTargets(void)
     CHECK(mrhiDestroyTexture(s_device, sampledOnly) == mrhi_success, "done");
 }
 
+// A declared rgba8 texture of the samples, viewable in its sRGB twin
+// when asked.
+static mrhiResourceId DeclareTwin(uint32_t samples, bool twin)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = mrhi_formatRgba8Unorm;
+    def.width = 64;
+    def.height = 64;
+    def.sampleCount = samples;
+    def.viewFormats[0] = twin ? mrhi_formatRgba8UnormSrgb : mrhi_formatNone;
+    mrhiResourceId resource = {0};
+    CHECK(mrhiDeclareTexture(s_device, &def, &resource) == mrhi_success, "declared");
+    return resource;
+}
+
+// Color targets in a view format: the texture's own or one it lists,
+// a resolve texture listing it too.
+static void TestViewFormats(void)
+{
+    Begin();
+    mrhiResourceId twin = DeclareTwin(1, true);
+    mrhiResourceId plain = DeclareTwin(1, false);
+    mrhiResourceId samples = DeclareTwin(4, true);
+    mrhiColorTarget target = Color(twin, mrhi_loadClear);
+    target.viewFormat = mrhi_formatRgba8UnormSrgb;
+    CHECK(Add(Pass(target, nullptr, 0)) == mrhi_success, "its listed twin");
+    target.viewFormat = mrhi_formatRgba8Unorm;
+    CHECK(Add(Pass(target, nullptr, 0)) == mrhi_success, "its own format named");
+    target.viewFormat = mrhi_formatBgra8Unorm;
+    CHECK(Add(Pass(target, nullptr, 0)) == mrhi_errorInvalid, "a format it does not list");
+    target = Color(plain, mrhi_loadClear);
+    target.viewFormat = mrhi_formatRgba8UnormSrgb;
+    CHECK(Add(Pass(target, nullptr, 0)) == mrhi_errorInvalid, "a twin it does not list");
+    target = Color(samples, mrhi_loadClear);
+    target.viewFormat = mrhi_formatRgba8UnormSrgb;
+    target.resolve = twin;
+    CHECK(Add(Pass(target, nullptr, 0)) == mrhi_success, "resolved into a texture listing it");
+    target.resolve = plain;
+    CHECK(Add(Pass(target, nullptr, 0)) == mrhi_errorInvalid,
+          "resolved into a texture not listing it");
+    target.viewFormat = mrhi_formatNone;
+    CHECK(Add(Pass(target, nullptr, 0)) == mrhi_success, "both in their own format");
+    Drop();
+}
+
 // Imported buffers and textures: their usages, written as outputs and
 // read without a pass writing them first.
 static void TestImports(void)
@@ -746,6 +791,7 @@ int main(void)
     TestAccesses();
     TestScopes();
     TestTargets();
+    TestViewFormats();
     TestImports();
     TestStaleAndLimits();
     TestViews();
