@@ -10,6 +10,7 @@
 #include "maul-rhi/test.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 static int s_allocations;
 
@@ -93,11 +94,17 @@ static void TestOpensLater(void)
     mrhiDeviceDef def = Def(adapter);
     def.features.shaderF16 = true;
     def.limits.textureDimension2d = 16384;
+    def.deviceLimits.frameUploadBytes = 3u << 20;
+    def.deviceLimits.diagnostics = 5;
     mrhiDevice* device = nullptr;
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "made");
     CHECK(device != nullptr && request.index1 != 0, "a device and a request");
     CHECK(mrhiGetDeviceState(device) == mrhi_deviceOpening, "opening until the drain");
+    mrhiDeviceLimits own;
+    CHECK(mrhiGetDeviceOwnLimits(device, &own) == mrhi_success &&
+              memcmp(&own, &def.deviceLimits, sizeof(own)) == 0,
+          "its own limits as asked, while opening");
     CHECK(Ready(instance, request) == mrhi_success, "ready");
     CHECK(mrhiGetDeviceState(device) == mrhi_deviceReady, "ready after it");
     mrhiFeatures features;
@@ -302,7 +309,10 @@ static void TestDeviceAllocatorAndMisuse(void)
     CHECK(s_allocations == 2, "the device's own allocator, for the core and the driver");
     CHECK(mrhiGetDeviceFeatures(device, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiGetDeviceLimits(device, nullptr) == mrhi_errorInvalid, "no out");
-    CHECK(mrhiGetDeviceMisuse(device) == 2 && mrhiGetDeviceMisuse(nullptr) == 0, "counted");
+    CHECK(mrhiGetDeviceOwnLimits(device, nullptr) == mrhi_errorInvalid, "no out");
+    mrhiDeviceLimits own;
+    CHECK(mrhiGetDeviceOwnLimits(nullptr, &own) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiGetDeviceMisuse(device) == 3 && mrhiGetDeviceMisuse(nullptr) == 0, "counted");
     CHECK(mrhiGetDeviceState(nullptr) == mrhi_deviceFailed, "no device");
     mrhiDestroyDevice(device);
     CHECK(s_allocations == 0, "returned");

@@ -774,6 +774,7 @@ restricted or absent-rejected, with how.
 | `mrhiGetDeviceState` | reads the library's lifecycle of the device |
 | `mrhiGetDeviceFeatures` | reads what the library granted |
 | `mrhiGetDeviceLimits` | reads what the library granted |
+| `mrhiGetDeviceOwnLimits` | reads what the device was made with |
 | `mrhiGetDeviceMisuse` | reads the library's misuse count |
 | `mrhiNextDeviceDiagnostic` | reads the library's own diagnostic queue |
 | `mrhiGetDeviceLossReport` | reads what the library kept of the loss |

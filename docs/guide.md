@@ -123,7 +123,10 @@ All memory is taken up front, through the def's allocator, from limits
 the def names: the instance's (`mrhiInstanceLimits`) and the device's
 (`mrhiDeviceLimits`: objects, frame resources, passes, accesses,
 command, upload and readback bytes). Each owner object takes its memory
-from its own allocator; a zeroed allocator is the C library's.
+from its own allocator; a zeroed allocator is the C library's. A
+library handed a device reads its budgets back with
+`mrhiGetDeviceOwnLimits`, as it reads the GPU's with
+`mrhiGetDeviceLimits`.
 
 ## 3. Adapters, features and limits
 

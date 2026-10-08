@@ -549,6 +549,17 @@ mrhiResult mrhiGetDeviceLimits(mrhiDevice* device, mrhiLimits* limitsOut)
     return mrhi_success;
 }
 
+mrhiResult mrhiGetDeviceOwnLimits(mrhiDevice* device, mrhiDeviceLimits* limitsOut)
+{
+    if (device == nullptr || limitsOut == nullptr)
+    {
+        return device == nullptr ? mrhi_errorInvalid
+                                 : mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
+    }
+    *limitsOut = device->deviceLimits;
+    return mrhi_success;
+}
+
 mrhiResult mrhiGetDeviceTimestampPeriod(mrhiDevice* device, double* periodOut)
 {
     if (device == nullptr || periodOut == nullptr)

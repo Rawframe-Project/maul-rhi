@@ -16,6 +16,10 @@ format.
   reached through its twin view, as a WebGPU canvas is, with no copy
   through a staging texture. A pipeline matches the view format; a
   resolve texture is viewed in it too. The struct grows.
+- `mrhiGetDeviceOwnLimits` reads back the limits of its own bookkeeping
+  a device was made with (`mrhiDeviceLimits`), so a library handed a
+  device learns its frame upload budget and the rest without being
+  told twice.
 
 ## [0.4.0] - 2026-10-08
 

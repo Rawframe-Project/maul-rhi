@@ -6677,6 +6677,34 @@
         },
         {
           "kind": "function",
+          "name": "get_device_own_limits",
+          "doc": "Reads the limits of its own bookkeeping a device was made with, as asked: object counts, frame command and upload bytes, readbacks, diagnostics. A library given a device learns its budgets here.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`, in any device state; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "limits_out",
+              "type": "struct.device_limits",
+              "pointer": "mutable",
+              "doc": "Receives the limits."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "library": "reads what the device was made with"
+        },
+        {
+          "kind": "function",
           "name": "get_device_timestamp_period",
           "doc": "Reads the nanoseconds one tick of the device's timestamps takes: 1 where the API reports nanoseconds already.",
           "returns": {

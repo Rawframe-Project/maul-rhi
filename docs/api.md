@@ -100,6 +100,11 @@ MRHI_NODISCARD MRHI_API mrhiResult mrhiGetDeviceLimits(mrhiDevice* device, mrhiL
 Reads the limits a device was granted.  @param device     The device. @param limitsOut  Receives the limits. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread; the device is used by one thread at a time.
 
 ```c
+MRHI_NODISCARD MRHI_API mrhiResult mrhiGetDeviceOwnLimits(mrhiDevice* device, mrhiDeviceLimits* limitsOut);
+```
+Reads the limits of its own bookkeeping a device was made with, as asked: object counts, frame command and upload bytes, readbacks, diagnostics. A library given a device learns its budgets here.  @param device     The device. @param limitsOut  Receives the limits. @return `mrhi_success`, in any device state; `mrhi_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread; the device is used by one thread at a time.
+
+```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiGetDeviceTimestampPeriod(mrhiDevice* device, double* periodOut);
 ```
 Reads the nanoseconds one tick of the device's timestamps takes: 1 where the API reports nanoseconds already.  @param device     The device. @param periodOut  Receives the nanoseconds per tick. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a device without the timestamp_query feature. @par Thread safety Safe from any thread; the device is used by one thread at a time.
@@ -771,4 +776,4 @@ Hands a native pass the command buffer the program recorded for it: a primary Vk
 
 ---
 
-142 functions across 15 headers.
+143 functions across 15 headers.
