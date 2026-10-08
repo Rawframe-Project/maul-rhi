@@ -1,0 +1,12 @@
+{
+  "root_block_bytes": 0,
+  "entries": [{"name": "cs", "stage": "compute", "workgroup": [4, 1, 1]}],
+  "bindings": [
+    {"table": 0, "slot": 0, "kind": "read_only_storage_buffer", "stages": ["compute"],
+     "min_size": 4},
+    {"table": 0, "slot": 1, "kind": "storage_buffer", "stages": ["compute"], "min_size": 4},
+    {"table": 0, "slot": 2, "kind": "storage_texture", "stages": ["compute"],
+     "access": "write_only", "format": "rgba8_unorm", "view_dimension": "2d"}
+  ],
+  "constants": []
+}

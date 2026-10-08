@@ -30,6 +30,7 @@
 #include "shaders/bindless_container.h"
 #include "shaders/conformance_container.h"
 #include "shaders/multiview_container.h"
+#include "shaders/storage_container.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -1364,7 +1365,9 @@ static void MakePlaced(Scene* scene, mrhiShaderId shader)
           "a pipeline writing depth and stencil");
     def.depthWrite = false;
     def.depthBias = 0;
-    def.stencilFront = (mrhiStencilFace){.compare = mrhi_compareEqual};
+    // A failed stencil test clears the stencil, which CheckRenderState
+    // reads back.
+    def.stencilFront = (mrhiStencilFace){.compare = mrhi_compareEqual, .failOp = mrhi_stencilZero};
     def.stencilBack = def.stencilFront;
     def.colorTargets[0].blend = true;
     def.colorTargets[0].color = (mrhiBlendComponent){
@@ -1691,6 +1694,84 @@ static void CheckSlicedMemory(mrhiDevice* device, bool webGpu)
     CHECK(!s_runs || (volume >= 4704 && array >= 5504), "a texture's texels at least");
     CHECK(!webGpu || (volume == 4704 && array == 5504),
           "a volume's and an array's texels exactly, on WebGPU");
+}
+
+// The binding kinds the scene leaves out (the storage container): four
+// values read from a read-only storage buffer, each doubled plus one
+// into a storage buffer and stored as red into a row of a write-only
+// rgba8 storage texture.
+static void CheckStorageBindings(mrhiDevice* device)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_storageContainer;
+    shaderDef.byteCount = sizeof(s_storageContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "the storage shader");
+    mrhiComputePipelineDef pipelineDef = mrhiDefaultComputePipelineDef();
+    pipelineDef.shader = shader;
+    pipelineDef.entry = "cs";
+    pipelineDef.entryLength = 2;
+    mrhiComputePipelineId pipeline = {0};
+    mrhiRequestId request = {0};
+    CHECK(mrhiCreateComputePipeline(device, &pipelineDef, &pipeline, &request) == mrhi_success,
+          "its pipeline");
+    AwaitPipelines(device, 1, 0);
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
+    bufferDef.size = 16;
+    mrhiTextureDef textureDef = mrhiDefaultTextureDef();
+    textureDef.format = mrhi_formatRgba8Unorm;
+    textureDef.width = 4;
+    textureDef.height = 1;
+    mrhiResourceId inputs = {0};
+    mrhiResourceId outputs = {0};
+    mrhiResourceId image = {0};
+    CHECK(mrhiDeclareBuffer(device, &bufferDef, &inputs) == mrhi_success &&
+              mrhiDeclareBuffer(device, &bufferDef, &outputs) == mrhi_success &&
+              mrhiDeclareTexture(device, &textureDef, &image) == mrhi_success,
+          "the buffers and the texture");
+    mrhiAccess upload = Whole(inputs, mrhi_accessCopyDestination);
+    mrhiPassId copy = CopyPass(device, &upload, 1);
+    mrhiAccess uses[3] = {Whole(inputs, mrhi_accessStorageRead),
+                          Whole(outputs, mrhi_accessStorageWrite),
+                          Whole(image, mrhi_accessStorageWrite)};
+    mrhiPassId dispatch = CopyPass(device, uses, 3);
+    mrhiAccess reads[2] = {Whole(outputs, mrhi_accessCopySource),
+                           Whole(image, mrhi_accessCopySource)};
+    mrhiPassId read = CopyPass(device, reads, 2);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    const uint32_t values[4] = {0, 51, 102, 255};
+    const mrhiBinding bindings[3] = {
+        {.slot = 0, .resource = inputs, .size = MRHI_WHOLE_SIZE},
+        {.slot = 1, .resource = outputs, .size = MRHI_WHOLE_SIZE},
+        {.slot = 2, .resource = image, .range = {.mipCount = 1, .layerCount = 1}},
+    };
+    mrhiRequestId results[2] = {0};
+    CHECK(mrhiBeginPass(device, copy) == mrhi_success &&
+              mrhiWriteBuffer(device, copy, inputs, 0, values, sizeof(values)) == mrhi_success &&
+              mrhiEndPass(device, copy) == mrhi_success &&
+              mrhiBeginPass(device, dispatch) == mrhi_success &&
+              mrhiSetComputePipeline(device, dispatch, pipeline) == mrhi_success &&
+              mrhiSetBindings(device, dispatch, 0, bindings, 3) == mrhi_success &&
+              mrhiDispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
+              mrhiEndPass(device, dispatch) == mrhi_success &&
+              mrhiBeginPass(device, read) == mrhi_success &&
+              mrhiReadBuffer(device, read, outputs, 0, sizeof(values), &results[0]) ==
+                  mrhi_success &&
+              mrhiReadTexture(device, read, &(mrhiTextureCopy){.resource = image},
+                              &(mrhiExtent3d){4, 1, 1}, &results[1]) == mrhi_success &&
+              mrhiEndPass(device, read) == mrhi_success,
+          "uploaded, dispatched and read");
+    Finish(device, 2);
+    const uint32_t doubled[4] = {1, 103, 205, 511};
+    const uint8_t red[16] = {0, 0, 0, 255, 51, 0, 0, 255, 102, 0, 0, 255, 255, 0, 0, 255};
+    CHECK(Taken(device, results[0], (const uint8_t*)doubled, sizeof(doubled)),
+          "each value read from the read-only buffer, doubled plus one");
+    CHECK(Taken(device, results[1], red, sizeof(red)), "each value stored as red in the texture");
+    CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
+              mrhiDestroyShader(device, shader) == mrhi_success,
+          "destroyed");
 }
 
 // A texel of 188 sampled through the texture's sRGB twin decodes to
@@ -2171,7 +2252,8 @@ static void DrawPlaced(const Scene* scene, mrhiPassId pass, mrhiResourceId verti
 // kept for a second that loads them and draws, from indirect arguments
 // past a draw of nothing, blue scaled by the blend constant only where
 // both tests pass, which is the lower right: the left half stays red,
-// the upper right black.
+// the upper right black. The stencil test fails everywhere else and
+// clears the stencil there: 0 but for 2 in the lower right.
 static void CheckRenderState(Scene* scene)
 {
     mrhiDevice* device = scene->device;
@@ -2195,8 +2277,8 @@ static void CheckRenderState(Scene* scene)
         PlacedPass(scene, z, false, Whole(v, mrhi_accessVertex), Whole(i, mrhi_accessIndex));
     mrhiPassId tested =
         PlacedPass(scene, z, true, Whole(v, mrhi_accessVertex), Whole(a, mrhi_accessIndirect));
-    mrhiAccess read = Whole(scene->t, mrhi_accessCopySource);
-    mrhiPassId reading = CopyPass(device, &read, 1);
+    mrhiAccess read[2] = {Whole(scene->t, mrhi_accessCopySource), Whole(z, mrhi_accessCopySource)};
+    mrhiPassId reading = CopyPass(device, read, 2);
     CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
     CHECK(mrhiBeginPass(device, upload) == mrhi_success &&
               mrhiWriteBuffer(device, upload, v, 0, kPlaced, sizeof(kPlaced)) == mrhi_success &&
@@ -2220,13 +2302,28 @@ static void CheckRenderState(Scene* scene)
           "tested");
     CHECK(mrhiBeginPass(device, reading) == mrhi_success, "reading");
     mrhiRequestId pixels = ReadTarget(scene, reading);
+    mrhiRequestId stencil = {0};
+    CHECK(mrhiReadTexture(device, reading,
+                          &(mrhiTextureCopy){.resource = z, .aspect = mrhi_aspectStencilOnly},
+                          &(mrhiExtent3d){8, 8, 1}, &stencil) == mrhi_success,
+          "the stencil read");
     CHECK(mrhiEndPass(device, reading) == mrhi_success, "read");
-    Finish(device, 1);
+    Finish(device, 2);
     uint8_t image[256];
     size_t size = 0;
     CHECK(mrhiTakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success &&
               size == sizeof(image),
           "the pixels");
+    uint8_t stencils[64];
+    CHECK(mrhiTakeReadback(device, stencil, stencils, sizeof(stencils), &size) == mrhi_success &&
+              size == sizeof(stencils),
+          "the stencil values");
+    bool cleared = true;
+    for (int at = 0; at < 64 && s_runs; ++at)
+    {
+        cleared = cleared && stencils[at] == (at % 8 >= 4 && at / 8 >= 4 ? 2 : 0);
+    }
+    CHECK(cleared, "the stencil cleared where its test failed, 2 where it passed");
     static const uint8_t kRed[4] = {255, 0, 0, 255};
     static const uint8_t kBlue[4] = {0, 0, 153, 255};
     bool right = true;
@@ -2541,7 +2638,10 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     RUN("binding.culling", CheckCulling(&scene));
     RUN("api.queries", CheckQueries(&scene, timestamps));
     RUN("binding.render_state", CheckRenderState(&scene));
-    RUN("binding.compute_split", CheckComputeSplit(&scene, timestamps));
+    RUN("binding.compute_split", {
+        CheckComputeSplit(&scene, timestamps);
+        CheckStorageBindings(device);
+    });
     if (features.pipelineStatisticsQuery)
     {
         RUN("api.statistics", CheckStatistics(&scene));
