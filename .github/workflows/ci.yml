@@ -21,7 +21,9 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q clang-20 clang-tidy-20 ninja-build
+          # clang without its recommends: llvm-20-dev alone is 50 MB.
+          sudo apt-get install -y -q --no-install-recommends clang-20 clang-tidy-20
+          sudo apt-get install -y -q ninja-build
           pip install clang-format==22.1.5 >/dev/null
       - name: clang-format
         run: |
@@ -80,7 +82,10 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q gcc-14 g++-14 clang-20 ninja-build \
+          # clang without its recommends (llvm-20-dev alone is 50 MB), with
+          # the sanitizers' runtime.
+          sudo apt-get install -y -q --no-install-recommends clang-20 libclang-rt-20-dev
+          sudo apt-get install -y -q gcc-14 g++-14 ninja-build \
             mesa-vulkan-drivers vulkan-validationlayers libxcb1-dev xvfb
       - name: Configure
         run: |
@@ -279,7 +284,8 @@ jobs:
       - name: Install the compiler, lavapipe, Xvfb, weston and Maul Window's files
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q clang-20 ninja-build mesa-vulkan-drivers \
+          sudo apt-get install -y -q --no-install-recommends clang-20 libclang-rt-20-dev
+          sudo apt-get install -y -q ninja-build mesa-vulkan-drivers \
             vulkan-validationlayers xvfb weston libwayland-dev wayland-protocols \
             libxcb1-dev libxcb-randr0-dev libxcb-xkb-dev libxcb-cursor-dev \
             libxcb-render0-dev libxcb-xinput-dev libxkbcommon-dev libxkbcommon-x11-dev
@@ -389,7 +395,9 @@ jobs:
       - name: Install compilers
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q clang-20 ninja-build
+          # libFuzzer's runtime, which clang only recommends.
+          sudo apt-get install -y -q --no-install-recommends clang-20 libclang-rt-20-dev
+          sudo apt-get install -y -q ninja-build
       - name: Build
         run: |
           cmake -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -D${PREFIX}_FUZZ=ON \
@@ -554,7 +562,8 @@ jobs:
       - name: Toolchain
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q clang-20 lld-20 wasi-libc libclang-rt-20-dev-wasm32
+          sudo apt-get install -y -q --no-install-recommends clang-20 lld-20 wasi-libc \
+            libclang-rt-20-dev-wasm32
       - name: Configure
         run: |
           cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake -DCMAKE_C_COMPILER=clang-20 \
