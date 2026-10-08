@@ -6,7 +6,7 @@
 include(FetchContent)
 FetchContent_Declare(maul-window
     GIT_REPOSITORY https://github.com/Rawframe-Project/maul-window.git
-    GIT_TAG v0.9.0
+    GIT_TAG v0.9.1
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(maul-window)
 
