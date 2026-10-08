@@ -274,7 +274,7 @@ jobs:
           LVP_POISON_MEMORY: "true"
         run: |
           if [ "$RUNNER_OS" = Linux ]; then run="xvfb-run -a"; else run=""; fi
-          $run ctest --test-dir build --output-on-failure
+          $run ctest --test-dir build --output-on-failure --timeout 300
 
   seam:
     # The seam with Maul Window (mrhi-0028): Maul Window fetched at its
@@ -307,12 +307,12 @@ jobs:
           VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
         run: |
           echo "== X11"
-          xvfb-run -a ctest --test-dir build -R '^seam$' --output-on-failure
+          xvfb-run -a ctest --test-dir build -R '^seam$' --output-on-failure --timeout 300
           echo "== Wayland"
           export XDG_RUNTIME_DIR=$(mktemp -d)
           weston --backend=headless --socket=wayland-seam --idle-time=0 &
           for i in $(seq 1 40); do [ -S "$XDG_RUNTIME_DIR/wayland-seam" ] && break; sleep 0.25; done
-          WAYLAND_DISPLAY=wayland-seam ctest --test-dir build -R '^seam$' --output-on-failure
+          WAYLAND_DISPLAY=wayland-seam ctest --test-dir build -R '^seam$' --output-on-failure --timeout 300
 
   # Each fuzz target runs for one minute on every push, over the bytes
   # programs load from disk and hand the library, from its seed.
@@ -433,7 +433,7 @@ jobs:
       - name: Build
         run: cmake --build build --config Release -j 4
       - name: Test
-        run: ctest --test-dir build -C Release --output-on-failure
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 300
       # The public headers alone under MSVC's cl, as C17 and C++17 with
       # /W4 /WX, which cannot build the library itself (family record 0008).
       - name: Headers under MSVC
@@ -555,7 +555,7 @@ jobs:
           MAUL_RHI_REQUIRE_BINDLESS: "1"
           MAUL_RHI_REQUIRE_STATISTICS: "1"
           MAUL_RHI_D3D12_DEBUG: "1"
-        run: ctest --test-dir build -C Debug --output-on-failure
+        run: ctest --test-dir build -C Debug --output-on-failure --timeout 300
 
   web-wasi:
     # The web without Emscripten (mrhi-0016): Clang's wasm32-wasi, the
@@ -583,7 +583,7 @@ jobs:
         env:
           MRHI_NODE_MODULES: /tmp/browser/node_modules
           MAUL_RHI_REQUIRE_WEBGPU: "1"
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --timeout 300
 
   web:
     name: web-emscripten
@@ -615,7 +615,7 @@ jobs:
         env:
           MRHI_NODE_MODULES: /tmp/browser/node_modules
           MAUL_RHI_REQUIRE_WEBGPU: "1"
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --timeout 300
       - name: Seam
         # The seam with Maul Window (mrhi-0028): its canvas, named by the
         # window's handles, presented to; it must not be skipped.
@@ -623,7 +623,7 @@ jobs:
           MRHI_NODE_MODULES: /tmp/browser/node_modules
           MAUL_RHI_REQUIRE_WEBGPU: "1"
           MAUL_RHI_REQUIRE_SURFACE: "1"
-        run: ctest --test-dir build -R '^seam$' --output-on-failure
+        run: ctest --test-dir build -R '^seam$' --output-on-failure --timeout 300
       - name: Size
         # The wasm budget (mrhi-0001): the library at -Oz without its
         # tests, every public function kept.
