@@ -1643,8 +1643,8 @@ static void CheckDrawFrame(Scene* scene, DrawMode mode)
     CHECK(Taken(device, scaled, (const uint8_t*)values, sizeof(values)), "scaled by 3");
 }
 
-// The frame memory one declared 64 by 64 texture of 64 slices or
-// layers and 4 mips takes, copied to in a pass never culled.
+// The frame memory one declared 4 by 64 texture of 4 slices or layers
+// and 4 mips takes, copied to in a pass never culled.
 static uint64_t SlicedBytes(mrhiDevice* device, mrhiTextureKind kind)
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
@@ -1652,9 +1652,9 @@ static uint64_t SlicedBytes(mrhiDevice* device, mrhiTextureKind kind)
     mrhiTextureDef def = mrhiDefaultTextureDef();
     def.kind = kind;
     def.format = mrhi_formatRgba8Unorm;
-    def.width = 64;
+    def.width = 4;
     def.height = 64;
-    def.depthOrLayers = 64;
+    def.depthOrLayers = 4;
     def.mipLevels = 4;
     mrhiResourceId texture = {0};
     CHECK(mrhiDeclareTexture(device, &def, &texture) == mrhi_success, "a texture");
@@ -1676,17 +1676,21 @@ static uint64_t SlicedBytes(mrhiDevice* device, mrhiTextureKind kind)
     return bytes;
 }
 
-// A volume's mips halve its depth too, an array's keep their layers: at
-// 4 mips the volume takes 1,198,080 bytes of texels and the array
-// 1,392,640, apart by more than any alignment. The volume is declared
-// first, so a driver measuring every texture as one kind fails.
-static void CheckSlicedMemory(mrhiDevice* device)
+// A volume's mips halve its depth too, an array's keep their layers,
+// and an edge that halves below one texel stays one: at 4 mips the
+// volume holds 1,176 texels (1,024, 128, 16 and 8) and the array 1,376
+// (1,024, 256, 64 and 32), 4 bytes each, which every driver's memory
+// holds at least. WebGPU's
+// measure is the texels themselves, so there they are exact; native
+// drivers pad as their GPUs lay textures out (Metal pads volumes).
+static void CheckSlicedMemory(mrhiDevice* device, bool webGpu)
 {
     uint64_t volume = SlicedBytes(device, mrhi_texture3d);
     uint64_t array = SlicedBytes(device, mrhi_texture2dArray);
     // The test driver doubles any mipped texture's texels.
-    CHECK(!s_runs || (volume >= 1198080 && array >= 1392640 && volume < array),
-          "a volume's mips take less than an array's");
+    CHECK(!s_runs || (volume >= 4704 && array >= 5504), "a texture's texels at least");
+    CHECK(!webGpu || (volume == 4704 && array == 5504),
+          "a volume's and an array's texels exactly, on WebGPU");
 }
 
 // A texel of 188 sampled through the texture's sRGB twin decodes to
@@ -2803,7 +2807,9 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     RUN("api.objects", CheckObjects(device, asked->timestampQuery));
     RUN("hazards.frame_memory", {
         CheckFrameMemory(device);
-        CheckSlicedMemory(device);
+        mrhiAdapterInfo info = {0};
+        CHECK(mrhiGetAdapterInfo(instance, adapter, &info) == mrhi_success, "its driver");
+        CheckSlicedMemory(device, info.driver == mrhi_driverWebGpu);
     });
     RUN("hazards.transient_twin", CheckTransientTwin(device));
     RUN("api.pipelines", CheckPipelines(device));
