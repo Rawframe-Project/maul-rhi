@@ -122,7 +122,9 @@ typedef struct mrhiD3d12Entry
 } mrhiD3d12Entry;
 
 // A checked container: its digest and root block, its sections in the
-// caller's bytes, whether it uses 16-bit floats, and the builtins and
+// caller's bytes, whether it uses 16-bit floats (in its interface or its
+// SPIR-V's capabilities), subgroup operations and 64-bit integers, and the
+// builtins and
 // heap uses of its entries together; the WGSL is absent (NULL, 0 bytes)
 // exactly when an entry uses a heap. The Metal map is NULL without Metal
 // code, and the MSL and metallib each NULL and 0 bytes when absent; the
@@ -132,6 +134,8 @@ typedef struct mrhiContainer
     uint8_t digest[MRHI_DIGEST_BYTES];
     uint32_t rootBlockBytes;
     bool float16;
+    bool subgroups;
+    bool int64;
     mrhiShaderBuiltins builtins;
     mrhiShaderHeapUses heapUses;
     const uint8_t* strings;

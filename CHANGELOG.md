@@ -10,6 +10,13 @@ format.
 
 ### Fixed
 
+- `mrhiCreateShader` refuses as unsupported a container whose SPIR-V
+  declares 16-bit floats or 16-bit storage, 64-bit integers or subgroup
+  operations on a device without `shaderF16`, `shaderInt64` or
+  `subgroups`. It saw 16-bit floats only in a container's interface, so
+  a compute shader using any of them reached a driver that had not
+  enabled them.
+
 - The D3D12 driver reported Microsoft's Basic Render Driver (WARP) as
   a hardware adapter where DXGI listed it without its software flag,
   as on GitHub's hosted Windows runner. WARP is now software by its

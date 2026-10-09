@@ -1003,6 +1003,84 @@ static void TestFeatures(void)
     Close(device);
 }
 
+// The SPIR-V instructions after the header, a word each.
+static void Instructions(const uint32_t* words, size_t count)
+{
+    uint8_t* spirv = Record(SPIRV, 0, 20 + count * 4);
+    for (size_t i = 0; i < count; ++i)
+    {
+        Put32(spirv + 20 + i * 4, words[i]);
+    }
+}
+
+// OpCapability's first word: two words long, opcode 17.
+#define CAPABILITY (2u << 16 | 17u)
+
+// The container's features from the capabilities its SPIR-V declares
+// first.
+static mrhiContainer Declaring(const uint32_t* words, size_t count)
+{
+    Reset();
+    Instructions(words, count);
+    Assemble();
+    mrhiContainer container = {0};
+    CHECK(mrhiParseContainer(s_container, s_size, &container) == mrhi_success, "it parses");
+    return container;
+}
+
+// The capabilities a container's SPIR-V declares, the features they
+// need, and the shaders a device makes of them with and without them.
+static void TestCapabilities(void)
+{
+    static const struct
+    {
+        uint32_t capability;
+        bool float16;
+        bool subgroups;
+        bool int64;
+    } cases[] = {
+        {9, true, false, false},     {4433, true, false, false},  {4436, true, false, false},
+        {4432, false, false, false}, {4437, false, false, false}, {11, false, false, true},
+        {10, false, false, false},   {12, false, false, false},   {61, false, true, false},
+        {68, false, true, false},    {60, false, false, false},   {69, false, false, false},
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+    {
+        const uint32_t words[] = {CAPABILITY, 1, CAPABILITY, cases[i].capability};
+        mrhiContainer container = Declaring(words, 4);
+        CHECK(container.float16 == cases[i].float16 && container.subgroups == cases[i].subgroups &&
+                  container.int64 == cases[i].int64,
+              "a capability and the feature it needs");
+    }
+    const uint32_t after[] = {CAPABILITY, 1, 3u << 16 | 14u, 0, 1, CAPABILITY, 9};
+    CHECK(!Declaring(after, 7).float16, "the list ends at the first other instruction");
+    const uint32_t empty[] = {17u, 9, CAPABILITY, 9};
+    CHECK(!Declaring(empty, 4).float16, "a word count of 0 ends it");
+    const uint32_t longer[] = {3u << 16 | 17u, 9, 0, CAPABILITY, 9};
+    CHECK(!Declaring(longer, 5).float16, "an OpCapability of another length ends it");
+    const uint32_t cut[] = {CAPABILITY};
+    CHECK(!Declaring(cut, 1).float16, "a capability cut by the module's end is not read");
+    static const uint32_t needs[3] = {9, 61, 11};
+    for (uint32_t i = 0; i < 3; ++i)
+    {
+        const uint32_t words[] = {CAPABILITY, needs[i]};
+        (void)Declaring(words, 2);
+        mrhiShaderDef def = Def();
+        mrhiShaderId shader;
+        mrhiDevice* device = Open(2, true);
+        CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported,
+              "code needing a feature the device lacks");
+        Close(device);
+        mrhiFeatures features = {.shaderF16 = i == 0, .subgroups = i == 1, .shaderInt64 = i == 2};
+        s_adapter.features = features;
+        mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+        deviceDef.features = features;
+        device = OpenWith(deviceDef, true);
+        CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "with the feature");
+        Close(device);
+    }
+}
+
 // A device granting bindless sampling, and heterogeneous heaps when
 // asked.
 static mrhiDevice* OpenBindless(bool heterogeneous)
@@ -1366,6 +1444,7 @@ int main(int argc, char** argv)
     TestCreate();
     TestRefusals();
     TestFeatures();
+    TestCapabilities();
     TestHeapFeatures();
     TestLimits();
     TestTableSize();

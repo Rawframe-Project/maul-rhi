@@ -13,6 +13,7 @@
 #include "capabilities_core.h"
 #include "label.h"
 #include "sha256.h"
+#include "spirv_caps.h"
 
 #include <stdckdint.h>
 #include <string.h>
@@ -982,6 +983,8 @@ mrhiResult mrhiParseContainer(const void* bytes, size_t size, mrhiContainer* con
     {
         return mrhi_errorInvalid;
     }
+    mrhiReadSpirvCapabilities(container.spirv, container.spirvBytes, &container.float16,
+                              &container.subgroups, &container.int64);
     *containerOut = container;
     return mrhi_success;
 }

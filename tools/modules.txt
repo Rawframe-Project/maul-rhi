@@ -88,6 +88,7 @@ compile: device_core
 plan: device_core
 memory: device_core
 sha256:
+spirv_caps: bytes
 stage_limits:
 tlsf: invariant
 command:
@@ -103,7 +104,7 @@ submit: device_core invariant
 copy_core: capabilities_core encoder_core
 cache: bytes device_core sha256
 bytes:
-container: bytes capabilities_core label sha256
+container: bytes capabilities_core label sha256 spirv_caps
 shader: container device_core label
 reflection: allocator container
 pipeline: device_core invariant label pipeline_core

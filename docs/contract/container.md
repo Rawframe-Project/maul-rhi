@@ -265,6 +265,13 @@ device:
   with the builtins `front_facing`, `sample_index`, `sample_mask` and
   `primitive_index` counted, than the limit;
 - 16-bit floats without `shaderF16`, or `mrhi_builtinPrimitiveIndex`;
+- code needing a feature the device lacks, by the capabilities its
+  SPIR-V declares (a module lists them before any other instruction):
+  `Float16` and the 16-bit storage capabilities (4433 to 4436) need
+  `shaderF16`, `Int64` needs `shaderInt64`, and `GroupNonUniform` to
+  `GroupNonUniformQuad` (61 to 68) need `subgroups`. The other forms of
+  the code are made from the same SPIR-V offline, so they need what it
+  needs;
 - heap uses without `bindless_sampling`, or storage textures or buffers
   from the heap without `bindless_heterogeneous`.
 
