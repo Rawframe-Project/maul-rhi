@@ -38,7 +38,7 @@ Checked by: review.
 | `src/` | Implementation and internal headers. |
 | `test/` | Test suites, one executable per suite. |
 | `bench/` | Benchmarks. |
-| `samples/` | Small standalone programs that use the installed package. |
+| `samples/` | Programs that use the library as a host does: standalone ones built against the installed package, and ones built in the tree that run as tests. |
 | `testbed/` | Interactive or visual tools. Not part of the library. |
 | `tools/` | Developer scripts, command-line tools and generators. |
 | `cmake/` | CMake modules and package templates. |
@@ -386,9 +386,27 @@ recognizes).
 - `CHANGELOG.md` follows Keep a Changelog. Every user-visible change
   adds a line under `[Unreleased]` in the same commit, in the section
   order Added, Changed, Deprecated, Removed, Fixed, Security.
-- Releases are tags `vX.Y.Z` on `main`. Before a release, the family
-  drift check (`family_sync.py --check`, run from the family's docs
-  repository) reports no difference for the library.
+- Releases are tags `vX.Y.Z` on `main`, made by following the release
+  checklist below in order. A library with steps of its own (a size
+  budget, recorded runs on devices) lists them in its
+  `docs/releasing.md`, linked from its README, and takes them between
+  steps 4 and 5.
+
+The release checklist:
+
+1. `CHANGELOG.md`: `[Unreleased]` becomes `[X.Y.Z] - YYYY-MM-DD`, with
+   a line saying what the release is, and an empty `[Unreleased]`
+   starts above it.
+2. The `PP_VERSION_*` macros are `X.Y.Z`, and the README's status
+   names the release.
+3. The family drift check (`family_sync.py --check`, run from the
+   family's docs repository) reports no difference for the library.
+4. These changes are one commit, `release: X.Y.Z`, and CI is green on
+   it in every job.
+5. An annotated tag `vX.Y.Z` on that commit is pushed, and a release
+   on the hosting site carries the changelog section as its notes.
+6. A library that pins this one (a seam check, a fetched dependency)
+   moves its pin in a commit of its own when it needs the release.
 
 Checked by: review; the release checklist.
 
