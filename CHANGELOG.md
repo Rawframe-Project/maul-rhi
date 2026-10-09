@@ -8,6 +8,11 @@ format.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-09
+
+Every optional feature a driver grants now has a conformance case, and
+dual-source blending, granted before but unreachable, can be used.
+
 ### Added
 
 - Conformance cases for 16-bit floats, subgroup operations and 64-bit
@@ -29,6 +34,10 @@ format.
 
 ### Changed
 
+- The contract version is 4 (`MRHI_CONTRACT_VERSION`): 0.5.0 grew
+  `mrhiColorTarget` (its view format) without raising it, so an instance
+  now refuses a program built against 0.5.0's headers or older with
+  `mrhi_errorVersion`.
 - The driver SPI is version 5 (`MRHI_SPI_VERSION`): the container a
   driver reads tells the shader features its code needs and each color
   output's blend source. Its mustpass list is
