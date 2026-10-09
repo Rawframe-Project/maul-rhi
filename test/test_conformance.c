@@ -552,6 +552,15 @@ static Case* BeginCase(const char* name)
     return nullptr;
 }
 
+// The D3D12 debug layer's errors so far, which validation.clean counts:
+// a case they come in is named, as a case waits for its own work and
+// the GPU-based validation reports when that work is done.
+#ifdef MAUL_RHI_D3D12_DRIVER
+#define DEBUG_ERRORS() mrhiTestD3d12Errors()
+#else
+#define DEBUG_ERRORS() 0u
+#endif
+
 // Runs a call as a case, counting its failures against it.
 #define RUN(name, call)                                                                            \
     do                                                                                             \
@@ -560,9 +569,14 @@ static Case* BeginCase(const char* name)
         if (run_ != nullptr)                                                                       \
         {                                                                                          \
             int before_ = s_failures;                                                              \
+            uint32_t errors_ = DEBUG_ERRORS();                                                     \
             call;                                                                                  \
             run_->runs += 1;                                                                       \
             run_->failures += s_failures - before_;                                                \
+            if (DEBUG_ERRORS() != errors_)                                                         \
+            {                                                                                      \
+                printf("the D3D12 debug layer's errors above came in case %s\n", name);            \
+            }                                                                                      \
         }                                                                                          \
     } while (0)
 
