@@ -29,6 +29,10 @@ format.
 
 ### Fixed
 
+- Metal no longer grants `unclippedDepth` on Apple's paravirtual device
+  (macOS virtual machines, such as GitHub's hosted runners), which clips
+  depth with the clamp mode set: the new unclipped depth case drew
+  nothing there.
 - `mrhiCreateShader` refuses as unsupported a container whose SPIR-V
   declares 16-bit floats or 16-bit storage, 64-bit integers or subgroup
   operations on a device without `shaderF16`, `shaderInt64` or

@@ -2442,6 +2442,23 @@ static void DrawFar(Scene* scene, mrhiGraphicsPipelineId pipeline, uint8_t pixel
           "the depths");
 }
 
+// Whether every pixel is a color at a depth; the first that is not is
+// printed.
+static bool IsFar(const uint8_t pixels[256], const float depths[64], const uint8_t color[4],
+                  float depth)
+{
+    for (int at = 0; at < 64 && s_runs; ++at)
+    {
+        if (!IsNear(pixels + at * 4, color) || depths[at] != depth)
+        {
+            printf("pixel %d: %u %u %u %u at depth %.9g\n", at, pixels[at * 4], pixels[at * 4 + 1],
+                   pixels[at * 4 + 2], pixels[at * 4 + 3], (double)depths[at]);
+            return false;
+        }
+    }
+    return true;
+}
+
 // Depth clamped instead of clipped (unclippedDepth): the far triangle
 // covers the target red at depth 1, where clipped it draws nothing and
 // the depth stays 0.5.
@@ -2479,19 +2496,9 @@ static void CheckUnclippedDepth(Scene* scene)
     uint8_t pixels[256];
     float depths[64];
     DrawFar(scene, clipped, pixels, depths);
-    bool nothing = true;
-    for (int at = 0; at < 64 && s_runs; ++at)
-    {
-        nothing = nothing && IsNear(pixels + at * 4, kBlack) && depths[at] == 0.5f;
-    }
-    CHECK(nothing, "clipped past the far plane, nothing drawn");
+    CHECK(IsFar(pixels, depths, kBlack, 0.5f), "clipped past the far plane, nothing drawn");
     DrawFar(scene, clamped, pixels, depths);
-    bool covered = true;
-    for (int at = 0; at < 64 && s_runs; ++at)
-    {
-        covered = covered && IsNear(pixels + at * 4, kRed) && depths[at] == 1.0f;
-    }
-    CHECK(covered, "clamped, the target covered at depth 1");
+    CHECK(IsFar(pixels, depths, kRed, 1.0f), "clamped, the target covered at depth 1");
     CHECK(mrhiDestroyGraphicsPipeline(device, clipped) == mrhi_success &&
               mrhiDestroyGraphicsPipeline(device, clamped) == mrhi_success &&
               mrhiDestroyShader(device, shader) == mrhi_success,
