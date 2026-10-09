@@ -209,6 +209,8 @@ file-scope state).
   review round names, phase or slice labels, dates, version stamps,
   "was/used to" stories or changelogs. History lives in git and in
   `CHANGELOG.md`; design reasoning lives in `docs/adr/`.
+- A design record cited as `P-NNNN` exists in `docs/adr/` and is
+  listed in the library's index of records, `docs/adr/P.md`.
 - No `TODO` or `FIXME` comments. Open an issue instead.
 - No comparisons with other libraries in code comments.
 - No em dash character anywhere in the repository.
@@ -224,7 +226,7 @@ file-scope state).
 MUNI_NODISCARD muniUtf8Result muniValidateUtf8(const char* bytes, size_t length);
 ```
 
-Checked by: `tools/check_docs.py` (public documentation);
+Checked by: `tools/check_docs.py` (public documentation, records);
 `tools/check_source.py` (SPDX line, history markers, `TODO`, `FIXME`,
 em dash, `/* */` comments); review (content).
 
