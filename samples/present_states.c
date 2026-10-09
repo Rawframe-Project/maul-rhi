@@ -19,6 +19,8 @@
 
 #define WIDTH  64
 #define HEIGHT 48
+// The frames a resize may take to be told.
+#define RESIZE_FRAMES 60
 
 static mrhiResult Configure(Sample* sample, const SampleWindow* window, mrhiSurfaceColor color,
                             uint32_t width, uint32_t height)
@@ -82,13 +84,15 @@ static bool Present(Sample* sample, const SampleWindow* window)
 
 // Resizes the window: an acquire tells the configuration is out of date
 // or suboptimal, at once on some platforms and after the next present on
-// others, so frames present until one does; presenting works again once
-// the surface is configured at the new size.
+// others, so frames present until one does, up to RESIZE_FRAMES: where a
+// thread of the platform's own watches the window (Mesa's X11 swapchain)
+// it may tell several frames late on a busy machine. Presenting works
+// again once the surface is configured at the new size.
 static void Resize(Sample* sample, SampleWindow* window, mrhiSurfaceColor color)
 {
     SampleWindowResize(window, WIDTH + 16, HEIGHT + 12);
     mrhiResult acquired = mrhi_success;
-    for (int frame = 0; frame < 4 && acquired == mrhi_success; ++frame)
+    for (int frame = 0; frame < RESIZE_FRAMES && acquired == mrhi_success; ++frame)
     {
         mrhiResourceId image = {0};
         acquired = Acquire(sample, window, &image);
