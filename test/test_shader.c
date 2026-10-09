@@ -11,6 +11,7 @@
 
 #include "capabilities_core.h"
 #include "container.h"
+#include "spirv_caps.h"
 #include "test_container.h"
 #include "test_device_setup.h"
 
@@ -1017,11 +1018,16 @@ static void Instructions(const uint32_t* words, size_t count)
 #define CAPABILITY (2u << 16 | 17u)
 
 // The container's features from the capabilities its SPIR-V declares
-// first.
+// first, without WGSL where they hold 64-bit integers.
 static mrhiContainer Declaring(const uint32_t* words, size_t count)
 {
     Reset();
     Instructions(words, count);
+    for (size_t i = 0; i + 1 < count; ++i)
+    {
+        s_sections[WGSL].size =
+            words[i] == CAPABILITY && words[i + 1] == 11 ? 0 : s_sections[WGSL].size;
+    }
     Assemble();
     mrhiContainer container = {0};
     CHECK(mrhiParseContainer(s_container, s_size, &container) == mrhi_success, "it parses");
@@ -1046,20 +1052,42 @@ static void TestCapabilities(void)
     };
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
     {
-        const uint32_t words[] = {CAPABILITY, 1, CAPABILITY, cases[i].capability};
-        mrhiContainer container = Declaring(words, 4);
+        const uint32_t words[] = {CAPABILITY, 1, CAPABILITY, cases[i].capability, CAPABILITY, 1};
+        mrhiContainer container = Declaring(words, 6);
         CHECK(container.float16 == cases[i].float16 && container.subgroups == cases[i].subgroups &&
                   container.int64 == cases[i].int64,
-              "a capability and the feature it needs");
+              "a capability among others and the feature it needs");
     }
-    const uint32_t after[] = {CAPABILITY, 1, 3u << 16 | 14u, 0, 1, CAPABILITY, 9};
-    CHECK(!Declaring(after, 7).float16, "the list ends at the first other instruction");
+    // OpExtension with an empty name, two words as OpCapability is.
+    const uint32_t after[] = {CAPABILITY, 1, 2u << 16 | 10u, 0, CAPABILITY, 9};
+    CHECK(!Declaring(after, 6).float16, "the list ends at the first other instruction");
     const uint32_t empty[] = {17u, 9, CAPABILITY, 9};
     CHECK(!Declaring(empty, 4).float16, "a word count of 0 ends it");
     const uint32_t longer[] = {3u << 16 | 17u, 9, 0, CAPABILITY, 9};
     CHECK(!Declaring(longer, 5).float16, "an OpCapability of another length ends it");
     const uint32_t cut[] = {CAPABILITY};
     CHECK(!Declaring(cut, 1).float16, "a capability cut by the module's end is not read");
+    // Its operand lies past the bytes given: no word of it is read.
+    uint8_t module[28] = {0};
+    Put32(module + 20, CAPABILITY);
+    Put32(module + 24, 9);
+    bool float16 = false;
+    bool subgroups = false;
+    bool int64 = false;
+    mrhiReadSpirvCapabilities(module, 24, &float16, &subgroups, &int64);
+    CHECK(!float16, "no word read past the module");
+    mrhiReadSpirvCapabilities(module, 28, &float16, &subgroups, &int64);
+    CHECK(float16 && !subgroups && !int64, "the same capability read within it");
+    // WGSL has no 64-bit integers: code declaring them has no WGSL, and
+    // other code has.
+    const uint32_t wide[] = {CAPABILITY, 11};
+    Reset();
+    Instructions(wide, 2);
+    CHECK(Built() == mrhi_errorInvalid, "WGSL beside 64-bit integers");
+    Reset();
+    Instructions(wide, 2);
+    s_sections[WGSL].size = 0;
+    CHECK(Built() == mrhi_success, "no WGSL with 64-bit integers");
     static const uint32_t needs[3] = {9, 61, 11};
     for (uint32_t i = 0; i < 3; ++i)
     {

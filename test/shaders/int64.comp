@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// The int64 container's compute entry "cs" (shaderInt64): each value
+// squared in 64 bits, its low and high words written. WGSL has no 64-bit
+// integers, so the container has no WGSL.
+
+#version 450
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) readonly buffer Inputs
+{
+    uint values[];
+} inputs;
+
+layout(set = 0, binding = 1) buffer Outputs
+{
+    uint values[];
+} outputs;
+
+void main()
+{
+    uint i = gl_GlobalInvocationID.x;
+    uint64_t value = uint64_t(inputs.values[i]);
+    uint64_t square = value * value;
+    outputs.values[i * 2u] = uint(square);
+    outputs.values[i * 2u + 1u] = uint(square >> 32);
+}

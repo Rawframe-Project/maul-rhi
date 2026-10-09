@@ -145,10 +145,12 @@ def name_words(name):
     return list(struct.unpack(f"<{len(raw) // 4}I", raw))
 
 
-def spirv(entries, bindings):
-    """A module header, OpEntryPoints and binding decorations: all the
-    writer reads."""
+def spirv(entries, bindings, capabilities=()):
+    """A module header, OpCapabilities, OpEntryPoints and binding
+    decorations: all the writer reads."""
     words = [0x07230203, 0x00010300, 0, 100, 0]
+    for capability in capabilities:
+        words += instruction(17, capability)
     models = {"vertex": 0, "fragment": 4, "compute": 5}
     for i, (name, stage) in enumerate(entries):
         words += instruction(15, models[stage], 10 + i, *name_words(name))
@@ -281,6 +283,16 @@ def main():
                    for at in range(0, len(entries), 48)] == [0, 1 | 8, 4 | 16],
                   "the entries' heap uses")
             check(section(data, 9) is None, "no WGSL section")
+
+        # 64-bit integers (Int64, 11), which WGSL lacks: no WGSL.
+        wide_code = spirv(SPIRV_ENTRIES, SPIRV_BINDINGS, (1, 11))
+        status, errors, output = write(folder, wide_code, None, REFLECTION)
+        check(status == 0, f"a container with 64-bit integers is written: {errors}")
+        if status == 0:
+            with open(output, "rb") as f:
+                check(section(f.read(), 9) is None, "no WGSL beside 64-bit integers")
+        status, _, output = write(folder, wide_code, WGSL, REFLECTION)
+        check(status == 1 and not os.path.exists(output), "refused: WGSL beside 64-bit integers")
 
         def heap_refused(what, code=heap_code, text=None, change=None):
             reflection = copy.deepcopy(heaped)

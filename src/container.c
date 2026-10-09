@@ -882,9 +882,10 @@ static bool AreRecordsValid(mrhiContainer* container)
         container->builtins |= entry.builtins;
         container->heapUses |= entry.heapUses;
     }
-    // WGSL reads no heaps yet and has no view index: a container using
-    // either has no WGSL, and one using neither needs it.
-    bool native = container->heapUses != 0 || (container->builtins & mrhi_builtinViewIndex) != 0;
+    // WGSL reads no heaps yet and has no view index or 64-bit integers: a
+    // container using any has no WGSL, and one using none needs it.
+    bool native = container->heapUses != 0 || (container->builtins & mrhi_builtinViewIndex) != 0 ||
+                  container->int64;
     if (native == (container->wgslBytes > 0))
     {
         return false;
@@ -927,6 +928,11 @@ static bool TakeParts(const uint8_t* bytes, const Section* sections, uint32_t co
     container->spirv = FindSection(bytes, sections, count, SECTION_SPIRV, &size);
     container->spirvBytes = size;
     bool spirv = size >= 20 && size % 4 == 0 && mrhiRead32(container->spirv) == SPIRV_MAGIC;
+    if (spirv)
+    {
+        mrhiReadSpirvCapabilities(container->spirv, size, &container->float16,
+                                  &container->subgroups, &container->int64);
+    }
     container->wgsl = FindSection(bytes, sections, count, SECTION_WGSL, &size);
     container->wgslBytes = size;
     bool wgsl = size == 0 || mrhiIsTextValid((const char*)container->wgsl, size);
@@ -983,8 +989,6 @@ mrhiResult mrhiParseContainer(const void* bytes, size_t size, mrhiContainer* con
     {
         return mrhi_errorInvalid;
     }
-    mrhiReadSpirvCapabilities(container.spirv, container.spirvBytes, &container.float16,
-                              &container.subgroups, &container.int64);
     *containerOut = container;
     return mrhi_success;
 }

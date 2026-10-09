@@ -55,7 +55,7 @@ after checking their bounds, so a later writer can add sections.
 | 6 | color outputs | no | 8-byte interface records |
 | 7 | constants | no | 16-byte specialization constants |
 | 8 | SPIR-V | yes | a SPIR-V module holding every entry point |
-| 9 | WGSL | unless an entry uses a heap | a WGSL module holding every entry point, UTF-8 |
+| 9 | WGSL | unless an entry uses a heap or the view index, or the code uses 64-bit integers | a WGSL module holding every entry point, UTF-8 |
 | 10 | inter-stage variables | no | 8-byte interface records |
 | 11 | Metal map | with Metal code | where each binding lies in Metal, and each entry's MSL |
 | 12 | MSL | no | Metal Shading Language sources, UTF-8 |
@@ -104,9 +104,10 @@ An entry that reads the view index of a multiview pass (record
 mrhi-0020) has the `mrhi_builtinViewIndex` bit, in a vertex or fragment
 entry; SPIR-V reads it as the `ViewIndex` builtin with the `MultiView`
 capability, and a device loads the container only with the multiview
-feature. WGSL reads no heaps yet and has no view index, so a container
-has a WGSL section exactly when none of its entries uses a heap or the
-view index.
+feature. WGSL reads no heaps yet and has no view index or 64-bit
+integers, so a container has a WGSL section exactly when none of its
+entries uses a heap or the view index and its SPIR-V does not declare
+`Int64`.
 
 ## Bindings
 
@@ -305,7 +306,7 @@ Drivers check the code itself when they make their modules.
 `tools/mrhi_container.py [--msl DIR] [--metallib FILE] [--dxil DIR]
 SPIRV WGSL REFLECTION OUTPUT` writes a container from the two modules
 and a JSON reflection (`-` for the WGSL of a container whose entries
-use heaps); its opening comment shows the reflection's form, whose enum
+use heaps or the view index, or whose SPIR-V declares `Int64`); its opening comment shows the reflection's form, whose enum
 names are the contract's without their prefixes. With `--msl`, it reads
 each entry's MSL from `DIR/ENTRY.metal`; with `--metallib`, the
 library; with either, it writes the Metal map by the rule below. With

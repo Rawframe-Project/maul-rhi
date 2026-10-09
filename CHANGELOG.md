@@ -8,6 +8,22 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- Conformance cases for 16-bit floats, subgroup operations and 64-bit
+  integers (`capabilities.shader_f16`, `capabilities.subgroups`,
+  `capabilities.shader_int64`), each run on the devices that grant the
+  feature: a driver that grants one now passes its case.
+- D3D12 grants `shaderF16` on devices with native 16-bit operations and
+  shader model 6.2, as the mapping appendix says it maps.
+
+### Changed
+
+- A container whose SPIR-V declares `Int64` has no WGSL section, as
+  WGSL has no 64-bit integers; `tools/mrhi_container.py` takes `-` for
+  its WGSL, and `tools/mrhi_dxil.py` compiles code declaring `Float16`
+  for shader model 6.2 with 16-bit types.
+
 ### Fixed
 
 - `mrhiCreateShader` refuses as unsupported a container whose SPIR-V

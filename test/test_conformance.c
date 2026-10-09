@@ -29,8 +29,11 @@
 #include "maul-rhi/test.h"
 #include "shaders/bindless_container.h"
 #include "shaders/conformance_container.h"
+#include "shaders/f16_container.h"
+#include "shaders/int64_container.h"
 #include "shaders/multiview_container.h"
 #include "shaders/storage_container.h"
+#include "shaders/subgroups_container.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -515,6 +518,9 @@ static Case s_cases[] = {
     {"capabilities.formats", 0, 0},
     {"capabilities.feature_formats", 0, 0},
     {"capabilities.multiview", 0, 0},
+    {"capabilities.shader_f16", 0, 0},
+    {"capabilities.subgroups", 0, 0},
+    {"capabilities.shader_int64", 0, 0},
     {"capabilities.required", 0, 0},
     {"binding.draws", 0, 0},
     {"binding.culling", 0, 0},
@@ -1788,6 +1794,104 @@ static void CheckStorageBindings(mrhiDevice* device)
           "destroyed");
 }
 
+// A compute container's entry "cs" run in one workgroup of four over
+// four values in a read-only storage buffer: the words it writes to a
+// storage buffer, read back, are those wanted.
+static void CheckCompute(mrhiDevice* device, const uint8_t* container, size_t bytes,
+                         const uint32_t values[4], const uint32_t* wanted, uint32_t words)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = container;
+    shaderDef.byteCount = bytes;
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "the shader");
+    mrhiComputePipelineDef pipelineDef = mrhiDefaultComputePipelineDef();
+    pipelineDef.shader = shader;
+    pipelineDef.entry = "cs";
+    pipelineDef.entryLength = 2;
+    mrhiComputePipelineId pipeline = {0};
+    mrhiRequestId request = {0};
+    CHECK(mrhiCreateComputePipeline(device, &pipelineDef, &pipeline, &request) == mrhi_success,
+          "its pipeline");
+    AwaitPipelines(device, 1, 0);
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiBufferDef inputDef = mrhiDefaultBufferDef();
+    inputDef.size = 4 * sizeof(uint32_t);
+    mrhiBufferDef outputDef = mrhiDefaultBufferDef();
+    outputDef.size = words * sizeof(uint32_t);
+    mrhiResourceId inputs = {0};
+    mrhiResourceId outputs = {0};
+    CHECK(mrhiDeclareBuffer(device, &inputDef, &inputs) == mrhi_success &&
+              mrhiDeclareBuffer(device, &outputDef, &outputs) == mrhi_success,
+          "the buffers");
+    mrhiAccess upload = Whole(inputs, mrhi_accessCopyDestination);
+    mrhiPassId copy = CopyPass(device, &upload, 1);
+    mrhiAccess uses[2] = {Whole(inputs, mrhi_accessStorageRead),
+                          Whole(outputs, mrhi_accessStorageWrite)};
+    mrhiPassId dispatch = CopyPass(device, uses, 2);
+    mrhiAccess back = Whole(outputs, mrhi_accessCopySource);
+    mrhiPassId read = CopyPass(device, &back, 1);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    const mrhiBinding bindings[2] = {
+        {.slot = 0, .resource = inputs, .size = MRHI_WHOLE_SIZE},
+        {.slot = 1, .resource = outputs, .size = MRHI_WHOLE_SIZE},
+    };
+    mrhiRequestId result = {0};
+    CHECK(mrhiBeginPass(device, copy) == mrhi_success &&
+              mrhiWriteBuffer(device, copy, inputs, 0, values, inputDef.size) == mrhi_success &&
+              mrhiEndPass(device, copy) == mrhi_success &&
+              mrhiBeginPass(device, dispatch) == mrhi_success &&
+              mrhiSetComputePipeline(device, dispatch, pipeline) == mrhi_success &&
+              mrhiSetBindings(device, dispatch, 0, bindings, 2) == mrhi_success &&
+              mrhiDispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
+              mrhiEndPass(device, dispatch) == mrhi_success &&
+              mrhiBeginPass(device, read) == mrhi_success &&
+              mrhiReadBuffer(device, read, outputs, 0, outputDef.size, &result) == mrhi_success &&
+              mrhiEndPass(device, read) == mrhi_success,
+          "uploaded, dispatched and read");
+    Finish(device, 1);
+    uint32_t got[8] = {0};
+    size_t taken = 0;
+    bool whole = mrhiTakeReadback(device, result, got, sizeof(got), &taken) == mrhi_success &&
+                 taken == outputDef.size;
+    bool same = !s_runs || (whole && memcmp(got, wanted, taken) == 0);
+    for (uint32_t i = 0; whole && !same && i < words; ++i)
+    {
+        printf("word %u: %u, wanted %u\n", i, got[i], wanted[i]);
+    }
+    CHECK(whole && same, "the words wanted");
+    CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
+              mrhiDestroyShader(device, shader) == mrhi_success,
+          "destroyed");
+}
+
+// 16-bit floats in two-byte buffer elements: the pairs (1.5, 2),
+// (0.25, 4), (-3, 0.5) and (100, 2), each multiplied plus 0.5, give 3.5,
+// 1.5, -1 and 200.5, every value exact in 16 bits.
+static void CheckShaderF16(mrhiDevice* device)
+{
+    const uint32_t values[4] = {0x40003E00u, 0x44003400u, 0x3800C200u, 0x40005640u};
+    const uint32_t wanted[2] = {0x3E004300u, 0x5A44BC00u};
+    CheckCompute(device, s_f16Container, sizeof(s_f16Container), values, wanted, 2);
+}
+
+// A subgroup add over a workgroup of four, which one subgroup holds.
+static void CheckSubgroups(mrhiDevice* device)
+{
+    const uint32_t values[4] = {1, 2, 3, 4};
+    const uint32_t wanted[4] = {10, 10, 10, 10};
+    CheckCompute(device, s_subgroupsContainer, sizeof(s_subgroupsContainer), values, wanted, 4);
+}
+
+// Squares in 64 bits, past 2^32, as their low and high words.
+static void CheckShaderInt64(mrhiDevice* device)
+{
+    const uint32_t values[4] = {3, 65536, 0x80000000u, 0xFFFFFFFFu};
+    const uint32_t wanted[8] = {9, 0, 0, 1, 0, 0x40000000u, 1, 0xFFFFFFFEu};
+    CheckCompute(device, s_int64Container, sizeof(s_int64Container), values, wanted, 8);
+}
+
 // A texel of 188 sampled through the texture's sRGB twin decodes to
 // about 0.503, where the texture's own format would give 0.737: the
 // triangle drawn with it is the scene's color at half strength.
@@ -2932,6 +3036,18 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     RUN("capabilities.feature_formats", CheckFeatureFormats(device, asked));
     CheckDrawing(device, asked->timestampQuery);
     RUN("capabilities.multiview", CheckMultiview(device));
+    if (asked->shaderF16)
+    {
+        RUN("capabilities.shader_f16", CheckShaderF16(device));
+    }
+    if (asked->subgroups)
+    {
+        RUN("capabilities.subgroups", CheckSubgroups(device));
+    }
+    if (asked->shaderInt64)
+    {
+        RUN("capabilities.shader_int64", CheckShaderInt64(device));
+    }
     RUN("threads.recording", CheckThreads(device));
     mrhiDestroyDevice(device);
 }

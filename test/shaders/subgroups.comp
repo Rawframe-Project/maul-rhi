@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// The subgroups container's compute entry "cs" (subgroups): each of a
+// workgroup's four invocations writes the sum of the four values over
+// its subgroup, which holds all four, as every driver's subgroups have
+// at least four invocations.
+
+#version 450
+#extension GL_KHR_shader_subgroup_arithmetic : require
+
+layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) readonly buffer Inputs
+{
+    uint values[];
+} inputs;
+
+layout(set = 0, binding = 1) buffer Outputs
+{
+    uint values[];
+} outputs;
+
+void main()
+{
+    uint i = gl_GlobalInvocationID.x;
+    outputs.values[i] = subgroupAdd(inputs.values[i]);
+}

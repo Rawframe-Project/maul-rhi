@@ -19,8 +19,9 @@
 # at set 4 binding 1 (DXC: -fvk-bind-resource-heap 0 4
 # -fvk-bind-sampler-heap 1 4). An entry reading the view index of a
 # multiview pass (record mrhi-0020) lists the builtin "view_index", in a
-# vertex entry too. WGSL reads no heaps yet and has no view index, so a
-# container whose entries use either has no WGSL: pass - for it.
+# vertex entry too. WGSL reads no heaps yet and has no view index or
+# 64-bit integers, so a container whose entries use any (its SPIR-V
+# declaring Int64) has no WGSL: pass - for it.
 #
 # The enum names are the contract's (docs/contract/mrhi.json) without
 # their prefixes. The reflection:
@@ -100,6 +101,9 @@ TABLES = 4
 # DescriptorSet; execution models by stage.
 OP_ENTRY_POINT = 15
 OP_DECORATE = 71
+OP_CAPABILITY = 17
+CAPABILITY_INT64 = 11
+CAPABILITY_FLOAT16 = 9
 DECORATION_BINDING = 33
 DECORATION_SET = 34
 EXECUTION_MODELS = {0: "vertex", 4: "fragment", 5: "compute"}
@@ -589,6 +593,18 @@ def metal_sections(reflection, root, msl, metallib):
 
 # D3D12.
 
+def capabilities(code):
+    """The capabilities a SPIR-V module declares, which it lists before
+    any other instruction."""
+    words = struct.unpack(f"<{len(code) // 4}I", code)
+    found = set()
+    at = 5
+    while at + 1 < len(words) and words[at] == (2 << 16 | OP_CAPABILITY):
+        found.add(words[at + 1])
+        at += 2
+    return found
+
+
 def fixed_constants(code):
     """The ids of the specialization constants the SPIR-V sizes something
     with: a workgroup size or an array's length, directly or through
@@ -753,12 +769,14 @@ def build(spirv, wgsl, reflection, enums, msl=None, metallib=None, dxil=None):
     check_spirv(spirv, reflection, bindings)
     heaps = any(e.get("heap_uses") for e in reflection["entries"])
     views = any("view_index" in e.get("builtins", []) for e in reflection["entries"])
-    if heaps or views:
-        need(wgsl is None, "WGSL reads no heaps and has no view index: a container using "
-             "either has no WGSL")
+    int64 = CAPABILITY_INT64 in capabilities(spirv)
+    if heaps or views or int64:
+        need(wgsl is None, "WGSL reads no heaps, has no view index and no 64-bit integers: a "
+             "container using any has no WGSL")
         wgsl = b""
     else:
-        need(wgsl is not None, "a container using no heap and no view index needs WGSL")
+        need(wgsl is not None, "a container using no heap, view index or 64-bit integers needs "
+             "WGSL")
         try:
             text = wgsl.decode("utf-8")
         except UnicodeDecodeError as error:

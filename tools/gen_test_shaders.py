@@ -6,7 +6,8 @@
 # the way a program's cook would, offline: test/shaders/conformance.*
 # (vert, frag, comp, placed.vert, root.frag, add.comp, wgsl, json),
 # test/shaders/bindless.{comp,json}, whose entry reads heaps and so has
-# no WGSL or MSL, and each sample's samples/shaders/NAME.*. glslangValidator
+# no WGSL or MSL, test/shaders/{f16,subgroups,int64}.*, one optional
+# shader feature each (int64 without WGSL, which has no 64-bit integers), and each sample's samples/shaders/NAME.*. glslangValidator
 # compiles each stage under its entry name, spirv-link joins them into
 # one module, spirv-val checks it for Vulkan 1.3, tools/mrhi_msl.py
 # crosses each entry of a container with WGSL to MSL through
@@ -38,6 +39,9 @@ CONTAINERS = (
     ("test/shaders", "multiview", (("vert", "vs"), ("frag", "fs")), False),
     ("test/shaders", "noop", (("vert", "vs"), ("frag", "fs"), ("comp", "cs")), True),
     ("test/shaders", "storage", (("comp", "cs"),), True),
+    ("test/shaders", "f16", (("comp", "cs"),), True),
+    ("test/shaders", "subgroups", (("comp", "cs"),), True),
+    ("test/shaders", "int64", (("comp", "cs"),), False),
     ("samples/shaders", "triangle", (("vert", "vs"), ("frag", "fs")), True),
     ("samples/shaders", "textured", (("vert", "vs"), ("frag", "fs")), True),
     ("samples/shaders", "compute_plan", (("comp", "plan"),), True),

@@ -11,6 +11,9 @@ capabilities.limits
 capabilities.formats
 capabilities.feature_formats
 capabilities.multiview
+capabilities.shader_f16
+capabilities.subgroups
+capabilities.shader_int64
 capabilities.required
 binding.draws
 binding.culling
