@@ -659,6 +659,17 @@ static void TestDualSource(void)
     def.colorTargets[0].blend = false;
     CHECK(Made(device, &def) == mrhi_success, "the factors of a target that does not blend");
     Close(device);
+    // A second source in the container, but not the feature.
+    Reset();
+    Variable(OUTPUTS, 1, 0, mrhi_scalarFloat32, 4, 1, 0);
+    Put16(Record(ENTRIES, 1, 48) + 30, 2);
+    device = OpenWithShader(mrhiDefaultDeviceDef());
+    def = Def();
+    def.colorTargets[0].blend = true;
+    def.colorTargets[0].color = (mrhiBlendComponent){mrhi_blendSrc1, mrhi_blendZero, mrhi_blendAdd};
+    CHECK(Made(device, &def) == mrhi_errorUnsupported,
+          "a second source in the shader without the feature");
+    Close(device);
     ResetAdapter();
     s_adapter.features.dualSourceBlending = true;
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
@@ -678,10 +689,40 @@ static void TestDualSource(void)
     Put16(Record(ENTRIES, 1, 48) + 30, 2);
     device = OpenWithShader(deviceDef);
     CHECK(Made(device, &def) == mrhi_success, "with the feature and a second source");
+    mrhiGraphicsPipelineDef plain = Def();
+    plain.colorTargets[0].blend = true;
+    plain.colorTargets[0].color =
+        (mrhiBlendComponent){mrhi_blendSrc1, mrhi_blendZero, mrhi_blendAdd};
+    CHECK(Made(device, &plain) == mrhi_success, "the second source as the source factor");
     def.colorTargets[1].format = mrhi_formatRgba8Unorm;
     def.colorTargets[1].writeMask = 0;
     def.colorTargetCount = 2;
     CHECK(Made(device, &def) == mrhi_errorUnsupported, "beside a second color target");
+    plain.colorTargetCount = 2;
+    plain.colorTargets[1].format = mrhi_formatRgba8Unorm;
+    plain.colorTargets[1].writeMask = 0;
+    CHECK(Made(device, &plain) == mrhi_errorUnsupported,
+          "the second source alone as a factor, beside a second target");
+    Close(device);
+    // Blending by the second source's alpha needs outputs with alpha.
+    ResetAdapter();
+    s_adapter.features.dualSourceBlending = true;
+    Reset();
+    Variable(OUTPUTS, 0, 0, mrhi_scalarFloat32, 3, 0, 0);
+    Variable(OUTPUTS, 1, 0, mrhi_scalarFloat32, 3, 1, 0);
+    Put16(Record(ENTRIES, 1, 48) + 30, 2);
+    device = OpenWithShader(deviceDef);
+    def = Def();
+    def.colorTargets[0].format = mrhi_formatRg8Unorm;
+    def.colorTargets[0].blend = true;
+    def.colorTargets[0].color = (mrhiBlendComponent){mrhi_blendSrc1, mrhi_blendZero, mrhi_blendAdd};
+    CHECK(Made(device, &def) == mrhi_success, "three components blended by the second source");
+    def.colorTargets[0].color =
+        (mrhiBlendComponent){mrhi_blendSrc1Alpha, mrhi_blendZero, mrhi_blendAdd};
+    CHECK(Made(device, &def) == mrhi_errorInvalid, "by its alpha, which they lack");
+    def.colorTargets[0].color =
+        (mrhiBlendComponent){mrhi_blendOne, mrhi_blendOneMinusSrc1Alpha, mrhi_blendAdd};
+    CHECK(Made(device, &def) == mrhi_errorInvalid, "by its alpha's complement");
     Close(device);
 }
 

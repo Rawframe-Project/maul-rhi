@@ -318,6 +318,11 @@ def main():
             status, _, output = write(folder, code, WGSL, with_outputs(outputs))
             check(status == 1 and not os.path.exists(output), f"refused: {what}")
 
+        sourced = copy.deepcopy(REFLECTION)
+        sourced["entries"][0]["inputs"][0]["blend_src"] = 0
+        status, _, output = write(folder, code, WGSL, sourced)
+        check(status == 1 and not os.path.exists(output), "refused: a blend source on an input")
+
         def heap_refused(what, code=heap_code, text=None, change=None):
             reflection = copy.deepcopy(heaped)
             if change:
