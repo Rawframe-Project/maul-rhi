@@ -30,6 +30,7 @@
 #include "shaders/bindless_container.h"
 #include "shaders/conformance_container.h"
 #include "shaders/f16_container.h"
+#include "shaders/instanced_container.h"
 #include "shaders/int64_container.h"
 #include "shaders/multiview_container.h"
 #include "shaders/storage_container.h"
@@ -522,6 +523,7 @@ static Case s_cases[] = {
     {"capabilities.subgroups", 0, 0},
     {"capabilities.shader_int64", 0, 0},
     {"capabilities.unclipped_depth", 0, 0},
+    {"capabilities.indirect_first_instance", 0, 0},
     {"capabilities.required", 0, 0},
     {"binding.draws", 0, 0},
     {"binding.culling", 0, 0},
@@ -2496,6 +2498,100 @@ static void CheckUnclippedDepth(Scene* scene)
           "destroyed");
 }
 
+// A first instance other than zero in an indirect draw
+// (indirectFirstInstance): instance 2's color of four, red among green,
+// covers the target, where a first instance taken as zero would draw it
+// green.
+static void CheckIndirectFirstInstance(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_instancedContainer;
+    shaderDef.byteCount = sizeof(s_instancedContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "the instanced shader");
+    static const mrhiVertexBufferLayout buffers[2] = {
+        {.stride = 16}, {.stride = 16, .stepMode = mrhi_stepInstance}};
+    static const mrhiVertexAttribute attributes[2] = {
+        {.buffer = 0, .location = 0, .format = mrhi_vertexFloat32x4},
+        {.buffer = 1, .location = 1, .format = mrhi_vertexFloat32x4},
+    };
+    mrhiGraphicsPipelineDef def = GraphicsDef(shader);
+    def.vertexBuffers = buffers;
+    def.vertexBufferCount = 2;
+    def.vertexAttributes = attributes;
+    def.vertexAttributeCount = 2;
+    mrhiGraphicsPipelineId pipeline = {0};
+    mrhiRequestId request = {0};
+    CHECK(mrhiCreateGraphicsPipeline(device, &def, &pipeline, &request) == mrhi_success,
+          "an instanced pipeline");
+    AwaitPipelines(device, 1, 0);
+    static const float kCover[3][4] = {
+        {-1.0f, -1.0f, 0.5f, 1.0f}, {3.0f, -1.0f, 0.5f, 1.0f}, {-1.0f, 3.0f, 0.5f, 1.0f}};
+    static const float kColors[4][4] = {{0.0f, 1.0f, 0.0f, 1.0f},
+                                        {0.0f, 1.0f, 0.0f, 1.0f},
+                                        {1.0f, 0.0f, 0.0f, 1.0f},
+                                        {0.0f, 1.0f, 0.0f, 1.0f}};
+    // Three vertices of one instance, from vertex 0 and instance 2.
+    static const uint32_t kArguments[4] = {3, 1, 0, 2};
+    BeginScene(scene);
+    mrhiResourceId v = Declared(device, sizeof(kCover));
+    mrhiResourceId c = Declared(device, sizeof(kColors));
+    mrhiResourceId a = Declared(device, sizeof(kArguments));
+    mrhiAccess writes[3] = {Whole(v, mrhi_accessCopyDestination),
+                            Whole(c, mrhi_accessCopyDestination),
+                            Whole(a, mrhi_accessCopyDestination)};
+    mrhiPassId upload = CopyPass(device, writes, 3);
+    const mrhiAccess accesses[3] = {Whole(v, mrhi_accessVertex), Whole(c, mrhi_accessVertex),
+                                    Whole(a, mrhi_accessIndirect)};
+    mrhiPassDef passDef = mrhiDefaultPassDef();
+    passDef.colorTargets[0] = (mrhiColorTarget){
+        .resource = scene->t,
+        .load = mrhi_loadClear,
+        .clear = {0.0f, 0.0f, 0.0f, 1.0f},
+    };
+    passDef.colorTargetCount = 1;
+    passDef.accesses = accesses;
+    passDef.accessCount = 3;
+    mrhiPassId draw = {0};
+    CHECK(mrhiAddPass(device, &passDef, &draw) == mrhi_success, "a pass");
+    mrhiAccess read = Whole(scene->t, mrhi_accessCopySource);
+    mrhiPassId reading = CopyPass(device, &read, 1);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiBeginPass(device, upload) == mrhi_success &&
+              mrhiWriteBuffer(device, upload, v, 0, kCover, sizeof(kCover)) == mrhi_success &&
+              mrhiWriteBuffer(device, upload, c, 0, kColors, sizeof(kColors)) == mrhi_success &&
+              mrhiWriteBuffer(device, upload, a, 0, kArguments, sizeof(kArguments)) ==
+                  mrhi_success &&
+              mrhiEndPass(device, upload) == mrhi_success &&
+              mrhiBeginPass(device, draw) == mrhi_success &&
+              mrhiSetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
+              mrhiSetVertexBuffer(device, draw, 0, v, 0, sizeof(kCover)) == mrhi_success &&
+              mrhiSetVertexBuffer(device, draw, 1, c, 0, sizeof(kColors)) == mrhi_success &&
+              mrhiDrawIndirect(device, draw, a, 0) == mrhi_success &&
+              mrhiEndPass(device, draw) == mrhi_success &&
+              mrhiBeginPass(device, reading) == mrhi_success,
+          "drawn");
+    mrhiRequestId color = ReadTarget(scene, reading);
+    CHECK(mrhiEndPass(device, reading) == mrhi_success, "read");
+    Finish(device, 1);
+    uint8_t pixels[256];
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, color, pixels, sizeof(pixels), &size) == mrhi_success &&
+              size == sizeof(pixels),
+          "the pixels");
+    static const uint8_t kRed[4] = {255, 0, 0, 255};
+    bool red = true;
+    for (int at = 0; at < 64 && s_runs; ++at)
+    {
+        red = red && IsNear(pixels + at * 4, kRed);
+    }
+    CHECK(red, "instance 2's color over the target");
+    CHECK(mrhiDestroyGraphicsPipeline(device, pipeline) == mrhi_success &&
+              mrhiDestroyShader(device, shader) == mrhi_success,
+          "destroyed");
+}
+
 // Render state on the target: a first pass writes depth and stencil,
 // kept for a second that loads them and draws, from indirect arguments
 // past a draw of nothing, blue scaled by the blend constant only where
@@ -2889,6 +2985,10 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     if (features.unclippedDepth)
     {
         RUN("capabilities.unclipped_depth", CheckUnclippedDepth(&scene));
+    }
+    if (features.indirectFirstInstance)
+    {
+        RUN("capabilities.indirect_first_instance", CheckIndirectFirstInstance(&scene));
     }
     RUN("binding.compute_split", {
         CheckComputeSplit(&scene, timestamps);

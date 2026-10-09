@@ -15,6 +15,7 @@ capabilities.shader_f16
 capabilities.subgroups
 capabilities.shader_int64
 capabilities.unclipped_depth
+capabilities.indirect_first_instance
 capabilities.required
 binding.draws
 binding.culling
