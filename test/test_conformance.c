@@ -521,6 +521,7 @@ static Case s_cases[] = {
     {"capabilities.shader_f16", 0, 0},
     {"capabilities.subgroups", 0, 0},
     {"capabilities.shader_int64", 0, 0},
+    {"capabilities.unclipped_depth", 0, 0},
     {"capabilities.required", 0, 0},
     {"binding.draws", 0, 0},
     {"binding.culling", 0, 0},
@@ -2366,6 +2367,135 @@ static void DrawPlaced(const Scene* scene, mrhiPassId pass, mrhiResourceId verti
           "placed");
 }
 
+// The triangle past the far plane: depth 1.5, covering the target.
+static const float kFar[3][4] = {
+    {-1.0f, -1.0f, 1.5f, 1.0f},
+    {3.0f, -1.0f, 1.5f, 1.0f},
+    {-1.0f, 3.0f, 1.5f, 1.0f},
+};
+
+// One frame: the far triangle drawn red with a pipeline over the target
+// cleared to black and a depth target cleared to 0.5, its pixels and
+// depths read back.
+static void DrawFar(Scene* scene, mrhiGraphicsPipelineId pipeline, uint8_t pixels[256],
+                    float depths[64])
+{
+    mrhiDevice* device = scene->device;
+    BeginScene(scene);
+    mrhiResourceId v = Declared(device, sizeof(kFar));
+    mrhiTextureDef depthDef = mrhiDefaultTextureDef();
+    depthDef.format = mrhi_formatDepth32Float;
+    depthDef.width = 8;
+    depthDef.height = 8;
+    mrhiResourceId z = {0};
+    CHECK(mrhiDeclareTexture(device, &depthDef, &z) == mrhi_success, "a depth target");
+    mrhiAccess write = Whole(v, mrhi_accessCopyDestination);
+    mrhiPassId upload = CopyPass(device, &write, 1);
+    const mrhiAccess accesses[4] = {
+        Whole(scene->u, mrhi_accessUniform), Whole(scene->d, mrhi_accessStorageReadWrite),
+        Whole(scene->w, mrhi_accessSampled), Whole(v, mrhi_accessVertex)};
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.colorTargets[0] = (mrhiColorTarget){
+        .resource = scene->t,
+        .load = mrhi_loadClear,
+        .clear = {0.0f, 0.0f, 0.0f, 1.0f},
+    };
+    def.colorTargetCount = 1;
+    def.depthTarget =
+        (mrhiDepthTarget){.resource = z, .depthLoad = mrhi_loadClear, .clearDepth = 0.5f};
+    def.accesses = accesses;
+    def.accessCount = 4;
+    mrhiPassId draw = {0};
+    CHECK(mrhiAddPass(device, &def, &draw) == mrhi_success, "a pass");
+    mrhiAccess read[2] = {Whole(scene->t, mrhi_accessCopySource), Whole(z, mrhi_accessCopySource)};
+    mrhiPassId reading = CopyPass(device, read, 2);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    const float red[4] = {1.0f, 0.0f, 0.0f, 1.0f};
+    CHECK(mrhiBeginPass(device, upload) == mrhi_success &&
+              mrhiWriteBuffer(device, upload, v, 0, kFar, sizeof(kFar)) == mrhi_success &&
+              mrhiEndPass(device, upload) == mrhi_success &&
+              mrhiBeginPass(device, draw) == mrhi_success &&
+              mrhiSetGraphicsPipeline(device, draw, pipeline) == mrhi_success,
+          "a far pipeline");
+    BindScene(scene, draw);
+    CHECK(mrhiSetVertexBuffer(device, draw, 0, v, 0, sizeof(kFar)) == mrhi_success &&
+              mrhiSetRootBlock(device, draw, 0, red, sizeof(red)) == mrhi_success &&
+              mrhiDraw(device, draw, 3, 1, 0, 0) == mrhi_success &&
+              mrhiEndPass(device, draw) == mrhi_success &&
+              mrhiBeginPass(device, reading) == mrhi_success,
+          "drawn");
+    mrhiRequestId color = ReadTarget(scene, reading);
+    mrhiRequestId depth = {0};
+    CHECK(mrhiReadTexture(device, reading,
+                          &(mrhiTextureCopy){.resource = z, .aspect = mrhi_aspectDepthOnly},
+                          &(mrhiExtent3d){8, 8, 1}, &depth) == mrhi_success &&
+              mrhiEndPass(device, reading) == mrhi_success,
+          "read");
+    Finish(device, 2);
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, color, pixels, 256, &size) == mrhi_success && size == 256,
+          "the pixels");
+    CHECK(mrhiTakeReadback(device, depth, depths, 64 * sizeof(float), &size) == mrhi_success &&
+              size == 64 * sizeof(float),
+          "the depths");
+}
+
+// Depth clamped instead of clipped (unclippedDepth): the far triangle
+// covers the target red at depth 1, where clipped it draws nothing and
+// the depth stays 0.5.
+static void CheckUnclippedDepth(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_conformanceContainer;
+    shaderDef.byteCount = sizeof(s_conformanceContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "a shader");
+    static const mrhiVertexBufferLayout buffer = {.stride = 16};
+    static const mrhiVertexAttribute position = {.format = mrhi_vertexFloat32x4};
+    mrhiGraphicsPipelineDef def = GraphicsDef(shader);
+    def.vertexEntry = "vp";
+    def.fragmentEntry = "fr";
+    def.vertexBuffers = &buffer;
+    def.vertexBufferCount = 1;
+    def.vertexAttributes = &position;
+    def.vertexAttributeCount = 1;
+    def.depthStencilFormat = mrhi_formatDepth32Float;
+    def.depthWrite = true;
+    def.depthCompare = mrhi_compareAlways;
+    mrhiGraphicsPipelineId clipped = {0};
+    mrhiGraphicsPipelineId clamped = {0};
+    mrhiRequestId request = {0};
+    CHECK(mrhiCreateGraphicsPipeline(device, &def, &clipped, &request) == mrhi_success,
+          "a clipping pipeline");
+    def.unclippedDepth = true;
+    CHECK(mrhiCreateGraphicsPipeline(device, &def, &clamped, &request) == mrhi_success,
+          "a clamping pipeline");
+    AwaitPipelines(device, 2, 0);
+    static const uint8_t kBlack[4] = {0, 0, 0, 255};
+    static const uint8_t kRed[4] = {255, 0, 0, 255};
+    uint8_t pixels[256];
+    float depths[64];
+    DrawFar(scene, clipped, pixels, depths);
+    bool nothing = true;
+    for (int at = 0; at < 64 && s_runs; ++at)
+    {
+        nothing = nothing && IsNear(pixels + at * 4, kBlack) && depths[at] == 0.5f;
+    }
+    CHECK(nothing, "clipped past the far plane, nothing drawn");
+    DrawFar(scene, clamped, pixels, depths);
+    bool covered = true;
+    for (int at = 0; at < 64 && s_runs; ++at)
+    {
+        covered = covered && IsNear(pixels + at * 4, kRed) && depths[at] == 1.0f;
+    }
+    CHECK(covered, "clamped, the target covered at depth 1");
+    CHECK(mrhiDestroyGraphicsPipeline(device, clipped) == mrhi_success &&
+              mrhiDestroyGraphicsPipeline(device, clamped) == mrhi_success &&
+              mrhiDestroyShader(device, shader) == mrhi_success,
+          "destroyed");
+}
+
 // Render state on the target: a first pass writes depth and stencil,
 // kept for a second that loads them and draws, from indirect arguments
 // past a draw of nothing, blue scaled by the blend constant only where
@@ -2756,6 +2886,10 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     RUN("binding.culling", CheckCulling(&scene));
     RUN("api.queries", CheckQueries(&scene, timestamps));
     RUN("binding.render_state", CheckRenderState(&scene));
+    if (features.unclippedDepth)
+    {
+        RUN("capabilities.unclipped_depth", CheckUnclippedDepth(&scene));
+    }
     RUN("binding.compute_split", {
         CheckComputeSplit(&scene, timestamps);
         CheckStorageBindings(device);
