@@ -294,6 +294,30 @@ def main():
         status, _, output = write(folder, wide_code, WGSL, REFLECTION)
         check(status == 1 and not os.path.exists(output), "refused: WGSL beside 64-bit integers")
 
+        # Dual-source blending: a second color source at location 0.
+        def with_outputs(outputs):
+            reflection = copy.deepcopy(REFLECTION)
+            reflection["entries"][1]["outputs"] = outputs
+            return reflection
+
+        first = {"location": 0, "type": "float32", "components": 4}
+        second = dict(first, blend_src=1)
+        status, errors, output = write(folder, code, WGSL, with_outputs([first, second]))
+        check(status == 0, f"two blend sources are written: {errors}")
+        if status == 0:
+            with open(output, "rb") as f:
+                records = section(f.read(), 6) or b""
+            check([records[at + 6] for at in range(0, len(records), 8)] == [0, 1],
+                  "each color output's blend source")
+        for what, outputs in (
+                ("a second source alone", [second]),
+                ("a second source of other components", [first, dict(second, components=3)]),
+                ("a second source at location 1", [first, dict(second, location=1)]),
+                ("a third blend source", [first, dict(second, blend_src=2)]),
+                ("two second sources", [second, dict(second)])):
+            status, _, output = write(folder, code, WGSL, with_outputs(outputs))
+            check(status == 1 and not os.path.exists(output), f"refused: {what}")
+
         def heap_refused(what, code=heap_code, text=None, change=None):
             reflection = copy.deepcopy(heaped)
             if change:

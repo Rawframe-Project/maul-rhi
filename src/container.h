@@ -7,6 +7,8 @@
 #ifndef MAUL_RHI_SRC_CONTAINER_H
 #define MAUL_RHI_SRC_CONTAINER_H
 
+#include "container_interface.h"
+
 #include "maul-rhi/shader.h"
 
 // An entry point: its stage, its name in the strings, its workgroup
@@ -45,14 +47,6 @@ typedef struct mrhiShaderBinding
 } mrhiShaderBinding;
 
 // A vertex input, a color output or an inter-stage variable.
-typedef struct mrhiShaderVariable
-{
-    uint32_t location;
-    mrhiScalarType type;
-    uint8_t components;
-    mrhiInterpolation interpolation;
-    mrhiSampling sampling;
-} mrhiShaderVariable;
 
 typedef struct mrhiShaderConstant
 {

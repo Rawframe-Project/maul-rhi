@@ -142,7 +142,7 @@ record:
 | 0 | u32 | its location |
 | 4 | u8 | its `mrhiScalarType`, other than none |
 | 5 | u8 | its component count, 1 to 4 |
-| 6 | u8 | an inter-stage variable's `mrhiInterpolation`; else 0 |
+| 6 | u8 | an inter-stage variable's `mrhiInterpolation`; a color output's blend source, 0 or 1; else 0 |
 | 7 | u8 | an inter-stage variable's `mrhiSampling`; else 0 |
 
 - A vertex input is a 32-bit float, signed or unsigned integer.
@@ -151,7 +151,12 @@ record:
   flat; perspective or linear sampled at the center, the centroid or
   per sample; flat taken from the first or either vertex.
 - Locations are unique within an entry's inputs, its outputs and its
-  variables.
+  variables, but for dual-source blending: a color output of blend
+  source 1, the second source, is at location 0 beside one of source 0
+  of the same type and component count. A graphics pipeline whose
+  blending reads the second source (`mrhi_blendSrc1` to
+  `mrhi_blendOneMinusSrc1Alpha`) needs `dualSourceBlending`, exactly one
+  color target and a fragment entry with a second source.
 
 ## The Metal map
 

@@ -30,14 +30,16 @@ is a typed failure, and for mustpass lists per SPI version.
   the device is made, and a refused device is destroyed through its
   first function, which `destroy` stays in every version.
 - The SPI headers (`driver.h`, `command.h`, `reflection.h`,
-  `container.h`) are installed as `maul-rhi/spi/`. Their types are the
-  SPI; any change to them raises `MRHI_SPI_VERSION`, now 4, the first
-  installed. The core functions they declare are not part of it.
+  `container.h`, `container_interface.h`) are installed as
+  `maul-rhi/spi/`. Their types are the SPI; any change to them raises
+  `MRHI_SPI_VERSION`, now 5 (4 was the first installed; 5 adds the
+  shader features a container's code needs and the blend source of its
+  color outputs). The core functions they declare are not part of it.
 - The conformance suite's checks are named cases in the ten categories
   of the requirements (`api.objects`, `binding.heaps`, ...).
   `test_conformance --list` prints them, `--case <name>` runs one, and
   every run ends with each case's outcome. The list of the current SPI
-  version, `conformance/mustpass/spi-4.txt`, must match the suite's
+  version, `conformance/mustpass/spi-5.txt`, must match the suite's
   listing (the `mustpass` test); lists of earlier versions stay as
   they were. A driver is admitted on a run that passes every case of
   its version's list. Device loss is injected with

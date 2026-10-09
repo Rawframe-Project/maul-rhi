@@ -246,6 +246,14 @@ extern "C"
         mrhi_blendConstant = 11,
         // 1 minus the blend constant.
         mrhi_blendOneMinusConstant = 12,
+        // The fragment's second source (dual-source blending).
+        mrhi_blendSrc1 = 13,
+        // 1 minus the second source.
+        mrhi_blendOneMinusSrc1 = 14,
+        // The second source's alpha.
+        mrhi_blendSrc1Alpha = 15,
+        // 1 minus the second source's alpha.
+        mrhi_blendOneMinusSrc1Alpha = 16,
     };
 
     // How blending combines its weighted source and destination.

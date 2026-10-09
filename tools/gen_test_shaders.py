@@ -8,7 +8,8 @@
 # test/shaders/bindless.{comp,json}, whose entry reads heaps and so has
 # no WGSL or MSL, test/shaders/{f16,subgroups,int64}.*, one optional
 # shader feature each (int64 without WGSL, which has no 64-bit integers),
-# test/shaders/instanced.*, a color per instance, and each sample's samples/shaders/NAME.*. glslangValidator
+# test/shaders/instanced.*, a color per instance, test/shaders/dual.*, two
+# blend sources, and each sample's samples/shaders/NAME.*. glslangValidator
 # compiles each stage under its entry name, spirv-link joins them into
 # one module, spirv-val checks it for Vulkan 1.3, tools/mrhi_msl.py
 # crosses each entry of a container with WGSL to MSL through
@@ -44,6 +45,7 @@ CONTAINERS = (
     ("test/shaders", "subgroups", (("comp", "cs"),), True),
     ("test/shaders", "int64", (("comp", "cs"),), False),
     ("test/shaders", "instanced", (("vert", "vs"), ("frag", "fs")), True),
+    ("test/shaders", "dual", (("vert", "vs"), ("frag", "fs")), True),
     ("samples/shaders", "triangle", (("vert", "vs"), ("frag", "fs")), True),
     ("samples/shaders", "textured", (("vert", "vs"), ("frag", "fs")), True),
     ("samples/shaders", "compute_plan", (("comp", "plan"),), True),

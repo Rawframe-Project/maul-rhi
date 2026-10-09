@@ -642,6 +642,49 @@ static void TestTargets(void)
     Close(device);
 }
 
+// Dual-source blending: a factor reading the second source needs the
+// feature, a second source in the fragment entry and one color target.
+static void TestDualSource(void)
+{
+    mrhiDevice* device = Open();
+    mrhiGraphicsPipelineDef def = Def();
+    def.colorTargets[0].blend = true;
+    def.colorTargets[0].color =
+        (mrhiBlendComponent){mrhi_blendSrc1, mrhi_blendOneMinusSrc1, mrhi_blendAdd};
+    CHECK(Made(device, &def) == mrhi_errorUnsupported, "a second source without the feature");
+    def.colorTargets[0].color = (mrhiBlendComponent){mrhi_blendOne, mrhi_blendZero, mrhi_blendAdd};
+    def.colorTargets[0].alpha =
+        (mrhiBlendComponent){mrhi_blendZero, mrhi_blendOneMinusSrc1Alpha, mrhi_blendAdd};
+    CHECK(Made(device, &def) == mrhi_errorUnsupported, "its alpha without the feature");
+    def.colorTargets[0].blend = false;
+    CHECK(Made(device, &def) == mrhi_success, "the factors of a target that does not blend");
+    Close(device);
+    ResetAdapter();
+    s_adapter.features.dualSourceBlending = true;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.features.dualSourceBlending = true;
+    Reset();
+    device = OpenWithShader(deviceDef);
+    def = Def();
+    def.colorTargets[0].blend = true;
+    def.colorTargets[0].color =
+        (mrhiBlendComponent){mrhi_blendSrc1Alpha, mrhi_blendOneMinusSrc1, mrhi_blendAdd};
+    CHECK(Made(device, &def) == mrhi_errorUnsupported, "a fragment entry without a second source");
+    Close(device);
+    ResetAdapter();
+    s_adapter.features.dualSourceBlending = true;
+    Reset();
+    Variable(OUTPUTS, 1, 0, mrhi_scalarFloat32, 4, 1, 0);
+    Put16(Record(ENTRIES, 1, 48) + 30, 2);
+    device = OpenWithShader(deviceDef);
+    CHECK(Made(device, &def) == mrhi_success, "with the feature and a second source");
+    def.colorTargets[1].format = mrhi_formatRgba8Unorm;
+    def.colorTargets[1].writeMask = 0;
+    def.colorTargetCount = 2;
+    CHECK(Made(device, &def) == mrhi_errorUnsupported, "beside a second color target");
+    Close(device);
+}
+
 static void TestBlend(void)
 {
     mrhiDevice* device = Open();
@@ -650,10 +693,10 @@ static void TestBlend(void)
     def.colorTargets[0].color =
         (mrhiBlendComponent){mrhi_blendSrcAlpha, mrhi_blendOneMinusSrcAlpha, mrhi_blendAdd};
     CHECK(Made(device, &def) == mrhi_success, "alpha blending");
-    def.colorTargets[0].color.srcFactor = mrhi_blendOneMinusConstant + 1;
+    def.colorTargets[0].color.srcFactor = mrhi_blendOneMinusSrc1Alpha + 1;
     CHECK(Made(device, &def) == mrhi_errorInvalid, "an unknown source factor");
     def.colorTargets[0].color.srcFactor = mrhi_blendOne;
-    def.colorTargets[0].alpha.dstFactor = mrhi_blendOneMinusConstant + 1;
+    def.colorTargets[0].alpha.dstFactor = mrhi_blendOneMinusSrc1Alpha + 1;
     CHECK(Made(device, &def) == mrhi_errorInvalid, "an unknown alpha factor");
     def.colorTargets[0].alpha =
         (mrhiBlendComponent){mrhi_blendOne, mrhi_blendOne, mrhi_blendMax + 1};
@@ -943,6 +986,7 @@ int main(void)
     TestDepthStencil();
     TestTargets();
     TestBlend();
+    TestDualSource();
     TestColorBytes();
     TestMultisample();
     ResetAdapter();

@@ -104,7 +104,8 @@ submit: device_core invariant
 copy_core: capabilities_core encoder_core
 cache: bytes device_core sha256
 bytes:
-container: bytes capabilities_core label sha256 spirv_caps
+container: bytes capabilities_core container_interface label sha256 spirv_caps
+container_interface: bytes
 shader: container device_core label
 reflection: allocator container
 pipeline: device_core invariant label pipeline_core

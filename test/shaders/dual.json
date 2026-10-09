@@ -1,0 +1,11 @@
+{
+  "root_block_bytes": 0,
+  "entries": [
+    {"name": "vs", "stage": "vertex"},
+    {"name": "fs", "stage": "fragment",
+     "outputs": [{"location": 0, "type": "float32", "components": 4},
+                 {"location": 0, "type": "float32", "components": 4, "blend_src": 1}]}
+  ],
+  "bindings": [],
+  "constants": []
+}

@@ -346,7 +346,33 @@ static void TestInterfaces(void)
     CHECK(VariableWith(OUTPUTS, 0, 4, mrhi_scalarNone) == mrhi_errorInvalid,
           "an output of no type");
     CHECK(VariableWith(OUTPUTS, 0, 5, 5) == mrhi_errorInvalid, "an output of five components");
-    CHECK(VariableWith(OUTPUTS, 0, 6, 1) == mrhi_errorInvalid, "an interpolated output");
+    CHECK(VariableWith(OUTPUTS, 0, 6, 2) == mrhi_errorInvalid, "a third blend source");
+    CHECK(VariableWith(OUTPUTS, 0, 6, 1) == mrhi_errorInvalid, "a second source alone");
+    // Dual-source blending: a second source at location 0 beside the
+    // first, of one type and component count.
+    Reset();
+    Variable(OUTPUTS, 1, 0, mrhi_scalarFloat32, 4, 1, 0);
+    Put16(Record(ENTRIES, 1, 48) + 30, 2);
+    CHECK(Built() == mrhi_success, "two sources at location 0");
+    Assemble();
+    mrhiContainer pair;
+    CHECK(mrhiParseContainer(s_container, s_size, &pair) == mrhi_success &&
+              mrhiContainerOutput(&pair, 0).blendSource == 0 &&
+              mrhiContainerOutput(&pair, 1).blendSource == 1 &&
+              mrhiContainerOutput(&pair, 1).interpolation == 0,
+          "each output's blend source");
+    Variable(OUTPUTS, 1, 0, mrhi_scalarFloat32, 3, 1, 0);
+    CHECK(Built() == mrhi_errorInvalid, "a second source of other components");
+    Variable(OUTPUTS, 1, 0, mrhi_scalarSint32, 4, 1, 0);
+    CHECK(Built() == mrhi_errorInvalid, "a second source of another type");
+    Variable(OUTPUTS, 1, 0, mrhi_scalarFloat32, 4, 0, 0);
+    CHECK(Built() == mrhi_errorInvalid, "two first sources at location 0");
+    Variable(OUTPUTS, 0, 0, mrhi_scalarFloat32, 4, 1, 0);
+    Variable(OUTPUTS, 1, 0, mrhi_scalarFloat32, 4, 1, 0);
+    CHECK(Built() == mrhi_errorInvalid, "two second sources");
+    Variable(OUTPUTS, 0, 1, mrhi_scalarFloat32, 4, 0, 0);
+    Variable(OUTPUTS, 1, 1, mrhi_scalarFloat32, 4, 1, 0);
+    CHECK(Built() == mrhi_errorInvalid, "a second source at location 1");
     CHECK(VariableWith(OUTPUTS, 0, 7, 1) == mrhi_errorInvalid, "a sampled output");
     Reset();
     Record(OUTPUTS, 0, 8)[4] = mrhi_scalarFloat16;

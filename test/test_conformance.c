@@ -29,6 +29,7 @@
 #include "maul-rhi/test.h"
 #include "shaders/bindless_container.h"
 #include "shaders/conformance_container.h"
+#include "shaders/dual_container.h"
 #include "shaders/f16_container.h"
 #include "shaders/instanced_container.h"
 #include "shaders/int64_container.h"
@@ -524,6 +525,7 @@ static Case s_cases[] = {
     {"capabilities.shader_int64", 0, 0},
     {"capabilities.unclipped_depth", 0, 0},
     {"capabilities.indirect_first_instance", 0, 0},
+    {"capabilities.dual_source_blending", 0, 0},
     {"capabilities.required", 0, 0},
     {"binding.draws", 0, 0},
     {"binding.culling", 0, 0},
@@ -2599,6 +2601,69 @@ static void CheckIndirectFirstInstance(Scene* scene)
           "destroyed");
 }
 
+// Dual-source blending (dualSourceBlending): over white, the first
+// source (0.25, 0.5, 0.75) plus white weighed by the second (0.5, 0.25,
+// 0.25) gives (0.75, 0.75, 1) over the target.
+static void CheckDualSourceBlending(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_dualContainer;
+    shaderDef.byteCount = sizeof(s_dualContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "the dual shader");
+    mrhiGraphicsPipelineDef def = GraphicsDef(shader);
+    def.colorTargets[0].blend = true;
+    def.colorTargets[0].color = (mrhiBlendComponent){mrhi_blendOne, mrhi_blendSrc1, mrhi_blendAdd};
+    def.colorTargets[0].alpha = (mrhiBlendComponent){mrhi_blendOne, mrhi_blendZero, mrhi_blendAdd};
+    mrhiGraphicsPipelineId pipeline = {0};
+    mrhiRequestId request = {0};
+    CHECK(mrhiCreateGraphicsPipeline(device, &def, &pipeline, &request) == mrhi_success,
+          "a pipeline blending two sources");
+    AwaitPipelines(device, 1, 0);
+    BeginScene(scene);
+    mrhiPassDef passDef = mrhiDefaultPassDef();
+    passDef.colorTargets[0] = (mrhiColorTarget){
+        .resource = scene->t,
+        .load = mrhi_loadClear,
+        .clear = {1.0f, 1.0f, 1.0f, 1.0f},
+    };
+    passDef.colorTargetCount = 1;
+    mrhiPassId draw = {0};
+    CHECK(mrhiAddPass(device, &passDef, &draw) == mrhi_success, "a pass");
+    mrhiAccess read = Whole(scene->t, mrhi_accessCopySource);
+    mrhiPassId reading = CopyPass(device, &read, 1);
+    CHECK(mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, draw) == mrhi_success &&
+              mrhiSetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
+              mrhiDraw(device, draw, 3, 1, 0, 0) == mrhi_success &&
+              mrhiEndPass(device, draw) == mrhi_success &&
+              mrhiBeginPass(device, reading) == mrhi_success,
+          "drawn");
+    mrhiRequestId color = ReadTarget(scene, reading);
+    CHECK(mrhiEndPass(device, reading) == mrhi_success, "read");
+    Finish(device, 1);
+    uint8_t pixels[256];
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, color, pixels, sizeof(pixels), &size) == mrhi_success &&
+              size == sizeof(pixels),
+          "the pixels");
+    static const uint8_t kBlended[4] = {191, 191, 255, 255};
+    bool blended = true;
+    for (int at = 0; at < 64 && s_runs; ++at)
+    {
+        if (blended && !IsNear(pixels + at * 4, kBlended))
+        {
+            printf("pixel %d: %u %u %u %u\n", at, pixels[at * 4], pixels[at * 4 + 1],
+                   pixels[at * 4 + 2], pixels[at * 4 + 3]);
+            blended = false;
+        }
+    }
+    CHECK(blended, "the first source plus white weighed by the second");
+    CHECK(mrhiDestroyGraphicsPipeline(device, pipeline) == mrhi_success &&
+              mrhiDestroyShader(device, shader) == mrhi_success,
+          "destroyed");
+}
+
 // Render state on the target: a first pass writes depth and stencil,
 // kept for a second that loads them and draws, from indirect arguments
 // past a draw of nothing, blue scaled by the blend constant only where
@@ -2996,6 +3061,10 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     if (features.indirectFirstInstance)
     {
         RUN("capabilities.indirect_first_instance", CheckIndirectFirstInstance(&scene));
+    }
+    if (features.dualSourceBlending)
+    {
+        RUN("capabilities.dual_source_blending", CheckDualSourceBlending(&scene));
     }
     RUN("binding.compute_split", {
         CheckComputeSplit(&scene, timestamps);

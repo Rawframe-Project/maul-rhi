@@ -1,4 +1,4 @@
-# Maul RHI conformance cases, SPI version 4 (mrhi-0024).
+# Maul RHI conformance cases, SPI version 5 (mrhi-0024).
 # A driver is admitted on a run that passes every case listed.
 api.adapters
 api.devices
@@ -11,6 +11,12 @@ capabilities.limits
 capabilities.formats
 capabilities.feature_formats
 capabilities.multiview
+capabilities.shader_f16
+capabilities.subgroups
+capabilities.shader_int64
+capabilities.unclipped_depth
+capabilities.indirect_first_instance
+capabilities.dual_source_blending
 capabilities.required
 binding.draws
 binding.culling

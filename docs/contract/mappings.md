@@ -675,6 +675,10 @@ restricted or absent-rejected, with how.
 | `mrhi_blendSrcAlphaSaturated` | direct: SRC_ALPHA_SATURATE | direct: D3D12_BLEND_SRC_ALPHA_SAT | direct: MTLBlendFactorSourceAlphaSaturated | direct: src-alpha-saturated |
 | `mrhi_blendConstant` | direct: CONSTANT_COLOR | direct: D3D12_BLEND_BLEND_FACTOR | direct: MTLBlendFactorBlendColor | direct: constant |
 | `mrhi_blendOneMinusConstant` | direct: ONE_MINUS_CONSTANT_COLOR | direct: D3D12_BLEND_INV_BLEND_FACTOR | direct: MTLBlendFactorOneMinusBlendColor | direct: one-minus-constant |
+| `mrhi_blendSrc1` | restricted: SRC1_COLOR, with dualSrcBlend | direct: D3D12_BLEND_SRC1_COLOR | direct: MTLBlendFactorSource1Color | restricted: src1, with dual-source-blending |
+| `mrhi_blendOneMinusSrc1` | restricted: ONE_MINUS_SRC1_COLOR, with dualSrcBlend | direct: D3D12_BLEND_INV_SRC1_COLOR | direct: MTLBlendFactorOneMinusSource1Color | restricted: one-minus-src1, with dual-source-blending |
+| `mrhi_blendSrc1Alpha` | restricted: SRC1_ALPHA, with dualSrcBlend | direct: D3D12_BLEND_SRC1_ALPHA | direct: MTLBlendFactorSource1Alpha | restricted: src1-alpha, with dual-source-blending |
+| `mrhi_blendOneMinusSrc1Alpha` | restricted: ONE_MINUS_SRC1_ALPHA, with dualSrcBlend | direct: D3D12_BLEND_INV_SRC1_ALPHA | direct: MTLBlendFactorOneMinusSource1Alpha | restricted: one-minus-src1-alpha, with dual-source-blending |
 
 ## mrhiBlendOperation
 

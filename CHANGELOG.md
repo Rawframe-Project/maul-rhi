@@ -17,11 +17,22 @@ format.
   draws (`capabilities.indirect_first_instance`), each run on the
   devices that grant the feature: a driver that grants one now passes
   its case.
+- Dual-source blending is reachable: `mrhiBlendFactor` gains
+  `mrhi_blendSrc1`, `mrhi_blendOneMinusSrc1`, `mrhi_blendSrc1Alpha` and
+  `mrhi_blendOneMinusSrc1Alpha`, and a container's color output carries
+  its blend source (`"blend_src": 1` in `tools/mrhi_container.py`'s
+  reflection), the second at location 0. The feature was granted, but
+  no factor or output could use it. Conformance checks it
+  (`capabilities.dual_source_blending`).
 - D3D12 grants `shaderF16` on devices with native 16-bit operations and
   shader model 6.2, as the mapping appendix says it maps.
 
 ### Changed
 
+- The driver SPI is version 5 (`MRHI_SPI_VERSION`): the container a
+  driver reads tells the shader features its code needs and each color
+  output's blend source. Its mustpass list is
+  `conformance/mustpass/spi-5.txt`; version 4's stays as released.
 - A container whose SPIR-V declares `Int64` has no WGSL section, as
   WGSL has no 64-bit integers; `tools/mrhi_container.py` takes `-` for
   its WGSL, and `tools/mrhi_dxil.py` compiles code declaring `Float16`

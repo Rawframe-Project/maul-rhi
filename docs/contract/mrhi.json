@@ -17325,6 +17325,98 @@
                   "note": "one-minus-constant"
                 }
               }
+            },
+            {
+              "name": "blend_src1",
+              "value": 13,
+              "doc": "The fragment's second source (dual-source blending).",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "SRC1_COLOR, with dualSrcBlend"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_SRC1_COLOR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorSource1Color"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "src1, with dual-source-blending"
+                }
+              }
+            },
+            {
+              "name": "blend_one_minus_src1",
+              "value": 14,
+              "doc": "1 minus the second source.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ONE_MINUS_SRC1_COLOR, with dualSrcBlend"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_INV_SRC1_COLOR"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorOneMinusSource1Color"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "one-minus-src1, with dual-source-blending"
+                }
+              }
+            },
+            {
+              "name": "blend_src1_alpha",
+              "value": 15,
+              "doc": "The second source's alpha.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "SRC1_ALPHA, with dualSrcBlend"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_SRC1_ALPHA"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorSource1Alpha"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "src1-alpha, with dual-source-blending"
+                }
+              }
+            },
+            {
+              "name": "blend_one_minus_src1_alpha",
+              "value": 16,
+              "doc": "1 minus the second source's alpha.",
+              "mapping": {
+                "vulkan": {
+                  "class": "restricted",
+                  "note": "ONE_MINUS_SRC1_ALPHA, with dualSrcBlend"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "D3D12_BLEND_INV_SRC1_ALPHA"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "MTLBlendFactorOneMinusSource1Alpha"
+                },
+                "web_gpu": {
+                  "class": "restricted",
+                  "note": "one-minus-src1-alpha, with dual-source-blending"
+                }
+              }
             }
           ]
         },

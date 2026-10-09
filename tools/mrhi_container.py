@@ -208,7 +208,7 @@ def unique(values, what):
 def pack_variable(item, role, enums, where):
     """An interface record: a vertex input, a color output or an
     inter-stage variable, whose interpolation defaults as WGSL's does."""
-    keys(item, ("location", "type", "components", "interpolation", "sampling"), where)
+    keys(item, ("location", "type", "components", "interpolation", "sampling", "blend_src"), where)
     high = COLOR_TARGETS - 1 if role == "output" else 0xFFFFFFFF
     location = number(item.get("location"), f"{where}: a location", 0, high)
     kind = item.get("type")
@@ -228,6 +228,13 @@ def pack_variable(item, role, enums, where):
     else:
         need("interpolation" not in item and "sampling" not in item,
              f"{where}: only inter-stage variables interpolate")
+    # A color output's byte 6 is its blend source (dual-source blending),
+    # the second at location 0 only.
+    source = item.get("blend_src", 0)
+    need("blend_src" not in item or role == "output", f"{where}: only color outputs blend")
+    need(source in (0, 1) and (source == 0 or location == 0),
+         f"{where}: a blend source is 0, or 1 at location 0")
+    interpolation = source if role == "output" else interpolation
     return location, struct.pack("<IBBBB", location, code, components, interpolation, sampling)
 
 
@@ -239,7 +246,14 @@ def pack_range(entry, key, role, enums, records, where, allowed):
     first = len(records)
     for item in items:
         records.append(pack_variable(item, role, enums, where))
-    unique([loc for loc, _ in records[first:]], f"{key} location in {where}")
+    packed = records[first:]
+    # Two color outputs share location 0 as the two blend sources, of one
+    # type and component count.
+    unique([(loc, record[6] if role == "output" else 0) for loc, record in packed],
+           f"{key} location in {where}")
+    sources = {record[6]: record[4:6] for loc, record in packed if role == "output" and loc == 0}
+    need(1 not in sources or sources.get(0) == sources[1],
+         f"{where}: a second blend source beside a first of its type and components")
     need(len(records) <= MAX_RECORDS, "too many records")
     return first, len(items)
 
