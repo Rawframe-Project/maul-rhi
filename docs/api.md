@@ -584,9 +584,9 @@ MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyComputePipeline(mrhiDevice* device
 Destroys a compute pipeline. A pending one's request is answered with mrhi_errorStale.  @param device    The device. @param pipeline  The pipeline. @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device; `mrhi_errorStale` for a pipeline the device no longer has. @par Thread safety Safe from any thread; the device is used by one thread at a time.
 
 ```c
-MRHI_NODISCARD MRHI_API mrhiResult mrhiGetPipelineCache(mrhiDevice* device, void* bytesOut, size_t capacity, size_t* sizeOut);
+MRHI_NODISCARD MRHI_API mrhiResult mrhiGetPipelineCache(mrhiDevice* device, void* bytes, size_t capacity, size_t* sizeOut);
 ```
-Writes the device's pipeline cache, for a later device's def: the driver's compiled pipelines in a checked envelope.  @param device    The device. @param bytesOut  Receives the cache, or NULL to learn its size. @param capacity  The bytes bytesOut holds. @param sizeOut   Receives the cache's size. @return `mrhi_success` with the cache written, or only its size when bytesOut is NULL; `mrhi_errorInvalid` for a NULL device or sizeOut; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when capacity is less than the size, which sizeOut receives; `mrhi_errorPlatform` when the driver fails to write it. @par Thread safety Safe from any thread; the device is used by one thread at a time.
+Writes the device's pipeline cache, for a later device's def: the driver's compiled pipelines in a checked envelope.  @param device    The device. @param bytes     Receives the cache, or NULL to learn its size. @param capacity  The bytes it holds. @param sizeOut   Receives the cache's size. @return `mrhi_success` with the cache written, or only its size when bytes is NULL; `mrhi_errorInvalid` for a NULL device or sizeOut; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when capacity is less than the size, which sizeOut receives; `mrhi_errorPlatform` when the driver fails to write it. @par Thread safety Safe from any thread; the device is used by one thread at a time.
 
 ```c
 MRHI_NODISCARD MRHI_API mrhiResult mrhiGetPipelineCacheOutcome(mrhiDevice* device);
