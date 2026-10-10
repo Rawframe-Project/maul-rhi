@@ -140,7 +140,7 @@ extern "C"
     {
         mrhiInstanceNotificationKind kind;
         // The request the record answers.
-        mrhiRequestId requestId;
+        mrhiRequestId request;
         // How the request ended.
         mrhiResult outcome;
     } mrhiInstanceNotification;

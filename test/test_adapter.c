@@ -55,7 +55,7 @@ static mrhiResult Find(mrhiInstance* instance, mrhiPowerPreference preference, b
     mrhiInstanceNotification record = {0};
     CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success, "an answer");
     CHECK(record.kind == mrhi_instanceAdaptersFound, "an adapters record");
-    CHECK(record.requestId.index1 == request.index1 && request.index1 != 0, "its request");
+    CHECK(record.request.index1 == request.index1 && request.index1 != 0, "its request");
     CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_empty, "exactly one answer");
     return record.outcome;
 }
@@ -141,13 +141,13 @@ static void TestAnswerComesAtTheDrain(void)
           "nothing listed before the answer");
     mrhiInstanceNotification record;
     CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
-              record.requestId.index1 == a.index1,
+              record.request.index1 == a.index1,
           "a answers first");
     CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
-              record.requestId.index1 == b.index1,
+              record.request.index1 == b.index1,
           "then b");
     CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
-              record.requestId.index1 == c.index1,
+              record.request.index1 == c.index1,
           "then c");
     CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_empty, "then nothing");
     CHECK(mrhiGetAdapters(instance, nullptr, 0, &count) == mrhi_success && count == 3,
@@ -168,7 +168,7 @@ static void TestManyRequestsAtOnce(void)
     int answers = 0;
     while (mrhiNextInstanceNotification(instance, &record) == mrhi_success)
     {
-        CHECK(record.requestId.index1 == (uint32_t)answers + 1, "in order");
+        CHECK(record.request.index1 == (uint32_t)answers + 1, "in order");
         ++answers;
     }
     CHECK(answers == 20, "every request answered once");

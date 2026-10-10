@@ -136,12 +136,12 @@ static bool Finish(mrhiRequestId token, const mrhiRequestId* readbacks, uint32_t
     CHECK(mrhiWaitFrame(s_device, token, 1) == mrhi_success, "finished");
     mrhiDeviceNotification record;
     bool answered = mrhiNextDeviceNotification(s_device, &record) == mrhi_success &&
-                    record.kind == mrhi_deviceFrameDone && record.requestId.index1 == token.index1;
+                    record.kind == mrhi_deviceFrameDone && record.request.index1 == token.index1;
     for (uint32_t i = 0; i < count; ++i)
     {
         answered = answered && mrhiNextDeviceNotification(s_device, &record) == mrhi_success &&
                    record.kind == mrhi_deviceReadbackReady &&
-                   record.requestId.index1 == readbacks[i].index1 && record.outcome == outcome;
+                   record.request.index1 == readbacks[i].index1 && record.outcome == outcome;
     }
     return answered && mrhiNextDeviceNotification(s_device, &record) == mrhi_empty;
 }

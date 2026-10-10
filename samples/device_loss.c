@@ -79,15 +79,15 @@ static void Lose(Sample* sample, mrhiBufferId buffer)
                 mrhiNextDeviceNotification(device, &record) == mrhi_success &&
                     record.kind == mrhi_deviceLostNotice && record.outcome == mrhi_errorDeviceLost,
                 "the notice first");
-    SampleCheck(
-        sample,
-        mrhiNextDeviceNotification(device, &record) == mrhi_success &&
-            record.kind == mrhi_deviceFrameDone && record.requestId.index1 == token.index1 &&
-            record.outcome == mrhi_errorDeviceLost &&
-            mrhiNextDeviceNotification(device, &record) == mrhi_success &&
-            record.kind == mrhi_deviceReadbackReady && record.requestId.index1 == readback.index1 &&
-            record.outcome == mrhi_errorDeviceLost,
-        "the frame and its readback answered lost");
+    SampleCheck(sample,
+                mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+                    record.kind == mrhi_deviceFrameDone && record.request.index1 == token.index1 &&
+                    record.outcome == mrhi_errorDeviceLost &&
+                    mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+                    record.kind == mrhi_deviceReadbackReady &&
+                    record.request.index1 == readback.index1 &&
+                    record.outcome == mrhi_errorDeviceLost,
+                "the frame and its readback answered lost");
     mrhiDeviceLossReport report;
     SampleCheck(sample,
                 mrhiGetDeviceLossReport(device, &report) == mrhi_success &&

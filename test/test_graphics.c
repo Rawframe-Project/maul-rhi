@@ -170,8 +170,8 @@ static void TestCreate(void)
           "a graphics pipeline");
     mrhiDeviceNotification record;
     CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success &&
-              record.kind == mrhi_devicePipelineReady &&
-              record.requestId.index1 == request.index1 && record.outcome == mrhi_success,
+              record.kind == mrhi_devicePipelineReady && record.request.index1 == request.index1 &&
+              record.outcome == mrhi_success,
           "answered ready");
     mrhiComputePipelineId other = {pipeline.index1, pipeline.generation};
     CHECK(mrhiDestroyComputePipeline(device, other) == mrhi_errorStale, "not a compute pipeline");

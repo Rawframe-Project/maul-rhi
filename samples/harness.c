@@ -166,8 +166,8 @@ static bool AwaitPipeline(Sample* sample, mrhiRequestId request)
     mrhiDeviceNotification record;
     while (NextDevice(sample->device, &record) == mrhi_success)
     {
-        if (record.kind == mrhi_devicePipelineReady && record.requestId.index1 == request.index1 &&
-            record.requestId.generation == request.generation)
+        if (record.kind == mrhi_devicePipelineReady && record.request.index1 == request.index1 &&
+            record.request.generation == request.generation)
         {
             return record.outcome == mrhi_success;
         }

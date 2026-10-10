@@ -3258,12 +3258,12 @@ static void CheckLoss(mrhiInstance* instance, mrhiAdapterId adapter)
               notice.kind == mrhi_deviceLostNotice,
           "the notice first");
     CHECK(mrhiNextDeviceNotification(device, &notice) == mrhi_success &&
-              notice.kind == mrhi_deviceFrameDone && notice.requestId.index1 == token.index1 &&
+              notice.kind == mrhi_deviceFrameDone && notice.request.index1 == token.index1 &&
               notice.outcome == mrhi_errorDeviceLost,
           "the frame answered lost");
     CHECK(mrhiNextDeviceNotification(device, &notice) == mrhi_success &&
-              notice.kind == mrhi_deviceReadbackReady &&
-              notice.requestId.index1 == readback.index1 && notice.outcome == mrhi_errorDeviceLost,
+              notice.kind == mrhi_deviceReadbackReady && notice.request.index1 == readback.index1 &&
+              notice.outcome == mrhi_errorDeviceLost,
           "its readback answered lost");
     mrhiDeviceLossReport report;
     CHECK(mrhiGetDeviceLossReport(device, &report) == mrhi_success &&

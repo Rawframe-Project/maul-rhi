@@ -83,8 +83,8 @@ static void TestCreate(void)
               pipeline.index1 != 0 && request.index1 != 0,
           "a pipeline, pending");
     mrhiDeviceNotification record = Next(device);
-    CHECK(record.kind == mrhi_devicePipelineReady && record.requestId.index1 == request.index1 &&
-              record.requestId.generation == request.generation && record.outcome == mrhi_success,
+    CHECK(record.kind == mrhi_devicePipelineReady && record.request.index1 == request.index1 &&
+              record.request.generation == request.generation && record.outcome == mrhi_success,
           "answered ready");
     CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_empty, "once");
     mrhiComputePipelineId second = {0};
@@ -281,7 +281,7 @@ static void TestPendingAndOutcome(void)
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_success, "again");
     CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success, "destroyed pending");
     mrhiDeviceNotification record = Next(device);
-    CHECK(record.kind == mrhi_devicePipelineReady && record.requestId.index1 == request.index1 &&
+    CHECK(record.kind == mrhi_devicePipelineReady && record.request.index1 == request.index1 &&
               record.outcome == mrhi_errorStale,
           "answered stale at once");
     CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_empty, "and never by the driver");

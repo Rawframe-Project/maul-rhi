@@ -35,7 +35,7 @@ static void TestLifecycle(void)
     CHECK(token.index1 == 1 && token.generation == 1, "the first token");
     mrhiDeviceNotification record;
     CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success, "answered");
-    CHECK(record.kind == mrhi_deviceFrameDone && record.requestId.index1 == token.index1 &&
+    CHECK(record.kind == mrhi_deviceFrameDone && record.request.index1 == token.index1 &&
               record.outcome == mrhi_success,
           "the frame is done");
     CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_empty, "once");
@@ -43,8 +43,7 @@ static void TestLifecycle(void)
     mrhiRequestId next = Run(device);
     CHECK(next.index1 == 2, "the next token");
     CHECK(mrhiWaitFrame(device, next, 0) == mrhi_success, "finished by now");
-    CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success &&
-              record.requestId.index1 == 2,
+    CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success && record.request.index1 == 2,
           "and still answered once");
     CHECK(mrhiGetDeviceMisuse(device) == 0, "no misuse");
     Close(device);
@@ -64,7 +63,7 @@ static void TestFramesInFlight(void)
     CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_empty, "nothing finished");
     CHECK(mrhiWaitFrame(device, second, 1) == mrhi_success, "the second waited for");
     CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success &&
-              record.requestId.index1 == second.index1,
+              record.request.index1 == second.index1,
           "the second answered");
     CHECK(mrhiWaitFrame(device, first, 0) == mrhi_timeout, "the first still running");
     CHECK(mrhiWaitFrame(device, first, 1000000) == mrhi_success, "waited for");
@@ -72,7 +71,7 @@ static void TestFramesInFlight(void)
     mrhiRequestId third = {0};
     CHECK(mrhiSubmitFrame(device, &third) == mrhi_success && third.index1 == 3, "the third");
     CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success &&
-              record.requestId.index1 == first.index1,
+              record.request.index1 == first.index1,
           "the first answered");
     CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_empty, "the third held");
     CHECK(mrhiWaitFrame(device, third, 1) == mrhi_success, "the third");
@@ -110,15 +109,15 @@ static void TestQueueWraps(void)
     mrhiRequestId b = Run(device);
     mrhiDeviceNotification record;
     CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success &&
-              record.requestId.index1 == a.index1,
+              record.request.index1 == a.index1,
           "the first");
     mrhiRequestId c = Run(device);
     CHECK(Begin(device) == mrhi_success, "the third's answer taken in, past the queue's end");
     CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success &&
-              record.requestId.index1 == b.index1,
+              record.request.index1 == b.index1,
           "the second");
     CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success &&
-              record.requestId.index1 == c.index1,
+              record.request.index1 == c.index1,
           "the third, from the queue's start");
     CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
     Close(device);

@@ -1120,7 +1120,7 @@
               "type": "enum.instance_notification_kind"
             },
             {
-              "name": "request_id",
+              "name": "request",
               "type": "id.request_id",
               "doc": "The request the record answers."
             },
@@ -11620,7 +11620,7 @@
               "type": "enum.device_notification_kind"
             },
             {
-              "name": "request_id",
+              "name": "request",
               "type": "id.request_id",
               "doc": "The request the record answers: a frame's token, a pipeline's request or a readback's, unique on the device."
             },

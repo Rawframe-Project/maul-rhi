@@ -83,8 +83,8 @@ static bool Next(mrhiDeviceNotificationKind kind, uint32_t request)
 {
     mrhiDeviceNotification record;
     return mrhiNextDeviceNotification(s_device, &record) == mrhi_success && record.kind == kind &&
-           record.requestId.index1 == request &&
-           record.requestId.generation == (request != 0 ? 1u : 0u) &&
+           record.request.index1 == request &&
+           record.request.generation == (request != 0 ? 1u : 0u) &&
            record.outcome == mrhi_errorDeviceLost;
 }
 
@@ -127,7 +127,7 @@ static void TestLostAtPoll(void)
     CHECK(freed.index1 < compiling.index1, "the compiling one in the later slot");
     CHECK(mrhiDestroyComputePipeline(s_device, freed) == mrhi_success &&
               mrhiNextDeviceNotification(s_device, &record) == mrhi_success &&
-              record.requestId.index1 == first.index1 && record.outcome == mrhi_errorStale,
+              record.request.index1 == first.index1 && record.outcome == mrhi_errorStale,
           "the first destroyed while compiling, answered stale");
     s_lose = true;
     CHECK(mrhiGetDeviceState(s_device) == mrhi_deviceReady, "lost at the next poll");

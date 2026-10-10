@@ -82,7 +82,7 @@ static mrhiResult Ready(mrhiInstance* instance, mrhiRequestId request)
     mrhiInstanceNotification record = {0};
     CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success, "a record");
     CHECK(record.kind == mrhi_instanceDeviceReady, "a device ready record");
-    CHECK(record.requestId.index1 == request.index1, "its request");
+    CHECK(record.request.index1 == request.index1, "its request");
     CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_empty, "exactly one");
     return record.outcome;
 }
