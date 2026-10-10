@@ -85,10 +85,22 @@ jobs:
         timeout-minutes: 15
         if: runner.os == 'Linux'
         run: |
+          # A mirror can trickle a package for the whole step, below the
+          # stall timeout: the downloads get four minutes a try, three tries,
+          # and installing, which must not be cut short, runs after them.
+          fetch() {
+            for try in 1 2 3; do
+              timeout 240 sudo apt-get $APT_OPTIONS install -y -q --download-only "$@" && return 0
+              echo "download try $try timed out or failed"
+            done
+            return 1
+          }
           sudo apt-get $APT_OPTIONS update -q
           # clang without its recommends (llvm-20-dev alone is 50 MB), with
           # the sanitizers' runtime.
+          fetch --no-install-recommends clang-20 libclang-rt-20-dev
           sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends clang-20 libclang-rt-20-dev
+          fetch gcc-14 g++-14 ninja-build mesa-vulkan-drivers vulkan-validationlayers libxcb1-dev xvfb
           sudo apt-get $APT_OPTIONS install -y -q gcc-14 g++-14 ninja-build \
             mesa-vulkan-drivers vulkan-validationlayers libxcb1-dev xvfb
       - name: Configure
