@@ -8,6 +8,10 @@ format.
 
 ## [Unreleased]
 
+### Changed
+
+- `mrhiDefaultInstanceDef` is built in the program, from the headers it includes (a `static inline` function), so the contract version it stamps is the program's: the instance now refuses a program built against another contract version, which the default made in the library never let it see. The contract version is 5, as the library no longer exports that function; `MRHI_INSTANCE_DEF_COOKIE` names the def's cookie.
+
 ## [0.6.0] - 2026-10-09
 
 Every optional feature a driver grants now has a conformance case, and

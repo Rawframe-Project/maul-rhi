@@ -735,7 +735,7 @@ restricted or absent-rejected, with how.
 | `mrhiInstanceNotification` | a record of the library's own notification queue |
 | `mrhiInstanceLimits` | sizes of the library's own tables |
 | `mrhiExternalDriverDef` | hands the library a driver of its SPI, whatever API that driver speaks |
-| `mrhiDefaultInstanceDef` | fills a def with the library's defaults |
+| `mrhiDefaultInstanceDef` | fills a def in the program's build |
 | `mrhiGetInstanceMisuse` | reads the library's misuse count |
 | `mrhiNextInstanceDiagnostic` | reads the library's own diagnostic queue |
 | `mrhiGetDriverFaults` | reads the library's validation layer count |

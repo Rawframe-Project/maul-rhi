@@ -27,7 +27,7 @@ extern "C"
 
 // The contract version a program is built against. An instance refuses any
 // other before 1.0.
-#define MRHI_CONTRACT_VERSION 4
+#define MRHI_CONTRACT_VERSION 5
 
 // MRHI_API marks the public functions: dllexport or dllimport in a
 // shared Windows build (maul_rhi_EXPORTS is defined while building

@@ -265,6 +265,10 @@ def check_function(errors, where, item, kind_of):
     for arg in item.get("args", []):
         if not arg.get("doc"):
             errors.append(f"{where}: argument '{arg.get('name')}' needs a doc")
+    body = item.get("inline_body")
+    if body is not None and (not isinstance(body, list) or not body or
+                             not all(isinstance(line, str) for line in body)):
+        errors.append(f"{where}: an inline body is a list of C lines")
     safety = item.get("thread_safety", {})
     if safety.get("class") not in THREAD_SAFETY:
         errors.append(f"{where}: unknown thread safety class '{safety.get('class')}'")
@@ -482,6 +486,12 @@ def emit_function(names, item):
                      "///")
     returns = item.get("returns")
     result = c_type(names, returns) if returns else "void"
+    if item.get("inline_body"):
+        # Built by the program from its own headers, so that a default
+        # stamps the version the program was built with.
+        return lines + [f"    static inline {result} "
+                        f"{names.function(item['name'])}({c_signature(names, item)})", "    {"] + [
+            "        " + line for line in item["inline_body"]] + ["    }"]
     nodiscard = f"{names.macro}_NODISCARD " if returns and returns["type"] == "result" else ""
     return lines + [f"    {nodiscard}{names.macro}_API {result} "
                     f"{names.function(item['name'])}({c_signature(names, item)});"]

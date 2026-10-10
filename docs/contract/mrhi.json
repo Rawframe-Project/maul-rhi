@@ -1226,9 +1226,15 @@
           }
         },
         {
+          "kind": "constant",
+          "name": "instance_def_cookie",
+          "value": 1836214638,
+          "doc": "The cookie of an instance def, which mrhiDefaultInstanceDef sets and the instance checks."
+        },
+        {
           "kind": "function",
           "name": "default_instance_def",
-          "doc": "Returns the default instance def: the contract version the program is built against, the C library's allocator and the default limits (8 chained structs per def, 64 notifications, 16 adapters).",
+          "doc": "Returns the default instance def, built in the program from the headers it includes: their contract version, the C library's allocator and the default limits (8 chained structs per def, 64 notifications, 16 adapters, 16 surfaces). Being the program's own, it lets the instance refuse a program built against another contract version rather than read a def of another layout.",
           "returns": {
             "type": "struct.instance_def",
             "doc": "The def, with a valid cookie."
@@ -1237,7 +1243,21 @@
           "thread_safety": {
             "class": "any"
           },
-          "library": "fills a def with the library's defaults"
+          "library": "fills a def in the program's build",
+          "inline_body": [
+            "#ifdef __cplusplus",
+            "mrhiInstanceDef def = {};",
+            "#else",
+            "mrhiInstanceDef def = {0};",
+            "#endif",
+            "def.cookie = MRHI_INSTANCE_DEF_COOKIE;",
+            "def.contractVersion = MRHI_CONTRACT_VERSION;",
+            "def.limits.chainDepth = 8;",
+            "def.limits.notifications = 64;",
+            "def.limits.adapters = 16;",
+            "def.limits.surfaces = 16;",
+            "return def;"
+          ]
         },
         {
           "kind": "function",
@@ -22121,5 +22141,5 @@
       ]
     }
   ],
-  "contract_version": 4
+  "contract_version": 5
 }

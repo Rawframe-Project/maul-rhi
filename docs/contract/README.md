@@ -31,7 +31,7 @@ Every item has a `kind`, a snake_case `name` and a `doc`.
 | `opaque` | none | a typed opaque pointer's struct, for a root object |
 | `id` | none | a generation-checked id, `{ index1, generation }` (family record 0016) |
 | `struct` | `members`: `name`, `type`, optional `doc`, `pointer`; optional `def` or `chained` | a typedef struct; a def opens with `cookie` and `next` (mrhi-0005), a chained struct with `mrhiChain chain` |
-| `function` | `args` (`name`, `type`, `doc`), optional `returns` (`type`, `doc`), `thread_safety` | a documented declaration; one returning `result` is nodiscard |
+| `function` | `args` (`name`, `type`, `doc`), optional `returns` (`type`, `doc`), `thread_safety`, optional `inline_body` (C lines) | a documented declaration; one returning `result` is nodiscard; one with an `inline_body` a `static inline` function the program builds, as a default that must stamp the program's headers (`mrhiDefaultInstanceDef`) |
 
 C names follow `docs/conventions.md` section 4: `get_version` becomes
 `mrhiGetVersion`, the struct `version` becomes `mrhiVersion`, the value
