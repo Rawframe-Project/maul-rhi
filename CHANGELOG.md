@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-10
+
+A contract version check that can refuse: the default instance def is
+built in the program, so a program built against other headers is
+refused rather than read in another layout; the notification records'
+request field renamed. Contract version 5.
+
 ### Changed
 
 - The notification records' `requestId` fields are named `request` (`mrhiInstanceNotification`, `mrhiDeviceNotification`), as the family names a typed id for what it names; rename the field where a program reads it.
