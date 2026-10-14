@@ -8,6 +8,10 @@ format.
 
 ## [Unreleased]
 
+### Fixed
+
+- `tools/mrhi_dxil.py` refuses HLSL in which SPIRV-Cross reads a loop's variable after the loop's continue block stepped it (`_5736++;` then a load indexed by `_5736`), which compiled to code reading the next iteration's element; SPIRV-Cross 2021.01 and vulkan-sdk-1.4.363.0 both write it. Read the value inside the loop's body, before the step.
+
 ## [0.7.0] - 2026-10-10
 
 A contract version check that can refuse: the default instance def is

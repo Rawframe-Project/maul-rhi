@@ -359,4 +359,7 @@ register 0 of a space of its own from 16, in the order the module
 declares them, so that arrays of one class never collide, crosses each
 entry to HLSL that reads the vertex information, defines each unfixed
 constant as a read of the constants' buffer, and compiles
-`DIR/ENTRY.dxil` without reflection or debug data.
+`DIR/ENTRY.dxil` without reflection or debug data. It refuses HLSL
+that reads a loop's variable after the loop's continue block stepped
+it, which SPIRV-Cross writes for some loops and which would read the
+next iteration's element.
