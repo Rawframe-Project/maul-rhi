@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Shader containers on a device (mrhi-0009): the container checked as
-// hostile input and against the device, its reflection kept for the
-// shader and its pipelines, and its code handed to the driver.
+// Shader containers on a device: the container checked as hostile
+// input and against the device, its reflection kept for the shader
+// and its pipelines, and its code handed to the driver.
 
 #include "device_core.h"
 #include "label.h"

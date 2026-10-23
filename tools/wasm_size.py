@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Sirac Ozmen
 #
-# The wasm budget (mrhi-0001): links a web build of the library, made at
-# -Oz without its tests, into a program that exports every public
-# function, so nothing the API reaches is dropped, prints the wasm and
-# JavaScript sizes, and fails when the wasm passes BUDGET. emcc must be
-# on the path.
+# The wasm budget: links a web build of the library, made at -Oz without
+# its tests, into a program that exports every public function, so
+# nothing the API reaches is dropped, prints the wasm and JavaScript
+# sizes, and fails when the wasm passes BUDGET. emcc must be on the
+# path.
 #
 # usage: wasm_size.py <libmaul-rhi.a>
 

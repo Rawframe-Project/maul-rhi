@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Sirac Ozmen
 #
-# Compiles the library's own D3D12 kernels (mrhi-0020) to DXIL with DXC,
-# each with its root signature embedded, and writes each as bytes to
+# Compiles the library's own D3D12 kernels to DXIL with DXC, each with
+# its root signature embedded, and writes each as bytes to
 # src/generated/NAME.h. DXC signs the DXIL when its validator (libdxil)
 # sits beside it. CI runs no DXC; the headers are committed, and this
 # script is run again whenever a kernel's source changes.

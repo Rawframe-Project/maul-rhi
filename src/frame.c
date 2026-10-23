@@ -2,9 +2,9 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Frames: one open at a time on a device, submitted to its driver with a
-// token, and answered once in the device's notification queue (family
-// record 0018) when the GPU finishes. Taking in finished frames polls the
-// driver; nothing here blocks unless the program waits.
+// token, and answered once in the device's notification queue when the
+// GPU finishes. Taking in finished frames polls the driver; nothing here
+// blocks unless the program waits.
 
 #include "device_core.h"
 #include "invariant.h"

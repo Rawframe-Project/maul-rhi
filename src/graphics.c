@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Graphics pipelines (mrhi-0010): every state of the def checked against
-// its shader's reflection, the device and WebGPU's rules for render
+// Graphics pipelines: every state of the def checked against its
+// shader's reflection, the device and WebGPU's rules for render
 // pipelines, before the driver sees it. A contradiction is invalid
 // input; what the device cannot do is unsupported, and invalid input
 // wins when both are found. Arrays longer than their limit are refused

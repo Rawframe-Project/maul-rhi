@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The walk of a submitted frame (mrhi-0013): each resource, pass and
-// barrier of the view, and each command record of each pass, checked
-// against the frame and the device's handles. The test driver traps on
-// what it finds; the validation layer counts it (mrhi-0025).
+// The walk of a submitted frame: each resource, pass and barrier of
+// the view, and each command record of each pass, checked against the
+// frame and the device's handles. The test driver traps on what it
+// finds; the validation layer counts it.
 
 #include "frame_walk.h"
 

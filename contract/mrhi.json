@@ -175,7 +175,7 @@
           "kind": "enum",
           "name": "struct_type",
           "width": "uint32",
-          "doc": "The type of a chained struct. Bit 31 clear marks a critical extension, which a library that does not know it refuses; bit 31 set marks a hint it may skip. Types with bit 30 set (MRHI_STRUCT_DRIVER_DEFINED) belong to drivers built outside the tree (mrhi-0024).",
+          "doc": "The type of a chained struct. Bit 31 clear marks a critical extension, which a library that does not know it refuses; bit 31 set marks a hint it may skip. Types with bit 30 set (MRHI_STRUCT_DRIVER_DEFINED) belong to drivers built outside the tree.",
           "values": [
             {
               "name": "struct_none",
@@ -250,7 +250,7 @@
             {
               "name": "struct_external_driver",
               "value": 14,
-              "doc": "mrhiExternalDriverDef, on an instance def: a driver made outside the library (mrhi-0024)."
+              "doc": "mrhiExternalDriverDef, on an instance def: a driver made outside the library."
             }
           ],
           "library": "tags of the library's extension chain"
@@ -259,7 +259,7 @@
           "kind": "constant",
           "name": "struct_driver_defined",
           "value": 1073741824,
-          "doc": "The bit of a chained struct type defined by a driver built outside the tree: such a struct is a surface's source on an instance of that driver, handed to it unexamined, and refused everywhere else (mrhi-0024)."
+          "doc": "The bit of a chained struct type defined by a driver built outside the tree: such a struct is a surface's source on an instance of that driver, handed to it unexamined, and refused everywhere else."
         },
         {
           "kind": "struct",
@@ -327,7 +327,7 @@
           "kind": "enum",
           "name": "diagnostic_code",
           "width": "uint16",
-          "doc": "The check a diagnostic record reports (mrhi-0027): one check of the core that refused a call as invalid input, or, in a build with the validation layer, one rule of the driver SPI that the driver broke (the driver codes, recorded in the instance's queue). Codes are fixed from the first release that carries them, and only added after it; mrhiDiagnosticText gives each one's text.",
+          "doc": "The check a diagnostic record reports: one check of the core that refused a call as invalid input, or, in a build with the validation layer, one rule of the driver SPI that the driver broke (the driver codes, recorded in the instance's queue). Codes are fixed from the first release that carries them, and only added after it; mrhiDiagnosticText gives each one's text.",
           "values": [
             {
               "name": "diagnostic_null_argument",
@@ -889,7 +889,7 @@
             {
               "name": "driver_external",
               "value": 5,
-              "doc": "A driver made outside the library and handed to the instance (mrhi-0024); its adapters' names tell such drivers apart."
+              "doc": "A driver made outside the library and handed to the instance; its adapters' names tell such drivers apart."
             }
           ],
           "library": "names the library's drivers, one per API"
@@ -1164,7 +1164,7 @@
           "kind": "struct",
           "name": "external_driver_def",
           "chained": true,
-          "doc": "A driver made outside the library against its SPI headers (maul-rhi/spi, mrhi-0024), chained on an instance def with the type mrhi_structExternalDriver. The instance starts it instead of the build's own driver. From a successful create the instance owns it and destroys it at its end; when the create fails, the program still owns it.",
+          "doc": "A driver made outside the library against its SPI headers (maul-rhi/spi), chained on an instance def with the type mrhi_structExternalDriver. The instance starts it instead of the build's own driver. From a successful create the instance owns it and destroys it at its end; when the create fails, the program still owns it.",
           "members": [
             {
               "name": "vtable",
@@ -1188,9 +1188,9 @@
           "doc": "How an instance is made. Build it with mrhiDefaultInstanceDef.",
           "members": [
             {
-              "name": "contract_version",
+              "name": "abi_version",
               "type": "uint32",
-              "doc": "MRHI_CONTRACT_VERSION, as the program was built."
+              "doc": "MRHI_ABI_VERSION, as the program was built: the release whose binary interface it expects."
             },
             {
               "name": "allocator",
@@ -1229,7 +1229,7 @@
         {
           "kind": "function",
           "name": "default_instance_def",
-          "doc": "Returns the default instance def, built in the program from the headers it includes: their contract version, the C library's allocator and the default limits (8 chained structs per def, 64 notifications, 16 adapters, 16 surfaces). Being the program's own, it lets the instance refuse a program built against another contract version rather than read a def of another layout.",
+          "doc": "Returns the default instance def, built in the program from the headers it includes: their ABI version, the C library's allocator and the default limits (8 chained structs per def, 64 notifications, 16 adapters, 16 surfaces). Being the program's own, it lets the instance refuse a program built against another release rather than read a def of another layout.",
           "returns": {
             "type": "struct.instance_def",
             "doc": "The def, with a valid cookie."
@@ -1246,7 +1246,7 @@
             "mrhiInstanceDef def = {0};",
             "#endif",
             "def.cookie = MRHI_INSTANCE_DEF_COOKIE;",
-            "def.contractVersion = MRHI_CONTRACT_VERSION;",
+            "def.abiVersion = MRHI_ABI_VERSION;",
             "def.limits.chainDepth = 8;",
             "def.limits.notifications = 64;",
             "def.limits.adapters = 16;",
@@ -1260,7 +1260,7 @@
           "doc": "Makes an instance.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a zero limit, an allocator with one function, an external driver without a vtable or with one smaller than the library knows or lacking a function, or an external driver beside the test driver or Vulkan structs; `mrhi_errorVersion` when the def's contract version is not the library's, or an external driver's SPI version is not its; `mrhi_errorUnsupported` for a critical extension the library does not know, such as mrhiTestDriverDef in a build without the test driver; `mrhi_errorCapacity` when the chain is deeper than the limit or the allocator fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a zero limit, an allocator with one function, an external driver without a vtable or with one smaller than the library knows or lacking a function, or an external driver beside the test driver or Vulkan structs; `mrhi_errorVersion` when the def carries its cookie but was stamped by another release's headers (its abiVersion is not MRHI_ABI_VERSION), checked before anything else of the def is read, or an external driver's SPI version is not the library's; `mrhi_errorUnsupported` for a critical extension the library does not know, such as mrhiTestDriverDef in a build without the test driver; `mrhi_errorCapacity` when the chain is deeper than the limit or the allocator fails."
           },
           "args": [
             {
@@ -1358,7 +1358,7 @@
         {
           "kind": "function",
           "name": "next_instance_diagnostic",
-          "doc": "Takes the oldest record from the instance's diagnostic queue (mrhi-0027), which holds a record for each call the instance refused as invalid input and, in a build with the validation layer, for each rule of the driver SPI its driver or its devices' drivers broke, up to the diagnostics limit; those past it are counted but not recorded.",
+          "doc": "Takes the oldest record from the instance's diagnostic queue, which holds a record for each call the instance refused as invalid input and, in a build with the validation layer, for each rule of the driver SPI its driver or its devices' drivers broke, up to the diagnostics limit; those past it are counted but not recorded.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success` with a record; `mrhi_empty` when the queue is drained or keeps none; `mrhi_errorInvalid` for a NULL argument."
@@ -1386,7 +1386,7 @@
         {
           "kind": "function",
           "name": "get_driver_faults",
-          "doc": "Returns how many breaches of the driver SPI the validation layer has found on the instance and its devices (mrhi-0025): frames no driver could translate, and driver answers no core could trust. Builds without the layer (MAUL_RHI_VALIDATION) find none.",
+          "doc": "Returns how many breaches of the driver SPI the validation layer has found on the instance and its devices: frames no driver could translate, and driver answers no core could trust. Builds without the layer (MAUL_RHI_VALIDATION) find none.",
           "returns": {
             "type": "uint64",
             "doc": "The count; 0 for a NULL instance or a build without the layer."
@@ -1582,12 +1582,12 @@
           "kind": "struct",
           "name": "features",
           "mapped": true,
-          "doc": "The optional features (mrhi-0006). The floor (compute, indirect draws, instancing, the texture kinds, independent blend, occlusion queries) needs no request.",
+          "doc": "The optional features. The floor (compute, indirect draws, instancing, the texture kinds, independent blend, occlusion queries) needs no request.",
           "members": [
             {
               "name": "timestamp_query",
               "type": "bool",
-              "doc": "Timestamps at pass boundaries (mrhi-0006).",
+              "doc": "Timestamps at pass boundaries.",
               "mapping": {
                 "vulkan": {
                   "class": "restricted",
@@ -2007,7 +2007,7 @@
           "name": "limits",
           "mapped": true,
           "defaults": true,
-          "doc": "The limits (mrhi-0006): WebGPU's floor in the contract's terms. An adapter reports its values; a device def requests values, the defaults being the floor.",
+          "doc": "The limits: WebGPU's floor in the contract's terms. An adapter reports its values; a device def requests values, the defaults being the floor.",
           "members": [
             {
               "name": "texture_dimension_2d",
@@ -6789,7 +6789,7 @@
         {
           "kind": "function",
           "name": "next_device_diagnostic",
-          "doc": "Takes the oldest record from the device's diagnostic queue (mrhi-0027), which holds a record for each call the device refused as invalid input, up to the diagnostics limit; refusals past it are counted but not recorded.",
+          "doc": "Takes the oldest record from the device's diagnostic queue, which holds a record for each call the device refused as invalid input, up to the diagnostics limit; refusals past it are counted but not recorded.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success` with a record; `mrhi_empty` when the queue is drained or keeps none; `mrhi_errorInvalid` for a NULL argument."
@@ -9650,7 +9650,7 @@
     },
     {
       "name": "heap",
-      "doc": "Bindless heaps (mrhi-0015): device objects of resource and sampler entries at indices the program chooses, one read by each pass that names it. Entries of resources a pass does not declare are hidden from it, unless they are sealed.",
+      "doc": "Bindless heaps: device objects of resource and sampler entries at indices the program chooses, one read by each pass that names it. Entries of resources a pass does not declare are hidden from it, unless they are sealed.",
       "includes": [
         "resources"
       ],
@@ -10980,7 +10980,7 @@
               "name": "selector",
               "type": "char",
               "pointer": "const",
-              "doc": "The canvas's name, UTF-8, selectorLength bytes: first a key of the program's Module.mrhiCanvases (an OffscreenCanvas in a worker, mrhi-0026), else a CSS selector of the document. Only read during the call."
+              "doc": "The canvas's name, UTF-8, selectorLength bytes: first a key of the program's Module.mrhiCanvases (an OffscreenCanvas in a worker), else a CSS selector of the document. Only read during the call."
             },
             {
               "name": "selector_length",
@@ -12059,7 +12059,7 @@
         {
           "kind": "function",
           "name": "seal_resource",
-          "doc": "Ends an imported texture or buffer of the open frame sealed (mrhi-0015): after the frame's passes it moves to the sealed state, the frame that uploads it sealing it without a frame of its own. From the next frame on any pass may read it through a heap without declaring it, and a frame that imports it may declare only the reads the sealed state allows (a texture sampled; a buffer as uniforms, vertices, indices, indirect arguments or storage read) until it is unsealed. Writing it through a heap while it is sealed is invalid, with undefined results. Sealing it again does nothing. Needs the bindless_sampling feature.",
+          "doc": "Ends an imported texture or buffer of the open frame sealed: after the frame's passes it moves to the sealed state, the frame that uploads it sealing it without a frame of its own. From the next frame on any pass may read it through a heap without declaring it, and a frame that imports it may declare only the reads the sealed state allows (a texture sampled; a buffer as uniforms, vertices, indices, indirect arguments or storage read) until it is unsealed. Writing it through a heap while it is sealed is invalid, with undefined results. Sealing it again does nothing. Needs the bindless_sampling feature.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a resource the frame declared, a surface image, or a texture without sampled usage; `mrhi_errorUnsupported` without the bindless_sampling feature; `mrhi_errorState` for a device without an open frame or with a compiled one; `mrhi_errorStale` for a resource not of the open frame, or whose object the device no longer has."
@@ -12086,7 +12086,7 @@
         {
           "kind": "function",
           "name": "unseal_resource",
-          "doc": "Returns an imported texture or buffer of the open frame to the graph's tracking (mrhi-0015): passes added after it may declare any use of it, and it leaves the frame in its last use's state. Undoes a seal made earlier in the frame; sealing it after unsealing ends it sealed again. Unsealing a resource that is not sealed does nothing. Needs the bindless_sampling feature.",
+          "doc": "Returns an imported texture or buffer of the open frame to the graph's tracking: passes added after it may declare any use of it, and it leaves the frame in its last use's state. Undoes a seal made earlier in the frame; sealing it after unsealing ends it sealed again. Unsealing a resource that is not sealed does nothing. Needs the bindless_sampling feature.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a resource the frame declared, or a surface image; `mrhi_errorUnsupported` without the bindless_sampling feature; `mrhi_errorState` for a device without an open frame or with a compiled one; `mrhi_errorStale` for a resource not of the open frame, or whose object the device no longer has."
@@ -13479,7 +13479,7 @@
             {
               "name": "state_sealed",
               "value": 17,
-              "doc": "Sealed (mrhi-0015): read through heaps by any pass without a barrier, and by the reads a pass may declare of it; for a texture, sampling by every shader stage.",
+              "doc": "Sealed: read through heaps by any pass without a barrier, and by the reads a pass may declare of it; for a texture, sampling by every shader stage.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -14796,7 +14796,7 @@
           "name": "shader_heap_uses",
           "width": "uint32",
           "mapped": true,
-          "doc": "What an entry point reads through the pass's heap (mrhi-0015); none for an entry point that uses no heap.",
+          "doc": "What an entry point reads through the pass's heap; none for an entry point that uses no heap.",
           "values": [
             {
               "name": "heap_use_sampled_textures",
@@ -18894,7 +18894,7 @@
         {
           "kind": "function",
           "name": "set_graphics_pipeline",
-          "doc": "Sets the graphics pipeline later draws use, in a pass with targets. It must be ready and fit the pass's targets: their formats and sample count, and no depth or stencil writes to a read-only depth target. A pipeline whose entry points read a heap needs a pass that names one (mrhi-0015).",
+          "doc": "Sets the graphics pipeline later draws use, in a pass with targets. It must be ready and fit the pass's targets: their formats and sample count, and no depth or stencil writes to a read-only depth target. A pipeline whose entry points read a heap needs a pass that names one.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass without targets, a pipeline that does not fit its targets, or one reading a heap in a pass naming none; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording, or a pipeline that is not ready; `mrhi_errorStale` also for a pipeline the device no longer has; `mrhi_errorCapacity` when the frame's commands are full."
@@ -18943,7 +18943,7 @@
         {
           "kind": "function",
           "name": "set_compute_pipeline",
-          "doc": "Sets the compute pipeline later dispatches use, in a pass without targets. A pipeline whose entry point reads a heap needs a pass that names one (mrhi-0015).",
+          "doc": "Sets the compute pipeline later dispatches use, in a pass without targets. A pipeline whose entry point reads a heap needs a pass that names one.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device a pass that renders or copies, or a pipeline reading a heap in a pass naming none; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording, or a pipeline that is not ready; `mrhi_errorStale` also for a pipeline the device no longer has; `mrhi_errorCapacity` when the frame's commands are full."
@@ -20014,7 +20014,7 @@
         {
           "kind": "function",
           "name": "clear_buffer",
-          "doc": "Writes zeros into a range of a buffer of the frame (mrhi-0022).",
+          "doc": "Writes zeros into a range of a buffer of the frame.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass with targets, an offset or a size not a multiple of 4, a range past the buffer, or a resource that is not a buffer the pass declares a covering copy destination access of; `mrhi_errorStale` for a pass of another frame or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
@@ -21575,7 +21575,7 @@
     },
     {
       "name": "d3d12",
-      "doc": "D3D12 objects for vendor upscalers (mrhi-0019): the device's native objects, a texture's resource, and the command list a native pass runs. Every other driver answers the functions unsupported.",
+      "doc": "D3D12 objects for vendor upscalers: the device's native objects, a texture's resource, and the command list a native pass runs. Every other driver answers the functions unsupported.",
       "includes": [
         "frame"
       ],
@@ -21735,7 +21735,7 @@
     },
     {
       "name": "metal",
-      "doc": "Metal objects for vendor upscalers and MetalFX (mrhi-0019): the device's native objects, a texture, and the command buffer a native pass runs. Every other driver answers the functions unsupported.",
+      "doc": "Metal objects for vendor upscalers and MetalFX: the device's native objects, a texture, and the command buffer a native pass runs. Every other driver answers the functions unsupported.",
       "includes": [
         "frame"
       ],

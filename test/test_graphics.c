@@ -89,7 +89,7 @@ static mrhiResult Made(mrhiDevice* device, const mrhiGraphicsPipelineDef* def)
 }
 
 // The check that refused the device's latest refusal, draining its
-// diagnostics (mrhi-0027); 0 when there is none.
+// diagnostics; 0 when there is none.
 static mrhiDiagnosticCode Refusal(mrhiDevice* device)
 {
     mrhiDiagnosticCode code = 0;
@@ -429,7 +429,7 @@ static void TestPrimitive(void)
     def.viewCount = 1;
     CHECK(Made(device, &def) == mrhi_success, "one view");
     Close(device);
-    // Views within the device's multiview limit (mrhi-0020).
+    // Views within the device's multiview limit.
     ResetAdapter();
     s_adapter.features.multiview = true;
     s_adapter.limits.multiviewViews = 4;

@@ -1,12 +1,12 @@
 # The internal module graph: each module
 # and the modules it may use. tools/check_modules.py enforces it.
 adapter: capabilities_core chain driver instance_core
-allocator:
+allocator: invariant
 base:
 capabilities_core:
 format_caps: capabilities_core
 chain:
-diagnostics:
+diagnostics: invariant
 device: allocator capabilities_core chain device_core diagnostics driver heap_core instance_core invariant label pool
 device_core: capabilities_core command diagnostics driver pool reflection
 driver: command reflection
@@ -72,8 +72,8 @@ web_js:
 instance_core: diagnostics driver pool
 invariant:
 label:
-notify: instance_core
-pool:
+notify: instance_core invariant
+pool: invariant
 resources: capabilities_core device_core heap_core label
 texture: capabilities_core chain device_core label
 view: capabilities_core device_core heap_core label
@@ -85,8 +85,8 @@ heap: allocator device_core heap_core label
 heap_core: device_core
 pass: capabilities_core device_core heap_core label
 compile: device_core
-plan: device_core
-memory: device_core
+plan: device_core invariant
+memory: device_core invariant
 sha256:
 spirv_caps: bytes
 stage_limits:
@@ -98,8 +98,8 @@ binding: capabilities_core encoder_core
 draw: encoder_core
 copy: copy_core
 upload: copy_core
-query: device_core encoder_core label
-readback: copy_core
+query: device_core encoder_core invariant label
+readback: copy_core invariant
 submit: device_core invariant
 copy_core: capabilities_core encoder_core
 cache: bytes device_core sha256

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Readbacks (mrhi-0011): a copy into the device's readback ring,
-// recorded with a request that the frame's finish answers, and taken out
-// once by the program. Records and ring bytes are used in order, taken
-// under a lock since passes record in parallel, and freed as the oldest
-// are taken.
+// Readbacks: a copy into the device's readback ring, recorded with a
+// request that the frame's finish answers, and taken out once by the
+// program. Records and ring bytes are used in order, taken under a lock
+// since passes record in parallel, and freed as the oldest are taken.
 
 #include "copy_core.h"
+#include "invariant.h"
 
 #include <stdatomic.h>
 #include <stdckdint.h>
@@ -73,6 +73,9 @@ static bool TakeRing(mrhiDevice* device, uint64_t bytes, uint64_t* positionOut)
         return false;
     }
     device->ringHead = at + bytes;
+    // The bytes lie in one piece of the ring, and the ring never holds more
+    // than its size.
+    MRHI_ASSERT(at % ring + bytes <= ring && device->ringHead - device->ringTail <= ring);
     *positionOut = at;
     return true;
 }
@@ -271,6 +274,7 @@ static void Free(mrhiDevice* device, mrhiReadback* readback)
     {
         const mrhiReadback* oldest = RecordAt(device, device->readbackTail++);
         device->ringTail = oldest->position + oldest->bytes;
+        MRHI_ASSERT(device->ringTail <= device->ringHead);
     }
 }
 
@@ -309,6 +313,9 @@ mrhiResult mrhiTakeReadback(mrhiDevice* device, mrhiRequestId request, void* byt
     {
         return mrhi_errorCapacity;
     }
+    MRHI_ASSERT(readback->size <= readback->bytes &&
+                RingOffset(device, readback) + readback->bytes <=
+                    device->deviceLimits.readbackBytes);
     const uint8_t* ring = device->readbackRing + RingOffset(device, readback);
     // A buffer's bytes, or rows of none, which have no pitch either.
     if (readback->pitch == 0)

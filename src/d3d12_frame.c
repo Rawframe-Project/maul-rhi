@@ -569,9 +569,9 @@ static void StartPart(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot)
     mrhiD3d12FlushBarriers(recorder);
 }
 
-// Places a native pass (mrhi-0019): its textures moved into their
-// accesses' states, the part recorded so far closed and queued with the
-// program's list, and the next part begun. Each list runs in its own
+// Places a native pass: its textures moved into their accesses' states,
+// the part recorded so far closed and queued with the program's list,
+// and the next part begun. Each list runs in its own
 // ExecuteCommandLists, after which D3D12 has finished the earlier ones'
 // work and buffers have decayed to the common state.
 static void RunNative(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrhiDriverPass* pass)

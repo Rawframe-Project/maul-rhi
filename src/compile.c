@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The frame's compile (mrhi-0008): passes are culled from the frame's
-// outputs backwards, at the granularity of whole resources, the kept
-// ones are planned, and the usages they make of each declared texture
-// are checked against its format. Declaration order stays execution
+// The frame's compile: passes are culled from the frame's outputs
+// backwards, at the granularity of whole resources, the kept ones are
+// planned, and the usages they make of each declared texture are
+// checked against its format. Declaration order stays execution
 // order.
 
 #include "device_core.h"

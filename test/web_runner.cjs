@@ -1,22 +1,17 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Runs a web test in headless Chrome with WebGPU (mrhi-0003): serves the
-// test's directory from localhost, a secure context, opens a page with
-// two canvases (#mrhi-canvas, #mrhi-canvas-2) that loads the test,
-// prints the test's output, and exits with the test's status. A page error, an error the browser
-// logs, or a WebGPU error the driver kept fails it. Puppeteer
-// comes from MRHI_NODE_MODULES; without it the test is skipped (77).
-// A test built without Emscripten (mrhi-0016) is a WebAssembly reactor:
-// the page gives it a minimal WASI (standard output to the console, the
-// environment, the clocks, random bytes and exit), the driver's imports
-// from maul-rhi.mjs beside it, a sleep through JSPI and the canvas's
-// resizing, and calls its main.
-// With --worker the test runs in a dedicated worker instead (mrhi-0026):
-// the page transfers both canvases' control to it, and the worker
-// registers the OffscreenCanvases under their selectors in
-// Module.mrhiCanvases and sends back its output, its status and the
-// driver's WebGPU errors.
+// Runs a web test in headless Chrome with WebGPU: serves the test's directory from localhost, a
+// secure context, opens a page with two canvases (#mrhi-canvas, #mrhi-canvas-2) that loads the
+// test, prints the test's output, and exits with the test's status. A page error, an error the
+// browser logs, or a WebGPU error the driver kept fails it. Puppeteer comes from
+// MRHI_NODE_MODULES; without it the test is skipped (77). A test built without Emscripten is a
+// WebAssembly reactor: the page gives it a minimal WASI (standard output to the console, the
+// environment, the clocks, random bytes and exit), the driver's imports from maul-rhi.mjs beside
+// it, a sleep through JSPI and the canvas's resizing, and calls its main. With --worker the test
+// runs in a dedicated worker instead: the page transfers both canvases' control to it, and the
+// worker registers the OffscreenCanvases under their selectors in Module.mrhiCanvases and sends
+// back its output, its status and the driver's WebGPU errors.
 //
 // usage: node web_runner.cjs [--worker] <test.js | test.wasm>
 

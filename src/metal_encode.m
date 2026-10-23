@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The Metal driver's pass encoding (mrhi-0003). A pass's bindings, root
-// block and buffer sizes are kept as the stream sets them and applied
-// before each draw or dispatch, through the pipeline's map, so their
-// order against the pipeline does not matter. Copies and query resolves
-// in a compute pass leave its compute encoder for a blit encoder, and
-// the compute encoder that follows takes up the pipeline and state
-// again; the pass's open debug groups close on each encoder and open on
-// the next, as Metal keeps them per encoder. Metal tracks the hazards
-// between encoders of private resources, so the core's barriers need no
+// The Metal driver's pass encoding. A pass's bindings, root block and
+// buffer sizes are kept as the stream sets them and applied before each
+// draw or dispatch, through the pipeline's map, so their order against
+// the pipeline does not matter. Copies and query resolves in a compute
+// pass leave its compute encoder for a blit encoder, and the compute
+// encoder that follows takes up the pipeline and state again; the
+// pass's open debug groups close on each encoder and open on the next,
+// as Metal keeps them per encoder. Metal tracks the hazards between
+// encoders of private resources, so the core's barriers need no
 // commands. A texture binding is a view of its texture unless it sees
 // the whole of it as it is.
 
@@ -218,7 +218,7 @@ static void StartRender(mrhiMetalEncoder* encoder)
     descriptor.renderTargetHeight = pass->height;
     if (pass->viewCount > 1)
     {
-        // A layer per view from the attachments' slices (mrhi-0020).
+        // A layer per view from the attachments' slices.
         descriptor.renderTargetArrayLength = pass->viewCount;
     }
     if (pass->occlusionSet != 0)
@@ -596,8 +596,8 @@ uint64_t mrhiMetalClampedBytes(const mrhiDriverFrame* frame)
 
 // Clamps the records of the pass's counted multi-draws into the clamped
 // buffer, in a compute encoder before the pass's render encoder, so that
-// each record past its draw's count draws no instances (mrhi-0020).
-// Metal orders the render encoder's indirect reads after the writes.
+// each record past its draw's count draws no instances. Metal orders the
+// render encoder's indirect reads after the writes.
 static void ClampPass(const mrhiMetalEncoder* encoder)
 {
     id<MTLComputeCommandEncoder> compute = nil;

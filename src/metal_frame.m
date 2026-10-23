@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The Metal driver's frames (mrhi-0003). A frame is recorded at
-// submission, one command buffer on the device's queue: its uploads are
-// copied into the slot's shared staging buffer, and its readbacks land
-// in the slot's shared mirror of the readback ring, copied into the ring
-// once the frame has finished. Declared resources are made for the frame
-// in private memory, each its own object, and released as soon as the
+// The Metal driver's frames. A frame is recorded at submission, one
+// command buffer on the device's queue: its uploads are copied into the
+// slot's shared staging buffer, and its readbacks land in the slot's
+// shared mirror of the readback ring, copied into the ring once the
+// frame has finished. Declared resources are made for the frame in
+// private memory, each its own object, and released as soon as the
 // command buffer is committed, since it holds them until it finishes.
 // The query sets a frame resolves are cleared to 0 before its passes, so
-// a query it never writes resolves to 0. The command buffer's
-// completion only signals a semaphore, which waits take with their
-// deadline; polls read the command buffer's status.
+// a query it never writes resolves to 0. The command buffer's completion
+// only signals a semaphore, which waits take with their deadline; polls
+// read the command buffer's status.
 
 #include "metal_frame.h"
 
@@ -22,9 +22,9 @@
 
 #include <string.h>
 
-// Clamps counted multi-draws' records (mrhi-0020): each thread copies a
-// record of `words` words, setting the instance count of a record at or
-// past the count to zero.
+// Clamps counted multi-draws' records: each thread copies a record of
+// `words` words, setting the instance count of a record at or past the
+// count to zero.
 static const char s_clampSource[] =
     "#include <metal_stdlib>\n"
     "using namespace metal;\n"
@@ -306,8 +306,8 @@ static void Record(mrhiMetalFrames* frames, mrhiMetalSlot* slot, const mrhiDrive
         const mrhiDriverPass* pass = &frame->passes[p];
         if (pass->native)
         {
-            // The native pass's buffer runs between the frame's own
-            // (mrhi-0019); Metal tracks the resources they share.
+            // The native pass's buffer runs between the frame's
+            // own; Metal tracks the resources they share.
             Commit(slot, commands);
             if (pass->nativeCommands != nullptr)
             {

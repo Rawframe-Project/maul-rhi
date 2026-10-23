@@ -247,7 +247,7 @@ def check_mapping(errors, where, mapping):
 
 
 # The kinds of concept that are mapped onto the APIs or declared the
-# library's own (mrhi-0002).
+# library's own.
 CLASSED_KINDS = ("function", "struct", "enum", "bitflags")
 
 
@@ -382,8 +382,26 @@ def preamble_version(contract, names):
                   f"#define {macro}_VERSION_{part.upper()} {value}",
                   "// x-release-please-end"]
     lines += [""]
-    lines += comment("The contract version a program is built against. An instance refuses any "
-                     "other before 1.0.", 0, "//")
+    lines += comment("The binary interface the headers describe, which the root def carries: the "
+                     "whole version before 1.0, where any release may break it, and the major and "
+                     "minor version from 1.0 on. The top bit is always set, so a zeroed value, "
+                     "or a small one written by hand, never matches.", 0, "//")
+    lines += [
+        f"#define {macro}_ABI_VERSION                                                           \\",
+        f"    (UINT32_C(0x80000000) | ((uint32_t){macro}_VERSION_MAJOR << 16) |                 \\",
+        f"     ({macro}_VERSION_MAJOR == 0                                                      \\",
+        f"          ? (((uint32_t){macro}_VERSION_MINOR << 8) | (uint32_t){macro}_VERSION_PATCH)    \\",
+        f"          : (uint32_t){macro}_VERSION_MINOR))",
+        f"#if {macro}_VERSION_MAJOR > 0x7FFF || {macro}_VERSION_MINOR > 0xFFFF",
+        f'#error "{macro}_VERSION_MAJOR or {macro}_VERSION_MINOR does not fit {macro}_ABI_VERSION"',
+        "#endif",
+        f"#if {macro}_VERSION_MAJOR == 0 && ({macro}_VERSION_MINOR > 0xFF || {macro}_VERSION_PATCH > 0xFF)",
+        f'#error "before 1.0, {macro}_VERSION_MINOR and {macro}_VERSION_PATCH must fit 8 bits each"',
+        "#endif",
+        "",
+    ]
+    lines += comment("The revision of the contract the headers are generated from "
+                     "(contract/mrhi.json).", 0, "//")
     lines.append(f"#define {macro}_CONTRACT_VERSION {contract['contract_version']}")
     return lines
 

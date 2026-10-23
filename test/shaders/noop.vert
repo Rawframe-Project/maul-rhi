@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The noop container's vertex entry "vs": a point at the origin, for the
-// CTS cases' pipelines that read nothing (record mrhi-0021).
+// CTS cases' pipelines that read nothing.
 
 #version 450
 

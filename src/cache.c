@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Pipeline caches (mrhi-0010): the driver's blob in an envelope that
-// names the library version, driver and adapter it came from and a
-// SHA-256 digest of it all. A cache only saves time, so an import never
-// fails the device; one that does not fit is ignored and reported.
+// Pipeline caches: the driver's blob in an envelope that names the
+// library version, driver and adapter it came from and a SHA-256 digest
+// of it all. A cache only saves time, so an import never fails the
+// device; one that does not fit is ignored and reported.
 
 #include "bytes.h"
 #include "device_core.h"

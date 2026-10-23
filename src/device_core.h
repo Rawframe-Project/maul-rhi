@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The device as the core sees it (mrhi-0004): its instance, what it was
-// granted, its state and its driver.
+// The device as the core sees it: its instance, what it was granted,
+// its state and its driver.
 
 #ifndef MAUL_RHI_SRC_DEVICE_CORE_H
 #define MAUL_RHI_SRC_DEVICE_CORE_H
@@ -66,11 +66,11 @@ typedef struct mrhiSamplerSlot
     uint32_t heapRefs;
 } mrhiSamplerSlot;
 
-// A heap entry as its heap keeps it (mrhi-0015): the view, buffer or
-// sampler slot it names and that slot's generation, 0 for an empty
-// entry; a buffer's range; its kind and whether it is writable; and the
-// token of the last frame submitted when it was emptied, 0 when no
-// frame can still read it.
+// A heap entry as its heap keeps it: the view, buffer or sampler slot
+// it names and that slot's generation, 0 for an empty entry; a buffer's
+// range; its kind and whether it is writable; and the token of the last
+// frame submitted when it was emptied, 0 when no frame can still read
+// it.
 typedef struct mrhiHeapEntrySlot
 {
     uint32_t object;
@@ -248,7 +248,7 @@ typedef struct mrhiRenderLayout
     mrhiFormat colors[MRHI_COLOR_TARGETS];
     mrhiFormat depth;
     uint32_t samples;
-    // The views rendered (mrhi-0020): 1 without multiview.
+    // The views rendered: 1 without multiview.
     uint32_t views;
     bool writesDepth;
     bool writesStencil;
@@ -278,7 +278,7 @@ typedef struct mrhiFramePass
     mrhiColorTarget colorTargets[MRHI_COLOR_TARGETS];
     uint32_t colorTargetCount;
     mrhiDepthTarget depthTarget;
-    // The views it renders (mrhi-0020): 1 without multiview.
+    // The views it renders: 1 without multiview.
     uint32_t viewCount;
     // The stores the compile derived for its targets.
     mrhiStoreOp colorStores[MRHI_COLOR_TARGETS];
@@ -312,8 +312,8 @@ typedef struct mrhiFramePass
     uint32_t occlusionGeneration;
     uint64_t occlusionHandle;
     bool occlusionOpen;
-    // Its open statistics query (mrhi-0023): the query and its set's
-    // driver handle, which its end records.
+    // Its open statistics query: the query and its set's driver
+    // handle, which its end records.
     uint32_t statisticsQuery;
     uint64_t statisticsSet;
     bool statisticsOpen;
@@ -498,8 +498,8 @@ struct mrhiDevice
     uint8_t* frameStaging;
     uint32_t stagingRegion;
     _Atomic uint64_t stagingTaken;
-    // The draws the open frame's counted multi-draws make at most, in all
-    // (mrhi-0020), never past frameIndirectDraws.
+    // The draws the open frame's counted multi-draws make at most, in
+    // all, never past frameIndirectDraws.
     _Atomic uint64_t countedTaken;
     uint32_t* runningRegions;
     // Each pass's vertex buffers' bytes plus one (0 for unset),
@@ -705,8 +705,8 @@ void mrhiFinishPipeline(mrhiDevice* device, uint64_t tag, mrhiResult outcome);
 // Answers every pending pipeline of a device being lost.
 void mrhiLosePipelines(mrhiDevice* device);
 
-// Loses a device, once (mrhi-0014): its state, the driver's report, then
-// a loss notice and every answer still owed, each mrhi_errorDeviceLost.
+// Loses a device, once: its state, the driver's report, then a loss
+// notice and every answer still owed, each mrhi_errorDeviceLost.
 void mrhiLoseDevice(mrhiDevice* device);
 
 // Passes a driver call's status through, losing the device when it is
@@ -724,8 +724,8 @@ mrhiResult mrhiCheckPassQueries(const mrhiDevice* device, const mrhiPassDef* def
 // keeps them in its pass.
 void mrhiMarkPassTimestamps(mrhiDevice* device, const mrhiPassDef* def, mrhiFramePass* pass);
 
-// Builds the view of the open, compiled frame a driver is submitted
-// (mrhi-0013).
+// Builds the view of the open, compiled frame a driver is
+// submitted.
 void mrhiViewFrame(mrhiDevice* device, mrhiDriverFrame* frameOut);
 
 #endif // MAUL_RHI_SRC_DEVICE_CORE_H

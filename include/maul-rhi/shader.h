@@ -190,8 +190,8 @@ extern "C"
         mrhi_builtinViewIndex = 0x40u,
     };
 
-    // What an entry point reads through the pass's heap (mrhi-0015); none for
-    // an entry point that uses no heap.
+    // What an entry point reads through the pass's heap; none for an entry
+    // point that uses no heap.
     typedef uint32_t mrhiShaderHeapUses;
 
     enum

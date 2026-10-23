@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The state of a Metal frame's encoding (mrhi-0003): its command buffer
-// and current encoder, the frame's objects by slot, the staging and
-// readback buffers copies name as object 0, and what the pass has set,
-// applied before each draw or dispatch. Included by the driver's
-// Objective-C files only.
+// The state of a Metal frame's encoding: its command buffer and current
+// encoder, the frame's objects by slot, the staging and readback
+// buffers copies name as object 0, and what the pass has set, applied
+// before each draw or dispatch. Included by the driver's Objective-C
+// files only.
 
 #ifndef MAUL_RHI_SRC_METAL_STATE_H
 #define MAUL_RHI_SRC_METAL_STATE_H
@@ -24,7 +24,7 @@
 #define MRHI_METAL_LABELS 32
 // The root block's bytes at most.
 #define MRHI_METAL_ROOT_BYTES 256
-// The views a multiview pass amplifies to at most (mrhi-0020).
+// The views a multiview pass amplifies to at most.
 #define MRHI_METAL_VIEWS 32
 
 // A table's binding as bound: its slot, kind, Metal object (a buffer, a
@@ -49,7 +49,7 @@ typedef struct mrhiMetalEncoder
     id<MTLBuffer> readback;
     // The kernel clamping counted multi-draws' records, the buffer they
     // are clamped into, and where the next counted draw's records lie in
-    // it (mrhi-0020).
+    // it.
     id<MTLComputePipelineState> clamp;
     id<MTLBuffer> clamped;
     uint64_t clampedAt;

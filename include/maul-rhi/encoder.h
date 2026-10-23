@@ -176,8 +176,7 @@ extern "C"
     /// Sets the graphics pipeline later draws use, in a pass with targets. It
     /// must be ready and fit the pass's targets: their formats and sample
     /// count, and no depth or stencil writes to a read-only depth target. A
-    /// pipeline whose entry points read a heap needs a pass that names one
-    /// (mrhi-0015).
+    /// pipeline whose entry points read a heap needs a pass that names one.
     ///
     /// @param device    The device.
     /// @param pass      The pass, recording.
@@ -196,7 +195,7 @@ extern "C"
 
     /// Sets the compute pipeline later dispatches use, in a pass without
     /// targets. A pipeline whose entry point reads a heap needs a pass that
-    /// names one (mrhi-0015).
+    /// names one.
     ///
     /// @param device    The device.
     /// @param pass      The pass, recording.
@@ -618,7 +617,7 @@ extern "C"
                                                       mrhiResourceId destination,
                                                       uint64_t destinationOffset, uint64_t size);
 
-    /// Writes zeros into a range of a buffer of the frame (mrhi-0022).
+    /// Writes zeros into a range of a buffer of the frame.
     ///
     /// @param device    The device.
     /// @param pass      The pass, recording, without targets.

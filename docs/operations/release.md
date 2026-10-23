@@ -11,6 +11,7 @@ Maul RHI follows Semantic Versioning with tags `vX.Y.Z`. Before 1.0.0 any releas
 
 ## Version bumps that go with a release
 
+- **The ABI version** follows the library version by itself; nothing is bumped by hand.
 - **The contract version** (`contract_version` in `contract/mrhi.json`, regenerated into `MRHI_CONTRACT_VERSION`) rises with any change to the public API's types or functions.
 - **The SPI version** (`MRHI_SPI_VERSION` in `src/driver.h`) rises with any change to the installed SPI headers, together with a new `conformance/mustpass/spi-<N>.txt`.
 - **The container version** (1, in `src/container.c` and `tools/mrhi_container.py`) rises with any change to a container's bytes.

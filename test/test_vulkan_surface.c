@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Vulkan surfaces' sRGB images (mrhi-0017): twin images where the surface
-// lists the sRGB format of every 8-bit unorm color it reports, as
-// Android's swapchain does, and not where one is missing. Then what a
-// surface can do from what it lists: its colors, present modes, alpha
-// modes and usages, and each floor it needs to present; and the format
-// a color takes.
+// Vulkan surfaces' sRGB images: twin images where the surface lists the
+// sRGB format of every 8-bit unorm color it reports, as Android's
+// swapchain does, and not where one is missing. Then what a surface can
+// do from what it lists: its colors, present modes, alpha modes and
+// usages, and each floor it needs to present; and the format a color
+// takes.
 
 #include "test_harness.h"
 #include "vulkan_surface.h"

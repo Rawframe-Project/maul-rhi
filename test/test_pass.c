@@ -235,9 +235,9 @@ static void TestDerivedUsages(void)
     Drop();
 }
 
-// Accesses a pass may not make.
-// The check that refused the device's latest refusal, draining its
-// diagnostics (mrhi-0027); 0 when there is none.
+// Accesses a pass may not make. The check that refused the
+// device's latest refusal, draining its diagnostics; 0 when there
+// is none.
 static mrhiDiagnosticCode Refusal(void)
 {
     mrhiDiagnosticCode code = 0;
@@ -694,10 +694,10 @@ static void TestStaleAndLimits(void)
     s_instance = instance;
 }
 
-// Multiview passes (mrhi-0020): unsupported without the feature or past
-// its limit; refused without targets, on targets without a layer per
-// view from theirs, and on 3D ones; a target's use spans a layer per
-// view, so that sampling the second layer beside it is refused.
+// Multiview passes: unsupported without the feature or past its limit;
+// refused without targets, on targets without a layer per view from
+// theirs, and on 3D ones; a target's use spans a layer per view, so
+// that sampling the second layer beside it is refused.
 static void TestViews(void)
 {
     Begin();

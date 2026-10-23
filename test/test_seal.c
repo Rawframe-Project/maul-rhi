@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Sealed resources on a test driver device (mrhi-0015): sealing and
-// unsealing refused without bindless sampling, outside a frame's
-// declarations, and for what the frame made; a sealed object ending its
-// frame sealed, then read without barriers and refused anything but the
-// sealed state's reads; unsealing returning it to tracking, a later seal
-// winning; and a dropped frame changing nothing.
+// Sealed resources on a test driver device: sealing and unsealing
+// refused without bindless sampling, outside a frame's declarations, and
+// for what the frame made; a sealed object ending its frame sealed, then
+// read without barriers and refused anything but the sealed state's
+// reads; unsealing returning it to tracking, a later seal winning; and a
+// dropped frame changing nothing.
 
 #include "test_device_setup.h"
 

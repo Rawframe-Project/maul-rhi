@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The Metal driver's copies (mrhi-0003). Metal copies one slice of an
-// array or cube texture at a time, so such a copy is a copy per layer,
-// its images a stride apart in the buffer; a 3D texture's copy takes its
-// depth at once. A depth and stencil texture's aspect is a blit option.
-// An occlusion query's result is 8 bytes, as the contract's.
+// The Metal driver's copies. Metal copies one slice of an array or cube
+// texture at a time, so such a copy is a copy per layer, its images a
+// stride apart in the buffer; a 3D texture's copy takes its depth at
+// once. A depth and stencil texture's aspect is a blit option. An
+// occlusion query's result is 8 bytes, as the contract's.
 
 #include "metal_copy.h"
 

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Bindless heaps (mrhi-0015): device objects of resource and sampler
-// entries at indices the program chooses. An entry is written only while
-// empty; one emptied is written again only once the frames submitted
-// before it was emptied finish, so no running frame ever reads an entry
-// that changes under it. Destroying a view, buffer or sampler empties
-// the entries naming it.
+// Bindless heaps: device objects of resource and sampler entries at
+// indices the program chooses. An entry is written only while empty; one
+// emptied is written again only once the frames submitted before it was
+// emptied finish, so no running frame ever reads an entry that changes
+// under it. Destroying a view, buffer or sampler empties the entries
+// naming it.
 
 #include "allocator.h"
 #include "heap_core.h"

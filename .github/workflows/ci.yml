@@ -67,9 +67,9 @@ jobs:
           - { name: linux-clang-20-asan, os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Debug,   extra: "-DMAUL_RHI_SANITIZE=ON -DMAUL_RHI_VALIDATION=ON" }
           - { name: linux-clang-20-tsan, os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Debug,   extra: "-DMAUL_RHI_TSAN=ON" }
           - { name: linux-shared,        os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Release, extra: "-DMAUL_RHI_BUILD_SHARED=ON" }
-          # The Metal driver on the runner's paravirtual device (mrhi-0003),
+          # The Metal driver on the runner's paravirtual device,
           # as released on macOS 15 and with assertions on macOS 26, each
-          # with the seam check on the runner's window server (mrhi-0028).
+          # with the seam check on the runner's window server.
           - { name: macos-clang,         os: macos-15,     cc: clang,    cxx: clang++,    config: Release, extra: "-DMAUL_RHI_SEAM=ON" }
           - { name: macos-clang-debug,   os: macos-26,     cc: clang,    cxx: clang++,    config: Debug,   extra: "-DMAUL_RHI_SEAM=ON" }
     steps:
@@ -256,9 +256,9 @@ jobs:
       - name: Test
         # Linux runs Vulkan on lavapipe, which must be found, under the
         # validation layer, whose errors in a test's output fail it,
-        # presents to an XCB window on Xvfb, reads heaps (mrhi-0003),
-        # counts pipeline statistics (mrhi-0023) and runs the suite again
-        # with its Vulkan driver handed in from outside (mrhi-0024).
+        # presents to an XCB window on Xvfb, reads heaps,
+        # counts pipeline statistics and runs the suite again
+        # with its Vulkan driver handed in from outside.
         # macOS runs Metal in its own cell.
         env:
           MAUL_RHI_REQUIRE_VULKAN: ${{ runner.os == 'Linux' && '1' || '' }}
@@ -284,7 +284,7 @@ jobs:
           if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
 
   seam:
-    # The seam with Maul Window (mrhi-0028): Maul Window fetched at its
+    # The seam with Maul Window: Maul Window fetched at its
     # release tag for this check alone, its X11 window on Xvfb and its
     # Wayland window on weston's headless compositor made into surfaces
     # on lavapipe, under the validation layer.
@@ -360,7 +360,7 @@ jobs:
           if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
 
   android:
-    # The Vulkan driver on Android (mrhi-0017) in the emulator, Android
+    # The Vulkan driver on Android in the emulator, Android
     # 15 on x86_64 with KVM, whose SwiftShader offers Vulkan 1.3: every
     # test through adb, a native adapter required.
     name: android-emulator
@@ -460,7 +460,7 @@ jobs:
           ctest --test-dir build -E '^(guide|sample_.*)$' -C Release --output-on-failure --timeout 300 2>&1 | tee ctest.log
           if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
       # The public headers alone under MSVC's cl, as C17 and C++17 with
-      # /W4 /WX, which cannot build the library itself (family record 0008).
+      # /W4 /WX, which cannot build the library itself.
       - name: Headers under MSVC
         run: |
           cmake -S cmake/HeaderCheck -B build-headers
@@ -468,7 +468,7 @@ jobs:
 
   # The default Windows build, the D3D12 driver, on WARP, the runner's
   # software adapter, under the Agility SDK's debug layer with GPU-based
-  # validation, whose errors fail the suites (mrhi-0003); the samples run
+  # validation, whose errors fail the suites; the samples run
   # there too. The SDK's NuGet package, the version the
   # directx/ headers are, goes beside each test in D3D12/, where the
   # tests' exports point.
@@ -481,7 +481,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Configure
-        # With the seam check: a Maul Window window on WARP (mrhi-0028).
+        # With the seam check: a Maul Window window on WARP.
         run: cmake -B build -T ClangCL -D${PREFIX}_WERROR=ON -DMAUL_RHI_SEAM=ON
       - name: Build
         run: cmake --build build --config Debug -j 4
@@ -586,7 +586,7 @@ jobs:
           if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
 
   web-wasi:
-    # The web without Emscripten (mrhi-0016): Clang's wasm32-wasi, the
+    # The web without Emscripten: Clang's wasm32-wasi, the
     # suites under Node's WASI and the conformance suite in headless
     # Chrome with WebGPU, which it must find.
     name: web-wasi
@@ -643,7 +643,7 @@ jobs:
         run: npm install --prefix /tmp/browser puppeteer
       - name: Test
         # The suites run in node, the conformance suite in headless Chrome
-        # with WebGPU, which it must find (mrhi-0003).
+        # with WebGPU, which it must find.
         env:
           MRHI_NODE_MODULES: /tmp/browser/node_modules
           MAUL_RHI_REQUIRE_WEBGPU: "1"
@@ -652,7 +652,7 @@ jobs:
           ctest --test-dir build --output-on-failure --timeout 300 2>&1 | tee ctest.log
           if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
       - name: Seam
-        # The seam with Maul Window (mrhi-0028): its canvas, named by the
+        # The seam with Maul Window: its canvas, named by the
         # window's handles, presented to; it must not be skipped.
         env:
           MRHI_NODE_MODULES: /tmp/browser/node_modules
@@ -663,7 +663,7 @@ jobs:
           ctest --test-dir build -R '^seam$' --output-on-failure --timeout 300 2>&1 | tee ctest.log
           if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
       - name: Size
-        # The wasm budget (mrhi-0001): the library at -Oz without its
+        # The wasm budget: the library at -Oz without its
         # tests, every public function kept.
         run: |
           emcmake cmake -B build-size -DCMAKE_BUILD_TYPE=MinSizeRel \

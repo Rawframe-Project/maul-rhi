@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// A Vulkan device's frames (mrhi-0003, mrhi-0013): a slot per frame in
-// flight with its command buffer, its transients' memory and objects,
-// its mapped staging and the readbacks it fills; the timeline semaphore
-// whose value counts the frames finished; and the queue of destroyed
-// objects, retired once the next frame submitted after their
-// destruction finishes.
+// A Vulkan device's frames: a slot per frame in flight with its command
+// buffer, its transients' memory and objects, its mapped staging and
+// the readbacks it fills; the timeline semaphore whose value counts the
+// frames finished; and the queue of destroyed objects, retired once the
+// next frame submitted after their destruction finishes.
 
 #ifndef MAUL_RHI_SRC_VULKAN_FRAME_H
 #define MAUL_RHI_SRC_VULKAN_FRAME_H
@@ -55,7 +54,7 @@ typedef struct mrhiVulkanSlot
 {
     VkCommandPool pool;
     // The command buffer the frame records into now: the first of its
-    // parts, then after each native pass the next (mrhi-0018).
+    // parts, then after each native pass the next.
     VkCommandBuffer commands;
     VkCommandBuffer parts[1 + MRHI_NATIVE_PASSES];
     uint32_t partsUsed;

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The validation layer (mrhi-0025): vtables around whichever driver an
-// instance starts, which pass every call through and count what breaks
-// the SPI's contract: a frame no driver could translate, and answers no
-// core could trust. Counts a driver could make the core overrun are
-// clamped; everything else passes through as the driver gave it.
+// The validation layer: vtables around whichever driver an instance
+// starts, which pass every call through and count what breaks the SPI's
+// contract: a frame no driver could translate, and answers no core
+// could trust. Counts a driver could make the core overrun are clamped;
+// everything else passes through as the driver gave it.
 
 // Built only with the layer; defined here too for tools that read the
 // file alone, outside such a build.
@@ -21,7 +21,7 @@
 #include <stdalign.h>
 
 // Where breaches go: the instance's fault count and its diagnostic
-// queue (mrhi-0027).
+// queue.
 typedef struct Watch
 {
     _Atomic uint64_t* faults;

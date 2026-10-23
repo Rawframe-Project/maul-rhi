@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// External drivers (mrhi-0024): the test driver handed to an instance
-// through mrhiExternalDriverDef as a program would hand its own. Its
-// adapters are reported as external; the handshake refuses another SPI
-// version, a short vtable or a missing function, of the instance
-// driver and of its devices; a refused driver stays the program's, and
-// an accepted one is destroyed with the instance (the sanitizers see
-// either mistake); its own surface sources reach it unexamined.
+// External drivers: the test driver handed to an instance through
+// mrhiExternalDriverDef as a program would hand its own. Its adapters
+// are reported as external; the handshake refuses another SPI version,
+// a short vtable or a missing function, of the instance driver and of
+// its devices; a refused driver stays the program's, and an accepted
+// one is destroyed with the instance (the sanitizers see either
+// mistake); its own surface sources reach it unexamined.
 
 #include "driver_test.h"
 #include "test_harness.h"
@@ -196,9 +196,9 @@ static mrhiResult MakeSurface(mrhiInstance* instance, const mrhiChain* source,
     return mrhiCreateSurface(instance, &def, surfaceOut);
 }
 
-// Driver-defined sources (mrhi-0024): an outside driver's instance hands
-// its own to it unexamined; every other instance refuses them as
-// unknown critical structs.
+// Driver-defined sources: an outside driver's instance hands its own to
+// it unexamined; every other instance refuses them as unknown critical
+// structs.
 static void TestOwnSources(void)
 {
     mrhiExternalDriverDef external = MakeDriver();

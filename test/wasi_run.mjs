@@ -3,9 +3,9 @@
 //
 // Runs a test built for wasm32-wasi under Node's WASI
 // (cmake/wasm32-wasi.cmake), with the WebGPU driver's imports from the
-// maul-rhi.mjs the build wrote beside it (mrhi-0016). Node has no WebGPU,
-// so the driver finds no adapter, as it does under Node with Emscripten;
-// the suite that needs one runs in a browser (web_runner.cjs).
+// maul-rhi.mjs the build wrote beside it. Node has no WebGPU, so the
+// driver finds no adapter, as it does under Node with Emscripten; the
+// suite that needs one runs in a browser (web_runner.cjs).
 //
 // usage: node wasi_run.mjs <test.wasm> [arguments]
 

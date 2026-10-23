@@ -110,8 +110,8 @@ static VkImageView MakeView(mrhiVulkanRecording* recording, VkImage image, const
 }
 
 // A view of one mip and layer (a 3D texture's depth slice) of a target;
-// in a multiview pass, of a layer per view from it (mrhi-0020).
-// A view of a target in a format, mrhi_formatNone for the texture's.
+// in a multiview pass, of a layer per view from it. A view of a target
+// in a format, mrhi_formatNone for the texture's.
 static VkImageView TargetView(mrhiVulkanRecording* recording, uint32_t index1, uint32_t mip,
                               uint32_t layer, VkImageUsageFlags use, mrhiFormat format)
 {
@@ -257,8 +257,8 @@ void mrhiVulkanBeginPass(mrhiVulkanRecording* recording)
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = {.extent = {pass->width, pass->height}},
         .layerCount = 1,
-        // A view per layer from the targets' (mrhi-0020); Vulkan ignores
-        // the layer count then.
+        // A view per layer from the targets'; Vulkan ignores the layer
+        // count then.
         .viewMask = pass->viewCount > 1 ? (1u << pass->viewCount) - 1 : 0,
         .colorAttachmentCount = pass->colorTargetCount,
         .pColorAttachments = colors,

@@ -2,11 +2,10 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Query sets on a test driver device: the def's checks, the timestamp
-// and statistics features, the device's state, and its two limits:
-// sets, and runs of queries. Occlusion queries in render passes: the
-// pass's set, one open query at a time, and each query written once a
-// frame. Statistics queries (mrhi-0023) in passes of the graphics class,
-// beside them.
+// and statistics features, the device's state, and its two limits: sets,
+// and runs of queries. Occlusion queries in render passes: the pass's
+// set, one open query at a time, and each query written once a frame.
+// Statistics queries in passes of the graphics class, beside them.
 
 #include "device_core.h"
 #include "test_device_setup.h"
