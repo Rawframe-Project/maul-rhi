@@ -297,6 +297,14 @@ jobs:
           if grep -E '\*\*\*(Skipped|Not Run)' "$RUNNER_TEMP/ctest.log"; then
             echo "::error::a test did not run"; exit 1
           fi
+      - name: Test logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: logs-android-emulator
+          path: out/android-emulator/Testing/Temporary/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Stop the emulator
         if: always() && env.EMULATOR_PID != ''
         run: kill "$EMULATOR_PID" || true
@@ -335,6 +343,14 @@ jobs:
           if grep -E '\*\*\*(Skipped|Not Run)' "$RUNNER_TEMP/ctest.log"; then
             echo "::error::a test did not run"; exit 1
           fi
+      - name: Test logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: logs-ios-simulator
+          path: out/ios-simulator/Testing/Temporary/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Shut the simulator down
         if: always() && env.MWIN_IOS_DEVICE != ''
         run: xcrun simctl shutdown "$MWIN_IOS_DEVICE" || true

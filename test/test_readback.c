@@ -384,7 +384,15 @@ static void TestRing(void)
           "all taken");
     Frame();
     CHECK(Read(0, 4096, &a) == mrhi_success, "the whole ring free again");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped, though its read wrapped the ring");
+    // The dropped wrap leaves the ring empty where the drop found it, so
+    // readbacks of every size go on.
+    Frame();
+    CHECK(Read(0, 4, &a) == mrhi_success && Read(0, 1024, &b) == mrhi_success,
+          "readbacks after the drop");
+    token = Submit();
+    mrhiRequestId after[] = {a, b};
+    CHECK(Finish(token, after, 2, mrhi_success), "answered");
     CloseDevice();
 }
 
