@@ -3482,7 +3482,7 @@ static void CheckForeignSources(mrhiInstance* instance)
 }
 
 #if defined(MRHI_TEST_XCB) || defined(MRHI_TEST_WEB) || defined(MAUL_RHI_METAL_DRIVER) ||          \
-    defined(MAUL_RHI_D3D12_DRIVER) || defined(MRHI_TEST_ANDROID)
+    defined(MAUL_RHI_D3D12_DRIVER) || defined(MRHI_TEST_ANDROID) || defined(MRHI_TEST_EXTERNAL)
 // Whether caps meet the floors and offer 8-bit sRGB in Rec. 709, each
 // color listed once.
 static bool MeetsFloors(const mrhiSurfaceCaps* caps)

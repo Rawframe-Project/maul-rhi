@@ -38,7 +38,7 @@ The options a developer uses besides the user's: `MAUL_RHI_SANITIZE` (AddressSan
 
 - **Android.** Boot an emulator with SwiftShader (`emulator -avd <avd> -no-window -no-audio -gpu swiftshader_indirect`), then `cmake --preset android-emulator` and `ctest --preset android-emulator`. Tests run on the device `ANDROID_SERIAL` names through `tools/run_android.sh`, which pushes each executable over adb and passes the host's `MAUL_RHI_*` variables, which adb's shell does not carry. The conformance suite also runs as an application on the system's NativeActivity (`tools/build_android_app.sh`, `tools/run_android_app.sh`), presenting to its window. Stop the emulator you started when the run ends.
 - **iOS.** Boot a simulator, set `MWIN_IOS_DEVICE` to its UDID (or leave one booted), then use the `ios-simulator` presets; tests run through `xcrun simctl spawn`.
-- **Windows.** Unpack the Agility SDK's NuGet package (`Microsoft.Direct3D.D3D12`, the version `directx/README.md` names) into `out/agility`; the `windows-d3d12` preset copies its DLLs beside the tests.
+- **Windows.** Unpack the Agility SDK's NuGet package (`Microsoft.Direct3D.D3D12`, the version `directx/README.md` names) into `out/agility`, as `tools/ci_agility.sh` does with the download's digest checked; the `windows-d3d12` preset copies its DLLs beside the tests.
 - **The web.** `cmake --preset web-emscripten` (with `EMSDK` set) or `--preset web-wasi`, then `ctest` with `MRHI_NODE_MODULES` naming Puppeteer's modules.
 
 ## Generated files

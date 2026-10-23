@@ -32,7 +32,6 @@ static void TestExact(void)
     CHECK(mrhiTlsfIsBlockEmpty(&store, freed), "empty again");
     CHECK(mrhiTlsfAllocate(&pool, &store, 4097, 1, &id, &offset) == 0, "too big");
     mrhiTlsfRemoveBlock(&pool, &store, freed);
-    CHECK(store.unusedCount == NODES, "every node back");
     CHECK(mrhiTlsfAllocate(&pool, &store, 1, 1, &id, &offset) == 0, "no block");
     // 1000 bytes lie inside a class, whose larger members a search skips.
     uint32_t odd = mrhiTlsfAddBlock(&pool, &store, 1, 1000);
@@ -77,7 +76,6 @@ static void TestAlignmentAndMerging(void)
     uint32_t last = mrhiTlsfFree(&pool, &store, third);
     CHECK(mrhiTlsfIsBlockEmpty(&store, last), "merged in any order");
     mrhiTlsfRemoveBlock(&pool, &store, last);
-    CHECK(store.unusedCount == NODES, "every node back");
 }
 
 // A store of two nodes: a tail it cannot split stays with the
@@ -93,14 +91,15 @@ static void TestOutOfNodes(void)
     uint64_t offset = 0;
     (void)mrhiTlsfAddBlock(&pool, &store, 0, 1000);
     uint32_t a = mrhiTlsfAllocate(&pool, &store, 10, 1, &block, &offset);
-    CHECK(a != 0 && offset == 0 && store.unusedCount == 0, "split with the last node");
+    CHECK(a != 0 && offset == 0, "split with the last node");
     uint32_t b = mrhiTlsfAllocate(&pool, &store, 10, 512, &block, &offset);
     CHECK(b != 0 && offset == 512, "aligned without a node");
-    CHECK(nodes[a - 1].size == 512 && nodes[b - 1].size == 488, "the bytes kept, none lost");
     CHECK(mrhiTlsfAllocate(&pool, &store, 1, 1, &block, &offset) == 0, "nothing free");
     (void)mrhiTlsfFree(&pool, &store, a);
     uint32_t last = mrhiTlsfFree(&pool, &store, b);
-    CHECK(mrhiTlsfIsBlockEmpty(&store, last) && nodes[last - 1].size == 1000, "whole again");
+    CHECK(mrhiTlsfIsBlockEmpty(&store, last), "empty again");
+    CHECK(mrhiTlsfAllocate(&pool, &store, 1000, 1, &block, &offset) != 0 && offset == 0,
+          "every byte back, none lost to the unsplit ranges");
 }
 
 static uint64_t s_seed = 0x243F6A8885A308D3u;
@@ -119,17 +118,16 @@ typedef struct Live
     uint64_t size;
 } Live;
 
-static bool Overlaps(const Live* live, uint32_t count)
+// Whether the last of the live allocations overlaps one before it.
+static bool LastOverlaps(const Live* live, uint32_t count)
 {
-    for (uint32_t i = 0; i < count; ++i)
+    const Live* last = &live[count - 1];
+    for (uint32_t i = 0; i + 1 < count; ++i)
     {
-        for (uint32_t j = i + 1; j < count; ++j)
+        if (live[i].block == last->block && live[i].offset < last->offset + last->size &&
+            last->offset < live[i].offset + live[i].size)
         {
-            if (live[i].block == live[j].block && live[i].offset < live[j].offset + live[j].size &&
-                live[j].offset < live[i].offset + live[i].size)
-            {
-                return true;
-            }
+            return true;
         }
     }
     return false;
@@ -160,8 +158,9 @@ static void TestRandom(void)
                 mrhiTlsfAllocate(&pool, &store, size, alignment, &added.block, &added.offset);
             if (added.id != 0)
             {
-                ok = added.offset % alignment == 0 && added.offset + size <= sizes[added.block];
                 live[count++] = added;
+                ok = added.offset % alignment == 0 && added.offset + size <= sizes[added.block] &&
+                     !LastOverlaps(live, count);
             }
         }
         else
@@ -170,25 +169,24 @@ static void TestRandom(void)
             (void)mrhiTlsfFree(&pool, &store, live[pick].id);
             live[pick] = live[--count];
         }
-        ok = ok && !Overlaps(live, count);
     }
     CHECK(ok, "aligned, in bounds and apart at every step");
     while (count > 0)
     {
         (void)mrhiTlsfFree(&pool, &store, live[--count].id);
     }
-    uint32_t empty = 0;
-    for (uint32_t i = 1; i <= NODES; ++i)
+    // Each block is whole again only if every range merged back: the
+    // largest first, so none is taken from a block meant for another.
+    static const uint32_t largestFirst[3] = {2, 1, 0};
+    for (uint32_t i = 0; i < 3; ++i)
     {
-        if (s_nodes[i - 1].free && mrhiTlsfIsBlockEmpty(&store, i))
-        {
-            CHECK(s_nodes[i - 1].size == sizes[s_nodes[i - 1].block], "a whole block");
-            mrhiTlsfRemoveBlock(&pool, &store, i);
-            ++empty;
-        }
+        uint32_t block = 0;
+        uint64_t offset = 1;
+        uint64_t size = sizes[largestFirst[i]];
+        CHECK(mrhiTlsfAllocate(&pool, &store, size, 1, &block, &offset) != 0 &&
+                  block == largestFirst[i] && offset == 0,
+              "every block merged back whole");
     }
-    CHECK(empty == 3 && store.unusedCount == NODES, "every block merged back");
-    CHECK(pool.firstMap == 0, "no free list left");
 }
 
 // A size at the start of a class takes a free range of that class,

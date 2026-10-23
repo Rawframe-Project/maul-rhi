@@ -53,6 +53,7 @@ Run the `pr` and `full` tiers through the workspace's heavy-job wrapper on the s
 Follow the [repository standard's Tests section](https://github.com/Rawframe-Project/.github/blob/main/docs/repository-standard.md#tests); in this repository:
 
 - Most behavior is tested on the test driver (`maul-rhi/test.h`), which needs no GPU and walks every submitted frame as a driver would, trapping on any record it could not translate.
+- A core test checks what a caller sees and what a driver is handed (the SPI: the frame view, its command records, staging and the readback ring, `mrhiTestFrameLog`), never the core's own bookkeeping in `mrhiDevice` or `mrhiInstance`. A white-box suite may set a counter to an edge no test reaches through public calls (a request id about to wrap, a repeat count about to saturate), and then checks only what the calls return.
 - `test/test_conformance.c` is the driver specification: named cases, run on the test driver and on every native adapter. A driver behavior that every driver must share is a conformance case, not a per-suite test. A new case is added to `conformance/mustpass/spi-<N>.txt` of the current SPI version.
 - A rule the core takes from WebGPU is proven by a case in `test/test_cts.c`, which translates the WebGPU CTS's validation cases and names each one.
 - Every C snippet of `docs/user/` appears unchanged in `test/test_guide.c`; `tools/check_guide.py` enforces it.

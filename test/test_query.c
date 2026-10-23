@@ -310,9 +310,6 @@ static void TestPassSets(void)
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorStale, "stale before the targets");
     def = RenderDef(target, occlusion);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "an occlusion set");
-    CHECK(s_device->framePasses[pass.index1 - 1].occlusionSet == occlusion.index1 &&
-              s_device->framePasses[pass.index1 - 1].occlusionGeneration == occlusion.generation,
-          "kept by the pass");
     CHECK(mrhiGetDeviceMisuse(s_device) == 2, "the stale ones not counted");
     Drop();
     Close(s_device);
@@ -419,10 +416,6 @@ static void TestTimestamps(void)
     mrhiPassId pass;
     def = TimedDef(set, 0, 1);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "both ends");
-    const mrhiFramePass* kept = &s_device->framePasses[pass.index1 - 1];
-    CHECK(kept->timestampSet == s_device->querySetSlots[set.index1 - 1].handle &&
-              kept->timestampBegin == 0 && kept->timestampEnd == 1,
-          "kept with the set's handle");
     def = TimedDef(set, 2, MRHI_NO_QUERY);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "its start only");
     def = TimedDef(set, MRHI_NO_QUERY, 3);

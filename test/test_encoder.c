@@ -750,11 +750,8 @@ static void TestArena(void)
     {
         CHECK(mrhiInsertDebugMarker(s_device, s_copy, "m", 1) == mrhi_success, "fills it");
     }
-    const mrhiFramePass* copy = &s_device->framePasses[s_copy.index1 - 1];
-    CHECK(copy->firstChunk == 1 && copy->lastChunk == 2 && s_device->frameChunks[0].next == 2 &&
-              s_device->frameChunks[0].count == perChunk - 1 &&
-              Nth(s_copy, 2 * markers - 1) != nullptr && Nth(s_copy, 2 * markers) == nullptr,
-          "two chunks linked");
+    CHECK(Nth(s_copy, 2 * markers - 1) != nullptr && Nth(s_copy, 2 * markers) == nullptr,
+          "every record kept, across chunks");
     CHECK(mrhiInsertDebugMarker(s_device, s_copy, "m", 1) == mrhi_errorCapacity, "full");
     CHECK(mrhiPushDebugGroup(s_device, s_copy, "g", 1) == mrhi_errorCapacity,
           "a group without room");
@@ -768,8 +765,7 @@ static void TestArena(void)
               mrhiInsertDebugMarker(s_device, s_copy, "m", 1) == mrhi_success &&
               mrhiEndPass(s_device, s_copy) == mrhi_success,
           "each frame takes the arena afresh");
-    CHECK(s_device->framePasses[s_copy.index1 - 1].firstChunk == 1 && Nth(s_copy, 2) == nullptr,
-          "from its first chunk, linked to nothing");
+    CHECK(Nth(s_copy, 2) == nullptr, "holding only the new frame's records");
 #else
     // Without labels a marker records nothing, so markers never fill it.
     bool taken = mrhiBeginPass(s_device, s_copy) == mrhi_success;

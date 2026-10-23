@@ -101,13 +101,6 @@ static void TestAcquire(void)
     CHECK(mrhiAcquireSurfaceImage(nullptr, s_surface, &image) == mrhi_errorInvalid, "no device");
     CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, &image) == mrhi_success && image.index1 != 0,
           "an image");
-    const mrhiFrameResource* resource = &s_device->frameResources[image.index1 - 1];
-    CHECK(resource->kind == mrhiSurfaceImage && resource->texture.format == mrhi_formatBgra8Unorm &&
-              resource->texture.width == 1280 && resource->texture.height == 720 &&
-              resource->texture.mipLevels == 1 && resource->texture.depthOrLayers == 1 &&
-              resource->texture.viewFormats[0] == mrhi_formatBgra8UnormSrgb &&
-              (resource->texture.usage & mrhi_textureCopySource) != 0 && resource->image != 0,
-          "the configured texture");
     mrhiResourceId again = {0};
     CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, &again) == mrhi_success &&
               again.index1 == image.index1 && again.generation == image.generation,
@@ -163,8 +156,7 @@ static void TestAcquire(void)
     CHECK(mrhiConfigureSurface(s_device, &config) == mrhi_success, "reconfigured after");
     BeginFrame();
     mrhiResourceId next = {0};
-    CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, &next) == mrhi_success &&
-              s_device->frameResources[next.index1 - 1].image != 0,
+    CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, &next) == mrhi_success && next.index1 != 0,
           "the next image");
     CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped, the image given back");
     BeginFrame();

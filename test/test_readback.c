@@ -237,7 +237,6 @@ static void TestRefusals(void)
     CHECK(mrhiReadBuffer(s_device, s_pass, none, 0, 4, &request) == mrhi_errorStale, "none");
     CHECK(mrhiReadBuffer(nullptr, s_pass, s_r[BUFFER], 0, 4, &request) == mrhi_errorInvalid,
           "no device");
-    CHECK(s_device->readbackHead == 0, "none recorded");
     CHECK(mrhiEndPass(s_device, s_pass) == mrhi_success && Read(0, 4, &request) == mrhi_errorState,
           "not recording");
     CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
@@ -268,9 +267,11 @@ static void TestTexture(void)
     Frame();
     mrhiTextureCopy source = {.resource = s_r[ARRAY], .z = 1};
     mrhiExtent3d size = {8, 8, 1};
+    mrhiRequestId buffer = {0};
+    mrhiRequestId layer = {0};
     mrhiRequestId request = {0};
-    CHECK(Read(0, 4, &request) == mrhi_success, "a buffer first");
-    CHECK(mrhiReadTexture(s_device, s_pass, &source, &size, &request) == mrhi_success, "a layer");
+    CHECK(Read(0, 4, &buffer) == mrhi_success, "a buffer first");
+    CHECK(mrhiReadTexture(s_device, s_pass, &source, &size, &layer) == mrhi_success, "a layer");
     const mrhiCommand* command = Nth(3);
     const mrhiCommandTextureSide* from = (const mrhiCommandTextureSide*)Nth(4);
     const mrhiCommandBufferSide* to = (const mrhiCommandBufferSide*)Nth(5);
@@ -310,10 +311,9 @@ static void TestTexture(void)
     CHECK(mrhiReadTexture(s_device, s_pass, &stencilOnly, &(mrhiExtent3d){16, 8, 1},
                           &stencilRequest) == mrhi_success,
           "the combined format's stencil");
-    mrhiRequestId layer = {s_device->readbacks[1].request, 1};
     mrhiRequestId token = Submit();
     mrhiRequestId answers[] = {
-        {s_device->readbacks[0].request, 1},
+        buffer,
         layer,
         depthRequest,
         stencilRequest,
@@ -382,9 +382,17 @@ static void TestRing(void)
               mrhiTakeReadback(s_device, d, bytes, sizeof(bytes), &size) == mrhi_success &&
               mrhiTakeReadback(s_device, e, bytes, sizeof(bytes), &size) == mrhi_success,
           "all taken");
-    CHECK(s_device->readbackTail == s_device->readbackHead &&
-              s_device->ringTail == s_device->ringHead,
-          "the ring empty");
+    Frame();
+    CHECK(Read(0, 4096, &a) == mrhi_success, "the whole ring free again");
+    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped, though its read wrapped the ring");
+    // The dropped wrap leaves the ring empty where the drop found it, so
+    // readbacks of every size go on.
+    Frame();
+    CHECK(Read(0, 4, &a) == mrhi_success && Read(0, 1024, &b) == mrhi_success,
+          "readbacks after the drop");
+    token = Submit();
+    mrhiRequestId after[] = {a, b};
+    CHECK(Finish(token, after, 2, mrhi_success), "answered");
     CloseDevice();
 }
 
@@ -398,8 +406,6 @@ static void TestDropAndFailure(void)
     size_t size = 0;
     CHECK(mrhiTakeReadback(s_device, dropped, nullptr, 0, &size) == mrhi_errorStale,
           "its readback gone");
-    CHECK(s_device->readbackPending == 0 && s_device->readbackHead == 0 && s_device->ringHead == 0,
-          "rolled back");
     Frame();
     mrhiRequestId request = {0};
     CHECK(Read(0, 4096, &request) == mrhi_success, "the whole ring again");
@@ -416,8 +422,7 @@ static void TestDropAndFailure(void)
     uint8_t bytes[16];
     CHECK(mrhiTakeReadback(s_device, request, bytes, sizeof(bytes), &size) == mrhi_errorPlatform,
           "taken as the failure");
-    CHECK(mrhiTakeReadback(s_device, request, bytes, sizeof(bytes), &size) == mrhi_errorStale &&
-              s_device->ringTail == s_device->ringHead,
+    CHECK(mrhiTakeReadback(s_device, request, bytes, sizeof(bytes), &size) == mrhi_errorStale,
           "and freed");
     CloseDevice();
 }
@@ -470,8 +475,7 @@ static void TestWrap(void)
     Frame();
     mrhiRequestId second = {0};
     CHECK(Read(0, 1024, &second) == mrhi_success, "a kilobyte past what is left");
-    CHECK(((const mrhiCommandBufferSide*)Nth(2))->offset == 0 && s_device->ringHead == 4096 + 1024,
-          "placed at the ring's start");
+    CHECK(((const mrhiCommandBufferSide*)Nth(2))->offset == 0, "placed at the ring's start");
     CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
     CloseDevice();
 }
@@ -520,8 +524,7 @@ static void TestSubmitFailure(void)
     mrhiRequestId token = {0};
     CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorPlatform, "refused by the driver");
     size_t size = 0;
-    CHECK(mrhiTakeReadback(s_device, request, nullptr, 0, &size) == mrhi_errorStale &&
-              s_device->readbackPending == 0 && s_device->ringHead == 0,
+    CHECK(mrhiTakeReadback(s_device, request, nullptr, 0, &size) == mrhi_errorStale,
           "its readback dropped");
     CloseDevice();
 }

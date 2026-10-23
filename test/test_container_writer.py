@@ -10,8 +10,10 @@
 #
 # usage: test_container_writer.py TEST_SHADER
 
+import contextlib
 import copy
 import hashlib
+import io
 import json
 import os
 import shutil
@@ -21,7 +23,8 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WRITER = os.path.join(ROOT, "tools", "mrhi_container.py")
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import mrhi_container  # noqa: E402
 
 WGSL = """
 // A comment naming @group(3) @binding(9) var<uniform> nothing: u32;
@@ -195,9 +198,12 @@ def write(folder, code, text, reflection, options=()):
         json.dump(reflection, f)
     if os.path.exists(paths[3]):
         os.remove(paths[3])
-    result = subprocess.run([sys.executable, WRITER, *options, *paths], capture_output=True,
-                            text=True)
-    return result.returncode, result.stderr, paths[3]
+    # In this process, as a separate one per write would make the test
+    # slow.
+    errors = io.StringIO()
+    with contextlib.redirect_stderr(errors):
+        code = mrhi_container.main([*options, *paths])
+    return code, errors.getvalue(), paths[3]
 
 
 def metal_options(folder, msl=None, metallib=None):

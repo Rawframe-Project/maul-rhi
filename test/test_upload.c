@@ -258,38 +258,35 @@ static void TestFull(void)
           "more than the staging");
     CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 4) == mrhi_errorCapacity,
           "and nothing after, though it would fit");
-    CHECK(s_device->stagingTaken == 0, "taking no staging");
     Drop();
     CloseDevice();
 }
 
-// The staging regions of the open frame as frames run and finish.
-static void TestRegions(void)
+// A frame's staged bytes stay as they were while it runs and the next
+// frame stages its own, as the SPI promises a driver.
+static void TestStagingInFlight(void)
 {
     Open(1024);
     Frame();
-    CHECK(s_device->stagingRegion == 0, "the first frame's region");
-    mrhiRequestId first = Submit();
+    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 8) == mrhi_success,
+          "the first frame's bytes");
+    const uint8_t* first = Staged(0);
+    mrhiRequestId running = Submit();
     Frame();
-    CHECK(s_device->stagingRegion == 1, "the second's, while the first runs");
     CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes + 40, 8) == mrhi_success &&
               memcmp(Staged(0), s_bytes + 40, 8) == 0,
-          "staged in it");
+          "the second frame's bytes");
+    CHECK(memcmp(first, s_bytes, 8) == 0, "the running frame's bytes untouched");
     mrhiRequestId second = Submit();
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
     CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_errorCapacity, "two in flight");
     CHECK(mrhiWaitFrame(s_device, second, 1) == mrhi_success, "the second finished first");
     Frame();
-    CHECK(s_device->stagingRegion == 1, "its region taken again");
-    mrhiRequestId third = Submit();
-    CHECK(mrhiWaitFrame(s_device, first, 1) == mrhi_success, "the first finished");
-    Frame();
-    CHECK(s_device->stagingRegion == 0, "its region taken");
+    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes + 80, 8) == mrhi_success,
+          "a third frame's bytes");
+    CHECK(memcmp(first, s_bytes, 8) == 0, "the first frame's still untouched");
     Drop();
-    CHECK(mrhiWaitFrame(s_device, third, 1) == mrhi_success, "the third finished");
-    Frame();
-    CHECK(s_device->stagingRegion == 0, "the first region when none runs");
-    Drop();
+    CHECK(mrhiWaitFrame(s_device, running, 1) == mrhi_success, "the first finished");
     CloseDevice();
 }
 
@@ -445,7 +442,7 @@ int main(void)
     TestBuffers();
     TestWholePitch();
     TestFull();
-    TestRegions();
+    TestStagingInFlight();
     TestTextures();
     return s_failures == 0 ? 0 : 1;
 }

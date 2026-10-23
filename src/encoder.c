@@ -492,12 +492,15 @@ static mrhiResult Label(mrhiDevice* device, mrhiPassId id, mrhiCommandType type,
     {
         return status;
     }
-    mrhiCommand command = {.type = (uint16_t)type, .b = length};
     if (type == mrhiCommandPushDebugGroup)
     {
         ++pass->debugDepth;
     }
-    return MAUL_RHI_LABELS ? Record(device, pass, command, label, length) : mrhi_success;
+    // A build without labels checks them and records nothing.
+    return MAUL_RHI_LABELS
+               ? Record(device, pass, (mrhiCommand){.type = (uint16_t)type, .b = length}, label,
+                        length)
+               : mrhi_success;
 }
 
 mrhiResult mrhiPushDebugGroup(mrhiDevice* device, mrhiPassId pass, const char* label,
