@@ -50,9 +50,11 @@ static void Measure(const mrhiDevice* device, const mrhiFrameResource* resource,
 }
 
 // Whether a range of the frame's memory is clear of every placed resource
-// whose kept passes meet the resource's.
-static bool ClearOfOthers(const mrhiDevice* device, const mrhiFrameResource* resource,
-                          uint64_t offset, uint64_t end)
+// whose kept passes meet the resource's. Only an assertion calls it, which
+// a release build compiles away.
+[[maybe_unused]] static bool ClearOfOthers(const mrhiDevice* device,
+                                           const mrhiFrameResource* resource, uint64_t offset,
+                                           uint64_t end)
 {
     for (uint32_t i = 0; i < device->frameResourceCount; ++i)
     {

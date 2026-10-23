@@ -122,8 +122,8 @@ static uint64_t Volume(const mrhiBox* box)
 
 // Whether the map's boxes still cover the whole exactly once: each move
 // splits boxes and replaces a part, so their volumes always sum to the
-// whole's, and none is empty.
-static bool CoversWhole(const Map* map)
+// whole's, and none is empty. Only assertions call it.
+[[maybe_unused]] static bool CoversWhole(const Map* map)
 {
     uint64_t sum = 0;
     for (uint32_t i = 0; i < map->count; ++i)
