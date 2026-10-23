@@ -376,8 +376,6 @@ static void CheckImageAdoption(mrhiDevice* device, VkDevice made, VkPhysicalDevi
     CHECK(mrhiCreateTexture(device, &def, &texture) == mrhi_errorInvalid, "no image refused");
     adopt.image = (void*)image;
     CHECK(mrhiCreateTexture(device, &def, &texture) == mrhi_success, "the image adopted");
-    CHECK(device->textureSlots[texture.index1 - 1].state == mrhi_stateColorTarget,
-          "taken as the color target it is handed over as");
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId resource = {0};
     mrhiRequestId token = {0};

@@ -36,6 +36,11 @@ void mrhiDropReadbacks(mrhiDevice* device)
     device->readbackPending -= device->readbackHead - device->frameReadbackFirst;
     device->readbackHead = device->frameReadbackFirst;
     device->ringHead = device->frameRingFirst;
+    // A wrap of the empty ring in the dropped frame moved the tail too.
+    if (device->ringTail > device->ringHead)
+    {
+        device->ringTail = device->ringHead;
+    }
 }
 
 void mrhiAnswerReadbacks(mrhiDevice* device, uint32_t first, uint32_t count, mrhiResult outcome)
@@ -52,7 +57,8 @@ void mrhiAnswerReadbacks(mrhiDevice* device, uint32_t first, uint32_t count, mrh
 
 // Takes bytes of the ring after its head, wrapping to its start rather
 // than splitting them: their position, or false when the ring lacks
-// room. No bytes take no room.
+// room. No bytes take no room, and the bytes an empty ring skips to wrap
+// are free at once, so an empty ring holds a readback of its whole size.
 static bool TakeRing(mrhiDevice* device, uint64_t bytes, uint64_t* positionOut)
 {
     uint64_t ring = device->deviceLimits.readbackBytes;
@@ -67,7 +73,15 @@ static bool TakeRing(mrhiDevice* device, uint64_t bytes, uint64_t* positionOut)
         return false;
     }
     uint64_t physical = at % ring;
-    at += physical + bytes > ring ? ring - physical : 0;
+    if (physical + bytes > ring)
+    {
+        bool empty = device->ringTail == at;
+        at += ring - physical;
+        if (empty)
+        {
+            device->ringTail = at;
+        }
+    }
     if (at + bytes - device->ringTail > ring)
     {
         return false;
@@ -273,7 +287,10 @@ static void Free(mrhiDevice* device, mrhiReadback* readback)
            RecordAt(device, device->readbackTail)->state == mrhiReadbackTaken)
     {
         const mrhiReadback* oldest = RecordAt(device, device->readbackTail++);
-        device->ringTail = oldest->position + oldest->bytes;
+        uint64_t end = oldest->position + oldest->bytes;
+        // A record of no bytes may lie behind a tail an empty ring's wrap
+        // moved.
+        device->ringTail = end > device->ringTail ? end : device->ringTail;
         MRHI_ASSERT(device->ringTail <= device->ringHead);
     }
 }

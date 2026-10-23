@@ -839,7 +839,7 @@ def read_entries(reflection, folder, suffix):
     return found
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(prog="mrhi_container.py")
     parser.add_argument("--msl", metavar="DIR", help="each entry's MSL, in DIR/NAME.metal")
     parser.add_argument("--metallib", metavar="FILE", help="a Metal library of every entry")
@@ -848,7 +848,7 @@ def main():
     parser.add_argument("wgsl", metavar="WGSL|-")
     parser.add_argument("reflection", metavar="REFLECTION")
     parser.add_argument("output", metavar="OUTPUT")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     spirv_path, wgsl_path, reflection_path, output_path = (args.spirv, args.wgsl,
                                                            args.reflection, args.output)
     try:

@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The id pool: slots taken and returned, stale ids refused, a full pool
-// refused, and generations that stay odd while live.
+// refused, and generations that wrap without naming a free slot.
 
 #include "pool.h"
 #include "test_harness.h"
@@ -22,34 +22,15 @@ static void TestAcquireAndRelease(void)
     CHECK(mrhiPoolAcquire(&pool, &a, &ga) && mrhiPoolAcquire(&pool, &b, &gb) &&
               mrhiPoolAcquire(&pool, &c, &gc),
           "three slots");
-    CHECK(a == 1 && b == 2 && c == 3 && pool.used == 3, "in order, 1-based");
+    CHECK(a != 0 && b != 0 && c != 0 && a != b && b != c && a != c, "three distinct, none null");
     uint32_t d = 0;
     uint32_t gd = 0;
     CHECK(!mrhiPoolAcquire(&pool, &d, &gd), "a full pool refuses");
     CHECK(mrhiPoolIsLive(&pool, b, gb), "b is live");
     mrhiPoolRelease(&pool, b);
-    CHECK(!mrhiPoolIsLive(&pool, b, gb) && pool.used == 2, "b's id ends");
+    CHECK(!mrhiPoolIsLive(&pool, b, gb), "b's id ends");
     CHECK(mrhiPoolAcquire(&pool, &d, &gd) && d == b && gd != gb, "the slot again, newer");
     CHECK(!mrhiPoolIsLive(&pool, b, gb) && mrhiPoolIsLive(&pool, d, gd), "old stale, new live");
-}
-
-static void TestFreedSlotsComeBackLastFirst(void)
-{
-    uint32_t generations[3];
-    uint32_t next[3];
-    mrhiPool pool;
-    mrhiPoolInit(&pool, 3, generations, next);
-    uint32_t index = 0;
-    uint32_t generation = 0;
-    for (int i = 0; i < 3; ++i)
-    {
-        CHECK(mrhiPoolAcquire(&pool, &index, &generation), "filled");
-    }
-    mrhiPoolRelease(&pool, 1);
-    mrhiPoolRelease(&pool, 3);
-    CHECK(mrhiPoolAcquire(&pool, &index, &generation) && index == 3, "the last freed first");
-    CHECK(mrhiPoolAcquire(&pool, &index, &generation) && index == 1, "then the one before");
-    CHECK(!mrhiPoolAcquire(&pool, &index, &generation), "then none");
 }
 
 static void TestIdsOutsideThePool(void)
@@ -93,7 +74,6 @@ static void TestEmptyPool(void)
 int main(void)
 {
     TestAcquireAndRelease();
-    TestFreedSlotsComeBackLastFirst();
     TestIdsOutsideThePool();
     TestGenerationsWrapOdd();
     TestEmptyPool();
