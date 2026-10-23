@@ -57,7 +57,7 @@ Follow the [repository standard's Tests section](https://github.com/Rawframe-Pro
 - `test/test_conformance.c` is the driver specification: named cases, run on the test driver and on every native adapter. A driver behavior that every driver must share is a conformance case, not a per-suite test. A new case is added to `conformance/mustpass/spi-<N>.txt` of the current SPI version.
 - A rule the core takes from WebGPU is proven by a case in `test/test_cts.c`, which translates the WebGPU CTS's validation cases and names each one.
 - Every C snippet of `docs/user/` appears unchanged in `test/test_guide.c`; `tools/check_guide.py` enforces it.
-- On CI the Linux tests run under the Vulkan validation layer with synchronization validation, and any "Validation Error" in a test's output fails it. D3D12 runs under the debug layer with GPU-based validation, Metal under API and shader validation.
+- On CI the Linux tests run under the Vulkan validation layer with synchronization validation, and any "Validation Error" in a test's output fails it. D3D12 runs under the debug layer with GPU-based validation, without its state tracking on pull requests (#7), Metal under API and shader validation.
 - A test that finds no adapter exits 77 and counts as skipped; CI fails on a skipped test, so each preset sets the `MAUL_RHI_REQUIRE_*` variables of what its runner has.
 - A fuzz finding becomes a test in the module's suite with the minimized input.
 

@@ -3,7 +3,9 @@
 //
 // The D3D12 debug layer for the suites that run the D3D12 driver:
 // turned on, with GPU-based validation, when MAUL_RHI_D3D12_DEBUG is
-// set and not empty, before the library opens a device. D3D12 keeps one
+// set and not empty, before the library opens a device; without that
+// validation's resource state tracking when MAUL_RHI_D3D12_GBV_STATES
+// is 0 (#7). D3D12 keeps one
 // device per adapter, so watching each adapter's device first watches
 // the library's too.
 

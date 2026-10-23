@@ -33,9 +33,10 @@ The macOS, Windows, Android, iOS and web cells run in CI only. The organization'
 | `msvc-headers` | The public headers alone under MSVC's `cl`, as C17 and C++17 with `/W4 /WX`. |
 | `web-emscripten` | The `web-emscripten` preset on the runner with the emsdk action, and the library's size at `-Oz` against `tools/wasm_size.py`'s budget. |
 | `fuzz` | Each fuzz target for 30 seconds on a pull request, 5 minutes on `main` and at night. |
+| `windows-d3d12-states` | Nightly and by hand only: the `windows-d3d12` cell with GPU-based validation's resource state tracking, which reports false errors in about one run in fifty ([#7](https://github.com/Rawframe-Project/maul-rhi/issues/7)), so it is not part of the pull request check and is never retried. |
 | `android-emulator`, `ios-simulator` | Nightly and by hand only: the presets of those names in the Android emulator and the iOS simulator, which take minutes to boot. |
 
-One check is off: on macOS 26 the image breaks shader validation's texture usage check, which zeroes a correctly made texture's samples, so `tools/ci_metal.sh` turns that check off for `macos-clang-debug` (`MTL_SHADER_VALIDATION_TEXTURE_USAGE=0`). The rest of Metal's validation stays on, `macos-clang` on macOS 15 keeps the check, and the cell takes it back by itself once `test/metal_usage_check.m` prints `ok` there ([#9](https://github.com/Rawframe-Project/maul-rhi/issues/9)).
+Two checks are off on pull requests. GPU-based validation's resource state tracking is off in `windows-d3d12` (`MAUL_RHI_D3D12_GBV_STATES=0`), since the Agility SDK reports false errors from it ([#7](https://github.com/Rawframe-Project/maul-rhi/issues/7), [debugging.md](debugging.md#direct3d-12)); the debug layer and the rest of the validation stay on, and `windows-d3d12-states` runs it nightly. And on macOS 26 the image breaks shader validation's texture usage check, which zeroes a correctly made texture's samples, so `tools/ci_metal.sh` turns that check off for `macos-clang-debug` (`MTL_SHADER_VALIDATION_TEXTURE_USAGE=0`). The rest of Metal's validation stays on, `macos-clang` on macOS 15 keeps the check, and the cell takes it back by itself once `test/metal_usage_check.m` prints `ok` there ([#9](https://github.com/Rawframe-Project/maul-rhi/issues/9)).
 
 A failed cell uploads its ctest logs for a week. The other workflows: `codeql.yml` (CodeQL, built with GCC 14), `pages.yml` (the documentation site), `pr-title.yml` (conventional titles with the scopes of [AGENTS.md](../../AGENTS.md#pull-requests)), `pr-gate.yml`, `release.yml` ([release.md](release.md)) and `scorecard.yml`.
 
@@ -68,7 +69,7 @@ The Linux presets run Vulkan on lavapipe and set, through their test presets:
 | `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation`, `VK_KHRONOS_VALIDATION_VALIDATE_SYNC=true` | The validation layer with synchronization validation; any "Validation Error" in a test's output fails it. |
 | `LVP_POISON_MEMORY=true` | Lavapipe fills new memory with nonzero bytes, so a read of memory nothing wrote fails reliably. |
 
-The other presets set their platform's counterparts: `MAUL_RHI_REQUIRE_METAL` with `MTL_DEBUG_LAYER` and `MTL_SHADER_VALIDATION`, `MAUL_RHI_REQUIRE_D3D12` with `MAUL_RHI_D3D12_DEBUG` for the debug layer and GPU-based validation, `MAUL_RHI_REQUIRE_WEBGPU` for headless Chrome. A test that finds no adapter and is not required exits 77 and counts as skipped; CI fails any cell with a skipped test, so a preset excludes by name the tests its runner cannot run, with the reason in its description.
+The other presets set their platform's counterparts: `MAUL_RHI_REQUIRE_METAL` with `MTL_DEBUG_LAYER` and `MTL_SHADER_VALIDATION`, `MAUL_RHI_REQUIRE_D3D12` with `MAUL_RHI_D3D12_DEBUG` for the debug layer and GPU-based validation (and `MAUL_RHI_D3D12_GBV_STATES=0` without its state tracking), `MAUL_RHI_REQUIRE_WEBGPU` for headless Chrome. A test that finds no adapter and is not required exits 77 and counts as skipped; CI fails any cell with a skipped test, so a preset excludes by name the tests its runner cannot run, with the reason in its description.
 
 ## Labels
 

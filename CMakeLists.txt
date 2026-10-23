@@ -251,6 +251,13 @@ if(MAUL_RHI_BUILD_TESTS)
         target_sources(test_d3d12_native PRIVATE test/d3d12_debug.c)
         target_include_directories(test_d3d12_native SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
         target_link_libraries(test_d3d12_native PRIVATE d3d12 dxgi)
+        # GPU-based validation's false state errors (#7) reproduced without
+        # library code: built with the tests so that it keeps compiling,
+        # run by hand as docs/operations/debugging.md says.
+        add_executable(d3d12_uav_check test/d3d12_uav_check.c test/d3d12_debug.c)
+        target_include_directories(d3d12_uav_check SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
+        target_link_libraries(d3d12_uav_check PRIVATE d3d12 dxgi)
+        maul_apply_flags(d3d12_uav_check)
         # The suites export the Agility SDK they run on from D3D12/ beside
         # them (test/d3d12_debug.c), where this copies the redistributable
         # DLLs of its NuGet package, the version the directx/ headers are.

@@ -244,6 +244,21 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # The windows-d3d12 cell with GPU-based validation's resource state
+  # tracking, which pull requests run without: on a device whose objects
+  # were made and released before, it reports false errors in about one
+  # run in fifty (#7, test/d3d12_uav_check.c). Nightly and by hand only,
+  # and never retried, until the Agility SDK fixes it.
+  windows-d3d12-states:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@ffd926f489c08984a43e40ac93e1f1feb784be93 # v0.0.8
+    permissions:
+      contents: read
+    with:
+      preset: windows-d3d12-states
+      runner: windows-2025
+      setup: tools/ci_agility.sh
+
   # The Vulkan driver on Android in the emulator, Android 15 on x86_64 with
   # KVM, whose SwiftShader offers Vulkan 1.3: every test through adb. Nightly
   # only, as booting the emulator takes minutes.
@@ -363,7 +378,7 @@ jobs:
   # ruleset.
   required:
     if: always()
-    needs: [changes, docs, zizmor, checks, build, msvc-headers, web-emscripten, fuzz, android-emulator, ios-simulator]
+    needs: [changes, docs, zizmor, checks, build, msvc-headers, web-emscripten, fuzz, windows-d3d12-states, android-emulator, ios-simulator]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     permissions: {}

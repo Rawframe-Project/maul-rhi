@@ -20,6 +20,7 @@
 #include <dxgi1_6.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <windows.h>
 
 __declspec(dllexport) const UINT D3D12SDKVersion = 619;
@@ -81,6 +82,19 @@ void mrhiTestWatchD3d12(void)
     {
         ID3D12Debug1_SetEnableGPUBasedValidation(validation, TRUE);
         ID3D12Debug1_Release(validation);
+    }
+    // MAUL_RHI_D3D12_GBV_STATES=0 keeps GPU-based validation but its
+    // resource state tracking, which reports false errors on a device
+    // whose objects were made and released before (#7). The debug layer
+    // still checks every barrier's states when a list is executed.
+    const char* states = getenv("MAUL_RHI_D3D12_GBV_STATES");
+    ID3D12Debug3* flags = nullptr;
+    if (states != nullptr && strcmp(states, "0") == 0 &&
+        SUCCEEDED(ID3D12Debug_QueryInterface(debug, &IID_ID3D12Debug3, (void**)&flags)))
+    {
+        ID3D12Debug3_SetGPUBasedValidationFlags(
+            flags, D3D12_GPU_BASED_VALIDATION_FLAGS_DISABLE_STATE_TRACKING);
+        ID3D12Debug3_Release(flags);
     }
     ID3D12Debug_Release(debug);
     IDXGIFactory4* factory = nullptr;
