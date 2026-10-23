@@ -165,10 +165,17 @@ XDG_RUNTIME_DIR=$runtime weston --backend=headless --socket=wayland-check --idle
     >"$out/weston.log" 2>&1 &
 weston=$!
 trap 'kill "$weston" 2>/dev/null || true; rm -rf "$runtime"' EXIT
+# Ten seconds for the socket, as tools/ci_display.sh gives; without it the
+# seam tests would fail to connect, so stop here with weston's log.
 for _ in $(seq 1 40); do
     [ -S "$runtime/wayland-check" ] && break
     sleep 0.25
 done
+if [ ! -S "$runtime/wayland-check" ]; then
+    echo "weston did not open its socket within 10 seconds:" >&2
+    cat "$out/weston.log" >&2
+    exit 1
+fi
 env -u DISPLAY XDG_RUNTIME_DIR="$runtime" WAYLAND_DISPLAY=wayland-check \
     ctest --preset linux-seam-wayland
 
