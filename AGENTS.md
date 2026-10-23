@@ -17,7 +17,7 @@ tools/check.sh changed          # before every push: rules, contract, format, th
 tools/check.sh pr               # the Linux part of the pull request check: clang-tidy, asan and gcc presets on lavapipe, seam on X11, short fuzzing
 tools/check.sh full             # adds TSan, the shared library, labels compiled out, seam on Wayland, longer fuzzing
 cmake --preset linux-clang-20-asan && cmake --build --preset linux-clang-20-asan   # one CI cell
-xvfb-run -a ctest --preset linux-clang-20-asan -L draw        # one suite, by label
+xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" ctest --preset linux-clang-20-asan -L draw   # one suite
 ./out/linux-clang-20-asan/test_conformance --case binding.draws  # one conformance case; --list lists them
 python3 tools/gen_contract.py   # regenerate headers and src/generated/ after editing contract/mrhi.json
 ```

@@ -65,7 +65,9 @@ preset() {
     step "preset $name"
     cmake --preset "$name" >"$out/$name.log"
     cmake --build --preset "$name" -j "$jobs" >>"$out/$name.log"
-    xvfb-run -a ctest --preset "$name" -j "$jobs" "$@"
+    # -noreset: an X server that resets when its last client leaves
+    # refuses the clients that connect meanwhile.
+    xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" ctest --preset "$name" -j "$jobs" "$@"
 }
 
 source_checks() {
