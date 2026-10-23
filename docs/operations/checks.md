@@ -38,6 +38,8 @@ The macOS, Windows, Android, iOS and web cells run in CI only. The organization'
 
 Two checks are off on pull requests. GPU-based validation's resource state tracking is off in `windows-d3d12` (`MAUL_RHI_D3D12_GBV_STATES=0`), since the Agility SDK reports false errors from it ([#7](https://github.com/Rawframe-Project/maul-rhi/issues/7), [debugging.md](debugging.md#direct3d-12)); the debug layer and the rest of the validation stay on, and `windows-d3d12-states` runs it nightly. And on macOS 26 the image breaks shader validation's texture usage check, which zeroes a correctly made texture's samples, so `tools/ci_metal.sh` turns that check off for `macos-clang-debug` (`MTL_SHADER_VALIDATION_TEXTURE_USAGE=0`). The rest of Metal's validation stays on, `macos-clang` on macOS 15 keeps the check, and the cell takes it back by itself once `test/metal_usage_check.m` prints `ok` there ([#9](https://github.com/Rawframe-Project/maul-rhi/issues/9)).
 
+A red `windows-d3d12-states` run is expected now and then: about 1 or 2 nightly runs in 100 report debug layer message 1358, "Incompatible texture barrier layout", which is the upstream fault of [#7](https://github.com/Rawframe-Project/maul-rhi/issues/7), not a regression. Add that run to #7 and move on; a red run with any other message is a real failure.
+
 A failed cell uploads its ctest logs for a week. The other workflows: `codeql.yml` (CodeQL, built with GCC 14), `pages.yml` (the documentation site), `pr-title.yml` (conventional titles with the scopes of [AGENTS.md](../../AGENTS.md#pull-requests)), `pr-gate.yml`, `release.yml` ([release.md](release.md)) and `scorecard.yml`.
 
 ## The rules
