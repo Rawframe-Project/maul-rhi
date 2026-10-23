@@ -19,7 +19,7 @@ The byte layout of a shader container, version 1, for anyone writing a cook of t
 
 ## Layout
 
-Every number is little-endian, and `mrhiCreateShader` reads byte by byte, so a container means the same on every host. The program hands the container over 8-byte aligned, so that its sections are aligned too and drivers can pass SPIR-V words on as they are. Every byte is checked as hostile input before anything is kept: a container that breaks any rule below is `mrhi_errorInvalid`, one of another version is `mrhi_errorVersion`, and one that needs what the device lacks is `mrhi_errorUnsupported`.
+Every number is little-endian, and `mrhiCreateShader` reads byte by byte, so a container means the same on every host. The program hands the container over 8-byte aligned, so that its sections are aligned too and drivers can pass SPIR-V words on as they are. Every byte is checked as hostile input before anything is kept: a container that breaks any rule below is `mrhi_errorFormat`, counting no misuse, one of another version is `mrhi_errorVersion`, and one that needs what the device lacks is `mrhi_errorUnsupported`.
 
 A container is a header, a table of sections, and the sections. Array sections are made of fixed-size records, at most 4096 of each, and every record is checked whether or not an entry refers to it. Names live in one strings section and are referred to by offset and length.
 

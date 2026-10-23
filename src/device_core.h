@@ -547,6 +547,10 @@ const mrhiDriverAdapter* mrhiCheckDeviceDef(mrhiInstance* instance, const mrhiDe
 // returns mrhi_errorInvalid.
 mrhiResult mrhiDeviceMisuse(mrhiDevice* device, mrhiDiagnosticCode code);
 
+// Records bad untrusted data refused by a check on the device, counting no
+// misuse, and returns mrhi_errorFormat.
+mrhiResult mrhiDeviceBadData(mrhiDevice* device, mrhiDiagnosticCode code);
+
 // The head every object def opens with.
 typedef struct mrhiDefHead
 {

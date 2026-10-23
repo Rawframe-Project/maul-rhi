@@ -108,8 +108,7 @@ static void TestCodes(void)
     mrhiGraphicsPipelineDef def = Def();
     def.vertexEntry = "nope";
     def.vertexEntryLength = 4;
-    CHECK(Made(device, &def) == mrhi_errorInvalid &&
-              Refusal(device) == mrhi_diagnosticPipelineEntry,
+    CHECK(Made(device, &def) == mrhi_errorFormat && Refusal(device) == mrhi_diagnosticPipelineEntry,
           "an entry the shader lacks");
     def = Def();
     def.constantCount = 1;
@@ -147,7 +146,7 @@ static void TestCodes(void)
     compute.entryLength = 2;
     mrhiComputePipelineId computeId;
     mrhiRequestId request;
-    CHECK(mrhiCreateComputePipeline(device, &compute, &computeId, &request) == mrhi_errorInvalid &&
+    CHECK(mrhiCreateComputePipeline(device, &compute, &computeId, &request) == mrhi_errorFormat &&
               Refusal(device) == mrhi_diagnosticPipelineEntry,
           "a vertex entry for compute");
     compute.entry = "cs";
@@ -206,10 +205,10 @@ static void TestEntries(void)
     mrhiDevice* device = Open();
     mrhiGraphicsPipelineDef def = Def();
     def.vertexEntry = "fs";
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "a fragment entry as the vertex one");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "a fragment entry as the vertex one");
     def = Def();
     def.fragmentEntry = "vs";
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "a vertex entry as the fragment one");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "a vertex entry as the fragment one");
     def = Def();
     def.vertexEntry = nullptr;
     CHECK(Made(device, &def) == mrhi_errorInvalid, "no vertex entry");
@@ -990,13 +989,13 @@ static void TestConstantsAndMisuse(void)
     required[12] = 1;
     mrhiDevice* device = OpenWithShader(mrhiDefaultDeviceDef());
     mrhiGraphicsPipelineDef def = Def();
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "a required constant unset");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "a required constant unset");
     mrhiConstantValue value = {3, 7.0};
     def.constants = &value;
     def.constantCount = 1;
     CHECK(Made(device, &def) == mrhi_success, "set");
     value.value = -1.0;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "set out of range");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "set out of range");
     def = Def();
     def.label = "\xC3";
     def.labelLength = 1;
@@ -1009,7 +1008,7 @@ static void TestConstantsAndMisuse(void)
     def.unclippedDepth = true;
     CHECK(Made(device, &def) == mrhi_errorUnsupported && mrhiGetDeviceMisuse(device) == misuse,
           "unsupported is not misuse");
-    CHECK(misuse == 3, "invalid input is");
+    CHECK(misuse == 1, "invalid input is, and bad constants are not");
     Close(device);
 }
 

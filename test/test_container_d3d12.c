@@ -63,27 +63,27 @@ static void TestParts(void)
     Reset();
     AddD3d12();
     DropSection(s_d3d12Map + 1);
-    CHECK(Built() == mrhi_errorInvalid, "a map without DXIL");
+    CHECK(Built() == mrhi_errorFormat, "a map without DXIL");
     Reset();
     AddD3d12();
     s_sections[s_d3d12Map + 1].size = 0;
-    CHECK(Built() == mrhi_errorInvalid, "a map with empty DXIL");
+    CHECK(Built() == mrhi_errorFormat, "a map with empty DXIL");
     Reset();
     AddD3d12();
     DropSection(s_d3d12Map);
-    CHECK(Built() == mrhi_errorInvalid, "DXIL without a map");
+    CHECK(Built() == mrhi_errorFormat, "DXIL without a map");
     Reset();
     AddD3d12();
     s_sections[s_sectionCount++] = (Section){.type = 14};
-    CHECK(Built() == mrhi_errorInvalid, "a repeated map");
+    CHECK(Built() == mrhi_errorFormat, "a repeated map");
     Reset();
     AddD3d12();
     s_sections[s_d3d12Map].size -= 1;
-    CHECK(Built() == mrhi_errorInvalid, "a map short of a constant");
+    CHECK(Built() == mrhi_errorFormat, "a map short of a constant");
     s_sections[s_d3d12Map].size += 2;
-    CHECK(Built() == mrhi_errorInvalid, "a map a byte long");
+    CHECK(Built() == mrhi_errorFormat, "a map a byte long");
     s_sections[s_d3d12Map].size = 24;
-    CHECK(Built() == mrhi_errorInvalid, "a map short of its head");
+    CHECK(Built() == mrhi_errorFormat, "a map short of its head");
     Reset();
     AddD3d12();
     AddMetal(true, false);
@@ -93,47 +93,47 @@ static void TestParts(void)
     s_sections[WGSL].size = 0;
     CHECK(Built() == mrhi_success, "a heap without D3D12 code");
     AddD3d12();
-    CHECK(Built() == mrhi_errorInvalid, "a heap the map gives no range");
-    CHECK(MapWith(24, 1) == mrhi_errorInvalid, "a heap range the map has no room for");
+    CHECK(Built() == mrhi_errorFormat, "a heap the map gives no range");
+    CHECK(MapWith(24, 1) == mrhi_errorFormat, "a heap range the map has no room for");
     for (size_t at = 28; at < 32; ++at)
     {
         Reset();
         AddD3d12();
         Map()[at] = 1;
-        CHECK(Built() == mrhi_errorInvalid, "a map zero that is not zero");
+        CHECK(Built() == mrhi_errorFormat, "a map zero that is not zero");
     }
 }
 
 static void TestEntries(void)
 {
-    CHECK(MapWith(MAP_ENTRY(1), 2) == mrhi_errorInvalid, "DXIL off 4-byte alignment");
+    CHECK(MapWith(MAP_ENTRY(1), 2) == mrhi_errorFormat, "DXIL off 4-byte alignment");
     CHECK(MapWith(MAP_ENTRY(1), 64) == mrhi_success, "two entries on one DXIL");
-    CHECK(MapWith(MAP_ENTRY(2), 68) == mrhi_errorInvalid, "DXIL past the section");
-    CHECK(MapWith(MAP_ENTRY(2), 0xFFFFFFF0u) == mrhi_errorInvalid, "DXIL far past the section");
-    CHECK(MapWith(MAP_ENTRY(2) + 4, 31) == mrhi_errorInvalid, "DXIL shorter than its header");
-    CHECK(MapWith(MAP_ENTRY(2) + 4, 0) == mrhi_errorInvalid, "an entry without DXIL");
-    CHECK(MapWith(MAP_ENTRY(0) + 8, 2) == mrhi_errorInvalid, "a vertex information flag of 2");
-    CHECK(MapWith(MAP_ENTRY(1) + 8, 1) == mrhi_errorInvalid,
+    CHECK(MapWith(MAP_ENTRY(2), 68) == mrhi_errorFormat, "DXIL past the section");
+    CHECK(MapWith(MAP_ENTRY(2), 0xFFFFFFF0u) == mrhi_errorFormat, "DXIL far past the section");
+    CHECK(MapWith(MAP_ENTRY(2) + 4, 31) == mrhi_errorFormat, "DXIL shorter than its header");
+    CHECK(MapWith(MAP_ENTRY(2) + 4, 0) == mrhi_errorFormat, "an entry without DXIL");
+    CHECK(MapWith(MAP_ENTRY(0) + 8, 2) == mrhi_errorFormat, "a vertex information flag of 2");
+    CHECK(MapWith(MAP_ENTRY(1) + 8, 1) == mrhi_errorFormat,
           "vertex information read by a fragment entry");
-    CHECK(MapWith(MAP_ENTRY(2) + 8, 1) == mrhi_errorInvalid,
+    CHECK(MapWith(MAP_ENTRY(2) + 8, 1) == mrhi_errorFormat,
           "vertex information read by a compute entry");
     for (size_t at = 12; at < 16; ++at)
     {
         Reset();
         AddD3d12();
         Map()[MAP_ENTRY(0) + at] = 1;
-        CHECK(Built() == mrhi_errorInvalid, "an entry's zero that is not zero");
+        CHECK(Built() == mrhi_errorFormat, "an entry's zero that is not zero");
     }
     Reset();
     AddD3d12();
     Dxil()[32 + 3] = 'D';
-    CHECK(Built() == mrhi_errorInvalid, "DXIL without its magic");
+    CHECK(Built() == mrhi_errorFormat, "DXIL without its magic");
     Reset();
     AddD3d12();
     Put32(Dxil() + 64 + 24, 36);
-    CHECK(Built() == mrhi_errorInvalid, "a DXIL size past its range");
+    CHECK(Built() == mrhi_errorFormat, "a DXIL size past its range");
     Put32(Dxil() + 64 + 24, 28);
-    CHECK(Built() == mrhi_errorInvalid, "a DXIL size short of its range");
+    CHECK(Built() == mrhi_errorFormat, "a DXIL size short of its range");
     for (uint32_t offset = 34; offset <= 36; offset += 2)
     {
         Reset();
@@ -142,14 +142,14 @@ static void TestEntries(void)
         memcpy(dxil, "DXBC", 4);
         Put32(dxil + 24, 32);
         Put32(Map() + MAP_ENTRY(1), offset);
-        CHECK(Built() == (offset == 36 ? mrhi_success : mrhi_errorInvalid),
+        CHECK(Built() == (offset == 36 ? mrhi_success : mrhi_errorFormat),
               offset == 36 ? "DXIL at a 4-byte offset" : "DXIL at a 2-byte offset");
     }
     Reset();
     AddD3d12();
     Put32(Map() + MAP_ENTRY(2) + 4, 28);
     Put32(Dxil() + 64 + 24, 28);
-    CHECK(Built() == mrhi_errorInvalid, "DXIL shorter than its header, as its size says");
+    CHECK(Built() == mrhi_errorFormat, "DXIL shorter than its header, as its size says");
     Reset();
     AddD3d12();
     Put32(Map() + MAP_ENTRY(1) + 4, 64);
@@ -162,41 +162,41 @@ static void TestBuffers(void)
     Reset();
     Put32(Record(META, 0, 16), 0);
     AddD3d12();
-    CHECK(Built() == mrhi_errorInvalid, "a place for an empty root block");
+    CHECK(Built() == mrhi_errorFormat, "a place for an empty root block");
     Put32(Map() + 4, 0);
     CHECK(Built() == mrhi_success, "no root block, no place");
     Reset();
     s_sections[CONSTANTS].size = 0;
     AddD3d12();
     s_sections[s_d3d12Map].size -= 1;
-    CHECK(Built() == mrhi_errorInvalid, "a place for absent constants");
+    CHECK(Built() == mrhi_errorFormat, "a place for absent constants");
     Put32(Map() + 8, 0);
     Put32(Map() + 12, 0);
     CHECK(Built() == mrhi_success, "no constants, no place");
     Reset();
     AddD3d12();
     Put32(Map() + MAP_ENTRY(0) + 8, 0);
-    CHECK(Built() == mrhi_errorInvalid, "a place for vertex information nobody reads");
+    CHECK(Built() == mrhi_errorFormat, "a place for vertex information nobody reads");
     Put32(Map() + 16, 0);
     Put32(Map() + 20, 0);
     CHECK(Built() == mrhi_success, "no reader, no place");
     CHECK(MapWith(4, 15) == mrhi_success, "the root block in the last space");
-    CHECK(MapWith(4, 16) == mrhi_errorInvalid, "the root block in a heap's space");
-    CHECK(MapWith(8, 0) == mrhi_errorInvalid, "the constants on the root block");
-    CHECK(MapWith(16, 1) == mrhi_errorInvalid, "the vertex information on the constants");
+    CHECK(MapWith(4, 16) == mrhi_errorFormat, "the root block in a heap's space");
+    CHECK(MapWith(8, 0) == mrhi_errorFormat, "the constants on the root block");
+    CHECK(MapWith(16, 1) == mrhi_errorFormat, "the vertex information on the constants");
     CHECK(MapWith(20, 6) == mrhi_success, "the vertex information in another space");
 }
 
 static void TestBindings(void)
 {
     CHECK(MapWith(MAP_BINDING(0) + 4, 15) == mrhi_success, "a binding in the last space");
-    CHECK(MapWith(MAP_BINDING(5) + 4, 16) == mrhi_errorInvalid, "a binding in a heap's space");
+    CHECK(MapWith(MAP_BINDING(5) + 4, 16) == mrhi_errorFormat, "a binding in a heap's space");
     Reset();
     AddD3d12();
     Put32(Map() + MAP_BINDING(0) + 4, 5);
-    CHECK(Built() == mrhi_errorInvalid, "a uniform buffer on the root block");
+    CHECK(Built() == mrhi_errorFormat, "a uniform buffer on the root block");
     Put32(Map() + MAP_BINDING(0), 2);
-    CHECK(Built() == mrhi_errorInvalid, "a uniform buffer on the vertex information");
+    CHECK(Built() == mrhi_errorFormat, "a uniform buffer on the vertex information");
     Put32(Map() + MAP_BINDING(0), 3);
     CHECK(Built() == mrhi_success, "a uniform buffer beside them");
     Reset();
@@ -208,7 +208,7 @@ static void TestBindings(void)
     AddD3d12();
     Put32(Map() + MAP_BINDING(2), 0);
     Put32(Map() + MAP_BINDING(2) + 4, 1);
-    CHECK(Built() == mrhi_errorInvalid, "a read-only storage buffer on a sampled texture");
+    CHECK(Built() == mrhi_errorFormat, "a read-only storage buffer on a sampled texture");
     Reset();
     AddD3d12();
     Put32(Map() + MAP_BINDING(2), 1);
@@ -217,7 +217,7 @@ static void TestBindings(void)
     AddD3d12();
     Put32(Map() + MAP_BINDING(5), 1);
     Put32(Map() + MAP_BINDING(5) + 4, 0);
-    CHECK(Built() == mrhi_errorInvalid, "a storage texture on a storage buffer");
+    CHECK(Built() == mrhi_errorFormat, "a storage texture on a storage buffer");
     Reset();
     AddD3d12();
     Put32(Map() + MAP_BINDING(3), 0);
@@ -240,7 +240,7 @@ static void TestConstants(void)
               mrhiContainerD3d12Fixed(&container, 0),
           "a fixed constant");
     Map()[MAP_FIXED] = 2;
-    CHECK(Built() == mrhi_errorInvalid, "a fixed flag of 2");
+    CHECK(Built() == mrhi_errorFormat, "a fixed flag of 2");
     Reset();
     uint8_t* constant = Record(CONSTANTS, 0, 16);
     Put32(constant + 8, 0);
@@ -248,7 +248,7 @@ static void TestConstants(void)
     AddD3d12();
     CHECK(Built() == mrhi_success, "a required constant read");
     Map()[MAP_FIXED] = 1;
-    CHECK(Built() == mrhi_errorInvalid, "a required constant fixed");
+    CHECK(Built() == mrhi_errorFormat, "a required constant fixed");
 }
 
 // Resets and adds the D3D12 sections with heap ranges before the fixed
@@ -292,13 +292,13 @@ static void TestHeapRanges(void)
     AddRanges(sampling, both, 2);
     CHECK(Built() == mrhi_success, "a resource range and a sampler range");
     AddRanges(mrhi_heapUseSampledTextures, both, 2);
-    CHECK(Built() == mrhi_errorInvalid, "a sampler range for an entry reading no samplers");
+    CHECK(Built() == mrhi_errorFormat, "a sampler range for an entry reading no samplers");
     AddRanges(sampling, both, 1);
-    CHECK(Built() == mrhi_errorInvalid, "samplers read without a sampler range");
+    CHECK(Built() == mrhi_errorFormat, "samplers read without a sampler range");
     AddRanges(mrhi_heapUseSamplers, both + 1, 1);
     CHECK(Built() == mrhi_success, "only samplers");
     AddRanges(mrhi_heapUseSamplers, both, 2);
-    CHECK(Built() == mrhi_errorInvalid, "a resource range for an entry reading no resources");
+    CHECK(Built() == mrhi_errorFormat, "a resource range for an entry reading no resources");
     const uint32_t cases[][2][3] = {
         {{3, 0, 16}, {2, 0, 17}},
         {{0, 0, 15}, {2, 0, 17}},
@@ -309,17 +309,17 @@ static void TestHeapRanges(void)
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
     {
         AddRanges(sampling, cases[i], 2);
-        CHECK(Built() == mrhi_errorInvalid, names[i]);
+        CHECK(Built() == mrhi_errorFormat, names[i]);
     }
     const uint32_t twice[3][3] = {{0, 1, 17}, {0, 1, 17}, {2, 0, 18}};
     AddRanges(sampling, twice, 3);
-    CHECK(Built() == mrhi_errorInvalid, "two ranges of one class on one place");
+    CHECK(Built() == mrhi_errorFormat, "two ranges of one class on one place");
     const uint32_t shared[3][3] = {{0, 0, 16}, {1, 0, 16}, {2, 0, 16}};
     AddRanges(sampling | mrhi_heapUseStorageBuffers, shared, 3);
     CHECK(Built() == mrhi_success, "ranges of three classes on one place");
     AddRanges(sampling, both, 2);
     Map()[MAP_FIXED + 12] = 1;
-    CHECK(Built() == mrhi_errorInvalid, "a range's zero that is not zero");
+    CHECK(Built() == mrhi_errorFormat, "a range's zero that is not zero");
 }
 
 int main(void)

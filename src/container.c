@@ -86,13 +86,13 @@ typedef struct Section
     uint64_t size;
 } Section;
 
-// Checks the header: success with the section count, version or invalid.
+// Checks the header: success with the section count, version or format.
 static mrhiResult CheckHeader(const uint8_t* bytes, size_t size, uint32_t* countOut)
 {
     if (size < HEADER_BYTES || bytes[0] != 'M' || bytes[1] != 'R' || bytes[2] != 'S' ||
         bytes[3] != 'C')
     {
-        return mrhi_errorInvalid;
+        return mrhi_errorFormat;
     }
     if (mrhiRead32(bytes + 4) != 1)
     {
@@ -102,7 +102,7 @@ static mrhiResult CheckHeader(const uint8_t* bytes, size_t size, uint32_t* count
     if (mrhiRead64(bytes + 8) != size || !IsZero(bytes + 52, 12) || count > MAX_SECTIONS ||
         count * (uint64_t)SECTION_BYTES > size - HEADER_BYTES)
     {
-        return mrhi_errorInvalid;
+        return mrhi_errorFormat;
     }
     uint8_t digest[MRHI_DIGEST_BYTES];
     mrhiSha256(bytes + 48, size - 48, digest);
@@ -110,7 +110,7 @@ static mrhiResult CheckHeader(const uint8_t* bytes, size_t size, uint32_t* count
     {
         if (digest[i] != bytes[16 + i])
         {
-            return mrhi_errorInvalid;
+            return mrhi_errorFormat;
         }
     }
     *countOut = count;
@@ -916,7 +916,7 @@ mrhiResult mrhiParseContainer(const void* bytes, size_t size, mrhiContainer* con
                  AreRecordsValid(&container);
     if (!valid)
     {
-        return mrhi_errorInvalid;
+        return mrhi_errorFormat;
     }
     *containerOut = container;
     return mrhi_success;
