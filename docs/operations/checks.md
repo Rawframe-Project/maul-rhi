@@ -20,6 +20,23 @@ Run `changed` before every push. Run `pr` and `full` through the workspace's hea
 
 The macOS, Windows, Android, iOS and web cells run in CI only. The organization's documentation check runs when the `.github` repository is checked out beside the workspace (`ORG_DEFAULTS` overrides where).
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request, on `main` and every night. Its one required check, `required`, passes when every other job passed or was skipped.
+
+| Job | What it runs |
+|---|---|
+| `changes` | Whether anything beyond documentation changed; the builds skip when not. |
+| `docs`, `zizmor` | The organization's documentation check (with `khronos/` and `directx/` left out) and the workflow audit. |
+| `checks` | In the CI image: clang-format on every file, the rules below, the contract's files, the documentation site, and clang-tidy on the native sources and, against `wasm32-wasi`, the web sources. |
+| `build` | One cell per preset through the organization's `cpp.yml`, with a setup script run before configuring: the Linux presets in the CI image with Xvfb, or weston for `linux-seam-wayland` (`tools/ci_display.sh`); `web-wasi` in the image with Puppeteer's headless Chrome (`tools/ci_browser.sh`); `macos-clang` on macOS 15 and `macos-clang-debug` on macOS 26 after the Metal texture usage check (`tools/ci_metal.sh`); `windows-d3d12` with the Agility SDK, its download checked by digest (`tools/ci_agility.sh`), and `windows-vulkan`. On a pull request `linux-clang-20-asan` runs each test up to three times, so a flaky one fails before it merges. |
+| `msvc-headers` | The public headers alone under MSVC's `cl`, as C17 and C++17 with `/W4 /WX`. |
+| `web-emscripten` | The `web-emscripten` preset on the runner with the emsdk action, and the library's size at `-Oz` against `tools/wasm_size.py`'s budget. |
+| `fuzz` | Each fuzz target for 30 seconds on a pull request, 5 minutes on `main` and at night. |
+| `android-emulator`, `ios-simulator` | Nightly and by hand only: the presets of those names in the Android emulator and the iOS simulator, which take minutes to boot. |
+
+A failed cell uploads its ctest logs for a week. The other workflows: `codeql.yml` (CodeQL, built with GCC 14), `pages.yml` (the documentation site), `pr-title.yml` (conventional titles with the scopes of [AGENTS.md](../../AGENTS.md#pull-requests)), `pr-gate.yml`, `release.yml` ([release.md](release.md)) and `scorecard.yml`.
+
 ## The rules
 
 | Check | Tool |

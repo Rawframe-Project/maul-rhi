@@ -1,37 +1,73 @@
-# Continuous integration for Maul RHI.
+# Continuous integration: the pull request check, and the full check on
+# main and every night, which fuzzes longer and adds the Android emulator
+# and the iOS simulator. Each build cell is a CMake preset built by the
+# organization's shared workflow; the other jobs run in the same CI image,
+# except the Emscripten build, which needs the emsdk action.
+# docs/operations/checks.md explains each job, and tools/check.sh runs the
+# Linux presets locally.
 name: ci
 
 on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "37 2 * * *"
   workflow_dispatch:
 
-env:
-  # apt retries a stalled download and gives up on a dead one.
-  APT_OPTIONS: -o Acquire::Retries=3 -o Acquire::http::Timeout=30
-  PREFIX: MAUL_RHI
+# A new push to a pull request cancels its running CI; runs on main get a
+# group of their own, so they are never cancelled.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  # The rules no compiler checks: formatting, static analysis and the
-  # family's source, module, documentation and length checks.
+  # Whether anything beyond documentation changed; the builds skip when not.
+  changes:
+    uses: Rawframe-Project/.github/.github/workflows/changes.yml@b8489ea26f2debb7981b8715d937a516916213bf # v0.0.3
+    permissions:
+      pull-requests: read
+
+  # The organization's documentation check; khronos/ and directx/ hold
+  # the Vulkan and DirectX headers, kept exactly as published.
+  docs:
+    uses: Rawframe-Project/.github/.github/workflows/docs-check.yml@b8489ea26f2debb7981b8715d937a516916213bf # v0.0.3
+    permissions:
+      contents: read
+    with:
+      exclude: khronos directx
+
+  zizmor:
+    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@b8489ea26f2debb7981b8715d937a516916213bf # v0.0.3
+    permissions:
+      contents: read
+
+  # The rules no compiler checks: formatting, the family's source, module,
+  # length, API documentation and snippet checks, the headers and sources
+  # the contract makes, the documentation site, and clang-tidy on the
+  # native and the web sources. It runs on documentation changes too, since
+  # the snippet check and the site read docs/.
   checks:
-    name: checks
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.2@sha256:73aa949aa7e24c9153107e0c601011ab689d3af0bf987ed7128e90faa3a754ef
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
-      - name: Install tools
-        timeout-minutes: 15
-        run: |
-          sudo apt-get $APT_OPTIONS update -q
-          # clang without its recommends: llvm-20-dev alone is 50 MB.
-          sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends clang-20 clang-tidy-20
-          sudo apt-get $APT_OPTIONS install -y -q ninja-build
-          pip install clang-format==22.1.5 >/dev/null
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: clang-format
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           clang-format --version
-          clang-format --dry-run -Werror $(find include src test tools bench samples -name '*.[ch]' 2>/dev/null)
+          git ls-files '*.c' '*.h' '*.m' ':!khronos/' ':!directx/' | xargs clang-format --dry-run -Werror
       - name: Family checks
         run: |
           python3 tools/check_source.py
@@ -39,340 +75,190 @@ jobs:
           python3 tools/check_docs.py
           python3 tools/check_lengths.py
           python3 tools/check_guide.py
-      - name: Contract
-        # The public headers and the generated sources are what the
-        # contract makes.
+      - name: The contract's headers and sources
         run: python3 tools/gen_contract.py --check
+      - name: The documentation site builds
+        run: python3 tools/build_docs.py
       - name: clang-tidy
+        # The native sources against Linux, the web ones against wasm32-wasi;
+        # the D3D12 sources need Windows' headers and build in the Windows
+        # cells.
         run: |
-          cmake -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-          # The web-only sources are checked by the web job; the D3D12 ones
-          # need Windows' headers and build in the Windows jobs.
-          for f in $(grep -L '"web_js.h"' src/*.c | grep -v d3d12); do
-            clang-tidy-20 -p build --quiet --warnings-as-errors='*' "$f" || exit 1
-          done
+          cmake --preset linux-clang-20 -B out/tidy -DCMAKE_EXPORT_COMPILE_COMMANDS=ON >/dev/null
+          cmake --preset web-wasi -B out/tidy-web -DCMAKE_EXPORT_COMPILE_COMMANDS=ON >/dev/null
+          grep -L '"web_js.h"' src/*.c | grep -v d3d12 |
+            xargs -P 4 -n 1 clang-tidy-20 -p out/tidy --quiet --warnings-as-errors='*'
+          grep -l '"web_js.h"' src/*.c |
+            xargs -P 4 -n 1 clang-tidy-20 -p out/tidy-web --quiet --warnings-as-errors='*'
 
-  # Every cell builds with warnings as errors and runs the whole suite,
-  # the header tests included.
-  build-test:
-    name: ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
+  # Every cell builds with warnings as errors and runs its test preset.
+  # Linux runs Vulkan on lavapipe under the validation layer, presenting to
+  # Xvfb, or for the Wayland seam to weston; macOS runs Metal under its
+  # validation; Windows runs D3D12 on WARP under the Agility SDK's debug
+  # layer, or the Vulkan driver without an adapter.
+  build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { name: linux-gcc-14,        os: ubuntu-24.04, cc: gcc-14,   cxx: g++-14,     config: Release, extra: "" }
-          - { name: linux-clang-20,      os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Release, extra: "-DMAUL_RHI_LABELS=OFF" }
-          - { name: linux-clang-20-asan, os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Debug,   extra: "-DMAUL_RHI_SANITIZE=ON -DMAUL_RHI_VALIDATION=ON" }
-          - { name: linux-clang-20-tsan, os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Debug,   extra: "-DMAUL_RHI_TSAN=ON" }
-          - { name: linux-shared,        os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Release, extra: "-DMAUL_RHI_BUILD_SHARED=ON" }
-          # The Metal driver on the runner's paravirtual device,
-          # as released on macOS 15 and with assertions on macOS 26, each
-          # with the seam check on the runner's window server.
-          - { name: macos-clang,         os: macos-15,     cc: clang,    cxx: clang++,    config: Release, extra: "-DMAUL_RHI_SEAM=ON" }
-          - { name: macos-clang-debug,   os: macos-26,     cc: clang,    cxx: clang++,    config: Debug,   extra: "-DMAUL_RHI_SEAM=ON" }
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install compilers, lavapipe, the validation layer and Xvfb
-        timeout-minutes: 15
-        if: runner.os == 'Linux'
-        run: |
-          # A mirror can trickle a package for the whole step, below the
-          # stall timeout: the downloads get four minutes a try, three tries,
-          # and installing, which must not be cut short, runs after them.
-          fetch() {
-            for try in 1 2 3; do
-              timeout 240 sudo apt-get $APT_OPTIONS install -y -q --download-only "$@" && return 0
-              echo "download try $try timed out or failed"
-            done
-            return 1
-          }
-          sudo apt-get $APT_OPTIONS update -q
-          # clang without its recommends (llvm-20-dev alone is 50 MB), with
-          # the sanitizers' runtime.
-          fetch --no-install-recommends clang-20 libclang-rt-20-dev
-          sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends clang-20 libclang-rt-20-dev
-          fetch gcc-14 g++-14 ninja-build mesa-vulkan-drivers vulkan-validationlayers libxcb1-dev xvfb
-          sudo apt-get $APT_OPTIONS install -y -q gcc-14 g++-14 ninja-build \
-            mesa-vulkan-drivers vulkan-validationlayers libxcb1-dev xvfb
-      - name: Configure
-        run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -D${PREFIX}_WERROR=ON \
-            -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} ${{ matrix.extra }}
-      - name: Build
-        run: cmake --build build -j 4
-      - name: Describe the Metal device
-        # What macOS runs on: the Metal device's families, argument
-        # buffer tier and counter sampling, which decide the driver's
-        # limits, heaps and timestamps.
-        if: runner.os == 'macOS'
-        run: |
-          cat > probe.m <<'EOF'
-          #import <Metal/Metal.h>
-          #include <stdio.h>
-          int main(void)
-          {
-              id<MTLDevice> device = MTLCreateSystemDefaultDevice();
-              if (device == nil)
-              {
-                  printf("no Metal device\n");
-                  return 0;
-              }
-              printf("%s: argument buffers tier %d, unified memory %d\n", device.name.UTF8String,
-                     (int)device.argumentBuffersSupport + 1, (int)device.hasUnifiedMemory);
-              const struct { MTLGPUFamily family; const char* name; } families[] = {
-                  {MTLGPUFamilyApple5, "Apple5"}, {MTLGPUFamilyApple6, "Apple6"},
-                  {MTLGPUFamilyApple7, "Apple7"}, {MTLGPUFamilyApple8, "Apple8"},
-                  {MTLGPUFamilyApple9, "Apple9"}, {MTLGPUFamilyMac2, "Mac2"},
-                  {MTLGPUFamilyCommon3, "Common3"}, {MTLGPUFamilyMetal3, "Metal3"}};
-              for (size_t i = 0; i < sizeof(families) / sizeof(families[0]); ++i)
-              {
-                  printf("  %s %d\n", families[i].name, (int)[device supportsFamily:families[i].family]);
-              }
-              printf("  threadgroup memory %lu, buffer %lu\n",
-                     (unsigned long)device.maxThreadgroupMemoryLength,
-                     (unsigned long)device.maxBufferLength);
-              printf("  counter sampling at stage %d, draw %d, dispatch %d, blit %d boundaries\n",
-                     (int)[device supportsCounterSampling:MTLCounterSamplingPointAtStageBoundary],
-                     (int)[device supportsCounterSampling:MTLCounterSamplingPointAtDrawBoundary],
-                     (int)[device supportsCounterSampling:MTLCounterSamplingPointAtDispatchBoundary],
-                     (int)[device supportsCounterSampling:MTLCounterSamplingPointAtBlitBoundary]);
-              for (id<MTLCounterSet> set in device.counterSets)
-              {
-                  printf("  counter set %s\n", set.name.UTF8String);
-              }
-              return 0;
-          }
-          EOF
-          clang -fobjc-arc probe.m -framework Metal -framework Foundation -o probe && ./probe
-      - name: Probe presentation timing
-        # Whether a drawable shown in a window reports when it was
-        # presented, which present timing needs.
-        if: runner.os == 'macOS'
-        continue-on-error: true
-        run: |
-          cat > present.m <<'EOF'
-          #import <Cocoa/Cocoa.h>
-          #import <Metal/Metal.h>
-          #import <QuartzCore/CAMetalLayer.h>
-          #include <stdatomic.h>
-          #include <stdio.h>
-          int main(void)
-          {
-              @autoreleasepool
-              {
-                  [NSApplication sharedApplication];
-                  [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-                  [NSApp finishLaunching];
-                  [NSApp activateIgnoringOtherApps:YES];
-                  printf("%lu screens\n", (unsigned long)NSScreen.screens.count);
-                  NSWindow* window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 256, 256)
-                                                                 styleMask:NSWindowStyleMaskTitled
-                                                                   backing:NSBackingStoreBuffered
-                                                                     defer:NO];
-                  id<MTLDevice> device = MTLCreateSystemDefaultDevice();
-                  CAMetalLayer* layer = [CAMetalLayer layer];
-                  layer.device = device;
-                  layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
-                  layer.drawableSize = CGSizeMake(256, 256);
-                  window.contentView.wantsLayer = YES;
-                  window.contentView.layer = layer;
-                  [window makeKeyAndOrderFront:nil];
-                  for (int spin = 0; spin < 50; ++spin)
-                  {
-                      NSEvent* event = [NSApp nextEventMatchingMask:NSEventMaskAny
-                                                          untilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]
-                                                             inMode:NSDefaultRunLoopMode
-                                                            dequeue:YES];
-                      if (event != nil)
-                      {
-                          [NSApp sendEvent:event];
-                      }
-                  }
-                  printf("window visible %d, occlusion visible %d, on screen %d\n", (int)window.isVisible,
-                         (int)((window.occlusionState & NSWindowOcclusionStateVisible) != 0),
-                         (int)(window.screen != nil));
-                  id<MTLCommandQueue> queue = [device newCommandQueue];
-                  static atomic_int handled;
-                  for (int i = 0; i < 30; ++i)
-                  {
-                      id<CAMetalDrawable> drawable = [layer nextDrawable];
-                      if (drawable == nil)
-                      {
-                          printf("no drawable at %d\n", i);
-                          continue;
-                      }
-                      CFTimeInterval asked = CACurrentMediaTime() + 0.05;
-                      bool timed = i % 2 == 1;
-                      [drawable addPresentedHandler:^(id<MTLDrawable> shown) {
-                          printf("drawable %lu presented at %.6f (asked %.6f)\n",
-                                 (unsigned long)shown.drawableID, shown.presentedTime, timed ? asked : 0.0);
-                          atomic_fetch_add(&handled, 1);
-                      }];
-                      id<MTLCommandBuffer> commands = [queue commandBuffer];
-                      MTLRenderPassDescriptor* pass = [MTLRenderPassDescriptor renderPassDescriptor];
-                      pass.colorAttachments[0].texture = drawable.texture;
-                      pass.colorAttachments[0].loadAction = MTLLoadActionClear;
-                      pass.colorAttachments[0].storeAction = MTLStoreActionStore;
-                      [[commands renderCommandEncoderWithDescriptor:pass] endEncoding];
-                      if (timed)
-                      {
-                          [commands presentDrawable:drawable atTime:asked];
-                      }
-                      else
-                      {
-                          [commands presentDrawable:drawable];
-                      }
-                      [commands commit];
-                      [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.02]];
-                  }
-                  [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1.0]];
-                  printf("%d presented handlers ran\n", atomic_load(&handled));
-              }
-              return 0;
-          }
-          EOF
-          clang -fobjc-arc present.m -framework Cocoa -framework Metal -framework QuartzCore -o present && ./present
-      - name: Check Metal's texture usage validation
-        # Shader validation's texture usage check zeroes a correctly made
-        # texture's samples on the macOS 26 image, which a program with no
-        # library code shows (test/metal_usage_check.m); where it does,
-        # the suite runs without that one check, and with it again once
-        # the platform is fixed.
-        if: runner.os == 'macOS'
-        env:
-          MTL_DEBUG_LAYER: "1"
-          MTL_SHADER_VALIDATION: "1"
-        run: |
-          clang -fobjc-arc test/metal_usage_check.m -framework Metal -framework Foundation -o usage_check
-          result=$(./usage_check)
-          echo "$result"
-          case "$result" in
-            *broken*)
-              echo "::warning::Metal's texture usage validation is broken on this image; the suite runs without it"
-              echo "MTL_SHADER_VALIDATION_TEXTURE_USAGE=0" >> "$GITHUB_ENV" ;;
-          esac
-      - name: Test
-        # Linux runs Vulkan on lavapipe, which must be found, under the
-        # validation layer, whose errors in a test's output fail it,
-        # presents to an XCB window on Xvfb, reads heaps,
-        # counts pipeline statistics and runs the suite again
-        # with its Vulkan driver handed in from outside.
-        # macOS runs Metal in its own cell.
-        env:
-          MAUL_RHI_REQUIRE_VULKAN: ${{ runner.os == 'Linux' && '1' || '' }}
-          MAUL_RHI_REQUIRE_SURFACE: ${{ runner.os != 'Windows' && '1' || '' }}
-          MAUL_RHI_REQUIRE_BINDLESS: ${{ runner.os == 'Linux' && '1' || '' }}
-          MAUL_RHI_REQUIRE_STATISTICS: ${{ runner.os == 'Linux' && '1' || '' }}
-          MAUL_RHI_REQUIRE_EXTERNAL: ${{ runner.os == 'Linux' && '1' || '' }}
-          # macOS must find the runner's Metal device, under Metal's API
-          # and shader validation, which stop a test on misuse.
-          MAUL_RHI_REQUIRE_METAL: ${{ runner.os == 'macOS' && '1' || '' }}
-          MTL_DEBUG_LAYER: ${{ runner.os == 'macOS' && '1' || '' }}
-          MTL_SHADER_VALIDATION: ${{ runner.os == 'macOS' && '1' || '' }}
-          VK_INSTANCE_LAYERS: ${{ runner.os == 'Linux' && 'VK_LAYER_KHRONOS_validation' || '' }}
-          # Synchronization validation checks the barriers the graph makes.
-          VK_KHRONOS_VALIDATION_VALIDATE_SYNC: "true"
-          # Lavapipe fills new memory with non-zero bytes, so a read of
-          # memory nothing wrote fails reliably.
-          LVP_POISON_MEMORY: "true"
-        run: |
-          if [ "$RUNNER_OS" = Linux ]; then run="xvfb-run -a"; else run=""; fi
-          set -o pipefail
-          $run ctest --test-dir build --output-on-failure --timeout 300 2>&1 | tee ctest.log
-          if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
+          - { preset: linux-gcc-14, setup: tools/ci_display.sh x11 }
+          - { preset: linux-clang-20, setup: tools/ci_display.sh x11 }
+          - { preset: linux-clang-20-asan, setup: tools/ci_display.sh x11, repeat: 3 }
+          - { preset: linux-clang-20-tsan, setup: tools/ci_display.sh x11 }
+          - { preset: linux-shared, setup: tools/ci_display.sh x11 }
+          - { preset: linux-seam-x11, setup: tools/ci_display.sh x11 }
+          - { preset: linux-seam-wayland, setup: tools/ci_display.sh wayland }
+          - { preset: web-wasi, setup: tools/ci_browser.sh }
+          - { preset: macos-clang, runner: macos-15, setup: tools/ci_metal.sh }
+          - { preset: macos-clang-debug, runner: macos-26, setup: tools/ci_metal.sh }
+          - { preset: windows-d3d12, runner: windows-2025, setup: tools/ci_agility.sh }
+          - { preset: windows-vulkan, runner: windows-2025 }
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@b8489ea26f2debb7981b8715d937a516916213bf # v0.0.3
+    permissions:
+      contents: read
+    with:
+      preset: ${{ matrix.preset }}
+      runner: ${{ matrix.runner || 'ubuntu-24.04' }}
+      repeat: ${{ matrix.repeat || 1 }}
+      setup: ${{ matrix.setup || '' }}
 
-  seam:
-    # The seam with Maul Window: Maul Window fetched at its
-    # release tag for this check alone, its X11 window on Xvfb and its
-    # Wayland window on weston's headless compositor made into surfaces
-    # on lavapipe, under the validation layer.
-    name: seam-linux
+  # The public headers alone under MSVC's cl, as C17 and C++17 with /W4 /WX:
+  # consumers may compile them with it, though it cannot build the library.
+  msvc-headers:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Headers under MSVC
+        run: |
+          cmake -S cmake/HeaderCheck -B out/headers
+          cmake --build out/headers --config Release
+
+  # The library under Emscripten: the suites in Node, the conformance suite
+  # and the seam check in headless Chrome with WebGPU, which they must find,
+  # and the size of the library at -Oz against its budget. The CI image has
+  # no Emscripten, so this job uses the runner and the emsdk action.
+  web-emscripten:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
-      - name: Install the compiler, lavapipe, Xvfb, weston and Maul Window's files
-        timeout-minutes: 15
-        run: |
-          sudo apt-get $APT_OPTIONS update -q
-          sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends clang-20 libclang-rt-20-dev
-          sudo apt-get $APT_OPTIONS install -y -q ninja-build mesa-vulkan-drivers \
-            vulkan-validationlayers xvfb weston libwayland-dev wayland-protocols \
-            libxcb1-dev libxcb-randr0-dev libxcb-xkb-dev libxcb-cursor-dev \
-            libxcb-render0-dev libxcb-xinput-dev libxkbcommon-dev libxkbcommon-x11-dev
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
+      - name: Browser
+        run: tools/ci_browser.sh
       - name: Configure
-        run: |
-          cmake -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -DMAUL_RHI_WERROR=ON \
-            -DMAUL_RHI_SEAM=ON
+        run: cmake --preset web-emscripten
       - name: Build
-        run: cmake --build build --target test_seam
+        run: cmake --build --preset web-emscripten
       - name: Test
-        env:
-          MAUL_RHI_REQUIRE_VULKAN: "1"
-          MAUL_RHI_REQUIRE_SURFACE: "1"
-          VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
         run: |
-          echo "== X11"
-          set -o pipefail
-          xvfb-run -a ctest --test-dir build -R '^seam$' --output-on-failure --timeout 300 2>&1 | tee ctest.log
-          if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
-          echo "== Wayland"
-          export XDG_RUNTIME_DIR=$(mktemp -d)
-          weston --backend=headless --socket=wayland-seam --idle-time=0 &
-          for i in $(seq 1 40); do [ -S "$XDG_RUNTIME_DIR/wayland-seam" ] && break; sleep 0.25; done
-          set -o pipefail
-          WAYLAND_DISPLAY=wayland-seam ctest --test-dir build -R '^seam$' --output-on-failure --timeout 300 2>&1 | tee ctest.log
-          if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
+          ctest --preset web-emscripten | tee "$RUNNER_TEMP/ctest.log"
+          if grep -E '\*\*\*(Skipped|Not Run)' "$RUNNER_TEMP/ctest.log"; then
+            echo "::error::a test did not run"; exit 1
+          fi
+      - name: Size
+        # The library at -Oz without its tests, every public function kept.
+        run: |
+          emcmake cmake -B out/web-size -DCMAKE_BUILD_TYPE=MinSizeRel \
+            "-DCMAKE_C_FLAGS_MINSIZEREL=-Oz -DNDEBUG" -DMAUL_RHI_BUILD_TESTS=OFF \
+            -DMAUL_RHI_BUILD_BENCH=OFF -DMAUL_RHI_BUILD_SAMPLES=OFF >/dev/null
+          cmake --build out/web-size -j 4
+          python3 tools/wasm_size.py out/web-size/libmaul-rhi.a
+      - name: Test logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: logs-web-emscripten
+          path: out/web-emscripten/Testing/Temporary/
+          if-no-files-found: ignore
+          retention-days: 7
 
-  # Each fuzz target runs for one minute on every push, over the bytes
-  # programs load from disk and hand the library, from its seed.
-  ios:
-    # The Metal driver built for iOS, every test in the simulator through
-    # simctl spawn, on an iPhone of the newest runtime.
-    name: ios-simulator
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v7
-      - name: Boot a simulator
-        run: |
-          udid=$(xcrun simctl list devices available -j | python3 -c '
-          import json, sys
-          devices = json.load(sys.stdin)["devices"]
-          runtimes = sorted((r for r in devices if ".iOS-" in r),
-                            key=lambda r: [int(p) for p in r.rsplit("iOS-", 1)[1].split("-")])
-          print(next(d["udid"] for d in devices[runtimes[-1]] if d["name"].startswith("iPhone")))')
-          xcrun simctl boot "$udid"
-          xcrun simctl bootstatus "$udid" -b
-          echo "MWIN_IOS_DEVICE=$udid" >> "$GITHUB_ENV"
-      - name: Configure
-        run: >
-          cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/ios-simulator.cmake
-          -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_WERROR=ON
-      - name: Build
-        run: cmake --build build -j 4
-      - name: Test
-        # The simulator's GPU has no cube arrays, below the contract's floor:
-        # no adapter is listed, so the guide and the samples have none.
-        run: |
-          set -o pipefail
-          ctest --test-dir build -E '^(guide|sample_.*)$' --output-on-failure --timeout 240 2>&1 | tee ctest.log
-          if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
-
-  android:
-    # The Vulkan driver on Android in the emulator, Android
-    # 15 on x86_64 with KVM, whose SwiftShader offers Vulkan 1.3: every
-    # test through adb, a native adapter required.
-    name: android-emulator
+  # Each fuzz target over the bytes programs load from disk and hand the
+  # library (shader containers and pipeline caches), from its seeds:
+  # briefly on a pull request, longer on main and at night.
+  fuzz:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.2@sha256:73aa949aa7e24c9153107e0c601011ab689d3af0bf987ed7128e90faa3a754ef
+    permissions:
+      contents: read
+    env:
+      FUZZ_SECONDS: ${{ github.event_name == 'pull_request' && 30 || 300 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build
+        run: |
+          cmake -B out/fuzz -G Ninja -DCMAKE_C_COMPILER=clang-20 -DMAUL_RHI_FUZZ=ON \
+            -DMAUL_RHI_BUILD_TESTS=OFF -DMAUL_RHI_WERROR=ON
+          cmake --build out/fuzz
+      - name: Run
+        # The targets side by side; a target's output goes to its log,
+        # printed when it finds something.
+        run: |
+          mkdir -p out/fuzz-logs out/corpus/fuzz_cache
+          python3 tools/container_seed.py out/corpus/fuzz_container >/dev/null
+          fuzz_one() {
+            name=$(basename "$1")
+            if "$1" -max_total_time="$FUZZ_SECONDS" "out/corpus/$name" >"out/fuzz-logs/$name.log" 2>&1; then
+              echo "$name: no finding"
+            else
+              tail -n 60 "out/fuzz-logs/$name.log"
+              echo "::error::$name found something"
+              return 1
+            fi
+          }
+          export -f fuzz_one
+          printf '%s\n' out/fuzz/fuzz_* | xargs -P 2 -I {} bash -c 'fuzz_one "$1"' _ {}
+      - name: Fuzz logs and crash inputs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz
+          path: |
+            out/fuzz-logs/
+            crash-*
+            leak-*
+            timeout-*
+            oom-*
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The Vulkan driver on Android in the emulator, Android 15 on x86_64 with
+  # KVM, whose SwiftShader offers Vulkan 1.3: every test through adb. Nightly
+  # only, as booting the emulator takes minutes.
+  android-emulator:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
     env:
       ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/28.2.13676358
       ANDROID_SERIAL: emulator-5554
       # Where avdmanager writes the device and the emulator reads it.
       ANDROID_AVD_HOME: /home/runner/.android/avd
-      MAUL_RHI_REQUIRE_VULKAN: 1
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Boot the emulator
         timeout-minutes: 15
         run: |
@@ -389,285 +275,85 @@ jobs:
           "$tools/sdkmanager" --install emulator "system-images;android-35;google_apis;x86_64" >/dev/null
           echo no | "$tools/avdmanager" create avd -n maul35 -k "system-images;android-35;google_apis;x86_64" -d pixel_5 >/dev/null
           nohup "$ANDROID_HOME/emulator/emulator" -avd maul35 -no-window -no-audio -no-boot-anim \
-            -no-snapshot -gpu swiftshader_indirect -port 5554 > emulator.log 2>&1 &
+            -no-snapshot -gpu swiftshader_indirect -port 5554 > "$RUNNER_TEMP/emulator.log" 2>&1 &
           emulator=$!
+          echo "EMULATOR_PID=$emulator" >> "$GITHUB_ENV"
           adb="$ANDROID_HOME/platform-tools/adb"
-          for i in $(seq 1 90); do
+          for _ in $(seq 1 90); do
             [ "$("$adb" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] && break
             kill -0 "$emulator" 2>/dev/null || break
             sleep 5
           done
-          "$adb" shell getprop sys.boot_completed | grep -q 1 || { tail -50 emulator.log; exit 1; }
+          "$adb" shell getprop sys.boot_completed | grep -q 1 || { tail -50 "$RUNNER_TEMP/emulator.log"; exit 1; }
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
       - name: Configure
-        run: >
-          cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/android-emulator.cmake
-          -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_WERROR=ON
+        run: cmake --preset android-emulator
       - name: Build
-        run: cmake --build build -j 4
+        run: cmake --build --preset android-emulator
       - name: Test
-        # These three samples show a window, and the samples know no Android
-        # window system.
         run: |
-          set -o pipefail
-          ctest --test-dir build -E '^sample_(hdr_surface|two_windows|present_states)$' --output-on-failure --timeout 240 2>&1 | tee ctest.log
-          if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
+          ctest --preset android-emulator | tee "$RUNNER_TEMP/ctest.log"
+          if grep -E '\*\*\*(Skipped|Not Run)' "$RUNNER_TEMP/ctest.log"; then
+            echo "::error::a test did not run"; exit 1
+          fi
+      - name: Stop the emulator
+        if: always() && env.EMULATOR_PID != ''
+        run: kill "$EMULATOR_PID" || true
 
-  fuzz:
-    name: fuzz
+  # The Metal driver built for iOS, every test in the simulator through
+  # simctl spawn, on an iPhone of the newest runtime. Nightly only, as
+  # booting the simulator takes minutes.
+  ios-simulator:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Boot a simulator
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          runtimes = sorted((r for r in devices if ".iOS-" in r),
+                            key=lambda r: [int(p) for p in r.rsplit("iOS-", 1)[1].split("-")])
+          print(next(d["udid"] for d in devices[runtimes[-1]] if d["name"].startswith("iPhone")))')
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          echo "MWIN_IOS_DEVICE=$udid" >> "$GITHUB_ENV"
+      - name: Configure
+        run: cmake --preset ios-simulator
+      - name: Build
+        run: cmake --build --preset ios-simulator
+      - name: Test
+        run: |
+          ctest --preset ios-simulator | tee "$RUNNER_TEMP/ctest.log"
+          if grep -E '\*\*\*(Skipped|Not Run)' "$RUNNER_TEMP/ctest.log"; then
+            echo "::error::a test did not run"; exit 1
+          fi
+      - name: Shut the simulator down
+        if: always() && env.MWIN_IOS_DEVICE != ''
+        run: xcrun simctl shutdown "$MWIN_IOS_DEVICE" || true
+
+  # The one check the ruleset requires: it passes when every job above
+  # passed or was skipped (for a documentation-only change, or a nightly
+  # job on a pull request), so adding or renaming a job never touches the
+  # ruleset.
+  required:
+    if: always()
+    needs: [changes, docs, zizmor, checks, build, msvc-headers, web-emscripten, fuzz, android-emulator, ios-simulator]
     runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
     steps:
-      - uses: actions/checkout@v7
-      - name: Install compilers
-        timeout-minutes: 15
+      - name: Every job passed or was skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          sudo apt-get $APT_OPTIONS update -q
-          # libFuzzer's runtime, which clang only recommends.
-          sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends clang-20 libclang-rt-20-dev
-          sudo apt-get $APT_OPTIONS install -y -q ninja-build
-      - name: Build
-        run: |
-          cmake -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -D${PREFIX}_FUZZ=ON \
-            -D${PREFIX}_BUILD_TESTS=OFF -D${PREFIX}_WERROR=ON
-          cmake --build build
-      - name: Run
-        run: |
-          python3 tools/container_seed.py corpus-fuzz_container
-          for target in build/fuzz_*; do
-            mkdir -p "corpus-$(basename $target)"
-            "$target" -max_total_time=60 "corpus-$(basename $target)"
+          echo "$RESULTS"
+          for r in $RESULTS; do
+            case "$r" in success | skipped) ;; *) exit 1 ;; esac
           done
-
-  windows-clang-cl:
-    name: windows-clang-cl
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v7
-      # Vulkan instead of D3D12, the alternative a Windows build may take.
-      - name: Configure
-        run: >
-          cmake -B build -T ClangCL -D${PREFIX}_WERROR=ON -D${PREFIX}_D3D12_DRIVER=OFF
-          -D${PREFIX}_VULKAN_DRIVER=ON
-      - name: Build
-        run: cmake --build build --config Release -j 4
-      - name: Test
-        # The guide and the samples open Vulkan, which the runner lacks (windows-d3d12 runs D3D12).
-        run: |
-          set -o pipefail
-          ctest --test-dir build -E '^(guide|sample_.*)$' -C Release --output-on-failure --timeout 300 2>&1 | tee ctest.log
-          if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
-      # The public headers alone under MSVC's cl, as C17 and C++17 with
-      # /W4 /WX, which cannot build the library itself.
-      - name: Headers under MSVC
-        run: |
-          cmake -S cmake/HeaderCheck -B build-headers
-          cmake --build build-headers --config Release
-
-  # The default Windows build, the D3D12 driver, on WARP, the runner's
-  # software adapter, under the Agility SDK's debug layer with GPU-based
-  # validation, whose errors fail the suites; the samples run
-  # there too. The SDK's NuGet package, the version the
-  # directx/ headers are, goes beside each test in D3D12/, where the
-  # tests' exports point.
-  windows-d3d12:
-    name: windows-d3d12
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v7
-      - name: Configure
-        # With the seam check: a Maul Window window on WARP.
-        run: cmake -B build -T ClangCL -D${PREFIX}_WERROR=ON -DMAUL_RHI_SEAM=ON
-      - name: Build
-        run: cmake --build build --config Debug -j 4
-      - name: Place the Agility SDK beside the tests
-        run: |
-          curl -sSfL -o agility.zip https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.619.5
-          unzip -q agility.zip -d agility
-          for dir in $(find build -name 'test_*.exe' -exec dirname {} \; | sort -u); do
-            mkdir -p "$dir/D3D12"
-            cp agility/build/native/bin/x64/*.dll "$dir/D3D12/"
-          done
-      - name: Probe presentation timing
-        # Whether a flip-model swapchain on WARP in the runner's desktop
-        # reports frame statistics, which present timing needs.
-        continue-on-error: true
-        run: |
-          mkdir -p probe
-          cat > probe/present.c <<'EOF'
-          #define COBJMACROS
-          #include <windows.h>
-          #include <d3d12.h>
-          #include <dxgi1_6.h>
-          #include <stdio.h>
-          static LRESULT CALLBACK Proc(HWND window, UINT message, WPARAM w, LPARAM l)
-          {
-              return DefWindowProcW(window, message, w, l);
-          }
-          int main(void)
-          {
-              IDXGIFactory4* factory = NULL;
-              IDXGIAdapter* warp = NULL;
-              ID3D12Device* device = NULL;
-              ID3D12CommandQueue* queue = NULL;
-              IDXGISwapChain1* chain = NULL;
-              HRESULT hr = CreateDXGIFactory2(0, &IID_IDXGIFactory4, (void**)&factory);
-              hr = SUCCEEDED(hr) ? IDXGIFactory4_EnumWarpAdapter(factory, &IID_IDXGIAdapter, (void**)&warp) : hr;
-              hr = SUCCEEDED(hr) ? D3D12CreateDevice((IUnknown*)warp, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device, (void**)&device) : hr;
-              D3D12_COMMAND_QUEUE_DESC queueDesc = {0};
-              hr = SUCCEEDED(hr) ? ID3D12Device_CreateCommandQueue(device, &queueDesc, &IID_ID3D12CommandQueue, (void**)&queue) : hr;
-              WNDCLASSW type = {0};
-              type.lpfnWndProc = Proc;
-              type.hInstance = GetModuleHandleW(NULL);
-              type.lpszClassName = L"probe";
-              RegisterClassW(&type);
-              HWND window = CreateWindowExW(0, L"probe", L"probe", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 256, 256, NULL, NULL, type.hInstance, NULL);
-              DXGI_SWAP_CHAIN_DESC1 desc = {0};
-              desc.Width = 256;
-              desc.Height = 256;
-              desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-              desc.SampleDesc.Count = 1;
-              desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-              desc.BufferCount = 2;
-              desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-              hr = SUCCEEDED(hr) ? IDXGIFactory4_CreateSwapChainForHwnd(factory, (IUnknown*)queue, window, &desc, NULL, NULL, &chain) : hr;
-              printf("setup 0x%08lx window %p\n", (unsigned long)hr, (void*)window);
-              if (FAILED(hr))
-              {
-                  return 0;
-              }
-              for (int i = 0; i < 30; ++i)
-              {
-                  MSG message;
-                  while (PeekMessageW(&message, NULL, 0, 0, PM_REMOVE))
-                  {
-                      TranslateMessage(&message);
-                      DispatchMessageW(&message);
-                  }
-                  HRESULT presented = IDXGISwapChain1_Present(chain, 1, 0);
-                  DXGI_FRAME_STATISTICS stats = {0};
-                  HRESULT read = IDXGISwapChain1_GetFrameStatistics(chain, &stats);
-                  UINT last = 0;
-                  IDXGISwapChain1_GetLastPresentCount(chain, &last);
-                  printf("present %2d: 0x%08lx stats 0x%08lx PresentCount %u PresentRefreshCount %u "
-                         "SyncRefreshCount %u SyncQPCTime %lld last %u\n",
-                         i, (unsigned long)presented, (unsigned long)read, stats.PresentCount,
-                         stats.PresentRefreshCount, stats.SyncRefreshCount,
-                         (long long)stats.SyncQPCTime.QuadPart, last);
-                  Sleep(16);
-              }
-              return 0;
-          }
-          EOF
-          cat > probe/CMakeLists.txt <<'EOF'
-          cmake_minimum_required(VERSION 3.25)
-          project(probe C)
-          add_executable(present present.c)
-          target_link_libraries(present d3d12 dxgi dxguid)
-          EOF
-          cmake -S probe -B probe/build -T ClangCL
-          cmake --build probe/build --config Release
-          probe/build/Release/present.exe
-      - name: Test
-        env:
-          MAUL_RHI_REQUIRE_D3D12: "1"
-          MAUL_RHI_REQUIRE_SURFACE: "1"
-          MAUL_RHI_REQUIRE_BINDLESS: "1"
-          MAUL_RHI_REQUIRE_STATISTICS: "1"
-          MAUL_RHI_D3D12_DEBUG: "1"
-        run: |
-          set -o pipefail
-          ctest --test-dir build -C Debug --output-on-failure --timeout 300 2>&1 | tee ctest.log
-          if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
-
-  web-wasi:
-    # The web without Emscripten: Clang's wasm32-wasi, the
-    # suites under Node's WASI and the conformance suite in headless
-    # Chrome with WebGPU, which it must find.
-    name: web-wasi
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - name: Toolchain
-        timeout-minutes: 15
-        run: |
-          sudo apt-get $APT_OPTIONS update -q
-          sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends clang-20 lld-20 wasi-libc \
-            libclang-rt-20-dev-wasm32
-      - name: Configure
-        run: |
-          cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake -DCMAKE_C_COMPILER=clang-20 \
-            -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_WERROR=ON
-      - name: Build
-        run: cmake --build build -j 4
-      - name: Browser
-        run: npm install --prefix /tmp/browser puppeteer
-      - name: Test
-        env:
-          MRHI_NODE_MODULES: /tmp/browser/node_modules
-          MAUL_RHI_REQUIRE_WEBGPU: "1"
-        # The samples open WebGPU, which WASI lacks.
-        run: |
-          set -o pipefail
-          ctest --test-dir build -E '^sample_.*$' --output-on-failure --timeout 300 2>&1 | tee ctest.log
-          if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
-
-  web:
-    name: web-emscripten
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - uses: emscripten-core/setup-emsdk@v16
-      - name: Configure
-        run: |
-          emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_WERROR=ON \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DMAUL_RHI_SEAM=ON
-      - name: Build
-        run: cmake --build build -j 4
-      - name: clang-tidy
-        timeout-minutes: 15
-        # The web-only sources, against Emscripten's sysroot.
-        run: |
-          sudo apt-get $APT_OPTIONS install -y -q clang-tidy-20
-          sysroot=$(em-config CACHE)/sysroot
-          for f in $(grep -l '"web_js.h"' src/*.c); do
-            clang-tidy-20 -p build --quiet --warnings-as-errors='*' --extra-arg=--sysroot=$sysroot \
-              --extra-arg=--target=wasm32-unknown-emscripten "$f" || exit 1
-          done
-      - name: Browser
-        run: npm install --prefix /tmp/browser puppeteer
-      - name: Test
-        # The suites run in node, the conformance suite in headless Chrome
-        # with WebGPU, which it must find.
-        env:
-          MRHI_NODE_MODULES: /tmp/browser/node_modules
-          MAUL_RHI_REQUIRE_WEBGPU: "1"
-        run: |
-          set -o pipefail
-          ctest --test-dir build --output-on-failure --timeout 300 2>&1 | tee ctest.log
-          if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
-      - name: Seam
-        # The seam with Maul Window: its canvas, named by the
-        # window's handles, presented to; it must not be skipped.
-        env:
-          MRHI_NODE_MODULES: /tmp/browser/node_modules
-          MAUL_RHI_REQUIRE_WEBGPU: "1"
-          MAUL_RHI_REQUIRE_SURFACE: "1"
-        run: |
-          set -o pipefail
-          ctest --test-dir build -R '^seam$' --output-on-failure --timeout 300 2>&1 | tee ctest.log
-          if grep -q "(Skipped)" ctest.log; then echo "::error::a test was skipped"; exit 1; fi
-      - name: Size
-        # The wasm budget: the library at -Oz without its
-        # tests, every public function kept.
-        run: |
-          emcmake cmake -B build-size -DCMAKE_BUILD_TYPE=MinSizeRel \
-            "-DCMAKE_C_FLAGS_MINSIZEREL=-Oz -DNDEBUG" -D${PREFIX}_BUILD_TESTS=OFF \
-            -D${PREFIX}_BUILD_BENCH=OFF -D${PREFIX}_BUILD_SAMPLES=OFF >/dev/null
-          cmake --build build-size -j 4
-          python3 tools/wasm_size.py build-size/libmaul-rhi.a
