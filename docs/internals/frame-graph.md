@@ -1,0 +1,59 @@
+# The frame graph
+
+The frame graph is the only way work reaches the GPU, and the reason the public API has no barriers, states, fences or semaphores. This page covers how a frame is declared, compiled and handed to its driver; [recording.md](recording.md) covers what happens between the compile and the submission.
+
+## Why declare first
+
+Production frame graphs (Frostbite, Unreal, Granite, Filament) run a setup callback and an execute callback per pass. The family forbids callbacks into the program, and AMD's Render Pipeline Shaders shows the alternative: once the graph is compiled, the program can record it itself, pass by pass, on any thread. So a frame is five steps: begin, declare, compile, record, submit. Everything the graph decides comes from the declarations alone, before a single command exists, which also makes the whole of its planning testable on the test driver.
+
+## Declaring
+
+`mrhiBeginFrame` opens the device's one frame. Its resources are frame-local, generation-checked ids for three kinds of thing:
+
+- **transients** the frame makes, places and may alias (`mrhiDeclareBuffer`, `mrhiDeclareTexture`);
+- **imported** device objects (`mrhiImportBuffer`, `mrhiImportTexture`), tracked and never aliased, each carrying one state between frames;
+- **acquired surface images** (`mrhiAcquireSurfaceImage`), tracked and never aliased.
+
+Importing copies the object's def or size, driver handle and carried state into the frame, so an object destroyed while the frame is open keeps its handle there. Its final state is carried back only while it is still live, so an object that takes its slot is never touched.
+
+A pass (`mrhiAddPass`) has a class, its render and depth targets with load, store, clear and resolve, at most one heap, its query sets, and the accesses it makes over subranges of mips, layers and planes. Within a pass a part of a texture is used in read-only kinds or in one writable kind, as WebGPU's usage scopes require, so each part has exactly one state per pass; sampling a read-only depth target shares the depth read state. Render areas are measured and labels copied when the pass is added, so a kept pass that is never begun still clears its targets at the right size.
+
+## Compiling
+
+`mrhiCompileFrame` does four things, in `src/compile.c` and `src/plan.c`:
+
+1. **Culling**, from the last pass back, at the granularity of whole resources: a pass is kept when it sets `neverCull`, or writes an imported resource, a surface image or a resource a kept later pass reads. Culled passes are never recorded and write no timestamps.
+2. **Stores.** A target's store is kept only when a later kept pass reads it or the texture outlives the frame; otherwise it is discarded, which lets tile GPUs keep it on chip.
+3. **Barriers.** Each resource's parts are tracked as disjoint boxes of mips, layers and planes mapped to the state their last use left them in. Each kept use makes barriers from the states it meets: a texture leaving the undefined state, a write on either side, or a texture changing state. Two reads of a buffer need none. The barriers are then put in the order they run.
+4. **Placement** of transients in the frame's memory, first fit in first-use order ([memory.md](memory.md#a-frames-memory)).
+
+Declaration order is execution order within a class, and today every driver runs every pass on one queue in declaration order. The class limits what a pass may do (a transfer pass only copies; vertex, index and query resolve accesses are graphics only), so a driver can move async compute and transfer passes onto queues of their own without a change to the API.
+
+## Aliasing
+
+When the first use of a transient lands on memory that resources used earlier in the frame, its barriers are marked `aliasing`, and a buffer's first use gains a barrier from the undefined state, which it would not otherwise have. Drivers order such a barrier after the earlier resources' uses: Vulkan waits for all commands' writes, Direct3D 12 records an aliasing barrier and discards a placed render target or depth texture whole at its first use, as D3D12 requires before anything else touches it.
+
+## Imported, sealed and presented states
+
+- An imported object ends the frame in one state. Parts its passes left in different states are unified at the frame's end, so the next frame starts from a single known state.
+- A surface image begins undefined and ends in `mrhi_statePresent`; a pass that writes it is kept with its store.
+- An image adopted from OpenXR ends every frame in its color or depth target state, whatever its last use, since the runtime takes it back that way.
+- A sealed resource ends the frame in `mrhi_stateSealed`, a read-only state any pass may read through a heap without declaring it ([binding.md](binding.md#sealing)).
+
+## The readable plan
+
+After the compile, `mrhiIsPassKept`, `mrhiGetPassPlan`, `mrhiGetResourcePlan`, `mrhiGetFrameBarriers` and `mrhiGetFrameMemory` expose the plan. They exist for conformance tests and graph tools, and they are why the hazards and aliasing cases of the conformance suite can be checked exactly on any driver.
+
+## Submission
+
+`mrhiSubmitFrame` hands the driver one read-only view, built in tables the device allocated with itself (`mrhiDriverFrame` in `src/driver.h`):
+
+- the frame's resources by slot: device objects by driver handle, transients by def with the usages their passes derive and their place in frame memory, and whether a kept pass uses each;
+- the kept passes in the order they run, with their class, label, targets and stores, render area, query sets, the resources they declare with the states they leave, and their first command chunk;
+- the barriers in the order they run;
+- the command chunks, the upload bytes, and the readback ring the driver fills before it reports the frame finished;
+- the bytes the transients take together.
+
+Drivers read this view and never the core's tables, so either side can change its layout. The view's tables cost a device about 60 bytes a resource and 550 a pass, and the labels 256 bytes a pass. The test driver and the validation layer walk each view completely ([drivers.md](drivers.md#the-frame-walk)).
+
+Submission is refused while a pass still records, or when a pass ran out of arena, staging or ring. `framesInFlight` bounds the frames submitted and not yet finished: beginning another is refused with `mrhi_errorCapacity` rather than blocking, so the browser's event loop is never stalled. A dropped frame, or one whose submission fails, gives back its readbacks and its acquired images.

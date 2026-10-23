@@ -107,8 +107,8 @@ static void Set(CAMetalLayer* layer, id<MTLDevice> device, const mrhiSurfaceConf
     }
     layer.drawableSize = CGSizeMake(config->width, config->height);
     // A drawable viewed in another format is no framebuffer only.
-    layer.framebufferOnly = config->usage == mrhi_textureRenderTarget &&
-                            config->viewFormats[0] == mrhi_formatNone;
+    layer.framebufferOnly =
+        config->usage == mrhi_textureRenderTarget && config->viewFormats[0] == mrhi_formatNone;
     layer.maximumDrawableCount = 3;
     layer.opaque = config->alphaMode == mrhi_alphaOpaque;
 #if TARGET_OS_OSX

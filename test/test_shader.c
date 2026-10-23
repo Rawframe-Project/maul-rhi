@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Shader containers: every rule of docs/contract/container.md broken
+// Shader containers: every rule of docs/user/shader-container-format.md broken
 // once against a container built here, the shaders a device makes from
 // them, and, given a file tools/mrhi_container.py wrote and what it
 // should hold, a check that the library reads it the same way.

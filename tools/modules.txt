@@ -1,4 +1,4 @@
-# The internal module graph (docs/conventions.md, section 6): each module
+# The internal module graph: each module
 # and the modules it may use. tools/check_modules.py enforces it.
 adapter: capabilities_core chain driver instance_core
 allocator:

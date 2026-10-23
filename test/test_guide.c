@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The guide's C snippets (docs/guide.md), each as written there
-// (tools/check_guide.py checks it, family record 0019), run on the first
-// adapter the native drivers list: the device opened by the guide's
-// OpenDevice, a triangle drawn and read back by its DrawAndRead, the
+// The C snippets of docs/user/, each as written there (tools/check_guide.py
+// checks it), run on the first adapter the native drivers list: the device
+// opened by OpenDevice, a triangle drawn and read back by DrawAndRead, the
 // pixels checked. Skips without an adapter unless MAUL_RHI_REQUIRE_VULKAN
-// is set, as the samples do; not built for the web, where the guide's
+// is set, as the samples do; not built for the web, where the snippets'
 // waits are a later frame's.
 
 #ifdef _WIN32

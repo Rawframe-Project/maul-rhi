@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The shader container's D3D12 map and DXIL (docs/contract/container.md):
+// The shader container's D3D12 map and DXIL (docs/user/shader-container-format.md):
 // every rule broken once against the default container with AddD3d12's
 // sections.
 

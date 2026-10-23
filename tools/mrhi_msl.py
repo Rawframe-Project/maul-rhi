@@ -5,7 +5,7 @@
 # Makes each entry's Metal Shading Language for tools/mrhi_container.py
 # --msl, offline, with SPIRV-Cross: it rewrites a copy of the SPIR-V so
 # that every binding's descriptor set is 0 and its binding number is the
-# index the container's Metal map gives it (docs/contract/container.md),
+# index the container's Metal map gives it (docs/user/shader-container-format.md),
 # then crosses each entry alone to DIR/NAME.metal with SPIRV-Cross's
 # --msl-decoration-binding, which takes those numbers as the MSL indices.
 # The root block, which has no binding, takes buffer 0. The MSL is made

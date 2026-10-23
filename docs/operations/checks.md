@@ -1,0 +1,56 @@
+# Checks
+
+What to run before pushing, what each tier covers, and what the test presets expect of the machine.
+
+## The tiers
+
+`tools/check.sh` has three tiers; each includes the one before it.
+
+| Tier | Runs | Budget |
+|---|---|---|
+| `changed` | The source, module, length, documentation and snippet rules; the contract's generated files; the organization's documentation check; clang-format on the changed files; the `linux-clang-20-asan` preset's tests without the `integration` label. A change to documentation alone builds nothing. | under 2 minutes |
+| `pr` | Every rule; clang-format on every file; clang-tidy on the sources it can see on Linux; the `linux-clang-20-asan` and `linux-gcc-14` presets, integration tests included, on lavapipe under Xvfb; the seam check on X11; 10 seconds of fuzzing per target. | under 10 minutes |
+| `full` | Also ThreadSanitizer, the shared library, labels compiled out, the seam check on Wayland under weston's headless compositor, and 60 seconds of fuzzing per target. | under 20 minutes |
+
+Run `changed` before every push. Run `pr` and `full` through the workspace's heavy-job wrapper on the shared machine:
+
+```sh
+/home/rawframe-project/tools/heavy.sh tools/check.sh full
+```
+
+The macOS, Windows, Android, iOS and web cells run in CI only. The organization's documentation check runs when the `.github` repository is checked out beside the workspace (`ORG_DEFAULTS` overrides where).
+
+## The rules
+
+| Check | Tool |
+|---|---|
+| Formatting | `clang-format` 22.1.5, `.clang-format` |
+| Naming, complexity | `clang-tidy-20`, `.clang-tidy` |
+| SPDX lines, comments, banned calls, file-scope state, file names | `tools/check_source.py` |
+| The module graph | `tools/check_modules.py`, `tools/modules.txt` |
+| File and function lengths | `tools/check_lengths.py`, `tools/length-exceptions.txt` |
+| Public documentation blocks and thread safety statements | `tools/check_docs.py` |
+| Documentation snippets run by `test/test_guide.c` | `tools/check_guide.py` |
+| Headers and generated sources match the contract | `tools/gen_contract.py --check` |
+| Allowed Markdown files, em dash, record numbers, links | the organization's `docs_check.py` |
+
+Each tool's header comment and message state its rule and why.
+
+## What the test presets expect
+
+The Linux presets run Vulkan on lavapipe and set, through their test presets:
+
+| Variable | Effect |
+|---|---|
+| `MAUL_RHI_REQUIRE_VULKAN` | A test that finds no Vulkan adapter fails instead of skipping. |
+| `MAUL_RHI_REQUIRE_SURFACE` | The surface cases and window samples fail without a window system; run under `xvfb-run -a`. |
+| `MAUL_RHI_REQUIRE_BINDLESS`, `MAUL_RHI_REQUIRE_STATISTICS` | The heap and pipeline statistics cases fail when the adapter does not grant them. |
+| `MAUL_RHI_REQUIRE_EXTERNAL` | `test_conformance_external` must exist and pass. |
+| `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation`, `VK_KHRONOS_VALIDATION_VALIDATE_SYNC=true` | The validation layer with synchronization validation; any "Validation Error" in a test's output fails it. |
+| `LVP_POISON_MEMORY=true` | Lavapipe fills new memory with nonzero bytes, so a read of memory nothing wrote fails reliably. |
+
+The other presets set their platform's counterparts: `MAUL_RHI_REQUIRE_METAL` with `MTL_DEBUG_LAYER` and `MTL_SHADER_VALIDATION`, `MAUL_RHI_REQUIRE_D3D12` with `MAUL_RHI_D3D12_DEBUG` for the debug layer and GPU-based validation, `MAUL_RHI_REQUIRE_WEBGPU` for headless Chrome. A test that finds no adapter and is not required exits 77 and counts as skipped; CI fails any cell with a skipped test, so a preset excludes by name the tests its runner cannot run, with the reason in its description.
+
+## Labels
+
+Every suite `test/test_<name>.c` carries the label `<name>`. Tests that drive a real GPU, window or browser also carry `integration`: the conformance suite and its external and worker forms, the samples (`sample`), the guide, the seam check, the native interop suites and the outside-driver build. `ctest -L <label>` runs one suite, `-LE integration` everything that needs no GPU.

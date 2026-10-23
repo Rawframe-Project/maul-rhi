@@ -2,17 +2,24 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Sirac Ozmen
 #
-# Writes the public headers, the result names and the thread safety
-# table from the contract, docs/contract/mrhi.json, which is their
-# source of truth (docs/contract/README.md describes it). The contract's
-# names are snake_case; this generator turns them into the family's C
-# names (docs/conventions.md, section 4). Headers go through the pinned
-# clang-format, so the format, documentation and source checks apply to
-# them as to hand-written code.
+# Writes the public headers and the generated sources from the contract,
+# contract/mrhi.json, which is their source of truth
+# (docs/internals/contract.md describes it). The contract's names are
+# snake_case; this generator turns them into the family's C names: get_version
+# becomes mrhiGetVersion, error_invalid mrhi_errorInvalid, view_count
+# viewCount. Headers go through the pinned clang-format, so the format,
+# documentation and source checks apply to them as to hand-written code.
 #
-# usage: gen_contract.py [--check]
-#   --check  writes nothing; fails naming each file that differs from
-#            what the contract generates.
+# The library version is not in the contract: it lives between
+# release-please's markers in base.h, which release-please moves, and the
+# generator keeps it as it finds it.
+#
+# usage: gen_contract.py [--check] [--mappings OUTPUT.md]
+#   --check     writes nothing; fails naming each file that differs from
+#               what the contract generates.
+#   --mappings  also writes the table of how each concept maps onto
+#               Vulkan, D3D12, Metal and WebGPU, for the documentation
+#               site; it is not committed.
 
 import json
 import os
@@ -23,7 +30,7 @@ import sys
 import textwrap
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONTRACT = os.path.join("docs", "contract", "mrhi.json")
+CONTRACT = os.path.join("contract", "mrhi.json")
 WIDTH = 80
 NAME = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
 KINDS = ("constant", "result", "enum", "bitflags", "opaque", "id", "struct", "function")
@@ -54,8 +61,8 @@ SCALARS = {"float": "mrhi_scalarFloat32", "sint": "mrhi_scalarSint32", "uint": "
 # rule), and the classes a mapping row may have.
 APIS = (("vulkan", "Vulkan"), ("d3d12", "D3D12"), ("metal", "Metal"), ("web_gpu", "WebGPU"))
 CLASSES = ("direct", "emulated", "restricted", "absent_rejected")
-# The openings of a thread safety paragraph (docs/conventions.md,
-# section 10), by class.
+# The openings of a thread safety paragraph, by class, as
+# tools/check_docs.py accepts them.
 THREAD_SAFETY = {
     "any": "Safe from any thread.",
     "any_exclusive": "Safe from any thread; {object} {verb} used by one thread at a time.",
@@ -279,8 +286,7 @@ def check_function(errors, where, item, kind_of):
 def validate(contract):
     """The contract's structural errors, as messages; empty when valid."""
     errors, kind_of = [], {}
-    for key in ("library", "title", "prefix", "macro", "guard", "version", "contract_version",
-                "headers"):
+    for key in ("library", "title", "prefix", "macro", "guard", "contract_version", "headers"):
         if key not in contract:
             errors.append(f"the contract has no '{key}'")
     if errors:
@@ -353,11 +359,28 @@ def c_declaration(names, spec, own=None):
     return f"{c_type(names, spec, own)} {name}"
 
 
+def library_version(contract):
+    """The (major, minor, patch) base.h carries between release-please's markers."""
+    path = os.path.join(ROOT, "include", contract["library"], "base.h")
+    text = open(path, encoding="utf-8").read() if os.path.exists(path) else ""
+    parts = []
+    for part in ("MAJOR", "MINOR", "PATCH"):
+        match = re.search(r"^#define " + contract["macro"] + "_VERSION_" + part + r" (\d+)$", text,
+                          re.M)
+        if match is None:
+            raise SystemExit(f"{path}: no {contract['macro']}_VERSION_{part}")
+        parts.append(int(match.group(1)))
+    return parts
+
+
 def preamble_version(contract, names):
-    version, macro = contract["version"], names.macro
-    lines = ["// The library version. CMake reads it from here."]
-    for part in ("major", "minor", "patch"):
-        lines.append(f"#define {macro}_VERSION_{part.upper()} {version[part]}")
+    macro = names.macro
+    lines = ["// The library version. CMake reads it from here, and release-please",
+             "// moves it between the markers."]
+    for part, value in zip(("major", "minor", "patch"), library_version(contract)):
+        lines += [f"// x-release-please-start-{part}",
+                  f"#define {macro}_VERSION_{part.upper()} {value}",
+                  "// x-release-please-end"]
     lines += [""]
     lines += comment("The contract version a program is built against. An instance refuses any "
                      "other before 1.0.", 0, "//")
@@ -771,22 +794,6 @@ def format_checks(contract):
     return lines + ["}"]
 
 
-def emit_thread_table(contract):
-    names = Names(contract)
-    lines = [f"# {contract['title']} thread safety", ""]
-    lines += textwrap.wrap(f"Generated by `tools/gen_contract.py` from `{CONTRACT}`: edit the "
-                           "contract, not this file.", 72)
-    lines += ["", "| Function | Thread safety |", "| --- | --- |"]
-    for header in contract["headers"]:
-        for item in header["items"]:
-            if item["kind"] != "function":
-                continue
-            safety = item["thread_safety"]
-            text = opening_of(safety)
-            lines.append(f"| `{names.function(item['name'])}` | {text} |")
-    return "\n".join(lines) + "\n"
-
-
 def emit_result_names(contract):
     """The source of the ResultName function, one case per result value."""
     names = Names(contract)
@@ -863,12 +870,10 @@ def outputs(contract):
     for header in contract["headers"]:
         path = os.path.join("include", contract["library"], header["name"] + ".h")
         files[path] = formatted(path, emit_header(contract, header))
-    files[os.path.join("docs", "contract", "thread-safety.md")] = emit_thread_table(contract)
     files[os.path.join("src", "generated", "result_names.c")] = emit_result_names(contract)
     files[os.path.join("src", "generated", "diagnostic_texts.c")] = emit_diagnostic_texts(contract)
     files[os.path.join("src", "generated", "defaults.c")] = emit_defaults(contract)
     files[os.path.join("src", "generated", "capabilities.c")] = emit_capability_checks(contract)
-    files[os.path.join("docs", "contract", "mappings.md")] = emit_mappings(contract)
     # The contract itself, in one canonical layout, so that its diffs
     # show only what changed.
     files[CONTRACT] = json.dumps(contract, indent=2, ensure_ascii=False) + "\n"
@@ -876,8 +881,13 @@ def outputs(contract):
 
 
 def main(argv):
-    if argv not in ([], ["--check"]):
-        raise SystemExit("usage: gen_contract.py [--check]")
+    check = "--check" in argv
+    rest = [arg for arg in argv if arg != "--check"]
+    mappings = None
+    if rest[:1] == ["--mappings"] and len(rest) == 2:
+        mappings = rest[1]
+    elif rest:
+        raise SystemExit("usage: gen_contract.py [--check] [--mappings OUTPUT.md]")
     with open(os.path.join(ROOT, CONTRACT), encoding="utf-8") as f:
         contract = json.load(f)
     errors = validate(contract)
@@ -890,13 +900,16 @@ def main(argv):
         if current == text:
             continue
         stale.append(path)
-        if not argv:
+        if not check:
             with open(full, "w", encoding="utf-8", newline="\n") as f:
                 f.write(text)
-    if argv and stale:
+    if mappings is not None:
+        with open(mappings, "w", encoding="utf-8", newline="\n") as f:
+            f.write(emit_mappings(contract))
+    if check and stale:
         raise SystemExit("stale, run tools/gen_contract.py: " + ", ".join(stale))
     print(f"contract: {len(outputs(contract))} files, {len(stale)} "
-          + ("stale" if argv else "written"))
+          + ("stale" if check else "written"))
 
 
 if __name__ == "__main__":
