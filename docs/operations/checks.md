@@ -35,6 +35,8 @@ The macOS, Windows, Android, iOS and web cells run in CI only. The organization'
 | `fuzz` | Each fuzz target for 30 seconds on a pull request, 5 minutes on `main` and at night. |
 | `android-emulator`, `ios-simulator` | Nightly and by hand only: the presets of those names in the Android emulator and the iOS simulator, which take minutes to boot. |
 
+One check is off: on macOS 26 the image breaks shader validation's texture usage check, which zeroes a correctly made texture's samples, so `tools/ci_metal.sh` turns that check off for `macos-clang-debug` (`MTL_SHADER_VALIDATION_TEXTURE_USAGE=0`). The rest of Metal's validation stays on, `macos-clang` on macOS 15 keeps the check, and the cell takes it back by itself once `test/metal_usage_check.m` prints `ok` there ([#9](https://github.com/Rawframe-Project/maul-rhi/issues/9)).
+
 A failed cell uploads its ctest logs for a week. The other workflows: `codeql.yml` (CodeQL, built with GCC 14), `pages.yml` (the documentation site), `pr-title.yml` (conventional titles with the scopes of [AGENTS.md](../../AGENTS.md#pull-requests)), `pr-gate.yml`, `release.yml` ([release.md](release.md)) and `scorecard.yml`.
 
 ## The rules
