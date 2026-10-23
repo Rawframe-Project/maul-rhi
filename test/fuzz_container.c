@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Fuzzes shader containers (mrhi-0009), the bytes a program loads from
-// disk and hands the library. The input's size field is set to its size
-// and its digest to the SHA-256 of what follows it before the parse, so
-// that mutations reach the section table and records instead of
-// stopping at those two checks, which the unit tests cover. A
-// container that parses must keep every section inside its bytes, name
-// its entries inside its strings, decode into a reflection that finds
-// each entry by its name and stage and frees what it took, and parse the
-// same again.
+// Fuzzes shader containers, the bytes a program loads from disk and
+// hands the library. The input's size field is set to its size and its
+// digest to the SHA-256 of what follows it before the parse, so that
+// mutations reach the section table and records instead of stopping at
+// those two checks, which the unit tests cover. A container that parses
+// must keep every section inside its bytes, name its entries inside its
+// strings, decode into a reflection that finds each entry by its name
+// and stage and frees what it took, and parse the same again.
 
 #include "container.h"
 #include "reflection.h"

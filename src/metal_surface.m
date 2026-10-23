@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The Metal driver's surfaces (mrhi-0003). A configuration sets the
-// layer's device, pixel format, color space, extended range, drawable
-// size, synchronization and opacity. The layer scales drawables of any
-// size to its bounds, so a program's size is its own; the drawables are
-// out of date once something else, a view resizing them, changes their
+// The Metal driver's surfaces. A configuration sets the layer's device,
+// pixel format, color space, extended range, drawable size,
+// synchronization and opacity. The layer scales drawables of any size
+// to its bounds, so a program's size is its own; the drawables are out
+// of date once something else, a view resizing them, changes their
 // size, and suboptimal while the layer's bounds in pixels differ from
 // it. Immediate presentation is macOS's: the display's synchronization
 // turned off.

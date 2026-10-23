@@ -1012,7 +1012,7 @@ static void TestFeatures(void)
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported, "the primitive index");
     CHECK(mrhiGetDeviceMisuse(device) == 0, "neither is misuse");
     Close(device);
-    // The view index needs multiview (mrhi-0020).
+    // The view index needs multiview.
     Reset();
     Put32(Record(ENTRIES, 0, 48) + 36, mrhi_builtinViewIndex);
     s_sections[WGSL].size = 0;

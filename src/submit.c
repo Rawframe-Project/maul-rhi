@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The view of a submitted frame (mrhi-0013): the frame's resources, kept
-// passes with the resources they declare, barriers, commands, uploads
-// and readback ring, built in tables the device allocated for them, as
-// its driver reads them.
+// The view of a submitted frame: the frame's resources, kept passes with
+// the resources they declare, barriers, commands, uploads and readback
+// ring, built in tables the device allocated for them, as its driver
+// reads them.
 
 #include "device_core.h"
 #include "invariant.h"

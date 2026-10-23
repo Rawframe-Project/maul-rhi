@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// What compute and graphics pipelines share (mrhi-0010): constant
-// values checked against the reflection, and slots that hold their
+// What compute and graphics pipelines share: constant values
+// checked against the reflection, and slots that hold their
 // reflection, reserve their answer and carry their tag.
 
 #ifndef MAUL_RHI_SRC_PIPELINE_CORE_H

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The seam with Maul Window (mrhi-0028): a window made with Maul
-// Window, a surface made from its native handles, frames presented;
-// the window resized, the surface configured again at the new size and
-// presented to; the surface ended before the window. The frames never
-// wait for the GPU: each frame takes the answers that came and submits
-// a new frame when the device has room, as a program on the browser's
-// frames must. Maul Window is fetched for this check alone
-// (test/seam/CMakeLists.txt). Exits 77 without a window system or an
-// adapter unless MAUL_RHI_REQUIRE_SURFACE is set.
+// The seam with Maul Window: a window made with Maul Window, a surface
+// made from its native handles, frames presented; the window resized,
+// the surface configured again at the new size and presented to; the
+// surface ended before the window. The frames never wait for the GPU:
+// each frame takes the answers that came and submits a new frame when
+// the device has room, as a program on the browser's frames must. Maul
+// Window is fetched for this check alone (test/seam/CMakeLists.txt).
+// Exits 77 without a window system or an adapter unless
+// MAUL_RHI_REQUIRE_SURFACE is set.
 
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS

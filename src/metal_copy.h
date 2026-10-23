@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The Metal driver's copies (mrhi-0003): copies between buffers and
-// textures, uploads from the frame's staging buffer, readbacks into its
-// readback buffer, and query resolves, on the encoder's open blit
-// encoder. Included by the driver's Objective-C files only.
+// The Metal driver's copies: copies between buffers and textures,
+// uploads from the frame's staging buffer, readbacks into its readback
+// buffer, and query resolves, on the encoder's open blit encoder.
+// Included by the driver's Objective-C files only.
 
 #ifndef MAUL_RHI_SRC_METAL_COPY_H
 #define MAUL_RHI_SRC_METAL_COPY_H

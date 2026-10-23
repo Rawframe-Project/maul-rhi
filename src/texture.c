@@ -208,7 +208,7 @@ static mrhiResult CheckTexture(mrhiDevice* device, const mrhiTextureDef* def)
     {
         return status;
     }
-    // An adopted image (mrhi-0018) is Vulkan's, made, and a render target.
+    // An adopted image is Vulkan's, made, and a render target.
     const mrhiTextureVulkanAdopt* adopt =
         (const mrhiTextureVulkanAdopt*)mrhiFindStruct(def->next, mrhi_structTextureVulkanAdopt);
     if (adopt != nullptr && device->adapterInfo.driver != mrhi_driverVulkan)

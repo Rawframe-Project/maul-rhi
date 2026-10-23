@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The D3D12 driver's tables, buffers, textures and query sets
-// (mrhi-0003); views and samplers are in d3d12_view.c. Buffers and
-// textures are committed resources in the GPU's default heap, as the
-// frame graph fills and reads them, and start in the common state. A
-// buffer's size rounds up to 256 bytes, so that a uniform binding's
-// constant buffer view, whose size D3D12 rounds up alike, stays inside
-// it. A texture whose views see it in other formats, or a depth
-// texture, which views read as a color format, is made in its typeless
-// family.
+// The D3D12 driver's tables, buffers, textures and query sets; views
+// and samplers are in d3d12_view.c. Buffers and textures are committed
+// resources in the GPU's default heap, as the frame graph fills and
+// reads them, and start in the common state. A buffer's size rounds up
+// to 256 bytes, so that a uniform binding's constant buffer view,
+// whose size D3D12 rounds up alike, stays inside it. A texture whose
+// views see it in other formats, or a depth texture, which views read
+// as a color format, is made in its typeless family.
 
 #include "d3d12_resource.h"
 
@@ -275,7 +274,7 @@ mrhiResult mrhiD3d12CreateQuerySet(mrhiD3d12Objects* objects, const mrhiQuerySet
         [mrhi_queryTimestamp] = D3D12_QUERY_TYPE_TIMESTAMP,
         [mrhi_queryPipelineStatistics] = D3D12_QUERY_TYPE_PIPELINE_STATISTICS,
     };
-    // D3D12's record is Maul RHI's eleven counters in order (mrhi-0023).
+    // D3D12's record is Maul RHI's eleven counters in order.
     static_assert(sizeof(D3D12_QUERY_DATA_PIPELINE_STATISTICS) ==
                       MRHI_STATISTICS_COUNTERS * sizeof(uint64_t),
                   "statistics resolve as D3D12 writes them");

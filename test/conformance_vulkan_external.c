@@ -2,9 +2,9 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The build's Vulkan driver handed to the conformance suite as a driver
-// from outside the tree (mrhi-0024), so that the external path runs the
-// whole suite on a driver that does GPU work. A driver built outside
-// the tree defines the same function against the installed SPI headers.
+// from outside the tree, so that the external path runs the whole suite
+// on a driver that does GPU work. A driver built outside the tree
+// defines the same function against the installed SPI headers.
 
 #include "driver_vulkan.h"
 

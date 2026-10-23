@@ -294,7 +294,7 @@ mrhiResult mrhiVulkanCreateQuerySet(mrhiVulkanObjects* objects, const mrhiQueryS
         [mrhi_queryPipelineStatistics] = VK_QUERY_TYPE_PIPELINE_STATISTICS,
     };
     // Every counter, in bit order, which is the order a resolve writes
-    // them in (mrhi-0023).
+    // them in.
     const VkQueryPoolCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
         .queryType = types[def->type],

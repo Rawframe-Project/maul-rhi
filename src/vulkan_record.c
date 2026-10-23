@@ -57,7 +57,7 @@ static const Use s_uses[] = {
                                     VK_IMAGE_LAYOUT_GENERAL},
     [mrhi_stateCopySource] = {VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL},
-    // Copies and clears (mrhi-0022) write a copy destination.
+    // Copies and clears write a copy destination.
     [mrhi_stateCopyDestination] = {VK_PIPELINE_STAGE_2_COPY_BIT | VK_PIPELINE_STAGE_2_CLEAR_BIT,
                                    VK_ACCESS_2_TRANSFER_WRITE_BIT,
                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL},
@@ -148,7 +148,7 @@ static const Use s_aliased = {VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_
                               VK_IMAGE_LAYOUT_UNDEFINED};
 
 // What a barrier into a native pass waits for and makes visible: the
-// program's commands may use any stage (mrhi-0018).
+// program's commands may use any stage.
 static const Use s_native = {VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
                              VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
                              VK_IMAGE_LAYOUT_UNDEFINED};
@@ -362,7 +362,7 @@ static void SetPipeline(mrhiVulkanRecording* recording, const mrhiCommand* comma
     recording->frames->api->vkCmdBindPipeline(recording->slot->commands, pipeline->bindPoint,
                                               pipeline->pipeline);
     // The pass's heap, bound again with each pipeline reading heaps,
-    // since pipelines of other table layouts disturb it (mrhi-0015).
+    // since pipelines of other table layouts disturb it.
     uint64_t heap = recording->pass->heap;
     if (pipeline->heap && heap != 0)
     {
@@ -552,10 +552,10 @@ static void RecordCommand(mrhiVulkanRecording* recording, const mrhiCommand* com
     }
 }
 
-// Places a native pass (mrhi-0018): ends the part recorded so far,
-// queues it and the program's command buffer, and begins the next part
-// with a barrier that orders every later command after the program's
-// and makes its writes visible.
+// Places a native pass: ends the part recorded so far, queues it and
+// the program's command buffer, and begins the next part with a
+// barrier that orders every later command after the program's and
+// makes its writes visible.
 static void RunNative(mrhiVulkanRecording* recording)
 {
     mrhiVulkanFrames* frames = recording->frames;

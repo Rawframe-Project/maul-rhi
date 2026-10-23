@@ -1,7 +1,7 @@
-# The seam with Maul Window (mrhi-0028), test only: Maul Window at its
-# release tag, fetched beside this check and linked into it alone (a
-# local copy may stand in through FETCHCONTENT_SOURCE_DIR_MAUL-WINDOW).
-# The library and its install never see it.
+# The seam with Maul Window, test only: Maul Window at its release tag,
+# fetched beside this check and linked into it alone (a local copy may
+# stand in through FETCHCONTENT_SOURCE_DIR_MAUL-WINDOW). The library
+# and its install never see it.
 
 include(FetchContent)
 FetchContent_Declare(maul-window

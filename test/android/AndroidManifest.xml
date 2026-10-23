@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A test application (tools/build_android_app.sh, mrhi-0017): the
+<!-- A test application (tools/build_android_app.sh): the
      system's NativeActivity running the test's native library, with no
      Java of its own. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="@PACKAGE@">

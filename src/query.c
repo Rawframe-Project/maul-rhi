@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Query sets (mrhi-0012): device objects of occlusion, timestamp or
-// pipeline statistics queries (mrhi-0023), each holding a run of the
-// device's query marks, which record the frame that last wrote each
-// query; the occlusion queries a render pass brackets its draws with;
-// and the statistics queries a pass of the graphics class brackets its
-// work with.
+// Query sets: device objects of occlusion, timestamp or pipeline
+// statistics queries, each holding a run of the device's query marks,
+// which record the frame that last wrote each query; the occlusion
+// queries a render pass brackets its draws with; and the statistics
+// queries a pass of the graphics class brackets its work with.
 
 #include "encoder_core.h"
+#include "invariant.h"
 #include "label.h"
 
 #include <stdatomic.h>
@@ -51,6 +51,7 @@ static bool FindRun(const mrhiDevice* device, uint32_t count, uint32_t* firstOut
             return false;
         }
     }
+    MRHI_ASSERT(start + count <= device->deviceLimits.queries);
     *firstOut = start;
     return true;
 }
@@ -217,6 +218,8 @@ void mrhiMarkPassTimestamps(mrhiDevice* device, const mrhiPassDef* def, mrhiFram
 // atomic.
 static bool MarkWritten(mrhiDevice* device, const mrhiQuerySetSlot* set, uint32_t query)
 {
+    // The caller checked the query against its set.
+    MRHI_ASSERT(query < set->count);
     uint64_t frame = device->frameNumber;
     return atomic_exchange_explicit(&device->queryMarks[set->first + query], frame,
                                     memory_order_relaxed) != frame;
@@ -371,8 +374,8 @@ mrhiResult mrhiResolveQueries(mrhiDevice* device, mrhiPassId id, mrhiQuerySetId 
     {
         return mrhi_errorStale;
     }
-    // Only a graphics pass declares a buffer with the query resolve access
-    // (mrhi-0012), so the pass is one without targets of that class.
+    // Only a graphics pass declares a buffer with the query resolve
+    // access, so the pass is one without targets of that class.
     if (mrhiWorkOf(pass) != mrhiWorkCompute)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticComputeOutsideComputePass);

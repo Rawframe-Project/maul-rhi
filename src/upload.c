@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Uploads (mrhi-0011): the program's bytes copied at the call into the
-// open frame's staging, each upload at a 512-byte boundary and a
-// texture's rows at a 256-byte pitch, and recorded as a copy from the
-// staging, whose side names no resource.
+// Uploads: the program's bytes copied at the call into the open
+// frame's staging, each upload at a 512-byte boundary and a texture's
+// rows at a 256-byte pitch, and recorded as a copy from the staging,
+// whose side names no resource.
 
 #include "copy_core.h"
 

@@ -240,15 +240,15 @@ extern "C"
                                                                mrhiSurfaceId surface,
                                                                mrhiResourceId* imageOut);
 
-    /// Ends an imported texture or buffer of the open frame sealed (mrhi-0015):
-    /// after the frame's passes it moves to the sealed state, the frame that
-    /// uploads it sealing it without a frame of its own. From the next frame on
-    /// any pass may read it through a heap without declaring it, and a frame
-    /// that imports it may declare only the reads the sealed state allows (a
-    /// texture sampled; a buffer as uniforms, vertices, indices, indirect
-    /// arguments or storage read) until it is unsealed. Writing it through a
-    /// heap while it is sealed is invalid, with undefined results. Sealing it
-    /// again does nothing. Needs the bindless_sampling feature.
+    /// Ends an imported texture or buffer of the open frame sealed: after the
+    /// frame's passes it moves to the sealed state, the frame that uploads it
+    /// sealing it without a frame of its own. From the next frame on any pass
+    /// may read it through a heap without declaring it, and a frame that
+    /// imports it may declare only the reads the sealed state allows (a texture
+    /// sampled; a buffer as uniforms, vertices, indices, indirect arguments or
+    /// storage read) until it is unsealed. Writing it through a heap while it
+    /// is sealed is invalid, with undefined results. Sealing it again does
+    /// nothing. Needs the bindless_sampling feature.
     ///
     /// @param device    The device.
     /// @param resource  The imported texture or buffer.
@@ -264,11 +264,11 @@ extern "C"
                                                         mrhiResourceId resource);
 
     /// Returns an imported texture or buffer of the open frame to the graph's
-    /// tracking (mrhi-0015): passes added after it may declare any use of it,
-    /// and it leaves the frame in its last use's state. Undoes a seal made
-    /// earlier in the frame; sealing it after unsealing ends it sealed again.
-    /// Unsealing a resource that is not sealed does nothing. Needs the
-    /// bindless_sampling feature.
+    /// tracking: passes added after it may declare any use of it, and it leaves
+    /// the frame in its last use's state. Undoes a seal made earlier in the
+    /// frame; sealing it after unsealing ends it sealed again. Unsealing a
+    /// resource that is not sealed does nothing. Needs the bindless_sampling
+    /// feature.
     ///
     /// @param device    The device.
     /// @param resource  The imported texture or buffer.
@@ -622,9 +622,9 @@ extern "C"
         mrhi_stateQueryResolve = 15,
         // Ready to present: a surface image at the end of its frame.
         mrhi_statePresent = 16,
-        // Sealed (mrhi-0015): read through heaps by any pass without a barrier,
-        // and by the reads a pass may declare of it; for a texture, sampling by
-        // every shader stage.
+        // Sealed: read through heaps by any pass without a barrier, and by the
+        // reads a pass may declare of it; for a texture, sampling by every
+        // shader stage.
         mrhi_stateSealed = 17,
     };
 

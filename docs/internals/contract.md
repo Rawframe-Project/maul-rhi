@@ -92,7 +92,8 @@ Every function's `thread_safety` has a `class` and, where it applies, an `object
 Several numbers version different things, and each changes for its own reason:
 
 - **The library version** (`MRHI_VERSION_*` in `base.h`): Semantic Versioning, moved only by release-please. Before 1.0 any release may change the API and the ABI.
-- **The contract version** (`MRHI_CONTRACT_VERSION`): the contract's revision. An instance refuses a def stamped with another one, so a program built against other headers is refused before its def is read.
+- **The ABI version** (`MRHI_ABI_VERSION` in `base.h`, made from the library version): the binary interface the headers describe, the whole version before 1.0 and the major and minor version from 1.0 on, with its top bit always set. `mrhiDefaultInstanceDef` is built in the program, so it stamps the instance def with the program's headers; `mrhiCreateInstance` checks the cookie first and the stamp second and refuses another release's with `mrhi_errorVersion` before it reads anything else, since such a def may have another layout. Every other def is used under an instance that passed, so it carries only its cookie.
+- **The contract version** (`MRHI_CONTRACT_VERSION`): the revision of `contract/mrhi.json` the headers were generated from.
 - **The SPI version** (`MRHI_SPI_VERSION` in `src/driver.h`): the driver interface's. Any change to the installed SPI headers raises it, and the conformance suite gets a mustpass list for it ([conformance.md](conformance.md)).
 - **The container version** (1, in the container's header): any change to the container's bytes raises it ([shaders.md](shaders.md)).
 - **The pipeline cache envelope's version**, beside the library version, driver and adapter it names: a cache from anything else is reported stale and ignored.

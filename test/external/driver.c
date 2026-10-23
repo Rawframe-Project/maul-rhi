@@ -2,10 +2,10 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // A driver built outside Maul RHI's tree against its installed headers
-// alone, the SPI's among them (mrhi-0024), as a console driver would
-// be: one adapter, found at the next poll, on which devices are not
-// made. The program hands it to an instance, which reports the adapter
-// as external, and destroys it with the instance.
+// alone, the SPI's among them, as a console driver would be: one
+// adapter, found at the next poll, on which devices are not made. The
+// program hands it to an instance, which reports the adapter as
+// external, and destroys it with the instance.
 
 #include <maul-rhi/instance.h>
 #include <maul-rhi/spi/driver.h>

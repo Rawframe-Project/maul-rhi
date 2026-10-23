@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// A Vulkan device (mrhi-0003): opened with the floor's features and the
-// granted ones, one queue, and a timeline semaphore for the frames. The
-// memory a declared resource takes is read from the create info alone
-// (Vulkan 1.3's device memory requirements). Buffers, textures, views
-// and samplers are made in device-local memory, query sets as query
-// pools; shader modules and pipelines are made at the call; configured
+// A Vulkan device: opened with the floor's features and the granted
+// ones, one queue, and a timeline semaphore for the frames. The memory
+// a declared resource takes is read from the create info alone (Vulkan
+// 1.3's device memory requirements). Buffers, textures, views and
+// samplers are made in device-local memory, query sets as query pools;
+// shader modules and pipelines are made at the call; configured
 // surfaces get swapchains (vulkan_swapchain.c). Frames run.
 
 #include "vulkan_device.h"
@@ -51,7 +51,7 @@ typedef struct VulkanDevice
     // transient targets on chip.
     uint32_t lazyTypes;
     double timestampPeriod;
-    // Made elsewhere and adopted (mrhi-0018): never destroyed here.
+    // Made elsewhere and adopted: never destroyed here.
     bool adopted;
     size_t bytes;
     mrhiVulkanMemory memory;
@@ -455,7 +455,7 @@ static VkResult Open(VulkanDevice* device, const mrhiDeviceDef* def)
     device->swapchains.mutableFormat = recipe.mutableFormat;
     bool swapchain = recipe.swapchain;
     // A device made elsewhere from this recipe is adopted, never made or
-    // destroyed here (mrhi-0018).
+    // destroyed here.
     device->adopted = AdoptedOf(def) != VK_NULL_HANDLE;
     VkResult result = VK_SUCCESS;
     if (device->adopted)

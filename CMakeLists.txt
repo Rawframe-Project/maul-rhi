@@ -20,12 +20,12 @@ option(MAUL_RHI_BUILD_SAMPLES "Build the samples" ${PROJECT_IS_TOP_LEVEL})
 option(MAUL_RHI_BUILD_SHARED "Build a shared library instead of a static one" OFF)
 option(MAUL_RHI_INSTALL "Generate install rules" ${PROJECT_IS_TOP_LEVEL})
 set(MAUL_RHI_CONFORMANCE_DRIVER "" CACHE STRING
-    "A target defining mrhiConformanceDriver, to run the conformance suite on (mrhi-0024)")
+    "A target defining mrhiConformanceDriver, to run the conformance suite on")
 option(MAUL_RHI_WERROR "Treat compiler warnings as errors" OFF)
 option(MAUL_RHI_SANITIZE "Instrument with AddressSanitizer and UBSan" OFF)
 option(MAUL_RHI_TSAN "Instrument with ThreadSanitizer" OFF)
-option(MAUL_RHI_VALIDATION "Build the validation layer around the driver SPI (mrhi-0025)" OFF)
-option(MAUL_RHI_LABELS "Hand debug labels to drivers and record label commands (mrhi-0029)" ON)
+option(MAUL_RHI_VALIDATION "Build the validation layer around the driver SPI" OFF)
+option(MAUL_RHI_LABELS "Hand debug labels to drivers and record label commands" ON)
 if(NOT MAUL_RHI_LABELS)
     # Labels are still checked, then dropped: every target here sees it.
     add_compile_definitions(MAUL_RHI_LABELS=0)
@@ -40,15 +40,15 @@ else()
     set(maul_rhi_test_driver OFF)
 endif()
 option(MAUL_RHI_TEST_DRIVER "Build the test driver (mrhiTestDriverDef)" ${maul_rhi_test_driver})
-# The web: Emscripten's, or a plain WebAssembly toolchain's (mrhi-0016).
+# The web: Emscripten's, or a plain WebAssembly toolchain's.
 if(EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "WASI")
     set(maul_rhi_web ON)
 else()
     set(maul_rhi_web OFF)
 endif()
-# The native driver (mrhi-0003), one per build: Metal on Apple systems,
-# D3D12 on Windows, Vulkan on the others; the web has none. A Windows
-# build may take Vulkan instead of D3D12.
+# The native driver, one per build: Metal on Apple systems, D3D12 on
+# Windows, Vulkan on the others; the web has none. A Windows build may
+# take Vulkan instead of D3D12.
 if(maul_rhi_web OR APPLE OR WIN32)
     set(maul_rhi_vulkan_default OFF)
 else()
@@ -64,7 +64,7 @@ if(MAUL_RHI_METAL_DRIVER AND MAUL_RHI_VULKAN_DRIVER)
     message(FATAL_ERROR "A build has one native driver: turn MAUL_RHI_VULKAN_DRIVER off "
                         "with MAUL_RHI_METAL_DRIVER on")
 endif()
-# The D3D12 driver (mrhi-0003), the native driver of Windows builds.
+# The D3D12 driver, the native driver of Windows builds.
 option(MAUL_RHI_D3D12_DRIVER "Build the D3D12 driver" ${WIN32})
 if(MAUL_RHI_D3D12_DRIVER AND NOT WIN32)
     message(FATAL_ERROR "The D3D12 driver builds on Windows only")
@@ -73,7 +73,7 @@ if(MAUL_RHI_D3D12_DRIVER AND MAUL_RHI_VULKAN_DRIVER)
     message(FATAL_ERROR "A build has one native driver: turn MAUL_RHI_VULKAN_DRIVER off "
                         "with MAUL_RHI_D3D12_DRIVER on")
 endif()
-# The WebGPU driver (mrhi-0003): every web build.
+# The WebGPU driver: every web build.
 option(MAUL_RHI_WEBGPU_DRIVER "Build the WebGPU driver" ${maul_rhi_web})
 
 # Every executable (tests, benchmarks, tools) lands in the top of the
@@ -233,8 +233,8 @@ if(MAUL_RHI_BUILD_TESTS)
         endforeach()
     endif()
     if(MAUL_RHI_METAL_DRIVER)
-        # A native pass on Metal (mrhi-0019), in Objective-C as the driver
-        # is, without ARC.
+        # A native pass on Metal, in Objective-C as the driver is, without
+        # ARC.
         add_executable(test_metal_native test/test_metal_native.m)
         target_link_libraries(test_metal_native PRIVATE maul-rhi "-framework Metal"
                               "-framework Foundation")
@@ -246,7 +246,7 @@ if(MAUL_RHI_BUILD_TESTS)
     endif()
     if(MAUL_RHI_D3D12_DRIVER)
         # A native pass on D3D12, under the debug layer and the Agility
-        # SDK the exe exports (mrhi-0019).
+        # SDK the exe exports.
         maul_add_test(d3d12_native)
         target_sources(test_d3d12_native PRIVATE test/d3d12_debug.c)
         target_include_directories(test_d3d12_native SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
@@ -323,12 +323,11 @@ if(MAUL_RHI_BUILD_TESTS)
             add_test(NAME dxil_order COMMAND Python3::Interpreter ${PROJECT_SOURCE_DIR}/test/test_dxil_order.py)
         endif()
     endif()
-    # Every driver the build has, through the public API (mrhi-0003).
-    # Where the XCB client library is installed, the suite also makes a
-    # window to check surfaces on; only the test links it. On the web it
-    # runs in headless Chrome (test/web_runner.cjs), sleeping through
-    # JSPI while the browser settles its promises, with Emscripten or
-    # without (mrhi-0016).
+    # Every driver the build has, through the public API. Where the XCB
+    # client library is installed, the suite also makes a window to
+    # check surfaces on; only the test links it. On the web it runs in
+    # headless Chrome (test/web_runner.cjs), sleeping through JSPI while
+    # the browser settles its promises, with Emscripten or without.
     if(maul_rhi_web)
         maul_add_test(conformance MANUAL)
         if(EMSCRIPTEN)
@@ -336,15 +335,15 @@ if(MAUL_RHI_BUILD_TESTS)
                                 -sEXPORTED_RUNTIME_METHODS=ENV)
         else()
             # A reactor whose main the runner calls through JSPI, with the
-            # driver's imports from maul-rhi.mjs (mrhi-0016).
+            # driver's imports from maul-rhi.mjs.
             target_link_options(test_conformance PRIVATE -mexec-model=reactor -Wl,--export-table
                                 -Wl,--export=main)
         endif()
         add_test(NAME conformance
                  COMMAND node ${PROJECT_SOURCE_DIR}/test/web_runner.cjs
                          $<TARGET_FILE:test_conformance>)
-        # Again in a dedicated worker, on the canvases' OffscreenCanvases
-        # (mrhi-0026).
+        # Again in a dedicated worker, on the canvases'
+        # OffscreenCanvases.
         add_test(NAME conformance_worker
                  COMMAND node ${PROJECT_SOURCE_DIR}/test/web_runner.cjs --worker
                          $<TARGET_FILE:test_conformance>)
@@ -370,9 +369,9 @@ if(MAUL_RHI_BUILD_TESTS)
             target_link_libraries(test_conformance PRIVATE d3d12 dxgi)
         endif()
     endif()
-    # The suite's cases are the mustpass list of the SPI version
-    # (mrhi-0024), conformance/mustpass/spi-<N>.txt, which must match
-    # what the suite lists.
+    # The suite's cases are the mustpass list of the SPI version,
+    # conformance/mustpass/spi-<N>.txt, which must match what the
+    # suite lists.
     file(STRINGS src/driver.h maul_rhi_spi REGEX "^#define MRHI_SPI_VERSION ")
     string(REGEX REPLACE ".* ([0-9]+)$" "\\1" maul_rhi_spi "${maul_rhi_spi}")
     target_compile_definitions(test_conformance PRIVATE MRHI_TEST_SPI_VERSION=${maul_rhi_spi})
@@ -397,7 +396,7 @@ if(MAUL_RHI_BUILD_TESTS)
     endif()
     # On Android the suite also runs as an application on the system's
     # NativeActivity, whose window its surface checks present to
-    # (test/android_activity.c, mrhi-0017).
+    # (test/android_activity.c).
     if(ANDROID AND MAUL_RHI_VULKAN_DRIVER)
         set(package org.maul.rhi.tests.conformance)
         add_library(test_conformance_app SHARED test/test_conformance.c test/android_activity.c)
@@ -423,8 +422,8 @@ if(MAUL_RHI_BUILD_TESTS)
                              ENVIRONMENT MAUL_RHI_REQUIRE_SURFACE=1)
     endif()
     maul_add_header_tests()
-    # The suite on a driver from outside the tree (mrhi-0024): a target
-    # defining mrhiConformanceDriver(mrhiExternalDriverDef*), named by
+    # The suite on a driver from outside the tree: a target defining
+    # mrhiConformanceDriver(mrhiExternalDriverDef*), named by
     # MAUL_RHI_CONFORMANCE_DRIVER. Without one, a Linux build hands the
     # suite its own Vulkan driver through the external path.
     set(maul_rhi_outside "${MAUL_RHI_CONFORMANCE_DRIVER}")
@@ -452,8 +451,8 @@ if(MAUL_RHI_BUILD_TESTS)
     # The Vulkan loader keeps drivers loaded after an instance ends, so
     # that LeakSanitizer reads their memory as held, not lost. Where the
     # validation layer runs, it logs to the test's output, and a
-    # validation error there fails the test (mrhi-0003). ThreadSanitizer
-    # leaves lavapipe's own threads alone (test/tsan.supp).
+    # validation error there fails the test. ThreadSanitizer leaves
+    # lavapipe's own threads alone (test/tsan.supp).
     set(maul_rhi_test_env VK_LOADER_DISABLE_DYNAMIC_LIBRARY_UNLOADING=1)
     if(MAUL_RHI_TSAN)
         list(APPEND maul_rhi_test_env
@@ -507,8 +506,8 @@ if(MAUL_RHI_BUILD_SAMPLES)
     add_subdirectory(samples)
 endif()
 
-# The guide's C snippets as written (family record 0019), run natively on
-# the samples' harness and triangle; the web's waits are a later frame's.
+# The guide's C snippets as written, run natively on the samples' harness
+# and triangle; the web's waits are a later frame's.
 if(MAUL_RHI_BUILD_TESTS AND NOT (EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "WASI"))
     add_executable(test_guide test/test_guide.c samples/harness.c)
     target_link_libraries(test_guide PRIVATE maul-rhi)
@@ -519,14 +518,14 @@ if(MAUL_RHI_BUILD_TESTS AND NOT (EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "WASI"
                          FAIL_REGULAR_EXPRESSION "Validation Error" LABELS "guide;integration")
 endif()
 
-# The seam with Maul Window, test only (mrhi-0028).
+# The seam with Maul Window, test only.
 if(MAUL_RHI_SEAM AND MAUL_RHI_BUILD_TESTS)
     add_subdirectory(test/seam)
 endif()
 
 if(MAUL_RHI_INSTALL)
     include(cmake/Install.cmake)
-    # The driver SPI, for drivers built outside the tree (mrhi-0024).
+    # The driver SPI, for drivers built outside the tree.
     install(FILES src/driver.h src/command.h src/reflection.h src/container.h
                   src/container_interface.h
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}/spi)

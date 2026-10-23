@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The open frame's resources (mrhi-0008): textures and buffers the graph
-// makes, whose usages its passes will decide, device textures and
-// buffers imported once per frame, and images acquired from surfaces.
-// Their ids carry the frame's serial, so they end with it.
+// The open frame's resources: textures and buffers the graph makes,
+// whose usages its passes will decide, device textures and buffers
+// imported once per frame, and images acquired from surfaces. Their ids
+// carry the frame's serial, so they end with it.
 
 #include "device_core.h"
 #include "instance_core.h"

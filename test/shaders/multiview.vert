@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // A triangle covering the target, colored by the view it is drawn in:
-// red in view 0, green in view 1 (record mrhi-0020).
+// red in view 0, green in view 1.
 
 #version 450
 #extension GL_EXT_multiview : require

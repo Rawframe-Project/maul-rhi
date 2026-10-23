@@ -12,16 +12,15 @@
 #   WGSL binding's kind, and a texture's dimension, match it.
 # A module may leave out a binding it does not use.
 #
-# An entry may read the pass's heap (record mrhi-0015), listing its
-# "heap_uses" ("sampled_textures", "storage_textures", "storage_buffers",
-# "samplers", and "writes" with a storage kind, never in a vertex entry).
-# SPIR-V reads the resource heap at set 4 binding 0 and the sampler heap
-# at set 4 binding 1 (DXC: -fvk-bind-resource-heap 0 4
-# -fvk-bind-sampler-heap 1 4). An entry reading the view index of a
-# multiview pass (record mrhi-0020) lists the builtin "view_index", in a
-# vertex entry too. WGSL reads no heaps yet and has no view index or
-# 64-bit integers, so a container whose entries use any (its SPIR-V
-# declaring Int64) has no WGSL: pass - for it.
+# An entry may read the pass's heap, listing its "heap_uses"
+# ("sampled_textures", "storage_textures", "storage_buffers", "samplers",
+# and "writes" with a storage kind, never in a vertex entry). SPIR-V
+# reads the resource heap at set 4 binding 0 and the sampler heap at set
+# 4 binding 1 (DXC: -fvk-bind-resource-heap 0 4 -fvk-bind-sampler-heap 1
+# 4). An entry reading the view index of a multiview pass lists the
+# builtin "view_index", in a vertex entry too. WGSL reads no heaps yet
+# and has no view index or 64-bit integers, so a container whose entries
+# use any (its SPIR-V declaring Int64) has no WGSL: pass - for it.
 #
 # The enum names are the contract's (contract/mrhi.json) without
 # their prefixes. The reflection:
@@ -283,8 +282,8 @@ def pack_entries(reflection, enums, strings, inputs, outputs, variables):
         storage = number(entry.get("workgroup_storage_bytes", 0), f"{where}: workgroup storage",
                          0, 0xFFFFFFFF if compute else 0)
         builtins = entry.get("builtins", [])
-        # The view index is a vertex or fragment builtin (record
-        # mrhi-0020); the others are a fragment entry's.
+        # The view index is a vertex or fragment builtin; the
+        # others are a fragment entry's.
         need(isinstance(builtins, list) and
              all(stage == "fragment" or (b == "view_index" and stage == "vertex")
                  for b in builtins),

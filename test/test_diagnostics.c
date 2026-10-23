@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Diagnostic queues (mrhi-0027): a record per refusal with the check's
-// code, repeats folded into one record, the first records kept when the
-// queue is full, none kept by default, the texts of the codes, and
-// refusals recorded from several threads at once.
+// Diagnostic queues: a record per refusal with the check's code,
+// repeats folded into one record, the first records kept when the queue
+// is full, none kept by default, the texts of the codes, and refusals
+// recorded from several threads at once.
 
 #include "test_device_setup.h"
 

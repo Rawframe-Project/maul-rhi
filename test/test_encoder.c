@@ -424,7 +424,7 @@ static void TestViewFormats(void)
     Close2();
 }
 
-// A pipeline is set only in passes of its views (mrhi-0020).
+// A pipeline is set only in passes of its views.
 static void TestViews(void)
 {
     s_adapter.features.multiview = true;

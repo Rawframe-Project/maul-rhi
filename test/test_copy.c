@@ -178,10 +178,10 @@ static mrhiBufferCopy Buffer(uint32_t resource, uint64_t offset, uint32_t perRow
     };
 }
 
-// Clears of a buffer (mrhi-0022): recorded as one command, the size
-// resolved, nothing for an empty one, and every refusal.
-// The check that refused the device's latest refusal, draining its
-// diagnostics (mrhi-0027); 0 when there is none.
+// Clears of a buffer: recorded as one command, the size resolved,
+// nothing for an empty one, and every refusal. The check that
+// refused the device's latest refusal, draining its diagnostics; 0
+// when there is none.
 static mrhiDiagnosticCode Refusal(void)
 {
     mrhiDiagnosticCode code = 0;

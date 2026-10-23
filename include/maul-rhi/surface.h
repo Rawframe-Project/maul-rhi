@@ -185,9 +185,8 @@ extern "C"
     {
         mrhiChain chain;
         // The canvas's name, UTF-8, selectorLength bytes: first a key of the
-        // program's Module.mrhiCanvases (an OffscreenCanvas in a worker,
-        // mrhi-0026), else a CSS selector of the document. Only read during the
-        // call.
+        // program's Module.mrhiCanvases (an OffscreenCanvas in a worker), else
+        // a CSS selector of the document. Only read during the call.
         const char* selector;
         // The selector's bytes.
         size_t selectorLength;

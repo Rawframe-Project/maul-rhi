@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The Vulkan driver's limits of binding (mrhi-0017): SwiftShader's on the
-// Android emulator, whose four descriptor sets and 200 resources a stage
-// once found no adapter, and a desktop device's, kept as they are.
+// The Vulkan driver's limits of binding: SwiftShader's on the Android
+// emulator, whose four descriptor sets and 200 resources a stage once
+// found no adapter, and a desktop device's, kept as they are.
 
 #include "capabilities_core.h"
 #include "test_harness.h"

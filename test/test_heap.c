@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Bindless heaps on a test driver device (mrhi-0015): the def's checks,
-// the two features and the size limits; entries of each kind with the
-// usages and ranges they need; entries written only while empty and
-// written again only once the frames submitted before their emptying
-// finish; objects whose destruction empties the entries naming them;
-// and the heap a pass names.
+// Bindless heaps on a test driver device: the def's checks, the two
+// features and the size limits; entries of each kind with the usages
+// and ranges they need; entries written only while empty and written
+// again only once the frames submitted before their emptying finish;
+// objects whose destruction empties the entries naming them; and the
+// heap a pass names.
 
 #include "device_core.h"
 #include "test_device_setup.h"

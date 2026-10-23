@@ -232,10 +232,9 @@ extern "C"
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_API uint64_t mrhiGetDeviceMisuse(mrhiDevice* device);
 
-    /// Takes the oldest record from the device's diagnostic queue (mrhi-0027),
-    /// which holds a record for each call the device refused as invalid input,
-    /// up to the diagnostics limit; refusals past it are counted but not
-    /// recorded.
+    /// Takes the oldest record from the device's diagnostic queue, which holds
+    /// a record for each call the device refused as invalid input, up to the
+    /// diagnostics limit; refusals past it are counted but not recorded.
     ///
     /// @param device         The device.
     /// @param diagnosticOut  Receives the record; untouched unless one is

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The D3D12 driver's devices (mrhi-0003): a D3D12 device, its direct
-// command queue, its objects (d3d12_resource.c), its shaders and
-// pipelines (d3d12_pipeline.c), its swapchains (d3d12_swapchain.c) and
-// its frames (d3d12_frame.c) and its heaps (d3d12_heap.c). A destroyed
+// The D3D12 driver's devices: a D3D12 device, its direct command
+// queue, its objects (d3d12_resource.c), its shaders and pipelines
+// (d3d12_pipeline.c), its swapchains (d3d12_swapchain.c) and its
+// frames (d3d12_frame.c) and its heaps (d3d12_heap.c). A destroyed
 // object, pipeline or heap waits until no frame can name it. A device
 // whose heaps would leave the frames' descriptor rings too little is
-// refused. A window holds one swapchain at a time, so
-// configuring a surface again and unconfiguring it wait for the frames
-// to finish and release the swapchain at once.
+// refused. A window holds one swapchain at a time, so configuring a
+// surface again and unconfiguring it wait for the frames to finish and
+// release the swapchain at once.
 
 #include "d3d12_device.h"
 

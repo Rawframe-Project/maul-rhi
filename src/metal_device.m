@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The Metal driver's devices (mrhi-0003): a retained Metal device and
-// its command queue, released when the device is destroyed, its objects
+// The Metal driver's devices: a retained Metal device and its command
+// queue, released when the device is destroyed, its objects
 // (metal_resource.m), shaders and pipelines (metal_pipeline.m) and
 // frames (metal_frame.m). A destroyed object or pipeline may still be
 // named by the next frame submitted, so it waits until that frame is

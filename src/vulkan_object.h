@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// A Vulkan device's objects (mrhi-0003): buffers, textures, views,
-// samplers and query sets in tables sized from the device limits, each
-// handle its slot's index plus one.
+// A Vulkan device's objects: buffers, textures, views, samplers and
+// query sets in tables sized from the device limits, each handle its
+// slot's index plus one.
 
 #ifndef MAUL_RHI_SRC_VULKAN_OBJECT_H
 #define MAUL_RHI_SRC_VULKAN_OBJECT_H
@@ -30,13 +30,12 @@ typedef struct mrhiVulkanTexture
 {
     VkImage image;
     mrhiVulkanAllocation allocation;
-    // Made elsewhere and adopted (mrhi-0018): neither it nor its memory is
-    // the library's to destroy.
+    // Made elsewhere and adopted: neither it nor its memory is the
+    // library's to destroy.
     bool adopted;
 } mrhiVulkanTexture;
 
-// The most queries a set has (mrhi-0012), and the words of a set's
-// bits.
+// The most queries a set has, and the words of a set's bits.
 #define MRHI_VULKAN_SET_QUERIES 4096
 #define MRHI_VULKAN_SET_WORDS   (MRHI_VULKAN_SET_QUERIES / 64)
 

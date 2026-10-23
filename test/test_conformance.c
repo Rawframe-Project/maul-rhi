@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The conformance suite (mrhi-0003): the same checks, through the public API
-// only, on every driver: the test driver, and each adapter of the
-// build's native driver. A host without native adapters skips them,
-// unless MAUL_RHI_REQUIRE_VULKAN (or _WEBGPU, _METAL or _D3D12, for the
-// build's driver) is set and not empty. The checks are named cases in
-// the requirements' ten categories (mrhi-0024): --list prints them, the
-// mustpass list of the SPI version, and --case runs one; every run
-// ends with each case's outcome.
+// The conformance suite: the same checks, through the public API only, on
+// every driver: the test driver, and each adapter of the build's native
+// driver. A host without native adapters skips them, unless
+// MAUL_RHI_REQUIRE_VULKAN (or _WEBGPU, _METAL or _D3D12, for the build's
+// driver) is set and not empty. The checks are named cases in the
+// requirements' ten categories: --list prints them, the mustpass list of the
+// SPI version, and --case runs one; every run ends with each case's outcome.
 
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
@@ -41,7 +40,7 @@
 #include <string.h>
 
 // On the web, built with Emscripten or with a plain WebAssembly
-// toolchain (mrhi-0016), the suite runs in a page with a canvas.
+// toolchain, the suite runs in a page with a canvas.
 #ifdef __EMSCRIPTEN__
 #include <emscripten/em_js.h>
 #include <emscripten/emscripten.h>
@@ -51,9 +50,8 @@ static void Sleep(void)
 {
     emscripten_sleep(1);
 }
-// clang-format off
-// Resizes the runner's canvas as a page would, or as a worker resizes
-// the OffscreenCanvas it was given (mrhi-0026).
+// clang-format off Resizes the runner's canvas as a page would, or as
+// a worker resizes the OffscreenCanvas it was given.
 EM_JS(void, ResizeCanvas, (int width), {
     const canvases = Module.mrhiCanvases || {};
     (canvases['#mrhi-canvas'] || document.querySelector('#mrhi-canvas')).width = width;
@@ -419,7 +417,7 @@ static void CheckFrameMemory(mrhiDevice* device)
 // A target with its twin among its view formats, only ever rendered to:
 // made on every API, and not transient, since a pass may render it
 // through the twin and WebGPU refuses view formats on a transient
-// attachment (mrhi-0008).
+// attachment.
 static void CheckTransientTwin(mrhiDevice* device)
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
@@ -506,8 +504,8 @@ typedef struct Case
     int failures;
 } Case;
 
-// The cases, by category, in the order of the requirements'
-// conformance section.
+// The cases, by category: the order --list prints and the mustpass
+// list records.
 static Case s_cases[] = {
     {"api.adapters", 0, 0},
     {"api.devices", 0, 0},
@@ -707,7 +705,7 @@ static void CheckRoundTrip(mrhiDevice* device)
           "a corner of the texture, copied into an array's third layer");
     CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "another frame");
     CHECK(mrhiImportBuffer(device, buffer, &b) == mrhi_success, "imported again");
-    // Two ranges cleared first (mrhi-0022), one to the buffer's end.
+    // Two ranges cleared first, one to the buffer's end.
     mrhiAccess cleared = Whole(b, mrhi_accessCopyDestination);
     mrhiPassId clear = CopyPass(device, &cleared, 1);
     mrhiAccess again = Whole(b, mrhi_accessCopySource);
@@ -2841,9 +2839,9 @@ static void CheckComputeSplit(Scene* scene, bool timestamps)
     CHECK(!timestamps || mrhiDestroyQuerySet(device, times) == mrhi_success, "destroyed");
 }
 
-// A multiview pass (mrhi-0020): one draw into two layers of a target,
-// red in view 0 and green in view 1; on a device without multiview, the
-// shader reading the view index and a pass of two views refused.
+// A multiview pass: one draw into two layers of a target, red in view 0
+// and green in view 1; on a device without multiview, the shader
+// reading the view index and a pass of two views refused.
 static void CheckMultiview(mrhiDevice* device)
 {
     mrhiFeatures features = {0};
@@ -2936,11 +2934,11 @@ static void CheckMultiview(mrhiDevice* device)
           "destroyed");
 }
 
-// Pipeline statistics (mrhi-0023): a query around a triangle drawn,
-// one around two dispatches of 8 invocations, and a third left
-// unwritten, resolved over bytes set to 0xFF. The triangle's input
-// assembly counts are exact; the stages after it ran at least once;
-// the stages Maul RHI lacks and those outside each query count 0.
+// Pipeline statistics: a query around a triangle drawn, one around
+// two dispatches of 8 invocations, and a third left unwritten,
+// resolved over bytes set to 0xFF. The triangle's input assembly
+// counts are exact; the stages after it ran at least once; the
+// stages Maul RHI lacks and those outside each query count 0.
 static void CheckStatistics(Scene* scene)
 {
     enum
@@ -3176,7 +3174,8 @@ static void RecordBoth(Recorder* first, Recorder* second)
 #endif
 
 // Two passes of one frame recorded at once, each uploading its own value
-// to its own buffer, then both read back (mrhi-0011's threading).
+// to its own buffer, then both read back: passes of a frame may record on
+// different threads.
 static void CheckThreads(mrhiDevice* device)
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
@@ -3218,9 +3217,9 @@ static void CheckThreads(mrhiDevice* device)
 }
 
 // A device lost through mrhiSimulateDeviceLoss with a frame and its
-// readback running (mrhi-0014): the notice, then both answered
-// lost, the report, calls answering lost, a clean destroy, and a new
-// device on the same adapter.
+// readback running: the notice, then both answered lost, the report,
+// calls answering lost, a clean destroy, and a new device on the
+// same adapter.
 static void CheckLoss(mrhiInstance* instance, mrhiAdapterId adapter)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
@@ -3415,7 +3414,7 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
 }
 
 // The breaches of the driver SPI the validation layer found on the
-// instances the suite made (mrhi-0025); none in builds without it.
+// instances the suite made; none in builds without it.
 static uint64_t s_driverFaults;
 
 static void TestTestDriver(void)
@@ -3979,9 +3978,9 @@ static void CheckMetalSurface(mrhiInstance* instance, const mrhiAdapterId* ids, 
 
 // Surfaces on the native driver's adapters.
 #ifdef MRHI_TEST_EXTERNAL
-// The window of the outside driver's harness (mrhi-0024): its surface
-// source, or NULL for the build platform's window system, and whether
-// the window fixes its images' size.
+// The window of the outside driver's harness: its surface source, or
+// NULL for the build platform's window system, and whether the window
+// fixes its images' size.
 const mrhiChain* mrhiConformanceSurface(bool* fixedSizeOut);
 
 // Presents to the outside driver's window from each adapter that can.
@@ -4039,7 +4038,7 @@ static void CheckSurfaces(mrhiInstance* instance)
 
 #ifdef MRHI_TEST_EXTERNAL
 // Made by the driver built outside the tree that the suite is linked
-// with (MAUL_RHI_CONFORMANCE_DRIVER, mrhi-0024): its def, or a failure.
+// with (MAUL_RHI_CONFORMANCE_DRIVER): its def, or a failure.
 mrhiResult mrhiConformanceDriver(mrhiExternalDriverDef* driverOut);
 #endif
 
@@ -4102,7 +4101,7 @@ static void TestNativeDriver(void)
 // calls main without arguments.
 [[maybe_unused]] static void List(void)
 {
-    printf("# Maul RHI conformance cases, SPI version %d (mrhi-0024).\n"
+    printf("# Maul RHI conformance cases, SPI version %d.\n"
            "# A driver is admitted on a run that passes every case listed.\n",
            MRHI_TEST_SPI_VERSION);
     for (size_t i = 0; i < sizeof(s_cases) / sizeof(s_cases[0]); ++i)

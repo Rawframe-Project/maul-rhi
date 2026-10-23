@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Encoders (mrhi-0011): a kept pass of a compiled frame, begun by the
-// thread that claims it, records commands into chunks of the frame's
-// arena, which it takes with one atomic counter, and is ended before
-// the frame is submitted. Every command is checked against its pass.
+// Encoders: a kept pass of a compiled frame, begun by the thread that
+// claims it, records commands into chunks of the frame's arena, which
+// it takes with one atomic counter, and is ended before the frame is
+// submitted. Every command is checked against its pass.
 
 #include "encoder_core.h"
 #include "invariant.h"
@@ -105,7 +105,7 @@ mrhiResult mrhiSetNativeCommands(mrhiDevice* device, mrhiPassId id, void* comman
 mrhiFramePass* mrhiRecordingPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut)
 {
     mrhiFramePass* pass = mrhiOpenPass(device, id, statusOut);
-    // A native pass's commands are the program's own (mrhi-0018).
+    // A native pass's commands are the program's own.
     if (pass != nullptr && pass->native)
     {
         *statusOut = mrhiDeviceMisuse(device, mrhi_diagnosticRecordedInNativePass);
@@ -148,6 +148,7 @@ mrhiCommand* mrhiTakeCommands(mrhiDevice* device, mrhiFramePass* pass, uint32_t 
     }
     mrhiCommand* records = &chunk->commands[chunk->count];
     chunk->count += count;
+    MRHI_ASSERT(chunk->count <= MRHI_CHUNK_COMMANDS);
     return records;
 }
 

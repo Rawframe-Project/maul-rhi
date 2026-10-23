@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Pipelines (mrhi-0009): checked against their shader's reflection,
-// started in the driver with a tag that carries their slot, and answered
-// in the device's queue, whose room each creation reserves.
+// Pipelines: checked against their shader's reflection, started in the
+// driver with a tag that carries their slot, and answered in the
+// device's queue, whose room each creation reserves.
 
 #include "invariant.h"
 #include "label.h"

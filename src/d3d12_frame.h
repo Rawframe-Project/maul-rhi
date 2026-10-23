@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// A D3D12 device's frames (mrhi-0003, mrhi-0013): a slot per frame in
-// flight with its command allocator and list, its mapped staging, the
-// descriptor heaps its targets' views and its bindings take, its
-// scratch buffer, its transients with the heap they are placed in, and
-// the readbacks it fills; the fence
-// whose value counts the frames finished; the readback buffer, the
-// command signatures of indirect work and the zeros of unwritten
-// queries; the recorder; and the queue of destroyed objects, released
-// once the next frame submitted after their destruction finishes.
-// Included by the driver's files only.
+// A D3D12 device's frames: a slot per frame in flight with its command
+// allocator and list, its mapped staging, the descriptor heaps its
+// targets' views and its bindings take, its scratch buffer, its
+// transients with the heap they are placed in, and the readbacks it
+// fills; the fence whose value counts the frames finished; the
+// readback buffer, the command signatures of indirect work and the
+// zeros of unwritten queries; the recorder; and the queue of destroyed
+// objects, released once the next frame submitted after their
+// destruction finishes. Included by the driver's files only.
 
 #ifndef MAUL_RHI_SRC_D3D12_FRAME_H
 #define MAUL_RHI_SRC_D3D12_FRAME_H
@@ -35,8 +34,8 @@ typedef struct mrhiD3d12Slot
 {
     ID3D12CommandAllocator* allocator;
     // The lists the frame records into, one after another on the
-    // allocator: the first, then after each native pass the next
-    // (mrhi-0019).
+    // allocator: the first, then after each native pass the
+    // next.
     ID3D12GraphicsCommandList* parts[1 + MRHI_NATIVE_PASSES];
     uint32_t partsUsed;
     // The lists the frame runs, in order, each in its own
@@ -104,8 +103,8 @@ typedef struct mrhiD3d12Frames
     uint64_t readbackSize;
     ID3D12CommandSignature* signatures[mrhiD3d12IndirectCount];
     // Whether the device draws counted multi-draws, and the kernel that
-    // expands their records for pipelines reading the vertex information
-    // (mrhi-0020), made when it does.
+    // expands their records for pipelines reading the vertex
+    // information, made when it does.
     bool counted;
     ID3D12RootSignature* expandRoot;
     ID3D12PipelineState* expand;

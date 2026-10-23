@@ -132,7 +132,7 @@ static mrhiBufferId MakeBuffer(uint64_t size, mrhiBufferUsage usage)
 
 // Opens a ready device with the buffers draws read: 10 vertices, 3
 // The check that refused the device's latest refusal, draining its
-// diagnostics (mrhi-0027); 0 when there is none.
+// diagnostics; 0 when there is none.
 static mrhiDiagnosticCode Refusal(void)
 {
     mrhiDiagnosticCode code = 0;
@@ -660,11 +660,10 @@ static void CountedFrame(mrhiBufferId records, mrhiBufferId counts, mrhiResource
           "the render pass begun");
 }
 
-// Counted multi-draws (mrhi-0020): unsupported without their feature; with it,
-// recorded with both buffers, the offsets and the most draws, and refused
-// for records or a count outside their buffers, offsets off 4, a most of
-// 0 or past MRHI_INDIRECT_DRAWS, and buffers the pass does not declare
-// as indirect.
+// Counted multi-draws: unsupported without their feature; with it, recorded
+// with both buffers, the offsets and the most draws, and refused for records
+// or a count outside their buffers, offsets off 4, a most of 0 or past
+// MRHI_INDIRECT_DRAWS, and buffers the pass does not declare as indirect.
 static void TestCountedDraws(void)
 {
     Open();

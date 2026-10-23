@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Fuzzes pipeline-cache imports (mrhi-0010), the bytes a program reads
-// back from disk and hands the library, on the test driver. The input's
-// first byte picks which of the envelope's checks the target satisfies
-// before the import (its magic, its size, the identity of this library,
-// driver and adapter, and its digest), so that mutations reach each
-// later check and the driver's own reading instead of stopping at the
-// first. An import is accepted only with a digest that matches, and the
-// test driver takes only its own 16-byte payload.
+// Fuzzes pipeline-cache imports, the bytes a program reads back from
+// disk and hands the library, on the test driver. The input's first
+// byte picks which of the envelope's checks the target satisfies before
+// the import (its magic, its size, the identity of this library, driver
+// and adapter, and its digest), so that mutations reach each later
+// check and the driver's own reading instead of stopping at the first.
+// An import is accepted only with a digest that matches, and the test
+// driver takes only its own 16-byte payload.
 
 #include "device_core.h"
 #include "sha256.h"

@@ -1,5 +1,5 @@
-# ThreadSanitizer suppressions for the conformance suite and the samples
-# (mrhi-0003). Lavapipe runs its rasterizer on threads of its own,
+# ThreadSanitizer suppressions for the conformance suite and the samples.
+# Lavapipe runs its rasterizer on threads of its own,
 # compiles shaders with LLVM and presents through the XCB client
 # library, and the Khronos validation layer checks submissions on a
 # thread of its own, all built without ThreadSanitizer, which cannot see

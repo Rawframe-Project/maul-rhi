@@ -32,8 +32,24 @@ extern "C"
 #define MRHI_VERSION_PATCH 1
 // x-release-please-end
 
-// The contract version a program is built against. An instance refuses any
-// other before 1.0.
+// The binary interface the headers describe, which the root def carries: the
+// whole version before 1.0, where any release may break it, and the major and
+// minor version from 1.0 on. The top bit is always set, so a zeroed value, or a
+// small one written by hand, never matches.
+#define MRHI_ABI_VERSION                                                                           \
+    (UINT32_C(0x80000000) | ((uint32_t)MRHI_VERSION_MAJOR << 16) |                                 \
+     (MRHI_VERSION_MAJOR == 0                                                                      \
+          ? (((uint32_t)MRHI_VERSION_MINOR << 8) | (uint32_t)MRHI_VERSION_PATCH)                   \
+          : (uint32_t)MRHI_VERSION_MINOR))
+#if MRHI_VERSION_MAJOR > 0x7FFF || MRHI_VERSION_MINOR > 0xFFFF
+#error "MRHI_VERSION_MAJOR or MRHI_VERSION_MINOR does not fit MRHI_ABI_VERSION"
+#endif
+#if MRHI_VERSION_MAJOR == 0 && (MRHI_VERSION_MINOR > 0xFF || MRHI_VERSION_PATCH > 0xFF)
+#error "before 1.0, MRHI_VERSION_MINOR and MRHI_VERSION_PATCH must fit 8 bits each"
+#endif
+
+// The revision of the contract the headers are generated from
+// (contract/mrhi.json).
 #define MRHI_CONTRACT_VERSION 5
 
 // MRHI_API marks the public functions: dllexport or dllimport in a
@@ -128,7 +144,7 @@ extern "C"
     // The type of a chained struct. Bit 31 clear marks a critical extension,
     // which a library that does not know it refuses; bit 31 set marks a hint it
     // may skip. Types with bit 30 set (MRHI_STRUCT_DRIVER_DEFINED) belong to
-    // drivers built outside the tree (mrhi-0024).
+    // drivers built outside the tree.
     typedef uint32_t mrhiStructType;
 
     enum
@@ -167,13 +183,13 @@ extern "C"
         // mrhiTextureVulkanAdopt, on a texture def: a VkImage made elsewhere.
         mrhi_structTextureVulkanAdopt = 13,
         // mrhiExternalDriverDef, on an instance def: a driver made outside the
-        // library (mrhi-0024).
+        // library.
         mrhi_structExternalDriver = 14,
     };
 
 // The bit of a chained struct type defined by a driver built outside the tree:
 // such a struct is a surface's source on an instance of that driver, handed to
-// it unexamined, and refused everywhere else (mrhi-0024).
+// it unexamined, and refused everywhere else.
 #define MRHI_STRUCT_DRIVER_DEFINED 0x40000000u
 
     // The header every chained struct opens with. A def's next field, or a
@@ -211,12 +227,12 @@ extern "C"
     /// Safe from any thread.
     MRHI_API const char* mrhiResultName(mrhiResult result);
 
-    // The check a diagnostic record reports (mrhi-0027): one check of the core
-    // that refused a call as invalid input, or, in a build with the validation
-    // layer, one rule of the driver SPI that the driver broke (the driver
-    // codes, recorded in the instance's queue). Codes are fixed from the first
-    // release that carries them, and only added after it; mrhiDiagnosticText
-    // gives each one's text.
+    // The check a diagnostic record reports: one check of the core that refused
+    // a call as invalid input, or, in a build with the validation layer, one
+    // rule of the driver SPI that the driver broke (the driver codes, recorded
+    // in the instance's queue). Codes are fixed from the first release that
+    // carries them, and only added after it; mrhiDiagnosticText gives each
+    // one's text.
     typedef uint16_t mrhiDiagnosticCode;
 
     enum

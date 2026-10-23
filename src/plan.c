@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The compile's plan (mrhi-0008): each resource's parts are mapped to the
-// state their last use left them in, as disjoint boxes of mips, layers
-// and planes, and each kept use makes barriers from the states it meets.
-// Imported objects carry one state between frames, so the frame's end
-// unifies theirs, an adopted image's to the state it rests in. The barriers are then put in the
-// order they run. Once the declared resources are placed, the first use of one over memory used
-// earlier in the frame is marked as aliasing, a buffer's gaining a barrier from the undefined state
-// for it.
+// The compile's plan: each resource's parts are mapped to the state their last use left them in, as
+// disjoint boxes of mips, layers and planes, and each kept use makes barriers from the states it
+// meets. Imported objects carry one state between frames, so the frame's end unifies theirs, an
+// adopted image's to the state it rests in. The barriers are then put in the order they run. Once
+// the declared resources are placed, the first use of one over memory used earlier in the frame is
+// marked as aliasing, a buffer's gaining a barrier from the undefined state for it.
 
 #include "device_core.h"
+#include "invariant.h"
 
 bool mrhiStateWrites(mrhiResourceState state)
 {
@@ -112,7 +111,32 @@ typedef struct Map
     uint32_t nextCount;
     uint32_t half;
     bool full;
+    // The parts of the whole, which the boxes cover exactly once.
+    uint64_t volume;
 } Map;
+
+static uint64_t Volume(const mrhiBox* box)
+{
+    return (uint64_t)box->mipCount * box->layerCount * (uint64_t)__builtin_popcount(box->planes);
+}
+
+// Whether the map's boxes still cover the whole exactly once: each move
+// splits boxes and replaces a part, so their volumes always sum to the
+// whole's, and none is empty. Only assertions call it.
+[[maybe_unused]] static bool CoversWhole(const Map* map)
+{
+    uint64_t sum = 0;
+    for (uint32_t i = 0; i < map->count; ++i)
+    {
+        uint64_t volume = Volume(&map->boxes[i]);
+        if (volume == 0)
+        {
+            return false;
+        }
+        sum += volume;
+    }
+    return sum == map->volume;
+}
 
 static void Push(Map* map, mrhiBox box)
 {
@@ -127,6 +151,9 @@ static void Push(Map* map, mrhiBox box)
 static void Emit(Map* map, uint32_t pass, const mrhiBox* part, mrhiResourceState after)
 {
     mrhiDevice* device = map->device;
+    // A barrier at the frame's end only joins other states.
+    MRHI_ASSERT(pass != 0 || part->state != after);
+    MRHI_ASSERT(part->mipCount > 0 && part->layerCount > 0 && part->planes != 0);
     if (device->frameBarrierCount == device->deviceLimits.frameBarriers)
     {
         map->full = true;
@@ -219,6 +246,7 @@ static void Move(Map* map, uint32_t pass, mrhiBox cut)
     }
     Push(map, cut);
     Swap(map);
+    MRHI_ASSERT(map->full || CoversWhole(map));
 }
 
 // Plans one resource over the kept passes, then its end: an imported
@@ -241,6 +269,7 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
         .half = half,
     };
     map.boxes[0] = whole;
+    map.volume = Volume(&whole);
     resource->firstPass = 0;
     resource->lastPass = 0;
     resource->finalState = whole.state;
@@ -264,6 +293,10 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
             uint32_t baseLayer = 0;
             uint32_t layerCount = 0;
             mrhiTrackedLayers(resource, &uses[i], &baseLayer, &layerCount);
+            // The pass's checks keep every use inside its resource.
+            MRHI_ASSERT(uses[i].baseMip + uses[i].mipCount <= whole.mipCount &&
+                        baseLayer + layerCount <= whole.layerCount &&
+                        (uses[i].planes & ~whole.planes) == 0);
             Move(&map, p + 1,
                  (mrhiBox){uses[i].baseMip, uses[i].mipCount, baseLayer, layerCount, uses[i].planes,
                            uses[i].state});
@@ -309,6 +342,7 @@ static void Sort(mrhiDevice* device)
     for (uint32_t i = 0; i < device->frameBarrierCount; ++i)
     {
         uint32_t pass = barriers[i].pass.index1;
+        MRHI_ASSERT(pass <= device->framePassCount);
         ++counts[pass == 0 ? buckets - 1 : pass];
     }
     uint32_t start = 0;
@@ -371,6 +405,8 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
         {
             continue;
         }
+        // Only a resource a kept pass uses is placed.
+        MRHI_ASSERT(resource->firstPass != 0);
         bool marked = false;
         for (uint32_t i = 0; i < planned; ++i)
         {

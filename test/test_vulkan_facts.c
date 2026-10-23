@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// A Vulkan device's floor, features and limits from its facts
-// (mrhi-0003), for devices no machine of the tests has: from a device
-// that has everything, each feature the floor or a contract feature
-// needs is taken away alone, and only what needs it goes; a queue
-// family with no timestamp bits has no timestamps; the heaps' sizes are
-// the smallest of their update after bind limits less the tables'
-// reserve, 0 without bindless sampling and the storage limits counted
-// only with heterogeneous heaps; multiview's views are at most 32.
+// A Vulkan device's floor, features and limits from its facts, for
+// devices no machine of the tests has: from a device that has
+// everything, each feature the floor or a contract feature needs is
+// taken away alone, and only what needs it goes; a queue family with no
+// timestamp bits has no timestamps; the heaps' sizes are the smallest
+// of their update after bind limits less the tables' reserve, 0 without
+// bindless sampling and the storage limits counted only with
+// heterogeneous heaps; multiview's views are at most 32.
 
 #include "capabilities_core.h"
 #include "test_harness.h"

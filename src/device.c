@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Devices (mrhi-0004): made at once and opened by their driver, with
-// the features and limits asked for checked against the adapter and
-// the floor.
+// Devices: made at once and opened by their driver, with the
+// features and limits asked for checked against the adapter and the
+// floor.
 
 #include "allocator.h"
 #include "capabilities_core.h"
@@ -59,7 +59,7 @@ static const mrhiStructType s_deviceStructs[] = {
     mrhi_structNone,
 };
 
-// Whether the def's Vulkan structs are well formed (mrhi-0018).
+// Whether the def's Vulkan structs are well formed.
 static bool AreVulkanStructsValid(const mrhiDeviceDef* def)
 {
     const mrhiDeviceVulkanAdopt* adopt =
@@ -445,7 +445,7 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
                                                    &driverDef, device->request, &device->driver);
     if (status == mrhi_success)
     {
-        // The handshake (mrhi-0024); destroy comes first in every version.
+        // The handshake; destroy comes first in every version.
         status = mrhiCheckDeviceVtable(device->driver.vtable);
         if (status != mrhi_success && device->driver.vtable != nullptr &&
             device->driver.vtable->destroy != nullptr)

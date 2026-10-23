@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Queries on Vulkan (vulkan_query.h), pipeline statistics among them
-// (mrhi-0023). A frame's recording marks the queries it writes, so that
-// a resolve copies those, waiting for their results, and fills the rest
-// with 0: Vulkan leaves a query that was never written unwritten in the
-// buffer.
+// Queries on Vulkan (vulkan_query.h), pipeline statistics among them. A
+// frame's recording marks the queries it writes, so that a resolve
+// copies those, waiting for their results, and fills the rest with 0:
+// Vulkan leaves a query that was never written unwritten in the buffer.
 
 #include "vulkan_query.h"
 

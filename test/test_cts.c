@@ -2,10 +2,10 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The WebGPU conformance test suite's validation cases whose calls have
-// Maul RHI counterparts (mrhi-0021), on the test driver: each case names
-// its CTS test, the call it becomes and the outcome the CTS expects,
-// success or the library's refusal. Cases the library decides otherwise
-// are listed with the reason. Translated from the CTS at a5e5d74
+// Maul RHI counterparts, on the test driver: each case names its CTS
+// test, the call it becomes and the outcome the CTS expects, success or
+// the library's refusal. Cases the library decides otherwise are listed
+// with the reason. Translated from the CTS at a5e5d74
 // (https://github.com/gpuweb/cts), whose cases are under this notice:
 //
 //   Copyright 2019 WebGPU CTS Contributors
@@ -1931,7 +1931,7 @@ static void TestQueries(void)
     // occlusion_query,disjoint_queries_with_same_query_index. Maul RHI
     // writes a query at most once in a frame, where the CTS allows once
     // a pass: a set is reset once, before the frame's first use, as
-    // Vulkan needs (mrhi-0012).
+    // Vulkan needs.
     static const uint32_t twice[] = {0, END, 0, END};
     Expect("begin_end:occlusion_query,disjoint_queries_with_same_query_index same pass",
            Occlusion(1, twice, 4, 1), false);

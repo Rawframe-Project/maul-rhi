@@ -2,26 +2,24 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Sirac Ozmen
 #
-# Makes each entry's DXIL for tools/mrhi_container.py --dxil, offline,
-# with SPIRV-Cross and DXC, by the writer's D3D12 rule
+# Makes each entry's DXIL for tools/mrhi_container.py --dxil, offline, with
+# SPIRV-Cross and DXC, by the writer's D3D12 rule
 # (docs/user/shader-container-format.md). SPIRV-Cross already places a binding at
-# its binding number as register and its set as space, which is the
-# rule; the tool gives a copy of the SPIR-V's root block (its push
-# constants) descriptor set 5 and binding 0, so that SPIRV-Cross places
-# it at b0 of space 5. Each variable of the heaps (set 4) moves to
-# binding 0 of a set of its own from 16, in the order the module
-# declares them, so that arrays of one register class never share a
-# register and space. Each entry is crossed alone to HLSL, a vertex
-# entry reading the draw's base vertex and first instance from b2 of
-# space 5, since D3D12's vertex and instance ids leave them out. Each
-# constant the SPIR-V does not size anything with is defined as a read
-# of b1 of space 5, where the driver writes the pipeline's values; a
-# fixed one keeps its default. DXC compiles each entry for SHADER_MODEL,
-# 6.1 for one reading the view index (record mrhi-0020), 6.2 with 16-bit
-# types for a module declaring Float16,
-# to DIR/NAME.dxil without reflection or debug data. HLSL that reads a
-# loop's variable after its continue block has stepped it is refused
-# (stale_reads). spirv-cross and dxc must be on the path.
+# its binding number as register and its set as space, which is the rule; the
+# tool gives a copy of the SPIR-V's root block (its push constants) descriptor
+# set 5 and binding 0, so that SPIRV-Cross places it at b0 of space 5. Each
+# variable of the heaps (set 4) moves to binding 0 of a set of its own from 16,
+# in the order the module declares them, so that arrays of one register class
+# never share a register and space. Each entry is crossed alone to HLSL, a vertex
+# entry reading the draw's base vertex and first instance from b2 of space 5,
+# since D3D12's vertex and instance ids leave them out. Each constant the SPIR-V
+# does not size anything with is defined as a read of b1 of space 5, where the
+# driver writes the pipeline's values; a fixed one keeps its default. DXC
+# compiles each entry for SHADER_MODEL, 6.1 for one reading the view index, 6.2
+# with 16-bit types for a module declaring Float16, to DIR/NAME.dxil without
+# reflection or debug data. HLSL that reads a loop's variable after its continue
+# block has stepped it is refused (stale_reads). spirv-cross and dxc must be on
+# the path.
 #
 # usage: mrhi_dxil.py SPIRV REFLECTION DIR
 
@@ -187,8 +185,8 @@ def main():
         try:
             for entry in entries:
                 stage, profile = STAGES[entry["stage"]]
-                # SV_ViewID, the view index (record mrhi-0020), needs 6.1;
-                # 16-bit floats need 6.2 and dxc's 16-bit types.
+                # SV_ViewID, the view index, needs 6.1; 16-bit floats need
+                # 6.2 and dxc's 16-bit types.
                 model = "6_1" if "view_index" in entry.get("builtins", []) else SHADER_MODEL
                 model = "6_2" if float16 else model
                 hlsl = os.path.join(work, entry["name"] + ".hlsl")

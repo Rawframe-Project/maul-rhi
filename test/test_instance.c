@@ -55,7 +55,7 @@ static mrhiResult Create(const mrhiInstanceDef* def)
 static void TestDefaultDefCreates(void)
 {
     mrhiInstanceDef def = mrhiDefaultInstanceDef();
-    CHECK(def.contractVersion == MRHI_CONTRACT_VERSION, "the def carries the contract version");
+    CHECK(def.abiVersion == MRHI_ABI_VERSION, "the def carries the headers' ABI version");
     CHECK(def.next == nullptr, "the def has no extensions");
     CHECK(Create(&def) == mrhi_success, "the default def creates");
     mrhiDestroyInstance(nullptr);
@@ -87,19 +87,28 @@ static void TestInvalidDefs(void)
 static void TestFailureClearsTheOutParameter(void)
 {
     mrhiInstanceDef def = mrhiDefaultInstanceDef();
-    def.contractVersion = 0;
+    def.abiVersion = 0;
     mrhiInstance* instance = (mrhiInstance*)&def;
     CHECK(mrhiCreateInstance(&def, &instance) == mrhi_errorVersion, "the failure");
     CHECK(instance == nullptr, "the out-parameter is NULL after a failure");
 }
 
-static void TestContractVersion(void)
+static void TestAbiVersion(void)
 {
+    CHECK((MRHI_ABI_VERSION & 0x80000000u) != 0, "the stamp's top bit is set");
     mrhiInstanceDef def = mrhiDefaultInstanceDef();
-    def.contractVersion = MRHI_CONTRACT_VERSION + 1;
-    CHECK(Create(&def) == mrhi_errorVersion, "a newer contract");
-    def.contractVersion = MRHI_CONTRACT_VERSION - 1;
-    CHECK(Create(&def) == mrhi_errorVersion, "an older contract");
+    def.abiVersion = MRHI_ABI_VERSION + 1;
+    CHECK(Create(&def) == mrhi_errorVersion, "another release's headers");
+    def.abiVersion = MRHI_ABI_VERSION & 0x7FFFFFFFu;
+    CHECK(Create(&def) == mrhi_errorVersion, "a stamp without its top bit");
+    // A def of another release may have another layout, so nothing past
+    // the stamp is read: its limits are not judged.
+    def = mrhiDefaultInstanceDef();
+    def.abiVersion = MRHI_ABI_VERSION + 1;
+    def.limits.chainDepth = 0;
+    CHECK(Create(&def) == mrhi_errorVersion, "the version before the limits");
+    def.cookie ^= 1;
+    CHECK(Create(&def) == mrhi_errorInvalid, "the cookie before the version");
 }
 
 static void TestChain(void)
@@ -156,7 +165,7 @@ int main(void)
     TestDefaultDefCreates();
     TestInvalidDefs();
     TestFailureClearsTheOutParameter();
-    TestContractVersion();
+    TestAbiVersion();
     TestChain();
     TestChainDepth();
     TestAllocator();

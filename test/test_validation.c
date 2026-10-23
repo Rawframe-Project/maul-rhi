@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The validation layer (mrhi-0025), in builds with MAUL_RHI_VALIDATION:
-// the test driver handed in from outside with one function broken at a
-// time, each breach counted by mrhiGetDriverFaults and recorded in the
+// The validation layer, in builds with MAUL_RHI_VALIDATION: the test
+// driver handed in from outside with one function broken at a time,
+// each breach counted by mrhiGetDriverFaults and recorded in the
 // instance's diagnostic queue with its rule's code while the call goes
 // on, and the edges a driver keeping the contract may reach left alone;
 // and a malformed frame, whose faults the walk counts without reading

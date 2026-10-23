@@ -1,7 +1,7 @@
 #!/bin/sh
-# Runs a test application in the Android emulator (mrhi-0017): installs
-# it on the device ANDROID_SERIAL names (else the only one), writes the
-# host's MAUL_RHI_* variables to its files/environment with run-as (the
+# Runs a test application in the Android emulator: installs it on the
+# device ANDROID_SERIAL names (else the only one), writes the host's
+# MAUL_RHI_* variables to its files/environment with run-as (the
 # application is debuggable), starts its activity, and waits, four
 # minutes at most, for the closing line files/out ends with, "result: N
 # failures". The library never ends the process, so the runner stops

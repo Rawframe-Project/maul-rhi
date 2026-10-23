@@ -1,6 +1,6 @@
 #!/bin/sh
-# Builds a test application for the Android emulator (mrhi-0017), with
-# the SDK's tools and no Gradle:
+# Builds a test application for the Android emulator, with the SDK's
+# tools and no Gradle:
 #
 #   tools/build_android_app.sh <out.apk> <libname.so> <package> [abi]
 #
