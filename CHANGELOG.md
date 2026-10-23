@@ -5,14 +5,7 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
-## [0.0.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.0.1...v0.0.1) (2026-10-23)
-
-
-### Documentation
-
-* note the macOS 26 cell's disabled Metal check ([#10](https://github.com/Rawframe-Project/maul-rhi/issues/10)) ([252bf29](https://github.com/Rawframe-Project/maul-rhi/commit/252bf2960bed0c0d026a275f6a9ac7f3f386fa98)), closes [#9](https://github.com/Rawframe-Project/maul-rhi/issues/9)
-
-## [0.0.1](https://github.com/Rawframe-Project/maul-rhi/releases/tag/v0.0.1)
+## [0.0.1](https://github.com/Rawframe-Project/maul-rhi/releases/tag/v0.0.1) (2026-10-23)
 
 The first release: one GPU API over Vulkan, Direct3D 12, Metal and
 WebGPU, with every call checked by WebGPU's rules on every driver.
