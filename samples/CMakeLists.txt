@@ -53,7 +53,7 @@ function(maul_rhi_add_sample name)
     endif()
     set_tests_properties(${target} PROPERTIES SKIP_RETURN_CODE 77
                          ENVIRONMENT "${maul_rhi_test_env}"
-                         FAIL_REGULAR_EXPRESSION "Validation Error")
+                         FAIL_REGULAR_EXPRESSION "Validation Error" LABELS "sample;integration")
 endfunction()
 
 maul_rhi_add_sample(triangle)

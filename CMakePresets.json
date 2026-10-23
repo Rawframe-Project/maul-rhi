@@ -1,0 +1,266 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/out/${presetName}",
+      "cacheVariables": { "MAUL_RHI_WERROR": "ON" }
+    },
+    {
+      "name": "linux",
+      "hidden": true,
+      "inherits": "base",
+      "generator": "Ninja",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+    },
+    {
+      "name": "gcc",
+      "hidden": true,
+      "cacheVariables": { "CMAKE_C_COMPILER": "gcc-14", "CMAKE_CXX_COMPILER": "g++-14" }
+    },
+    {
+      "name": "clang",
+      "hidden": true,
+      "cacheVariables": { "CMAKE_C_COMPILER": "clang-20", "CMAKE_CXX_COMPILER": "clang++-20" }
+    },
+    {
+      "name": "linux-gcc-14",
+      "displayName": "GCC 14, Release, Vulkan on lavapipe",
+      "inherits": ["linux", "gcc"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "linux-clang-20",
+      "displayName": "Clang 20, Release, debug labels compiled out",
+      "inherits": ["linux", "clang"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "MAUL_RHI_LABELS": "OFF" }
+    },
+    {
+      "name": "linux-clang-20-asan",
+      "displayName": "Clang 20, AddressSanitizer and UBSan, the validation layer, assertions on",
+      "inherits": ["linux", "clang"],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MAUL_RHI_SANITIZE": "ON",
+        "MAUL_RHI_VALIDATION": "ON"
+      }
+    },
+    {
+      "name": "linux-clang-20-tsan",
+      "displayName": "Clang 20, ThreadSanitizer, assertions on",
+      "inherits": ["linux", "clang"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "MAUL_RHI_TSAN": "ON" }
+    },
+    {
+      "name": "linux-shared",
+      "displayName": "Clang 20, shared library",
+      "inherits": ["linux", "clang"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "MAUL_RHI_BUILD_SHARED": "ON" }
+    },
+    {
+      "name": "linux-seam-x11",
+      "displayName": "Clang 20, the check against Maul Window on X11",
+      "inherits": ["linux", "clang"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "MAUL_RHI_SEAM": "ON" }
+    },
+    {
+      "name": "linux-seam-wayland",
+      "displayName": "Clang 20, the check against Maul Window on Wayland",
+      "inherits": "linux-seam-x11"
+    },
+    {
+      "name": "android-emulator",
+      "displayName": "The NDK, x86_64, run in the Android emulator",
+      "inherits": "linux",
+      "toolchainFile": "${sourceDir}/cmake/android-emulator.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "web-emscripten",
+      "displayName": "Emscripten, Release, the seam check included",
+      "inherits": "linux",
+      "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "MAUL_RHI_SEAM": "ON" }
+    },
+    {
+      "name": "web-wasi",
+      "displayName": "Clang 20 for wasm32-wasi, without Emscripten",
+      "inherits": ["linux", "clang"],
+      "toolchainFile": "${sourceDir}/cmake/wasm32-wasi.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "macos",
+      "hidden": true,
+      "inherits": "base",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
+    },
+    {
+      "name": "macos-clang",
+      "displayName": "Apple Clang, Release, Metal, the seam check included",
+      "inherits": "macos",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "MAUL_RHI_SEAM": "ON" }
+    },
+    {
+      "name": "macos-clang-debug",
+      "displayName": "Apple Clang, Debug, Metal, the seam check included",
+      "inherits": "macos",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "MAUL_RHI_SEAM": "ON" }
+    },
+    {
+      "name": "ios-simulator",
+      "displayName": "Apple Clang for the iOS simulator, Release",
+      "inherits": "macos",
+      "toolchainFile": "${sourceDir}/cmake/ios-simulator.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "windows",
+      "hidden": true,
+      "inherits": "base",
+      "toolset": { "value": "ClangCL", "strategy": "set" },
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "windows-d3d12",
+      "displayName": "clang-cl, D3D12 on WARP under the Agility SDK's debug layer, the seam check included",
+      "inherits": "windows",
+      "cacheVariables": {
+        "MAUL_RHI_SEAM": "ON",
+        "MAUL_RHI_D3D12_AGILITY": "${sourceDir}/out/agility/build/native/bin/x64"
+      }
+    },
+    {
+      "name": "windows-vulkan",
+      "displayName": "clang-cl, the Vulkan driver instead of D3D12",
+      "inherits": "windows",
+      "cacheVariables": { "MAUL_RHI_D3D12_DRIVER": "OFF", "MAUL_RHI_VULKAN_DRIVER": "ON" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "linux-gcc-14", "configurePreset": "linux-gcc-14" },
+    { "name": "linux-clang-20", "configurePreset": "linux-clang-20" },
+    { "name": "linux-clang-20-asan", "configurePreset": "linux-clang-20-asan" },
+    { "name": "linux-clang-20-tsan", "configurePreset": "linux-clang-20-tsan" },
+    { "name": "linux-shared", "configurePreset": "linux-shared" },
+    { "name": "linux-seam-x11", "configurePreset": "linux-seam-x11", "targets": ["test_seam"] },
+    { "name": "linux-seam-wayland", "configurePreset": "linux-seam-wayland", "targets": ["test_seam"] },
+    { "name": "android-emulator", "configurePreset": "android-emulator" },
+    { "name": "web-emscripten", "configurePreset": "web-emscripten" },
+    { "name": "web-wasi", "configurePreset": "web-wasi" },
+    { "name": "macos-clang", "configurePreset": "macos-clang" },
+    { "name": "macos-clang-debug", "configurePreset": "macos-clang-debug" },
+    { "name": "ios-simulator", "configurePreset": "ios-simulator" },
+    { "name": "windows-d3d12", "configurePreset": "windows-d3d12", "configuration": "Debug" },
+    { "name": "windows-vulkan", "configurePreset": "windows-vulkan", "configuration": "Release" }
+  ],
+  "testPresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "timeout": 300, "jobs": 4 }
+    },
+    {
+      "name": "lavapipe",
+      "hidden": true,
+      "inherits": "base",
+      "description": "Vulkan on lavapipe, which must be found, under the validation layer with synchronization validation, presenting to the X server in DISPLAY; lavapipe poisons new memory, so a read of memory nothing wrote fails.",
+      "environment": {
+        "MAUL_RHI_REQUIRE_VULKAN": "1",
+        "MAUL_RHI_REQUIRE_SURFACE": "1",
+        "MAUL_RHI_REQUIRE_BINDLESS": "1",
+        "MAUL_RHI_REQUIRE_STATISTICS": "1",
+        "MAUL_RHI_REQUIRE_EXTERNAL": "1",
+        "VK_INSTANCE_LAYERS": "VK_LAYER_KHRONOS_validation",
+        "VK_KHRONOS_VALIDATION_VALIDATE_SYNC": "true",
+        "LVP_POISON_MEMORY": "true"
+      }
+    },
+    { "name": "linux-gcc-14", "inherits": "lavapipe", "configurePreset": "linux-gcc-14" },
+    { "name": "linux-clang-20", "inherits": "lavapipe", "configurePreset": "linux-clang-20" },
+    { "name": "linux-clang-20-asan", "inherits": "lavapipe", "configurePreset": "linux-clang-20-asan" },
+    { "name": "linux-clang-20-tsan", "inherits": "lavapipe", "configurePreset": "linux-clang-20-tsan" },
+    { "name": "linux-shared", "inherits": "lavapipe", "configurePreset": "linux-shared" },
+    {
+      "name": "linux-seam-x11",
+      "inherits": "lavapipe",
+      "configurePreset": "linux-seam-x11",
+      "filter": { "include": { "name": "^seam$" } }
+    },
+    {
+      "name": "linux-seam-wayland",
+      "inherits": "lavapipe",
+      "configurePreset": "linux-seam-wayland",
+      "filter": { "include": { "name": "^seam$" } }
+    },
+    {
+      "name": "android-emulator",
+      "inherits": "base",
+      "configurePreset": "android-emulator",
+      "description": "The three window samples make windows of their own, and the samples know no Android window system.",
+      "environment": { "MAUL_RHI_REQUIRE_VULKAN": "1" },
+      "filter": { "exclude": { "name": "^sample_(hdr_surface|two_windows|present_states)$" } }
+    },
+    {
+      "name": "web-emscripten",
+      "inherits": "base",
+      "configurePreset": "web-emscripten",
+      "environment": { "MAUL_RHI_REQUIRE_WEBGPU": "1", "MAUL_RHI_REQUIRE_SURFACE": "1" }
+    },
+    {
+      "name": "web-wasi",
+      "inherits": "base",
+      "configurePreset": "web-wasi",
+      "description": "The samples open WebGPU, which Node's WASI lacks.",
+      "environment": { "MAUL_RHI_REQUIRE_WEBGPU": "1" },
+      "filter": { "exclude": { "name": "^sample_" } }
+    },
+    {
+      "name": "metal",
+      "hidden": true,
+      "inherits": "base",
+      "description": "The runner's Metal device, which must be found, under Metal's API and shader validation, which stop a test on misuse.",
+      "environment": {
+        "MAUL_RHI_REQUIRE_METAL": "1",
+        "MAUL_RHI_REQUIRE_SURFACE": "1",
+        "MTL_DEBUG_LAYER": "1",
+        "MTL_SHADER_VALIDATION": "1"
+      }
+    },
+    { "name": "macos-clang", "inherits": "metal", "configurePreset": "macos-clang" },
+    { "name": "macos-clang-debug", "inherits": "metal", "configurePreset": "macos-clang-debug" },
+    {
+      "name": "ios-simulator",
+      "inherits": "base",
+      "configurePreset": "ios-simulator",
+      "description": "The simulator's GPU has no cube arrays, below the floor: no adapter is listed, so the guide and the samples have none.",
+      "execution": { "timeout": 240 },
+      "filter": { "exclude": { "name": "^(guide|sample_.*)$" } }
+    },
+    {
+      "name": "windows-d3d12",
+      "inherits": "base",
+      "configurePreset": "windows-d3d12",
+      "configuration": "Debug",
+      "description": "WARP, which must be found, under the Agility SDK's debug layer and GPU-based validation, whose errors fail the tests.",
+      "environment": {
+        "MAUL_RHI_REQUIRE_D3D12": "1",
+        "MAUL_RHI_REQUIRE_SURFACE": "1",
+        "MAUL_RHI_REQUIRE_BINDLESS": "1",
+        "MAUL_RHI_REQUIRE_STATISTICS": "1",
+        "MAUL_RHI_D3D12_DEBUG": "1"
+      }
+    },
+    {
+      "name": "windows-vulkan",
+      "inherits": "base",
+      "configurePreset": "windows-vulkan",
+      "configuration": "Release",
+      "description": "The runner has no Vulkan, so the guide and the samples, which open the native driver, have no adapter.",
+      "filter": { "exclude": { "name": "^(guide|sample_.*)$" } }
+    }
+  ]
+}

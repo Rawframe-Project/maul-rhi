@@ -1,95 +1,66 @@
 # Maul RHI
 
-The GPU device layer for games, engines and editors: adapters and
-devices, resources and binding, pipelines, a frame graph that records
-and submits every pass, surfaces and presentation. Written in C23 with
-public headers any C17 or C++17 program can include, drivers over each
-GPU API directly, and an MIT license.
+One GPU API in C over Vulkan, Direct3D 12, Metal and WebGPU, with a frame graph that makes hazards impossible to write.
 
-It owns:
+[![CI](https://github.com/Rawframe-Project/maul-rhi/actions/workflows/ci.yml/badge.svg)](https://github.com/Rawframe-Project/maul-rhi/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/Rawframe-Project/maul-rhi)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/Rawframe-Project/maul-rhi)](https://github.com/Rawframe-Project/maul-rhi/releases)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Rawframe-Project/maul-rhi/badge)](https://scorecard.dev/viewer/?uri=github.com/Rawframe-Project/maul-rhi)
 
-- instances, adapters and devices, and the capabilities a program
-  requests from them;
-- buffers, textures, samplers, shader containers and pipelines, bound
-  through portable binding tables, with bindless heaps where the GPU
-  API has them;
-- the frame graph, the only way to record and submit work: barriers
-  and transient memory are the library's, so hazards cannot be written;
-- surfaces, swapchains, presentation and frame pacing, from the native
-  handles a window library such as Maul Window gives.
+A game, an engine or an editor that wants to run on every GPU writes its renderer four times, or against a layer that hides too much or too little. Maul RHI is that layer, drawn tightly around what the four APIs share:
 
-It owns no windows, scenes, materials or shader compilers: it loads
-shader containers built offline. Every request that completes later
-answers with exactly one record in a queue the program drains; no
-library thread runs, and no callback delivers a result.
+- **Adapters and devices** that grant exactly the features and limits a program asks for, so a program that runs on one adapter runs on any that grants the same.
+- **Buffers, textures, samplers, shader containers and pipelines**, bound through binding tables and a root block on every API, and through bindless heaps where the GPU has them.
+- **A frame graph** as the only way work reaches the GPU. Passes declare what they touch; the library culls, plans every barrier and aliases transient memory. The API has no barriers, fences or semaphores to get wrong.
+- **Surfaces and presentation** from the native handles of any window library, with HDR formats where the platform has them.
+- **Native doors** for OpenXR and vendor upscalers (FSR, DLSS, XeSS, MetalFX), and a driver interface for platforms whose APIs are closed.
 
-[The guide](docs/guide.md) walks through each part, and
-[the API reference](docs/api.md) lists all 143 public functions,
-generated from the headers.
+Every call is checked by WebGPU's rules on every driver, so a frame that records anywhere records on the web. The library starts no thread and takes no callbacks: whatever finishes later is answered once in a queue the program drains. All memory comes from the program's allocator when an instance or device is made. Shaders are compiled offline into containers that carry every API's code; nothing is compiled at run time.
 
-## Status
-
-0.7.0 is the current release. It has the whole contract on four
-drivers, Vulkan, Direct3D 12, Metal and WebGPU, and a test driver
-without a GPU, with the conformance suite, the samples and the
-benchmarks. Since 0.1.0: counted multi-draw indirect and multiview on
-every native driver (mrhi-0020), buffer clears (mrhi-0022), pipeline
-statistics on Vulkan and Direct3D 12 (mrhi-0023), drivers built outside
-the tree against the installed SPI headers with a mustpass list
-(mrhi-0024), a validation layer around the SPI (mrhi-0025), the WebGPU
-driver in a worker (mrhi-0026), diagnostics naming the check behind
-every refusal (mrhi-0027), a check that Maul Window's windows present
-through it (mrhi-0028), and debug labels a build compiles out
-(mrhi-0029). Not yet granted anywhere: present timing (no
-CI device times its presents); on Metal, also bindless heaps and
-timestamps, which wait for a Metal 3 device to test on.
-Each build has one native driver: Metal on Apple systems, Direct3D 12
-on Windows (or Vulkan, with `MAUL_RHI_VULKAN_DRIVER=ON` and
-`MAUL_RHI_D3D12_DRIVER=OFF`), Vulkan on the others, WebGPU on the web,
-built with Emscripten or with Clang's `wasm32-wasi`
-(`-DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake`), whose page loads
-the driver's JavaScript from the `maul-rhi.mjs` the build writes
-(mrhi-0016). Android runs the Vulkan driver, built with the NDK
-(`-DCMAKE_TOOLCHAIN_FILE=cmake/android-emulator.cmake`) and tested in
-the emulator (mrhi-0017).
-On Vulkan, an OpenXR runtime's instance, device and swapchain images
-are adopted (`maul-rhi/vulkan.h`, mrhi-0018).
-
-## Building
-
-Requirements: CMake 3.25 and GCC 14 or Clang 19 or newer; on Windows,
-`clang-cl` (the Visual Studio component "C++ Clang tools for Windows").
+## Quick start
 
 ```sh
+git clone https://github.com/Rawframe-Project/maul-rhi.git
+cd maul-rhi
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-ctest --test-dir build
+ctest --test-dir build -LE integration
+./build/sample_triangle
 ```
 
-## Samples
+The tests labeled `integration` and the samples need a GPU, or a software rasterizer such as lavapipe; without one they report themselves skipped. Install the library with `cmake --install build --prefix <prefix>` and use it from CMake:
 
-`samples/` holds small programs, each one file on a shared harness
-(`samples/harness.c`): `triangle.c` draws a triangle offscreen and
-reads it back, `upload_readback.c` moves bytes and texels through the
-GPU and back, `textured.c` draws a textured quad with both binding
-tables set, `compute_indirect.c` plans a dispatch on the GPU and runs
-it indirectly, `msaa.c` resolves a four-sample target, and `shadow.c`
-draws with reversed-Z depth and a shadow map. `hdr_surface.c`,
-`two_windows.c` and `present_states.c` present, to X windows through
-XCB (`samples/window.c`), to the web runner's canvases, or to
-CAMetalLayers outside any window on Metal, and
-`device_loss.c` loses its device on purpose and recovers. Each checks
-its own result, so CTest runs them as tests on the build's native
-driver, and in headless Chrome on the web. They are built unless
-`MAUL_RHI_BUILD_SAMPLES` is off; their shader containers are made by
-`tools/gen_test_shaders.py`.
+```cmake
+find_package(maul-rhi REQUIRED CONFIG)
+target_link_libraries(app PRIVATE maul-rhi::maul-rhi)
+```
 
-## Design
+or through pkg-config as `maul-rhi`. [Getting started](docs/user/getting-started.md) opens a first device.
 
-The rules every Maul library follows are in `docs/conventions.md` and
-`docs/adr/`; the records particular to this library are listed in
-`docs/adr/mrhi.md`.
+## Platforms
+
+| Platform | Driver |
+|---|---|
+| Linux, Android | Vulkan 1.3 |
+| Windows | Direct3D 12 (or Vulkan) |
+| macOS, iOS | Metal |
+| The web | WebGPU, with Emscripten or Clang's `wasm32-wasi` |
+
+The library builds with GCC 14 or Clang 19 and newer, and with `clang-cl` on Windows. Its public headers are C17 and C++17. CI builds and tests every platform, on lavapipe, WARP, the hosted Macs' GPUs, the Android emulator, the iOS simulator and headless Chrome. Present timing is not granted by any driver yet; on Metal, neither are timestamps nor bindless heaps.
+
+## Documentation
+
+- [The documentation site](https://rawframe-project.github.io/maul-rhi/), with the API reference and the per-API mappings generated from the contract.
+- [User documentation](docs/README.md): one page per part of the library.
+- [How it works](docs/internals/overview.md) and [how to develop it](docs/operations/development.md).
+- [Changelog](CHANGELOG.md).
+
+Maul RHI belongs to the Maul family of standalone C libraries, which share one set of conventions. [Maul Window](https://github.com/Rawframe-Project/maul-window) makes the windows it presents to, though any window library works.
+
+## Contributing
+
+Issues are welcome. Pull requests are accepted for issues a maintainer has approved; see [CONTRIBUTING.md](https://github.com/Rawframe-Project/.github/blob/main/CONTRIBUTING.md). The project is developed with AI coding agents, directed and reviewed by its maintainers; outside contributions follow the [AI policy](https://github.com/Rawframe-Project/.github/blob/main/AI_POLICY.md).
 
 ## License
 
-MIT; see `LICENSE`.
+MIT; see [LICENSE](LICENSE). The Khronos headers in `khronos/` are under the Apache 2.0 and MIT licenses, and the DirectX headers in `directx/` under the MIT license; their READMEs give the details.

@@ -251,6 +251,22 @@ if(MAUL_RHI_BUILD_TESTS)
         target_sources(test_d3d12_native PRIVATE test/d3d12_debug.c)
         target_include_directories(test_d3d12_native SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
         target_link_libraries(test_d3d12_native PRIVATE d3d12 dxgi)
+        # The suites export the Agility SDK they run on from D3D12/ beside
+        # them (test/d3d12_debug.c), where this copies the redistributable
+        # DLLs of its NuGet package, the version the directx/ headers are.
+        set(MAUL_RHI_D3D12_AGILITY "" CACHE PATH
+            "The Agility SDK's bin/x64 folder, copied into D3D12/ beside the tests")
+        if(MAUL_RHI_D3D12_AGILITY)
+            file(GLOB maul_rhi_agility "${MAUL_RHI_D3D12_AGILITY}/*.dll")
+            if(NOT maul_rhi_agility)
+                message(FATAL_ERROR "MAUL_RHI_D3D12_AGILITY holds no DLL: ${MAUL_RHI_D3D12_AGILITY}")
+            endif()
+            add_custom_target(maul_rhi_agility ALL
+                COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:test_d3d12_native>/D3D12
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${maul_rhi_agility}
+                        $<TARGET_FILE_DIR:test_d3d12_native>/D3D12
+                VERBATIM)
+        endif()
     endif()
     maul_add_test(instance)
     if(MAUL_RHI_TEST_DRIVER)
@@ -447,6 +463,14 @@ if(MAUL_RHI_BUILD_TESTS)
     set_tests_properties(${maul_rhi_tests} PROPERTIES
                          ENVIRONMENT "${maul_rhi_test_env}"
                          FAIL_REGULAR_EXPRESSION "Validation Error")
+    # The tests that drive a real GPU, window or browser: the changed-files
+    # check leaves them out, every other check runs them.
+    foreach(test conformance conformance_worker conformance_external conformance_app
+                 vulkan_external metal_native d3d12_native external_build)
+        if(TEST ${test})
+            set_property(TEST ${test} APPEND PROPERTY LABELS integration)
+        endif()
+    endforeach()
 endif()
 
 # The fuzz targets: test/fuzz_<area>.c, run as fuzz_<area> <corpus dir>,
@@ -492,7 +516,7 @@ if(MAUL_RHI_BUILD_TESTS AND NOT (EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "WASI"
     maul_apply_flags(test_guide)
     add_test(NAME guide COMMAND test_guide)
     set_tests_properties(guide PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "${maul_rhi_test_env}"
-                         FAIL_REGULAR_EXPRESSION "Validation Error")
+                         FAIL_REGULAR_EXPRESSION "Validation Error" LABELS "guide;integration")
 endif()
 
 # The seam with Maul Window, test only (mrhi-0028).

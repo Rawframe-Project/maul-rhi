@@ -3,7 +3,7 @@
 //
 // The container's parse: the header and digest, the section table's
 // bounds and overlaps, then every record against the rules of
-// docs/contract/container.md. Every read is bounded by the sizes checked
+// docs/user/shader-container-format.md. Every read is bounded by the sizes checked
 // before it, and bytes are read one at a time, so nothing depends on the
 // caller's alignment.
 

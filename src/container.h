@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Shader containers (mrhi-0009, docs/contract/container.md): the parse
-// that checks every byte as hostile input, and the decoded reflection.
+// Shader containers (docs/user/shader-container-format.md): the parse that
+// checks every byte as hostile input, and the decoded reflection.
 
 #ifndef MAUL_RHI_SRC_CONTAINER_H
 #define MAUL_RHI_SRC_CONTAINER_H

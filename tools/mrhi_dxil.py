@@ -4,7 +4,7 @@
 #
 # Makes each entry's DXIL for tools/mrhi_container.py --dxil, offline,
 # with SPIRV-Cross and DXC, by the writer's D3D12 rule
-# (docs/contract/container.md). SPIRV-Cross already places a binding at
+# (docs/user/shader-container-format.md). SPIRV-Cross already places a binding at
 # its binding number as register and its set as space, which is the
 # rule; the tool gives a copy of the SPIR-V's root block (its push
 # constants) descriptor set 5 and binding 0, so that SPIRV-Cross places

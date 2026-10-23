@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Sirac Ozmen
 #
-# Writes a shader container (docs/contract/container.md) from a SPIR-V
+# Writes a shader container (docs/user/shader-container-format.md) from a SPIR-V
 # module, a WGSL module and a JSON reflection. It checks the reflection
 # by the rules the library's reader applies, and refuses code that
 # disagrees with it:
@@ -23,7 +23,7 @@
 # 64-bit integers, so a container whose entries use any (its SPIR-V
 # declaring Int64) has no WGSL: pass - for it.
 #
-# The enum names are the contract's (docs/contract/mrhi.json) without
+# The enum names are the contract's (contract/mrhi.json) without
 # their prefixes. The reflection:
 #   {
 #     "root_block_bytes": 16,
@@ -90,7 +90,7 @@ import struct
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONTRACT = os.path.join(ROOT, "docs", "contract", "mrhi.json")
+CONTRACT = os.path.join(ROOT, "contract", "mrhi.json")
 SPIRV_MAGIC = 0x07230203
 COLOR_TARGETS = 8
 MAX_ROOT_BLOCK = 256

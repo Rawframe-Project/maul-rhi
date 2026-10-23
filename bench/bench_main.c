@@ -6,8 +6,8 @@
 // recorded, the compile of a fixed frame, and a frame's start to its
 // submission; each the best of five runs. Then, exactly, the bytes an
 // instance and a device with the default defs take from their
-// allocators. Given a baseline file, such as bench/baseline.txt, it
-// prints each number's ratio to the recorded one as well. Skipped where
+// allocators. Given a baseline file, an earlier run's output on the same
+// machine, it prints each number's ratio to the recorded one as well. Skipped where
 // there is no adapter.
 
 #ifdef _WIN32

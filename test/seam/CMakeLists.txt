@@ -23,4 +23,4 @@ else()
     add_test(NAME seam COMMAND test_seam)
 endif()
 set_tests_properties(seam PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "${maul_rhi_test_env}"
-                     FAIL_REGULAR_EXPRESSION "Validation Error")
+                     FAIL_REGULAR_EXPRESSION "Validation Error" LABELS "seam;integration")
