@@ -84,7 +84,8 @@ jobs:
         # the D3D12 sources need Windows' headers and build in the Windows
         # cells.
         run: |
-          cmake --preset linux-clang-20 -B out/tidy -DCMAKE_EXPORT_COMPILE_COMMANDS=ON >/dev/null
+          cmake --preset linux-clang-20 -B out/tidy -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DMAUL_RHI_LABELS=ON >/dev/null
           cmake --preset web-wasi -B out/tidy-web -DCMAKE_EXPORT_COMPILE_COMMANDS=ON >/dev/null
           grep -L '"web_js.h"' src/*.c | grep -v d3d12 |
             xargs -P 4 -n 1 clang-tidy-20 -p out/tidy --quiet --warnings-as-errors='*'
