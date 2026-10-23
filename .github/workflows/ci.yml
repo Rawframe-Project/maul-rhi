@@ -30,21 +30,21 @@ defaults:
 jobs:
   # Whether anything beyond documentation changed; the builds skip when not.
   changes:
-    uses: Rawframe-Project/.github/.github/workflows/changes.yml@2f63b13b7b6ff73a19fb04e7fa9c9e559ee44491 # v0.0.5
+    uses: Rawframe-Project/.github/.github/workflows/changes.yml@edc466dd0b7fd8ccab1a02e8034128753ebeb93b # v0.0.6
     permissions:
       pull-requests: read
 
   # The organization's documentation check; khronos/ and directx/ hold
   # the Vulkan and DirectX headers, kept exactly as published.
   docs:
-    uses: Rawframe-Project/.github/.github/workflows/docs-check.yml@2f63b13b7b6ff73a19fb04e7fa9c9e559ee44491 # v0.0.5
+    uses: Rawframe-Project/.github/.github/workflows/docs-check.yml@edc466dd0b7fd8ccab1a02e8034128753ebeb93b # v0.0.6
     permissions:
       contents: read
     with:
       exclude: khronos directx
 
   zizmor:
-    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@2f63b13b7b6ff73a19fb04e7fa9c9e559ee44491 # v0.0.5
+    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@edc466dd0b7fd8ccab1a02e8034128753ebeb93b # v0.0.6
     permissions:
       contents: read
 
@@ -56,7 +56,7 @@ jobs:
   checks:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    container: ghcr.io/rawframe-project/ci-cpp:2026.10.3@sha256:af7335beac5206f116bc82f9b44538bc633395bd0c10d933012c41f56326e0fc
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.4@sha256:9715ff153db04ba0ed4f520b6d2528ff7860f803de61ab011ba60a4eed572836
     permissions:
       contents: read
     steps:
@@ -65,9 +65,11 @@ jobs:
           persist-credentials: false
       - name: clang-format
         run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           clang-format --version
-          git ls-files '*.c' '*.h' '*.m' ':!khronos/' ':!directx/' | xargs clang-format --dry-run -Werror
+          # A checkout git refused would list nothing and pass unchecked.
+          files=$(git ls-files '*.c' '*.h' '*.m' ':!khronos/' ':!directx/')
+          [ -n "$files" ] || { echo "::error::git listed no sources"; exit 1; }
+          echo "$files" | xargs clang-format --dry-run -Werror
       - name: Family checks
         run: |
           python3 tools/check_source.py
@@ -116,7 +118,7 @@ jobs:
           - { preset: macos-clang-debug, runner: macos-26, setup: tools/ci_metal.sh }
           - { preset: windows-d3d12, runner: windows-2025, setup: tools/ci_agility.sh }
           - { preset: windows-vulkan, runner: windows-2025 }
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@2f63b13b7b6ff73a19fb04e7fa9c9e559ee44491 # v0.0.5
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@edc466dd0b7fd8ccab1a02e8034128753ebeb93b # v0.0.6
     permissions:
       contents: read
     with:
@@ -196,7 +198,7 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    container: ghcr.io/rawframe-project/ci-cpp:2026.10.3@sha256:af7335beac5206f116bc82f9b44538bc633395bd0c10d933012c41f56326e0fc
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.4@sha256:9715ff153db04ba0ed4f520b6d2528ff7860f803de61ab011ba60a4eed572836
     permissions:
       contents: read
     env:
