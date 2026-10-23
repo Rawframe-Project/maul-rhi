@@ -30,21 +30,21 @@ defaults:
 jobs:
   # Whether anything beyond documentation changed; the builds skip when not.
   changes:
-    uses: Rawframe-Project/.github/.github/workflows/changes.yml@b8489ea26f2debb7981b8715d937a516916213bf # v0.0.3
+    uses: Rawframe-Project/.github/.github/workflows/changes.yml@fe462053997271eb7a3117c65d6dd567e130e229 # v0.0.4
     permissions:
       pull-requests: read
 
   # The organization's documentation check; khronos/ and directx/ hold
   # the Vulkan and DirectX headers, kept exactly as published.
   docs:
-    uses: Rawframe-Project/.github/.github/workflows/docs-check.yml@b8489ea26f2debb7981b8715d937a516916213bf # v0.0.3
+    uses: Rawframe-Project/.github/.github/workflows/docs-check.yml@fe462053997271eb7a3117c65d6dd567e130e229 # v0.0.4
     permissions:
       contents: read
     with:
       exclude: khronos directx
 
   zizmor:
-    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@b8489ea26f2debb7981b8715d937a516916213bf # v0.0.3
+    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@fe462053997271eb7a3117c65d6dd567e130e229 # v0.0.4
     permissions:
       contents: read
 
@@ -115,7 +115,7 @@ jobs:
           - { preset: macos-clang-debug, runner: macos-26, setup: tools/ci_metal.sh }
           - { preset: windows-d3d12, runner: windows-2025, setup: tools/ci_agility.sh }
           - { preset: windows-vulkan, runner: windows-2025 }
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@b8489ea26f2debb7981b8715d937a516916213bf # v0.0.3
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@fe462053997271eb7a3117c65d6dd567e130e229 # v0.0.4
     permissions:
       contents: read
     with:
