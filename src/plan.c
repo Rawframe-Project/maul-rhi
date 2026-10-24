@@ -96,6 +96,15 @@ static mrhiTextureRange RangeOf(const mrhiBox* box, uint8_t planes)
     return (mrhiTextureRange){box->baseMip, box->mipCount, box->baseLayer, box->layerCount, aspect};
 }
 
+// The part of a resource a use covers, in the state it leaves it in.
+static mrhiBox BoxOf(const mrhiFrameResource* resource, const mrhiFrameUse* use)
+{
+    uint32_t baseLayer = 0;
+    uint32_t layerCount = 0;
+    mrhiTrackedLayers(resource, use, &baseLayer, &layerCount);
+    return (mrhiBox){use->baseMip, use->mipCount, baseLayer, layerCount, use->planes, use->state};
+}
+
 // The map of one resource during planning: its boxes in one half of the
 // device's room while the next map is built in the other, the planes of
 // the whole, and whether a limit was reached.
@@ -151,8 +160,10 @@ static void Push(Map* map, mrhiBox box)
 static void Emit(Map* map, uint32_t pass, const mrhiBox* part, mrhiResourceState after)
 {
     mrhiDevice* device = map->device;
-    // A barrier at the frame's end only joins other states.
+    // A barrier at the frame's end only joins other states; any other
+    // comes before a kept pass.
     MRHI_ASSERT(pass != 0 || part->state != after);
+    MRHI_ASSERT(pass == 0 || device->framePasses[pass - 1].kept);
     MRHI_ASSERT(part->mipCount > 0 && part->layerCount > 0 && part->planes != 0);
     if (device->frameBarrierCount == device->deviceLimits.frameBarriers)
     {
@@ -290,16 +301,12 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
             resource->finalState = uses[i].state;
             bool target = uses[i].use == mrhiUseColorTarget || uses[i].use == mrhiUseDepthTarget;
             targetsOnly = targetsOnly && target && uses[i].writes && !uses[i].reads;
-            uint32_t baseLayer = 0;
-            uint32_t layerCount = 0;
-            mrhiTrackedLayers(resource, &uses[i], &baseLayer, &layerCount);
+            mrhiBox cut = BoxOf(resource, &uses[i]);
             // The pass's checks keep every use inside its resource.
-            MRHI_ASSERT(uses[i].baseMip + uses[i].mipCount <= whole.mipCount &&
-                        baseLayer + layerCount <= whole.layerCount &&
-                        (uses[i].planes & ~whole.planes) == 0);
-            Move(&map, p + 1,
-                 (mrhiBox){uses[i].baseMip, uses[i].mipCount, baseLayer, layerCount, uses[i].planes,
-                           uses[i].state});
+            MRHI_ASSERT(cut.baseMip + cut.mipCount <= whole.mipCount &&
+                        cut.baseLayer + cut.layerCount <= whole.layerCount &&
+                        (cut.planes & ~whole.planes) == 0);
+            Move(&map, p + 1, cut);
         }
     }
     // A texture with view formats may be rendered in one, which WebGPU's
@@ -326,6 +333,24 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
         Move(&map, 0, whole);
     }
     return !map.full;
+}
+
+// Whether the barriers are in the order they run: by pass, the frame's
+// end last. Only an assertion calls it.
+[[maybe_unused]] static bool InRunOrder(const mrhiDevice* device)
+{
+    uint32_t last = 1;
+    for (uint32_t i = 0; i < device->frameBarrierCount; ++i)
+    {
+        uint32_t pass = device->frameBarriers[i].pass.index1;
+        uint32_t rank = pass == 0 ? UINT32_MAX : pass;
+        if (rank < last)
+        {
+            return false;
+        }
+        last = rank;
+    }
+    return true;
 }
 
 // Puts the barriers in the order they run: by pass, the frame's end last,
@@ -361,6 +386,81 @@ static void Sort(mrhiDevice* device)
     {
         device->frameBarriers[i] = device->frameBarrierScratch[i];
     }
+    MRHI_ASSERT(InRunOrder(device));
+}
+
+// Whether a barrier before a pass after one, up to another, meets a part
+// of a resource. Only assertions call it.
+[[maybe_unused]] static bool BarrierMeets(const mrhiDevice* device, uint32_t after, uint32_t upTo,
+                                          uint32_t slot, const mrhiBox* part)
+{
+    uint8_t planes = WholeOf(&device->frameResources[slot - 1]).planes;
+    for (uint32_t i = 0; i < device->frameBarrierCount; ++i)
+    {
+        const mrhiBarrier* barrier = &device->frameBarriers[i];
+        const mrhiTextureRange* range = &barrier->range;
+        uint8_t covered = range->aspect == mrhi_aspectAll         ? planes
+                          : range->aspect == mrhi_aspectDepthOnly ? 1
+                                                                  : 2;
+        mrhiBox box = {range->baseMip,    range->mipCount, range->baseLayer,
+                       range->layerCount, covered,         barrier->after};
+        mrhiBox common;
+        uint32_t pass = barrier->pass.index1;
+        if (pass > after && pass <= upTo && barrier->resource.index1 == slot &&
+            Intersect(&box, part, &common))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Whether two uses of one part race without a barrier between them:
+// either writes, or a texture changes state. Only assertions call it.
+[[maybe_unused]] static bool Races(const mrhiFrameResource* resource, const mrhiFrameUse* first,
+                                   const mrhiFrameUse* second)
+{
+    return mrhiStateWrites(first->state) || mrhiStateWrites(second->state) ||
+           (IsTexture(resource) && first->state != second->state);
+}
+
+// Whether no hazard was planned: for every two kept uses of a part of a
+// resource in different passes that race, a barrier before a pass after
+// the first, up to the second, meets the part they share. It checks the
+// barriers against the uses alone, apart from how the maps found them,
+// at the cost of every pair of uses. Only an assertion calls it.
+[[maybe_unused]] static bool IsHazardFree(const mrhiDevice* device)
+{
+    for (uint32_t q = 1; q < device->framePassCount; ++q)
+    {
+        const mrhiFramePass* later = &device->framePasses[q];
+        for (uint32_t j = 0; j < later->useCount && later->kept; ++j)
+        {
+            const mrhiFrameUse* second = &device->frameUses[later->firstUse + j];
+            const mrhiFrameResource* resource = &device->frameResources[second->resource - 1];
+            mrhiBox box = BoxOf(resource, second);
+            for (uint32_t p = 0; p < q; ++p)
+            {
+                const mrhiFramePass* earlier = &device->framePasses[p];
+                for (uint32_t i = 0; i < earlier->useCount && earlier->kept; ++i)
+                {
+                    const mrhiFrameUse* first = &device->frameUses[earlier->firstUse + i];
+                    if (first->resource != second->resource)
+                    {
+                        continue;
+                    }
+                    mrhiBox earlierBox = BoxOf(resource, first);
+                    mrhiBox shared;
+                    if (Intersect(&earlierBox, &box, &shared) && Races(resource, first, second) &&
+                        !BarrierMeets(device, p + 1, q + 1, second->resource, &shared))
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    return true;
 }
 
 mrhiResult mrhiPlan(mrhiDevice* device)
@@ -374,6 +474,7 @@ mrhiResult mrhiPlan(mrhiDevice* device)
         }
     }
     Sort(device);
+    MRHI_ASSERT(IsHazardFree(device));
     return mrhi_success;
 }
 

@@ -649,5 +649,7 @@ mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
         }
     }
     Barriers(&recording, &barrier, (mrhiPassId){0});
+    // The barriers run in pass order, so a recorded frame took them all.
+    MRHI_ASSERT(recording.status != mrhi_success || barrier == frame->barrierCount);
     return recording.status;
 }
