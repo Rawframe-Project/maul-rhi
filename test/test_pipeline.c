@@ -255,7 +255,7 @@ static void TestConstants(void)
           "one set twice");
     values[1].id = 7;
     def.constantCount = 5;
-    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorInvalid,
+    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorFormat,
           "more values than constants");
     def.constants = nullptr;
     def.constantCount = 1;
@@ -388,6 +388,10 @@ static void TestStateAndFailure(void)
     Close(device);
 }
 
+// A list from content far longer than the shader's constants, every id
+// repeated: refused by its length before any scan over it, so as format.
+static mrhiConstantValue s_oversized[100000];
+
 // Bad data, a damaged container or an entry its shader lacks, is refused
 // as format and counts no misuse: a correct program meets it in content.
 static void TestBadData(void)
@@ -408,7 +412,16 @@ static void TestBadData(void)
     mrhiRequestId request;
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorFormat,
           "an entry the shader lacks");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "neither is misuse");
+    for (size_t i = 0; i < sizeof(s_oversized) / sizeof(s_oversized[0]); ++i)
+    {
+        s_oversized[i] = (mrhiConstantValue){.id = 7, .value = 0.0};
+    }
+    def = Def(shader, "cs");
+    def.constants = s_oversized;
+    def.constantCount = sizeof(s_oversized) / sizeof(s_oversized[0]);
+    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorFormat,
+          "an oversized list, by its length");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "none is misuse");
     Close(device);
 }
 

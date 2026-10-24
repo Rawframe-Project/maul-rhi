@@ -58,6 +58,13 @@ static mrhiResult ConstantsFault(const mrhiReflection* reflection, const mrhiCon
     {
         return mrhi_errorInvalid;
     }
+    // More values than constants is refused first, so the scans below stay
+    // within the reflection's count, at most a section's MAX_RECORDS, however
+    // long a list from content is.
+    if (count > reflection->constantCount)
+    {
+        return mrhi_errorFormat;
+    }
     for (uint32_t i = 0; i < count; ++i)
     {
         for (uint32_t j = 0; j < i; ++j)
