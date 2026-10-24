@@ -75,4 +75,4 @@ The other presets set their platform's counterparts: `MAUL_RHI_REQUIRE_METAL` wi
 
 ## Labels
 
-Every suite `test/test_<name>.c` carries the label `<name>`. Tests that drive a real GPU, window or browser also carry `integration`: the conformance suite and its external and worker forms, the samples (`sample`), the guide, the seam check, the native interop suites and the outside-driver build. `ctest -L <label>` runs one suite, `-LE integration` everything that needs no GPU.
+Every suite `test/test_<name>.c` carries the label `<name>`. Tests that drive a real GPU, window or browser also carry `integration`: the conformance suite and its external and worker forms, the samples (`sample`), the guide, the seam check, the native interop suites and the outside-driver build. `ctest -L <label>` runs one suite, `-LE integration` everything that needs no GPU. In Linux shared builds, `exports` (`tools/check_exports.py`) checks that the library exports every function the public headers declare and nothing else, no data included.
