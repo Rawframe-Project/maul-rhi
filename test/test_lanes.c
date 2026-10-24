@@ -162,34 +162,55 @@ static void TestLaterReader(void)
     Open();
     Begin();
     mrhiResourceId buffer = Buffer();
-    Pass(mrhi_passGraphics, Access(buffer, mrhi_accessStorageWrite, 0), false);
+    Pass(mrhi_passTransfer, Access(buffer, mrhi_accessCopyDestination, 0), false);
     mrhiPassId set = Pass(mrhi_passAsyncCompute, Access(buffer, mrhi_accessStorageRead, 0), true);
     mrhiPassId later = Pass(mrhi_passAsyncCompute, Access(buffer, mrhi_accessStorageRead, 0), true);
+    mrhiPassId read = Pass(mrhi_passGraphics, Access(buffer, mrhi_accessStorageRead, 0), true);
+    mrhiPassId write = Pass(mrhi_passTransfer, Access(buffer, mrhi_accessCopyDestination, 0), true);
+    Submit();
+    CHECK(Waits(read, kNone, set, kNone), "the graphics read follows the read that set the state");
+    CHECK(Waits(write, read, later, kNone), "the write follows the last read of each class");
+    Close(s_device);
+}
+
+// A buffer read in a second state takes a barrier from the first, so it
+// follows the reads in the first state, and a write after it follows it.
+static void TestReadStates(void)
+{
+    Open();
+    Begin();
+    mrhiResourceId buffer = Buffer();
+    Pass(mrhi_passGraphics, Access(buffer, mrhi_accessStorageWrite, 0), false);
+    mrhiPassId compute =
+        Pass(mrhi_passAsyncCompute, Access(buffer, mrhi_accessStorageRead, 0), true);
     mrhiPassId copy = Pass(mrhi_passTransfer, Access(buffer, mrhi_accessCopySource, 0), true);
     mrhiPassId write = Pass(mrhi_passGraphics, Access(buffer, mrhi_accessStorageWrite, 0), true);
     Submit();
-    CHECK(Waits(copy, kNone, set, kNone), "the copy follows the read that set the state");
-    CHECK(Waits(write, kNone, later, copy), "the write follows the last read of each class");
+    CHECK(Waits(copy, kNone, compute, kNone), "the copy follows the read in the other state");
+    CHECK(Waits(write, kNone, kNone, copy), "the write follows the copy, which set the state");
     Close(s_device);
 }
 
 // A write after reads in two other classes follows the last of each. The
-// first read follows the first write; the second needs no barrier after
-// the first, so it follows the pass whose barrier set the state.
+// first read follows the first write; the second, in the same state,
+// needs no barrier after the first, so it follows the pass whose barrier
+// set the state.
 static void TestWriteAfterReads(void)
 {
     Open();
     Begin();
     mrhiResourceId buffer = Buffer();
-    mrhiPassId first = Pass(mrhi_passGraphics, Access(buffer, mrhi_accessStorageWrite, 0), false);
+    mrhiPassId first =
+        Pass(mrhi_passTransfer, Access(buffer, mrhi_accessCopyDestination, 0), false);
     mrhiPassId compute =
         Pass(mrhi_passAsyncCompute, Access(buffer, mrhi_accessStorageRead, 0), true);
-    mrhiPassId copy = Pass(mrhi_passTransfer, Access(buffer, mrhi_accessCopySource, 0), true);
-    mrhiPassId second = Pass(mrhi_passGraphics, Access(buffer, mrhi_accessStorageWrite, 0), true);
+    mrhiPassId graphics = Pass(mrhi_passGraphics, Access(buffer, mrhi_accessStorageRead, 0), true);
+    mrhiPassId second =
+        Pass(mrhi_passTransfer, Access(buffer, mrhi_accessCopyDestination, 0), true);
     Submit();
-    CHECK(Waits(compute, first, kNone, kNone), "the first read follows the first write");
-    CHECK(Waits(copy, kNone, compute, kNone), "the second read follows the first");
-    CHECK(Waits(second, kNone, compute, copy), "the second write follows both reads");
+    CHECK(Waits(compute, kNone, kNone, first), "the first read follows the first write");
+    CHECK(Waits(graphics, kNone, compute, kNone), "the second read follows the first");
+    CHECK(Waits(second, graphics, compute, kNone), "the second write follows both reads");
     Close(s_device);
 }
 
@@ -348,6 +369,7 @@ int main(void)
     TestReadAfterRead();
     TestCarriedRead();
     TestLaterReader();
+    TestReadStates();
     TestDisjointParts();
     TestPlanes();
     TestAliasing();
