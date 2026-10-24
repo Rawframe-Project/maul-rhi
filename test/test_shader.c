@@ -1431,10 +1431,31 @@ static void TestStateAndFailure(void)
     Close(device);
 }
 
+// A ready device granting every feature a container can need: the
+// bindless ones, 16-bit floats, subgroups, 64-bit integers and multiview.
+static mrhiDevice* OpenEverything(void)
+{
+    s_adapter.features.bindlessSampling = true;
+    s_adapter.features.bindlessHeterogeneous = true;
+    s_adapter.features.shaderF16 = true;
+    s_adapter.features.subgroups = true;
+    s_adapter.features.shaderInt64 = true;
+    s_adapter.features.multiview = true;
+    s_adapter.limits.heapSize = 4096;
+    s_adapter.limits.samplerHeapSize = 64;
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.features = s_adapter.features;
+    def.limits.heapSize = 1024;
+    def.limits.samplerHeapSize = 16;
+    return OpenWith(def, true);
+}
+
 // Reads a written container and checks what it holds: its digest in
-// hex, its entry and binding counts, its root block, and its heap uses
-// (a device granting both bindless features reads those).
-static int CheckFile(char** args)
+// hex, its entry and binding counts, its root block, and its heap uses.
+// It is read on a device without features (one granting both bindless
+// features for heap uses), or, when an eighth argument says "all", on one
+// granting every feature a container can need.
+static int CheckFile(char** args, bool all)
 {
     FILE* file = fopen(args[0], "rb");
     CHECK(file != nullptr, "the file opens");
@@ -1455,7 +1476,9 @@ static int CheckFile(char** args)
         digest[i / 2] = (uint8_t)(digest[i / 2] << 4 | value);
     }
     uint32_t heapUses = (uint32_t)atoi(args[5]);
-    mrhiDevice* device = heapUses == 0 ? Open(1, true) : OpenBindless(true);
+    mrhiDevice* device = all             ? OpenEverything()
+                         : heapUses == 0 ? Open(1, true)
+                                         : OpenBindless(true);
     mrhiShaderDef def = Def();
     mrhiShaderId shader;
     mrhiShaderInfo info = {0};
@@ -1473,9 +1496,9 @@ static int CheckFile(char** args)
 int main(int argc, char** argv)
 {
     ResetAdapter();
-    if (argc == 7)
+    if (argc == 7 || (argc == 8 && strcmp(argv[7], "all") == 0))
     {
-        return CheckFile(argv + 1);
+        return CheckFile(argv + 1, argc == 8);
     }
     TestDefault();
     TestHeader();

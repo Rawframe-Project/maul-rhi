@@ -34,4 +34,4 @@ The web runner (`test/web_runner.cjs`) prints the page's console and fails on an
 
 ## Fuzzing
 
-Build with `-DMAUL_RHI_FUZZ=ON` and Clang, then run `fuzz_container` or `fuzz_cache` over a corpus directory, always with `-max_total_time`. `tools/container_seed.py <dir>` writes every container the tests and samples compile in as `fuzz_container`'s seeds. A crash leaves its input in the working directory; run the target on that file alone to reproduce it, then add the minimized input as a test in the module's suite.
+Build with `-DMAUL_RHI_FUZZ=ON` and Clang, then run `fuzz_container` or `fuzz_cache` over a corpus directory, always with `-max_total_time`. `tools/container_seed.py <dir>` writes `fuzz_container`'s seeds: every container the tests and samples compile in, and a minimal one per feature of the format. A crash leaves its input in the working directory; run the target on that file alone to reproduce it, then add the minimized input as a test in the module's suite.
