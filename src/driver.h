@@ -19,7 +19,10 @@
 
 // The SPI version a driver's vtable must carry. Any change to the SPI
 // headers raises it; 4 is the first installed.
-#define MRHI_SPI_VERSION 6
+#define MRHI_SPI_VERSION 7
+
+// The pass classes (mrhiPassClass): graphics, async compute and transfer.
+#define MRHI_PASS_CLASSES 3
 
 // The 64-bit counters a pipeline statistics query writes.
 #define MRHI_STATISTICS_COUNTERS 11
@@ -127,9 +130,14 @@ typedef struct mrhiDriverAccess
 // derived; its render area; its occlusion query set's handle (0 for
 // none); its timestamp query set's handle and the queries written at
 // its start and end (MRHI_NO_QUERY for none); its heap's handle (0 for
-// none); the resources it declares, which a heap may reach unbound; and
-// its first command chunk, an index into the frame's chunks plus one (0
-// for none), each chunk naming the next.
+// none); the resources it declares, which a heap may reach unbound; its
+// first command chunk, an index into the frame's chunks plus one (0 for
+// none), each chunk naming the next; and, by class, the latest pass of
+// that class it must follow (a null id for none, always for its own
+// class). Passes of one class run in the frame's order. A driver that runs
+// classes on queues of their own orders each pass after the passes its
+// waitFor names, and the frame's end after every class's last pass; one
+// that runs every pass on one queue in the frame's order may ignore it.
 typedef struct mrhiDriverPass
 {
     mrhiPassId id;
@@ -160,6 +168,7 @@ typedef struct mrhiDriverPass
     // pass the program gave none (NULL).
     bool native;
     void* nativeCommands;
+    mrhiPassId waitFor[MRHI_PASS_CLASSES];
 } mrhiDriverPass;
 
 // A heap entry as its driver writes it: its kind, the view's or

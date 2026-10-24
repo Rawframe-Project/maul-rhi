@@ -84,6 +84,11 @@ static mrhiDriverPass ViewPass(const mrhiDevice* device, uint32_t index, uint32_
         .native = pass->native,
         .nativeCommands = pass->nativeCommands,
     };
+    for (uint32_t c = 0; c < MRHI_PASS_CLASSES; ++c)
+    {
+        uint32_t wait = pass->waitFor[c];
+        view.waitFor[c] = (mrhiPassId){wait, wait == 0 ? 0 : device->frameSerial};
+    }
     for (uint32_t i = 0; i < pass->colorTargetCount; ++i)
     {
         view.colorTargets[i] = pass->colorTargets[i];

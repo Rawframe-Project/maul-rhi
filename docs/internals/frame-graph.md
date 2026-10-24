@@ -27,7 +27,14 @@ A pass (`mrhiAddPass`) has a class, its render and depth targets with load, stor
 3. **Barriers.** Each resource's parts are tracked as disjoint boxes of mips, layers and planes mapped to the state their last use left them in. Each kept use makes barriers from the states it meets: a texture leaving the undefined state, a write on either side, or a texture changing state. Two reads of a buffer need none. The barriers are then put in the order they run.
 4. **Placement** of transients in the frame's memory, first fit in first-use order ([memory.md](memory.md#a-frames-memory)).
 
-Declaration order is execution order within a class, and today every driver runs every pass on one queue in declaration order. The class limits what a pass may do (a transfer pass only copies; vertex, index and query resolve accesses are graphics only), so a driver can move async compute and transfer passes onto queues of their own without a change to the API.
+Declaration order is execution order within a class. Across classes, the compile finds for each kept pass the latest pass of each other class it must follow:
+
+- the passes whose uses of a part race its own, either writing or changing a texture's state;
+- for a part it reads without a barrier, the pass whose barrier or write set the part's state;
+- every class's last pass over memory that a placed resource takes from earlier ones;
+- every class's passes before a native pass, and the native pass for every class's passes after it, since the program's commands may reach past what it declares.
+
+Planning tracks this per part beside the state, so parts that never meet order nothing. The class limits what a pass may do (a transfer pass only copies; vertex, index and query resolve accesses are graphics only), so a driver can move async compute and transfer passes onto queues of their own without a change to the API, ordering each pass after the passes it must follow. Today every driver runs every pass on one queue in declaration order, which keeps those orders as well.
 
 ## Aliasing
 
@@ -49,11 +56,11 @@ After the compile, `mrhiIsPassKept`, `mrhiGetPassPlan`, `mrhiGetResourcePlan`, `
 `mrhiSubmitFrame` hands the driver one read-only view, built in tables the device allocated with itself (`mrhiDriverFrame` in `src/driver.h`):
 
 - the frame's resources by slot: device objects by driver handle, transients by def with the usages their passes derive and their place in frame memory, and whether a kept pass uses each;
-- the kept passes in the order they run, with their class, label, targets and stores, render area, query sets, the resources they declare with the states they leave, and their first command chunk;
+- the kept passes in the order they run, with their class, label, targets and stores, render area, query sets, the resources they declare with the states they leave, their first command chunk, and the latest pass of each other class they must follow;
 - the barriers in the order they run;
 - the command chunks, the upload bytes, and the readback ring the driver fills before it reports the frame finished;
 - the bytes the transients take together.
 
-Drivers read this view and never the core's tables, so either side can change its layout. The view's tables cost a device about 60 bytes a resource and 550 a pass, and the labels 256 bytes a pass. The test driver and the validation layer walk each view completely ([drivers.md](drivers.md#the-frame-walk)).
+Drivers read this view and never the core's tables, so either side can change its layout. The view's tables cost a device about 60 bytes a resource and 630 a pass, and the labels 256 bytes a pass. The test driver and the validation layer walk each view completely ([drivers.md](drivers.md#the-frame-walk)).
 
 Submission is refused while a pass still records, or when a pass ran out of arena, staging or ring. `framesInFlight` bounds the frames submitted and not yet finished: beginning another is refused with `mrhi_errorCapacity` rather than blocking, so the browser's event loop is never stalled. A dropped frame, or one whose submission fails, gives back its readbacks and its acquired images.

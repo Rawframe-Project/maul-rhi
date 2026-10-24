@@ -72,6 +72,7 @@ mrhiResult mrhiCompile(mrhiDevice* device)
     {
         return status;
     }
+    mrhiOrderPasses(device);
     mrhiDeriveStores(device);
     device->frameCompiled = true;
     return mrhi_success;

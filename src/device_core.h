@@ -192,13 +192,18 @@ typedef struct mrhiFrameResource
     uint32_t lastPass;
     mrhiResourceState firstState;
     mrhiResourceState finalState;
+    // Its last kept pass of each class, 0 for none.
+    uint32_t lastPassOf[MRHI_PASS_CLASSES];
     // Where the compile placed a declared resource in the frame's memory.
     bool placed;
     uint64_t memoryOffset;
     uint64_t memoryBytes;
 } mrhiFrameResource;
 
-// A part of a resource in one state, in the compile's map of it.
+// A part of a resource in one state, in the compile's map of it, with,
+// by pass class, the latest kept pass that used it since its state was
+// last set and the latest that set it (frame pass indices plus one, 0 for
+// none): a use racing the part follows its users, any other its setters.
 typedef struct mrhiBox
 {
     uint32_t baseMip;
@@ -207,6 +212,8 @@ typedef struct mrhiBox
     uint32_t layerCount;
     uint8_t planes;
     mrhiResourceState state;
+    uint32_t users[MRHI_PASS_CLASSES];
+    uint32_t setters[MRHI_PASS_CLASSES];
 } mrhiBox;
 
 // The uses a pass makes of a resource beyond the access kinds.
@@ -326,6 +333,11 @@ typedef struct mrhiFramePass
     uint64_t heap;
     // Its label's bytes, in the device's frameLabels.
     uint32_t labelLength;
+    // By class, the latest kept pass of that class it must follow, found by
+    // the compile (frame pass indices plus one, 0 for none), and the latest
+    // of each class it follows through those and its class's order.
+    uint32_t waitFor[MRHI_PASS_CLASSES];
+    uint32_t follows[MRHI_PASS_CLASSES];
 } mrhiFramePass;
 
 // A surface as the device that configured it keeps it: the surface, the
@@ -651,9 +663,14 @@ void mrhiDeriveStores(mrhiDevice* device);
 mrhiResult mrhiPlace(mrhiDevice* device);
 
 // Marks the first use of each placed resource that takes memory used
-// earlier in the frame, adding a buffer's barrier for it: success, or
-// mrhi_errorCapacity when the barriers run out.
+// earlier in the frame, adding a buffer's barrier for it, and orders its
+// uses after the other classes' passes that used that memory: success,
+// or mrhi_errorCapacity when the barriers run out.
 mrhiResult mrhiPlanAliasing(mrhiDevice* device);
+
+// Completes the kept passes' waits with the native passes' and finds the
+// passes each follows through them and its class's order.
+void mrhiOrderPasses(mrhiDevice* device);
 
 // Leaves each imported object in the state the submitted frame left it.
 void mrhiApplyFinalStates(mrhiDevice* device);

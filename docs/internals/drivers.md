@@ -34,7 +34,7 @@ It traps (`MRHI_ASSERT`) when the core breaks the SPI: work asked of a lost devi
 
 ## The frame walk
 
-`src/frame_walk.c` reads a submitted frame as a driver would: every resource, pass and barrier; every command record, its payload inside its chunk, every frame resource it names of the right type, every handle one the driver made; every upload and readback inside the staging and the ring. The test driver traps on any fault it finds and fills the `mrhiTestFrameLog` a test asked for. Every frame a test submits is therefore also a check of the recorded streams.
+`src/frame_walk.c` reads a submitted frame as a driver would: every resource, pass and barrier; each pass's waits, each naming an earlier pass of its class or none; every command record, its payload inside its chunk, every frame resource it names of the right type, every handle one the driver made; every upload and readback inside the staging and the ring. The test driver traps on any fault it finds and fills the `mrhiTestFrameLog` a test asked for. Every frame a test submits is therefore also a check of the recorded streams.
 
 ## The validation layer
 

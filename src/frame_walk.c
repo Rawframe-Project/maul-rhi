@@ -241,6 +241,27 @@ static void WalkPass(Walk* walk, const mrhiDriverPass* pass)
     WalkCommands(walk, pass);
 }
 
+// Checks a pass's class and waits: each names a pass of its class
+// earlier in the frame, or none, and none of the pass's own class.
+static void CheckWaits(Walk* walk, uint32_t index)
+{
+    const mrhiDriverFrame* frame = walk->frame;
+    const mrhiDriverPass* pass = &frame->passes[index];
+    WALK_CHECK(pass->passClass < MRHI_PASS_CLASSES);
+    for (uint32_t c = 0; c < MRHI_PASS_CLASSES; ++c)
+    {
+        mrhiPassId wait = pass->waitFor[c];
+        bool found = wait.index1 == 0 && wait.generation == 0;
+        for (uint32_t i = 0; i < index && !found && c != pass->passClass; ++i)
+        {
+            const mrhiDriverPass* earlier = &frame->passes[i];
+            found = earlier->id.index1 == wait.index1 &&
+                    earlier->id.generation == wait.generation && earlier->passClass == c;
+        }
+        WALK_CHECK(found);
+    }
+}
+
 // Checks a resource: a device object's or swapchain's handle, a surface
 // image's image, or a transient's place in the frame's memory.
 static void CheckResource(Walk* walk, const mrhiDriverResource* resource)
@@ -278,6 +299,7 @@ uint64_t mrhiWalkFrame(const mrhiDriverFrame* frame, mrhiHandleCheck isHandle, c
     }
     for (uint32_t i = 0; i < frame->passCount; ++i)
     {
+        CheckWaits(walk, i);
         WalkPass(walk, &frame->passes[i]);
     }
     // Every chunk the frame took belongs to a kept pass.
