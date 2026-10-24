@@ -1493,12 +1493,60 @@ static int CheckFile(char** args, bool all)
     return s_failures == 0 ? 0 : 1;
 }
 
+// Reads every file a list names, one per line with CheckFile's arguments
+// separated by tabs, so that test_container_writer.py reads all it writes
+// in one process. After whatever its checks print, each line is answered
+// "file N: read" or "file N: refused"; the caller knows which it expects.
+static int CheckFiles(const char* list)
+{
+    FILE* file = fopen(list, "r");
+    CHECK(file != nullptr, "the list opens");
+    if (file == nullptr)
+    {
+        return 1;
+    }
+    char line[4096];
+    for (int n = 0; fgets(line, sizeof(line), file) != nullptr; ++n)
+    {
+        char* args[7] = {nullptr};
+        int count = 0;
+        for (char* field = line; field != nullptr && count < 7;)
+        {
+            args[count++] = field;
+            char* end = strpbrk(field, "\t\n");
+            field = end != nullptr && *end == '\t' ? end + 1 : nullptr;
+            if (end != nullptr)
+            {
+                *end = '\0';
+            }
+        }
+        int before = s_failures;
+        ResetAdapter();
+        if (count == 6 || (count == 7 && strcmp(args[6], "all") == 0))
+        {
+            CheckFile(args, count == 7);
+        }
+        else
+        {
+            CHECK(false, "a line of six or seven fields");
+        }
+        printf("file %d: %s\n", n, s_failures == before ? "read" : "refused");
+        s_failures = before;
+    }
+    fclose(file);
+    return s_failures == 0 ? 0 : 1;
+}
+
 int main(int argc, char** argv)
 {
     ResetAdapter();
     if (argc == 7 || (argc == 8 && strcmp(argv[7], "all") == 0))
     {
         return CheckFile(argv + 1, argc == 8);
+    }
+    if (argc == 3 && strcmp(argv[1], "--files") == 0)
+    {
+        return CheckFiles(argv[2]);
     }
     TestDefault();
     TestHeader();
