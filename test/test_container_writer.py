@@ -6,7 +6,8 @@
 # is read by test_shader with the same digest and reflection, as are one
 # whose entries use heaps and so has no WGSL, and ones with Metal code,
 # and D3D12 code, whose maps follow the writer's rules; code that
-# disagrees with its reflection is refused.
+# disagrees with its reflection is refused; and every minimal fuzz seed
+# of tools/container_seed.py is read too.
 #
 # usage: test_container_writer.py TEST_SHADER
 
@@ -24,6 +25,7 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
+import container_seed  # noqa: E402
 import mrhi_container  # noqa: E402
 
 WGSL = """
@@ -617,6 +619,21 @@ def main():
                            fs=dxbc("fragment", DXIL["fs"] + [("t*", 0, 16)]))
         heap_d3d12_refused("a heap in a reserved space",
                            cs=dxbc("compute", DXIL["cs"] + [("u*", 0, 0xFFFFFFF0)]))
+
+        # tools/container_seed.py's minimal seeds: each one the library
+        # reads, with the reflection it was written from.
+        with open(mrhi_container.CONTRACT, encoding="utf-8") as f:
+            enums = mrhi_container.Enums(json.load(f))
+        for name, data, (entries, bindings, root, heaps) in container_seed.minimal(enums):
+            output = os.path.join(folder, f"{name}.mrsc")
+            with open(output, "wb") as f:
+                f.write(data)
+            digest = hashlib.sha256(data[48:]).hexdigest()
+            args = [test_shader, output, digest, str(entries), str(bindings), str(root),
+                    str(heaps)]
+            result = subprocess.run(args, capture_output=True, text=True)
+            check(result.returncode == 0, f"the library reads the seed {name}: {result.stdout}")
+            check(len(data) < 1024, f"the seed {name} stays under a kilobyte")
     return 1 if failures else 0
 
 
