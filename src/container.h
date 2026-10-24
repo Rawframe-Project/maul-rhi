@@ -120,7 +120,8 @@ typedef struct mrhiD3d12Entry
 // SPIR-V's capabilities), subgroup operations and 64-bit integers, and the
 // builtins and
 // heap uses of its entries together; the WGSL is absent (NULL, 0 bytes)
-// exactly when an entry uses a heap. The Metal map is NULL without Metal
+// exactly when an entry uses a heap or the view index, or the SPIR-V
+// declares 64-bit integers. The Metal map is NULL without Metal
 // code, and the MSL and metallib each NULL and 0 bytes when absent; the
 // D3D12 map and DXIL are both NULL and 0 bytes, or both present.
 typedef struct mrhiContainer
