@@ -178,6 +178,16 @@ static uint32_t FindFitting(const mrhiTlsf* pool, uint64_t size)
                                  node->offset + node->size == after->offset));
 }
 
+// Whether a range meets its neighbours, none of them free: free ranges
+// never meet, as each free merges with its free neighbours. Only
+// assertions call it.
+[[maybe_unused]] static bool IsMerged(const mrhiTlsfNodes* store, uint32_t id)
+{
+    const mrhiTlsfNode* node = NODE(store, id);
+    return IsJoined(store, id) && (node->previous == 0 || !NODE(store, node->previous)->free) &&
+           (node->next == 0 || !NODE(store, node->next)->free);
+}
+
 // Links a new node after a node of the same block.
 static void LinkAfter(mrhiTlsfNodes* store, uint32_t id, uint32_t added)
 {
@@ -336,11 +346,7 @@ uint32_t mrhiTlsfFree(mrhiTlsf* pool, mrhiTlsfNodes* store, uint32_t allocation)
         Remove(pool, store, after);
         Absorb(store, id);
     }
-    // Free ranges never meet: each free merges with its free neighbours.
-    const mrhiTlsfNode* freed = NODE(store, id);
-    MRHI_ASSERT(IsJoined(store, id) &&
-                (freed->previous == 0 || !NODE(store, freed->previous)->free) &&
-                (freed->next == 0 || !NODE(store, freed->next)->free));
+    MRHI_ASSERT(IsMerged(store, id));
     Insert(pool, store, id);
     return id;
 }
