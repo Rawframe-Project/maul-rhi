@@ -5,6 +5,24 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.2.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.1.0...v0.2.0) (2026-10-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **graph:** a buffer read in a second read state now takes a barrier from the first. mrhiGetFrameBarriers lists it, and it counts against frameBarriers, so a frame near that limit can now fail mrhiCompileFrame with mrhi_errorCapacity. A host near the limit raises frameBarriers in its device def by the number of state changes between reads of its buffers.
+* **spi:** the driver SPI moves from version 6 to 7. A driver built outside the tree must be rebuilt against version 7, or the core refuses it with mrhi_errorVersion. mrhiDriverPass gains waitFor, which a driver running every pass on one queue in the frame's order may ignore.
+
+### Added
+
+* **spi:** name the passes of other classes each pass must follow ([#66](https://github.com/Rawframe-Project/maul-rhi/issues/66)) ([32a9d6e](https://github.com/Rawframe-Project/maul-rhi/commit/32a9d6e1a6875a26571b83421ce13995f8f63258))
+* **vulkan:** record each pass class in a lane of its own ([#69](https://github.com/Rawframe-Project/maul-rhi/issues/69)) ([1d8fa6d](https://github.com/Rawframe-Project/maul-rhi/commit/1d8fa6dfb26d221826e8529b7cf0f2fee2707203)), closes [#68](https://github.com/Rawframe-Project/maul-rhi/issues/68)
+
+
+### Fixed
+
+* **graph:** barrier a buffer read in a second state ([#71](https://github.com/Rawframe-Project/maul-rhi/issues/71)) ([cff248f](https://github.com/Rawframe-Project/maul-rhi/commit/cff248fa0bdbeb175e665e57b21fcb3360bd3e3b))
+
 ## [0.1.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.0.1...v0.1.0) (2026-10-24)
 
 Bad data from content is now refused apart from bugs in the calling
