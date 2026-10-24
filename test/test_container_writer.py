@@ -17,7 +17,6 @@ import hashlib
 import io
 import json
 import os
-import shutil
 import struct
 import subprocess
 import sys
@@ -186,18 +185,40 @@ def constants(data):
     return [struct.unpack_from("<IB3xIB3x", records, at) for at in range(0, len(records), 16)]
 
 
+def stored(folder, data, suffix):
+    """A file holding data, written once and named by its digest. The test
+    passes the same few inputs to about a hundred writes, and a new file
+    costs more than its bytes on some runners: a scan on Windows, a flush
+    on close on macOS."""
+    path = os.path.join(folder, hashlib.sha256(data).hexdigest()[:16] + suffix)
+    if not os.path.exists(path):
+        with open(path, "wb") as f:
+            f.write(data)
+    return path
+
+
+def stored_entries(folder, entries, suffix):
+    """A directory holding each entry's code as NAME + suffix, written once
+    and named by the digest of its contents."""
+    entries = {n: c if isinstance(c, bytes) else c.encode("utf-8") for n, c in entries.items()}
+    digest = hashlib.sha256()
+    for name, code in sorted(entries.items()):
+        digest.update(struct.pack("<II", len(name), len(code)) + name.encode("utf-8") + code)
+    directory = os.path.join(folder, suffix[1:] + "-" + digest.hexdigest()[:16])
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        for name, code in entries.items():
+            with open(os.path.join(directory, name + suffix), "wb") as f:
+                f.write(code)
+    return directory
+
+
 def write(folder, code, text, reflection, options=()):
     """Writes a container; text None passes no WGSL."""
-    paths = [os.path.join(folder, n) for n in ("a.spv", "a.wgsl", "a.json", "a.mrsc")]
-    with open(paths[0], "wb") as f:
-        f.write(code)
-    if text is None:
-        paths[1] = "-"
-    else:
-        with open(paths[1], "w", encoding="utf-8") as f:
-            f.write(text)
-    with open(paths[2], "w", encoding="utf-8") as f:
-        json.dump(reflection, f)
+    paths = [stored(folder, code, ".spv"),
+             "-" if text is None else stored(folder, text.encode("utf-8"), ".wgsl"),
+             stored(folder, json.dumps(reflection).encode("utf-8"), ".json"),
+             os.path.join(folder, "a.mrsc")]
     if os.path.exists(paths[3]):
         os.remove(paths[3])
     # In this process, as a separate one per write would make the test
@@ -213,31 +234,16 @@ def metal_options(folder, msl=None, metallib=None):
     options for them."""
     options = []
     if msl is not None:
-        directory = os.path.join(folder, "msl")
-        shutil.rmtree(directory, ignore_errors=True)
-        os.makedirs(directory)
-        for name, text in msl.items():
-            with open(os.path.join(directory, name + ".metal"), "wb") as f:
-                f.write(text if isinstance(text, bytes) else text.encode("utf-8"))
-        options += ["--msl", directory]
+        options += ["--msl", stored_entries(folder, msl, ".metal")]
     if metallib is not None:
-        path = os.path.join(folder, "a.metallib")
-        with open(path, "wb") as f:
-            f.write(metallib)
-        options += ["--metallib", path]
+        options += ["--metallib", stored(folder, metallib, ".metallib")]
     return options
 
 
 def dxil_options(folder, dxil):
     """Writes each entry's DXIL as given and answers the writer's options
     for it."""
-    directory = os.path.join(folder, "dxil")
-    shutil.rmtree(directory, ignore_errors=True)
-    os.makedirs(directory)
-    for name, code in dxil.items():
-        with open(os.path.join(directory, name + ".dxil"), "wb") as f:
-            f.write(code)
-    return ["--dxil", directory]
+    return ["--dxil", stored_entries(folder, dxil, ".dxil")]
 
 
 def main():
