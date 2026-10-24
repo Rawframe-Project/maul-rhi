@@ -174,6 +174,12 @@ class Enums:
         self.heap_uses = enum(contract, "shader_heap_uses", "heap_use_")
         self.constants = enum(contract, "constant_type", "constant_")
 
+    def canonical(self):
+        """Every value the writer reads from the contract, sorted, as bytes:
+        what a container's bytes depend on, apart from the contract's prose."""
+        return json.dumps({field: sorted(values.items()) for field, values in vars(self).items()},
+                          sort_keys=True).encode()
+
 
 def need(condition, message):
     if not condition:
