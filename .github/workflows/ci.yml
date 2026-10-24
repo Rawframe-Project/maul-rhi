@@ -156,7 +156,8 @@ jobs:
   # The library under Emscripten: the suites in Node, the conformance suite
   # and the seam check in headless Chrome with WebGPU, which they must find,
   # and the size of the library at -Oz against its budget. The CI image has
-  # no Emscripten, so this job uses the runner and the emsdk action.
+  # no Emscripten, so this job uses the runner and the emsdk action, with
+  # Emscripten's version pinned.
   web-emscripten:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -169,6 +170,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
+        with:
+          version: 6.0.13
       - name: Browser
         run: tools/ci_browser.sh
       - name: Configure
