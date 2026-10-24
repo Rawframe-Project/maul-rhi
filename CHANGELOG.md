@@ -7,16 +7,44 @@ may change the API, the ABI and every data format.
 
 ## [0.1.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.0.1...v0.1.0) (2026-10-24)
 
+Bad data from content is now refused apart from bugs in the calling
+code. A damaged shader, or one that does not fit a pipeline, returns
+the new `mrhi_errorFormat` and counts no misuse, so the misuse count
+keeps showing only bugs in the program.
 
-### ⚠ BREAKING CHANGES
+### Added
 
-* **pipeline:** graphics pipeline creation refuses state the shader's reflection does not take (vertex inputs, fragment outputs and targets, the stage interface, fragment depth, the written sample mask) with mrhi_errorFormat instead of mrhi_errorInvalid, and counts no misuse for it. Dual-source blending whose fragment entry has no second source is mrhi_errorFormat too, where it was mrhi_errorUnsupported.
-* **shader:** shader and pipeline creation refuse bad data with the new result mrhi_errorFormat instead of mrhi_errorInvalid, and count no misuse for it: a damaged shader container, and an entry, constants or a constant value the shader's reflection does not take. mrhiParseContainer returns mrhi_errorFormat, and the driver interface moves to SPI version 6.
+- `mrhi_errorFormat`: the data is malformed or does not contain what
+  was asked for. It counts no misuse; every `mrhi_errorInvalid` still
+  counts one. Diagnostic records name the check for both
+  ([#22](https://github.com/Rawframe-Project/maul-rhi/pull/22)).
 
-### Fixed
+### Changed
 
-* **pipeline:** refuse graphics state the shader rejects as format ([#27](https://github.com/Rawframe-Project/maul-rhi/issues/27)) ([ddb0070](https://github.com/Rawframe-Project/maul-rhi/commit/ddb007055610074091f2b2db66498ad3bc97b2a8)), closes [#23](https://github.com/Rawframe-Project/maul-rhi/issues/23)
-* **shader:** refuse bad shader data with mrhi_errorFormat ([#22](https://github.com/Rawframe-Project/maul-rhi/issues/22)) ([d0f62a3](https://github.com/Rawframe-Project/maul-rhi/commit/d0f62a328f782487bbaa5e03d3ee9ea132692834)), closes [#21](https://github.com/Rawframe-Project/maul-rhi/issues/21)
+- **Breaking:** `mrhiCreateShader` refuses a damaged container with
+  `mrhi_errorFormat` instead of `mrhi_errorInvalid`. NULL or misaligned
+  bytes stay `mrhi_errorInvalid`
+  ([#22](https://github.com/Rawframe-Project/maul-rhi/pull/22)).
+- **Breaking:** compute and graphics pipeline creation refuse with
+  `mrhi_errorFormat` an entry the shader lacks, a constant id or value
+  its reflection does not take, a required constant left unset, and
+  more constant values than the shader has constants. A NULL entry,
+  NULL values with a count and a constant given twice stay
+  `mrhi_errorInvalid`
+  ([#22](https://github.com/Rawframe-Project/maul-rhi/pull/22)).
+- **Breaking:** graphics pipeline creation refuses with
+  `mrhi_errorFormat` state the shader's reflection does not take:
+  vertex inputs, fragment outputs and targets, the stage interface,
+  fragment depth and the written sample mask. Dual-source blending
+  whose fragment entry has no second source is `mrhi_errorFormat` too,
+  where it was `mrhi_errorUnsupported`. A def with both a bug and such
+  state returns `mrhi_errorInvalid` and counts the bug
+  ([#27](https://github.com/Rawframe-Project/maul-rhi/pull/27)).
+- **Breaking for drivers built outside the tree:** the driver
+  interface is SPI version 6, and `mrhiParseContainer` returns
+  `mrhi_errorFormat` for a damaged container. Drivers are admitted on
+  `conformance/mustpass/spi-6.txt`, which holds the same cases as
+  version 5 ([#22](https://github.com/Rawframe-Project/maul-rhi/pull/22)).
 
 ## [0.0.1](https://github.com/Rawframe-Project/maul-rhi/releases/tag/v0.0.1) (2026-10-23)
 
