@@ -530,6 +530,7 @@ static Case s_cases[] = {
     {"binding.compute_split", 0, 0},
     {"binding.heaps", 0, 0},
     {"hazards.aliasing", 0, 0},
+    {"hazards.pass_classes", 0, 0},
     {"hazards.transient_twin", 0, 0},
     {"hazards.frame_memory", 0, 0},
     {"transfers.round_trip", 0, 0},
@@ -2838,6 +2839,97 @@ static void CheckComputeSplit(Scene* scene, bool timestamps)
     CHECK(!timestamps || mrhiDestroyQuerySet(device, times) == mrhi_success, "destroyed");
 }
 
+// A pass of a class with the given accesses.
+static mrhiPassId ClassPass(mrhiDevice* device, mrhiPassClass passClass, const mrhiAccess* accesses,
+                            uint32_t count)
+{
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.passClass = passClass;
+    def.accesses = accesses;
+    def.accessCount = count;
+    def.neverCull = true;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(device, &def, &pass) == mrhi_success, "a classed pass");
+    return pass;
+}
+
+// Dispatches the adding pipeline once in a pass, adding a value to each
+// word of the scene's storage buffer.
+static bool AddIn(const Scene* scene, mrhiPassId pass, float value)
+{
+    const float block[4] = {value, 0.0f, 0.0f, 0.0f};
+    bool set = mrhiBeginPass(scene->device, pass) == mrhi_success &&
+               mrhiSetComputePipeline(scene->device, pass, scene->adding) == mrhi_success &&
+               mrhiSetRootBlock(scene->device, pass, 0, block, sizeof(block)) == mrhi_success;
+    BindScene(scene, pass);
+    return set && mrhiDispatch(scene->device, pass, 1, 1, 1) == mrhi_success &&
+           mrhiEndPass(scene->device, pass) == mrhi_success;
+}
+
+// One buffer passed between the three pass classes: a transfer upload,
+// an async compute and a graphics dispatch adding 5 and 7, a transfer
+// read, an async compute dispatch adding 1 after that read, and a last
+// read. Every handoff, the write after a read included, must be ordered
+// across classes. A transfer upload of another buffer between the two
+// additions follows no pass, so the read after them follows the graphics
+// pass with its class's work already begun.
+static void CheckPassClasses(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    BeginScene(scene);
+    mrhiAccess fill = Whole(scene->d, mrhi_accessCopyDestination);
+    mrhiPassId filled = ClassPass(device, mrhi_passTransfer, &fill, 1);
+    const mrhiAccess uses[3] = {Whole(scene->u, mrhi_accessUniform),
+                                Whole(scene->d, mrhi_accessStorageReadWrite),
+                                Whole(scene->w, mrhi_accessSampled)};
+    mrhiPassId five = ClassPass(device, mrhi_passAsyncCompute, uses, 3);
+    mrhiBufferDef def = mrhiDefaultBufferDef();
+    def.size = 16;
+    mrhiResourceId e = {0};
+    CHECK(mrhiDeclareBuffer(device, &def, &e) == mrhi_success, "a declared buffer");
+    mrhiAccess mark = Whole(e, mrhi_accessCopyDestination);
+    mrhiPassId marked = ClassPass(device, mrhi_passTransfer, &mark, 1);
+    mrhiPassId seven = ClassPass(device, mrhi_passGraphics, uses, 3);
+    mrhiAccess back = Whole(scene->d, mrhi_accessCopySource);
+    mrhiPassId first = ClassPass(device, mrhi_passTransfer, &back, 1);
+    mrhiPassId one = ClassPass(device, mrhi_passAsyncCompute, uses, 3);
+    const mrhiAccess reads[2] = {back, Whole(e, mrhi_accessCopySource)};
+    mrhiPassId last = ClassPass(device, mrhi_passTransfer, reads, 2);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    const uint32_t values[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    mrhiRequestId added = {0};
+    mrhiRequestId again = {0};
+    mrhiRequestId marks = {0};
+    const uint32_t words[4] = {9, 8, 7, 6};
+    CHECK(mrhiBeginPass(device, filled) == mrhi_success &&
+              mrhiWriteBuffer(device, filled, scene->d, 0, values, sizeof(values)) ==
+                  mrhi_success &&
+              mrhiEndPass(device, filled) == mrhi_success,
+          "uploaded");
+    CHECK(AddIn(scene, five, 5.0f) && mrhiBeginPass(device, marked) == mrhi_success &&
+              mrhiWriteBuffer(device, marked, e, 0, words, sizeof(words)) == mrhi_success &&
+              mrhiEndPass(device, marked) == mrhi_success && AddIn(scene, seven, 7.0f),
+          "added 5, marked and added 7");
+    CHECK(mrhiBeginPass(device, first) == mrhi_success &&
+              mrhiReadBuffer(device, first, scene->d, 0, sizeof(values), &added) == mrhi_success &&
+              mrhiEndPass(device, first) == mrhi_success,
+          "read");
+    CHECK(AddIn(scene, one, 1.0f), "added 1");
+    CHECK(mrhiBeginPass(device, last) == mrhi_success &&
+              mrhiReadBuffer(device, last, scene->d, 0, sizeof(values), &again) == mrhi_success &&
+              mrhiReadBuffer(device, last, e, 0, sizeof(words), &marks) == mrhi_success &&
+              mrhiEndPass(device, last) == mrhi_success,
+          "read again");
+    Finish(device, 3);
+    const uint32_t twelve[8] = {13, 14, 15, 16, 17, 18, 19, 20};
+    const uint32_t thirteen[8] = {14, 15, 16, 17, 18, 19, 20, 21};
+    CHECK(Taken(device, added, (const uint8_t*)twelve, sizeof(twelve)),
+          "the first read after both additions");
+    CHECK(Taken(device, again, (const uint8_t*)thirteen, sizeof(thirteen)),
+          "the last read after the third");
+    CHECK(Taken(device, marks, (const uint8_t*)words, sizeof(words)), "the other upload");
+}
+
 // A multiview pass: one draw into two layers of a target, red in view 0
 // and green in view 1; on a device without multiview, the shader
 // reading the view index and a pass of two views refused.
@@ -3067,6 +3159,7 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
         CheckComputeSplit(&scene, timestamps);
         CheckStorageBindings(device);
     });
+    RUN("hazards.pass_classes", CheckPassClasses(&scene));
     if (features.pipelineStatisticsQuery)
     {
         RUN("api.statistics", CheckStatistics(&scene));

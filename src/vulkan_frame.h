@@ -2,10 +2,11 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // A Vulkan device's frames: a slot per frame in flight with its command
-// buffer, its transients' memory and objects, its mapped staging and
-// the readbacks it fills; the timeline semaphore whose value counts the
-// frames finished; and the queue of destroyed objects, retired once the
-// next frame submitted after their destruction finishes.
+// buffers and the batches it submits them in, its transients' memory and
+// objects, its mapped staging and the readbacks it fills; the timeline
+// semaphore whose value counts the frames finished, and one per lane for
+// the batches; and the queue of destroyed objects, retired once the next
+// frame submitted after their destruction finishes.
 
 #ifndef MAUL_RHI_SRC_VULKAN_FRAME_H
 #define MAUL_RHI_SRC_VULKAN_FRAME_H
@@ -21,6 +22,36 @@
 #define MRHI_VULKAN_POOLS            64
 #define MRHI_VULKAN_POOL_SETS        256
 #define MRHI_VULKAN_POOL_DESCRIPTORS 1024
+
+// The lanes a frame's passes are recorded in. Every pass class has one
+// with MAUL_RHI_VULKAN_SPLIT_LANES, each lane's passes running on the one
+// queue as submissions of their own that wait on the passes they follow
+// through the lanes' timeline semaphores; otherwise every class is
+// recorded in one lane, a frame's one submission.
+#ifdef MAUL_RHI_VULKAN_SPLIT_LANES
+#define MRHI_VULKAN_LANES 3
+#define MRHI_VULKAN_SPLIT true
+#else
+#define MRHI_VULKAN_LANES 1
+#define MRHI_VULKAN_SPLIT false
+#endif
+
+// The command buffers one batch submits at most: its parts with the
+// native passes' between them.
+#define MRHI_VULKAN_BATCH_SUBMITS (1 + 2 * MRHI_NATIVE_PASSES)
+
+// One submission of a frame: a lane's command buffers, a range of its
+// slot's submits; by lane, the timeline value it waits for (0 for none,
+// always for its own); and the value of its lane's timeline it signals,
+// 0 for none.
+typedef struct mrhiVulkanBatch
+{
+    uint32_t lane;
+    uint32_t firstSubmit;
+    uint32_t submitCount;
+    uint64_t waits[MRHI_VULKAN_LANES];
+    uint64_t signal;
+} mrhiVulkanBatch;
 
 // What a destroyed object waiting to retire is.
 typedef enum mrhiVulkanRetired
@@ -53,15 +84,21 @@ typedef struct mrhiVulkanRange
 typedef struct mrhiVulkanSlot
 {
     VkCommandPool pool;
-    // The command buffer the frame records into now: the first of its
-    // parts, then after each native pass the next.
+    // The command buffer the frame records into now, one of its parts: a
+    // batch's first, then after each native pass the next.
     VkCommandBuffer commands;
-    VkCommandBuffer parts[1 + MRHI_NATIVE_PASSES];
+    VkCommandBuffer* parts;
     uint32_t partsUsed;
-    // The command buffers the frame submits, in order: its parts with the
-    // native passes' between them.
-    VkCommandBufferSubmitInfo submits[1 + 2 * MRHI_NATIVE_PASSES];
+    // The command buffers the frame submits, each batch's together: its
+    // parts with the native passes' between them.
+    VkCommandBufferSubmitInfo* submits;
     uint32_t submitCount;
+    // The frame's batches, in the order they are submitted, and room for
+    // their submissions and semaphores.
+    mrhiVulkanBatch* batches;
+    uint32_t batchCount;
+    VkSubmitInfo2* infos;
+    VkSemaphoreSubmitInfo* semaphores;
     // The core's tag while its frame runs; 0 when idle.
     uint64_t tag;
     // The frame's serial, the timeline value its end signals.
@@ -99,6 +136,10 @@ typedef struct mrhiVulkanFrames
     VkDevice device;
     VkQueue queue;
     VkSemaphore timeline;
+    // Each lane's timeline semaphore, made only with more than one lane,
+    // and the last value given each.
+    VkSemaphore lanes[MRHI_VULKAN_LANES];
+    uint64_t laneValues[MRHI_VULKAN_LANES];
     VkFormat depthStencil;
     const VkPhysicalDeviceMemoryProperties* memory;
     mrhiVulkanObjects* objects;
@@ -107,6 +148,13 @@ typedef struct mrhiVulkanFrames
     mrhiVulkanSwapchains* swapchains;
     mrhiVulkanSlot* slots;
     uint32_t slotCount;
+    // The command buffers and batches each slot has.
+    uint32_t partLimit;
+    uint32_t batchLimit;
+    // While a frame records, by frame pass index: whether a pass of
+    // another lane follows it, and the batch it is in (an index plus one).
+    bool* followed;
+    uint32_t* passBatches;
     uint32_t readbackLimit;
     uint32_t viewLimit;
     // Frames submitted, and frames reported finished.
@@ -150,10 +198,11 @@ bool mrhiVulkanWaitFrame(mrhiVulkanFrames* frames, uint64_t tag, uint64_t timeou
 // Destroys an object once the next frame submitted finishes.
 void mrhiVulkanRetireLater(mrhiVulkanFrames* frames, mrhiVulkanRetired kind, uint64_t handle);
 
-// Records a frame's work into its slot's command buffer
-// (vulkan_record.c): mrhi_success, or mrhi_errorCapacity when views or
-// descriptor sets run out.
+// Records a frame's work into its slot's batches (vulkan_record.c):
+// mrhi_success, or mrhi_errorCapacity when views or descriptor sets run
+// out; resultOut is the device's failure to begin or end a command
+// buffer, VK_SUCCESS without one.
 mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
-                            const mrhiDriverFrame* frame);
+                            const mrhiDriverFrame* frame, VkResult* resultOut);
 
 #endif // MAUL_RHI_SRC_VULKAN_FRAME_H

@@ -117,6 +117,7 @@ jobs:
           - { preset: linux-gcc-14, setup: tools/ci_display.sh x11 }
           - { preset: linux-clang-20, setup: tools/ci_display.sh x11 }
           - { preset: linux-clang-20-asan, setup: tools/ci_display.sh x11, repeat: 3 }
+          - { preset: linux-lanes, setup: tools/ci_display.sh x11 }
           - { preset: linux-clang-20-tsan, setup: tools/ci_display.sh x11 }
           - { preset: linux-shared, setup: tools/ci_display.sh x11 }
           - { preset: linux-seam-x11, setup: tools/ci_display.sh x11 }

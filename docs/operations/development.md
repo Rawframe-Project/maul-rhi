@@ -32,7 +32,7 @@ cmake --build build
 ctest --test-dir build -LE integration   # the test driver only, no GPU
 ```
 
-The options a developer uses besides the user's: `MAUL_RHI_SANITIZE` (AddressSanitizer and UBSan), `MAUL_RHI_TSAN`, `MAUL_RHI_FUZZ` (the libFuzzer targets, Clang only), `MAUL_RHI_COVERAGE`, `MAUL_RHI_SEAM` (the check against Maul Window, which fetches it at configure time), `MAUL_RHI_CONFORMANCE_DRIVER` (a target defining an outside driver for the conformance suite) and `MAUL_RHI_D3D12_AGILITY` (the Agility SDK's `bin/x64` folder, copied into `D3D12/` beside the tests).
+The options a developer uses besides the user's: `MAUL_RHI_SANITIZE` (AddressSanitizer and UBSan), `MAUL_RHI_TSAN`, `MAUL_RHI_FUZZ` (the libFuzzer targets, Clang only), `MAUL_RHI_COVERAGE`, `MAUL_RHI_SEAM` (the check against Maul Window, which fetches it at configure time), `MAUL_RHI_CONFORMANCE_DRIVER` (a target defining an outside driver for the conformance suite), `MAUL_RHI_VULKAN_SPLIT_LANES` (the Vulkan driver's work submitted in a lane per pass class, for the `linux-lanes` cell) and `MAUL_RHI_D3D12_AGILITY` (the Agility SDK's `bin/x64` folder, copied into `D3D12/` beside the tests).
 
 ## Platform runs
 

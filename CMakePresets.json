@@ -48,6 +48,17 @@
       }
     },
     {
+      "name": "linux-lanes",
+      "displayName": "Clang 20, each pass class's Vulkan work submitted apart, AddressSanitizer and UBSan, the validation layer, assertions on",
+      "inherits": ["linux", "clang"],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MAUL_RHI_SANITIZE": "ON",
+        "MAUL_RHI_VALIDATION": "ON",
+        "MAUL_RHI_VULKAN_SPLIT_LANES": "ON"
+      }
+    },
+    {
       "name": "linux-clang-20-tsan",
       "displayName": "Clang 20, ThreadSanitizer, assertions on",
       "inherits": ["linux", "clang"],
@@ -148,6 +159,7 @@
     { "name": "linux-gcc-14", "configurePreset": "linux-gcc-14" },
     { "name": "linux-clang-20", "configurePreset": "linux-clang-20" },
     { "name": "linux-clang-20-asan", "configurePreset": "linux-clang-20-asan" },
+    { "name": "linux-lanes", "configurePreset": "linux-lanes" },
     { "name": "linux-clang-20-tsan", "configurePreset": "linux-clang-20-tsan" },
     { "name": "linux-shared", "configurePreset": "linux-shared" },
     { "name": "linux-seam-x11", "configurePreset": "linux-seam-x11", "targets": ["test_seam"] },
@@ -188,6 +200,7 @@
     { "name": "linux-gcc-14", "inherits": "lavapipe", "configurePreset": "linux-gcc-14" },
     { "name": "linux-clang-20", "inherits": "lavapipe", "configurePreset": "linux-clang-20" },
     { "name": "linux-clang-20-asan", "inherits": "lavapipe", "configurePreset": "linux-clang-20-asan" },
+    { "name": "linux-lanes", "inherits": "lavapipe", "configurePreset": "linux-lanes" },
     { "name": "linux-clang-20-tsan", "inherits": "lavapipe", "configurePreset": "linux-clang-20-tsan" },
     { "name": "linux-shared", "inherits": "lavapipe", "configurePreset": "linux-shared" },
     {

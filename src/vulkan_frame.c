@@ -2,9 +2,10 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // A Vulkan device's frames (vulkan_frame.h). Frames run in submission
-// order on one queue, each signalling the timeline semaphore with its
-// serial, so a poll reads one counter to know every frame finished, and
-// a slot is reused only once the core has been told its frame finished.
+// order on one queue, each as its batches (vulkan_lanes.h), its last
+// signalling the timeline semaphore with its serial, so a poll reads one
+// counter to know every frame finished, and a slot is reused only once
+// the core has been told its frame finished.
 
 #include "vulkan_frame.h"
 
@@ -79,7 +80,7 @@ static VkResult MakeSlot(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, uint32_
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .commandPool = slot->pool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1 + MRHI_NATIVE_PASSES,
+        .commandBufferCount = frames->partLimit,
     };
     result = frames->api->vkAllocateCommandBuffers(frames->device, &buffer, slot->parts);
     slot->commands = slot->parts[0];
@@ -93,10 +94,29 @@ static VkResult MakeSlot(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, uint32_
                       &slot->staging, &slot->stagingMemory, &slot->stagingBytes, &flags);
 }
 
+// Makes each lane's timeline semaphore, with more than one lane.
+static VkResult MakeLanes(mrhiVulkanFrames* frames)
+{
+    const VkSemaphoreTypeCreateInfo timeline = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+        .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+    };
+    const VkSemaphoreCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        .pNext = &timeline,
+    };
+    VkResult result = VK_SUCCESS;
+    for (uint32_t l = 0; MRHI_VULKAN_SPLIT && l < MRHI_VULKAN_LANES && result == VK_SUCCESS; ++l)
+    {
+        result = frames->api->vkCreateSemaphore(frames->device, &info, nullptr, &frames->lanes[l]);
+    }
+    return result;
+}
+
 mrhiResult mrhiVulkanFramesInit(mrhiVulkanFrames* frames, uint32_t family,
                                 const mrhiDeviceLimits* limits)
 {
-    VkResult result = VK_SUCCESS;
+    VkResult result = MakeLanes(frames);
     for (uint32_t i = 0; i < frames->slotCount && result == VK_SUCCESS; ++i)
     {
         result = MakeSlot(frames, &frames->slots[i], family, limits);
@@ -209,6 +229,10 @@ void mrhiVulkanFramesDestroy(mrhiVulkanFrames* frames)
     }
     frames->api->vkDestroyBuffer(frames->device, frames->readback, nullptr);
     frames->api->vkFreeMemory(frames->device, frames->readbackMemory, nullptr);
+    for (uint32_t l = 0; l < MRHI_VULKAN_LANES; ++l)
+    {
+        frames->api->vkDestroySemaphore(frames->device, frames->lanes[l], nullptr);
+    }
 }
 
 // Makes a transient's object and reports its memory requirements.
@@ -351,66 +375,97 @@ static VkResult MakeTransients(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
     return result;
 }
 
-// Records a frame into its slot and submits it, signalling its serial.
+// A timeline semaphore's value, waited for or signalled at any stage.
+static VkSemaphoreSubmitInfo Value(VkSemaphore semaphore, uint64_t value)
+{
+    return (VkSemaphoreSubmitInfo){
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+        .semaphore = semaphore,
+        .value = value,
+        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+    };
+}
+
+// A batch's submission, its lanes' waits and signal in the slot's room
+// for its semaphores.
+static VkSubmitInfo2 SubmitOf(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, uint32_t index)
+{
+    const mrhiVulkanBatch* batch = &slot->batches[index];
+    VkSemaphoreSubmitInfo* waits = &slot->semaphores[(size_t)index * (MRHI_VULKAN_LANES + 1)];
+    uint32_t waitCount = 0;
+    for (uint32_t l = 0; l < MRHI_VULKAN_LANES; ++l)
+    {
+        if (batch->waits[l] != 0)
+        {
+            waits[waitCount++] = Value(frames->lanes[l], batch->waits[l]);
+        }
+    }
+    VkSemaphoreSubmitInfo* signal = waits + MRHI_VULKAN_LANES;
+    *signal = Value(frames->lanes[batch->lane], batch->signal);
+    return (VkSubmitInfo2){
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .waitSemaphoreInfoCount = waitCount,
+        .pWaitSemaphoreInfos = waits,
+        .commandBufferInfoCount = batch->submitCount,
+        .pCommandBufferInfos = &slot->submits[batch->firstSubmit],
+        .signalSemaphoreInfoCount = batch->signal != 0 ? 1 : 0,
+        .pSignalSemaphoreInfos = signal,
+    };
+}
+
+// Submits a recorded frame's batches in one call. The first waits for its
+// surface images' acquires, and for the frame that used its slot before
+// it: the host saw that frame finish before reusing the slot's memory, so
+// the wait costs the GPU nothing, but it puts the reuse in the queue's own
+// order, where synchronization validation sees it. The last signals the
+// frame's serial and its images' presents. Each also waits for and
+// signals its lanes' values.
+static VkResult SubmitBatches(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
+                              const mrhiDriverFrame* frame)
+{
+    mrhiVulkanSwapchains* swapchains = frames->swapchains;
+    uint32_t images = mrhiVulkanPresentSemaphores(swapchains, frame, frames->submitted + 1);
+    bool reused = frames->submitted >= frames->slotCount;
+    swapchains->waits[0] =
+        Value(frames->timeline, reused ? frames->submitted + 1 - frames->slotCount : 0);
+    swapchains->signals[0] = Value(frames->timeline, frames->submitted + 1);
+    for (uint32_t i = 0; i < slot->batchCount; ++i)
+    {
+        slot->infos[i] = SubmitOf(frames, slot, i);
+    }
+    // The first batch waits for no lane: with one lane it is the frame's
+    // one batch, with more the query resets every lane waits for. The last,
+    // on the first lane, signals nothing a later batch waits for.
+    VkSubmitInfo2* first = &slot->infos[0];
+    VkSubmitInfo2* last = &slot->infos[slot->batchCount - 1];
+    MRHI_ASSERT(first->waitSemaphoreInfoCount == 0);
+    first->waitSemaphoreInfoCount = images + (reused ? 1 : 0);
+    first->pWaitSemaphoreInfos = reused ? swapchains->waits : swapchains->waits + 1;
+    last->signalSemaphoreInfoCount = images + 1;
+    last->pSignalSemaphoreInfos = swapchains->signals;
+    return frames->api->vkQueueSubmit2(frames->queue, slot->batchCount, slot->infos,
+                                       VK_NULL_HANDLE);
+}
+
+// Records a frame into its slot's batches and submits them, the last
+// signalling its serial.
 static VkResult Run(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, const mrhiDriverFrame* frame,
                     mrhiResult* statusOut)
 {
     VkResult result = frames->api->vkResetCommandPool(frames->device, slot->pool, 0);
-    const VkCommandBufferBeginInfo begin = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-    };
-    slot->commands = slot->parts[0];
-    slot->partsUsed = 1;
+    slot->partsUsed = 0;
     slot->submitCount = 0;
+    slot->batchCount = 0;
+    *statusOut = mrhi_success;
     if (result == VK_SUCCESS)
     {
-        result = frames->api->vkBeginCommandBuffer(slot->commands, &begin);
-    }
-    *statusOut = result == VK_SUCCESS ? mrhiVulkanRecord(frames, slot, frame) : mrhi_success;
-    if (result == VK_SUCCESS)
-    {
-        result = frames->api->vkEndCommandBuffer(slot->commands);
+        *statusOut = mrhiVulkanRecord(frames, slot, frame, &result);
     }
     if (result != VK_SUCCESS || *statusOut != mrhi_success)
     {
         return result;
     }
-    slot->submits[slot->submitCount++] = (VkCommandBufferSubmitInfo){
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-        .commandBuffer = slot->commands,
-    };
-    // The frame waits for its surface images' acquires and signals their
-    // presents beside its serial. It also waits for the frame that used
-    // its slot before it: the host saw that frame finish before reusing
-    // the slot's memory, so the wait costs the GPU nothing, but it puts
-    // the reuse in the queue's own order, where synchronization
-    // validation sees it.
-    mrhiVulkanSwapchains* swapchains = frames->swapchains;
-    uint32_t images = mrhiVulkanPresentSemaphores(swapchains, frame, frames->submitted + 1);
-    bool reused = frames->submitted >= frames->slotCount;
-    swapchains->waits[0] = (VkSemaphoreSubmitInfo){
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-        .semaphore = frames->timeline,
-        .value = reused ? frames->submitted + 1 - frames->slotCount : 0,
-        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-    };
-    swapchains->signals[0] = (VkSemaphoreSubmitInfo){
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-        .semaphore = frames->timeline,
-        .value = frames->submitted + 1,
-        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-    };
-    const VkSubmitInfo2 submit = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-        .waitSemaphoreInfoCount = images + (reused ? 1 : 0),
-        .pWaitSemaphoreInfos = reused ? swapchains->waits : swapchains->waits + 1,
-        .commandBufferInfoCount = slot->submitCount,
-        .pCommandBufferInfos = slot->submits,
-        .signalSemaphoreInfoCount = images + 1,
-        .pSignalSemaphoreInfos = swapchains->signals,
-    };
-    return frames->api->vkQueueSubmit2(frames->queue, 1, &submit, VK_NULL_HANDLE);
+    return SubmitBatches(frames, slot, frame);
 }
 
 mrhiResult mrhiVulkanSubmit(mrhiVulkanFrames* frames, const mrhiDriverFrame* frame, uint64_t tag)

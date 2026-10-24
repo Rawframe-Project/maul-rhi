@@ -13,6 +13,7 @@
 #include "vulkan_adapter.h"
 #include "vulkan_heap.h"
 #include "vulkan_label.h"
+#include "vulkan_lanes.h"
 #include "vulkan_pass.h"
 #include "vulkan_query.h"
 
@@ -553,36 +554,14 @@ static void RecordCommand(mrhiVulkanRecording* recording, const mrhiCommand* com
 }
 
 // Places a native pass: ends the part recorded so far, queues it and
-// the program's command buffer, and begins the next part with a
-// barrier that orders every later command after the program's and
-// makes its writes visible.
+// the program's command buffer in the pass's batch, and begins the next
+// part with a barrier that orders every later command after the
+// program's and makes its writes visible.
 static void RunNative(mrhiVulkanRecording* recording)
 {
     mrhiVulkanFrames* frames = recording->frames;
     mrhiVulkanSlot* slot = recording->slot;
-    MRHI_ASSERT(slot->partsUsed < 1 + MRHI_NATIVE_PASSES);
-    VkResult result = frames->api->vkEndCommandBuffer(slot->commands);
-    slot->submits[slot->submitCount++] = (VkCommandBufferSubmitInfo){
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-        .commandBuffer = slot->commands,
-    };
-    if (recording->pass->nativeCommands != nullptr)
-    {
-        slot->submits[slot->submitCount++] = (VkCommandBufferSubmitInfo){
-            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-            .commandBuffer = (VkCommandBuffer)recording->pass->nativeCommands,
-        };
-    }
-    slot->commands = slot->parts[slot->partsUsed++];
-    const VkCommandBufferBeginInfo begin = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-    };
-    if (result == VK_SUCCESS)
-    {
-        result = frames->api->vkBeginCommandBuffer(slot->commands, &begin);
-    }
-    if (result != VK_SUCCESS)
+    if (!mrhiVulkanNextPart(recording, recording->pass->nativeCommands))
     {
         recording->status = mrhi_errorCapacity;
         return;
@@ -602,8 +581,55 @@ static void RunNative(mrhiVulkanRecording* recording)
     frames->api->vkCmdPipelineBarrier2(slot->commands, &dependency);
 }
 
+// Records a kept pass in its lane's batch: its barriers, then the
+// program's command buffer for a native pass, or its label, timestamps
+// and commands.
+static void RecordPass(mrhiVulkanRecording* recording, size_t* barrier)
+{
+    mrhiVulkanFrames* frames = recording->frames;
+    const mrhiDriverFrame* frame = recording->frame;
+    mrhiVulkanEnterPass(recording);
+    if (recording->result != VK_SUCCESS)
+    {
+        return;
+    }
+    if (recording->pass->native)
+    {
+        Barriers(recording, barrier, recording->pass->id);
+        RunNative(recording);
+        mrhiVulkanLeavePass(recording);
+        return;
+    }
+    VkCommandBuffer commands = recording->slot->commands;
+    bool labelled = recording->pass->labelLength > 0;
+    if (labelled)
+    {
+        mrhiVulkanBeginLabel(frames->api, commands, recording->pass->label,
+                             recording->pass->labelLength);
+    }
+    Barriers(recording, barrier, recording->pass->id);
+    mrhiVulkanPassTimestamp(recording, false);
+    mrhiVulkanBeginPass(recording);
+    for (uint32_t chunk = recording->pass->firstChunk; chunk != 0;
+         chunk = frame->chunks[chunk - 1].next)
+    {
+        const mrhiCommandChunk* at = &frame->chunks[chunk - 1];
+        for (uint32_t i = 0; i < at->count; i += 1u + at->commands[i].payload)
+        {
+            RecordCommand(recording, &at->commands[i]);
+        }
+    }
+    mrhiVulkanEndPass(recording);
+    mrhiVulkanPassTimestamp(recording, true);
+    if (labelled)
+    {
+        mrhiVulkanEndLabel(frames->api, commands);
+    }
+    mrhiVulkanLeavePass(recording);
+}
+
 mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
-                            const mrhiDriverFrame* frame)
+                            const mrhiDriverFrame* frame, VkResult* resultOut)
 {
     mrhiVulkanRecording recording = {
         .frames = frames,
@@ -611,45 +637,28 @@ mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
         .frame = frame,
         .serial = frames->submitted + 1,
         .status = mrhi_success,
+        .result = VK_SUCCESS,
     };
-    mrhiVulkanResetQueries(&recording);
+    mrhiVulkanBeginLanes(&recording);
     size_t barrier = 0;
-    for (uint32_t p = 0; p < frame->passCount && recording.status == mrhi_success; ++p)
+    for (uint32_t p = 0;
+         p < frame->passCount && recording.status == mrhi_success && recording.result == VK_SUCCESS;
+         ++p)
     {
         recording.pass = &frame->passes[p];
-        if (recording.pass->native)
-        {
-            Barriers(&recording, &barrier, recording.pass->id);
-            RunNative(&recording);
-            continue;
-        }
-        bool labelled = recording.pass->labelLength > 0;
-        if (labelled)
-        {
-            mrhiVulkanBeginLabel(frames->api, slot->commands, recording.pass->label,
-                                 recording.pass->labelLength);
-        }
-        Barriers(&recording, &barrier, recording.pass->id);
-        mrhiVulkanPassTimestamp(&recording, false);
-        mrhiVulkanBeginPass(&recording);
-        for (uint32_t chunk = recording.pass->firstChunk; chunk != 0;
-             chunk = frame->chunks[chunk - 1].next)
-        {
-            const mrhiCommandChunk* at = &frame->chunks[chunk - 1];
-            for (uint32_t i = 0; i < at->count; i += 1u + at->commands[i].payload)
-            {
-                RecordCommand(&recording, &at->commands[i]);
-            }
-        }
-        mrhiVulkanEndPass(&recording);
-        mrhiVulkanPassTimestamp(&recording, true);
-        if (labelled)
-        {
-            mrhiVulkanEndLabel(frames->api, slot->commands);
-        }
+        RecordPass(&recording, &barrier);
     }
-    Barriers(&recording, &barrier, (mrhiPassId){0});
-    // The barriers run in pass order, so a recorded frame took them all.
-    MRHI_ASSERT(recording.status != mrhi_success || barrier == frame->barrierCount);
+    if (recording.status == mrhi_success && recording.result == VK_SUCCESS)
+    {
+        mrhiVulkanEndLanes(&recording);
+    }
+    if (recording.status == mrhi_success && recording.result == VK_SUCCESS)
+    {
+        Barriers(&recording, &barrier, (mrhiPassId){0});
+        mrhiVulkanCloseLanes(&recording);
+        // The barriers run in pass order, so a recorded frame took them all.
+        MRHI_ASSERT(barrier == frame->barrierCount);
+    }
+    *resultOut = recording.result;
     return recording.status;
 }

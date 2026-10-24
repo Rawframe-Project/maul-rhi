@@ -55,6 +55,10 @@ else()
     set(maul_rhi_vulkan_default ON)
 endif()
 option(MAUL_RHI_VULKAN_DRIVER "Build the Vulkan driver" ${maul_rhi_vulkan_default})
+# Each pass class's Vulkan work as submissions of its own on the one
+# queue, waiting on each other through timeline semaphores: a check of
+# the driver's batches, never a release build's.
+option(MAUL_RHI_VULKAN_SPLIT_LANES "Submit each pass class's Vulkan work apart (test only)" OFF)
 # The Metal driver, in Objective-C.
 option(MAUL_RHI_METAL_DRIVER "Build the Metal driver" ${APPLE})
 if(MAUL_RHI_METAL_DRIVER AND NOT APPLE)
@@ -160,12 +164,15 @@ endif()
 if(MAUL_RHI_VULKAN_DRIVER)
     target_sources(maul-rhi PRIVATE src/driver_vulkan.c src/vulkan_adapter.c src/vulkan_api.c
                                    src/vulkan_device.c src/vulkan_facts.c src/vulkan_frame.c src/vulkan_graphics.c
-                                   src/vulkan_heap.c src/vulkan_label.c src/vulkan_memory.c
+                                   src/vulkan_heap.c src/vulkan_label.c src/vulkan_lanes.c src/vulkan_memory.c
                                    src/vulkan_object.c src/vulkan_pass.c src/vulkan_pipeline.c
                                    src/vulkan_query.c src/vulkan_recipe.c src/vulkan_record.c
                                    src/vulkan_resource.c
                                    src/vulkan_surface.c src/vulkan_swapchain.c)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_VULKAN_DRIVER)
+    if(MAUL_RHI_VULKAN_SPLIT_LANES)
+        target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_VULKAN_SPLIT_LANES)
+    endif()
     # The Khronos headers, kept as published (khronos/README.md).
     target_include_directories(maul-rhi SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/khronos)
     target_link_libraries(maul-rhi PRIVATE ${CMAKE_DL_LIBS})
