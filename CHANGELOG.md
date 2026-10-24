@@ -7,21 +7,71 @@ may change the API, the ABI and every data format.
 
 ## [0.2.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.1.0...v0.2.0) (2026-10-24)
 
-
-### ⚠ BREAKING CHANGES
-
-* **graph:** a buffer read in a second read state now takes a barrier from the first. mrhiGetFrameBarriers lists it, and it counts against frameBarriers, so a frame near that limit can now fail mrhiCompileFrame with mrhi_errorCapacity. A host near the limit raises frameBarriers in its device def by the number of state changes between reads of its buffers.
-* **spi:** the driver SPI moves from version 6 to 7. A driver built outside the tree must be rebuilt against version 7, or the core refuses it with mrhi_errorVersion. mrhiDriverPass gains waitFor, which a driver running every pass on one queue in the frame's order may ignore.
+The core now tells a driver which passes of other classes each pass
+must follow, the first step to running async compute and transfer
+passes on queues of their own. Drivers built outside the tree must be
+rebuilt. A buffer read in two states after a write now takes the
+barrier it was missing, which can change how many barriers a frame
+needs.
 
 ### Added
 
-* **spi:** name the passes of other classes each pass must follow ([#66](https://github.com/Rawframe-Project/maul-rhi/issues/66)) ([32a9d6e](https://github.com/Rawframe-Project/maul-rhi/commit/32a9d6e1a6875a26571b83421ce13995f8f63258))
-* **vulkan:** record each pass class in a lane of its own ([#69](https://github.com/Rawframe-Project/maul-rhi/issues/69)) ([1d8fa6d](https://github.com/Rawframe-Project/maul-rhi/commit/1d8fa6dfb26d221826e8529b7cf0f2fee2707203)), closes [#68](https://github.com/Rawframe-Project/maul-rhi/issues/68)
+- `waitFor` in the driver interface: for each pass, the passes of other
+  classes it must follow, worked out from every resource use in the
+  frame, so a driver can run async compute and transfer passes on
+  queues of their own
+  ([#66](https://github.com/Rawframe-Project/maul-rhi/pull/66)).
+- `frames.md` says how to time compute and copy work: in a
+  graphics-class pass, as async compute and transfer passes take no
+  timestamps yet
+  ([#36](https://github.com/Rawframe-Project/maul-rhi/pull/36)).
 
+### Changed
+
+- **Breaking, for drivers built outside the tree:** the driver
+  interface is SPI version 7, and a table of version 6 is refused with
+  `mrhi_errorVersion`. `mrhiDriverPass` gains
+  `waitFor[MRHI_PASS_CLASSES]`: by class, the latest pass of that class
+  the pass must follow, a null id for none and always for its own
+  class. A driver that runs every pass on one queue in the frame's
+  order may ignore it, as every driver in the tree does. Drivers are
+  admitted on `conformance/mustpass/spi-7.txt`, which adds
+  `hazards.pass_classes` and `hazards.read_states` to the cases of
+  version 6, and may now be handed barriers between two read states of
+  a buffer ([#66](https://github.com/Rawframe-Project/maul-rhi/pull/66),
+  [#69](https://github.com/Rawframe-Project/maul-rhi/pull/69),
+  [#71](https://github.com/Rawframe-Project/maul-rhi/pull/71)).
+- **Breaking:** a buffer read in a second read state now takes a
+  barrier from the first. Before, the second read could miss the last write, and a later
+  write could overtake the first read. `mrhiGetFrameBarriers` lists
+  these barriers, and each counts against `frameBarriers`, so a frame
+  near that limit can now fail `mrhiCompileFrame` with
+  `mrhi_errorCapacity`. Raise `frameBarriers` in the device def by the
+  number of state changes between reads of your buffers
+  ([#71](https://github.com/Rawframe-Project/maul-rhi/pull/71)).
+- A device takes about 415 KB more from the program's allocator when it
+  is made, at the default limits, to track which passes of other classes
+  each pass follows
+  ([#66](https://github.com/Rawframe-Project/maul-rhi/pull/66)).
+- The library is built with `-fno-math-errno`, so `sqrt` is one
+  rounded instruction on every target, never a C library call
+  ([#49](https://github.com/Rawframe-Project/maul-rhi/pull/49),
+  [#55](https://github.com/Rawframe-Project/maul-rhi/pull/55)).
+- Debug and sanitizer builds trap on a broken internal invariant of the
+  frame graph, the heaps, shader containers and the Vulkan driver's
+  submissions; Release builds are unchanged
+  ([#39](https://github.com/Rawframe-Project/maul-rhi/pull/39),
+  [#66](https://github.com/Rawframe-Project/maul-rhi/pull/66),
+  [#69](https://github.com/Rawframe-Project/maul-rhi/pull/69)).
 
 ### Fixed
 
-* **graph:** barrier a buffer read in a second state ([#71](https://github.com/Rawframe-Project/maul-rhi/issues/71)) ([cff248f](https://github.com/Rawframe-Project/maul-rhi/commit/cff248fa0bdbeb175e665e57b21fcb3360bd3e3b))
+- Vulkan: after a frame failed to record, such as a native pass whose
+  next command buffer failed to begin, the next frame wrote timestamps
+  and queries into query sets it had not reset, and the failed command
+  buffer was still ended. A failed begin or end now stops the recording,
+  and every recording resets its query sets
+  ([#69](https://github.com/Rawframe-Project/maul-rhi/pull/69)).
 
 ## [0.1.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.0.1...v0.1.0) (2026-10-24)
 
