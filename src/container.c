@@ -838,7 +838,8 @@ static bool AreRecordsValid(mrhiContainer* container)
 
 // Takes the meta, strings and code sections. An absent section has size
 // 0, so the size checks require the meta and SPIR-V; the strings are
-// required by the entries' names, and the WGSL by entries using no heap.
+// required by the entries' names, and the WGSL unless an entry uses a heap
+// or the view index or the SPIR-V declares 64-bit integers.
 // A metallib has its magic; the Metal map, MSL, D3D12 map and DXIL are
 // checked with the records.
 static bool TakeParts(const uint8_t* bytes, const Section* sections, uint32_t count,

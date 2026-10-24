@@ -39,8 +39,18 @@ int main(void)
     memset(a, 'a', sizeof(a));
     CHECK(Hashes(a, 55, "9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318"),
           "55 bytes, padded in one block");
+    CHECK(Hashes(a, 56, "b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a"),
+          "56 bytes, the length past the first block");
+    CHECK(Hashes(a, 57, "f13b2d724659eb3bf47f2dd6af1accc87b81f09f59f2b75e5c0bed6589dfe8c6"),
+          "57 bytes");
+    CHECK(Hashes(a, 63, "7d3e74a05d7db15bce4ad9ec0658ea98e3f06eeecf16b4c6fff2da457ddc2f34"),
+          "a byte short of a block");
     CHECK(Hashes(a, 64, "ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb"),
           "one whole block");
+    CHECK(Hashes(a, 65, "635361c48bb9eab14198e76ea8ab7f1a41685d6ad62aa9146d301d4f17eb0ae0"),
+          "a byte past a block");
+    CHECK(Hashes(a, 128, "6836cf13bac400e9105071cd6af47084dfacad4e5e302c94bfed24e013afb73e"),
+          "two whole blocks");
     CHECK(Hashes(a, 1000, "41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3"),
           "a thousand bytes");
     return s_failures == 0 ? 0 : 1;

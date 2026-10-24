@@ -481,15 +481,18 @@ endif()
 
 # The fuzz targets: test/fuzz_<area>.c, run as fuzz_<area> <corpus dir>,
 # over the bytes programs load from disk and hand the library.
-# tools/container_seed.py writes fuzz_container's seed; fuzz_cache makes
-# its own envelopes.
+# tools/container_seed.py writes fuzz_container's seeds; fuzz_cache makes
+# its own envelopes. test/fuzz_coverage_ignore.txt names the sources
+# coverage leaves out.
 if(MAUL_RHI_FUZZ)
     # The library is instrumented too: its coverage guides libFuzzer, and
     # the sanitizers watch its code, not only the targets'. Undefined
     # behavior aborts the run, so libFuzzer writes the input that found it
     # instead of printing and going on.
+    set(ignored ${PROJECT_SOURCE_DIR}/test/fuzz_coverage_ignore.txt)
     target_compile_options(maul-rhi PRIVATE -fsanitize=fuzzer-no-link,address,undefined
-                                            -fno-sanitize-recover=all)
+                                            -fno-sanitize-recover=all
+                                            -fsanitize-coverage-ignorelist=${ignored})
     target_link_options(maul-rhi PUBLIC -fsanitize=address,undefined)
     foreach(area container cache)
         add_executable(fuzz_${area} test/fuzz_${area}.c)
