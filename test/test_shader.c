@@ -1451,9 +1451,11 @@ static mrhiDevice* OpenEverything(void)
 }
 
 // Reads a written container and checks what it holds: its digest in
-// hex, its entry and binding counts, its root block, and its heap uses,
-// on a device granting every feature a container can need.
-static int CheckFile(char** args)
+// hex, its entry and binding counts, its root block, and its heap uses.
+// It is read on a device without features (one granting both bindless
+// features for heap uses), or, when an eighth argument says "all", on one
+// granting every feature a container can need.
+static int CheckFile(char** args, bool all)
 {
     FILE* file = fopen(args[0], "rb");
     CHECK(file != nullptr, "the file opens");
@@ -1474,7 +1476,9 @@ static int CheckFile(char** args)
         digest[i / 2] = (uint8_t)(digest[i / 2] << 4 | value);
     }
     uint32_t heapUses = (uint32_t)atoi(args[5]);
-    mrhiDevice* device = OpenEverything();
+    mrhiDevice* device = all             ? OpenEverything()
+                         : heapUses == 0 ? Open(1, true)
+                                         : OpenBindless(true);
     mrhiShaderDef def = Def();
     mrhiShaderId shader;
     mrhiShaderInfo info = {0};
@@ -1492,9 +1496,9 @@ static int CheckFile(char** args)
 int main(int argc, char** argv)
 {
     ResetAdapter();
-    if (argc == 7)
+    if (argc == 7 || (argc == 8 && strcmp(argv[7], "all") == 0))
     {
-        return CheckFile(argv + 1);
+        return CheckFile(argv + 1, argc == 8);
     }
     TestDefault();
     TestHeader();

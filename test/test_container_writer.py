@@ -621,16 +621,28 @@ def main():
                            cs=dxbc("compute", DXIL["cs"] + [("u*", 0, 0xFFFFFFF0)]))
 
         # tools/container_seed.py's minimal seeds: each one the library
-        # reads, with the reflection it was written from.
+        # reads, with the reflection it was written from. A seed declaring
+        # no capability past Shader is read on a device without features,
+        # which refuses one that needs a feature; only the 64-bit integer
+        # and view index seeds are read on a device granting every feature.
         with open(mrhi_container.CONTRACT, encoding="utf-8") as f:
             enums = mrhi_container.Enums(json.load(f))
-        for name, data, (entries, bindings, root, heaps) in container_seed.minimal(enums):
+        for name, data, facts in container_seed.minimal(enums):
+            entries, bindings, root, heaps, needs = facts
             output = os.path.join(folder, f"{name}.mrsc")
             with open(output, "wb") as f:
                 f.write(data)
+            declared = mrhi_container.capabilities(section(data, 8) or b"")
+            check(declared == {1, *needs},
+                  f"the seed {name} declares the capabilities {sorted(declared)}")
             digest = hashlib.sha256(data[48:]).hexdigest()
             args = [test_shader, output, digest, str(entries), str(bindings), str(root),
                     str(heaps)]
+            if needs:
+                result = subprocess.run(args, capture_output=True, text=True)
+                check(result.returncode != 0,
+                      f"the seed {name} is refused on a device without features")
+                args.append("all")
             result = subprocess.run(args, capture_output=True, text=True)
             check(result.returncode == 0, f"the library reads the seed {name}: {result.stdout}")
             check(len(data) < 1024, f"the seed {name} stays under a kilobyte")

@@ -138,7 +138,8 @@ def dxil(entry, ranges):
 
 def minimal(enums):
     """Each minimal seed's name, bytes and what the library reads of it:
-    entries, bindings, root block bytes and heap uses."""
+    entries, bindings, root block bytes, heap uses, and the SPIR-V
+    capabilities it declares beyond Shader, which a device must grant."""
     uses = {"sampled_textures": 1, "storage_textures": 2, "storage_buffers": 4, "samplers": 8,
             "writes": 16}
     seeds = []
@@ -160,7 +161,8 @@ def minimal(enums):
         for use in heaps:
             heap_bits |= uses[use]
         seeds.append((name, data, (len(entries), len(reflection.get("bindings", [])),
-                                   reflection.get("root_block_bytes", 0), heap_bits)))
+                                   reflection.get("root_block_bytes", 0), heap_bits,
+                                   tuple(capabilities))))
     return seeds
 
 
