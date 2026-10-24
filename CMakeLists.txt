@@ -429,6 +429,17 @@ if(MAUL_RHI_BUILD_TESTS)
                              ENVIRONMENT MAUL_RHI_REQUIRE_SURFACE=1)
     endif()
     maul_add_header_tests()
+    # A shared build exports the public functions and nothing else: the
+    # internal functions and tables stay hidden.
+    if(MAUL_RHI_BUILD_SHARED AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        find_package(Python3 COMPONENTS Interpreter)
+        if(Python3_Interpreter_FOUND)
+            add_test(NAME exports COMMAND Python3::Interpreter
+                                          ${PROJECT_SOURCE_DIR}/tools/check_exports.py
+                                          $<TARGET_FILE:maul-rhi>)
+            set_tests_properties(exports PROPERTIES LABELS exports)
+        endif()
+    endif()
     # The suite on a driver from outside the tree: a target defining
     # mrhiConformanceDriver(mrhiExternalDriverDef*), named by
     # MAUL_RHI_CONFORMANCE_DRIVER. Without one, a Linux build hands the
