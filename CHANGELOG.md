@@ -5,6 +5,19 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.1.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.0.1...v0.1.0) (2026-10-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **pipeline:** graphics pipeline creation refuses state the shader's reflection does not take (vertex inputs, fragment outputs and targets, the stage interface, fragment depth, the written sample mask) with mrhi_errorFormat instead of mrhi_errorInvalid, and counts no misuse for it. Dual-source blending whose fragment entry has no second source is mrhi_errorFormat too, where it was mrhi_errorUnsupported.
+* **shader:** shader and pipeline creation refuse bad data with the new result mrhi_errorFormat instead of mrhi_errorInvalid, and count no misuse for it: a damaged shader container, and an entry, constants or a constant value the shader's reflection does not take. mrhiParseContainer returns mrhi_errorFormat, and the driver interface moves to SPI version 6.
+
+### Fixed
+
+* **pipeline:** refuse graphics state the shader rejects as format ([#27](https://github.com/Rawframe-Project/maul-rhi/issues/27)) ([ddb0070](https://github.com/Rawframe-Project/maul-rhi/commit/ddb007055610074091f2b2db66498ad3bc97b2a8)), closes [#23](https://github.com/Rawframe-Project/maul-rhi/issues/23)
+* **shader:** refuse bad shader data with mrhi_errorFormat ([#22](https://github.com/Rawframe-Project/maul-rhi/issues/22)) ([d0f62a3](https://github.com/Rawframe-Project/maul-rhi/commit/d0f62a328f782487bbaa5e03d3ee9ea132692834)), closes [#21](https://github.com/Rawframe-Project/maul-rhi/issues/21)
+
 ## [0.0.1](https://github.com/Rawframe-Project/maul-rhi/releases/tag/v0.0.1) (2026-10-23)
 
 The first release: one GPU API over Vulkan, Direct3D 12, Metal and
