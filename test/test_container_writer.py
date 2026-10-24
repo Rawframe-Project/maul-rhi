@@ -249,17 +249,59 @@ def main():
             failures.append(message)
             print(f"FAIL: {message}")
 
+    # The containers the library is to read, each with what test_shader
+    # checks and whether it reads or refuses it. They are read together
+    # at the end, in one process, as a process per file would make the
+    # test slow.
+    reads = []
+
+    def library_reads(folder, data, fields, message, expected="read"):
+        path = os.path.join(folder, f"read{len(reads)}.mrsc")
+        with open(path, "wb") as f:
+            f.write(data)
+        reads.append(([path, hashlib.sha256(data[48:]).hexdigest(), *fields], expected, message))
+
+    def read_all(folder):
+        listed = os.path.join(folder, "reads.txt")
+        with open(listed, "w", encoding="utf-8") as f:
+            f.writelines("\t".join(line) + "\n" for line, _, _ in reads)
+        result = subprocess.run([test_shader, "--files", listed], capture_output=True, text=True)
+        answers = {}
+        printed = []
+        for text in result.stdout.splitlines():
+            head, _, answer = text.partition(": ")
+            if head.startswith("file ") and answer in ("read", "refused"):
+                answers[int(head[5:])] = (answer, " ".join(printed))
+                printed = []
+            else:
+                printed.append(text)
+        check(len(answers) == len(reads),
+              f"test_shader answers every file: {result.stdout[-2000:]} {result.stderr[-2000:]}")
+        for n, (_, expected, message) in enumerate(reads):
+            answer, printed = answers.get(n, ("no answer", ""))
+            check(answer == expected, f"{message}: {answer} {printed}")
+
     with tempfile.TemporaryDirectory() as folder:
+        # The writer reads the contract's enums alone, and reads the whole
+        # contract for each container; the test writes about a hundred, so
+        # it gives the writer a copy holding the enums' names and values.
+        with open(mrhi_container.CONTRACT, encoding="utf-8") as f:
+            contract = json.load(f)
+        mrhi_container.CONTRACT = os.path.join(folder, "contract.json")
+        with open(mrhi_container.CONTRACT, "w", encoding="utf-8") as f:
+            json.dump({"headers": [{"items": [
+                {"name": item["name"],
+                 "values": [{"name": v["name"], "value": v["value"]} for v in item["values"]]}
+                for header in contract["headers"] for item in header["items"]
+                if "values" in item]}]}, f)
         code = spirv(SPIRV_ENTRIES, SPIRV_BINDINGS)
         status, errors, output = write(folder, code, WGSL, REFLECTION)
         check(status == 0, f"the container is written: {errors}")
         if status == 0:
             with open(output, "rb") as f:
                 data = f.read()
-            digest = hashlib.sha256(data[48:]).hexdigest()
-            args = [test_shader, output, digest, "3", str(len(REFLECTION["bindings"])), "16", "0"]
-            result = subprocess.run(args, capture_output=True, text=True)
-            check(result.returncode == 0, f"the library reads it: {result.stdout}")
+            library_reads(folder, data, ["3", str(len(REFLECTION["bindings"])), "16", "0"],
+                          "the library reads it")
             check(constants(data) == [(0, 4, 0x3F800000, 0), (1, 2, 0xFFFFFFFE, 0),
                                       (2, 1, 1, 0), (3, 3, 0, 1)],
                   "the constants' types, default bits and required flags")
@@ -281,11 +323,9 @@ def main():
         if status == 0:
             with open(output, "rb") as f:
                 data = f.read()
-            digest = hashlib.sha256(data[48:]).hexdigest()
-            args = [test_shader, output, digest, "3", str(len(REFLECTION["bindings"])), "16",
-                    str(1 | 4 | 8 | 16)]
-            result = subprocess.run(args, capture_output=True, text=True)
-            check(result.returncode == 0, f"the library reads it: {result.stdout}")
+            library_reads(folder, data,
+                          ["3", str(len(REFLECTION["bindings"])), "16", str(1 | 4 | 8 | 16)],
+                          "the library reads the container using heaps")
             entries = section(data, 3) or b""
             check([struct.unpack_from("<44xI", entries, at)[0]
                    for at in range(0, len(entries), 48)] == [0, 1 | 8, 4 | 16],
@@ -433,10 +473,8 @@ def main():
                 return None
             with open(output, "rb") as f:
                 data = f.read()
-            digest = hashlib.sha256(data[48:]).hexdigest()
-            args = [test_shader, output, digest, "3", str(len(REFLECTION["bindings"])), "16", "0"]
-            result = subprocess.run(args, capture_output=True, text=True)
-            check(result.returncode == 0, f"the library reads {what}: {result.stdout}")
+            library_reads(folder, data, ["3", str(len(REFLECTION["bindings"])), "16", "0"],
+                          f"the library reads {what}")
             return data
 
         data = read_back(metal_options(folder, msl=MSL), "MSL")
@@ -629,23 +667,19 @@ def main():
             enums = mrhi_container.Enums(json.load(f))
         for name, data, facts in container_seed.minimal(enums):
             entries, bindings, root, heaps, needs = facts
-            output = os.path.join(folder, f"{name}.mrsc")
-            with open(output, "wb") as f:
-                f.write(data)
             declared = mrhi_container.capabilities(section(data, 8) or b"")
             check(declared == {1, *needs},
                   f"the seed {name} declares the capabilities {sorted(declared)}")
-            digest = hashlib.sha256(data[48:]).hexdigest()
-            args = [test_shader, output, digest, str(entries), str(bindings), str(root),
-                    str(heaps)]
+            fields = [str(entries), str(bindings), str(root), str(heaps)]
             if needs:
-                result = subprocess.run(args, capture_output=True, text=True)
-                check(result.returncode != 0,
-                      f"the seed {name} is refused on a device without features")
-                args.append("all")
-            result = subprocess.run(args, capture_output=True, text=True)
-            check(result.returncode == 0, f"the library reads the seed {name}: {result.stdout}")
+                library_reads(folder, data, fields,
+                              f"the seed {name} is refused on a device without features",
+                              expected="refused")
+                fields.append("all")
+            library_reads(folder, data, fields, f"the library reads the seed {name}")
             check(len(data) < 1024, f"the seed {name} stays under a kilobyte")
+
+        read_all(folder)
     return 1 if failures else 0
 
 
