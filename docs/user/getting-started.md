@@ -2,6 +2,12 @@
 
 Maul RHI puts one API over Vulkan, Direct3D 12, Metal and WebGPU. A program opens an instance, asks it for adapters, opens a device on one, and sends work to the device as frames. This page covers building the library, the rules every call follows, and opening a first device.
 
+## Contents
+
+- [Building and linking](#building-and-linking)
+- [Opening a device](#opening-a-device)
+- [The rules every call follows](#the-rules-every-call-follows)
+
 ## Building and linking
 
 Maul RHI needs CMake 3.25 and GCC 14 or Clang 19 or newer; on Windows, `clang-cl` (Visual Studio's "C++ Clang tools for Windows").

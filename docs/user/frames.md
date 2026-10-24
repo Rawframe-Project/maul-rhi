@@ -2,6 +2,14 @@
 
 All GPU work reaches a device as a frame. A frame declares its resources and passes up front; the library culls what nothing needs, plans the barriers and places transient memory, the program records each pass, and the driver translates the frame at submission. There are no barriers, states, fences or semaphores in the API, so a hazard cannot be written.
 
+## Contents
+
+- [Resources](#resources)
+- [A frame, step by step](#a-frame-step-by-step)
+- [Moving bytes](#moving-bytes)
+- [Draws beyond the basics](#draws-beyond-the-basics)
+- [Queries](#queries)
+
 ## Resources
 
 **Device objects** outlive frames: buffers (`mrhiCreateBuffer`), textures (`mrhiCreateTexture`) and their views (`mrhiCreateView`), samplers and query sets. A texture's usages are fixed when it is made, and its view formats may name only its sRGB or linear twin. Destroying an object that a submitted frame still uses is safe: the driver keeps it until that frame has finished.
