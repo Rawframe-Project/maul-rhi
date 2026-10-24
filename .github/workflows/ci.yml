@@ -200,10 +200,11 @@ jobs:
 
   # Each fuzz target over the bytes programs load from disk and hand the
   # library (shader containers and pipeline caches), from its seeds:
-  # briefly on a pull request, longer on main and at night.
+  # briefly on a pull request, longer on main. The nightly run is
+  # fuzz-nightly.
   fuzz:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || github.event_name == 'push')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     container: ghcr.io/rawframe-project/ci-cpp:2026.10.6@sha256:50c383f608f992c272196139d749f15978e35143a2876362b1e0aef6993480bd
@@ -249,6 +250,126 @@ jobs:
             leak-*
             timeout-*
             oom-*
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The fuzz targets, one per test/fuzz_*.c, for fuzz-nightly's matrix.
+  fuzz-targets:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    outputs:
+      targets: ${{ steps.list.outputs.targets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: list
+        run: echo "targets=$(cd test && ls fuzz_*.c | sed 's/\.c$//' | jq -R . | jq -cs .)" >>"$GITHUB_OUTPUT"
+
+  # Every night each target fuzzes ten minutes, in a job of its own so that
+  # the targets run at once, from its seeds and its corpus of the nights
+  # before, carried in an Actions cache. The seeds are the floor:
+  # fuzz_container's are what tools/container_seed.py writes, and
+  # fuzz_cache has none, as the target builds each envelope from the
+  # input's first byte. The cache is keyed by the target and by the fuzz
+  # build's inputs (the library, its CMake, the target and the compiler), so
+  # an unchanged build restores its own corpus exactly; a target whose build
+  # changed restores its latest corpus of an earlier build, since a corpus
+  # is only inputs, which stay valid against a new binary. After the run
+  # the fuzzer's merge minimizes the seeds and the corpus together against
+  # this binary, and the result is saved for the next night. The summary
+  # compares the seeds' coverage with the corpus's, and the corpus is
+  # uploaded, to pick inputs worth adding to the seeds.
+  fuzz-nightly:
+    needs: fuzz-targets
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.fuzz-targets.outputs.targets) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.6@sha256:50c383f608f992c272196139d749f15978e35143a2876362b1e0aef6993480bd
+    permissions:
+      contents: read
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build
+        env:
+          INPUTS: ${{ hashFiles('src/**', 'include/**', 'cmake/**', 'CMakeLists.txt', 'test/fuzz_coverage_ignore.txt', format('test/{0}.c', matrix.target)) }}
+        run: |
+          cmake -B out/fuzz -G Ninja -DCMAKE_C_COMPILER=clang-20 -DMAUL_RHI_FUZZ=ON \
+            -DMAUL_RHI_BUILD_TESTS=OFF -DMAUL_RHI_WERROR=ON
+          cmake --build out/fuzz --target "$TARGET"
+          [ -x "out/fuzz/$TARGET" ] || { echo "::error::$TARGET was not built"; exit 1; }
+          compiler=$(clang-20 --version | head -1 | sha256sum | cut -c1-16)
+          echo "CORPUS_KEY=corpus-$TARGET-$INPUTS-$compiler" >>"$GITHUB_ENV"
+      - name: Seeds
+        run: |
+          mkdir -p "out/seeds/$TARGET"
+          if [ "$TARGET" = fuzz_container ]; then
+            python3 tools/container_seed.py "out/seeds/$TARGET" >/dev/null
+          fi
+      - name: Restore the corpus
+        id: restore
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/corpus/${{ matrix.target }}
+          key: ${{ env.CORPUS_KEY }}-${{ github.run_id }}
+          # This build's corpus, else the target's from an earlier build:
+          # its inputs stay valid, and the merge re-scores them.
+          restore-keys: |
+            ${{ env.CORPUS_KEY }}-
+            corpus-${{ matrix.target }}-
+      - name: Fuzz
+        run: |
+          mkdir -p "out/corpus/$TARGET" out/findings
+          "out/fuzz/$TARGET" -max_total_time=600 -artifact_prefix=out/findings/ \
+            "out/corpus/$TARGET" "out/seeds/$TARGET"
+      - name: Minimize the corpus
+        env:
+          MATCHED: ${{ steps.restore.outputs.cache-matched-key }}
+        run: |
+          # Minimized together: the files of the seeds and the corpus that
+          # keep every feature either reaches, seeds among them.
+          mkdir -p out/merged
+          "out/fuzz/$TARGET" -merge=1 out/merged "out/seeds/$TARGET" "out/corpus/$TARGET"
+          rm -rf "out/corpus/$TARGET"
+          mv out/merged "out/corpus/$TARGET"
+          coverage() { "out/fuzz/$TARGET" -runs=0 "$@" 2>&1 | sed -n 's/.*INITED cov: \([0-9]*\).*/\1/p'; }
+          case "$MATCHED" in
+          "") restored="none: the seeds alone" ;;
+          "$CORPUS_KEY"-*) restored="this build's" ;;
+          *) restored="an earlier build's" ;;
+          esac
+          {
+            echo "| Target | Corpus restored | Seeds' coverage | Corpus's coverage | Corpus files |"
+            echo "|---|---|---|---|---|"
+            echo "| \`$TARGET\` | $restored | $(coverage "out/seeds/$TARGET") | $(coverage "out/corpus/$TARGET") | $(ls "out/corpus/$TARGET" | wc -l) |"
+          } >>"$GITHUB_STEP_SUMMARY"
+      - name: Save the corpus
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/corpus/${{ matrix.target }}
+          key: ${{ env.CORPUS_KEY }}-${{ github.run_id }}
+      - name: Upload the corpus
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: corpus-${{ matrix.target }}
+          path: out/corpus/${{ matrix.target }}/
+          retention-days: 7
+      - name: Upload the findings
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: findings-${{ matrix.target }}
+          path: out/findings/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -386,7 +507,8 @@ jobs:
   # ruleset.
   required:
     if: always()
-    needs: [changes, docs, zizmor, checks, build, msvc-headers, web-emscripten, fuzz, windows-d3d12-states, android-emulator, ios-simulator]
+    needs: [changes, docs, zizmor, checks, build, msvc-headers, web-emscripten, fuzz, fuzz-targets,
+            fuzz-nightly, windows-d3d12-states, android-emulator, ios-simulator]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     permissions: {}
