@@ -3,8 +3,8 @@
 //
 // Graphics pipelines on a test driver device: from one def that is
 // valid, each rule of WebGPU's render pipeline validation broken once,
-// invalid when it contradicts itself or the shader and unsupported when
-// the device cannot do it.
+// invalid when it contradicts itself, format when the shader refuses it
+// and unsupported when the device cannot do it.
 
 #include "test_container.h"
 #include "test_device_setup.h"
@@ -339,10 +339,10 @@ static void TestAttributes(void)
     CHECK(Made(device, &def) == mrhi_errorUnsupported, "a location past the limit");
     def = Def();
     s_attributes[0].location = 4;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "an input without an attribute");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "an input without an attribute");
     def = Def();
     s_attributes[0].format = mrhi_vertexUint32x3;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "unsigned integers for a float input");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "unsigned integers for a float input");
     def = Def();
     s_attributes[0].format = mrhi_vertexUnorm8x4;
     CHECK(Made(device, &def) == mrhi_success, "normalized bytes for a float input");
@@ -377,9 +377,9 @@ static void TestAttributes(void)
     s_buffers[0].stride = 8;
     CHECK(Made(device, &def) == mrhi_success, "unsigned shorts for an unsigned input");
     s_attributes[0].format = mrhi_vertexSint16x4;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "signed shorts for an unsigned input");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "signed shorts for an unsigned input");
     s_attributes[0].format = mrhi_vertexUnorm16x4;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "normalized shorts for an unsigned input");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "normalized shorts for an unsigned input");
     Close(device);
 }
 
@@ -562,7 +562,7 @@ static void TestDepthStencil(void)
     Put32(Record(ENTRIES, 1, 48) + 36, mrhi_builtinFragDepth);
     device = OpenWithShader(mrhiDefaultDeviceDef());
     def = Def();
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "a fragment depth without a depth format");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "a fragment depth without a depth format");
     def.depthStencilFormat = mrhi_formatDepthStencil;
     CHECK(Made(device, &def) == mrhi_success, "a fragment depth with one");
     Close(device);
@@ -598,7 +598,7 @@ static void TestTargets(void)
     def = Def();
     def.colorTargets[1].format = mrhi_formatRgba8Unorm;
     def.colorTargetCount = 2;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "a written target without an output");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "a written target without an output");
     def.colorTargets[1].writeMask = 0;
     CHECK(Made(device, &def) == mrhi_success, "an unwritten target without an output");
     def = Def();
@@ -607,9 +607,9 @@ static void TestTargets(void)
     CHECK(Made(device, &def) == mrhi_errorInvalid, "a blend on no target");
     def = Def();
     def.colorTargets[0].format = mrhi_formatR32Uint;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "floats for an unsigned target");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "floats for an unsigned target");
     def.colorTargets[0].format = mrhi_formatR32Sint;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "floats for a signed target");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "floats for a signed target");
     def.colorTargets[0].format = mrhi_formatR32Float;
     CHECK(Made(device, &def) == mrhi_success, "four floats for one channel");
     Close(device);
@@ -624,17 +624,17 @@ static void TestTargets(void)
     Record(OUTPUTS, 0, 8)[5] = 3;
     device = OpenWithShader(mrhiDefaultDeviceDef());
     def = Def();
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "three components for four channels");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "three components for four channels");
     def.colorTargets[0].format = mrhi_formatRg8Unorm;
     CHECK(Made(device, &def) == mrhi_success, "three components for two channels");
     def.colorTargets[0].blend = true;
     def.colorTargets[0].color.srcFactor = mrhi_blendSrcAlpha;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "blending by an alpha the output lacks");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "blending by an alpha the output lacks");
     def.colorTargets[0].color.srcFactor = mrhi_blendOne;
     def.colorTargets[0].color.dstFactor = mrhi_blendOneMinusSrcAlpha;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "and by its complement");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "and by its complement");
     def.colorTargets[0].color.dstFactor = mrhi_blendSrcAlphaSaturated;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "and saturated");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "and saturated");
     def.colorTargets[0].color.dstFactor = mrhi_blendOneMinusSrc;
     def.colorTargets[0].alpha.srcFactor = mrhi_blendSrcAlpha;
     CHECK(Made(device, &def) == mrhi_success, "blending without reading the source alpha");
@@ -650,11 +650,12 @@ static void TestDualSource(void)
     def.colorTargets[0].blend = true;
     def.colorTargets[0].color =
         (mrhiBlendComponent){mrhi_blendSrc1, mrhi_blendOneMinusSrc1, mrhi_blendAdd};
-    CHECK(Made(device, &def) == mrhi_errorUnsupported, "a second source without the feature");
+    CHECK(Made(device, &def) == mrhi_errorFormat,
+          "a second source the shader lacks, without the feature");
     def.colorTargets[0].color = (mrhiBlendComponent){mrhi_blendOne, mrhi_blendZero, mrhi_blendAdd};
     def.colorTargets[0].alpha =
         (mrhiBlendComponent){mrhi_blendZero, mrhi_blendOneMinusSrc1Alpha, mrhi_blendAdd};
-    CHECK(Made(device, &def) == mrhi_errorUnsupported, "its alpha without the feature");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "its alpha, which the shader lacks too");
     def.colorTargets[0].blend = false;
     CHECK(Made(device, &def) == mrhi_success, "the factors of a target that does not blend");
     Close(device);
@@ -679,7 +680,7 @@ static void TestDualSource(void)
     def.colorTargets[0].blend = true;
     def.colorTargets[0].color =
         (mrhiBlendComponent){mrhi_blendSrc1Alpha, mrhi_blendOneMinusSrc1, mrhi_blendAdd};
-    CHECK(Made(device, &def) == mrhi_errorUnsupported, "a fragment entry without a second source");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "a fragment entry without a second source");
     Close(device);
     ResetAdapter();
     s_adapter.features.dualSourceBlending = true;
@@ -718,10 +719,10 @@ static void TestDualSource(void)
     CHECK(Made(device, &def) == mrhi_success, "three components blended by the second source");
     def.colorTargets[0].color =
         (mrhiBlendComponent){mrhi_blendSrc1Alpha, mrhi_blendZero, mrhi_blendAdd};
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "by its alpha, which they lack");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "by its alpha, which they lack");
     def.colorTargets[0].color =
         (mrhiBlendComponent){mrhi_blendOne, mrhi_blendOneMinusSrc1Alpha, mrhi_blendAdd};
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "by its alpha's complement");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "by its alpha's complement");
     Close(device);
 }
 
@@ -855,7 +856,7 @@ static void TestMultisample(void)
     def.sampleCount = 4;
     CHECK(Made(device, &def) == mrhi_success, "a written sample mask");
     def.alphaToCoverage = true;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "with alpha to coverage");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "with alpha to coverage");
     Close(device);
     // rgba32float that multisamples but cannot blend.
     ResetAdapter();
@@ -905,7 +906,7 @@ static void TestInterface(void)
         mrhiDevice* device = WithInput(cases[i].type, cases[i].components, cases[i].interpolation,
                                        cases[i].sampling);
         mrhiGraphicsPipelineDef def = Def();
-        CHECK(Made(device, &def) == mrhi_errorInvalid &&
+        CHECK(Made(device, &def) == mrhi_errorFormat &&
                   Refusal(device) == mrhi_diagnosticGraphicsInterface,
               cases[i].what);
         Close(device);
@@ -915,13 +916,13 @@ static void TestInterface(void)
     Variable(VARIABLES, 1, 0, mrhi_scalarUint32, 2, mrhi_interpolationFlat, mrhi_samplingFirst);
     mrhiDevice* device = OpenWithShader(mrhiDefaultDeviceDef());
     mrhiGraphicsPipelineDef flat = Def();
-    CHECK(Made(device, &flat) == mrhi_errorInvalid, "only the type differs");
+    CHECK(Made(device, &flat) == mrhi_errorFormat, "only the type differs");
     Close(device);
     Reset();
     Put32(Record(VARIABLES, 1, 8), 1);
     device = OpenWithShader(mrhiDefaultDeviceDef());
     mrhiGraphicsPipelineDef def = Def();
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "an input no output writes");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "an input no output writes");
     Close(device);
     // A vertex entry writing as many variables as the limit leaves none
     // for a point's size.
@@ -962,7 +963,7 @@ static void TestHalfFloats(void)
     mrhiGraphicsPipelineDef def = Def();
     CHECK(Made(device, &def) == mrhi_success, "16-bit floats for a float target");
     def.colorTargets[0].format = mrhi_formatR32Uint;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "but not for an unsigned one");
+    CHECK(Made(device, &def) == mrhi_errorFormat, "but not for an unsigned one");
     Close(device);
     ResetAdapter();
 }
@@ -978,6 +979,49 @@ static void TestDriverFailure(void)
           "nothing to answer");
     Close(device);
     ResetAdapter();
+}
+
+// State the shader's reflection refuses is bad data: format under its
+// check's code, counting no misuse. Invalid input outranks it, and it
+// outranks what the device cannot do.
+static void TestBadState(void)
+{
+    mrhiDevice* device = Open();
+    mrhiGraphicsPipelineDef def = Def();
+    s_attributes[0].location = 4;
+    CHECK(Made(device, &def) == mrhi_errorFormat &&
+              Refusal(device) == mrhi_diagnosticGraphicsVertex,
+          "an input without an attribute");
+    def = Def();
+    def.colorTargets[0].format = mrhi_formatR32Uint;
+    CHECK(Made(device, &def) == mrhi_errorFormat &&
+              Refusal(device) == mrhi_diagnosticGraphicsTargets,
+          "floats for an unsigned target");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "neither is misuse");
+    // The unsupported primitive is checked before the refused target.
+    def = Def();
+    def.unclippedDepth = true;
+    def.colorTargets[0].format = mrhi_formatR32Uint;
+    CHECK(Made(device, &def) == mrhi_errorFormat &&
+              Refusal(device) == mrhi_diagnosticGraphicsTargets,
+          "format over unsupported");
+    def = Def();
+    s_attributes[0].location = 4;
+    def.topology = 99;
+    CHECK(Made(device, &def) == mrhi_errorInvalid &&
+              Refusal(device) == mrhi_diagnosticGraphicsPrimitive,
+          "invalid over format");
+    CHECK(mrhiGetDeviceMisuse(device) == 1, "only the invalid one counted");
+    Close(device);
+    Reset();
+    Put32(Record(ENTRIES, 1, 48) + 36, mrhi_builtinFragDepth);
+    device = OpenWithShader(mrhiDefaultDeviceDef());
+    def = Def();
+    CHECK(Made(device, &def) == mrhi_errorFormat &&
+              Refusal(device) == mrhi_diagnosticGraphicsDepthStencil &&
+              mrhiGetDeviceMisuse(device) == 0,
+          "a fragment depth without a depth format");
+    Close(device);
 }
 
 static void TestConstantsAndMisuse(void)
@@ -1033,6 +1077,7 @@ int main(void)
     TestInterface();
     TestHalfFloats();
     TestDriverFailure();
+    TestBadState();
     TestConstantsAndMisuse();
     return s_failures == 0 ? 0 : 1;
 }

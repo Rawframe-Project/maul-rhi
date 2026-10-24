@@ -100,7 +100,7 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
 | Result | Meaning |
 |---|---|
 | `mrhi_errorInvalid` | An argument the call can never take. It also counts one misuse on the instance or device. |
-| `mrhi_errorFormat` | The data is malformed or does not contain what was asked for: a damaged shader container, or an entry or constants its reflection lacks. Bad data is not a bug in the program, so it counts no misuse. |
+| `mrhi_errorFormat` | The data is malformed or does not contain what was asked for: a damaged shader container, or an entry, constants or pipeline state its reflection refuses. Bad data is not a bug in the program, so it counts no misuse. |
 | `mrhi_errorStale` | An id whose object is gone. |
 | `mrhi_errorCapacity` | A limit is reached. |
 | `mrhi_errorUnsupported` | The adapter or driver cannot do it. |
