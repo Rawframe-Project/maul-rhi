@@ -15,7 +15,7 @@
 # holding data, or one no header declares fails it, as does a declared
 # function missing from the library. Each failure names the symbol.
 #
-#   python3 tools/check_exports.py [--nm NM] out/linux-shared/libmaul-rhi.so
+#   python3 tools/check_exports.py [--nm NM] out/linux-shared/lib<library>.so
 #
 # Reads the dynamic symbol table with nm (CMake passes CMAKE_NM); for ELF
 # shared libraries.
