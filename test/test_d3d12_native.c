@@ -4,8 +4,8 @@
 // A native pass on D3D12 (maul-rhi/d3d12.h): a texture uploaded by the
 // library, overwritten by the program's own command list copying in
 // texels of its own, and read back by the library, the program's texels
-// coming back; a pipeline dispatched on both sides of a native pass,
-// after which the library records into a list of its own; the device's
+// coming back; pipelines dispatching and drawing on both sides of a
+// native pass, after which the library records into a list of its own; the device's
 // native objects, and the refusals. Under the
 // debug layer, whose errors fail the suite. Skipped where there is no
 // D3D12 adapter, unless MAUL_RHI_REQUIRE_D3D12 is set.
@@ -194,48 +194,90 @@ static void CheckFrame(mrhiDevice* device, mrhiTextureId texture, ID3D12Graphics
     CHECK(copied, "the program's texels, after the upload and before the readback");
 }
 
-// A frame dispatching one pipeline before and after a native pass with
-// no list of the program's: the pass after it records into a new list,
-// which has no root signature until the library sets one again, as the
-// debug layer checks.
-static void CheckRoots(mrhiDevice* device)
+// The noop kernel's compute pipeline and its draw's graphics pipeline,
+// into an RGBA8 target.
+static void MakePipelines(mrhiDevice* device, mrhiShaderId* shaderOut,
+                          mrhiComputePipelineId* computeOut, mrhiGraphicsPipelineId* graphicsOut)
 {
     mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
     shaderDef.bytes = s_noopContainer;
     shaderDef.byteCount = sizeof(s_noopContainer);
-    mrhiShaderId shader = {0};
-    mrhiComputePipelineDef pipelineDef = mrhiDefaultComputePipelineDef();
-    pipelineDef.entry = "cs";
-    pipelineDef.entryLength = 2;
-    mrhiComputePipelineId pipeline = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, shaderOut) == mrhi_success, "the shader");
+    mrhiComputePipelineDef compute = mrhiDefaultComputePipelineDef();
+    compute.shader = *shaderOut;
+    compute.entry = "cs";
+    compute.entryLength = 2;
+    mrhiGraphicsPipelineDef graphics = mrhiDefaultGraphicsPipelineDef();
+    graphics.shader = *shaderOut;
+    graphics.vertexEntry = "vs";
+    graphics.vertexEntryLength = 2;
+    graphics.fragmentEntry = "fs";
+    graphics.fragmentEntryLength = 2;
+    graphics.colorTargets[0].format = mrhi_formatRgba8Unorm;
+    graphics.colorTargetCount = 1;
     mrhiRequestId request = {0};
     mrhiDeviceNotification record;
-    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "the shader");
-    pipelineDef.shader = shader;
-    CHECK(mrhiCreateComputePipeline(device, &pipelineDef, &pipeline, &request) == mrhi_success &&
+    CHECK(mrhiCreateComputePipeline(device, &compute, computeOut, &request) == mrhi_success &&
               mrhiNextDeviceNotification(device, &record) == mrhi_success &&
               record.kind == mrhi_devicePipelineReady && record.outcome == mrhi_success,
-          "the pipeline");
+          "the compute pipeline");
+    CHECK(mrhiCreateGraphicsPipeline(device, &graphics, graphicsOut, &request) == mrhi_success &&
+              mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+              record.kind == mrhi_devicePipelineReady && record.outcome == mrhi_success,
+          "the graphics pipeline");
+}
+
+// A frame dispatching and drawing before and after a native pass with no
+// list of the program's: the passes after it record into a new list,
+// which has no root signature until the library sets each again, as the
+// debug layer checks.
+static void CheckRoots(mrhiDevice* device)
+{
+    mrhiShaderId shader = {0};
+    mrhiComputePipelineId compute = {0};
+    mrhiGraphicsPipelineId graphics = {0};
+    MakePipelines(device, &shader, &compute, &graphics);
+    mrhiTextureDef targetDef = mrhiDefaultTextureDef();
+    targetDef.format = mrhi_formatRgba8Unorm;
+    targetDef.width = SIZE;
+    targetDef.height = SIZE;
+    targetDef.usage = mrhi_textureRenderTarget;
+    mrhiTextureId texture = {0};
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
-    mrhiPassDef def = mrhiDefaultPassDef();
-    def.neverCull = true;
-    // A dispatch, the native pass and a dispatch.
-    mrhiPassId passes[3] = {{0}};
-    for (uint32_t i = 0; i < 3; ++i)
+    mrhiResourceId target = {0};
+    CHECK(mrhiCreateTexture(device, &targetDef, &texture) == mrhi_success &&
+              mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportTexture(device, texture, &target) == mrhi_success,
+          "a frame with a target");
+    // A dispatch and a draw, the native pass, then a dispatch and a draw.
+    mrhiPassId passes[5] = {{0}};
+    for (uint32_t i = 0; i < 5; ++i)
     {
-        def.native = i == 1;
+        mrhiPassDef def = mrhiDefaultPassDef();
+        def.neverCull = true;
+        def.native = i == 2;
+        if (i % 3 == 1)
+        {
+            def.colorTargets[0] = (mrhiColorTarget){.resource = target, .load = mrhi_loadClear};
+            def.colorTargetCount = 1;
+        }
         CHECK(mrhiAddPass(device, &def, &passes[i]) == mrhi_success, "a pass");
     }
     CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
-    for (uint32_t i = 0; i < 3; ++i)
+    for (uint32_t i = 0; i < 5; ++i)
     {
         bool recorded = mrhiBeginPass(device, passes[i]) == mrhi_success;
-        if (i != 1)
+        if (i % 3 == 0)
         {
             recorded = recorded &&
-                       mrhiSetComputePipeline(device, passes[i], pipeline) == mrhi_success &&
+                       mrhiSetComputePipeline(device, passes[i], compute) == mrhi_success &&
                        mrhiDispatch(device, passes[i], 1, 1, 1) == mrhi_success;
+        }
+        else if (i % 3 == 1)
+        {
+            recorded = recorded &&
+                       mrhiSetGraphicsPipeline(device, passes[i], graphics) == mrhi_success &&
+                       mrhiDraw(device, passes[i], 3, 1, 0, 0) == mrhi_success;
         }
         CHECK(recorded && mrhiEndPass(device, passes[i]) == mrhi_success, "a pass recorded");
     }
@@ -243,12 +285,15 @@ static void CheckRoots(mrhiDevice* device)
     CHECK(mrhiSubmitFrame(device, &token) == mrhi_success &&
               mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
           "submitted and finished");
+    mrhiDeviceNotification record;
     while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
     {
     }
-    CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
+    CHECK(mrhiDestroyTexture(device, texture) == mrhi_success &&
+              mrhiDestroyGraphicsPipeline(device, graphics) == mrhi_success &&
+              mrhiDestroyComputePipeline(device, compute) == mrhi_success &&
               mrhiDestroyShader(device, shader) == mrhi_success,
-          "the pipeline and shader ended");
+          "the target, pipelines and shader ended");
 }
 
 static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
