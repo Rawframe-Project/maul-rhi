@@ -212,7 +212,8 @@ static void TestMipChain(void)
     CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
 }
 
-// Buffers: no barrier before a first use or between reads.
+// Buffers: no barrier before a first use or between reads in one state,
+// and one between reads in two states.
 static void TestBuffers(void)
 {
     Begin();
@@ -228,13 +229,16 @@ static void TestBuffers(void)
     AddPass(transfer);
     mrhiAccess read = Access(buffer, mrhi_accessStorageRead, 0, 1);
     mrhiPassId compute = Compute(&read, 1, true);
+    Compute(&read, 1, true);
     mrhiAccess vertices = Access(buffer, mrhi_accessVertex, 0, 1);
-    Compute(&vertices, 1, true);
+    mrhiPassId vertex = Compute(&vertices, 1, true);
     CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
-    CHECK(s_count == 1 &&
+    CHECK(s_count == 2 &&
               Is(0, compute, buffer, 0, 1, kAll, mrhi_stateCopyDestination, mrhi_stateStorageRead),
-          "only after the write");
+          "after the write");
+    CHECK(Is(1, vertex, buffer, 0, 1, kAll, mrhi_stateStorageRead, mrhi_stateVertex),
+          "before the read in another state, none between the two in one");
     mrhiResourcePlan plan = Plan(buffer);
     CHECK(plan.usage == (mrhi_bufferCopyDestination | mrhi_bufferStorage | mrhi_bufferVertex),
           "its usages");

@@ -27,6 +27,7 @@ hazards.aliasing
 hazards.pass_classes
 hazards.transient_twin
 hazards.frame_memory
+hazards.read_states
 transfers.round_trip
 transfers.clear
 swapchain.foreign_sources

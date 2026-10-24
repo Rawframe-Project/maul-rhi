@@ -533,6 +533,7 @@ static Case s_cases[] = {
     {"hazards.pass_classes", 0, 0},
     {"hazards.transient_twin", 0, 0},
     {"hazards.frame_memory", 0, 0},
+    {"hazards.read_states", 0, 0},
     {"transfers.round_trip", 0, 0},
     {"transfers.clear", 0, 0},
     {"swapchain.foreign_sources", 0, 0},
@@ -1722,8 +1723,9 @@ static void CheckSlicedMemory(mrhiDevice* device, bool webGpu)
 // The binding kinds the scene leaves out (the storage container): four
 // values read from a read-only storage buffer, each doubled plus one
 // into a storage buffer and stored as red into a row of a write-only
-// rgba8 storage texture.
-static void CheckStorageBindings(mrhiDevice* device)
+// rgba8 storage texture. With readBack the values are also copied back
+// from the read-only buffer, read in a second state after the first.
+static void CheckStorageBindings(mrhiDevice* device, bool readBack)
 {
     mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
     shaderDef.bytes = s_storageContainer;
@@ -1760,9 +1762,10 @@ static void CheckStorageBindings(mrhiDevice* device)
                           Whole(outputs, mrhi_accessStorageWrite),
                           Whole(image, mrhi_accessStorageWrite)};
     mrhiPassId dispatch = CopyPass(device, uses, 3);
-    mrhiAccess reads[2] = {Whole(outputs, mrhi_accessCopySource),
-                           Whole(image, mrhi_accessCopySource)};
-    mrhiPassId read = CopyPass(device, reads, 2);
+    mrhiAccess reads[3] = {Whole(outputs, mrhi_accessCopySource),
+                           Whole(image, mrhi_accessCopySource),
+                           Whole(inputs, mrhi_accessCopySource)};
+    mrhiPassId read = CopyPass(device, reads, readBack ? 3 : 2);
     CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
     const uint32_t values[4] = {0, 51, 102, 255};
     const mrhiBinding bindings[3] = {
@@ -1770,7 +1773,7 @@ static void CheckStorageBindings(mrhiDevice* device)
         {.slot = 1, .resource = outputs, .size = MRHI_WHOLE_SIZE},
         {.slot = 2, .resource = image, .range = {.mipCount = 1, .layerCount = 1}},
     };
-    mrhiRequestId results[2] = {0};
+    mrhiRequestId results[3] = {0};
     CHECK(mrhiBeginPass(device, copy) == mrhi_success &&
               mrhiWriteBuffer(device, copy, inputs, 0, values, sizeof(values)) == mrhi_success &&
               mrhiEndPass(device, copy) == mrhi_success &&
@@ -1784,14 +1787,18 @@ static void CheckStorageBindings(mrhiDevice* device)
                   mrhi_success &&
               mrhiReadTexture(device, read, &(mrhiTextureCopy){.resource = image},
                               &(mrhiExtent3d){4, 1, 1}, &results[1]) == mrhi_success &&
+              (!readBack || mrhiReadBuffer(device, read, inputs, 0, sizeof(values), &results[2]) ==
+                                mrhi_success) &&
               mrhiEndPass(device, read) == mrhi_success,
           "uploaded, dispatched and read");
-    Finish(device, 2);
+    Finish(device, readBack ? 3 : 2);
     const uint32_t doubled[4] = {1, 103, 205, 511};
     const uint8_t red[16] = {0, 0, 0, 255, 51, 0, 0, 255, 102, 0, 0, 255, 255, 0, 0, 255};
     CHECK(Taken(device, results[0], (const uint8_t*)doubled, sizeof(doubled)),
           "each value read from the read-only buffer, doubled plus one");
     CHECK(Taken(device, results[1], red, sizeof(red)), "each value stored as red in the texture");
+    CHECK(!readBack || Taken(device, results[2], (const uint8_t*)values, sizeof(values)),
+          "the values copied back after the shader read them");
     CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
               mrhiDestroyShader(device, shader) == mrhi_success,
           "destroyed");
@@ -3157,7 +3164,7 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     }
     RUN("binding.compute_split", {
         CheckComputeSplit(&scene, timestamps);
-        CheckStorageBindings(device);
+        CheckStorageBindings(device, false);
     });
     RUN("hazards.pass_classes", CheckPassClasses(&scene));
     if (features.pipelineStatisticsQuery)
@@ -3431,6 +3438,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
         CheckSlicedMemory(device, info.driver == mrhi_driverWebGpu);
     });
     RUN("hazards.transient_twin", CheckTransientTwin(device));
+    RUN("hazards.read_states", CheckStorageBindings(device, true));
     RUN("api.pipelines", CheckPipelines(device));
     RUN("transfers.round_trip", CheckRoundTrip(device));
     RUN("hazards.aliasing", CheckAliasing(device));

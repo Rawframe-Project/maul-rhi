@@ -5,11 +5,11 @@
 // transitions. A texture's state follows the core's plan, which gives a
 // barrier at each of its changes; a transition between two uses of the
 // same unordered access state is a UAV barrier. A buffer's state is the
-// driver's: the plan gives no barrier between two reads, which D3D12's
-// states tell apart, so each use moves the buffer where its state lacks
-// the use's, gathering read states together, and a plan's barrier
-// between storage writes on a buffer in the unordered access state is a
-// UAV barrier.
+// driver's: D3D12's read states gather several reads into one, which the
+// plan's do not, so each use moves the buffer where its state lacks the
+// use's, gathering read states together. A plan's barrier between two
+// reads of a buffer does nothing, and one between storage writes on a
+// buffer in the unordered access state is a UAV barrier.
 
 #include "d3d12_barrier.h"
 

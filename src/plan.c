@@ -20,15 +20,17 @@ bool mrhiStateWrites(mrhiResourceState state)
 }
 
 // Whether going from one state to another needs a barrier: a texture
-// leaving the undefined state, a write on either side, or a texture
-// changing state.
+// leaving the undefined state, any change of state, or a write after a
+// write. A buffer read in a second state after a first takes one too:
+// the barrier into the first made the last write visible to that state's
+// reads only, and a later write must wait for the reads of both.
 static bool NeedsBarrier(mrhiResourceState before, mrhiResourceState after, bool texture)
 {
     if (before == mrhi_stateUndefined)
     {
         return texture;
     }
-    return mrhiStateWrites(before) || mrhiStateWrites(after) || (texture && before != after);
+    return before != after || mrhiStateWrites(after);
 }
 
 static bool IsTexture(const mrhiFrameResource* resource)
