@@ -16,8 +16,9 @@
 #                            tests on lavapipe and Xvfb, the seam check on
 #                            X11, and a short fuzzing pass.
 #   tools/check.sh full      also ThreadSanitizer, the shared library,
-#                            labels compiled out, the seam check on Wayland
-#                            and longer fuzzing.
+#                            labels compiled out, the Vulkan driver's lanes
+#                            split, the seam check on Wayland and longer
+#                            fuzzing.
 #
 # The builds are the CI cells' CMake presets (CMakePresets.json), in
 # out/<preset>; the other trees go to out/check-*. Needs gcc-14, clang-20,
@@ -159,7 +160,7 @@ done
 
 [ "$tier" = full ] || exit 0
 
-for name in linux-clang-20-tsan linux-shared linux-clang-20; do
+for name in linux-clang-20-tsan linux-shared linux-clang-20 linux-lanes; do
     preset "$name"
 done
 

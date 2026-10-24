@@ -26,7 +26,18 @@ A shader is a module over the container's SPIR-V. A pipeline's layout comes from
 
 ## Frames
 
-Each frame in flight has a slot: a command buffer, its transients made at submission and bound where the core placed them in the slot's block, its mapped staging, the readback ranges it fills, and descriptor pools that reset when the slot is reused. A frame signals the device's timeline semaphore with its serial, so a poll reads one counter, copies finished frames' readbacks into the core's ring and reports them in order. A frame also waits on the timeline for the frame that used its slot before it. The host has already seen that frame finish before reusing the slot, so the wait costs nothing, but it puts the reuse in the queue's order, where synchronization validation can see it.
+Each frame in flight has a slot: its command buffers, its transients made at submission and bound where the core placed them in the slot's block, its mapped staging, the readback ranges it fills, and descriptor pools that reset when the slot is reused. A frame signals the device's timeline semaphore with its serial, so a poll reads one counter, copies finished frames' readbacks into the core's ring and reports them in order. A frame also waits on the timeline for the frame that used its slot before it. The host has already seen that frame finish before reusing the slot, so the wait costs nothing, but it puts the reuse in the queue's order, where synchronization validation can see it. A command buffer that fails to begin or end stops the recording: nothing more is recorded into or ended on the frame's buffers, nothing is submitted, and the submission reports the failure (`test_vulkan_frame` fails each begin in turn).
+
+Every pass class records in the one queue the device opens, in the frame's order, so the frame is one batch of command buffers: a native pass's own buffer goes between two of the driver's. The recording is still cut in lanes, one per class, ready for a queue per class: a pass starts a new batch on its lane when it follows a pass of another class (`waitFor` in the frame view), and a pass that another class follows ends its batch. With one lane, as every build but a test one has, the classes share it and the frame stays one batch. The test-only option `MAUL_RHI_VULKAN_SPLIT_LANES` gives each class its own lane, on the same queue: each lane signals its own timeline semaphore at the end of each batch, a batch waits for the values of the batches its first pass follows, the first batch resets the frame's query sets before every lane's first batch, and a last batch on the graphics lane waits for every lane and records the frame's end barriers. The batches go to the queue in the order they open, so each wait names a value already submitted.
+
+What checks the lanes, each for its own part:
+
+- The core's assertions check the `waitFor` edges themselves against every use in the frame ([frame-graph.md](frame-graph.md)).
+- An assertion before each submission, in Debug and sanitizer builds, works the edges between lanes out again from the frame view and finds each in the submissions themselves: the batch holding a pass waits on the followed lane's semaphore for at least the value that the batch holding the followed pass, submitted before it, signals. A wait dropped in the recording or in the submission traps there.
+- The `linux-lanes` cell runs every suite in the split build with those assertions on, under synchronization validation, which checks every barrier in the queue's order and the timeline semaphores' use.
+- `hazards.pass_classes` reads back wrong values when a pass lands in a batch submitted before one it follows.
+
+On one queue a barrier also waits for every earlier batch, so no check here sees whether a semaphore wait alone orders two lanes on the GPU. That, and a second queue family, wait for an adapter that has one waits for an adapter that has one ([#64](https://github.com/Rawframe-Project/maul-rhi/issues/64)).
 
 The core's resource states map to Vulkan stages, accesses and layouts for its barriers. A barrier marked aliasing waits for all commands' writes. A copy destination's barriers name the clear stage beside the copy stage, since `mrhiClearBuffer` is `vkCmdFillBuffer`.
 
@@ -38,7 +49,7 @@ Counted multi-draw is `vkCmdDrawIndirectCount` (with `drawIndirectCount` and `mu
 
 ## Queries
 
-A query set is a query pool. Each set a frame names is reset once before its first pass; a pass's timestamps are written before and after it, and occlusion queries bracket draws. As it records, the driver marks the queries the frame writes, and a resolve copies those with their results awaited and fills the others with zero, since Vulkan writes nothing for a query never written.
+A query set is a query pool. Each set a frame names is reset once before its first pass, in every recording: a frame that failed to record is not submitted, so the next one, under the same serial, resets it again; a pass's timestamps are written before and after it, and occlusion queries bracket draws. As it records, the driver marks the queries the frame writes, and a resolve copies those with their results awaited and fills the others with zero, since Vulkan writes nothing for a query never written.
 
 ## Heaps
 

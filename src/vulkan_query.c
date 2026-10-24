@@ -21,11 +21,11 @@ static mrhiVulkanQuerySet* SetOf(const mrhiVulkanRecording* recording, uint64_t 
 static void Reset(const mrhiVulkanRecording* recording, uint64_t handle)
 {
     mrhiVulkanQuerySet* set = SetOf(recording, handle);
-    if (set->resetSerial == recording->serial)
+    if (set->resetRecorded == recording->recorded)
     {
         return;
     }
-    set->resetSerial = recording->serial;
+    set->resetRecorded = recording->recorded;
     memset(set->written, 0, sizeof(set->written));
     recording->frames->api->vkCmdResetQueryPool(recording->slot->commands, set->pool, 0,
                                                 set->count);
