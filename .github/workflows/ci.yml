@@ -79,6 +79,14 @@ jobs:
           python3 tools/check_guide.py
       - name: The contract's headers and sources
         run: python3 tools/gen_contract.py --check
+      # CI has no shader tools: the committed headers' stamps are checked
+      # against their inputs and pins, and each check proven on a copy.
+      - name: The shader headers' stamps
+        run: |
+          python3 tools/gen_test_shaders.py --check
+          python3 tools/gen_test_shaders.py --self-test
+          python3 tools/gen_kernels.py --check
+          python3 tools/gen_kernels.py --self-test
       - name: The documentation site builds
         run: python3 tools/build_docs.py
       - name: clang-tidy

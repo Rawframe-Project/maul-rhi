@@ -78,6 +78,12 @@ source_checks() {
     python3 tools/check_docs.py
     python3 tools/check_guide.py
     python3 tools/gen_contract.py --check
+    # The committed shader headers against their inputs and pins, and
+    # each check proven on a copy of the tree.
+    python3 tools/gen_test_shaders.py --check
+    python3 tools/gen_test_shaders.py --self-test
+    python3 tools/gen_kernels.py --check
+    python3 tools/gen_kernels.py --self-test
     if [ -f "$org/scripts/docs_check.py" ]; then
         python3 "$org/scripts/docs_check.py" --exclude khronos --exclude directx
     else
