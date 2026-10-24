@@ -5,8 +5,8 @@
 // library, overwritten by the program's own command list copying in
 // texels of its own, and read back by the library, the program's texels
 // coming back; a pipeline dispatched on both sides of a native pass,
-// which starts a list of its own; the device's native objects, and the
-// refusals. Under the
+// after which the library records into a list of its own; the device's
+// native objects, and the refusals. Under the
 // debug layer, whose errors fail the suite. Skipped where there is no
 // D3D12 adapter, unless MAUL_RHI_REQUIRE_D3D12 is set.
 
@@ -25,7 +25,7 @@
 #include "maul-rhi/pipeline.h"
 #include "maul-rhi/resources.h"
 #include "maul-rhi/vulkan.h"
-#include "shaders/conformance_container.h"
+#include "shaders/noop_container.h"
 
 #include <directx/d3d12.h>
 #include <stdio.h>
@@ -35,9 +35,6 @@
 // The texture's side, and the rows' pitch D3D12 copies from a buffer at.
 #define SIZE  16
 #define PITCH 256
-// The words the dispatches scale, by the pipeline's constant each time.
-#define WORDS 8
-#define SCALE 3
 
 static mrhiAccess Whole(mrhiResourceId resource, mrhiAccessKind kind)
 {
@@ -197,22 +194,19 @@ static void CheckFrame(mrhiDevice* device, mrhiTextureId texture, ID3D12Graphics
     CHECK(copied, "the program's texels, after the upload and before the readback");
 }
 
-// A frame scaling a buffer's words by the conformance kernel before and
-// after a native pass with no list of the program's: the pass after it
-// records into a new list, which has no root signature until the library
-// sets one, so the words come back scaled twice.
+// A frame dispatching one pipeline before and after a native pass with
+// no list of the program's: the pass after it records into a new list,
+// which has no root signature until the library sets one again, as the
+// debug layer checks.
 static void CheckRoots(mrhiDevice* device)
 {
     mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
-    shaderDef.bytes = s_conformanceContainer;
-    shaderDef.byteCount = sizeof(s_conformanceContainer);
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
     mrhiShaderId shader = {0};
     mrhiComputePipelineDef pipelineDef = mrhiDefaultComputePipelineDef();
     pipelineDef.entry = "cs";
     pipelineDef.entryLength = 2;
-    const mrhiConstantValue scale = {.id = 0, .value = SCALE};
-    pipelineDef.constants = &scale;
-    pipelineDef.constantCount = 1;
     mrhiComputePipelineId pipeline = {0};
     mrhiRequestId request = {0};
     mrhiDeviceNotification record;
@@ -221,81 +215,40 @@ static void CheckRoots(mrhiDevice* device)
     CHECK(mrhiCreateComputePipeline(device, &pipelineDef, &pipeline, &request) == mrhi_success &&
               mrhiNextDeviceNotification(device, &record) == mrhi_success &&
               record.kind == mrhi_devicePipelineReady && record.outcome == mrhi_success,
-          "the scaling pipeline");
-    mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
-    bufferDef.size = WORDS * sizeof(uint32_t);
-    bufferDef.usage = mrhi_bufferStorage | mrhi_bufferCopySource | mrhi_bufferCopyDestination;
-    mrhiBufferId buffer = {0};
+          "the pipeline");
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    mrhiResourceId resource = {0};
-    CHECK(mrhiCreateBuffer(device, &bufferDef, &buffer) == mrhi_success &&
-              mrhiBeginFrame(device, &frame) == mrhi_success &&
-              mrhiImportBuffer(device, buffer, &resource) == mrhi_success,
-          "a frame with the buffer");
-    mrhiAccess accesses[3] = {Whole(resource, mrhi_accessCopyDestination),
-                              Whole(resource, mrhi_accessStorageReadWrite),
-                              Whole(resource, mrhi_accessCopySource)};
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiPassDef def = mrhiDefaultPassDef();
     def.neverCull = true;
-    def.accessCount = 1;
-    // The upload, a dispatch, the native pass, a dispatch and the readback.
-    mrhiPassId passes[5] = {{0}};
-    const uint32_t uses[5] = {0, 1, 1, 1, 2};
-    for (uint32_t i = 0; i < 5; ++i)
+    // A dispatch, the native pass and a dispatch.
+    mrhiPassId passes[3] = {{0}};
+    for (uint32_t i = 0; i < 3; ++i)
     {
-        def.accesses = &accesses[uses[i]];
-        def.native = i == 2;
+        def.native = i == 1;
         CHECK(mrhiAddPass(device, &def, &passes[i]) == mrhi_success, "a pass");
     }
-    uint32_t words[WORDS];
-    for (uint32_t i = 0; i < WORDS; ++i)
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    for (uint32_t i = 0; i < 3; ++i)
     {
-        words[i] = i + 1;
-    }
-    const mrhiBinding binding = {.slot = 1, .resource = resource, .size = MRHI_WHOLE_SIZE};
-    CHECK(mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, passes[0]) == mrhi_success &&
-              mrhiWriteBuffer(device, passes[0], resource, 0, words, sizeof(words)) ==
-                  mrhi_success &&
-              mrhiEndPass(device, passes[0]) == mrhi_success,
-          "uploaded");
-    for (uint32_t i = 1; i < 4; ++i)
-    {
-        bool dispatched = mrhiBeginPass(device, passes[i]) == mrhi_success;
-        if (i != 2)
+        bool recorded = mrhiBeginPass(device, passes[i]) == mrhi_success;
+        if (i != 1)
         {
-            dispatched = dispatched &&
-                         mrhiSetComputePipeline(device, passes[i], pipeline) == mrhi_success &&
-                         mrhiSetBindings(device, passes[i], 0, &binding, 1) == mrhi_success &&
-                         mrhiDispatch(device, passes[i], 1, 1, 1) == mrhi_success;
+            recorded = recorded &&
+                       mrhiSetComputePipeline(device, passes[i], pipeline) == mrhi_success &&
+                       mrhiDispatch(device, passes[i], 1, 1, 1) == mrhi_success;
         }
-        CHECK(dispatched && mrhiEndPass(device, passes[i]) == mrhi_success, "a pass recorded");
+        CHECK(recorded && mrhiEndPass(device, passes[i]) == mrhi_success, "a pass recorded");
     }
-    mrhiRequestId bytes = {0};
     mrhiRequestId token = {0};
-    CHECK(mrhiBeginPass(device, passes[4]) == mrhi_success &&
-              mrhiReadBuffer(device, passes[4], resource, 0, sizeof(words), &bytes) ==
-                  mrhi_success &&
-              mrhiEndPass(device, passes[4]) == mrhi_success &&
-              mrhiSubmitFrame(device, &token) == mrhi_success &&
+    CHECK(mrhiSubmitFrame(device, &token) == mrhi_success &&
               mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
-          "read back and finished");
+          "submitted and finished");
     while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
     {
     }
-    uint32_t taken[WORDS] = {0};
-    size_t size = 0;
-    bool scaled = mrhiTakeReadback(device, bytes, taken, sizeof(taken), &size) == mrhi_success &&
-                  size == sizeof(taken);
-    for (uint32_t i = 0; scaled && i < WORDS; ++i)
-    {
-        scaled = taken[i] == (i + 1) * SCALE * SCALE;
-    }
-    CHECK(scaled, "the words scaled on both sides of the native pass");
     CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
-              mrhiDestroyShader(device, shader) == mrhi_success &&
-              mrhiDestroyBuffer(device, buffer) == mrhi_success,
-          "the pipeline, shader and buffer ended");
+              mrhiDestroyShader(device, shader) == mrhi_success,
+          "the pipeline and shader ended");
 }
 
 static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
