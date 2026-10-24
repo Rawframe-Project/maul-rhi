@@ -12,6 +12,10 @@
 // where there is no Vulkan 1.3 adapter, unless MAUL_RHI_REQUIRE_VULKAN is
 // set.
 
+#ifdef _WIN32
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include "test_harness.h"
 #include "vulkan_api.h"
 
