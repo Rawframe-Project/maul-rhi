@@ -282,9 +282,26 @@ def main():
             check(answer == expected, f"{message}: {answer} {printed}")
 
     with tempfile.TemporaryDirectory() as folder:
+        code = spirv(SPIRV_ENTRIES, SPIRV_BINDINGS)
+        stages = {e["name"]: e["stage"] for e in REFLECTION["entries"]}
+        blobs = {n: dxbc(stages[n], r) for n, r in DXIL.items()}
+        # A container with WGSL, one with MSL and one with DXIL, written
+        # with the whole contract and again with the copy below.
+        variants = ((), metal_options(folder, msl=MSL), dxil_options(folder, blobs))
+
+        def written(options):
+            status, errors, output = write(folder, code, WGSL, REFLECTION, options)
+            check(status == 0, f"a container is written: {errors}")
+            if status != 0:
+                return None
+            with open(output, "rb") as f:
+                return f.read()
+
+        whole = [written(options) for options in variants]
         # The writer reads the contract's enums alone, and reads the whole
         # contract for each container; the test writes about a hundred, so
         # it gives the writer a copy holding the enums' names and values.
+        # The same containers prove the copy holds whatever the writer reads.
         with open(mrhi_container.CONTRACT, encoding="utf-8") as f:
             contract = json.load(f)
         mrhi_container.CONTRACT = os.path.join(folder, "contract.json")
@@ -294,7 +311,8 @@ def main():
                  "values": [{"name": v["name"], "value": v["value"]} for v in item["values"]]}
                 for header in contract["headers"] for item in header["items"]
                 if "values" in item]}]}, f)
-        code = spirv(SPIRV_ENTRIES, SPIRV_BINDINGS)
+        check([written(options) for options in variants] == whole,
+              "the writer's copy of the contract writes what the whole contract does")
         status, errors, output = write(folder, code, WGSL, REFLECTION)
         check(status == 0, f"the container is written: {errors}")
         if status == 0:
