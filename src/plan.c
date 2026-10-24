@@ -68,7 +68,8 @@ static mrhiResourceState* CarriedState(mrhiDevice* device, const mrhiFrameResour
     return nullptr;
 }
 
-// The common part of two boxes: whether they meet, with it in out.
+// The common part of two boxes: whether they meet, with it in out, in the
+// first's state and tracking.
 static bool Intersect(const mrhiBox* a, const mrhiBox* b, mrhiBox* out)
 {
     uint32_t mipStart = a->baseMip > b->baseMip ? a->baseMip : b->baseMip;
@@ -79,10 +80,13 @@ static bool Intersect(const mrhiBox* a, const mrhiBox* b, mrhiBox* out)
     uint32_t layerEnd = a->baseLayer + a->layerCount < b->baseLayer + b->layerCount
                             ? a->baseLayer + a->layerCount
                             : b->baseLayer + b->layerCount;
-    uint8_t planes = a->planes & b->planes;
-    *out =
-        (mrhiBox){mipStart, mipEnd - mipStart, layerStart, layerEnd - layerStart, planes, a->state};
-    return mipStart < mipEnd && layerStart < layerEnd && planes != 0;
+    *out = *a;
+    out->baseMip = mipStart;
+    out->mipCount = mipEnd - mipStart;
+    out->baseLayer = layerStart;
+    out->layerCount = layerEnd - layerStart;
+    out->planes = a->planes & b->planes;
+    return mipStart < mipEnd && layerStart < layerEnd && out->planes != 0;
 }
 
 // The texture range of a box, with its planes as an aspect.
@@ -102,7 +106,14 @@ static mrhiBox BoxOf(const mrhiFrameResource* resource, const mrhiFrameUse* use)
     uint32_t baseLayer = 0;
     uint32_t layerCount = 0;
     mrhiTrackedLayers(resource, use, &baseLayer, &layerCount);
-    return (mrhiBox){use->baseMip, use->mipCount, baseLayer, layerCount, use->planes, use->state};
+    return (mrhiBox){
+        .baseMip = use->baseMip,
+        .mipCount = use->mipCount,
+        .baseLayer = baseLayer,
+        .layerCount = layerCount,
+        .planes = use->planes,
+        .state = use->state,
+    };
 }
 
 // The map of one resource during planning: its boxes in one half of the
@@ -233,11 +244,40 @@ static void Swap(Map* map)
     map->nextCount = 0;
 }
 
+// Orders a pass after the passes of other classes a part's tracking
+// names.
+static void Follow(mrhiFramePass* pass, const uint32_t* passes)
+{
+    for (uint32_t c = 0; c < MRHI_PASS_CLASSES; ++c)
+    {
+        if (c != pass->passClass && passes[c] > pass->waitFor[c])
+        {
+            pass->waitFor[c] = passes[c];
+        }
+    }
+}
+
+// Joins a part's tracking into the box a use leaves: by class, the later
+// of each, which over-orders a pass at worst, never under-orders it.
+static void Join(mrhiBox* into, const mrhiBox* part)
+{
+    for (uint32_t c = 0; c < MRHI_PASS_CLASSES; ++c)
+    {
+        into->users[c] = part->users[c] > into->users[c] ? part->users[c] : into->users[c];
+        into->setters[c] =
+            part->setters[c] > into->setters[c] ? part->setters[c] : into->setters[c];
+    }
+}
+
 // Moves a part of the map to a state, before a pass or at the frame's end
 // (pass 0): barriers from every state it meets, at the end only from
-// other states.
+// other states. Before a pass, the pass follows the other classes' users
+// of each part it races, and the passes that set each other part's state;
+// a part it changes or writes is then set by it alone.
 static void Move(Map* map, uint32_t pass, mrhiBox cut)
 {
+    mrhiFramePass* framePass = pass == 0 ? nullptr : &map->device->framePasses[pass - 1];
+    bool sets = false;
     for (uint32_t i = 0; i < map->count; ++i)
     {
         const mrhiBox* box = &map->boxes[i];
@@ -253,11 +293,37 @@ static void Move(Map* map, uint32_t pass, mrhiBox cut)
         {
             Emit(map, pass, &part, cut.state);
         }
+        if (framePass != nullptr)
+        {
+            Follow(framePass, needed ? box->users : box->setters);
+            bool set = needed || mrhiStateWrites(cut.state);
+            sets = sets || set;
+            if (!set)
+            {
+                Join(&cut, box);
+            }
+        }
         PushRest(map, box, &cut, &part);
+    }
+    if (framePass != nullptr)
+    {
+        cut.users[framePass->passClass] = pass;
+        cut.setters[framePass->passClass] = sets ? pass : cut.setters[framePass->passClass];
     }
     Push(map, cut);
     Swap(map);
     MRHI_ASSERT(map->full || CoversWhole(map));
+}
+
+// Forgets the kept passes a resource's last plan found.
+static void ForgetPasses(mrhiFrameResource* resource)
+{
+    resource->firstPass = 0;
+    resource->lastPass = 0;
+    for (uint32_t c = 0; c < MRHI_PASS_CLASSES; ++c)
+    {
+        resource->lastPassOf[c] = 0;
+    }
 }
 
 // Plans one resource over the kept passes, then its end: an imported
@@ -281,8 +347,7 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
     };
     map.boxes[0] = whole;
     map.volume = Volume(&whole);
-    resource->firstPass = 0;
-    resource->lastPass = 0;
+    ForgetPasses(resource);
     resource->finalState = whole.state;
     bool targetsOnly = true;
     for (uint32_t p = 0; p < device->framePassCount && !map.full; ++p)
@@ -298,6 +363,7 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
             resource->firstState = resource->firstPass == 0 ? uses[i].state : resource->firstState;
             resource->firstPass = resource->firstPass == 0 ? p + 1 : resource->firstPass;
             resource->lastPass = p + 1;
+            resource->lastPassOf[pass->passClass] = p + 1;
             resource->finalState = uses[i].state;
             bool target = uses[i].use == mrhiUseColorTarget || uses[i].use == mrhiUseDepthTarget;
             targetsOnly = targetsOnly && target && uses[i].writes && !uses[i].reads;
@@ -402,8 +468,14 @@ static void Sort(mrhiDevice* device)
         uint8_t covered = range->aspect == mrhi_aspectAll         ? planes
                           : range->aspect == mrhi_aspectDepthOnly ? 1
                                                                   : 2;
-        mrhiBox box = {range->baseMip,    range->mipCount, range->baseLayer,
-                       range->layerCount, covered,         barrier->after};
+        mrhiBox box = {
+            .baseMip = range->baseMip,
+            .mipCount = range->mipCount,
+            .baseLayer = range->baseLayer,
+            .layerCount = range->layerCount,
+            .planes = covered,
+            .state = barrier->after,
+        };
         mrhiBox common;
         uint32_t pass = barrier->pass.index1;
         if (pass > after && pass <= upTo && barrier->resource.index1 == slot &&
@@ -466,6 +538,13 @@ static void Sort(mrhiDevice* device)
 mrhiResult mrhiPlan(mrhiDevice* device)
 {
     device->frameBarrierCount = 0;
+    for (uint32_t p = 0; p < device->framePassCount; ++p)
+    {
+        for (uint32_t c = 0; c < MRHI_PASS_CLASSES; ++c)
+        {
+            device->framePasses[p].waitFor[c] = 0;
+        }
+    }
     for (uint32_t slot = 1; slot <= device->frameResourceCount; ++slot)
     {
         if (!PlanResource(device, slot))
@@ -478,21 +557,57 @@ mrhiResult mrhiPlan(mrhiDevice* device)
     return mrhi_success;
 }
 
+// Whether another placed resource used memory a placed resource takes, in
+// kept passes before its first.
+static bool UsedBefore(const mrhiFrameResource* other, const mrhiFrameResource* resource)
+{
+    return other->placed && other->lastPass < resource->firstPass &&
+           other->memoryOffset < resource->memoryOffset + resource->memoryBytes &&
+           resource->memoryOffset < other->memoryOffset + other->memoryBytes;
+}
+
 // Whether a placed resource takes memory that another placed resource
 // used in kept passes before its first.
 static bool Aliases(const mrhiDevice* device, const mrhiFrameResource* resource)
 {
     for (uint32_t i = 0; i < device->frameResourceCount; ++i)
     {
-        const mrhiFrameResource* other = &device->frameResources[i];
-        if (other->placed && other->lastPass < resource->firstPass &&
-            other->memoryOffset < resource->memoryOffset + resource->memoryBytes &&
-            resource->memoryOffset < other->memoryOffset + other->memoryBytes)
+        if (UsedBefore(&device->frameResources[i], resource))
         {
             return true;
         }
     }
     return false;
+}
+
+// Orders every kept pass using a placed resource after the other classes'
+// last passes that used the memory it takes before it: their uses and its
+// meet in the same bytes, even where it reads what it never wrote.
+static void FollowAliased(mrhiDevice* device, uint32_t slot)
+{
+    const mrhiFrameResource* resource = &device->frameResources[slot - 1];
+    uint32_t after[MRHI_PASS_CLASSES] = {0};
+    for (uint32_t i = 0; i < device->frameResourceCount; ++i)
+    {
+        const mrhiFrameResource* other = &device->frameResources[i];
+        for (uint32_t c = 0; c < MRHI_PASS_CLASSES && UsedBefore(other, resource); ++c)
+        {
+            after[c] = other->lastPassOf[c] > after[c] ? other->lastPassOf[c] : after[c];
+        }
+    }
+    for (uint32_t p = resource->firstPass - 1; p < resource->lastPass; ++p)
+    {
+        mrhiFramePass* pass = &device->framePasses[p];
+        const mrhiFrameUse* uses = &device->frameUses[pass->firstUse];
+        for (uint32_t i = 0; i < pass->useCount && pass->kept; ++i)
+        {
+            if (uses[i].resource == slot)
+            {
+                Follow(pass, after);
+                break;
+            }
+        }
+    }
 }
 
 mrhiResult mrhiPlanAliasing(mrhiDevice* device)
@@ -508,6 +623,7 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
         }
         // Only a resource a kept pass uses is placed.
         MRHI_ASSERT(resource->firstPass != 0);
+        FollowAliased(device, slot);
         bool marked = false;
         for (uint32_t i = 0; i < planned; ++i)
         {
@@ -543,6 +659,161 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
         Sort(device);
     }
     return mrhi_success;
+}
+
+// Whether a kept pass follows an earlier kept pass, through waits and
+// class order. Only assertions call it.
+[[maybe_unused]] static bool Follows(const mrhiDevice* device, uint32_t later, uint32_t earlier)
+{
+    const mrhiFramePass* first = &device->framePasses[earlier - 1];
+    return device->framePasses[later - 1].follows[first->passClass] >= earlier;
+}
+
+// Whether a kept pass uses a resource. Only assertions call it.
+[[maybe_unused]] static bool Uses(const mrhiDevice* device, uint32_t pass, uint32_t slot)
+{
+    const mrhiFramePass* framePass = &device->framePasses[pass - 1];
+    for (uint32_t i = 0; i < framePass->useCount && framePass->kept; ++i)
+    {
+        if (device->frameUses[framePass->firstUse + i].resource == slot)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Whether every two kept uses of a part of a resource follow one another,
+// whatever their classes, when they race or a barrier before the earlier
+// sets the part's state for the later: apart from how the maps found the
+// waits, at the cost of every pair of uses. Only assertions call it.
+[[maybe_unused]] static bool RacesFollow(const mrhiDevice* device)
+{
+    for (uint32_t q = 1; q < device->framePassCount; ++q)
+    {
+        const mrhiFramePass* later = &device->framePasses[q];
+        for (uint32_t j = 0; j < later->useCount && later->kept; ++j)
+        {
+            const mrhiFrameUse* second = &device->frameUses[later->firstUse + j];
+            const mrhiFrameResource* resource = &device->frameResources[second->resource - 1];
+            mrhiBox box = BoxOf(resource, second);
+            for (uint32_t p = 0; p < q; ++p)
+            {
+                const mrhiFramePass* earlier = &device->framePasses[p];
+                for (uint32_t i = 0; i < earlier->useCount && earlier->kept; ++i)
+                {
+                    const mrhiFrameUse* first = &device->frameUses[earlier->firstUse + i];
+                    mrhiBox earlierBox = BoxOf(resource, first);
+                    mrhiBox shared;
+                    bool ordered = first->resource != second->resource ||
+                                   !Intersect(&earlierBox, &box, &shared) ||
+                                   Follows(device, q + 1, p + 1);
+                    if (!ordered && (Races(resource, first, second) ||
+                                     BarrierMeets(device, p, p + 1, second->resource, &shared)))
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    return true;
+}
+
+// Whether every kept use of a placed resource follows every kept use of
+// the resources that used its memory before it. Only assertions call it.
+[[maybe_unused]] static bool MemoryFollows(const mrhiDevice* device)
+{
+    for (uint32_t r = 1; r <= device->frameResourceCount; ++r)
+    {
+        const mrhiFrameResource* resource = &device->frameResources[r - 1];
+        for (uint32_t o = 1; o <= device->frameResourceCount && resource->placed; ++o)
+        {
+            const mrhiFrameResource* other = &device->frameResources[o - 1];
+            for (uint32_t p = other->firstPass; UsedBefore(other, resource) && p <= other->lastPass;
+                 ++p)
+            {
+                for (uint32_t q = resource->firstPass;
+                     q <= resource->lastPass && Uses(device, p, o); ++q)
+                {
+                    if (Uses(device, q, r) && !Follows(device, q, p))
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    return true;
+}
+
+// Whether every kept pass follows the native passes before it and is
+// followed by those after it. Only assertions call it.
+[[maybe_unused]] static bool NativesFollow(const mrhiDevice* device)
+{
+    for (uint32_t n = 1; n <= device->framePassCount; ++n)
+    {
+        const mrhiFramePass* native = &device->framePasses[n - 1];
+        for (uint32_t x = 1; x <= device->framePassCount && native->kept && native->native; ++x)
+        {
+            bool ordered = x == n || !device->framePasses[x - 1].kept ||
+                           (x < n ? Follows(device, n, x) : Follows(device, x, n));
+            if (!ordered)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+// Finds the passes a kept pass follows: those its class's previous pass
+// follows, those each pass it waits for follows, and itself.
+static void FindFollows(mrhiDevice* device, uint32_t index, uint32_t previous)
+{
+    mrhiFramePass* pass = &device->framePasses[index - 1];
+    for (uint32_t c = 0; c < MRHI_PASS_CLASSES; ++c)
+    {
+        pass->follows[c] = previous == 0 ? 0 : device->framePasses[previous - 1].follows[c];
+    }
+    for (uint32_t w = 0; w < MRHI_PASS_CLASSES; ++w)
+    {
+        const uint32_t* waited =
+            pass->waitFor[w] == 0 ? nullptr : device->framePasses[pass->waitFor[w] - 1].follows;
+        for (uint32_t c = 0; c < MRHI_PASS_CLASSES && waited != nullptr; ++c)
+        {
+            pass->follows[c] = waited[c] > pass->follows[c] ? waited[c] : pass->follows[c];
+        }
+    }
+    pass->follows[pass->passClass] = index;
+}
+
+void mrhiOrderPasses(mrhiDevice* device)
+{
+    uint32_t latest[MRHI_PASS_CLASSES] = {0};
+    uint32_t natives[MRHI_PASS_CLASSES] = {0};
+    for (uint32_t p = 0; p < device->framePassCount; ++p)
+    {
+        mrhiFramePass* pass = &device->framePasses[p];
+        if (!pass->kept)
+        {
+            continue;
+        }
+        // A native pass follows every class's passes before it, and every
+        // class's passes after it follow it: the program's commands may
+        // reach past what it declares.
+        Follow(pass, natives);
+        if (pass->native)
+        {
+            Follow(pass, latest);
+            natives[pass->passClass] = p + 1;
+        }
+        FindFollows(device, p + 1, latest[pass->passClass]);
+        latest[pass->passClass] = p + 1;
+    }
+    MRHI_ASSERT(RacesFollow(device));
+    MRHI_ASSERT(MemoryFollows(device));
+    MRHI_ASSERT(NativesFollow(device));
 }
 
 void mrhiApplyFinalStates(mrhiDevice* device)
