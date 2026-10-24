@@ -1,0 +1,8 @@
+# Sources libFuzzer's coverage instrumentation leaves out, passed with
+# -fsanitize-coverage-ignorelist in the MAUL_RHI_FUZZ build. ASan and
+# UBSan still check them.
+#
+# SHA-256 runs over every input to set and check the digest; its
+# comparisons guide no mutation and took most of fuzz_container's time
+# (#29). test/test_sha256.c checks it by known answers.
+src:*/src/sha256.c

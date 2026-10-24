@@ -22,7 +22,7 @@ The device keeps the decoded reflection in one allocation with a reference count
 
 Unknown section types are skipped after their bounds are checked, so a later writer can add a section without a new format version. Any change to the bytes of a known section raises the version.
 
-`fuzz_container` fuzzes the reader from the conformance suite's container, which `tools/container_seed.py` writes out. It sets each input's size field and digest before parsing, so mutations reach the sections and records instead of failing the header, and also parses each input cut short. A container that parses must keep its parts inside its bytes and apart, and decode into a reflection that finds every entry and frees what it took.
+`fuzz_container` fuzzes the reader from every container the tests and samples compile in, which `tools/container_seed.py` writes out: each reaches other parts of the format, such as vertex inputs, a second blend source, heap uses, 64-bit integers or multiview. SHA-256 is left out of the coverage instrumentation (`test/fuzz_coverage_ignore.txt`), since hashing every input took most of the run and its comparisons guide nothing; `test/test_sha256.c` checks it by known answers. It sets each input's size field and digest before parsing, so mutations reach the sections and records instead of failing the header, and also parses each input cut short. A container that parses must keep its parts inside its bytes and apart, and decode into a reflection that finds every entry and frees what it took.
 
 ## The writer
 
