@@ -30,21 +30,21 @@ defaults:
 jobs:
   # Whether anything beyond documentation changed; the builds skip when not.
   changes:
-    uses: Rawframe-Project/.github/.github/workflows/changes.yml@e63b1814ad99c8d5c750660ce23397ccbc3fb903 # v0.0.17
+    uses: Rawframe-Project/.github/.github/workflows/changes.yml@c84f41e11c17d61e2876d65faf9aed1bea5130f7 # v0.0.19
     permissions:
       pull-requests: read
 
   # The organization's documentation check; khronos/ and directx/ hold
   # the Vulkan and DirectX headers, kept exactly as published.
   docs:
-    uses: Rawframe-Project/.github/.github/workflows/docs-check.yml@e63b1814ad99c8d5c750660ce23397ccbc3fb903 # v0.0.17
+    uses: Rawframe-Project/.github/.github/workflows/docs-check.yml@c84f41e11c17d61e2876d65faf9aed1bea5130f7 # v0.0.19
     permissions:
       contents: read
     with:
       exclude: khronos directx
 
   zizmor:
-    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@e63b1814ad99c8d5c750660ce23397ccbc3fb903 # v0.0.17
+    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@c84f41e11c17d61e2876d65faf9aed1bea5130f7 # v0.0.19
     permissions:
       contents: read
 
@@ -126,7 +126,7 @@ jobs:
           - { preset: macos-clang-debug, runner: macos-26, setup: tools/ci_metal.sh }
           - { preset: windows-d3d12, runner: windows-2025, setup: tools/ci_agility.sh }
           - { preset: windows-vulkan, runner: windows-2025 }
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@e63b1814ad99c8d5c750660ce23397ccbc3fb903 # v0.0.17
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@c84f41e11c17d61e2876d65faf9aed1bea5130f7 # v0.0.19
     permissions:
       contents: read
     with:
@@ -259,7 +259,7 @@ jobs:
   # and never retried, until the Agility SDK fixes it.
   windows-d3d12-states:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@e63b1814ad99c8d5c750660ce23397ccbc3fb903 # v0.0.17
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@c84f41e11c17d61e2876d65faf9aed1bea5130f7 # v0.0.19
     permissions:
       contents: read
     with:
