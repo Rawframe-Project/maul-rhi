@@ -12,6 +12,7 @@
 #include "bytes.h"
 #include "capabilities_core.h"
 #include "container_interface.h"
+#include "invariant.h"
 #include "label.h"
 #include "sha256.h"
 #include "spirv_caps.h"
@@ -175,8 +176,19 @@ static bool TakeArray(const uint8_t* bytes, const Section* sections, uint32_t co
     return size % recordBytes == 0 && size / recordBytes <= MAX_RECORDS;
 }
 
+// Whether a record lies inside the section given. The accessors read
+// only after the parse checked the sizes they rely on; only assertions
+// call it.
+[[maybe_unused]] static bool Inside(const uint8_t* section, size_t sectionBytes, const uint8_t* at,
+                                    size_t bytes)
+{
+    return section != nullptr && at >= section && bytes <= sectionBytes &&
+           (size_t)(at - section) <= sectionBytes - bytes;
+}
+
 mrhiShaderEntry mrhiContainerEntry(const mrhiContainer* container, uint32_t index)
 {
+    MRHI_ASSERT(index < container->entryCount);
     const uint8_t* at = container->entries + (size_t)index * ENTRY_BYTES;
     return (mrhiShaderEntry){
         .stage = mrhiRead32(at),
@@ -197,6 +209,7 @@ mrhiShaderEntry mrhiContainerEntry(const mrhiContainer* container, uint32_t inde
 
 mrhiShaderBinding mrhiContainerBinding(const mrhiContainer* container, uint32_t index)
 {
+    MRHI_ASSERT(index < container->bindingCount);
     const uint8_t* at = container->bindings + (size_t)index * BINDING_BYTES;
     return (mrhiShaderBinding){
         .table = at[0],
@@ -215,12 +228,14 @@ mrhiShaderBinding mrhiContainerBinding(const mrhiContainer* container, uint32_t 
 
 mrhiShaderVariable mrhiContainerInput(const mrhiContainer* container, uint32_t index)
 {
+    MRHI_ASSERT(index < container->inputCount);
     return mrhiReadInterfaceRecord(container->inputs, index);
 }
 
 // A color output's byte 6 is its blend source, not an interpolation.
 mrhiShaderVariable mrhiContainerOutput(const mrhiContainer* container, uint32_t index)
 {
+    MRHI_ASSERT(index < container->outputCount);
     mrhiShaderVariable output = mrhiReadInterfaceRecord(container->outputs, index);
     output.blendSource = (uint8_t)output.interpolation;
     output.interpolation = 0;
@@ -229,11 +244,13 @@ mrhiShaderVariable mrhiContainerOutput(const mrhiContainer* container, uint32_t 
 
 mrhiShaderVariable mrhiContainerVariable(const mrhiContainer* container, uint32_t index)
 {
+    MRHI_ASSERT(index < container->variableCount);
     return mrhiReadInterfaceRecord(container->variables, index);
 }
 
 mrhiShaderConstant mrhiContainerConstant(const mrhiContainer* container, uint32_t index)
 {
+    MRHI_ASSERT(index < container->constantCount);
     const uint8_t* at = container->constants + (size_t)index * CONSTANT_BYTES;
     return (mrhiShaderConstant){
         .id = mrhiRead32(at),
@@ -245,12 +262,15 @@ mrhiShaderConstant mrhiContainerConstant(const mrhiContainer* container, uint32_
 
 uint8_t mrhiContainerMetalRoot(const mrhiContainer* container)
 {
+    MRHI_ASSERT(Inside(container->metalMap, container->metalMapBytes, container->metalMap, 8));
     return container->metalMap[0];
 }
 
 mrhiMetalEntry mrhiContainerMetalEntry(const mrhiContainer* container, uint32_t index)
 {
     const uint8_t* at = container->metalMap + 8 + (size_t)index * METAL_ENTRY_BYTES;
+    MRHI_ASSERT(index < container->entryCount &&
+                Inside(container->metalMap, container->metalMapBytes, at, METAL_ENTRY_BYTES));
     return (mrhiMetalEntry){
         .mslOffset = mrhiRead32(at),
         .mslLength = mrhiRead32(at + 4),
@@ -260,7 +280,11 @@ mrhiMetalEntry mrhiContainerMetalEntry(const mrhiContainer* container, uint32_t 
 
 uint8_t mrhiContainerMetalIndex(const mrhiContainer* container, uint32_t binding)
 {
-    return container->metalMap[8 + (size_t)container->entryCount * METAL_ENTRY_BYTES + binding];
+    const uint8_t* at =
+        container->metalMap + 8 + (size_t)container->entryCount * METAL_ENTRY_BYTES + binding;
+    MRHI_ASSERT(binding < container->bindingCount &&
+                Inside(container->metalMap, container->metalMapBytes, at, 1));
+    return *at;
 }
 
 static mrhiD3d12Place ReadPlace(const uint8_t* at)
@@ -268,14 +292,24 @@ static mrhiD3d12Place ReadPlace(const uint8_t* at)
     return (mrhiD3d12Place){.reg = mrhiRead32(at), .space = mrhiRead32(at + 4)};
 }
 
+// Whether a record lies inside the D3D12 map. Only assertions call it.
+[[maybe_unused]] static bool InD3d12Map(const mrhiContainer* container, const uint8_t* at,
+                                        size_t bytes)
+{
+    return Inside(container->d3d12Map, container->d3d12MapBytes, at, bytes);
+}
+
 mrhiD3d12Place mrhiContainerD3d12Buffer(const mrhiContainer* container, mrhiD3d12MapBuffer buffer)
 {
-    return ReadPlace(container->d3d12Map + (size_t)buffer * 8);
+    const uint8_t* at = container->d3d12Map + (size_t)buffer * 8;
+    MRHI_ASSERT(buffer <= mrhiD3d12VertexInfo && InD3d12Map(container, at, 8));
+    return ReadPlace(at);
 }
 
 mrhiD3d12Entry mrhiContainerD3d12Entry(const mrhiContainer* container, uint32_t index)
 {
     const uint8_t* at = container->d3d12Map + D3D12_HEAD_BYTES + (size_t)index * D3D12_ENTRY_BYTES;
+    MRHI_ASSERT(index < container->entryCount && InD3d12Map(container, at, D3D12_ENTRY_BYTES));
     return (mrhiD3d12Entry){
         .dxilOffset = mrhiRead32(at),
         .dxilLength = mrhiRead32(at + 4),
@@ -292,11 +326,14 @@ static const uint8_t* D3d12Bindings(const mrhiContainer* container)
 
 mrhiD3d12Place mrhiContainerD3d12Binding(const mrhiContainer* container, uint32_t binding)
 {
-    return ReadPlace(D3d12Bindings(container) + (size_t)binding * 8);
+    const uint8_t* at = D3d12Bindings(container) + (size_t)binding * 8;
+    MRHI_ASSERT(binding < container->bindingCount && InD3d12Map(container, at, 8));
+    return ReadPlace(at);
 }
 
 uint32_t mrhiContainerD3d12HeapRangeCount(const mrhiContainer* container)
 {
+    MRHI_ASSERT(InD3d12Map(container, container->d3d12Map + 24, 4));
     return mrhiRead32(container->d3d12Map + 24);
 }
 
@@ -308,6 +345,8 @@ static const uint8_t* D3d12HeapRanges(const mrhiContainer* container)
 mrhiD3d12HeapRange mrhiContainerD3d12HeapRange(const mrhiContainer* container, uint32_t index)
 {
     const uint8_t* at = D3d12HeapRanges(container) + (size_t)index * D3D12_RANGE_BYTES;
+    MRHI_ASSERT(index < mrhiContainerD3d12HeapRangeCount(container) &&
+                InD3d12Map(container, at, D3D12_RANGE_BYTES));
     return (mrhiD3d12HeapRange){
         .rangeClass = (mrhiD3d12HeapClass)mrhiRead32(at),
         .reg = mrhiRead32(at + 4),
@@ -317,9 +356,11 @@ mrhiD3d12HeapRange mrhiContainerD3d12HeapRange(const mrhiContainer* container, u
 
 bool mrhiContainerD3d12Fixed(const mrhiContainer* container, uint32_t constant)
 {
-    return D3d12HeapRanges(
-               container)[(size_t)mrhiContainerD3d12HeapRangeCount(container) * D3D12_RANGE_BYTES +
-                          constant] != 0;
+    const uint8_t* at = D3d12HeapRanges(container) +
+                        (size_t)mrhiContainerD3d12HeapRangeCount(container) * D3D12_RANGE_BYTES +
+                        constant;
+    MRHI_ASSERT(constant < container->constantCount && InD3d12Map(container, at, 1));
+    return *at != 0;
 }
 
 // Whether a range of records lies in an array of count.
@@ -885,6 +926,40 @@ static bool TakeParts(const uint8_t* bytes, const Section* sections, uint32_t co
            strings && spirv && wgsl && metallib;
 }
 
+// Whether every offset the library follows after the parse lies inside
+// its section: each entry's name in the strings, its interface ranges in
+// their arrays, its MSL and DXIL in theirs. The record checks above make
+// it so; only an assertion calls it.
+[[maybe_unused]] static bool IsSliced(const mrhiContainer* container)
+{
+    for (uint32_t i = 0; i < container->entryCount; ++i)
+    {
+        mrhiShaderEntry entry = mrhiContainerEntry(container, i);
+        bool sliced = Inside(container->strings, container->stringBytes,
+                             container->strings + entry.nameOffset, entry.nameLength) &&
+                      InArray(entry.firstInput, entry.inputCount, container->inputCount) &&
+                      InArray(entry.firstOutput, entry.outputCount, container->outputCount) &&
+                      InArray(entry.firstVariable, entry.variableCount, container->variableCount);
+        if (container->msl != nullptr)
+        {
+            mrhiMetalEntry metal = mrhiContainerMetalEntry(container, i);
+            sliced = sliced && Inside(container->msl, container->mslBytes,
+                                      container->msl + metal.mslOffset, metal.mslLength);
+        }
+        if (container->dxil != nullptr)
+        {
+            mrhiD3d12Entry d3d12 = mrhiContainerD3d12Entry(container, i);
+            sliced = sliced && Inside(container->dxil, container->dxilBytes,
+                                      container->dxil + d3d12.dxilOffset, d3d12.dxilLength);
+        }
+        if (!sliced)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 mrhiResult mrhiParseContainer(const void* bytes, size_t size, mrhiContainer* containerOut)
 {
     const uint8_t* data = bytes;
@@ -919,6 +994,7 @@ mrhiResult mrhiParseContainer(const void* bytes, size_t size, mrhiContainer* con
     {
         return mrhi_errorFormat;
     }
+    MRHI_ASSERT(IsSliced(&container));
     *containerOut = container;
     return mrhi_success;
 }

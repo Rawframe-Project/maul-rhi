@@ -10,6 +10,7 @@
 
 #include "allocator.h"
 #include "heap_core.h"
+#include "invariant.h"
 #include "label.h"
 
 #include "maul-rhi/encoder.h"
@@ -109,11 +110,24 @@ static uint32_t* RefsOf(mrhiDevice* device, const mrhiHeapEntrySlot* entry, bool
                                                  : &device->viewSlots[entry->object - 1].heapRefs;
 }
 
+// Whether an entry names a live object of the generation it was written
+// with: destroying one empties the entries naming it first. Only an
+// assertion calls it.
+[[maybe_unused]] static bool NamesLive(const mrhiDevice* device, const mrhiHeapEntrySlot* entry,
+                                       bool sampler)
+{
+    const mrhiPool* pool = sampler                                 ? &device->samplers
+                           : entry->kind == mrhi_heapStorageBuffer ? &device->buffers
+                                                                   : &device->views;
+    return mrhiPoolIsLive(pool, entry->object, entry->generation);
+}
+
 // Empties an entry, which frames submitted until now may still read.
 static void Empty(mrhiDevice* device, mrhiHeapEntrySlot* entry, bool sampler)
 {
     if (entry->object != 0)
     {
+        MRHI_ASSERT(NamesLive(device, entry, sampler) && *RefsOf(device, entry, sampler) > 0);
         --*RefsOf(device, entry, sampler);
     }
     *entry = (mrhiHeapEntrySlot){.freeAfter = device->lastSubmitted};
@@ -367,6 +381,10 @@ void mrhiForgetHeapObject(mrhiDevice* device, mrhiHeapObject kind, uint32_t inde
             }
         }
     }
+    // Every entry that named it counted once.
+    MRHI_ASSERT(kind == mrhiHeapObjectSampler  ? device->samplerSlots[index1 - 1].heapRefs == 0
+                : kind == mrhiHeapObjectBuffer ? device->bufferSlots[index1 - 1].heapRefs == 0
+                                               : device->viewSlots[index1 - 1].heapRefs == 0);
 }
 
 mrhiResult mrhiCheckPassHeap(mrhiDevice* device, mrhiHeapId heap, uint64_t* handleOut)
