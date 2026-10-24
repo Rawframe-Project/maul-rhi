@@ -481,15 +481,20 @@ static void KeepVertexFacts(mrhiDevice* device, uint32_t index1, const mrhiGraph
     }
 }
 
-// Finds the def's entries in the shader: false when either is missing.
-static bool FindStages(const mrhiShaderSlot* shader, const mrhiGraphicsPipelineDef* def,
-                       Stages* stagesOut)
+// Finds the def's entries in the shader: success, mrhi_errorInvalid for a
+// NULL vertex entry or a NULL fragment entry with a length, or
+// mrhi_errorFormat when the shader lacks either.
+static mrhiResult FindStages(const mrhiShaderSlot* shader, const mrhiGraphicsPipelineDef* def,
+                             Stages* stagesOut)
 {
+    if (def->vertexEntry == nullptr ||
+        (def->fragmentEntry == nullptr && def->fragmentEntryLength > 0))
+    {
+        return mrhi_errorInvalid;
+    }
     const mrhiReflection* reflection = shader->reflection;
     uint32_t vertex =
-        def->vertexEntry == nullptr
-            ? reflection->entryCount
-            : mrhiFindEntry(reflection, def->vertexEntry, def->vertexEntryLength, mrhi_stageVertex);
+        mrhiFindEntry(reflection, def->vertexEntry, def->vertexEntryLength, mrhi_stageVertex);
     uint32_t fragment = def->fragmentEntry == nullptr
                             ? reflection->entryCount
                             : mrhiFindEntry(reflection, def->fragmentEntry,
@@ -499,13 +504,13 @@ static bool FindStages(const mrhiShaderSlot* shader, const mrhiGraphicsPipelineD
         .vertex = vertex < reflection->entryCount ? &reflection->entries[vertex] : nullptr,
         .fragment = fragment < reflection->entryCount ? &reflection->entries[fragment] : nullptr,
     };
-    bool fragmentFound = def->fragmentEntry == nullptr ? def->fragmentEntryLength == 0
-                                                       : stagesOut->fragment != nullptr;
-    return stagesOut->vertex != nullptr && fragmentFound;
+    bool fragmentFound = def->fragmentEntry == nullptr || stagesOut->fragment != nullptr;
+    return stagesOut->vertex != nullptr && fragmentFound ? mrhi_success : mrhi_errorFormat;
 }
 
 // Checks a graphics pipeline def: its shader, with its stages, or NULL
-// with the refusal, invalid input counted as misuse.
+// with the refusal, invalid input counted as misuse and entries or
+// constants the reflection lacks not.
 static mrhiShaderSlot* CheckGraphicsDef(mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
                                         Stages* stagesOut, mrhiResult* statusOut)
 {
@@ -515,14 +520,17 @@ static mrhiShaderSlot* CheckGraphicsDef(mrhiDevice* device, const mrhiGraphicsPi
     {
         return nullptr;
     }
-    if (!FindStages(shader, def, stagesOut))
+    mrhiResult found = FindStages(shader, def, stagesOut);
+    if (found != mrhi_success)
     {
-        *statusOut = mrhiDeviceMisuse(device, mrhi_diagnosticPipelineEntry);
+        *statusOut = found == mrhi_errorInvalid
+                         ? mrhiDeviceMisuse(device, mrhi_diagnosticPipelineEntry)
+                         : mrhiDeviceBadData(device, mrhi_diagnosticPipelineEntry);
         return nullptr;
     }
-    if (!mrhiAreConstantsValid(shader->reflection, def->constants, def->constantCount))
+    *statusOut = mrhiCheckConstants(device, shader->reflection, def->constants, def->constantCount);
+    if (*statusOut != mrhi_success)
     {
-        *statusOut = mrhiDeviceMisuse(device, mrhi_diagnosticPipelineConstants);
         return nullptr;
     }
     // Every state is checked, and invalid input outranks what the device

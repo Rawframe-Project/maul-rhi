@@ -21,14 +21,14 @@ The writer applies the reader's rules and refuses code that disagrees with the r
 
 ### Loading
 
-`mrhiCreateShader` takes the container's bytes, 8-byte aligned, and checks every one as hostile input, so a damaged or hostile file is refused, never read past its end. It also refuses, as unsupported, a container that needs what the device lacks: limits, 16-bit floats, 64-bit integers, subgroups, multiview or heaps. `mrhiGetShaderInfo` reads the reflection back. The bytes may be freed once the call returns.
+`mrhiCreateShader` takes the container's bytes, 8-byte aligned, and checks every one as hostile input, so a damaged or hostile file is refused with `mrhi_errorFormat`, never read past its end. Bad bytes count no misuse, since a correct program can load them from content; NULL or misaligned bytes are `mrhi_errorInvalid` and count one. It also refuses, as unsupported, a container that needs what the device lacks: limits, 16-bit floats, 64-bit integers, subgroups, multiview or heaps. `mrhiGetShaderInfo` reads the reflection back. The bytes may be freed once the call returns.
 
 ## Pipelines
 
 `mrhiCreateGraphicsPipeline` and `mrhiCreateComputePipeline` return a pipeline id at once, and `mrhi_devicePipelineReady` answers in the device's queue when it can be used: compiling a pipeline takes long enough to stall a frame, and the browser offers only asynchronous creation. A program starts its pipelines while loading and polls for them as it polls for frames. Destroying a pending pipeline answers it `mrhi_errorStale` at once.
 
 - A graphics def carries every state of WebGPU's render pipeline: vertex buffers and attributes as arrays with counts, primitive state, depth and stencil (with `mrhi_formatNone` for none), multisampling and each color target's format, blending and write mask. A field for an aspect the depth format lacks must keep its default, so a forgotten format is refused rather than ignored.
-- Specialization constants are doubles, as in WebGPU, checked against each constant's type. Every constant without a default must be set, by every pipeline made from the container.
+- Specialization constants are doubles, as in WebGPU, checked against each constant's type. Every constant without a default must be set, by every pipeline made from the container. An entry, a constant id or a value the reflection does not take is `mrhi_errorFormat`, counting no misuse; a NULL entry, NULL values with a count or a constant set twice is `mrhi_errorInvalid`.
 - A pipeline's binding layout is its whole container's, and it keeps working after its shader is destroyed.
 - Everything the reflection allows is checked before the driver sees the pipeline: a def that contradicts itself, its shader or WebGPU's rules is invalid; one the device cannot do is unsupported.
 

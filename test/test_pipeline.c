@@ -158,22 +158,26 @@ static void TestInvalid(void)
     def.labelLength = 1;
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorInvalid,
           "a bad label");
-    const char* entries[] = {"vs", "fs", "c", "css", "", nullptr};
+    def = Def(shader, nullptr);
+    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorInvalid,
+          "no entry");
+    def.entryLength = 2;
+    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorInvalid,
+          "no name with a length");
+    CHECK(mrhiGetDeviceMisuse(device) == 7, "each counted");
+    // An entry the shader lacks is bad data, which a correct program can
+    // meet in a shader from content.
+    const char* entries[] = {"vs", "fs", "c", "css", ""};
     for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); ++i)
     {
         def = Def(shader, entries[i]);
-        CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorInvalid,
+        CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorFormat,
               "not a compute entry");
     }
     def = Def(shader, "cs");
     def.entryLength = 1;
-    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorInvalid,
+    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorFormat,
           "a name's start");
-    def = Def(shader, nullptr);
-    def.entryLength = 2;
-    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorInvalid,
-          "no name with a length");
-    CHECK(mrhiGetDeviceMisuse(device) == 13, "each counted");
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def = Def(shader, "cs");
     def.next = &critical;
@@ -187,7 +191,7 @@ static void TestInvalid(void)
           "no shader");
     CHECK(mrhiDestroyComputePipeline(device, (mrhiComputePipelineId){1, 1}) == mrhi_errorStale,
           "a pipeline never made");
-    CHECK(mrhiGetDeviceMisuse(device) == 13, "other refusals are not misuse");
+    CHECK(mrhiGetDeviceMisuse(device) == 7, "other refusals are not misuse");
     CHECK(mrhiNextDeviceNotification(device, &(mrhiDeviceNotification){0}) == mrhi_empty,
           "nothing started");
     Close(device);
@@ -220,29 +224,29 @@ static void TestConstants(void)
     mrhiShaderId shader = Shader(device);
     CHECK(WithValue(device, shader, 8, 1.0) == mrhi_success, "true");
     CHECK(WithValue(device, shader, 8, 0.0) == mrhi_success, "false");
-    CHECK(WithValue(device, shader, 8, 0.5) == mrhi_errorInvalid, "a boolean of one half");
-    CHECK(WithValue(device, shader, 8, 2.0) == mrhi_errorInvalid, "a boolean of 2");
+    CHECK(WithValue(device, shader, 8, 0.5) == mrhi_errorFormat, "a boolean of one half");
+    CHECK(WithValue(device, shader, 8, 2.0) == mrhi_errorFormat, "a boolean of 2");
     CHECK(WithValue(device, shader, 9, -2147483648.0) == mrhi_success, "the least int32");
     CHECK(WithValue(device, shader, 9, 2147483647.0) == mrhi_success, "the greatest int32");
-    CHECK(WithValue(device, shader, 9, 2147483648.0) == mrhi_errorInvalid, "past int32");
-    CHECK(WithValue(device, shader, 9, -2147483649.0) == mrhi_errorInvalid, "below int32");
-    CHECK(WithValue(device, shader, 9, 1.5) == mrhi_errorInvalid, "an int32 with a fraction");
+    CHECK(WithValue(device, shader, 9, 2147483648.0) == mrhi_errorFormat, "past int32");
+    CHECK(WithValue(device, shader, 9, -2147483649.0) == mrhi_errorFormat, "below int32");
+    CHECK(WithValue(device, shader, 9, 1.5) == mrhi_errorFormat, "an int32 with a fraction");
     CHECK(WithValue(device, shader, 10, 4294967295.0) == mrhi_success, "the greatest uint32");
-    CHECK(WithValue(device, shader, 10, 4294967296.0) == mrhi_errorInvalid, "past uint32");
-    CHECK(WithValue(device, shader, 10, -1.0) == mrhi_errorInvalid, "a negative uint32");
-    CHECK(WithValue(device, shader, 10, 0.25) == mrhi_errorInvalid, "a uint32 with a fraction");
+    CHECK(WithValue(device, shader, 10, 4294967296.0) == mrhi_errorFormat, "past uint32");
+    CHECK(WithValue(device, shader, 10, -1.0) == mrhi_errorFormat, "a negative uint32");
+    CHECK(WithValue(device, shader, 10, 0.25) == mrhi_errorFormat, "a uint32 with a fraction");
     CHECK(WithValue(device, shader, 7, (double)FLT_MAX) == mrhi_success, "the greatest float");
     CHECK(WithValue(device, shader, 7, -(double)FLT_MAX) == mrhi_success, "the least float");
-    CHECK(WithValue(device, shader, 7, 3.5e38) == mrhi_errorInvalid, "past float");
-    CHECK(WithValue(device, shader, 7, -3.5e38) == mrhi_errorInvalid, "below float");
-    CHECK(WithValue(device, shader, 7, (double)INFINITY) == mrhi_errorInvalid, "infinity");
-    CHECK(WithValue(device, shader, 7, (double)NAN) == mrhi_errorInvalid, "NaN");
-    CHECK(WithValue(device, shader, 11, 0.0) == mrhi_errorInvalid, "an unknown id");
+    CHECK(WithValue(device, shader, 7, 3.5e38) == mrhi_errorFormat, "past float");
+    CHECK(WithValue(device, shader, 7, -3.5e38) == mrhi_errorFormat, "below float");
+    CHECK(WithValue(device, shader, 7, (double)INFINITY) == mrhi_errorFormat, "infinity");
+    CHECK(WithValue(device, shader, 7, (double)NAN) == mrhi_errorFormat, "NaN");
+    CHECK(WithValue(device, shader, 11, 0.0) == mrhi_errorFormat, "an unknown id");
     CHECK(WithValue(device, shader, 10, 1.0) == mrhi_success, "the required one alone");
     mrhiComputePipelineDef def = Def(shader, "cs");
     mrhiComputePipelineId pipeline;
     mrhiRequestId request;
-    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorInvalid,
+    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorFormat,
           "the required one left unset");
     mrhiConstantValue values[5] = {{10, 1.0}, {10, 2.0}, {7, 0.0}, {8, 0.0}, {9, 0.0}};
     def.constants = values;
@@ -251,7 +255,7 @@ static void TestConstants(void)
           "one set twice");
     values[1].id = 7;
     def.constantCount = 5;
-    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorInvalid,
+    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorFormat,
           "more values than constants");
     def.constants = nullptr;
     def.constantCount = 1;
@@ -259,7 +263,7 @@ static void TestConstants(void)
           "no values with a count");
     def.constants = &values[2];
     def.constantCount = 3;
-    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorInvalid,
+    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorFormat,
           "every value but the required one");
     Close(device);
 }
@@ -384,6 +388,43 @@ static void TestStateAndFailure(void)
     Close(device);
 }
 
+// A list from content far longer than the shader's constants, every id
+// repeated: refused by its length before any scan over it, so as format.
+static mrhiConstantValue s_oversized[100000];
+
+// Bad data, a damaged container or an entry its shader lacks, is refused
+// as format and counts no misuse: a correct program meets it in content.
+static void TestBadData(void)
+{
+    mrhiDevice* device = Open(4, 16, true);
+    Reset();
+    Assemble();
+    s_container[s_size - 1] ^= 1;
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_container;
+    shaderDef.byteCount = s_size;
+    mrhiShaderId damaged = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &damaged) == mrhi_errorFormat,
+          "a damaged container");
+    mrhiShaderId shader = Shader(device);
+    mrhiComputePipelineDef def = Def(shader, "main");
+    mrhiComputePipelineId pipeline;
+    mrhiRequestId request;
+    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorFormat,
+          "an entry the shader lacks");
+    for (size_t i = 0; i < sizeof(s_oversized) / sizeof(s_oversized[0]); ++i)
+    {
+        s_oversized[i] = (mrhiConstantValue){.id = 7, .value = 0.0};
+    }
+    def = Def(shader, "cs");
+    def.constants = s_oversized;
+    def.constantCount = sizeof(s_oversized) / sizeof(s_oversized[0]);
+    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorFormat,
+          "an oversized list, by its length");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "none is misuse");
+    Close(device);
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -391,6 +432,7 @@ int main(void)
     TestRequestsShared();
     TestInvalid();
     TestConstants();
+    TestBadData();
     TestPendingAndOutcome();
     TestRoomAndLimits();
     TestStateAndFailure();

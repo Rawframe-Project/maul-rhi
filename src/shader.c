@@ -143,7 +143,7 @@ static bool IsWithin(const mrhiDevice* device, const mrhiContainer* container)
 }
 
 // Checks a def and its container: success with the container, or the
-// refusal, invalid input counted as misuse.
+// refusal, invalid input counted as misuse and a bad container not.
 static mrhiResult CheckShaderDef(mrhiDevice* device, const mrhiShaderDef* def,
                                  mrhiContainer* containerOut)
 {
@@ -157,9 +157,9 @@ static mrhiResult CheckShaderDef(mrhiDevice* device, const mrhiShaderDef* def,
         return mrhiDeviceMisuse(device, mrhi_diagnosticShaderBytes);
     }
     status = mrhiParseContainer(def->bytes, def->byteCount, containerOut);
-    if (status == mrhi_errorInvalid)
+    if (status == mrhi_errorFormat)
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticShaderContainer);
+        return mrhiDeviceBadData(device, mrhi_diagnosticShaderContainer);
     }
     return status == mrhi_success && !IsWithin(device, containerOut) ? mrhi_errorUnsupported
                                                                      : status;

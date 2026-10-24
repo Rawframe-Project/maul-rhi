@@ -163,7 +163,7 @@ typedef struct mrhiContainer
 } mrhiContainer;
 
 // Checks a container: success with its sections, mrhi_errorVersion for
-// another version, or mrhi_errorInvalid.
+// another version, or mrhi_errorFormat.
 mrhiResult mrhiParseContainer(const void* bytes, size_t size, mrhiContainer* containerOut);
 
 // The records of a checked container, by index.

@@ -91,10 +91,10 @@ static void TestHeader(void)
 {
     Reset();
     Assemble();
-    CHECK(mrhiParseContainer(s_container, 63, &(mrhiContainer){0}) == mrhi_errorInvalid,
+    CHECK(mrhiParseContainer(s_container, 63, &(mrhiContainer){0}) == mrhi_errorFormat,
           "shorter than a header");
     s_container[0] = 'm';
-    CHECK(Parse() == mrhi_errorInvalid, "another magic");
+    CHECK(Parse() == mrhi_errorFormat, "another magic");
     Assemble();
     Put32(s_container + 4, 2);
     CHECK(Parse() == mrhi_errorVersion, "another version");
@@ -103,31 +103,31 @@ static void TestHeader(void)
     CHECK(Parse() == mrhi_errorVersion, "version 0");
     Assemble();
     Put64(s_container + 8, s_size + 8);
-    CHECK(Parse() == mrhi_errorInvalid, "a size past the bytes");
+    CHECK(Parse() == mrhi_errorFormat, "a size past the bytes");
     Assemble();
-    CHECK(mrhiParseContainer(s_container, s_size - 8, &(mrhiContainer){0}) == mrhi_errorInvalid,
+    CHECK(mrhiParseContainer(s_container, s_size - 8, &(mrhiContainer){0}) == mrhi_errorFormat,
           "fewer bytes than its size");
     Assemble();
     s_container[s_size - 1] ^= 1;
-    CHECK(Parse() == mrhi_errorInvalid, "a damaged byte");
+    CHECK(Parse() == mrhi_errorFormat, "a damaged byte");
     Assemble();
     s_container[20] ^= 0x80;
-    CHECK(Parse() == mrhi_errorInvalid, "a damaged digest");
+    CHECK(Parse() == mrhi_errorFormat, "a damaged digest");
     for (size_t at = 52; at < 64; at += 4)
     {
         Assemble();
         s_container[at] = 1;
         Seal();
-        CHECK(Parse() == mrhi_errorInvalid, "a header zero that is not zero");
+        CHECK(Parse() == mrhi_errorFormat, "a header zero that is not zero");
     }
     Assemble();
     Put32(s_container + 48, 65);
     Seal();
-    CHECK(Parse() == mrhi_errorInvalid, "too many sections");
+    CHECK(Parse() == mrhi_errorFormat, "too many sections");
     Assemble();
     Put32(s_container + 48, 30);
     Seal();
-    CHECK(Parse() == mrhi_errorInvalid, "a table past the end");
+    CHECK(Parse() == mrhi_errorFormat, "a table past the end");
 }
 
 // Sets section index's offset, or size, in the assembled table.
@@ -154,23 +154,23 @@ static void TestSections(void)
     Reset();
     Assemble();
     Move(WGSL, OffsetOf(WGSL) + 4, 4);
-    CHECK(Parse() == mrhi_errorInvalid, "a misaligned section");
+    CHECK(Parse() == mrhi_errorFormat, "a misaligned section");
     Assemble();
     Move(META, 64, 16);
-    CHECK(Parse() == mrhi_errorInvalid, "a section in the table");
+    CHECK(Parse() == mrhi_errorFormat, "a section in the table");
     Reset();
     s_sections[s_sectionCount++] = (Section){.type = 100};
     Assemble();
     Move(s_sectionCount - 1, 64 + (uint64_t)s_sectionCount * 24 - 8, 0);
-    CHECK(Parse() == mrhi_errorInvalid, "an empty section in the table's last record");
+    CHECK(Parse() == mrhi_errorFormat, "an empty section in the table's last record");
     Move(s_sectionCount - 1, s_size, 0);
     CHECK(Parse() == mrhi_success, "an empty section at the end");
     s_sections[s_sectionCount - 1].size = 8;
     Assemble();
     Move(s_sectionCount - 1, OffsetOf(s_sectionCount - 1), 9);
-    CHECK(Parse() == mrhi_errorInvalid, "an unknown section a byte past the end");
+    CHECK(Parse() == mrhi_errorFormat, "an unknown section a byte past the end");
     Move(s_sectionCount - 1, OffsetOf(s_sectionCount - 1), 0 - OffsetOf(s_sectionCount - 1));
-    CHECK(Parse() == mrhi_errorInvalid, "an unknown section whose end wraps to 0");
+    CHECK(Parse() == mrhi_errorFormat, "an unknown section whose end wraps to 0");
     Reset();
     while (s_sectionCount < 64)
     {
@@ -178,19 +178,19 @@ static void TestSections(void)
     }
     CHECK(Built() == mrhi_success, "64 sections");
     s_sections[s_sectionCount++] = (Section){.type = 100};
-    CHECK(Built() == mrhi_errorInvalid, "65 sections");
+    CHECK(Built() == mrhi_errorFormat, "65 sections");
     Reset();
     Assemble();
     uint32_t fit = (uint32_t)((s_size - 64) / 24);
     Put32(s_container + 48, fit + 1);
     Seal();
-    CHECK(Parse() == mrhi_errorInvalid, "a table a record past the end");
+    CHECK(Parse() == mrhi_errorFormat, "a table a record past the end");
     Assemble();
     Move(WGSL, OffsetOf(SPIRV), 8);
-    CHECK(Parse() == mrhi_errorInvalid, "overlapping sections");
+    CHECK(Parse() == mrhi_errorFormat, "overlapping sections");
     Assemble();
     Move(WGSL, OffsetOf(WGSL), 9);
-    CHECK(Parse() == mrhi_errorInvalid, "a section a byte past the end");
+    CHECK(Parse() == mrhi_errorFormat, "a section a byte past the end");
     Assemble();
     uint8_t first[24];
     memcpy(first, s_container + 64, 24);
@@ -200,38 +200,38 @@ static void TestSections(void)
     CHECK(Parse() == mrhi_success, "touching sections listed out of order");
     Assemble();
     Move(WGSL, OffsetOf(WGSL), UINT64_MAX);
-    CHECK(Parse() == mrhi_errorInvalid, "a size that wraps");
+    CHECK(Parse() == mrhi_errorFormat, "a size that wraps");
     Assemble();
     s_container[64 + 4] = 1;
     Seal();
-    CHECK(Parse() == mrhi_errorInvalid, "a table zero that is not zero");
+    CHECK(Parse() == mrhi_errorFormat, "a table zero that is not zero");
     Reset();
     s_sections[s_sectionCount++] = s_sections[CONSTANTS];
-    CHECK(Built() == mrhi_errorInvalid, "a known section twice");
+    CHECK(Built() == mrhi_errorFormat, "a known section twice");
     Reset();
     s_sections[s_sectionCount++] = s_sections[WGSL];
-    CHECK(Built() == mrhi_errorInvalid, "the last known section twice");
+    CHECK(Built() == mrhi_errorFormat, "the last known section twice");
     Reset();
     s_sections[s_sectionCount++] = (Section){.type = 100, .size = 8};
     Assemble();
     Move(s_sectionCount - 1, OffsetOf(WGSL), 8);
-    CHECK(Parse() == mrhi_errorInvalid, "an unknown section overlapping");
+    CHECK(Parse() == mrhi_errorFormat, "an unknown section overlapping");
     uint32_t required[] = {META, STRINGS, ENTRIES, SPIRV, WGSL};
     for (size_t i = 0; i < sizeof(required) / sizeof(required[0]); ++i)
     {
         Reset();
         DropSection(required[i]);
-        CHECK(Built() == mrhi_errorInvalid, "a required section left out");
+        CHECK(Built() == mrhi_errorFormat, "a required section left out");
     }
     Reset();
     s_sections[ENTRIES].size = 0;
-    CHECK(Built() == mrhi_errorInvalid, "no entries");
+    CHECK(Built() == mrhi_errorFormat, "no entries");
     uint32_t arrays[] = {ENTRIES, BINDINGS, INPUTS, OUTPUTS, CONSTANTS, VARIABLES};
     for (size_t i = 0; i < sizeof(arrays) / sizeof(arrays[0]); ++i)
     {
         Reset();
         s_sections[arrays[i]].size += 4;
-        CHECK(Built() == mrhi_errorInvalid, "a part of a record");
+        CHECK(Built() == mrhi_errorFormat, "a part of a record");
     }
 }
 
@@ -239,19 +239,19 @@ static void TestMeta(void)
 {
     Reset();
     s_sections[META].size = 12;
-    CHECK(Built() == mrhi_errorInvalid, "a short meta");
+    CHECK(Built() == mrhi_errorFormat, "a short meta");
     Reset();
     Put32(s_sections[META].bytes, 18);
-    CHECK(Built() == mrhi_errorInvalid, "a root block not a multiple of 4");
+    CHECK(Built() == mrhi_errorFormat, "a root block not a multiple of 4");
     Reset();
     Put32(s_sections[META].bytes, 260);
-    CHECK(Built() == mrhi_errorInvalid, "a root block past 256");
+    CHECK(Built() == mrhi_errorFormat, "a root block past 256");
     Reset();
     Put32(s_sections[META].bytes, 256);
     CHECK(Built() == mrhi_success, "a root block of 256");
     Reset();
     s_sections[META].bytes[15] = 1;
-    CHECK(Built() == mrhi_errorInvalid, "a meta zero that is not zero");
+    CHECK(Built() == mrhi_errorFormat, "a meta zero that is not zero");
 }
 
 static void TestEntries(void)
@@ -261,56 +261,56 @@ static void TestEntries(void)
     {
         Reset();
         Put32(Record(ENTRIES, 2, 48), stages[i]);
-        CHECK(Built() == mrhi_errorInvalid, "not one stage");
+        CHECK(Built() == mrhi_errorFormat, "not one stage");
     }
     Reset();
     Entry(0, mrhi_stageVertex, 0, 0);
-    CHECK(Built() == mrhi_errorInvalid, "an empty name");
+    CHECK(Built() == mrhi_errorFormat, "an empty name");
     Reset();
     Entry(0, mrhi_stageVertex, 5, 2);
-    CHECK(Built() == mrhi_errorInvalid, "a name past the strings");
+    CHECK(Built() == mrhi_errorFormat, "a name past the strings");
     Reset();
     Entry(0, mrhi_stageVertex, UINT32_MAX, 2);
-    CHECK(Built() == mrhi_errorInvalid, "a name offset that wraps");
+    CHECK(Built() == mrhi_errorFormat, "a name offset that wraps");
     Reset();
     Entry(0, mrhi_stageVertex, 2, 2);
-    CHECK(Built() == mrhi_errorInvalid, "a repeated name");
+    CHECK(Built() == mrhi_errorFormat, "a repeated name");
     Reset();
     Entry(1, mrhi_stageFragment, 0, 1);
     CHECK(Built() == mrhi_success, "a name that is the start of one before it");
     Reset();
     s_sections[STRINGS].bytes[0] = 0xFF;
-    CHECK(Built() == mrhi_errorInvalid, "a name that is not UTF-8");
+    CHECK(Built() == mrhi_errorFormat, "a name that is not UTF-8");
     Reset();
     s_sections[STRINGS].bytes[1] = 0;
-    CHECK(Built() == mrhi_errorInvalid, "a name with NUL");
+    CHECK(Built() == mrhi_errorFormat, "a name with NUL");
     Reset();
     memset(Record(STRINGS, 0, 263) + 6, 'a', 257);
     Entry(0, mrhi_stageVertex, 6, 257);
-    CHECK(Built() == mrhi_errorInvalid, "a name past 256 bytes");
+    CHECK(Built() == mrhi_errorFormat, "a name past 256 bytes");
     Entry(0, mrhi_stageVertex, 6, 256);
     CHECK(Built() == mrhi_success, "a name of 256 bytes");
     for (uint32_t axis = 0; axis < 3; ++axis)
     {
         Reset();
         Put32(Record(ENTRIES, 2, 48) + 12 + axis * 4, 0);
-        CHECK(Built() == mrhi_errorInvalid, "a compute entry with no workgroup");
+        CHECK(Built() == mrhi_errorFormat, "a compute entry with no workgroup");
         Reset();
         Put32(Record(ENTRIES, 1, 48) + 12 + axis * 4, 1);
-        CHECK(Built() == mrhi_errorInvalid, "a fragment entry with a workgroup");
+        CHECK(Built() == mrhi_errorFormat, "a fragment entry with a workgroup");
     }
     Reset();
     Put16(Record(ENTRIES, 1, 48) + 26, 1);
-    CHECK(Built() == mrhi_errorInvalid, "inputs on a fragment entry");
+    CHECK(Built() == mrhi_errorFormat, "inputs on a fragment entry");
     Reset();
     Put16(Record(ENTRIES, 0, 48) + 30, 1);
-    CHECK(Built() == mrhi_errorInvalid, "outputs on a vertex entry");
+    CHECK(Built() == mrhi_errorFormat, "outputs on a vertex entry");
     Reset();
     Put16(Record(ENTRIES, 0, 48) + 24, 1);
-    CHECK(Built() == mrhi_errorInvalid, "inputs past their section");
+    CHECK(Built() == mrhi_errorFormat, "inputs past their section");
     Reset();
     Put16(Record(ENTRIES, 1, 48) + 28, UINT16_MAX);
-    CHECK(Built() == mrhi_errorInvalid, "outputs far past their section");
+    CHECK(Built() == mrhi_errorFormat, "outputs far past their section");
 }
 
 // Resets, then sets byte at of interface record index in section.
@@ -323,31 +323,30 @@ static mrhiResult VariableWith(uint32_t section, uint32_t index, size_t at, uint
 
 static void TestInterfaces(void)
 {
-    CHECK(VariableWith(INPUTS, 0, 4, mrhi_scalarNone) == mrhi_errorInvalid, "an input of no type");
-    CHECK(VariableWith(INPUTS, 0, 4, mrhi_scalarUint32 + 1) == mrhi_errorInvalid,
+    CHECK(VariableWith(INPUTS, 0, 4, mrhi_scalarNone) == mrhi_errorFormat, "an input of no type");
+    CHECK(VariableWith(INPUTS, 0, 4, mrhi_scalarUint32 + 1) == mrhi_errorFormat,
           "an input of an unknown type");
-    CHECK(VariableWith(INPUTS, 0, 4, mrhi_scalarFloat16) == mrhi_errorInvalid,
+    CHECK(VariableWith(INPUTS, 0, 4, mrhi_scalarFloat16) == mrhi_errorFormat,
           "a 16-bit float input");
     CHECK(VariableWith(INPUTS, 0, 4, mrhi_scalarUint32) == mrhi_success, "an unsigned input");
-    CHECK(VariableWith(INPUTS, 0, 5, 0) == mrhi_errorInvalid, "an input of no components");
-    CHECK(VariableWith(INPUTS, 0, 5, 5) == mrhi_errorInvalid, "an input of five components");
+    CHECK(VariableWith(INPUTS, 0, 5, 0) == mrhi_errorFormat, "an input of no components");
+    CHECK(VariableWith(INPUTS, 0, 5, 5) == mrhi_errorFormat, "an input of five components");
     CHECK(VariableWith(INPUTS, 0, 5, 4) == mrhi_success, "an input of four components");
-    CHECK(VariableWith(INPUTS, 0, 6, 1) == mrhi_errorInvalid, "an interpolated input");
-    CHECK(VariableWith(INPUTS, 0, 7, 1) == mrhi_errorInvalid, "a sampled input");
-    CHECK(VariableWith(INPUTS, 1, 4, mrhi_scalarNone) == mrhi_errorInvalid,
+    CHECK(VariableWith(INPUTS, 0, 6, 1) == mrhi_errorFormat, "an interpolated input");
+    CHECK(VariableWith(INPUTS, 0, 7, 1) == mrhi_errorFormat, "a sampled input");
+    CHECK(VariableWith(INPUTS, 1, 4, mrhi_scalarNone) == mrhi_errorFormat,
           "an input no entry names, of no type");
     Reset();
     Variable(INPUTS, 1, 3, mrhi_scalarUint32, 1, 0, 0);
     Put16(Record(ENTRIES, 0, 48) + 26, 2);
-    CHECK(Built() == mrhi_errorInvalid, "a repeated input location");
+    CHECK(Built() == mrhi_errorFormat, "a repeated input location");
     Put32(Record(INPUTS, 1, 8), 4);
     CHECK(Built() == mrhi_success, "two input locations");
 
-    CHECK(VariableWith(OUTPUTS, 0, 4, mrhi_scalarNone) == mrhi_errorInvalid,
-          "an output of no type");
-    CHECK(VariableWith(OUTPUTS, 0, 5, 5) == mrhi_errorInvalid, "an output of five components");
-    CHECK(VariableWith(OUTPUTS, 0, 6, 2) == mrhi_errorInvalid, "a third blend source");
-    CHECK(VariableWith(OUTPUTS, 0, 6, 1) == mrhi_errorInvalid, "a second source alone");
+    CHECK(VariableWith(OUTPUTS, 0, 4, mrhi_scalarNone) == mrhi_errorFormat, "an output of no type");
+    CHECK(VariableWith(OUTPUTS, 0, 5, 5) == mrhi_errorFormat, "an output of five components");
+    CHECK(VariableWith(OUTPUTS, 0, 6, 2) == mrhi_errorFormat, "a third blend source");
+    CHECK(VariableWith(OUTPUTS, 0, 6, 1) == mrhi_errorFormat, "a second source alone");
     // Dual-source blending: a second source at location 0 beside the
     // first, of one type and component count.
     Reset();
@@ -362,18 +361,18 @@ static void TestInterfaces(void)
               mrhiContainerOutput(&pair, 1).interpolation == 0,
           "each output's blend source");
     Variable(OUTPUTS, 1, 0, mrhi_scalarFloat32, 3, 1, 0);
-    CHECK(Built() == mrhi_errorInvalid, "a second source of other components");
+    CHECK(Built() == mrhi_errorFormat, "a second source of other components");
     Variable(OUTPUTS, 1, 0, mrhi_scalarSint32, 4, 1, 0);
-    CHECK(Built() == mrhi_errorInvalid, "a second source of another type");
+    CHECK(Built() == mrhi_errorFormat, "a second source of another type");
     Variable(OUTPUTS, 1, 0, mrhi_scalarFloat32, 4, 0, 0);
-    CHECK(Built() == mrhi_errorInvalid, "two first sources at location 0");
+    CHECK(Built() == mrhi_errorFormat, "two first sources at location 0");
     Variable(OUTPUTS, 0, 0, mrhi_scalarFloat32, 4, 1, 0);
     Variable(OUTPUTS, 1, 0, mrhi_scalarFloat32, 4, 1, 0);
-    CHECK(Built() == mrhi_errorInvalid, "two second sources");
+    CHECK(Built() == mrhi_errorFormat, "two second sources");
     Variable(OUTPUTS, 0, 1, mrhi_scalarFloat32, 4, 0, 0);
     Variable(OUTPUTS, 1, 1, mrhi_scalarFloat32, 4, 1, 0);
-    CHECK(Built() == mrhi_errorInvalid, "a second source at location 1");
-    CHECK(VariableWith(OUTPUTS, 0, 7, 1) == mrhi_errorInvalid, "a sampled output");
+    CHECK(Built() == mrhi_errorFormat, "a second source at location 1");
+    CHECK(VariableWith(OUTPUTS, 0, 7, 1) == mrhi_errorFormat, "a sampled output");
     Reset();
     Record(OUTPUTS, 0, 8)[4] = mrhi_scalarFloat16;
     Assemble();
@@ -382,16 +381,16 @@ static void TestInterfaces(void)
           "a 16-bit float output, noted");
     Reset();
     Put32(Record(OUTPUTS, 0, 8), MRHI_COLOR_TARGETS);
-    CHECK(Built() == mrhi_errorInvalid, "an output past the color targets");
+    CHECK(Built() == mrhi_errorFormat, "an output past the color targets");
     Put32(Record(OUTPUTS, 0, 8), MRHI_COLOR_TARGETS - 1);
     CHECK(Built() == mrhi_success, "the last color target");
     Reset();
     Variable(OUTPUTS, 1, MRHI_COLOR_TARGETS, mrhi_scalarFloat32, 4, 0, 0);
-    CHECK(Built() == mrhi_errorInvalid, "an output no entry names, past the targets");
+    CHECK(Built() == mrhi_errorFormat, "an output no entry names, past the targets");
     Reset();
     Variable(OUTPUTS, 1, 0, mrhi_scalarSint32, 4, 0, 0);
     Put16(Record(ENTRIES, 1, 48) + 30, 2);
-    CHECK(Built() == mrhi_errorInvalid, "a repeated output location");
+    CHECK(Built() == mrhi_errorFormat, "a repeated output location");
     Put32(Record(OUTPUTS, 1, 8), 1);
     CHECK(Built() == mrhi_success, "two output locations");
 }
@@ -420,44 +419,44 @@ static void TestVariables(void)
               mrhi_success,
           "a flat integer from either vertex");
     CHECK(Interpolated(mrhi_scalarSint32, mrhi_interpolationPerspective, mrhi_samplingCenter) ==
-              mrhi_errorInvalid,
+              mrhi_errorFormat,
           "an interpolated signed integer");
     CHECK(Interpolated(mrhi_scalarUint32, mrhi_interpolationLinear, mrhi_samplingCenter) ==
-              mrhi_errorInvalid,
+              mrhi_errorFormat,
           "an interpolated unsigned integer");
     CHECK(Interpolated(mrhi_scalarFloat32, mrhi_interpolationFlat, mrhi_samplingCenter) ==
-              mrhi_errorInvalid,
+              mrhi_errorFormat,
           "flat at the center");
     CHECK(Interpolated(mrhi_scalarFloat32, mrhi_interpolationPerspective, mrhi_samplingFirst) ==
-              mrhi_errorInvalid,
+              mrhi_errorFormat,
           "perspective from the first vertex");
     CHECK(Interpolated(mrhi_scalarFloat32, mrhi_interpolationLinear, mrhi_samplingNone) ==
-              mrhi_errorInvalid,
+              mrhi_errorFormat,
           "linear with no sampling");
     CHECK(Interpolated(mrhi_scalarFloat32, mrhi_interpolationNone, mrhi_samplingCenter) ==
-              mrhi_errorInvalid,
+              mrhi_errorFormat,
           "no interpolation");
     CHECK(Interpolated(mrhi_scalarFloat32, mrhi_interpolationFlat + 1, mrhi_samplingFirst) ==
-              mrhi_errorInvalid,
+              mrhi_errorFormat,
           "an unknown interpolation");
     CHECK(Interpolated(mrhi_scalarFloat32, mrhi_interpolationFlat, mrhi_samplingEither + 1) ==
-              mrhi_errorInvalid,
+              mrhi_errorFormat,
           "an unknown sampling");
-    CHECK(VariableWith(VARIABLES, 1, 5, 0) == mrhi_errorInvalid, "a variable of no components");
-    CHECK(VariableWith(VARIABLES, 1, 4, mrhi_scalarNone) == mrhi_errorInvalid,
+    CHECK(VariableWith(VARIABLES, 1, 5, 0) == mrhi_errorFormat, "a variable of no components");
+    CHECK(VariableWith(VARIABLES, 1, 4, mrhi_scalarNone) == mrhi_errorFormat,
           "a variable of no type");
     Reset();
     Variable(VARIABLES, 2, 0, mrhi_scalarFloat32, 1, mrhi_interpolationLinear, mrhi_samplingCenter);
     Put16(Record(ENTRIES, 1, 48) + 34, 2);
-    CHECK(Built() == mrhi_errorInvalid, "a repeated variable location");
+    CHECK(Built() == mrhi_errorFormat, "a repeated variable location");
     Put32(Record(VARIABLES, 2, 8), 9);
     CHECK(Built() == mrhi_success, "two variable locations");
     Reset();
     Put16(Record(ENTRIES, 1, 48) + 32, 2);
-    CHECK(Built() == mrhi_errorInvalid, "variables past their section");
+    CHECK(Built() == mrhi_errorFormat, "variables past their section");
     Reset();
     Put16(Record(ENTRIES, 2, 48) + 34, 1);
-    CHECK(Built() == mrhi_errorInvalid, "variables on a compute entry");
+    CHECK(Built() == mrhi_errorFormat, "variables on a compute entry");
 }
 
 // Resets, then sets entry index's u32 at to value.
@@ -484,18 +483,18 @@ static void TestBuiltinsAndStorage(void)
     CHECK(EntryWith(1, 36, fragment) == mrhi_success, "every fragment builtin");
     CHECK(NativeEntryWith(1, mrhiShaderBuiltinsKnown) == mrhi_success,
           "every builtin, without WGSL");
-    CHECK(EntryWith(1, 36, mrhi_builtinViewIndex) == mrhi_errorInvalid, "the view index with WGSL");
+    CHECK(EntryWith(1, 36, mrhi_builtinViewIndex) == mrhi_errorFormat, "the view index with WGSL");
     CHECK(NativeEntryWith(0, mrhi_builtinViewIndex) == mrhi_success, "a vertex entry's view index");
-    CHECK(NativeEntryWith(0, mrhi_builtinViewIndex | mrhi_builtinFrontFacing) == mrhi_errorInvalid,
+    CHECK(NativeEntryWith(0, mrhi_builtinViewIndex | mrhi_builtinFrontFacing) == mrhi_errorFormat,
           "but no other vertex builtin");
-    CHECK(NativeEntryWith(2, mrhi_builtinViewIndex) == mrhi_errorInvalid,
+    CHECK(NativeEntryWith(2, mrhi_builtinViewIndex) == mrhi_errorFormat,
           "a compute entry's view index");
-    CHECK(EntryWith(1, 36, mrhiShaderBuiltinsKnown + 1) == mrhi_errorInvalid, "an unknown builtin");
-    CHECK(EntryWith(0, 36, mrhi_builtinFragDepth) == mrhi_errorInvalid, "a vertex builtin");
-    CHECK(EntryWith(2, 36, mrhi_builtinSampleIndex) == mrhi_errorInvalid, "a compute builtin");
-    CHECK(EntryWith(1, 36, 0x80000000u) == mrhi_errorInvalid, "the highest unknown builtin");
-    CHECK(EntryWith(1, 40, 16) == mrhi_errorInvalid, "a fragment entry's workgroup storage");
-    CHECK(EntryWith(1, 40, 0x10000u) == mrhi_errorInvalid,
+    CHECK(EntryWith(1, 36, mrhiShaderBuiltinsKnown + 1) == mrhi_errorFormat, "an unknown builtin");
+    CHECK(EntryWith(0, 36, mrhi_builtinFragDepth) == mrhi_errorFormat, "a vertex builtin");
+    CHECK(EntryWith(2, 36, mrhi_builtinSampleIndex) == mrhi_errorFormat, "a compute builtin");
+    CHECK(EntryWith(1, 36, 0x80000000u) == mrhi_errorFormat, "the highest unknown builtin");
+    CHECK(EntryWith(1, 40, 16) == mrhi_errorFormat, "a fragment entry's workgroup storage");
+    CHECK(EntryWith(1, 40, 0x10000u) == mrhi_errorFormat,
           "a fragment entry's workgroup storage past 16 bits");
     CHECK(EntryWith(2, 40, 0) == mrhi_success, "a compute entry without workgroup storage");
     Reset();
@@ -533,24 +532,24 @@ static mrhiResult HeapUses(uint32_t index, mrhiShaderHeapUses uses)
 static void TestHeapUses(void)
 {
     CHECK(HeapUses(2, mrhiShaderHeapUsesKnown) == mrhi_success, "every heap use");
-    CHECK(HeapUses(1, mrhiShaderHeapUsesKnown + 1) == mrhi_errorInvalid, "an unknown heap use");
-    CHECK(HeapUses(1, 0x80000000u) == mrhi_errorInvalid, "the highest unknown heap use");
-    CHECK(HeapUses(1, mrhi_heapUseWrites) == mrhi_errorInvalid, "writes alone");
+    CHECK(HeapUses(1, mrhiShaderHeapUsesKnown + 1) == mrhi_errorFormat, "an unknown heap use");
+    CHECK(HeapUses(1, 0x80000000u) == mrhi_errorFormat, "the highest unknown heap use");
+    CHECK(HeapUses(1, mrhi_heapUseWrites) == mrhi_errorFormat, "writes alone");
     CHECK(HeapUses(1, mrhi_heapUseWrites | mrhi_heapUseSampledTextures | mrhi_heapUseSamplers) ==
-              mrhi_errorInvalid,
+              mrhi_errorFormat,
           "writes without a storage kind");
     CHECK(HeapUses(1, mrhi_heapUseWrites | mrhi_heapUseStorageTextures) == mrhi_success &&
               HeapUses(2, mrhi_heapUseWrites | mrhi_heapUseStorageBuffers) == mrhi_success,
           "fragment and compute entries write");
-    CHECK(HeapUses(0, mrhi_heapUseWrites | mrhi_heapUseStorageBuffers) == mrhi_errorInvalid,
+    CHECK(HeapUses(0, mrhi_heapUseWrites | mrhi_heapUseStorageBuffers) == mrhi_errorFormat,
           "a vertex entry does not");
     CHECK(HeapUses(0, mrhi_heapUseStorageBuffers) == mrhi_success, "but reads");
     Reset();
     Put32(Record(ENTRIES, 1, 48) + 44, mrhi_heapUseSampledTextures);
-    CHECK(Built() == mrhi_errorInvalid, "WGSL beside a heap");
+    CHECK(Built() == mrhi_errorFormat, "WGSL beside a heap");
     Reset();
     Put32(Record(ENTRIES, 1, 48) + 44, 0x10000u);
-    CHECK(Built() == mrhi_errorInvalid, "a heap use past 16 bits, beside WGSL");
+    CHECK(Built() == mrhi_errorFormat, "a heap use past 16 bits, beside WGSL");
     SetHeapUses(0, mrhi_heapUseSampledTextures);
     Put32(Record(ENTRIES, 2, 48) + 44, mrhi_heapUseStorageBuffers | mrhi_heapUseWrites);
     Assemble();
@@ -576,42 +575,41 @@ static mrhiResult BindingWith(uint32_t index, size_t at, uint8_t value)
 
 static void TestBindings(void)
 {
-    CHECK(BindingWith(0, 0, 4) == mrhi_errorInvalid, "a fifth table");
+    CHECK(BindingWith(0, 0, 4) == mrhi_errorFormat, "a fifth table");
     CHECK(BindingWith(0, 0, 3) == mrhi_success, "the fourth table");
-    CHECK(BindingWith(2, 1, mrhi_bindingNone) == mrhi_errorInvalid, "no kind");
-    CHECK(BindingWith(2, 1, mrhi_bindingStorageTexture + 1) == mrhi_errorInvalid,
-          "an unknown kind");
-    CHECK(BindingWith(0, 4, 0) == mrhi_errorInvalid, "no stages");
-    CHECK(BindingWith(0, 4, 8) == mrhi_errorInvalid, "an unknown stage");
-    CHECK(BindingWith(1, 4, mrhi_stageVertex) == mrhi_errorInvalid,
+    CHECK(BindingWith(2, 1, mrhi_bindingNone) == mrhi_errorFormat, "no kind");
+    CHECK(BindingWith(2, 1, mrhi_bindingStorageTexture + 1) == mrhi_errorFormat, "an unknown kind");
+    CHECK(BindingWith(0, 4, 0) == mrhi_errorFormat, "no stages");
+    CHECK(BindingWith(0, 4, 8) == mrhi_errorFormat, "an unknown stage");
+    CHECK(BindingWith(1, 4, mrhi_stageVertex) == mrhi_errorFormat,
           "a vertex stage writing a storage buffer");
-    CHECK(BindingWith(5, 4, mrhi_stageVertex) == mrhi_errorInvalid,
+    CHECK(BindingWith(5, 4, mrhi_stageVertex) == mrhi_errorFormat,
           "a vertex stage writing a storage texture");
     Reset();
     uint8_t* storage = Record(BINDINGS, 5, 24);
     storage[4] = mrhi_stageVertex;
     storage[11] = mrhi_storageReadOnly;
     CHECK(Built() == mrhi_success, "a vertex stage reading a storage texture");
-    CHECK(BindingWith(0, 2, 1) == mrhi_errorInvalid, "a repeated table and slot");
-    CHECK(BindingWith(3, 8, mrhi_samplerNone) == mrhi_errorInvalid, "a sampler with no type");
-    CHECK(BindingWith(3, 8, mrhi_samplerComparison + 1) == mrhi_errorInvalid,
+    CHECK(BindingWith(0, 2, 1) == mrhi_errorFormat, "a repeated table and slot");
+    CHECK(BindingWith(3, 8, mrhi_samplerNone) == mrhi_errorFormat, "a sampler with no type");
+    CHECK(BindingWith(3, 8, mrhi_samplerComparison + 1) == mrhi_errorFormat,
           "an unknown sampler type");
     CHECK(BindingWith(3, 8, mrhi_samplerComparison) == mrhi_success, "a comparison sampler");
-    CHECK(BindingWith(0, 8, mrhi_samplerFiltering) == mrhi_errorInvalid, "a buffer's sampler type");
-    CHECK(BindingWith(4, 9, mrhi_sampleNone) == mrhi_errorInvalid, "no sample type");
-    CHECK(BindingWith(4, 9, mrhi_sampleUint + 1) == mrhi_errorInvalid, "an unknown sample type");
-    CHECK(BindingWith(3, 9, mrhi_sampleFloat) == mrhi_errorInvalid, "a sampler's sample type");
-    CHECK(BindingWith(4, 10, mrhi_texture3d + 1) == mrhi_errorInvalid, "an unknown dimension");
-    CHECK(BindingWith(0, 10, mrhi_texture2dArray) == mrhi_errorInvalid, "a buffer's dimension");
-    CHECK(BindingWith(5, 10, mrhi_textureCube) == mrhi_errorInvalid, "a storage cube");
+    CHECK(BindingWith(0, 8, mrhi_samplerFiltering) == mrhi_errorFormat, "a buffer's sampler type");
+    CHECK(BindingWith(4, 9, mrhi_sampleNone) == mrhi_errorFormat, "no sample type");
+    CHECK(BindingWith(4, 9, mrhi_sampleUint + 1) == mrhi_errorFormat, "an unknown sample type");
+    CHECK(BindingWith(3, 9, mrhi_sampleFloat) == mrhi_errorFormat, "a sampler's sample type");
+    CHECK(BindingWith(4, 10, mrhi_texture3d + 1) == mrhi_errorFormat, "an unknown dimension");
+    CHECK(BindingWith(0, 10, mrhi_texture2dArray) == mrhi_errorFormat, "a buffer's dimension");
+    CHECK(BindingWith(5, 10, mrhi_textureCube) == mrhi_errorFormat, "a storage cube");
     CHECK(BindingWith(5, 10, mrhi_texture3d) == mrhi_success, "a 3D storage texture");
-    CHECK(BindingWith(5, 11, mrhi_storageNone) == mrhi_errorInvalid, "no access");
-    CHECK(BindingWith(5, 11, mrhi_storageReadWrite + 1) == mrhi_errorInvalid, "an unknown access");
-    CHECK(BindingWith(4, 11, mrhi_storageReadOnly) == mrhi_errorInvalid, "a sampled access");
-    CHECK(BindingWith(5, 12, 0) == mrhi_errorInvalid, "a storage texture with no format");
-    CHECK(BindingWith(5, 12, 0xFF) == mrhi_errorInvalid, "an unknown format");
-    CHECK(BindingWith(4, 12, mrhi_formatRgba8Unorm) == mrhi_errorInvalid, "a sampled format");
-    CHECK(BindingWith(4, 14, 1) == mrhi_errorInvalid, "a filterable multisampled cube");
+    CHECK(BindingWith(5, 11, mrhi_storageNone) == mrhi_errorFormat, "no access");
+    CHECK(BindingWith(5, 11, mrhi_storageReadWrite + 1) == mrhi_errorFormat, "an unknown access");
+    CHECK(BindingWith(4, 11, mrhi_storageReadOnly) == mrhi_errorFormat, "a sampled access");
+    CHECK(BindingWith(5, 12, 0) == mrhi_errorFormat, "a storage texture with no format");
+    CHECK(BindingWith(5, 12, 0xFF) == mrhi_errorFormat, "an unknown format");
+    CHECK(BindingWith(4, 12, mrhi_formatRgba8Unorm) == mrhi_errorFormat, "a sampled format");
+    CHECK(BindingWith(4, 14, 1) == mrhi_errorFormat, "a filterable multisampled cube");
     Reset();
     uint8_t* sampled = Record(BINDINGS, 4, 24);
     sampled[9] = mrhi_sampleUnfilterableFloat;
@@ -619,17 +617,17 @@ static void TestBindings(void)
     sampled[14] = 1;
     CHECK(Built() == mrhi_success, "an unfilterable multisampled 2D texture");
     sampled[14] = 2;
-    CHECK(Built() == mrhi_errorInvalid, "multisampled neither 0 nor 1");
+    CHECK(Built() == mrhi_errorFormat, "multisampled neither 0 nor 1");
     sampled[14] = 1;
     sampled[10] = mrhi_texture2dArray;
-    CHECK(Built() == mrhi_errorInvalid, "a multisampled array");
+    CHECK(Built() == mrhi_errorFormat, "a multisampled array");
     sampled[10] = mrhi_texture2d;
     sampled[9] = mrhi_sampleFloat;
-    CHECK(Built() == mrhi_errorInvalid, "a filterable multisampled texture");
-    CHECK(BindingWith(0, 14, 1) == mrhi_errorInvalid, "a multisampled buffer");
-    CHECK(BindingWith(0, 15, 1) == mrhi_errorInvalid, "a binding zero that is not zero");
-    CHECK(BindingWith(4, 16, 1) == mrhi_errorInvalid, "a texture's minimum size");
-    CHECK(BindingWith(3, 23, 1) == mrhi_errorInvalid, "a sampler's minimum size");
+    CHECK(Built() == mrhi_errorFormat, "a filterable multisampled texture");
+    CHECK(BindingWith(0, 14, 1) == mrhi_errorFormat, "a multisampled buffer");
+    CHECK(BindingWith(0, 15, 1) == mrhi_errorFormat, "a binding zero that is not zero");
+    CHECK(BindingWith(4, 16, 1) == mrhi_errorFormat, "a texture's minimum size");
+    CHECK(BindingWith(3, 23, 1) == mrhi_errorFormat, "a sampler's minimum size");
     CHECK(BindingWith(1, 23, 1) == mrhi_success, "a storage buffer's minimum size");
 }
 
@@ -637,9 +635,9 @@ static void TestConstantsAndCode(void)
 {
     Reset();
     Record(CONSTANTS, 0, 16)[4] = mrhi_constantNone;
-    CHECK(Built() == mrhi_errorInvalid, "a constant with no type");
+    CHECK(Built() == mrhi_errorFormat, "a constant with no type");
     Record(CONSTANTS, 0, 16)[4] = mrhi_constantFloat32 + 1;
-    CHECK(Built() == mrhi_errorInvalid, "an unknown constant type");
+    CHECK(Built() == mrhi_errorFormat, "an unknown constant type");
     Reset();
     uint8_t* flag = Record(CONSTANTS, 1, 16);
     flag[4] = mrhi_constantBool;
@@ -647,43 +645,43 @@ static void TestConstantsAndCode(void)
     Put32(flag + 8, 1);
     CHECK(Built() == mrhi_success, "a true boolean");
     Put32(flag + 8, 2);
-    CHECK(Built() == mrhi_errorInvalid, "a boolean neither 0 nor 1");
+    CHECK(Built() == mrhi_errorFormat, "a boolean neither 0 nor 1");
     Put32(flag + 8, 0);
     flag[12] = 1;
     CHECK(Built() == mrhi_success, "a constant with no default");
     Put32(flag + 8, 1);
-    CHECK(Built() == mrhi_errorInvalid, "a default's bits on one with none");
+    CHECK(Built() == mrhi_errorFormat, "a default's bits on one with none");
     Put32(flag + 8, 0);
     flag[12] = 2;
-    CHECK(Built() == mrhi_errorInvalid, "a required flag neither 0 nor 1");
+    CHECK(Built() == mrhi_errorFormat, "a required flag neither 0 nor 1");
     flag[12] = 0;
     Put32(flag, 7);
-    CHECK(Built() == mrhi_errorInvalid, "a repeated constant id");
+    CHECK(Built() == mrhi_errorFormat, "a repeated constant id");
     size_t zeros[] = {5, 6, 7, 13, 15};
     for (size_t i = 0; i < sizeof(zeros) / sizeof(zeros[0]); ++i)
     {
         Reset();
         Record(CONSTANTS, 0, 16)[zeros[i]] = 1;
-        CHECK(Built() == mrhi_errorInvalid, "a constant zero that is not zero");
+        CHECK(Built() == mrhi_errorFormat, "a constant zero that is not zero");
     }
     Reset();
     s_sections[SPIRV].size = 16;
-    CHECK(Built() == mrhi_errorInvalid, "SPIR-V shorter than its header");
+    CHECK(Built() == mrhi_errorFormat, "SPIR-V shorter than its header");
     Reset();
     s_sections[SPIRV].size = 22;
-    CHECK(Built() == mrhi_errorInvalid, "SPIR-V not in words");
+    CHECK(Built() == mrhi_errorFormat, "SPIR-V not in words");
     Reset();
     s_sections[SPIRV].bytes[0] = 0x04;
-    CHECK(Built() == mrhi_errorInvalid, "SPIR-V without its magic");
+    CHECK(Built() == mrhi_errorFormat, "SPIR-V without its magic");
     Reset();
     s_sections[WGSL].size = 0;
-    CHECK(Built() == mrhi_errorInvalid, "empty WGSL");
+    CHECK(Built() == mrhi_errorFormat, "empty WGSL");
     Reset();
     s_sections[WGSL].bytes[3] = 0xC0;
-    CHECK(Built() == mrhi_errorInvalid, "WGSL that is not UTF-8");
+    CHECK(Built() == mrhi_errorFormat, "WGSL that is not UTF-8");
     Reset();
     s_sections[WGSL].bytes[7] = 0;
-    CHECK(Built() == mrhi_errorInvalid, "WGSL with NUL");
+    CHECK(Built() == mrhi_errorFormat, "WGSL with NUL");
 }
 
 // Resets and adds every Metal section, then sets byte at of the map.
@@ -723,110 +721,110 @@ static void TestMetalCode(void)
     CHECK(Built() == mrhi_success, "a metallib alone");
     Reset();
     AddMetal(false, false);
-    CHECK(Built() == mrhi_errorInvalid, "a map without code");
+    CHECK(Built() == mrhi_errorFormat, "a map without code");
     Reset();
     AddMetal(true, true);
     DropSection(METAL_MAP);
-    CHECK(Built() == mrhi_errorInvalid, "code without a map");
+    CHECK(Built() == mrhi_errorFormat, "code without a map");
     Reset();
     AddMetal(false, true);
     DropSection(METAL_MAP);
-    CHECK(Built() == mrhi_errorInvalid, "a metallib without a map");
+    CHECK(Built() == mrhi_errorFormat, "a metallib without a map");
     Reset();
     AddMetal(true, true);
     s_sections[s_sectionCount++] = (Section){.type = 11};
-    CHECK(Built() == mrhi_errorInvalid, "a repeated map");
+    CHECK(Built() == mrhi_errorFormat, "a repeated map");
     Reset();
     AddMetal(true, true);
     s_sections[METAL_MAP].size -= 1;
-    CHECK(Built() == mrhi_errorInvalid, "a map short of a binding");
+    CHECK(Built() == mrhi_errorFormat, "a map short of a binding");
     s_sections[METAL_MAP].size += 2;
-    CHECK(Built() == mrhi_errorInvalid, "a map a byte long");
+    CHECK(Built() == mrhi_errorFormat, "a map a byte long");
     s_sections[METAL_MAP].size = 0;
-    CHECK(Built() == mrhi_errorInvalid, "an empty map");
+    CHECK(Built() == mrhi_errorFormat, "an empty map");
     Reset();
     AddMetal(false, true);
     s_sections[METAL_MAP + 1].bytes[3] = 'C';
-    CHECK(Built() == mrhi_errorInvalid, "a metallib without its magic");
+    CHECK(Built() == mrhi_errorFormat, "a metallib without its magic");
     s_sections[METAL_MAP + 1].bytes[3] = 'B';
     s_sections[METAL_MAP + 1].size = 3;
     Assemble();
     // The magic's last byte in the padding after it, which nothing checks.
     s_container[OffsetOf(METAL_MAP + 1) + 3] = 'B';
     Seal();
-    CHECK(Parse() == mrhi_errorInvalid, "a metallib shorter than its magic");
+    CHECK(Parse() == mrhi_errorFormat, "a metallib shorter than its magic");
     SetHeapUses(2, mrhi_heapUseStorageBuffers);
     AddMetal(true, true);
-    CHECK(Built() == mrhi_errorInvalid, "Metal code beside a heap");
+    CHECK(Built() == mrhi_errorFormat, "Metal code beside a heap");
 }
 
 static void TestMetalMap(void)
 {
     for (size_t at = 1; at < 8; ++at)
     {
-        CHECK(MapWith(at, 1) == mrhi_errorInvalid, "a map zero that is not zero");
+        CHECK(MapWith(at, 1) == mrhi_errorFormat, "a map zero that is not zero");
     }
     CHECK(MapWith(0, 30) == mrhi_success, "the root block at buffer 30");
-    CHECK(MapWith(0, 31) == mrhi_errorInvalid, "the root block past the buffers");
-    CHECK(MapWith(0, 255) == mrhi_errorInvalid, "no root block's index for one");
-    CHECK(MapWith(0, 1) == mrhi_errorInvalid, "the root block on a binding's buffer");
+    CHECK(MapWith(0, 31) == mrhi_errorFormat, "the root block past the buffers");
+    CHECK(MapWith(0, 255) == mrhi_errorFormat, "no root block's index for one");
+    CHECK(MapWith(0, 1) == mrhi_errorFormat, "the root block on a binding's buffer");
     Reset();
     Put32(Record(META, 0, 16), 0);
     AddMetal(true, true);
     s_sections[METAL_MAP].bytes[0] = 255;
     CHECK(Built() == mrhi_success, "no root block, no index");
     s_sections[METAL_MAP].bytes[0] = 0;
-    CHECK(Built() == mrhi_errorInvalid, "an index for an empty root block");
+    CHECK(Built() == mrhi_errorFormat, "an index for an empty root block");
     CHECK(MapWith(MAP_BINDING(0), 30) == mrhi_success, "a buffer at 30");
-    CHECK(MapWith(MAP_BINDING(0), 31) == mrhi_errorInvalid, "a buffer past 30");
-    CHECK(MapWith(MAP_BINDING(1), 1) == mrhi_errorInvalid, "two buffers at one index");
-    CHECK(MapWith(MAP_BINDING(0), 0) == mrhi_errorInvalid, "a buffer on the root block");
+    CHECK(MapWith(MAP_BINDING(0), 31) == mrhi_errorFormat, "a buffer past 30");
+    CHECK(MapWith(MAP_BINDING(1), 1) == mrhi_errorFormat, "two buffers at one index");
+    CHECK(MapWith(MAP_BINDING(0), 0) == mrhi_errorFormat, "a buffer on the root block");
     CHECK(MapWith(MAP_BINDING(3), 15) == mrhi_success, "a sampler at 15");
-    CHECK(MapWith(MAP_BINDING(3), 16) == mrhi_errorInvalid, "a sampler past 15");
+    CHECK(MapWith(MAP_BINDING(3), 16) == mrhi_errorFormat, "a sampler past 15");
     CHECK(MapWith(MAP_BINDING(4), 127) == mrhi_success, "a texture at 127");
-    CHECK(MapWith(MAP_BINDING(4), 128) == mrhi_errorInvalid, "a texture past 127");
-    CHECK(MapWith(MAP_BINDING(5), 0) == mrhi_errorInvalid, "two textures at one index");
+    CHECK(MapWith(MAP_BINDING(4), 128) == mrhi_errorFormat, "a texture past 127");
+    CHECK(MapWith(MAP_BINDING(5), 0) == mrhi_errorFormat, "two textures at one index");
     CHECK(MapWith(MAP_BINDING(3), 1) == mrhi_success, "a sampler on a texture's index");
     CHECK(MapWith(MAP_BINDING(4), 3) == mrhi_success, "a texture on a buffer's index");
     CHECK(MapWith(MAP_ENTRY(2) + 8, 30) == mrhi_success, "buffer sizes at a free index");
-    CHECK(MapWith(MAP_ENTRY(2) + 8, 31) == mrhi_errorInvalid, "buffer sizes past 30");
-    CHECK(MapWith(MAP_ENTRY(2) + 8, 0) == mrhi_errorInvalid, "buffer sizes on the root block");
-    CHECK(MapWith(MAP_ENTRY(2) + 8, 2) == mrhi_errorInvalid, "buffer sizes on a binding");
+    CHECK(MapWith(MAP_ENTRY(2) + 8, 31) == mrhi_errorFormat, "buffer sizes past 30");
+    CHECK(MapWith(MAP_ENTRY(2) + 8, 0) == mrhi_errorFormat, "buffer sizes on the root block");
+    CHECK(MapWith(MAP_ENTRY(2) + 8, 2) == mrhi_errorFormat, "buffer sizes on a binding");
     CHECK(MapWith(MAP_ENTRY(2) + 8, 4) == mrhi_success &&
               MapWith(MAP_ENTRY(1) + 8, 4) == mrhi_success,
           "buffer sizes on an index a texture or sampler uses");
     for (size_t at = 9; at < 16; ++at)
     {
-        CHECK(MapWith(MAP_ENTRY(0) + at, 1) == mrhi_errorInvalid,
+        CHECK(MapWith(MAP_ENTRY(0) + at, 1) == mrhi_errorFormat,
               "an entry's zero that is not zero");
     }
 }
 
 static void TestMetalSources(void)
 {
-    CHECK(MapWith(MAP_ENTRY(1) + 4, 0) == mrhi_errorInvalid, "an entry without MSL");
-    CHECK(MapWith(MAP_ENTRY(2) + 4, 19) == mrhi_errorInvalid, "MSL a byte past the section");
+    CHECK(MapWith(MAP_ENTRY(1) + 4, 0) == mrhi_errorFormat, "an entry without MSL");
+    CHECK(MapWith(MAP_ENTRY(2) + 4, 19) == mrhi_errorFormat, "MSL a byte past the section");
     CHECK(MapWith(MAP_ENTRY(2) + 4, 17) == mrhi_success, "MSL short of the section's end");
-    CHECK(MapWith(MAP_ENTRY(2) + 3, 0xFF) == mrhi_errorInvalid, "MSL far past the section");
+    CHECK(MapWith(MAP_ENTRY(2) + 3, 0xFF) == mrhi_errorFormat, "MSL far past the section");
     CHECK(MapWith(MAP_ENTRY(0) + 4, 38) == mrhi_success, "one MSL range over another");
     Reset();
     AddMetal(true, true);
     Put32(s_sections[METAL_MAP].bytes + MAP_ENTRY(2), 0xFFFFFFF0u);
     Put32(s_sections[METAL_MAP].bytes + MAP_ENTRY(2) + 4, 0x20u);
-    CHECK(Built() == mrhi_errorInvalid, "an MSL range whose end wraps");
+    CHECK(Built() == mrhi_errorFormat, "an MSL range whose end wraps");
     Reset();
     AddMetal(true, true);
     s_sections[MSL].bytes[40] = 0;
-    CHECK(Built() == mrhi_errorInvalid, "MSL with NUL");
+    CHECK(Built() == mrhi_errorFormat, "MSL with NUL");
     s_sections[MSL].bytes[40] = 0xC0;
-    CHECK(Built() == mrhi_errorInvalid, "MSL that is not UTF-8");
+    CHECK(Built() == mrhi_errorFormat, "MSL that is not UTF-8");
     Reset();
     AddMetal(false, true);
     Put32(s_sections[METAL_MAP].bytes + MAP_ENTRY(0) + 4, 1);
-    CHECK(Built() == mrhi_errorInvalid, "an MSL range without MSL");
+    CHECK(Built() == mrhi_errorFormat, "an MSL range without MSL");
     Put32(s_sections[METAL_MAP].bytes + MAP_ENTRY(0) + 4, 0);
     Put32(s_sections[METAL_MAP].bytes + MAP_ENTRY(0), 1);
-    CHECK(Built() == mrhi_errorInvalid, "an MSL offset without MSL");
+    CHECK(Built() == mrhi_errorFormat, "an MSL offset without MSL");
 }
 
 // A container whose input section is moved past the others and holds
@@ -852,7 +850,7 @@ static mrhiResult WithInputs(uint32_t count)
 static void TestRecordLimit(void)
 {
     CHECK(WithInputs(4096) == mrhi_success, "4096 records");
-    CHECK(WithInputs(4097) == mrhi_errorInvalid, "4097 records");
+    CHECK(WithInputs(4097) == mrhi_errorFormat, "4097 records");
 }
 
 // Every single-bit flip of the default container is refused: the digest
@@ -967,11 +965,11 @@ static void TestRefusals(void)
     memmove(s_container + 4, s_container, s_size);
     def.bytes = s_container + 4;
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorInvalid, "misaligned bytes");
+    CHECK(mrhiGetDeviceMisuse(device) == 7, "each counted");
     Assemble();
     s_container[s_size - 1] ^= 1;
     def = Def();
-    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorInvalid, "a damaged container");
-    CHECK(mrhiGetDeviceMisuse(device) == 8, "each counted");
+    CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorFormat, "a damaged container");
     Assemble();
     Put32(s_container + 4, 2);
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorVersion, "another version");
@@ -984,7 +982,7 @@ static void TestRefusals(void)
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def.next = &critical;
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported, "an extension");
-    CHECK(mrhiGetDeviceMisuse(device) == 8, "other refusals are not misuse");
+    CHECK(mrhiGetDeviceMisuse(device) == 7, "other refusals are not misuse");
     def.next = nullptr;
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "the device's root block");
     Close(device);
@@ -1109,7 +1107,7 @@ static void TestCapabilities(void)
     const uint32_t wide[] = {CAPABILITY, 11};
     Reset();
     Instructions(wide, 2);
-    CHECK(Built() == mrhi_errorInvalid, "WGSL beside 64-bit integers");
+    CHECK(Built() == mrhi_errorFormat, "WGSL beside 64-bit integers");
     Reset();
     Instructions(wide, 2);
     s_sections[WGSL].size = 0;

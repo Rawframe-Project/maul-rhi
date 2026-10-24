@@ -40,6 +40,8 @@ const char* mrhiResultName(mrhiResult result)
         return "mrhi_errorOutOfDate";
     case mrhi_errorDeviceLost:
         return "mrhi_errorDeviceLost";
+    case mrhi_errorFormat:
+        return "mrhi_errorFormat";
     default:
         return "unknown result";
     }

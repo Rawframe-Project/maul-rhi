@@ -133,7 +133,7 @@ static void Run(const uint8_t* data, size_t size)
     }
     mrhiContainer container;
     mrhiResult status = mrhiParseContainer(bytes, size, &container);
-    Expect(status == mrhi_success || status == mrhi_errorInvalid || status == mrhi_errorVersion);
+    Expect(status == mrhi_success || status == mrhi_errorFormat || status == mrhi_errorVersion);
     if (status == mrhi_success)
     {
         CheckSections(bytes, size, &container);

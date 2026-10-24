@@ -477,10 +477,12 @@ extern "C"
     /// @param pipelineOut  Receives the pipeline.
     /// @param requestOut   Receives the id its ready record answers.
     /// @return `mrhi_success` with the pipeline pending; `mrhi_errorInvalid`
-    /// for a NULL argument, a def without its cookie, a bad label, entries the
-    /// shader has not as vertex and fragment entries, constants as for compute
-    /// pipelines, or state that contradicts itself, the reflection or WebGPU's
-    /// rules; `mrhi_errorStale` for a shader the device no longer has;
+    /// for a NULL argument, a def without its cookie, a bad label, a NULL
+    /// vertex entry, a NULL fragment entry with a length, constants as for
+    /// compute pipelines, or state that contradicts itself, the reflection or
+    /// WebGPU's rules; `mrhi_errorFormat` for entries the shader has not as
+    /// vertex and fragment entries, or constants as for compute pipelines;
+    /// `mrhi_errorStale` for a shader the device no longer has;
     /// `mrhi_errorUnsupported` for vertex buffers, attributes, strides, inter-
     /// stage variables or color bytes past the device's limits, target formats
     /// the device cannot render, blend or multisample as asked, unclipped depth
@@ -560,15 +562,16 @@ extern "C"
     /// @param pipelineOut  Receives the pipeline.
     /// @param requestOut   Receives the id its ready record answers.
     /// @return `mrhi_success` with the pipeline pending; `mrhi_errorInvalid`
-    /// for a NULL argument, a def without its cookie, a bad label, an entry the
-    /// shader has not as a compute entry, a constant the shader has not, twice,
-    /// or with a value its type cannot hold, or a constant without a default
-    /// left unset; `mrhi_errorStale` for a shader the device no longer has;
-    /// `mrhi_errorUnsupported` for a critical extension the library does not
-    /// know; `mrhi_errorState` for a device that is not ready;
-    /// `mrhi_errorCapacity` when the device's pipeline limit is reached or its
-    /// queue has no room for the answer; `mrhi_errorPlatform` when the driver
-    /// refuses at once.
+    /// for a NULL argument, a def without its cookie, a bad label, a NULL
+    /// entry, NULL constants with a count, or a constant given twice;
+    /// `mrhi_errorFormat` for an entry the shader has not as a compute entry, a
+    /// constant the shader has not or with a value its type cannot hold, or a
+    /// constant without a default left unset; `mrhi_errorStale` for a shader
+    /// the device no longer has; `mrhi_errorUnsupported` for a critical
+    /// extension the library does not know; `mrhi_errorState` for a device that
+    /// is not ready; `mrhi_errorCapacity` when the device's pipeline limit is
+    /// reached or its queue has no room for the answer; `mrhi_errorPlatform`
+    /// when the driver refuses at once.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateComputePipeline(mrhiDevice* device,

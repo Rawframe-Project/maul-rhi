@@ -19,7 +19,7 @@
 
 // The SPI version a driver's vtable must carry. Any change to the SPI
 // headers raises it; 4 is the first installed.
-#define MRHI_SPI_VERSION 5
+#define MRHI_SPI_VERSION 6
 
 // The 64-bit counters a pipeline statistics query writes.
 #define MRHI_STATISTICS_COUNTERS 11

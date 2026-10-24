@@ -518,6 +518,12 @@ mrhiResult mrhiDeviceMisuse(mrhiDevice* device, mrhiDiagnosticCode code)
     return mrhi_errorInvalid;
 }
 
+mrhiResult mrhiDeviceBadData(mrhiDevice* device, mrhiDiagnosticCode code)
+{
+    mrhiRecordDiagnostic(&device->diagnostics, code);
+    return mrhi_errorFormat;
+}
+
 mrhiResult mrhiDeviceUsable(const mrhiDevice* device)
 {
     if (device->state == mrhi_deviceLost)
