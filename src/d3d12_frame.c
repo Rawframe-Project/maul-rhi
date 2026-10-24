@@ -551,11 +551,14 @@ static mrhiD3d12GpuRing GpuRingOf(ID3D12Device* device, ID3D12DescriptorHeap* he
 // heaps set, and its sealed buffers moved into every read a heap may
 // make of them, since a heap may read one in any pass without it being
 // declared; buffers start each part in the common state they decayed
-// to.
+// to. A list begins with no root signature, so the next pipeline sets
+// its own.
 static void StartPart(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot)
 {
     mrhiD3d12Recorder* recorder = &frames->recorder;
     const mrhiDriverFrame* frame = recorder->frame;
+    recorder->graphicsRoot = nullptr;
+    recorder->computeRoot = nullptr;
     ID3D12DescriptorHeap* heaps[] = {slot->viewHeap, slot->samplerHeap};
     ID3D12GraphicsCommandList_SetDescriptorHeaps(recorder->list, 2, heaps);
     for (uint32_t i = 0; i < frame->resourceCount; ++i)
