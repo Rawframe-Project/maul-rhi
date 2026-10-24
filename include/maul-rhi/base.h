@@ -50,7 +50,7 @@ extern "C"
 
 // The revision of the contract the headers are generated from
 // (contract/mrhi.json).
-#define MRHI_CONTRACT_VERSION 6
+#define MRHI_CONTRACT_VERSION 7
 
 // MRHI_API marks the public functions: dllexport or dllimport in a
 // shared Windows build (maul_rhi_EXPORTS is defined while building
@@ -122,9 +122,9 @@ extern "C"
         // The device is lost: the GPU was reset, removed or its driver failed.
         mrhi_errorDeviceLost = -9,
         // The data is malformed or does not contain what was asked for: a
-        // damaged shader container, or an entry or constants its reflection
-        // does not have. Bad data is not a bug in the calling code, so it
-        // counts no misuse.
+        // damaged shader container, or an entry, constants or pipeline state
+        // its reflection does not take. Bad data is not a bug in the calling
+        // code, so it counts no misuse.
         mrhi_errorFormat = -10,
     };
 

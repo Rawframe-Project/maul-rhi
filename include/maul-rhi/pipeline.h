@@ -479,10 +479,15 @@ extern "C"
     /// @return `mrhi_success` with the pipeline pending; `mrhi_errorInvalid`
     /// for a NULL argument, a def without its cookie, a bad label, a NULL
     /// vertex entry, a NULL fragment entry with a length, constants as for
-    /// compute pipelines, or state that contradicts itself, the reflection or
-    /// WebGPU's rules; `mrhi_errorFormat` for entries the shader has not as
-    /// vertex and fragment entries, or constants as for compute pipelines;
-    /// `mrhi_errorStale` for a shader the device no longer has;
+    /// compute pipelines, or state that contradicts itself or WebGPU's rules;
+    /// `mrhi_errorFormat` for entries the shader has not as vertex and fragment
+    /// entries, constants as for compute pipelines, or state the reflection
+    /// refuses: a vertex input without an attribute of its scalar class, a
+    /// fragment depth without a depth format, a target its fragment output does
+    /// not fit, blending by an alpha or a second source the output lacks, alpha
+    /// to coverage with a written sample mask, or a fragment input no vertex
+    /// output matches; invalid input outranks format, and format outranks
+    /// unsupported; `mrhi_errorStale` for a shader the device no longer has;
     /// `mrhi_errorUnsupported` for vertex buffers, attributes, strides, inter-
     /// stage variables or color bytes past the device's limits, target formats
     /// the device cannot render, blend or multisample as asked, unclipped depth
