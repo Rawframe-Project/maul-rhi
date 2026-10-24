@@ -21,10 +21,10 @@ Every CI cell is a preset of `CMakePresets.json`, built in `out/<preset>`:
 ```sh
 cmake --preset linux-clang-20-asan
 cmake --build --preset linux-clang-20-asan
-xvfb-run -a ctest --preset linux-clang-20-asan
+xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" ctest --preset linux-clang-20-asan
 ```
 
-The Linux test presets require lavapipe, the validation layer and an X server, and fail rather than skip without them. A plain build needs none of that:
+The Linux test presets require lavapipe, the validation layer and an X server, and fail rather than skip without them. The server runs with `-noreset`, which keeps it from resetting, and refusing connections, whenever its last client leaves. A plain build needs none of that:
 
 ```sh
 cmake -B build -G Ninja -DCMAKE_C_COMPILER=clang-20

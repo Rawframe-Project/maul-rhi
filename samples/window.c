@@ -15,7 +15,6 @@
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/em_js.h>
 #elif defined(SAMPLE_XCB)
-#include <threads.h>
 #include <xcb/xcb.h>
 #elif defined(SAMPLE_WIN32)
 #include <windows.h>
@@ -90,32 +89,24 @@ static void Sync(xcb_connection_t* connection)
     free(xcb_get_input_focus_reply(connection, xcb_get_input_focus(connection), nullptr));
 }
 
-// Connects to the X server DISPLAY names, trying again for a second: a
-// server busy with many clients at once may refuse a connection for a
-// moment, as Xvfb under a parallel test run does.
-static xcb_connection_t* ConnectX(void)
-{
-    xcb_connection_t* connection = xcb_connect(nullptr, nullptr);
-    for (int tries = 1;
-         tries < 20 && xcb_connection_has_error(connection) != 0 && getenv("DISPLAY") != nullptr;
-         ++tries)
-    {
-        xcb_disconnect(connection);
-        (void)thrd_sleep(&(struct timespec){.tv_nsec = 50000000}, nullptr);
-        connection = xcb_connect(nullptr, nullptr);
-    }
-    return connection;
-}
-
 int SampleWindowOpen(Sample* sample, SampleWindow* window, int index, uint32_t width,
                      uint32_t height)
 {
     *window = (SampleWindow){.index = index};
-    xcb_connection_t* connection = ConnectX();
-    if (xcb_connection_has_error(connection) != 0)
+    // Only a missing DISPLAY is a skip. A server DISPLAY names that
+    // refuses the connection is a broken run, which a retry would hide.
+    const char* display = getenv("DISPLAY");
+    if (display == nullptr || display[0] == '\0')
     {
+        return Missing("no DISPLAY");
+    }
+    xcb_connection_t* connection = xcb_connect(nullptr, nullptr);
+    int error = xcb_connection_has_error(connection);
+    if (error != 0)
+    {
+        printf("FAIL: cannot connect to the X server (DISPLAY=%s, xcb error %d)\n", display, error);
         xcb_disconnect(connection);
-        return Missing("no X server");
+        return 1;
     }
     xcb_screen_t* screen = xcb_setup_roots_iterator(xcb_get_setup(connection)).data;
     window->connection = connection;

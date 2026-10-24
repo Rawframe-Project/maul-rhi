@@ -75,7 +75,6 @@ static void ResizeCanvas(int width)
 #endif
 
 #ifdef MRHI_TEST_XCB
-#include <threads.h>
 #include <xcb/xcb.h>
 #endif
 #ifdef MRHI_TEST_ANDROID
@@ -3750,32 +3749,25 @@ static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiS
 #endif
 
 #ifdef MRHI_TEST_XCB
-// Connects to the X server DISPLAY names, trying again for a second: a
-// server busy with many clients at once may refuse a connection for a
-// moment, as Xvfb under a parallel test run does.
-static xcb_connection_t* ConnectX(void)
-{
-    xcb_connection_t* connection = xcb_connect(nullptr, nullptr);
-    for (int tries = 1;
-         tries < 20 && xcb_connection_has_error(connection) != 0 && getenv("DISPLAY") != nullptr;
-         ++tries)
-    {
-        xcb_disconnect(connection);
-        (void)thrd_sleep(&(struct timespec){.tv_nsec = 50000000}, nullptr);
-        connection = xcb_connect(nullptr, nullptr);
-    }
-    return connection;
-}
-
 // A window of the X server the environment names, where there is one.
 static void CheckXcbSurface(mrhiInstance* instance, const mrhiAdapterId* ids, size_t count)
 {
-    xcb_connection_t* connection = ConnectX();
-    if (xcb_connection_has_error(connection) != 0)
+    // Only a missing DISPLAY is a skip. A server DISPLAY names that
+    // refuses the connection is a broken run, which a retry would hide.
+    const char* display = getenv("DISPLAY");
+    if (display == nullptr || display[0] == '\0')
     {
-        xcb_disconnect(connection);
         CHECK(!IsSet("MAUL_RHI_REQUIRE_SURFACE"), "an X server where required");
-        printf("skip: no X server for surfaces\n");
+        printf("skip: no DISPLAY for surfaces\n");
+        return;
+    }
+    xcb_connection_t* connection = xcb_connect(nullptr, nullptr);
+    int error = xcb_connection_has_error(connection);
+    if (error != 0)
+    {
+        printf("cannot connect to the X server (DISPLAY=%s, xcb error %d)\n", display, error);
+        CHECK(false, "a connection to the X server DISPLAY names");
+        xcb_disconnect(connection);
         return;
     }
     xcb_screen_t* screen = xcb_setup_roots_iterator(xcb_get_setup(connection)).data;
