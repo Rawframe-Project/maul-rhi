@@ -200,10 +200,10 @@ if(MAUL_RHI_D3D12_DRIVER)
     target_sources(maul-rhi PRIVATE src/driver_d3d12.c src/d3d12_api.c src/d3d12_device.c
                                    src/d3d12_names.c src/d3d12_resource.c src/d3d12_slots.c
                                    src/d3d12_view.c src/d3d12_pipeline.c src/d3d12_root.c
-                                   src/d3d12_graphics.c src/d3d12_frame.c src/d3d12_record.c
-                                   src/d3d12_barrier.c src/d3d12_copy.c src/d3d12_bind.c
-                                   src/d3d12_draw.c src/d3d12_heap.c src/d3d12_surface.c
-                                   src/d3d12_swapchain.c)
+                                   src/d3d12_graphics.c src/d3d12_frame.c src/d3d12_lanes.c
+                                   src/d3d12_record.c src/d3d12_barrier.c src/d3d12_copy.c
+                                   src/d3d12_bind.c src/d3d12_draw.c src/d3d12_heap.c
+                                   src/d3d12_surface.c src/d3d12_swapchain.c)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_D3D12_DRIVER)
     # The DirectX headers, kept as published (directx/README.md).
     target_include_directories(maul-rhi SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
@@ -253,12 +253,15 @@ if(MAUL_RHI_BUILD_TESTS)
         add_test(NAME metal_native COMMAND test_metal_native)
     endif()
     if(MAUL_RHI_D3D12_DRIVER)
-        # A native pass on D3D12, under the debug layer and the Agility
-        # SDK the exe exports.
-        maul_add_test(d3d12_native)
-        target_sources(test_d3d12_native PRIVATE test/d3d12_debug.c)
-        target_include_directories(test_d3d12_native SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
-        target_link_libraries(test_d3d12_native PRIVATE d3d12 dxgi)
+        # A native pass on D3D12, and the queues a frame's passes run on,
+        # seen through the runtime's tables the suite wraps: under the
+        # debug layer and the Agility SDK each exe exports.
+        foreach(test d3d12_native d3d12_queues)
+            maul_add_test(${test})
+            target_sources(test_${test} PRIVATE test/d3d12_debug.c)
+            target_include_directories(test_${test} SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
+            target_link_libraries(test_${test} PRIVATE d3d12 dxgi)
+        endforeach()
         # GPU-based validation's false state errors (#7) reproduced without
         # library code: built with the tests so that it keeps compiling,
         # run by hand as docs/operations/debugging.md says.
@@ -482,7 +485,8 @@ if(MAUL_RHI_BUILD_TESTS)
     # The tests that drive a real GPU, window or browser: the changed-files
     # check leaves them out, every other check runs them.
     foreach(test conformance conformance_worker conformance_external conformance_app
-                 vulkan_external vulkan_frame metal_native d3d12_native external_build)
+                 vulkan_external vulkan_frame metal_native d3d12_native d3d12_queues
+                 external_build)
         if(TEST ${test})
             set_property(TEST ${test} APPEND PROPERTY LABELS integration)
         endif()

@@ -21,21 +21,33 @@
 // The vertex buffers a pipeline reads at most.
 #define MRHI_D3D12_VERTEX_BUFFERS D3D12_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT
 
+// The queues a device runs a frame's passes on, its lanes: the direct
+// queue, which presents and runs the native passes, the compute queue
+// and the copy queue (d3d12_lanes.h).
+typedef enum mrhiD3d12Lane
+{
+    mrhiD3d12LaneDirect,
+    mrhiD3d12LaneCompute,
+    mrhiD3d12LaneCopy,
+    mrhiD3d12LaneCount,
+} mrhiD3d12Lane;
+
 // A frame's object: its resource, whether it is a texture (with its def)
-// or a buffer, and a buffer's D3D12 state. Every buffer starts a frame
-// in the common state, since D3D12 decays buffers to it when a command
-// list finishes. A texture's undefined parts are in the initial state; a
-// placed target is discarded at its first use, which D3D12 asks of
-// placed render target and depth textures before anything else. The
-// bytes of a device's zeros, which resolves and clears copy in pieces:
-// D3D12's placement alignment, so no smaller buffer takes less memory.
+// or a buffer, and a buffer's D3D12 state on each lane. Every buffer
+// starts each lane's batch of work in the common state, since D3D12
+// decays buffers to it when a command list finishes. A texture's
+// undefined parts are in the initial state; a placed target is discarded
+// at its first use, which D3D12 asks of placed render target and depth
+// textures before anything else. The bytes of a device's zeros, which
+// resolves and clears copy in pieces: D3D12's placement alignment, so no
+// smaller buffer takes less memory.
 #define MRHI_D3D12_ZERO_BYTES UINT64_C(65536)
 
 typedef struct mrhiD3d12Object
 {
     ID3D12Resource* resource;
     const mrhiTextureDef* texture;
-    D3D12_RESOURCE_STATES state;
+    D3D12_RESOURCE_STATES state[mrhiD3d12LaneCount];
     D3D12_RESOURCE_STATES initial;
     bool discard;
 } mrhiD3d12Object;
@@ -100,7 +112,10 @@ typedef enum mrhiD3d12Indirect
 typedef struct mrhiD3d12Recorder
 {
     ID3D12Device* device;
+    // The list recording, its lane, and the states that lane's lists take.
     ID3D12GraphicsCommandList* list;
+    mrhiD3d12Lane lane;
+    D3D12_RESOURCE_STATES laneStates;
     // The device's objects; its query sets keep the queries the frame
     // writes.
     mrhiD3d12Objects* objects;

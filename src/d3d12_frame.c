@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// A D3D12 device's frames (d3d12_frame.h). Frames run in submission
-// order on one queue, each signalling the fence with its serial, so a
+// A D3D12 device's frames (d3d12_frame.h). A frame's passes run on its
+// lanes' queues (d3d12_lanes.h), and its end runs on the direct queue
+// after every lane's work and signals the fence with its serial, so a
 // poll reads one counter to know every frame finished, and a slot is
-// reused only once the core has been told its frame finished. A frame's
+// reused only once the core has been told its frame finished. A frame is
+// recorded whole before any of it runs, so one that fails runs nothing. A frame's
 // transients are made at its submit and released when it finishes:
 // placed where the core put them in the slot's heap, which grows as
 // frames need, or committed on their own where the heap's tier cannot
@@ -14,6 +16,7 @@
 
 #include "allocator.h"
 #include "d3d12_barrier.h"
+#include "d3d12_lanes.h"
 #include "d3d12_record.h"
 #include "invariant.h"
 
@@ -92,11 +95,47 @@ bool mrhiD3d12HeapsFit(uint32_t count, uint32_t entries, uint32_t samplers)
                MRHI_D3D12_RING_FLOOR;
 }
 
+// The batches a frame runs at most: each pass opens one at most, beside
+// the frame's last. Each batch takes a list on its lane, and each native
+// pass one more on the direct lane, besides its own.
+static uint32_t BatchLimit(const mrhiDeviceLimits* limits)
+{
+    return limits->framePasses + 2;
+}
+
+static uint32_t ListLimit(const mrhiDeviceLimits* limits, mrhiD3d12Lane lane)
+{
+    return BatchLimit(limits) + (lane == mrhiD3d12LaneDirect ? MRHI_NATIVE_PASSES : 0);
+}
+
+static uint32_t SlotLists(const mrhiDeviceLimits* limits)
+{
+    uint32_t lists = 0;
+    for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
+    {
+        lists += ListLimit(limits, (mrhiD3d12Lane)lane);
+    }
+    return lists;
+}
+
 mrhiD3d12FrameRoom mrhiD3d12PlanFrames(mrhiLayout* layout, const mrhiDeviceLimits* limits,
                                        uint32_t slots)
 {
     mrhiD3d12FrameRoom room = {0};
     room.slots = mrhiLayoutAdd(layout, slots, sizeof(mrhiD3d12Slot), alignof(mrhiD3d12Slot));
+    room.lists =
+        mrhiLayoutAdd(layout, (size_t)slots * SlotLists(limits), sizeof(ID3D12GraphicsCommandList*),
+                      alignof(ID3D12GraphicsCommandList*));
+    room.runs = mrhiLayoutAdd(layout, (size_t)slots * (SlotLists(limits) + MRHI_NATIVE_PASSES),
+                              sizeof(ID3D12CommandList*), alignof(ID3D12CommandList*));
+    room.batches = mrhiLayoutAdd(layout, (size_t)slots * BatchLimit(limits), sizeof(mrhiD3d12Batch),
+                                 alignof(mrhiD3d12Batch));
+    room.passLanes = mrhiLayoutAdd(layout, (size_t)limits->framePasses + 1, sizeof(mrhiD3d12Lane),
+                                   alignof(mrhiD3d12Lane));
+    room.passBatches =
+        mrhiLayoutAdd(layout, (size_t)limits->framePasses + 1, sizeof(uint32_t), alignof(uint32_t));
+    room.followed =
+        mrhiLayoutAdd(layout, (size_t)limits->framePasses + 1, sizeof(bool), alignof(bool));
     room.table = mrhiLayoutAdd(layout, limits->frameResources, sizeof(mrhiD3d12Object),
                                alignof(mrhiD3d12Object));
     room.transients = mrhiLayoutAdd(layout, (size_t)slots * limits->frameResources,
@@ -148,32 +187,59 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
     frames->readbackSize = limits->readbackBytes;
     frames->retirees = (mrhiD3d12Retiree*)(block + room->retirees);
     frames->retireCapacity = room->retireCapacity;
+    mrhiD3d12Lanes* lanes = &frames->lanes;
+    lanes->device = frames->device;
+    lanes->queues[mrhiD3d12LaneDirect] = frames->queue;
+    lanes->recorder = &frames->recorder;
+    lanes->batchLimit = BatchLimit(limits);
+    lanes->runLimit = SlotLists(limits) + MRHI_NATIVE_PASSES;
+    lanes->passLanes = (mrhiD3d12Lane*)(block + room->passLanes);
+    lanes->passBatches = (uint32_t*)(block + room->passBatches);
+    lanes->followed = (bool*)(block + room->followed);
     ID3D12Resource** transients = (ID3D12Resource**)(block + room->transients);
     mrhiD3d12Range* readbacks = (mrhiD3d12Range*)(block + room->readbacks);
+    ID3D12GraphicsCommandList** lists = (ID3D12GraphicsCommandList**)(block + room->lists);
+    ID3D12CommandList** runs = (ID3D12CommandList**)(block + room->runs);
+    mrhiD3d12Batch* batches = (mrhiD3d12Batch*)(block + room->batches);
     for (uint32_t i = 0; i < slots; ++i)
     {
-        frames->slots[i] = (mrhiD3d12Slot){
+        mrhiD3d12Slot* slot = &frames->slots[i];
+        *slot = (mrhiD3d12Slot){
+            .lanes = {.runs = runs + (size_t)i * lanes->runLimit,
+                      .batches = batches + (size_t)i * lanes->batchLimit},
             .transients = transients + (size_t)i * limits->frameResources,
             .readbacks = readbacks + (size_t)i * limits->readbacks,
         };
+        for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
+        {
+            lanes->listLimit[lane] = ListLimit(limits, (mrhiD3d12Lane)lane);
+            slot->lanes.lists[lane] = lists;
+            lists += lanes->listLimit[lane];
+        }
     }
 }
 
 static bool OpenSlot(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot)
 {
     ID3D12Device* device = frames->device;
-    if (FAILED(ID3D12Device_CreateCommandAllocator(device, D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                                   &IID_ID3D12CommandAllocator,
-                                                   (void**)&slot->allocator)))
+    for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
     {
-        return false;
+        if (FAILED(ID3D12Device_CreateCommandAllocator(
+                device, mrhiD3d12ListType((mrhiD3d12Lane)lane), &IID_ID3D12CommandAllocator,
+                (void**)&slot->lanes.allocators[lane])))
+        {
+            return false;
+        }
     }
+    // A frame of the direct lane's work alone takes these.
+    ID3D12GraphicsCommandList** parts = slot->lanes.lists[mrhiD3d12LaneDirect];
     for (uint32_t i = 0; i < 1 + MRHI_NATIVE_PASSES; ++i)
     {
-        if (FAILED(ID3D12Device_CreateCommandList(
-                device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, slot->allocator, nullptr,
-                &IID_ID3D12GraphicsCommandList, (void**)&slot->parts[i])) ||
-            FAILED(ID3D12GraphicsCommandList_Close(slot->parts[i])))
+        if (FAILED(ID3D12Device_CreateCommandList(device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                                  slot->lanes.allocators[mrhiD3d12LaneDirect],
+                                                  nullptr, &IID_ID3D12GraphicsCommandList,
+                                                  (void**)&parts[i])) ||
+            FAILED(ID3D12GraphicsCommandList_Close(parts[i])))
         {
             return false;
         }
@@ -265,10 +331,31 @@ static bool OpenShared(mrhiD3d12Frames* frames)
     return made;
 }
 
+// Makes the compute and copy queues and each lane's fence: whether
+// D3D12 made them all.
+static bool OpenLanes(mrhiD3d12Lanes* lanes)
+{
+    bool made = true;
+    for (int lane = 0; lane < mrhiD3d12LaneCount && made; ++lane)
+    {
+        if (lane != mrhiD3d12LaneDirect)
+        {
+            const D3D12_COMMAND_QUEUE_DESC desc = {.Type = mrhiD3d12ListType((mrhiD3d12Lane)lane)};
+            made = SUCCEEDED(ID3D12Device_CreateCommandQueue(
+                lanes->device, &desc, &IID_ID3D12CommandQueue, (void**)&lanes->queues[lane]));
+        }
+        made = made &&
+               SUCCEEDED(ID3D12Device_CreateFence(lanes->device, 0, D3D12_FENCE_FLAG_NONE,
+                                                  &IID_ID3D12Fence, (void**)&lanes->fences[lane]));
+    }
+    return made;
+}
+
 mrhiResult mrhiD3d12OpenFrames(mrhiD3d12Frames* frames)
 {
     if (FAILED(ID3D12Device_CreateFence(frames->device, 0, D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence,
-                                        (void**)&frames->fence)))
+                                        (void**)&frames->fence)) ||
+        !OpenLanes(&frames->lanes))
     {
         return mrhi_errorCapacity;
     }
@@ -387,11 +474,22 @@ void mrhiD3d12CloseFrames(mrhiD3d12Frames* frames)
         Drop(slot->depthHeap);
         Drop(slot->viewHeap);
         Drop(slot->samplerHeap);
-        for (uint32_t part = 0; part < 1 + MRHI_NATIVE_PASSES; ++part)
+        for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
         {
-            Drop(slot->parts[part]);
+            for (uint32_t list = 0; list < frames->lanes.listLimit[lane]; ++list)
+            {
+                Drop(slot->lanes.lists[lane][list]);
+            }
+            Drop(slot->lanes.allocators[lane]);
         }
-        Drop(slot->allocator);
+    }
+    for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
+    {
+        Drop(frames->lanes.fences[lane]);
+        if (lane != mrhiD3d12LaneDirect)
+        {
+            Drop(frames->lanes.queues[lane]);
+        }
     }
     for (int i = 0; i < mrhiD3d12IndirectCount; ++i)
     {
@@ -481,8 +579,8 @@ static bool TakeObjects(const mrhiD3d12Frames* frames, mrhiD3d12Slot* slot,
     {
         const mrhiDriverResource* resource = &frame->resources[i];
         mrhiD3d12Object* object = &frames->table[i];
-        *object = (mrhiD3d12Object){.state = D3D12_RESOURCE_STATE_COMMON,
-                                    .initial = D3D12_RESOURCE_STATE_COMMON};
+        // Every lane's state is the common one, 0.
+        *object = (mrhiD3d12Object){.initial = D3D12_RESOURCE_STATE_COMMON};
         slot->transients[i] = nullptr;
         if (!resource->needed || !made)
         {
@@ -547,88 +645,29 @@ static mrhiD3d12GpuRing GpuRingOf(ID3D12Device* device, ID3D12DescriptorHeap* he
     return ring;
 }
 
-// Starts a part of the frame's recording: the slot's shader-visible
-// heaps set, and its sealed buffers moved into every read a heap may
-// make of them, since a heap may read one in any pass without it being
-// declared; buffers start each part in the common state they decayed
-// to. A list begins with no root signature, so the next pipeline sets
-// its own.
-static void StartPart(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot)
-{
-    mrhiD3d12Recorder* recorder = &frames->recorder;
-    const mrhiDriverFrame* frame = recorder->frame;
-    recorder->graphicsRoot = nullptr;
-    recorder->computeRoot = nullptr;
-    ID3D12DescriptorHeap* heaps[] = {slot->viewHeap, slot->samplerHeap};
-    ID3D12GraphicsCommandList_SetDescriptorHeaps(recorder->list, 2, heaps);
-    for (uint32_t i = 0; i < frame->resourceCount; ++i)
-    {
-        if (frame->resources[i].sealed && frames->table[i].resource != nullptr &&
-            frames->table[i].texture == nullptr)
-        {
-            mrhiD3d12Use(recorder, i + 1, mrhiD3d12BufferState(mrhi_stateSealed));
-        }
-    }
-    mrhiD3d12FlushBarriers(recorder);
-}
-
-// Places a native pass: its textures moved into their accesses' states,
-// the part recorded so far closed and queued with the program's list,
-// and the next part begun. Each list runs in its own
-// ExecuteCommandLists, after which D3D12 has finished the earlier ones'
-// work and buffers have decayed to the common state.
-static void RunNative(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrhiDriverPass* pass)
+// Places a native pass on the direct lane: its textures moved into
+// their accesses' states, the part recorded so far closed and queued
+// with the program's list, and the next part begun. Each list runs in
+// its own ExecuteCommandLists, after which D3D12 has finished the
+// earlier ones' work and buffers have decayed to the common state.
+static void RunNative(mrhiD3d12Frames* frames, const mrhiDriverPass* pass)
 {
     mrhiD3d12Recorder* recorder = &frames->recorder;
     mrhiD3d12RecordBarriers(recorder, pass->id);
     mrhiD3d12FlushBarriers(recorder);
-    MRHI_ASSERT(slot->partsUsed < 1 + MRHI_NATIVE_PASSES);
-    HRESULT result = ID3D12GraphicsCommandList_Close(recorder->list);
-    slot->runs[slot->runCount++] = (ID3D12CommandList*)recorder->list;
-    if (pass->nativeCommands != nullptr)
-    {
-        slot->runs[slot->runCount++] = (ID3D12CommandList*)pass->nativeCommands;
-    }
-    recorder->list = slot->parts[slot->partsUsed++];
-    if (SUCCEEDED(result))
-    {
-        result = ID3D12GraphicsCommandList_Reset(recorder->list, slot->allocator, nullptr);
-    }
-    if (FAILED(result))
-    {
-        recorder->status = mrhi_errorDeviceLost;
-        return;
-    }
-    for (uint32_t i = 0; i < recorder->frame->resourceCount; ++i)
-    {
-        mrhiD3d12Object* object = &frames->table[i];
-        object->state = object->texture == nullptr ? D3D12_RESOURCE_STATE_COMMON : object->state;
-    }
-    recorder->scratchState = D3D12_RESOURCE_STATE_COMMON;
-    StartPart(frames, slot);
+    mrhiD3d12NextPart(&frames->lanes, pass->nativeCommands);
 }
 
-// Records a frame into its slot's list: its passes, each after its
-// barriers, then the barriers at its end. Answers success,
+// Records a frame into its slot's lists: its passes, each on its lane
+// after its barriers, then the barriers at its end. Answers success,
 // mrhi_errorCapacity when a descriptor ring or the scratch buffer ran
-// out, or mrhi_errorDeviceLost when D3D12 fails the list.
+// out or D3D12 made no list, or mrhi_errorDeviceLost when D3D12 fails a
+// list.
 static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrhiDriverFrame* frame)
 {
-    HRESULT result = ID3D12CommandAllocator_Reset(slot->allocator);
-    slot->partsUsed = 1;
-    slot->runCount = 0;
-    if (SUCCEEDED(result))
-    {
-        result = ID3D12GraphicsCommandList_Reset(slot->parts[0], slot->allocator, nullptr);
-    }
-    if (FAILED(result))
-    {
-        return mrhi_errorDeviceLost;
-    }
     mrhiD3d12Recorder* recorder = &frames->recorder;
     *recorder = (mrhiD3d12Recorder){
         .device = frames->device,
-        .list = slot->parts[0],
         .objects = frames->objects,
         .pipelines = frames->pipelines,
         .frame = frame,
@@ -657,15 +696,29 @@ static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrh
         .scratchState = D3D12_RESOURCE_STATE_COMMON,
         .status = mrhi_success,
     };
-    StartPart(frames, slot);
+    mrhiD3d12Lanes* lanes = &frames->lanes;
+    mrhiD3d12BeginLanes(lanes, &slot->lanes, slot->viewHeap, slot->samplerHeap, frames->submitted);
     for (uint32_t i = 0; i < frame->passCount && recorder->status == mrhi_success; ++i)
     {
-        if (frame->passes[i].native)
+        const mrhiDriverPass* pass = &frame->passes[i];
+        mrhiD3d12EnterPass(lanes, pass);
+        if (recorder->status != mrhi_success)
         {
-            RunNative(frames, slot, &frame->passes[i]);
-            continue;
+            break;
         }
-        mrhiD3d12RecordPass(recorder, &frame->passes[i]);
+        if (pass->native)
+        {
+            RunNative(frames, pass);
+        }
+        else
+        {
+            mrhiD3d12RecordPass(recorder, pass);
+        }
+        mrhiD3d12LeavePass(lanes, pass);
+    }
+    if (recorder->status == mrhi_success)
+    {
+        mrhiD3d12EndLanes(lanes);
     }
     if (recorder->status == mrhi_success)
     {
@@ -673,10 +726,7 @@ static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrh
         MRHI_ASSERT(recorder->barrierAt == frame->barrierCount);
     }
     slot->readbackCount = recorder->readbackCount;
-    // A list is closed even when it is not run, so that it resets.
-    result = ID3D12GraphicsCommandList_Close(recorder->list);
-    slot->runs[slot->runCount++] = (ID3D12CommandList*)recorder->list;
-    return FAILED(result) ? mrhi_errorDeviceLost : recorder->status;
+    return mrhiD3d12CloseLanes(lanes) ? recorder->status : mrhi_errorDeviceLost;
 }
 
 // Notes the device removed when D3D12 says so: whether it has.
@@ -728,10 +778,10 @@ mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame
     mrhiResult status = Record(frames, slot, frame);
     if (status == mrhi_success)
     {
-        for (uint32_t i = 0; i < slot->runCount; ++i)
-        {
-            ID3D12CommandQueue_ExecuteCommandLists(frames->queue, 1, &slot->runs[i]);
-        }
+        status = mrhiD3d12RunLanes(&frames->lanes, &slot->lanes, frames->fence, frame);
+    }
+    if (status == mrhi_success)
+    {
         status = Present(frames, frame);
     }
     if (status == mrhi_success &&
