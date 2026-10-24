@@ -5,6 +5,47 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.1.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.0.1...v0.1.0) (2026-10-24)
+
+Bad data from content is now refused apart from bugs in the calling
+code. A damaged shader, or one that does not fit a pipeline, returns
+the new `mrhi_errorFormat` and counts no misuse, so the misuse count
+keeps showing only bugs in the program.
+
+### Added
+
+- `mrhi_errorFormat`: the data is malformed or does not contain what
+  was asked for. It counts no misuse; every `mrhi_errorInvalid` still
+  counts one. Diagnostic records name the check for both
+  ([#22](https://github.com/Rawframe-Project/maul-rhi/pull/22)).
+
+### Changed
+
+- **Breaking:** `mrhiCreateShader` refuses a damaged container with
+  `mrhi_errorFormat` instead of `mrhi_errorInvalid`. NULL or misaligned
+  bytes stay `mrhi_errorInvalid`
+  ([#22](https://github.com/Rawframe-Project/maul-rhi/pull/22)).
+- **Breaking:** compute and graphics pipeline creation refuse with
+  `mrhi_errorFormat` an entry the shader lacks, a constant id or value
+  its reflection does not take, a required constant left unset, and
+  more constant values than the shader has constants. A NULL entry,
+  NULL values with a count and a constant given twice stay
+  `mrhi_errorInvalid`
+  ([#22](https://github.com/Rawframe-Project/maul-rhi/pull/22)).
+- **Breaking:** graphics pipeline creation refuses with
+  `mrhi_errorFormat` state the shader's reflection does not take:
+  vertex inputs, fragment outputs and targets, the stage interface,
+  fragment depth and the written sample mask. Dual-source blending
+  whose fragment entry has no second source is `mrhi_errorFormat` too,
+  where it was `mrhi_errorUnsupported`. A def with both a bug and such
+  state returns `mrhi_errorInvalid` and counts the bug
+  ([#27](https://github.com/Rawframe-Project/maul-rhi/pull/27)).
+- **Breaking for drivers built outside the tree:** the driver
+  interface is SPI version 6, and `mrhiParseContainer` returns
+  `mrhi_errorFormat` for a damaged container. Drivers are admitted on
+  `conformance/mustpass/spi-6.txt`, which holds the same cases as
+  version 5 ([#22](https://github.com/Rawframe-Project/maul-rhi/pull/22)).
+
 ## [0.0.1](https://github.com/Rawframe-Project/maul-rhi/releases/tag/v0.0.1) (2026-10-23)
 
 The first release: one GPU API over Vulkan, Direct3D 12, Metal and
