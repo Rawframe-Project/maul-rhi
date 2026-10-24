@@ -12,13 +12,6 @@
 #include "invariant.h"
 #include "vulkan_query.h"
 
-// The lane a pass class records in: its own with a lane per class, else
-// the one lane.
-static uint32_t LaneOf(mrhiPassClass passClass)
-{
-    return passClass % MRHI_VULKAN_LANES;
-}
-
 // Notes a failure of the device, the first only.
 static void Note(mrhiVulkanRecording* recording, VkResult result)
 {
@@ -79,14 +72,19 @@ static void Open(mrhiVulkanRecording* recording, uint32_t lane, const uint64_t* 
     recording->laneBatch[lane] = slot->batchCount;
     recording->laneSubmitCount[lane] = 0;
     recording->laneStarted[lane] = true;
-    Note(recording, BeginPart(recording, lane));
+    if (recording->result == VK_SUCCESS)
+    {
+        Note(recording, BeginPart(recording, lane));
+    }
 }
 
 // Closes a lane's open batch, if any: its command buffers join the
 // slot's, and with more than one lane it signals the lane's next value.
+// After the device failed nothing is ended, as a part may not have begun,
+// and the frame is not submitted.
 static void Close(mrhiVulkanRecording* recording, uint32_t lane)
 {
-    if (recording->laneBatch[lane] == 0)
+    if (recording->laneBatch[lane] == 0 || recording->result != VK_SUCCESS)
     {
         return;
     }
@@ -121,13 +119,18 @@ void mrhiVulkanBeginLanes(mrhiVulkanRecording* recording)
         for (uint32_t c = 0; c < MRHI_PASS_CLASSES; ++c)
         {
             uint32_t followed = pass->waitFor[c].index1;
-            frames->followed[followed] =
-                frames->followed[followed] ||
-                (followed != 0 && LaneOf((mrhiPassClass)c) != LaneOf(pass->passClass));
+            frames->followed[followed] = frames->followed[followed] ||
+                                         (followed != 0 && mrhiVulkanLaneOf((mrhiPassClass)c) !=
+                                                               mrhiVulkanLaneOf(pass->passClass));
         }
     }
     const uint64_t none[MRHI_VULKAN_LANES] = {0};
     Open(recording, 0, none);
+    // A part that failed to begin records nothing.
+    if (recording->result != VK_SUCCESS)
+    {
+        return;
+    }
     mrhiVulkanResetQueries(recording);
     // With more than one lane the resets are a batch every lane waits for.
     if (MRHI_VULKAN_SPLIT)
@@ -141,13 +144,13 @@ void mrhiVulkanEnterPass(mrhiVulkanRecording* recording)
     mrhiVulkanFrames* frames = recording->frames;
     mrhiVulkanSlot* slot = recording->slot;
     const mrhiDriverPass* pass = recording->pass;
-    uint32_t lane = LaneOf(pass->passClass);
+    uint32_t lane = mrhiVulkanLaneOf(pass->passClass);
     uint64_t waits[MRHI_VULKAN_LANES] = {0};
     bool follows = false;
     for (uint32_t c = 0; c < MRHI_PASS_CLASSES; ++c)
     {
         uint32_t followed = pass->waitFor[c].index1;
-        uint32_t other = LaneOf((mrhiPassClass)c);
+        uint32_t other = mrhiVulkanLaneOf((mrhiPassClass)c);
         if (followed == 0 || other == lane)
         {
             continue;
@@ -178,7 +181,7 @@ void mrhiVulkanLeavePass(mrhiVulkanRecording* recording)
 {
     if (recording->frames->followed[recording->pass->id.index1])
     {
-        Close(recording, LaneOf(recording->pass->passClass));
+        Close(recording, mrhiVulkanLaneOf(recording->pass->passClass));
     }
 }
 
@@ -205,8 +208,11 @@ void mrhiVulkanCloseLanes(mrhiVulkanRecording* recording)
 
 bool mrhiVulkanNextPart(mrhiVulkanRecording* recording, void* native)
 {
-    uint32_t lane = LaneOf(recording->pass->passClass);
-    VkResult ended = EndPart(recording, lane, native);
-    VkResult begun = BeginPart(recording, lane);
-    return ended == VK_SUCCESS && begun == VK_SUCCESS;
+    uint32_t lane = mrhiVulkanLaneOf(recording->pass->passClass);
+    Note(recording, EndPart(recording, lane, native));
+    if (recording->result == VK_SUCCESS)
+    {
+        Note(recording, BeginPart(recording, lane));
+    }
+    return recording->result == VK_SUCCESS;
 }

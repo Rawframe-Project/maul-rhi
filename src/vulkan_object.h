@@ -39,15 +39,14 @@ typedef struct mrhiVulkanTexture
 #define MRHI_VULKAN_SET_QUERIES 4096
 #define MRHI_VULKAN_SET_WORDS   (MRHI_VULKAN_SET_QUERIES / 64)
 
-// A query set: its pool, its queries and their type, the frame that
-// reset it last, and the queries that frame has written so far as it
-// records.
+// A query set: its pool, its queries and their type, the recording that
+// reset it last, and the queries that recording has written so far.
 typedef struct mrhiVulkanQuerySet
 {
     VkQueryPool pool;
     uint32_t count;
     mrhiQueryType type;
-    uint64_t resetSerial;
+    uint64_t resetRecorded;
     uint64_t written[MRHI_VULKAN_SET_WORDS];
 } mrhiVulkanQuerySet;
 

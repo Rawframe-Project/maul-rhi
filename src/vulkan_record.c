@@ -635,7 +635,7 @@ mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
         .frames = frames,
         .slot = slot,
         .frame = frame,
-        .serial = frames->submitted + 1,
+        .recorded = ++frames->recorded,
         .status = mrhi_success,
         .result = VK_SUCCESS,
     };

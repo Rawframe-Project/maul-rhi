@@ -36,6 +36,13 @@
 #define MRHI_VULKAN_SPLIT false
 #endif
 
+// The lane a pass class records in: its own with a lane per class, else
+// the one lane.
+static inline uint32_t mrhiVulkanLaneOf(mrhiPassClass passClass)
+{
+    return (uint32_t)passClass % MRHI_VULKAN_LANES;
+}
+
 // The command buffers one batch submits at most: its parts with the
 // native passes' between them.
 #define MRHI_VULKAN_BATCH_SUBMITS (1 + 2 * MRHI_NATIVE_PASSES)
@@ -159,6 +166,10 @@ typedef struct mrhiVulkanFrames
     uint32_t viewLimit;
     // Frames submitted, and frames reported finished.
     uint64_t submitted;
+    // Frames recorded, failed ones included: a query set is reset once in
+    // each recording, and a failed one is not submitted, so the next frame,
+    // under the same serial, resets it again.
+    uint64_t recorded;
     uint64_t finished;
     VkDeviceMemory readbackMemory;
     VkBuffer readback;

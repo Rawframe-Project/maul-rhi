@@ -413,6 +413,69 @@ static VkSubmitInfo2 SubmitOf(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, ui
     };
 }
 
+// The value a submission signals on a semaphore, 0 for none.
+[[maybe_unused]] static uint64_t SignalOn(const VkSubmitInfo2* info, VkSemaphore semaphore)
+{
+    for (uint32_t i = 0; i < info->signalSemaphoreInfoCount; ++i)
+    {
+        if (info->pSignalSemaphoreInfos[i].semaphore == semaphore)
+        {
+            return info->pSignalSemaphoreInfos[i].value;
+        }
+    }
+    return 0;
+}
+
+// Whether a submission waits on a semaphore for a value at least the one
+// given.
+[[maybe_unused]] static bool WaitsOn(const VkSubmitInfo2* info, VkSemaphore semaphore,
+                                     uint64_t value)
+{
+    for (uint32_t i = 0; i < info->waitSemaphoreInfoCount; ++i)
+    {
+        const VkSemaphoreSubmitInfo* wait = &info->pWaitSemaphoreInfos[i];
+        if (wait->semaphore == semaphore && wait->value >= value)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Whether the submissions hold every edge of the frame view between
+// lanes: a pass that follows a pass of another lane is in a batch that
+// waits for the value the followed pass's batch, submitted before it,
+// signals. Worked out again from the passes' waitFor and the submissions
+// themselves, apart from the batches' own waits; only an assertion calls
+// it.
+[[maybe_unused]] static bool HoldsFollows(const mrhiVulkanFrames* frames,
+                                          const mrhiVulkanSlot* slot, const mrhiDriverFrame* frame)
+{
+    for (uint32_t p = 0; p < frame->passCount; ++p)
+    {
+        const mrhiDriverPass* pass = &frame->passes[p];
+        uint32_t held = frames->passBatches[pass->id.index1];
+        for (uint32_t c = 0; c < MRHI_PASS_CLASSES; ++c)
+        {
+            uint32_t followed = pass->waitFor[c].index1;
+            uint32_t lane = mrhiVulkanLaneOf((mrhiPassClass)c);
+            if (followed == 0 || lane == mrhiVulkanLaneOf(pass->passClass))
+            {
+                continue;
+            }
+            uint32_t earlier = frames->passBatches[followed];
+            uint64_t value =
+                earlier == 0 ? 0 : SignalOn(&slot->infos[earlier - 1], frames->lanes[lane]);
+            if (earlier >= held || value == 0 ||
+                !WaitsOn(&slot->infos[held - 1], frames->lanes[lane], value))
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 // Submits a recorded frame's batches in one call. The first waits for its
 // surface images' acquires, and for the frame that used its slot before
 // it: the host saw that frame finish before reusing the slot's memory, so
@@ -443,6 +506,7 @@ static VkResult SubmitBatches(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
     first->pWaitSemaphoreInfos = reused ? swapchains->waits : swapchains->waits + 1;
     last->signalSemaphoreInfoCount = images + 1;
     last->pSignalSemaphoreInfos = swapchains->signals;
+    MRHI_ASSERT(HoldsFollows(frames, slot, frame));
     return frames->api->vkQueueSubmit2(frames->queue, slot->batchCount, slot->infos,
                                        VK_NULL_HANDLE);
 }
