@@ -72,7 +72,11 @@ jobs:
           git archive --format=tar.gz --prefix="${GITHUB_REPOSITORY#*/}-${TAG#v}/" -o "dist/${GITHUB_REPOSITORY#*/}-${TAG#v}.tar.gz" HEAD
         env:
           TAG: ${{ needs.release-please.outputs.tag }}
+      # Without a source name syft names the document after its path, ".".
       - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        env:
+          SYFT_SOURCE_NAME: ${{ github.event.repository.name }}
+          SYFT_SOURCE_VERSION: ${{ needs.release-please.outputs.tag }}
         with:
           path: .
           format: spdx-json
