@@ -485,8 +485,11 @@ endif()
 # its own envelopes.
 if(MAUL_RHI_FUZZ)
     # The library is instrumented too: its coverage guides libFuzzer, and
-    # the sanitizers watch its code, not only the targets'.
-    target_compile_options(maul-rhi PRIVATE -fsanitize=fuzzer-no-link,address,undefined)
+    # the sanitizers watch its code, not only the targets'. Undefined
+    # behavior aborts the run, so libFuzzer writes the input that found it
+    # instead of printing and going on.
+    target_compile_options(maul-rhi PRIVATE -fsanitize=fuzzer-no-link,address,undefined
+                                            -fno-sanitize-recover=all)
     target_link_options(maul-rhi PUBLIC -fsanitize=address,undefined)
     foreach(area container cache)
         add_executable(fuzz_${area} test/fuzz_${area}.c)
@@ -494,8 +497,10 @@ if(MAUL_RHI_FUZZ)
         # The targets reach the library's own functions.
         target_include_directories(fuzz_${area} PRIVATE ${PROJECT_SOURCE_DIR}/src)
         maul_apply_flags(fuzz_${area})
-        target_compile_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined)
-        target_link_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined)
+        target_compile_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined
+                                                   -fno-sanitize-recover=all)
+        target_link_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined
+                                                -fno-sanitize-recover=all)
     endforeach()
 endif()
 
