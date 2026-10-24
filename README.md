@@ -19,6 +19,8 @@ Every call is checked by WebGPU's rules on every driver, so a frame that records
 
 ## Quick start
 
+It builds with CMake 3.25 or newer and GCC 14 or newer, Clang 19 or newer, or Apple Clang. On Linux and macOS:
+
 ```sh
 git clone https://github.com/Rawframe-Project/maul-rhi.git
 cd maul-rhi
@@ -27,6 +29,15 @@ cmake --build build
 ctest --test-dir build -LE integration
 ./build/sample_triangle
 ```
+
+Ubuntu 24.04's default compiler is GCC 13, which the build refuses ("GCC 14 or newer is required"). Install GCC 14 and configure again in a fresh build directory, since `build/` keeps the compiler it first found; then go on from `cmake --build build`:
+
+```sh
+sudo apt install gcc-14
+rm -rf build && CC=gcc-14 cmake -B build -DCMAKE_BUILD_TYPE=Release
+```
+
+On Windows the library builds with `clang-cl`, and on the web with Emscripten; [Getting started](docs/user/getting-started.md) lists what each needs.
 
 The tests labeled `integration` and the samples need a GPU, or a software rasterizer such as lavapipe; without one they report themselves skipped. Install the library with `cmake --install build --prefix <prefix>` and use it from CMake:
 
@@ -46,7 +57,7 @@ or through pkg-config as `maul-rhi`. [Getting started](docs/user/getting-started
 | macOS, iOS | Metal |
 | The web | WebGPU, with Emscripten or Clang's `wasm32-wasi` |
 
-The library builds with GCC 14 or Clang 19 and newer, and with `clang-cl` on Windows. Its public headers are C17 and C++17. CI builds and tests every platform, on lavapipe, WARP, the hosted Macs' GPUs, the Android emulator, the iOS simulator and headless Chrome. Present timing is not granted by any driver yet; on Metal, neither are timestamps nor bindless heaps.
+Its public headers are C17 and C++17. CI builds and tests every platform, on lavapipe, WARP, the hosted Macs' GPUs, the Android emulator, the iOS simulator and headless Chrome. Present timing is not granted by any driver yet; on Metal, neither are timestamps nor bindless heaps.
 
 ## Documentation
 
