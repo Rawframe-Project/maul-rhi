@@ -126,6 +126,53 @@ static void TestReadAfterWrite(void)
     Close(s_device);
 }
 
+// A read that needs no barrier follows the pass whose barrier set the
+// part's state, even with no write in the frame: an imported texture the
+// last frame left as a copy's destination is sampled by two classes.
+static void TestCarriedRead(void)
+{
+    Open();
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = mrhi_formatRgba8Unorm;
+    def.width = 64;
+    def.height = 64;
+    def.usage = mrhi_textureSampled | mrhi_textureCopyDestination;
+    mrhiTextureId object = {0};
+    CHECK(mrhiCreateTexture(s_device, &def, &object) == mrhi_success, "a texture");
+    Begin();
+    mrhiResourceId texture = {0};
+    CHECK(mrhiImportTexture(s_device, object, &texture) == mrhi_success, "imported");
+    Pass(mrhi_passTransfer, Access(texture, mrhi_accessCopyDestination, 0), true);
+    Submit();
+    Begin();
+    CHECK(mrhiImportTexture(s_device, object, &texture) == mrhi_success, "imported again");
+    mrhiPassId compute = Pass(mrhi_passAsyncCompute, Access(texture, mrhi_accessSampled, 0), true);
+    mrhiPassId graphics = Pass(mrhi_passGraphics, Access(texture, mrhi_accessSampled, 0), true);
+    Submit();
+    CHECK(Waits(compute, kNone, kNone, kNone), "the first read follows nothing in the frame");
+    CHECK(Waits(graphics, kNone, compute, kNone), "the second read follows the first's barrier");
+    Close(s_device);
+}
+
+// A write follows every class's last read since the state was set: a read
+// in the setter's own class after it, which a third class's read does not
+// follow, among them.
+static void TestLaterReader(void)
+{
+    Open();
+    Begin();
+    mrhiResourceId buffer = Buffer();
+    Pass(mrhi_passGraphics, Access(buffer, mrhi_accessStorageWrite, 0), false);
+    mrhiPassId set = Pass(mrhi_passAsyncCompute, Access(buffer, mrhi_accessStorageRead, 0), true);
+    mrhiPassId later = Pass(mrhi_passAsyncCompute, Access(buffer, mrhi_accessStorageRead, 0), true);
+    mrhiPassId copy = Pass(mrhi_passTransfer, Access(buffer, mrhi_accessCopySource, 0), true);
+    mrhiPassId write = Pass(mrhi_passGraphics, Access(buffer, mrhi_accessStorageWrite, 0), true);
+    Submit();
+    CHECK(Waits(copy, kNone, set, kNone), "the copy follows the read that set the state");
+    CHECK(Waits(write, kNone, later, copy), "the write follows the last read of each class");
+    Close(s_device);
+}
+
 // A write after reads in two other classes follows the last of each. The
 // first read follows the first write; the second needs no barrier after
 // the first, so it follows the pass whose barrier set the state.
@@ -299,6 +346,8 @@ int main(void)
     TestReadAfterWrite();
     TestWriteAfterReads();
     TestReadAfterRead();
+    TestCarriedRead();
+    TestLaterReader();
     TestDisjointParts();
     TestPlanes();
     TestAliasing();

@@ -683,8 +683,9 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
     return false;
 }
 
-// Whether every two kept uses of a part of a resource that race follow
-// one another, whatever their classes: apart from how the maps found the
+// Whether every two kept uses of a part of a resource follow one another,
+// whatever their classes, when they race or a barrier before the earlier
+// sets the part's state for the later: apart from how the maps found the
 // waits, at the cost of every pair of uses. Only assertions call it.
 [[maybe_unused]] static bool RacesFollow(const mrhiDevice* device)
 {
@@ -704,9 +705,11 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
                     const mrhiFrameUse* first = &device->frameUses[earlier->firstUse + i];
                     mrhiBox earlierBox = BoxOf(resource, first);
                     mrhiBox shared;
-                    if (first->resource == second->resource &&
-                        Intersect(&earlierBox, &box, &shared) && Races(resource, first, second) &&
-                        !Follows(device, q + 1, p + 1))
+                    bool ordered = first->resource != second->resource ||
+                                   !Intersect(&earlierBox, &box, &shared) ||
+                                   Follows(device, q + 1, p + 1);
+                    if (!ordered && (Races(resource, first, second) ||
+                                     BarrierMeets(device, p, p + 1, second->resource, &shared)))
                     {
                         return false;
                     }
