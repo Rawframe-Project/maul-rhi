@@ -73,7 +73,8 @@ def main():
     if flags:
         sys.exit("usage: gen_kernels.py [--check | --self-test [--skip-inputs] | path to dxc]")
     dxc = sys.argv[1] if len(sys.argv) > 1 else "dxc"
-    shader_stamp.refuse_unpinned({"dxc": shader_stamp.dxc_identity(dxc)}, shader_stamp.DXC)
+    shader_stamp.refuse_unpinned({"dxc": shader_stamp.dxc_identity(dxc)},
+                                 {"dxc": shader_stamp.DXC_IDENTITY})
     stamped = dict(units(ROOT))
     with tempfile.TemporaryDirectory() as work:
         for source, name, array in KERNELS:

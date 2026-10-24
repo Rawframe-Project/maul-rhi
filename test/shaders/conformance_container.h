@@ -5,7 +5,7 @@
 // from test/shaders/conformance.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:e7b8b5af2d2c4eaa42f92d59d9ed24ca35ccfdbcaabc1a5d9835b8f32e46d68d
+// inputs sha256:2c326077b4f53934f56c21e27efad02a4214ea88b8f4aa4a3140cbcb6a81ba78
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0

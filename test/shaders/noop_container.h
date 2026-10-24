@@ -5,7 +5,7 @@
 // from test/shaders/noop.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:93d0f7d04c63648de07cae7f76a6aca5d4b83b4d9d70f349a35bcf6298d10e7a
+// inputs sha256:dc3eefd1e326763be3d7641476832608f0c83ace3057b5565efee6c61ccde14c
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0

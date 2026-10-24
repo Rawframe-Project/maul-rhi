@@ -46,13 +46,13 @@ The options a developer uses besides the user's: `MAUL_RHI_SANITIZE` (AddressSan
 | Files | Generator | Inputs | In CI |
 |---|---|---|---|
 | `include/maul-rhi/*.h`, `src/generated/{capabilities,defaults,diagnostic_texts,result_names}.c` | `python3 tools/gen_contract.py` | `contract/mrhi.json` | regenerated, and any difference fails |
-| `test/shaders/*_container.h`, `samples/shaders/*_container.h` | `python3 tools/gen_test_shaders.py` | the GLSL and WGSL sources and JSON reflections beside them, and the generator and writer scripts | committed and stamped; CI has no shader tools and checks the stamps |
+| `test/shaders/*_container.h`, `samples/shaders/*_container.h` | `python3 tools/gen_test_shaders.py` | the GLSL and WGSL sources and JSON reflections beside them, the generator and writer scripts, and the contract's values the writer reads | committed and stamped; CI has no shader tools and checks the stamps |
 | `src/generated/d3d12_expand.h` | `python3 tools/gen_kernels.py [dxc]` | `src/d3d12_expand.hlsl` and the generator | committed and stamped; CI has no DXC and checks the stamp |
 | `maul-rhi.mjs` (in the build tree) | `tools/gen_web_glue.py`, run by the build | the `EM_JS` functions of the WebGPU driver | built every time |
 
 `gen_test_shaders.py` needs `glslangValidator`, `spirv-link`, `spirv-val`, `spirv-cross` and `dxc` on the path, and runs `tools/mrhi_msl.py`, `tools/mrhi_dxil.py` and `tools/mrhi_container.py` for each container. `gen_kernels.py` signs the DXIL when DXC's validator (`libdxil`) sits beside it. Run a generator again whenever its inputs change, and commit what it writes.
 
-Both generators make only with the pinned tools, and refuse others by name:
+Both generators make only with the pinned tools, compared exactly, and refuse others by name:
 
 | Tool | Pinned version | Where it comes from |
 |---|---|---|
@@ -63,7 +63,7 @@ Both generators make only with the pinned tools, and refuse others by name:
 
 Check the tarball's SHA-256 against that digest, which the release API reports for the asset, before running it. The Maul family pins the same DXC.
 
-Each generated header carries a stamp: `// inputs sha256:` over every input it was made from (each named by its path, CRLF read as LF), a `// tool` line per pinned tool, and `// bytes sha256:` over its array. `--check` on either generator needs no tools: it fails on a changed input, a moved pin or an edited header, naming the header. `--self-test` proves that check on a copy of the tree: it passes as committed and with CRLF line ends, and fails on each of the three. With `--skip-inputs`, which turns off the input comparison, the self-test exits 1. `tools/check.sh` and CI's `checks` job run all four. Moving a pin means regenerating every header with the new tool, in a pull request of its own that says why its bytes changed.
+Each generated header carries a stamp: `// inputs sha256:` over every input it was made from (each named by its path, CRLF read as LF; for a container, also every value the writer reads from `contract/mrhi.json`, so renumbering one stales the containers while rewording the contract does not), a `// tool` line per pinned tool, and `// bytes sha256:` over its array. `--check` on either generator needs no tools: it fails on a changed input, a moved pin or an edited header, naming the header. `--self-test` proves that check on a copy of the tree: it passes as committed and with CRLF line ends, and fails on each of the three; for the containers it also fails when two of the contract's sample type values are swapped and passes when only the contract's prose changes. With `--skip-inputs`, which turns off the input comparison, the self-test exits 1. `tools/check.sh` and CI's `checks` job run all four. Moving a pin means regenerating every header with the new tool, in a pull request of its own that says why its bytes changed.
 
 The library version in `base.h` is not generated: release-please moves it, and `gen_contract.py` keeps it.
 

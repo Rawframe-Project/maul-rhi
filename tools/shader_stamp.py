@@ -21,6 +21,8 @@
 # Standard library only.
 
 import hashlib
+import importlib.util
+import json
 import os
 import re
 import shutil
@@ -29,8 +31,10 @@ import sys
 import tempfile
 
 STAMP = re.compile(r"^// (inputs|tool|bytes) (.*)$", re.MULTILINE)
-# The family's DXC, which both generators pin: the release asset of
-# microsoft/DirectXShaderCompiler, named with its SHA-256.
+# The family's DXC, which both generators pin: what dxc --version
+# reports of it, and the stamp's lines naming the release asset of
+# microsoft/DirectXShaderCompiler with its SHA-256.
+DXC_IDENTITY = "libdxcompiler 1.9.0.1, 0d3ee6b5"
 DXC = (
     "dxc linux_dxc_2026_07_29 (v1.9.2607, libdxcompiler 1.9.0.1, 0d3ee6b5)",
     "dxc sha256:55665c87824051ed4774ff3280a79ccbbb7d39243b9736ca5e98222134112d54",
@@ -54,14 +58,29 @@ def dxc_identity(dxc="dxc"):
     return f"libdxcompiler {found.group(3)}, {found.group(2)}"
 
 
-def refuse_unpinned(found, pins):
-    """Exits naming each installed tool, by name, that no pin of its name
-    holds."""
-    wrong = [f"{name}: installed {value}" for name, value in found.items()
-             if not any(pin.startswith(name) and value in pin for pin in pins)]
+def refuse_unpinned(found, pinned):
+    """Exits naming each installed tool whose identity is not exactly its
+    pin; both map a tool's name to its identity."""
+    wrong = [f"{name}: installed {found.get(name)}, pinned {pin}"
+             for name, pin in pinned.items() if found.get(name) != pin]
     if wrong:
-        sys.exit("the installed tools are not the pinned ones:\n  " + "\n  ".join(wrong) +
-                 "\nthe pins: " + "; ".join(pins))
+        sys.exit("the installed tools are not the pinned ones:\n  " + "\n  ".join(wrong))
+
+
+# An input that is not a file's bytes: the contract's values the container
+# writer reads (mrhi_container.Enums.canonical), so that changing one
+# stales every container while an edit to the contract's prose does not.
+CONTRACT_VALUES = "contract/mrhi.json values"
+
+
+def contract_values(root):
+    """The contract's values the root's container writer reads, as bytes."""
+    spec = importlib.util.spec_from_file_location(
+        "stamped_writer", os.path.join(root, "tools", "mrhi_container.py"))
+    writer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(writer)
+    with open(os.path.join(root, "contract", "mrhi.json"), encoding="utf-8") as f:
+        return writer.Enums(json.load(f)).canonical()
 
 
 def inputs_digest(root, paths):
@@ -69,6 +88,9 @@ def inputs_digest(root, paths):
     LF, in path order."""
     digest = hashlib.sha256()
     for path in sorted(paths):
+        if path == CONTRACT_VALUES:
+            digest.update(path.encode() + b"\0" + contract_values(root) + b"\0")
+            continue
         with open(os.path.join(root, path), "rb") as f:
             data = f.read().replace(b"\r\n", b"\n")
         digest.update(path.encode() + b"\0" + str(len(data)).encode() + b"\0" + data)
@@ -128,12 +150,13 @@ def check(root, units, tools, script, compare_inputs=True):
     return 1 if found else 0
 
 
-def self_test(root, copied, units_of, tools, compare_inputs=True):
+def self_test(root, copied, units_of, tools, compare_inputs=True, cases=()):
     """Proves the check on copies of the tree: it passes as committed and
     with CRLF inputs, and fails on a changed input, a changed pin and an
-    edited header, each for its own reason. copied names the files and
-    folders to copy; units_of answers the units for a root. Answers the
-    exit status."""
+    edited header, each for its own reason, and as each of the cases says
+    (what, a change of a copy's root, the problem kinds wanted). copied
+    names the files and folders to copy; units_of answers the units for a
+    root. Answers the exit status."""
     failures = []
 
     def copy():
@@ -171,7 +194,7 @@ def self_test(root, copied, units_of, tools, compare_inputs=True):
             f.write(data.replace(old, new, 1) if old else data + new)
 
     def crlf(work, header, inputs):
-        for path in inputs + [header]:
+        for path in [p for p in inputs if p != CONTRACT_VALUES] + [header]:
             full = os.path.join(work, path)
             with open(full, "rb") as f:
                 data = f.read().replace(b"\r\n", b"\n")
@@ -194,9 +217,11 @@ def self_test(root, copied, units_of, tools, compare_inputs=True):
                                                               b"// tool moved "), {"tools"})
     expect("an edited header", edited_byte, {"bytes"})
     expect("CRLF line ends", crlf, set())
+    for what, change, wanted in cases:
+        expect(what, lambda work, header, inputs, change=change: change(work), wanted)
     for failure in failures:
         print(f"self-test: {failure}")
     if not failures:
         print("self-test: the check passes as committed and with CRLF, and fails on a changed "
-              "input, pin or header")
+              "input, pin or header" + "".join(f"; {what}: as wanted" for what, _, _ in cases))
     return 1 if failures else 0

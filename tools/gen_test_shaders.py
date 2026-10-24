@@ -44,16 +44,18 @@ import shader_stamp  # noqa: E402
 
 # The tools every committed header was made by, as tool_identities()
 # reads them, DXC the family's (shader_stamp.DXC).
-PINS = (
-    "glslang 15.1.0",
-    "SPIRV-Tools v2025.1",
-    "spirv-cross 2021.01.15+1.3.239.0",
-    *shader_stamp.DXC,
-)
-# The scripts every container is made by; mrhi_msl.py too for those with
-# MSL.
+PINNED = {
+    "glslang": "glslang 15.1.0",
+    "SPIRV-Tools": "SPIRV-Tools v2025.1",
+    "spirv-cross": "spirv-cross 2021.01.15+1.3.239.0",
+    "dxc": shader_stamp.DXC_IDENTITY,
+}
+# The stamp's tool lines.
+PINS = (PINNED["glslang"], PINNED["SPIRV-Tools"], PINNED["spirv-cross"], *shader_stamp.DXC)
+# The scripts every container is made by, and the contract's values the
+# writer reads; mrhi_msl.py too for those with MSL.
 SCRIPTS = ("tools/gen_test_shaders.py", "tools/shader_stamp.py", "tools/mrhi_container.py",
-           "tools/mrhi_dxil.py")
+           "tools/mrhi_dxil.py", shader_stamp.CONTRACT_VALUES)
 # Each container: its directory, its name, its stages' sources and
 # entries, and whether it has WGSL (a container reading heaps or the
 # view index has none); a container reading no heap has MSL, and every
@@ -106,6 +108,26 @@ def units(root):
         inputs += list(SCRIPTS) + ([] if heaps else ["tools/mrhi_msl.py"])
         found.append((f"{folder}/{name}_container.h", inputs))
     return found
+
+
+def contract_edit(emitted):
+    """A self-test change to a copy's contract: swapping the values of the
+    first two sample types, which containers emit, or only rewording that
+    enum's doc."""
+    def change(work):
+        path = os.path.join(work, "contract", "mrhi.json")
+        with open(path, encoding="utf-8") as file:
+            contract = json.load(file)
+        item = next(item for header in contract["headers"] for item in header["items"]
+                    if item.get("name") == "sample_type")
+        if emitted:
+            first, second = item["values"][1], item["values"][2]
+            first["value"], second["value"] = second["value"], first["value"]
+        else:
+            item["doc"] += " Reworded."
+        with open(path, "w", encoding="utf-8", newline="\n") as file:
+            json.dump(contract, file, indent=2)
+    return change
 
 
 def run(*command):
@@ -180,11 +202,14 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.check or args.self_test:
         if args.self_test:
-            return shader_stamp.self_test(ROOT, ("tools", "test/shaders", "samples/shaders"),
-                                          units, PINS, not args.skip_inputs)
+            cases = (("a changed contract value", contract_edit(True), {"inputs"}),
+                     ("the contract's prose reworded", contract_edit(False), set()))
+            return shader_stamp.self_test(ROOT, ("tools", "test/shaders", "samples/shaders",
+                                                 "contract"),
+                                          units, PINS, not args.skip_inputs, cases)
         return shader_stamp.check(ROOT, units(ROOT), PINS, "tools/gen_test_shaders.py",
                                   not args.skip_inputs)
-    shader_stamp.refuse_unpinned(tool_identities(), PINS)
+    shader_stamp.refuse_unpinned(tool_identities(), PINNED)
     stamped = dict(units(ROOT))
     for folder, name, stages, wgsl in CONTAINERS:
         shaders = os.path.join(ROOT, folder)
