@@ -4,7 +4,8 @@
 // A native pass on Metal (maul-rhi/metal.h): a texture uploaded by the
 // library, overwritten by the program's own command buffer blitting in
 // texels of its own, and read back by the library, the program's texels
-// coming back; the device's native objects, and the refusals. Skipped
+// coming back; the device's native objects, the refusals, and the usage
+// flags of the textures the library makes. Skipped
 // where there is no Metal adapter, unless MAUL_RHI_REQUIRE_METAL is set.
 
 #include "test_harness.h"
@@ -133,6 +134,62 @@ static void CheckFrame(mrhiDevice* device, mrhiTextureId texture, id<MTLCommandB
     CHECK(copied, "the program's texels, after the upload and before the readback");
 }
 
+// One texture usage and the MTLTextureUsage the shader access it allows
+// needs, which Metal's texture usage validation would check at run time.
+typedef struct UsageCase
+{
+    mrhiTextureUsage usage;
+    mrhiFormat format;
+    mrhiFormat viewFormat;
+    MTLTextureUsage needed;
+    const char* what;
+} UsageCase;
+
+// Each texture the library makes carries the usage flags its accesses
+// need: the core refuses a binding or attachment without the usage its
+// kind takes, so these flags cover every access a frame can make. This
+// holds where Metal's own texture usage check cannot run, on the macOS 26
+// runner whose check reports a mismatch on every texture (#9).
+static void CheckUsages(mrhiDevice* device)
+{
+    static const UsageCase cases[] = {
+        {mrhi_textureSampled, mrhi_formatRgba8Unorm, mrhi_formatNone, MTLTextureUsageShaderRead,
+         "sampled: shader reads"},
+        {mrhi_textureStorage, mrhi_formatRgba8Unorm, mrhi_formatNone,
+         MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite,
+         "storage: shader reads and writes"},
+        {mrhi_textureRenderTarget, mrhi_formatRgba8Unorm, mrhi_formatNone,
+         MTLTextureUsageRenderTarget, "a render target"},
+        {mrhi_textureSampled | mrhi_textureRenderTarget, mrhi_formatRgba8Unorm, mrhi_formatNone,
+         MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget, "sampled and a render target"},
+        {mrhi_textureSampled, mrhi_formatRgba8Unorm, mrhi_formatRgba8UnormSrgb,
+         MTLTextureUsageShaderRead | MTLTextureUsagePixelFormatView, "a view of another format"},
+        {mrhi_textureRenderTarget, mrhi_formatDepthStencil, mrhi_formatNone,
+         MTLTextureUsageRenderTarget | MTLTextureUsagePixelFormatView,
+         "depth and stencil, viewed by aspect"},
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+    {
+        mrhiTextureDef def = mrhiDefaultTextureDef();
+        def.format = cases[i].format;
+        def.width = SIZE;
+        def.height = SIZE;
+        def.usage = cases[i].usage;
+        def.viewFormats[0] = cases[i].viewFormat;
+        mrhiTextureId texture = {0};
+        void* made = nullptr;
+        bool created = mrhiCreateTexture(device, &def, &texture) == mrhi_success &&
+                       mrhiGetMetalTexture(device, texture, &made) == mrhi_success &&
+                       made != nullptr;
+        MTLTextureUsage usage = created ? ((id<MTLTexture>)made).usage : 0;
+        CHECK(created && (usage & cases[i].needed) == cases[i].needed, cases[i].what);
+        if (created)
+        {
+            CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "the texture ended");
+        }
+    }
+}
+
 static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
 {
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
@@ -148,6 +205,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
     {
         return;
     }
+    CheckUsages(device);
     void* native = nullptr;
     void* queue = nullptr;
     void* unused[5] = {0};

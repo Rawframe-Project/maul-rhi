@@ -4,8 +4,10 @@
 // Whether Metal's shader validation reads a sampled texture right on
 // this machine, with no Maul RHI code: a 1x1 texture made for shader
 // reads, sampled by a fragment function into a 1x1 target. On the macOS
-// 26 runner image, shader validation's texture usage check reports a
-// usage mismatch on this texture and the sample reads zero; CI runs this
+// 26 runner image (26.6.2, the Apple Paravirtual device), shader
+// validation's texture usage check reports a usage mismatch on this
+// texture and the sample reads zero, as it does for every texture read or
+// sampled in render or compute, whatever its usage and storage; CI runs this
 // first and turns off that one check where it fails, so the suite keeps
 // every other check there and the check comes back once the platform is
 // fixed. Prints "usage check: ok" or "usage check: broken" and exits 0

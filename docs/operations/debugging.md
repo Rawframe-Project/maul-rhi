@@ -22,7 +22,7 @@ GPU-based validation's resource state tracking reports false errors on the 1.619
 
 ## Metal
 
-`MTL_DEBUG_LAYER=1` and `MTL_SHADER_VALIDATION=1` stop a test on API misuse and out-of-bounds shader access. On the macOS 26 image the texture usage check of shader validation misfires on correctly made textures; `test/metal_usage_check.m` reproduces it without library code, and `MTL_SHADER_VALIDATION_TEXTURE_USAGE=0` turns that one check off. Xcode's GPU capture shows labels.
+`MTL_DEBUG_LAYER=1` and `MTL_SHADER_VALIDATION=1` stop a test on API misuse and out-of-bounds shader access. On the macOS 26 runner image (26.6.2, the Apple Paravirtual device) the texture usage check of shader validation reports "Texture usage flags mismatch" on every texture a shader reads or samples, in render and compute alike, and the access reads zero; `test/metal_usage_check.m` reproduces it without library code, and `MTL_SHADER_VALIDATION_TEXTURE_USAGE=0` turns that one check off. Xcode's GPU capture shows labels.
 
 ## The web
 
