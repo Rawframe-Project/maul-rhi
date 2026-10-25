@@ -339,10 +339,12 @@ if(MAUL_RHI_BUILD_TESTS)
             add_test(NAME container_writer
                      COMMAND Python3::Interpreter ${PROJECT_SOURCE_DIR}/test/test_container_writer.py
                              $<TARGET_FILE:test_shader>)
+            set_tests_properties(container_writer PROPERTIES LABELS container_writer)
         endif()
         # The D3D12 tool's refusal of a loop variable read after its step.
         if(Python3_Interpreter_FOUND AND NOT CMAKE_CROSSCOMPILING)
             add_test(NAME dxil_order COMMAND Python3::Interpreter ${PROJECT_SOURCE_DIR}/test/test_dxil_order.py)
+            set_tests_properties(dxil_order PROPERTIES LABELS dxil_order)
         endif()
     endif()
     # Every driver the build has, through the public API. Where the XCB
@@ -408,6 +410,7 @@ if(MAUL_RHI_BUILD_TESTS)
                  COMMAND ${CMAKE_COMMAND} -DSUITE=$<TARGET_FILE:test_conformance>
                          -DLIST=${PROJECT_SOURCE_DIR}/conformance/mustpass/spi-${maul_rhi_spi}.txt
                          -P ${PROJECT_SOURCE_DIR}/test/mustpass.cmake)
+        set_tests_properties(mustpass PROPERTIES LABELS mustpass)
     endif()
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND AND MAUL_RHI_VULKAN_DRIVER AND NOT CMAKE_CROSSCOMPILING)
@@ -572,5 +575,7 @@ if(MAUL_RHI_INSTALL)
                          -DSOURCE=${PROJECT_SOURCE_DIR}/test/external -DGENERATOR=${CMAKE_GENERATOR}
                          -DCC=${CMAKE_C_COMPILER} -DCONFIG=$<CONFIG> -P
                          ${PROJECT_SOURCE_DIR}/test/external/run.cmake)
+        # Added after the loop above labels the integration tests.
+        set_tests_properties(external_build PROPERTIES LABELS "external_build;integration")
     endif()
 endif()
