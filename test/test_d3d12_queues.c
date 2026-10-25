@@ -421,19 +421,24 @@ static void CheckFailedList(mrhiDevice* device, mrhiBufferId buffer, mrhiCompute
     }
 }
 
+// Set by Unblock just before it lets the held queue run.
+static volatile LONG s_unblocked = 0;
+
 // Signals the suite's fence a while after it starts, letting the queue
 // behind it run.
 static DWORD WINAPI Unblock(LPVOID fence)
 {
-    Sleep(300);
+    Sleep(1000);
+    (void)InterlockedExchange(&s_unblocked, 1);
     return SUCCEEDED(ID3D12Fence_Signal((ID3D12Fence*)fence, 1)) ? 0 : 1;
 }
 
 // A frame filling a transient and reading it back, queued behind a wait
 // for a fence of the suite's, whose last signal fails: the device is
 // lost. Its work runs once the fence is signalled, so the frame's lists,
-// allocators and transient must outlive it, and the device's teardown
-// must not release them first, as the debug layer and the run check.
+// allocators and transient must outlive it: the device's teardown waits
+// for that work before releasing them, so it returns only after the
+// fence was signalled.
 static void CheckLostFrame(mrhiDevice* device)
 {
     void* native = nullptr;
@@ -473,6 +478,8 @@ static void CheckLostFrame(mrhiDevice* device)
     Unhook();
     CHECK(thread != nullptr, "the fence's signaller");
     mrhiDestroyDevice(device);
+    CHECK(thread == nullptr || InterlockedCompareExchange(&s_unblocked, 0, 0) == 1,
+          "the teardown waited for the queued frame");
     // Whatever the queue still held runs now, if it has not.
     if (thread != nullptr)
     {
