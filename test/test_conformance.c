@@ -571,6 +571,30 @@ static Case* BeginCase(const char* name)
 #define DEBUG_ERRORS() 0u
 #endif
 
+// By case, the times it, or a part of it, was left out on a device with
+// every feature its adapter grants, and why, the last time.
+#define CASES (sizeof(s_cases) / sizeof(s_cases[0]))
+static int s_skips[CASES];
+static const char* s_skipped[CASES];
+
+// Whether the device the cases run on has every feature its adapter
+// grants, so that a case or part left out for a feature is a skip.
+static bool s_full;
+
+// Counts and prints a case, or a part of it, left out on such a device
+// of a native adapter for a feature the adapter lacks; the test driver
+// grants only some features, on purpose.
+static void Skip(const char* name, const char* why)
+{
+    Case* skip = BeginCase(name);
+    if (skip != nullptr && s_full && s_runs)
+    {
+        s_skips[skip - s_cases] += 1;
+        s_skipped[skip - s_cases] = why;
+        printf("case %s: skipped %s\n", name, why);
+    }
+}
+
 // Runs a call as a case, counting its failures against it.
 #define RUN(name, call)                                                                            \
     do                                                                                             \
@@ -3143,6 +3167,10 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
             CheckDrawFrame(&scene, DRAW_COUNTED);
         }
     });
+    if (!features.multiDrawIndirectCount)
+    {
+        Skip("binding.draws", "in part, without multiDrawIndirectCount");
+    }
     RUN("transfers.clear", {
         CheckClear(&scene);
         CheckViewFormat(&scene);
@@ -3154,13 +3182,25 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     {
         RUN("capabilities.unclipped_depth", CheckUnclippedDepth(&scene));
     }
+    else
+    {
+        Skip("capabilities.unclipped_depth", "without unclippedDepth");
+    }
     if (features.indirectFirstInstance)
     {
         RUN("capabilities.indirect_first_instance", CheckIndirectFirstInstance(&scene));
     }
+    else
+    {
+        Skip("capabilities.indirect_first_instance", "without indirectFirstInstance");
+    }
     if (features.dualSourceBlending)
     {
         RUN("capabilities.dual_source_blending", CheckDualSourceBlending(&scene));
+    }
+    else
+    {
+        Skip("capabilities.dual_source_blending", "without dualSourceBlending");
     }
     RUN("binding.compute_split", {
         CheckComputeSplit(&scene, timestamps);
@@ -3170,6 +3210,10 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     if (features.pipelineStatisticsQuery)
     {
         RUN("api.statistics", CheckStatistics(&scene));
+    }
+    else
+    {
+        Skip("api.statistics", "without pipelineStatisticsQuery");
     }
 }
 
@@ -3444,18 +3488,36 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     RUN("hazards.aliasing", CheckAliasing(device));
     RUN("capabilities.feature_formats", CheckFeatureFormats(device, asked));
     CheckDrawing(device, asked->timestampQuery);
+    if (!asked->timestampQuery)
+    {
+        Skip("api.objects", "in part, without timestampQuery");
+        Skip("api.queries", "in part, without timestampQuery");
+        Skip("binding.compute_split", "in part, without timestampQuery");
+    }
     RUN("capabilities.multiview", CheckMultiview(device));
     if (asked->shaderF16)
     {
         RUN("capabilities.shader_f16", CheckShaderF16(device));
     }
+    else
+    {
+        Skip("capabilities.shader_f16", "without shaderF16");
+    }
     if (asked->subgroups)
     {
         RUN("capabilities.subgroups", CheckSubgroups(device));
     }
+    else
+    {
+        Skip("capabilities.subgroups", "without subgroups");
+    }
     if (asked->shaderInt64)
     {
         RUN("capabilities.shader_int64", CheckShaderInt64(device));
+    }
+    else
+    {
+        Skip("capabilities.shader_int64", "without shaderInt64");
     }
     RUN("threads.recording", CheckThreads(device));
     mrhiDestroyDevice(device);
@@ -3474,13 +3536,17 @@ static void CheckInfo(mrhiInstance* instance, mrhiAdapterId adapter, mrhiDriverK
     CHECK(info.nameLength > 0 && info.nameLength <= MRHI_ADAPTER_NAME_BYTES, "a name");
 }
 
-// Where MAUL_RHI_REQUIRE_STATISTICS is set, every native adapter counts
-// pipeline statistics, so that their case runs.
+// Where MAUL_RHI_REQUIRE_STATISTICS or MAUL_RHI_REQUIRE_TIMESTAMPS is
+// set, every native adapter counts pipeline statistics or writes
+// timestamps, so that the cases and parts needing them run.
 static void CheckRequired(const mrhiFeatures* all)
 {
     const char* statistics = getenv("MAUL_RHI_REQUIRE_STATISTICS");
     CHECK(all->pipelineStatisticsQuery || !s_runs || statistics == nullptr || statistics[0] == '\0',
           "pipeline statistics, required");
+    const char* timestamps = getenv("MAUL_RHI_REQUIRE_TIMESTAMPS");
+    CHECK(all->timestampQuery || !s_runs || timestamps == nullptr || timestamps[0] == '\0',
+          "timestamp queries, required");
 }
 
 // Checks every adapter an instance lists, and that a second search
@@ -3500,7 +3566,9 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         mrhiFeatures all;
         CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
         RUN("capabilities.required", CheckRequired(&all));
+        s_full = true;
         CheckDevice(instance, ids[i], &all);
+        s_full = false;
         RUN("api.cache_import", CheckCacheImport(instance, ids[i]));
         RUN("limits.retirement", CheckRetirement(instance, ids[i]));
         RUN("binding.heaps", CheckHeaps(instance, ids[i], driver != mrhi_driverTest));
@@ -4210,8 +4278,20 @@ static void Report(void)
     for (size_t i = 0; i < sizeof(s_cases) / sizeof(s_cases[0]); ++i)
     {
         const Case* run = &s_cases[i];
-        const char* outcome = run->runs == 0 ? "not run" : run->failures > 0 ? "fail" : "pass";
-        printf("case %s: %s\n", run->name, outcome);
+        int skips = s_skips[i];
+        const char* outcome = run->failures > 0 ? "fail"
+                              : run->runs > 0   ? "pass"
+                              : skips > 0       ? "skipped"
+                                                : "not run";
+        if (skips > 0)
+        {
+            printf("case %s: %s, skipped %d times, last %s\n", run->name, outcome, skips,
+                   s_skipped[i]);
+        }
+        else
+        {
+            printf("case %s: %s\n", run->name, outcome);
+        }
         counted += run->failures;
     }
     if (s_failures > counted)

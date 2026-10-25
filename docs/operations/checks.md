@@ -67,7 +67,7 @@ The Linux presets run Vulkan on lavapipe and set, through their test presets:
 |---|---|
 | `MAUL_RHI_REQUIRE_VULKAN` | A test that finds no Vulkan adapter fails instead of skipping. |
 | `MAUL_RHI_REQUIRE_SURFACE` | The surface cases and window samples fail without a window system; run under `xvfb-run -a -s "-screen 0 1280x1024x24 -noreset"`. Without `-noreset`, Xvfb resets each time its last client leaves and refuses the clients that connect meanwhile. With `DISPLAY` set, a test whose connection the server refuses fails with xcb's error; only an unset `DISPLAY` is a skip. |
-| `MAUL_RHI_REQUIRE_BINDLESS`, `MAUL_RHI_REQUIRE_STATISTICS` | The heap and pipeline statistics cases fail when the adapter does not grant them. |
+| `MAUL_RHI_REQUIRE_BINDLESS`, `MAUL_RHI_REQUIRE_STATISTICS`, `MAUL_RHI_REQUIRE_TIMESTAMPS` | The heap, pipeline statistics and timestamp cases fail when the adapter does not grant them. The D3D12 preset sets the last two as well. Elsewhere, a conformance case or part left out for a feature the adapter lacks prints `case <name>: skipped without <feature>` and counts in the report, so a skip never reads as a pass. |
 | `MAUL_RHI_REQUIRE_EXTERNAL` | `test_conformance_external` must exist and pass. |
 | `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation`, `VK_KHRONOS_VALIDATION_VALIDATE_SYNC=true` | The validation layer with synchronization validation; any "Validation Error" in a test's output fails it. |
 | `LVP_POISON_MEMORY=true` | Lavapipe fills new memory with nonzero bytes, so a read of memory nothing wrote fails reliably. |
