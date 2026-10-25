@@ -86,8 +86,11 @@ static void Place(mrhiD3d12Lanes* lanes)
     for (uint32_t p = 0; p < frame->passCount; ++p)
     {
         const mrhiDriverPass* pass = &frame->passes[p];
-        lanes->passLanes[pass->id.index1] =
-            pass->native ? mrhiD3d12LaneDirect : LaneOfClass(pass->passClass);
+        // A timed pass runs on the direct queue, whose frequency is the
+        // device's timestamp period.
+        lanes->passLanes[pass->id.index1] = pass->native || pass->timestampSet != 0
+                                                ? mrhiD3d12LaneDirect
+                                                : LaneOfClass(pass->passClass);
         for (uint32_t i = 0; i < pass->accessCount; ++i)
         {
             const mrhiD3d12Object* object = &recorder->table[pass->accesses[i].resource - 1];

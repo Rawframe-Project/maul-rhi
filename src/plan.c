@@ -769,6 +769,43 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
     return true;
 }
 
+// Whether a pass declares a query resolve access, so that it may resolve
+// queries.
+static bool MayResolve(const mrhiDevice* device, const mrhiFramePass* pass)
+{
+    for (uint32_t i = 0; i < pass->useCount; ++i)
+    {
+        if (device->frameUses[pass->firstUse + i].state == mrhi_stateQueryResolve)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Whether every kept pass that may resolve queries follows every kept
+// timed pass before it, and every kept timed pass follows every kept pass
+// before it that may resolve. Only assertions call it.
+[[maybe_unused]] static bool TimestampsFollow(const mrhiDevice* device)
+{
+    for (uint32_t q = 2; q <= device->framePassCount; ++q)
+    {
+        const mrhiFramePass* later = &device->framePasses[q - 1];
+        for (uint32_t p = 1; p < q && later->kept; ++p)
+        {
+            const mrhiFramePass* earlier = &device->framePasses[p - 1];
+            bool meet =
+                earlier->kept && ((earlier->timestampSet != 0 && MayResolve(device, later)) ||
+                                  (MayResolve(device, earlier) && later->timestampSet != 0));
+            if (meet && !Follows(device, q, p))
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 // Finds the passes a kept pass follows: those its class's previous pass
 // follows, those each pass it waits for follows, and itself.
 static void FindFollows(mrhiDevice* device, uint32_t index, uint32_t previous)
@@ -794,12 +831,28 @@ void mrhiOrderPasses(mrhiDevice* device)
 {
     uint32_t latest[MRHI_PASS_CLASSES] = {0};
     uint32_t natives[MRHI_PASS_CLASSES] = {0};
+    uint32_t timed[MRHI_PASS_CLASSES] = {0};
+    uint32_t resolving[MRHI_PASS_CLASSES] = {0};
     for (uint32_t p = 0; p < device->framePassCount; ++p)
     {
         mrhiFramePass* pass = &device->framePasses[p];
         if (!pass->kept)
         {
             continue;
+        }
+        // A resolve is recorded after the compile, so a pass that may
+        // resolve follows every class's timed passes before it, and a
+        // timed pass follows the passes before it that may resolve: a
+        // query reads as written when an earlier pass in the frame's order
+        // wrote it, on every queue.
+        bool resolves = MayResolve(device, pass);
+        if (resolves)
+        {
+            Follow(pass, timed);
+        }
+        if (pass->timestampSet != 0)
+        {
+            Follow(pass, resolving);
         }
         // A native pass follows every class's passes before it, and every
         // class's passes after it follow it: the program's commands may
@@ -812,10 +865,13 @@ void mrhiOrderPasses(mrhiDevice* device)
         }
         FindFollows(device, p + 1, latest[pass->passClass]);
         latest[pass->passClass] = p + 1;
+        timed[pass->passClass] = pass->timestampSet != 0 ? p + 1 : timed[pass->passClass];
+        resolving[pass->passClass] = resolves ? p + 1 : resolving[pass->passClass];
     }
     MRHI_ASSERT(RacesFollow(device));
     MRHI_ASSERT(MemoryFollows(device));
     MRHI_ASSERT(NativesFollow(device));
+    MRHI_ASSERT(TimestampsFollow(device));
 }
 
 void mrhiApplyFinalStates(mrhiDevice* device)

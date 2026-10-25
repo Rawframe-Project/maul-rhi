@@ -787,7 +787,7 @@
             {
               "name": "diagnostic_pass_queries",
               "value": 106,
-              "doc": "A pass def's query sets do not fit: an occlusion set that is not one or on a pass without targets, or timestamps that are not a graphics pass's two different queries, in range and not yet written this frame."
+              "doc": "A pass def's query sets do not fit: an occlusion set that is not one or on a pass without targets, or timestamps that are not two different queries, in range and not yet written this frame."
             },
             {
               "name": "diagnostic_pass_uses",
@@ -12938,7 +12938,7 @@
             {
               "name": "timestamp_query_set",
               "type": "id.query_set_id",
-              "doc": "The timestamp query set the pass writes its start and end times into, for a pass of the graphics class; a null id for none."
+              "doc": "The timestamp query set the pass writes its start and end times into; a null id for none."
             },
             {
               "name": "timestamp_begin",
@@ -13000,7 +13000,7 @@
           "doc": "Declares a pass of the open frame, after the passes declared before it in its class.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an unknown class, kind, aspect or operation, an access or target its resource cannot take (a kind for the other resource type, a range outside the texture, a use an imported object was not made with, a target that does not render or depth-test, a use of a sealed resource other than the reads its sealed state allows), targets of different sizes or sample counts, views past one on a native pass or one without targets, targets without a layer for each view or of a 3D texture with views past one, a resolve that does not match, a subresource written and used otherwise in the pass, an access the class does not allow, a declared resource read before any pass wrote it, an occlusion query set that is not one or is named by a pass without targets, or timestamps of a set that is not a timestamp set, on a pass not of the graphics class, without a set, with neither query, with both the same, or with a query past the set's count or already written in this frame; `mrhi_errorStale` for a resource of another frame, an imported object destroyed since, or a query set or heap the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know, or views past one without the multiview feature or past its limit; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorCapacity` when the device's framePasses or frameAccesses limit is reached."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an unknown class, kind, aspect or operation, an access or target its resource cannot take (a kind for the other resource type, a range outside the texture, a use an imported object was not made with, a target that does not render or depth-test, a use of a sealed resource other than the reads its sealed state allows), targets of different sizes or sample counts, views past one on a native pass or one without targets, targets without a layer for each view or of a 3D texture with views past one, a resolve that does not match, a subresource written and used otherwise in the pass, an access the class does not allow, a declared resource read before any pass wrote it, an occlusion query set that is not one or is named by a pass without targets, or timestamps of a set that is not a timestamp set, without a set, with neither query, with both the same, or with a query past the set's count or already written in this frame; `mrhi_errorStale` for a resource of another frame, an imported object destroyed since, or a query set or heap the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know, or views past one without the multiview feature or past its limit; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorCapacity` when the device's framePasses or frameAccesses limit is reached."
           },
           "args": [
             {

@@ -492,8 +492,8 @@ extern "C"
         // The occlusion query set the pass's occlusion queries write, for a
         // pass with targets; a null id for none.
         mrhiQuerySetId occlusionQuerySet;
-        // The timestamp query set the pass writes its start and end times into,
-        // for a pass of the graphics class; a null id for none.
+        // The timestamp query set the pass writes its start and end times into;
+        // a null id for none.
         mrhiQuerySetId timestampQuerySet;
         // The query written at the pass's start, or MRHI_NO_QUERY.
         uint32_t timestampBegin;
@@ -535,16 +535,16 @@ extern "C"
     /// subresource written and used otherwise in the pass, an access the class
     /// does not allow, a declared resource read before any pass wrote it, an
     /// occlusion query set that is not one or is named by a pass without
-    /// targets, or timestamps of a set that is not a timestamp set, on a pass
-    /// not of the graphics class, without a set, with neither query, with both
-    /// the same, or with a query past the set's count or already written in
-    /// this frame; `mrhi_errorStale` for a resource of another frame, an
-    /// imported object destroyed since, or a query set or heap the device no
-    /// longer has; `mrhi_errorUnsupported` for a critical extension the library
-    /// does not know, or views past one without the multiview feature or past
-    /// its limit; `mrhi_errorState` for a device without an open frame, or a
-    /// frame already compiled; `mrhi_errorCapacity` when the device's
-    /// framePasses or frameAccesses limit is reached.
+    /// targets, or timestamps of a set that is not a timestamp set, without a
+    /// set, with neither query, with both the same, or with a query past the
+    /// set's count or already written in this frame; `mrhi_errorStale` for a
+    /// resource of another frame, an imported object destroyed since, or a
+    /// query set or heap the device no longer has; `mrhi_errorUnsupported` for
+    /// a critical extension the library does not know, or views past one
+    /// without the multiview feature or past its limit; `mrhi_errorState` for a
+    /// device without an open frame, or a frame already compiled;
+    /// `mrhi_errorCapacity` when the device's framePasses or frameAccesses
+    /// limit is reached.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def,
