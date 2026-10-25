@@ -235,9 +235,7 @@ extern "C"
     // The check a diagnostic record reports: one check of the core that refused
     // a call as invalid input, or, in a build with the validation layer, one
     // rule of the driver SPI that the driver broke (the driver codes, recorded
-    // in the instance's queue). Codes are fixed from the first release that
-    // carries them, and only added after it; mrhiDiagnosticText gives each
-    // one's text.
+    // in the instance's queue). mrhiDiagnosticText gives each one's text.
     typedef uint16_t mrhiDiagnosticCode;
 
     enum

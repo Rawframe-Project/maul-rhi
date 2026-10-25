@@ -20,7 +20,7 @@ The handshake is typed: a table of another `MRHI_SPI_VERSION` is `mrhi_errorVers
 
 ## Admission
 
-A driver is admitted on a run of the conformance suite that passes every case of its SPI version's list, `conformance/mustpass/spi-<N>.txt`. Build the suite against the driver by naming a CMake target that defines
+A driver is admitted on a run of the conformance suite that passes every case of the current SPI version's list, `conformance/mustpass/spi-<N>.txt`. Build the suite against the driver by naming a CMake target that defines
 
 <!-- guide: not run: declarations a driver's own target defines; test/conformance_vulkan_external.c defines them for the Vulkan driver -->
 ```c
@@ -32,6 +32,5 @@ with `-DMAUL_RHI_CONFORMANCE_DRIVER=<target>`. The build then adds `test_conform
 
 - `test_conformance_external --list` prints the cases, `--case <name>` runs one, and every run ends with each case's outcome.
 - Build the library with `MAUL_RHI_VALIDATION=ON` for the run. The validation layer then checks every answer the driver gives the core, and the `validation.clean` case requires that it counted no fault ([troubleshooting](troubleshooting.md#the-validation-layer)).
-- The lists of earlier SPI versions stay as they were, so a driver built against an older interface knows exactly what it was admitted on.
 
 `test/external/` in the repository builds a minimal driver against an install alone, which shows the shape of such a project.
