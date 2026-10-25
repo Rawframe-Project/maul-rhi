@@ -4,10 +4,11 @@
 #
 # tools/mrhi_dxil.py's stale_reads: SPIRV-Cross's HLSL reading a loop's
 # variable after its continue block stepped it is found, as a scene's
-# light loop once read the next light's intensity, and with a decrement
-# too; the same loop with the read made in its body, a step at a loop's
-# end, and a step of the body's own followed by a read of the stepped
-# value, as maul-vfx's kernels write them, are not.
+# light loop once read the next light's intensity, with a decrement, and
+# in a do-while's continue part; the same loops with the read made in the
+# body, a step at a loop's end, a do-while's condition, and a step of the
+# body's own followed by a read of the stepped value, as maul-vfx's
+# kernels write them, are not.
 #
 # usage: test_dxil_order.py
 
@@ -69,6 +70,35 @@ STALE_DOWN = """
             _42 = max(_42, _data.Load(_40 * 4 + 0));
             continue;
         }
+"""
+
+# A do-while, which SPIRV-Cross writes for a loop branching back on a
+# condition: the shape the pinned tools give a GLSL do-while (its body
+# reading values[indices[i]], stepping i and adding the value up), with
+# the read folded after the step as in the light loop. The pinned tools
+# fold no load there from the inputs tried, so the fold is written in.
+STALE_DO = """
+        float4 _20 = 0.0f.xxxx;
+        uint _8 = _11_m0;
+        do
+        {
+            _8++;
+            _20 += asfloat(_31.Load4(_35.Load(_8 * 4 + 0) * 16 + 0));
+        } while (_8 < (_11_m0 + _11_m1));
+"""
+
+# The same do-while as the pinned tools give it: the value read before
+# the step, and the condition reading the stepped count, as the loop
+# means it.
+KEPT_DO = """
+        float4 _20 = 0.0f.xxxx;
+        uint _8 = _11_m0;
+        do
+        {
+            float4 _27 = asfloat(_31.Load4(_35.Load(_8 * 4 + 0) * 16 + 0));
+            _8++;
+            _20 += _27;
+        } while (_8 < (_11_m0 + _11_m1));
 """
 
 # Steps of a loop body's own, each followed by a read of the stepped value
@@ -186,7 +216,9 @@ def main():
     cases = 0
     for source, expected, what in ((STALE, [(12, "_5736")], "the stale read"),
                                    (STALE_DOWN, [(10, "_40")], "the stale read stepping down"),
-                                   (KEPT, [], "the loop read in its body")):
+                                   (STALE_DO, [(7, "_8")], "the stale read in a do-while"),
+                                   (KEPT, [], "the loop read in its body"),
+                                   (KEPT_DO, [], "the do-while's condition")):
         cases += 1
         found = tool.stale_reads(source)
         if found != expected:

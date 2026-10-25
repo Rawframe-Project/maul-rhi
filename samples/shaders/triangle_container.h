@@ -5,7 +5,7 @@
 // from samples/shaders/triangle.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:92e64a0e5d5650b384ce9da414f146986a44846653dbc4028eaf235f1996a4fa
+// inputs sha256:b4dfaa4e7f07b8088c4e619403cc32c59394006b6546921ef8ce7878d8a6b244
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0
