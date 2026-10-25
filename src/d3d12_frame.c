@@ -455,17 +455,25 @@ static void WaitFor(mrhiD3d12Frames* frames, uint64_t serial)
 
 // After a frame failed with some of its work queued, which no serial
 // counts: waits for each queue to finish what it holds, so that the
-// slot's lists, allocators and transients are not released under it. A
-// queue that takes no signal, as on a removed device, is not waited for.
+// slot's lists, allocators and transients are not released under it.
+// Every queue is signalled before any is waited for, since a queue may
+// wait for a signal of another's that failed, which only that queue's
+// drain signal passes. A queue that takes no signal, as on a removed
+// device, is not waited for.
 static void Drain(mrhiD3d12Frames* frames)
 {
     mrhiD3d12Lanes* lanes = &frames->lanes;
+    bool signalled[mrhiD3d12LaneCount] = {0};
     for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
     {
-        uint64_t value = ++lanes->values[lane];
-        if (SUCCEEDED(ID3D12CommandQueue_Signal(lanes->queues[lane], lanes->fences[lane], value)))
+        signalled[lane] = SUCCEEDED(ID3D12CommandQueue_Signal(
+            lanes->queues[lane], lanes->fences[lane], ++lanes->values[lane]));
+    }
+    for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
+    {
+        if (signalled[lane])
         {
-            WaitOn(frames, lanes->fences[lane], value);
+            WaitOn(frames, lanes->fences[lane], lanes->values[lane]);
         }
     }
 }

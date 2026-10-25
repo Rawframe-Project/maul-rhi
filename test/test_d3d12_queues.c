@@ -75,10 +75,11 @@ static FenceFn s_signal;
 static CreateListFn s_createList;
 static Call s_calls[CALLS];
 static uint32_t s_callCount;
-// While set, D3D12 makes no compute list; and the direct queue's next
-// signal fails.
+// While set, D3D12 makes no compute list; and the next signal of the
+// queue of kind s_failQueue fails.
 static bool s_failCompute;
 static bool s_failSignal;
+static D3D12_COMMAND_LIST_TYPE s_failQueue;
 // While set, the direct queue's next signal that does not fail goes in
 // and then this fence is signalled to 1, the fence and value it took kept in s_drained and
 // s_drainedValue, with a reference.
@@ -113,7 +114,7 @@ static HRESULT STDMETHODCALLTYPE Wait(ID3D12CommandQueue* queue, ID3D12Fence* fe
 static HRESULT STDMETHODCALLTYPE Signal(ID3D12CommandQueue* queue, ID3D12Fence* fence, UINT64 value)
 {
     Note(queue, CALL_SIGNAL, fence, value);
-    if (s_failSignal && s_calls[s_callCount - 1].queue == D3D12_COMMAND_LIST_TYPE_DIRECT)
+    if (s_failSignal && s_calls[s_callCount - 1].queue == s_failQueue)
     {
         s_failSignal = false;
         return E_FAIL;
@@ -476,6 +477,7 @@ static void CheckLostFrame(mrhiDevice* device)
           "recorded");
     Hook(device);
     s_failSignal = true;
+    s_failQueue = D3D12_COMMAND_LIST_TYPE_DIRECT;
     s_release = fence;
     mrhiRequestId token = {0};
     CHECK(mrhiSubmitFrame(device, &token) == mrhi_errorDeviceLost, "the frame's signal failed");
@@ -576,6 +578,58 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, bool fail
     mrhiDestroyDevice(device);
 }
 
+// A dispatch in an async compute pass and a readback after it in a
+// graphics pass, whose compute queue's signal fails: the direct queue
+// still waits for that signal. The failed submit must signal every queue
+// before waiting for any, or the direct queue's drain stays behind a
+// value that only the compute queue's drain reaches, and the submit
+// never returns.
+static void CheckLostLane(mrhiInstance* instance, mrhiAdapterId adapter)
+{
+    mrhiDevice* device = OpenDevice(instance, adapter);
+    if (device == nullptr)
+    {
+        return;
+    }
+    mrhiShaderId shader = {0};
+    mrhiComputePipelineId pipeline = NoopPipeline(device, &shader);
+    mrhiBufferDef def = mrhiDefaultBufferDef();
+    def.size = sizeof(kWords);
+    def.usage = mrhi_bufferStorage | mrhi_bufferCopySource;
+    mrhiBufferId buffer = {0};
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId b = {0};
+    CHECK(mrhiCreateBuffer(device, &def, &buffer) == mrhi_success &&
+              mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportBuffer(device, buffer, &b) == mrhi_success,
+          "a frame with a buffer");
+    mrhiAccess storage = Whole(b, mrhi_accessStorageReadWrite);
+    mrhiAccess read = Whole(b, mrhi_accessCopySource);
+    mrhiPassId compute = AddPass(device, mrhi_passAsyncCompute, &storage);
+    mrhiPassId back = AddPass(device, mrhi_passGraphics, &read);
+    mrhiRequestId request = {0};
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    Dispatch(device, compute, pipeline);
+    CHECK(mrhiBeginPass(device, back) == mrhi_success &&
+              mrhiReadBuffer(device, back, b, 0, sizeof(kWords), &request) == mrhi_success &&
+              mrhiEndPass(device, back) == mrhi_success,
+          "read back");
+    Hook(device);
+    s_failSignal = true;
+    s_failQueue = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+    mrhiRequestId token = {0};
+    CHECK(mrhiSubmitFrame(device, &token) == mrhi_errorDeviceLost,
+          "the compute queue's signal failed");
+    CHECK(FirstRunWaits(D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_LIST_TYPE_COMPUTE),
+          "the direct queue waited for the failed signal");
+    Unhook();
+    CHECK(mrhiDestroyBuffer(device, buffer) == mrhi_success &&
+              mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
+              mrhiDestroyShader(device, shader) == mrhi_success,
+          "the objects ended");
+    mrhiDestroyDevice(device);
+}
+
 int main(void)
 {
     // Before the library opens a device, as the debug layer needs.
@@ -602,6 +656,7 @@ int main(void)
         {
             CheckLostFrame(lost);
         }
+        CheckLostLane(instance, adapter);
     }
     else
     {
