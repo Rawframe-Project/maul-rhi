@@ -337,8 +337,9 @@ static bool OpenShared(mrhiD3d12Frames* frames)
     return made;
 }
 
-// Makes the compute and copy queues and each lane's fence: whether
-// D3D12 made them all.
+// Makes the compute and copy queues and each lane's fence, and compares
+// the compute and direct queues' timestamp frequencies: whether D3D12
+// made them all.
 static bool OpenLanes(mrhiD3d12Lanes* lanes)
 {
     bool made = true;
@@ -354,6 +355,14 @@ static bool OpenLanes(mrhiD3d12Lanes* lanes)
                SUCCEEDED(ID3D12Device_CreateFence(lanes->device, 0, D3D12_FENCE_FLAG_NONE,
                                                   &IID_ID3D12Fence, (void**)&lanes->fences[lane]));
     }
+    UINT64 direct = 0;
+    UINT64 compute = 0;
+    lanes->computeTimes = made &&
+                          SUCCEEDED(ID3D12CommandQueue_GetTimestampFrequency(
+                              lanes->queues[mrhiD3d12LaneDirect], &direct)) &&
+                          SUCCEEDED(ID3D12CommandQueue_GetTimestampFrequency(
+                              lanes->queues[mrhiD3d12LaneCompute], &compute)) &&
+                          direct == compute;
     return made;
 }
 

@@ -61,6 +61,7 @@ typedef struct Call
 
 typedef void(STDMETHODCALLTYPE* ExecuteFn)(ID3D12CommandQueue*, UINT, ID3D12CommandList* const*);
 typedef HRESULT(STDMETHODCALLTYPE* FenceFn)(ID3D12CommandQueue*, ID3D12Fence*, UINT64);
+typedef HRESULT(STDMETHODCALLTYPE* FrequencyFn)(ID3D12CommandQueue*, UINT64*);
 typedef HRESULT(STDMETHODCALLTYPE* SetEventFn)(ID3D12Fence*, UINT64, HANDLE);
 typedef HRESULT(STDMETHODCALLTYPE* CreateListFn)(ID3D12Device*, UINT, D3D12_COMMAND_LIST_TYPE,
                                                  ID3D12CommandAllocator*, ID3D12PipelineState*,
@@ -74,6 +75,7 @@ static ID3D12FenceVtbl* s_fenceTable;
 static ExecuteFn s_execute;
 static FenceFn s_wait;
 static FenceFn s_signal;
+static FrequencyFn s_frequency;
 static CreateListFn s_createList;
 static SetEventFn s_setEvent;
 static Call s_calls[CALLS];
@@ -83,6 +85,9 @@ static uint32_t s_callCount;
 // value kept in s_failedFence and s_failedValue.
 static bool s_failCompute;
 static bool s_failSignal;
+// While set, a compute queue's timestamps tick one more a second than
+// D3D12 says.
+static bool s_skewCompute;
 static D3D12_COMMAND_LIST_TYPE s_failQueue;
 static uint32_t s_failAfter;
 static ID3D12Fence* s_failedFence;
@@ -154,6 +159,18 @@ static HRESULT STDMETHODCALLTYPE Signal(ID3D12CommandQueue* queue, ID3D12Fence* 
     return result;
 }
 
+static HRESULT STDMETHODCALLTYPE Frequency(ID3D12CommandQueue* queue, UINT64* frequency)
+{
+    HRESULT result = s_frequency(queue, frequency);
+    D3D12_COMMAND_QUEUE_DESC desc;
+    (void)ID3D12CommandQueue_GetDesc(queue, &desc);
+    if (s_skewCompute && SUCCEEDED(result) && desc.Type == D3D12_COMMAND_LIST_TYPE_COMPUTE)
+    {
+        *frequency += 1;
+    }
+    return result;
+}
+
 static HRESULT STDMETHODCALLTYPE SetEventOn(ID3D12Fence* fence, UINT64 value, HANDLE event)
 {
     if (s_hold != nullptr)
@@ -204,14 +221,17 @@ static void Hook(mrhiDevice* device)
     s_deviceTable = (ID3D12DeviceVtbl*)((ID3D12Device*)native)->lpVtbl;
     s_execute = s_queueTable->ExecuteCommandLists;
     s_wait = s_queueTable->Wait;
+    s_frequency = s_queueTable->GetTimestampFrequency;
     s_signal = s_queueTable->Signal;
     s_createList = s_deviceTable->CreateCommandList;
     const ExecuteFn execute = Execute;
     const FenceFn wait = Wait;
+    const FrequencyFn frequency = Frequency;
     const FenceFn signal = Signal;
     const CreateListFn create = CreateList;
     Patch(&s_queueTable->ExecuteCommandLists, &execute, sizeof(execute));
     Patch(&s_queueTable->Wait, &wait, sizeof(wait));
+    Patch(&s_queueTable->GetTimestampFrequency, &frequency, sizeof(frequency));
     Patch(&s_queueTable->Signal, &signal, sizeof(signal));
     Patch(&s_deviceTable->CreateCommandList, &create, sizeof(create));
 }
@@ -250,12 +270,14 @@ static void Unhook(void)
     }
     Patch(&s_queueTable->ExecuteCommandLists, &s_execute, sizeof(s_execute));
     Patch(&s_queueTable->Wait, &s_wait, sizeof(s_wait));
+    Patch(&s_queueTable->GetTimestampFrequency, &s_frequency, sizeof(s_frequency));
     Patch(&s_queueTable->Signal, &s_signal, sizeof(s_signal));
     Patch(&s_deviceTable->CreateCommandList, &s_createList, sizeof(s_createList));
     s_queueTable = nullptr;
     s_deviceTable = nullptr;
     s_failCompute = false;
     s_failSignal = false;
+    s_skewCompute = false;
     s_release = nullptr;
 }
 
@@ -592,10 +614,11 @@ static void CheckLostFrame(mrhiDevice* device)
     }
 }
 
-static mrhiDevice* OpenDevice(mrhiInstance* instance, mrhiAdapterId adapter)
+static mrhiDevice* OpenWith(mrhiInstance* instance, mrhiAdapterId adapter, bool timestamps)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
+    def.features.timestampQuery = timestamps;
     mrhiDevice* device = nullptr;
     mrhiRequestId opened = {0};
     mrhiInstanceNotification record;
@@ -604,6 +627,11 @@ static mrhiDevice* OpenDevice(mrhiInstance* instance, mrhiAdapterId adapter)
               record.outcome == mrhi_success,
           "a device");
     return device;
+}
+
+static mrhiDevice* OpenDevice(mrhiInstance* instance, mrhiAdapterId adapter)
+{
+    return OpenWith(instance, adapter, false);
 }
 
 // The noop kernel's pipeline, which takes no tables.
@@ -757,6 +785,179 @@ static void CheckLostLane(mrhiInstance* instance, mrhiAdapterId adapter, uint32_
     }
 }
 
+// A device buffer of a size and usage, imported into the open frame.
+static mrhiResourceId Imported(mrhiDevice* device, mrhiBufferUsage usage, mrhiBufferId* objectOut)
+{
+    mrhiBufferDef def = mrhiDefaultBufferDef();
+    def.size = 256;
+    def.usage = usage;
+    mrhiResourceId resource = {0};
+    CHECK(mrhiCreateBuffer(device, &def, objectOut) == mrhi_success &&
+              mrhiImportBuffer(device, *objectOut, &resource) == mrhi_success,
+          "an imported buffer");
+    return resource;
+}
+
+// A pass of a class with one access, timed by two queries of a set when
+// it is given.
+static mrhiPassId Timed(mrhiDevice* device, mrhiPassClass passClass, mrhiAccess access,
+                        mrhiQuerySetId set, uint32_t begin)
+{
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.passClass = passClass;
+    def.neverCull = true;
+    def.accesses = &access;
+    def.accessCount = 1;
+    def.timestampQuerySet = set;
+    def.timestampBegin = set.index1 == 0 ? MRHI_NO_QUERY : begin;
+    def.timestampEnd = set.index1 == 0 ? MRHI_NO_QUERY : begin + 1;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(device, &def, &pass) == mrhi_success, "a pass");
+    return pass;
+}
+
+// Whether the compute and direct queues of a device's D3D12 device tick
+// their timestamps alike, as a compute queue of the test's own reads it.
+static bool SameFrequencies(mrhiDevice* device)
+{
+    void* native = nullptr;
+    void* queue = nullptr;
+    ID3D12CommandQueue* compute = nullptr;
+    const D3D12_COMMAND_QUEUE_DESC desc = {.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE};
+    UINT64 direct = 0;
+    UINT64 computed = 0;
+    bool read =
+        mrhiGetD3d12Device(device, &native, &queue) == mrhi_success &&
+        SUCCEEDED(ID3D12Device_CreateCommandQueue((ID3D12Device*)native, &desc,
+                                                  &IID_ID3D12CommandQueue, (void**)&compute)) &&
+        SUCCEEDED(ID3D12CommandQueue_GetTimestampFrequency((ID3D12CommandQueue*)queue, &direct)) &&
+        SUCCEEDED(ID3D12CommandQueue_GetTimestampFrequency(compute, &computed));
+    CHECK(read, "both queues' timestamp frequencies");
+    printf("timestamp frequencies: direct %llu, compute %llu\n", (unsigned long long)direct,
+           (unsigned long long)computed);
+    if (compute != nullptr)
+    {
+        ID3D12CommandQueue_Release(compute);
+    }
+    return read && direct == computed;
+}
+
+// A frame with a pass of a class timed by queries 0 and 1, uploading a
+// buffer or, for an async compute pass, dispatching over it, and an
+// untimed transfer pass uploading another buffer; then a
+// graphics pass resolving the set and one reading the times back. The
+// times are checked; the calls the queues took stay in the log.
+static void TimeFrame(mrhiDevice* device, mrhiPassClass passClass, mrhiComputePipelineId pipeline)
+{
+    mrhiQuerySetDef setDef = mrhiDefaultQuerySetDef();
+    setDef.type = mrhi_queryTimestamp;
+    setDef.count = 2;
+    mrhiQuerySetId set = {0};
+    CHECK(mrhiCreateQuerySet(device, &setDef, &set) == mrhi_success, "a timestamp set");
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    bool dispatch = passClass == mrhi_passAsyncCompute;
+    mrhiBufferId objects[3] = {0};
+    mrhiResourceId timed =
+        Imported(device, dispatch ? mrhi_bufferStorage : mrhi_bufferCopyDestination, &objects[0]);
+    mrhiResourceId other = Imported(device, mrhi_bufferCopyDestination, &objects[1]);
+    mrhiResourceId times =
+        Imported(device, mrhi_bufferQueryResolve | mrhi_bufferCopySource, &objects[2]);
+    mrhiPassId work = Timed(
+        device, passClass,
+        Whole(timed, dispatch ? mrhi_accessStorageReadWrite : mrhi_accessCopyDestination), set, 0);
+    mrhiPassId untimed = Timed(device, mrhi_passTransfer, Whole(other, mrhi_accessCopyDestination),
+                               (mrhiQuerySetId){0}, 0);
+    mrhiPassId resolve = Timed(device, mrhi_passGraphics, Whole(times, mrhi_accessQueryResolve),
+                               (mrhiQuerySetId){0}, 0);
+    mrhiPassId back = Timed(device, mrhi_passGraphics, Whole(times, mrhi_accessCopySource),
+                            (mrhiQuerySetId){0}, 0);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    if (dispatch)
+    {
+        Dispatch(device, work, pipeline);
+    }
+    else
+    {
+        CHECK(mrhiBeginPass(device, work) == mrhi_success &&
+                  mrhiWriteBuffer(device, work, timed, 0, kWords, sizeof(kWords)) == mrhi_success &&
+                  mrhiEndPass(device, work) == mrhi_success,
+              "a timed upload");
+    }
+    mrhiRequestId request = {0};
+    CHECK(mrhiBeginPass(device, untimed) == mrhi_success &&
+              mrhiWriteBuffer(device, untimed, other, 0, kWords, sizeof(kWords)) == mrhi_success &&
+              mrhiEndPass(device, untimed) == mrhi_success &&
+              mrhiBeginPass(device, resolve) == mrhi_success &&
+              mrhiResolveQueries(device, resolve, set, 0, 2, times, 0) == mrhi_success &&
+              mrhiEndPass(device, resolve) == mrhi_success &&
+              mrhiBeginPass(device, back) == mrhi_success &&
+              mrhiReadBuffer(device, back, times, 0, 16, &request) == mrhi_success &&
+              mrhiEndPass(device, back) == mrhi_success,
+          "an untimed upload, the resolve and the readback");
+    Hook(device);
+    Finish(device);
+    uint64_t ticks[2] = {0};
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, request, ticks, sizeof(ticks), &size) == mrhi_success &&
+              size == sizeof(ticks) && ticks[0] != 0 && ticks[1] >= ticks[0],
+          "the pass's times");
+    for (int i = 0; i < 3; ++i)
+    {
+        CHECK(mrhiDestroyBuffer(device, objects[i]) == mrhi_success, "a buffer ended");
+    }
+    CHECK(mrhiDestroyQuerySet(device, set) == mrhi_success, "the set ended");
+}
+
+// Timed passes on a device with timestamps: where the compute queue ticks
+// as the direct queue does, a timed transfer pass runs on the compute
+// queue while an untimed one in the same frame runs on the copy queue,
+// a timed async compute pass on the compute queue, and the resolve on the
+// direct queue after a wait for the compute queue. A second device whose
+// compute queue is made to tick otherwise runs a timed transfer pass on
+// the direct queue, and an untimed one still on the copy queue.
+static void CheckTimed(mrhiInstance* instance, mrhiAdapterId adapter)
+{
+    mrhiDevice* device = OpenWith(instance, adapter, true);
+    if (device == nullptr)
+    {
+        return;
+    }
+    mrhiShaderId shader = {0};
+    mrhiComputePipelineId pipeline = NoopPipeline(device, &shader);
+    bool same = SameFrequencies(device);
+    TimeFrame(device, mrhi_passTransfer, pipeline);
+    CHECK(Runs(D3D12_COMMAND_LIST_TYPE_COPY) > 0, "the untimed transfer on the copy queue");
+    CHECK(!same || (Runs(D3D12_COMMAND_LIST_TYPE_COMPUTE) > 0 &&
+                    Waits(D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_LIST_TYPE_COMPUTE)),
+          "the timed transfer on the compute queue, the resolve after it");
+    CHECK(same || Runs(D3D12_COMMAND_LIST_TYPE_COMPUTE) == 0,
+          "the timed transfer on the direct queue");
+    Unhook();
+    TimeFrame(device, mrhi_passAsyncCompute, pipeline);
+    CHECK(!same || (Runs(D3D12_COMMAND_LIST_TYPE_COMPUTE) > 0 &&
+                    Waits(D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_LIST_TYPE_COMPUTE)),
+          "the timed dispatch on the compute queue, the resolve after it");
+    // The table is shared, so the next device's compute queue reads the
+    // skewed frequency when it opens.
+    s_skewCompute = true;
+    mrhiDevice* skewed = OpenWith(instance, adapter, true);
+    s_skewCompute = false;
+    Unhook();
+    if (skewed != nullptr)
+    {
+        TimeFrame(skewed, mrhi_passTransfer, pipeline);
+        CHECK(Runs(D3D12_COMMAND_LIST_TYPE_COMPUTE) == 0 && Runs(D3D12_COMMAND_LIST_TYPE_COPY) > 0,
+              "a timed transfer on the direct queue where the compute queue ticks otherwise");
+        Unhook();
+        mrhiDestroyDevice(skewed);
+    }
+    CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
+              mrhiDestroyShader(device, shader) == mrhi_success,
+          "the objects ended");
+    mrhiDestroyDevice(device);
+}
+
 int main(void)
 {
     // Before the library opens a device, as the debug layer needs.
@@ -785,6 +986,7 @@ int main(void)
         }
         CheckLostLane(instance, adapter, 0);
         CheckLostLane(instance, adapter, 1);
+        CheckTimed(instance, adapter);
     }
     else
     {

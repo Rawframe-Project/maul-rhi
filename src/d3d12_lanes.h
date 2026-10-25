@@ -67,6 +67,9 @@ typedef struct mrhiD3d12Lanes
     ID3D12CommandQueue* queues[mrhiD3d12LaneCount];
     ID3D12Fence* fences[mrhiD3d12LaneCount];
     uint64_t values[mrhiD3d12LaneCount];
+    // Whether the compute queue's timestamps tick as the direct queue's,
+    // whose frequency is the device's timestamp period.
+    bool computeTimes;
     // The lists a slot records on each lane at most, its runs and its
     // batches.
     uint32_t listLimit[mrhiD3d12LaneCount];
