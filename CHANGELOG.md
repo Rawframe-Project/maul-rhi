@@ -25,9 +25,10 @@ may change the API, the ABI and every data format.
 - D3D12 runs a timed pass on the compute queue when that queue's
   timestamp frequency matches the direct queue's. A timed async compute
   pass stays on the compute queue wherever an untimed one would run,
-  and a timed transfer pass runs there too: it measures the compute engine's time and loses its overlap with the
-  copy queue, for that pass only. Where the frequencies differ, a timed
-  pass runs on the direct queue. The copy queue takes no timed pass
+  and a timed transfer pass runs there too: it measures the compute
+  engine's time and loses its overlap with the copy queue, for that pass
+  only. Where the frequencies differ, a timed pass runs on the direct
+  queue. The copy queue takes no timed pass
   ([#96](https://github.com/Rawframe-Project/maul-rhi/pull/96)).
 
 ### Changed
