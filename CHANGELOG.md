@@ -7,10 +7,14 @@ may change the API, the ABI and every data format.
 
 ## [0.2.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.2.0...v0.2.1) (2026-10-25)
 
-
 ### Fixed
 
-* **d3d12:** set root signatures again in the list after a native pass ([#78](https://github.com/Rawframe-Project/maul-rhi/issues/78)) ([e61fcba](https://github.com/Rawframe-Project/maul-rhi/commit/e61fcba9076596fd9cecce7934104b46363a7773)), closes [#77](https://github.com/Rawframe-Project/maul-rhi/issues/77)
+- D3D12: after a native pass, a dispatch or draw whose pipeline came
+  from the same shader container as one used before the native pass
+  ran with no root signature set. The debug layer reported it, and a
+  GPU could run the work with whatever arguments it found. Such passes
+  now set their root signature again
+  ([#78](https://github.com/Rawframe-Project/maul-rhi/pull/78)).
 
 ## [0.2.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.1.0...v0.2.0) (2026-10-24)
 
