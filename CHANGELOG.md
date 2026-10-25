@@ -5,6 +5,14 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.5.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.4.1...v0.5.0) (2026-10-25)
+
+
+### Added
+
+* **d3d12:** run timed passes on compute when its clock matches direct ([#96](https://github.com/Rawframe-Project/maul-rhi/issues/96)) ([2e485e8](https://github.com/Rawframe-Project/maul-rhi/commit/2e485e878d2e421cbdf3151c0795e9cdb6b94f76)), closes [#95](https://github.com/Rawframe-Project/maul-rhi/issues/95)
+* **graph:** take timestamps in passes of every class ([#92](https://github.com/Rawframe-Project/maul-rhi/issues/92)) ([bc24dea](https://github.com/Rawframe-Project/maul-rhi/commit/bc24deac3bc5c17e6a3aa6097c581d30e2ec5b93)), closes [#91](https://github.com/Rawframe-Project/maul-rhi/issues/91)
+
 ## [0.4.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.4.0...v0.4.1) (2026-10-25)
 
 ### Fixed
