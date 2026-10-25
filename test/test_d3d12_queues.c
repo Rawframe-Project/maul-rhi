@@ -484,8 +484,8 @@ static void CheckLostFrame(mrhiDevice* device)
     Unhook();
     if (fence != nullptr)
     {
-        // Whatever the queue still holds may run: D3D12 releases a queue
-        // only once it is idle.
+        // Whatever the queue still holds may run: a teardown with the
+        // queue still held does not return.
         (void)ID3D12Fence_Signal(fence, 1);
     }
     mrhiDestroyDevice(device);
