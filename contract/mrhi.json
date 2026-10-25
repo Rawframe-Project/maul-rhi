@@ -11842,7 +11842,7 @@
           "doc": "Waits until the device's notification queue holds a record, or the deadline passes, without taking it; the record is then taken with mrhiNextDeviceNotification. It first takes in what the driver finished, and then waits for the oldest running frame, whose end is the next answer GPU work brings. On the web, where nothing may block, it only takes in what the browser has settled: with nothing settled it times out at once, whatever the deadline, and a program keeps yielding to the browser between calls.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` once the queue holds a record, a lost device's notice included; `mrhi_timeout` when the deadline passed first, or at once on the web; `mrhi_empty` at once when the queue is empty and the device owes no answer, with no pipeline pending and no frame running; `mrhi_errorInvalid` for a NULL device."
+            "doc": "`mrhi_success` once the queue holds a record, a lost device's notice included; `mrhi_timeout` when the deadline passed first, or at once on the web; `mrhi_empty` at once when the queue is empty and the device owes no answer, with no pipeline pending and no frame running (a readback is owed only once its frame is submitted); `mrhi_errorInvalid` for a NULL device."
           },
           "args": [
             {

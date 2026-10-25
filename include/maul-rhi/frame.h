@@ -153,8 +153,9 @@ extern "C"
     /// @return `mrhi_success` once the queue holds a record, a lost device's
     /// notice included; `mrhi_timeout` when the deadline passed first, or at
     /// once on the web; `mrhi_empty` at once when the queue is empty and the
-    /// device owes no answer, with no pipeline pending and no frame running;
-    /// `mrhi_errorInvalid` for a NULL device.
+    /// device owes no answer, with no pipeline pending and no frame running (a
+    /// readback is owed only once its frame is submitted); `mrhi_errorInvalid`
+    /// for a NULL device.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiWaitDeviceNotification(mrhiDevice* device,

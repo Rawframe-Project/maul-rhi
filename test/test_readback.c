@@ -183,7 +183,10 @@ static void TestBuffer(void)
     size_t size = 0;
     CHECK(mrhiTakeReadback(s_device, request, nullptr, 0, &size) == mrhi_errorState,
           "not answered while recording");
+    CHECK(mrhiWaitDeviceNotification(s_device, UINT64_C(1000000000)) == mrhi_empty,
+          "a wait owes it nothing before its frame is submitted");
     mrhiRequestId token = Submit();
+    CHECK(mrhiWaitDeviceNotification(s_device, 0) == mrhi_timeout, "then its held frame is owed");
     CHECK(token.index1 == request.index1 + 1, "requests share one counter");
     CHECK(mrhiTakeReadback(s_device, request, nullptr, 0, &size) == mrhi_errorState,
           "nor while its frame runs");

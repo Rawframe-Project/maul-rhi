@@ -385,6 +385,8 @@ mrhiResult mrhiWaitDeviceNotification(mrhiDevice* device, uint64_t timeoutNs)
     {
         return mrhi_success;
     }
-    bool owed = device->runningCount > 0 || device->pendingCount > 0 || device->readbackPending > 0;
+    // A readback is owed once its frame is submitted, and its frame then
+    // runs; one recorded in the open frame waits for the submit.
+    bool owed = device->runningCount > 0 || device->pendingCount > 0;
     return owed ? mrhi_timeout : mrhi_empty;
 }
