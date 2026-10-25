@@ -320,6 +320,9 @@ def main():
                 data = f.read()
             library_reads(folder, data, ["3", str(len(REFLECTION["bindings"])), "16", "0"],
                           "the library reads it")
+            table = [struct.unpack_from("<IIQQ", data, 64 + 24 * i)
+                     for i in range(struct.unpack_from("<I", data, 48)[0])]
+            check(all(size > 0 for _, _, _, size in table), "no empty section written")
             check(constants(data) == [(0, 4, 0x3F800000, 0), (1, 2, 0xFFFFFFFE, 0),
                                       (2, 1, 1, 0), (3, 3, 0, 1)],
                   "the constants' types, default bits and required flags")
@@ -330,6 +333,17 @@ def main():
             check(section(data, 10) == struct.pack("<IBBBBIBBBBIBBBB", 0, 1, 2, 1, 1,
                                                    1, 4, 1, 3, 4, 0, 1, 2, 2, 2),
                   "the inter-stage variables, with WGSL's default interpolation")
+
+        # The meta holds the root block's size; at its default of 0 bytes
+        # the writer leaves it out.
+        status, errors, output = write(folder, code, WGSL, dict(REFLECTION, root_block_bytes=0))
+        check(status == 0, f"a container without a root block is written: {errors}")
+        if status == 0:
+            with open(output, "rb") as f:
+                data = f.read()
+            check(section(data, 1) is None, "the meta of an empty root block left out")
+            library_reads(folder, data, ["3", str(len(REFLECTION["bindings"])), "0", "0"],
+                          "the library reads it without the meta")
 
         # Heaps: fs samples through both heaps, cs writes storage buffers.
         heaped = copy.deepcopy(REFLECTION)

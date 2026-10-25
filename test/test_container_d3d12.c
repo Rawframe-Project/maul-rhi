@@ -74,7 +74,7 @@ static void TestParts(void)
     CHECK(Built() == mrhi_errorFormat, "DXIL without a map");
     Reset();
     AddD3d12();
-    s_sections[s_sectionCount++] = (Section){.type = 14};
+    s_sections[s_sectionCount++] = (Section){.type = 14, .size = 8};
     CHECK(Built() == mrhi_errorFormat, "a repeated map");
     Reset();
     AddD3d12();
@@ -160,7 +160,7 @@ static void TestEntries(void)
 static void TestBuffers(void)
 {
     Reset();
-    Put32(Record(META, 0, 16), 0);
+    s_sections[META].size = 0;
     AddD3d12();
     CHECK(Built() == mrhi_errorFormat, "a place for an empty root block");
     Put32(Map() + 4, 0);
