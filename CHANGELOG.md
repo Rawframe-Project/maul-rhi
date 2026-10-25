@@ -7,10 +7,24 @@ may change the API, the ABI and every data format.
 
 ## [0.6.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.5.0...v0.6.0) (2026-10-25)
 
-
 ### Added
 
-* **device:** wait for a device's next notification ([#102](https://github.com/Rawframe-Project/maul-rhi/issues/102)) ([059ca2f](https://github.com/Rawframe-Project/maul-rhi/commit/059ca2f04771e1f3605ba1e515cc8822ffb0a332)), closes [#98](https://github.com/Rawframe-Project/maul-rhi/issues/98)
+- `mrhiWaitDeviceNotification(device, timeoutNs)` waits until the
+  device's notification queue holds a record, or the deadline passes,
+  without taking the record. It returns `mrhi_success` once a record is
+  there, a lost device's notice included, and `mrhi_timeout` when the
+  deadline passes first. When the queue is empty and the device owes no
+  answer (no pipeline pending, no frame running) it returns
+  `mrhi_empty` at once, so a program never sleeps for an answer that
+  cannot come; a readback is owed only once its frame is submitted. The
+  timeout is in nanoseconds, as `mrhiWaitFrame`'s, and 0 only checks.
+  On native drivers it waits for the oldest running frame through the
+  driver's frame wait, so a program waiting for a pipeline or a
+  readback no longer spins. On the web it never blocks: it finds only
+  an answer the browser has already settled, and otherwise times out at
+  once. `contract_version` rises to 8; drivers built outside the tree
+  see no change, since the SPI is untouched
+  ([#102](https://github.com/Rawframe-Project/maul-rhi/pull/102)).
 
 ## [0.5.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.4.1...v0.5.0) (2026-10-25)
 
