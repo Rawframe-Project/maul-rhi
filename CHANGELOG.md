@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.2.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.2.0...v0.2.1) (2026-10-25)
+
+
+### Fixed
+
+* **d3d12:** set root signatures again in the list after a native pass ([#78](https://github.com/Rawframe-Project/maul-rhi/issues/78)) ([e61fcba](https://github.com/Rawframe-Project/maul-rhi/commit/e61fcba9076596fd9cecce7934104b46363a7773)), closes [#77](https://github.com/Rawframe-Project/maul-rhi/issues/77)
+
 ## [0.2.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.1.0...v0.2.0) (2026-10-24)
 
 The core now tells a driver which passes of other classes each pass
