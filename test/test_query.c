@@ -405,7 +405,7 @@ static void TestTimestamps(void)
     OpenFrames(1u << 20);
     // The timestamps' run starts past the occlusion set's.
     mrhiQuerySetId occlusion = MakeSet(mrhi_queryOcclusion, 8);
-    mrhiQuerySetId set = MakeSet(mrhi_queryTimestamp, 8);
+    mrhiQuerySetId set = MakeSet(mrhi_queryTimestamp, 12);
     mrhiQuerySetId gone = MakeSet(mrhi_queryTimestamp, 8);
     CHECK(mrhiDestroyQuerySet(s_device, gone) == mrhi_success, "one destroyed");
     mrhiPassDef def = mrhiDefaultPassDef();
@@ -424,6 +424,12 @@ static void TestTimestamps(void)
     def.timestampQuerySet = set;
     def.timestampBegin = 4;
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "a render pass with both sets");
+    def = TimedDef(set, 8, 9);
+    def.passClass = mrhi_passAsyncCompute;
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "an async compute pass");
+    def = TimedDef(set, 10, 11);
+    def.passClass = mrhi_passTransfer;
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "a transfer pass");
     uint32_t misuse = 0;
     def = TimedDef(set, 0, MRHI_NO_QUERY);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a start written");
@@ -433,22 +439,21 @@ static void TestTimestamps(void)
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "the same query");
     def = TimedDef(set, MRHI_NO_QUERY, MRHI_NO_QUERY);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "neither");
-    def = TimedDef(set, 8, MRHI_NO_QUERY);
+    def = TimedDef(set, 12, MRHI_NO_QUERY);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a start past the set");
-    def = TimedDef(set, 5, 8);
+    def = TimedDef(set, 5, 12);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "an end past it");
     def = TimedDef(occlusion, 5, 6);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "an occlusion set");
-    def = TimedDef(set, 5, 6);
-    def.passClass = mrhi_passAsyncCompute;
-    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "async compute");
+    def = TimedDef(set, 9, MRHI_NO_QUERY);
     def.passClass = mrhi_passTransfer;
-    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a transfer pass");
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid,
+          "a query another class's pass wrote");
     def = TimedDef((mrhiQuerySetId){0}, 5, MRHI_NO_QUERY);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a start without a set");
     def = TimedDef((mrhiQuerySetId){0}, MRHI_NO_QUERY, 5);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "an end without a set");
-    misuse += 11;
+    misuse += 10;
     def = TimedDef(set, 6, 0);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a start with a written end");
     def = TimedDef(set, 7, 1);

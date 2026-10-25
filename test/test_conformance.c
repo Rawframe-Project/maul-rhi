@@ -512,6 +512,7 @@ static Case s_cases[] = {
     {"api.pipelines", 0, 0},
     {"api.cache_import", 0, 0},
     {"api.queries", 0, 0},
+    {"api.pass_timestamps", 0, 0},
     {"api.statistics", 0, 0},
     {"capabilities.limits", 0, 0},
     {"capabilities.formats", 0, 0},
@@ -2937,6 +2938,86 @@ static void CheckPassClasses(Scene* scene)
     CHECK(Taken(device, marks, (const uint8_t*)words, sizeof(words)), "the other upload");
 }
 
+// Timestamps of a pass of each class besides graphics: an async compute
+// pass's around a dispatch and a transfer pass's around an upload, each
+// pass ending no earlier than it starts.
+static void CheckPassTimestamps(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    mrhiQuerySetId times = MakeQuerySet(device, mrhi_queryTimestamp, 4);
+    BeginScene(scene);
+    mrhiBufferDef def = mrhiDefaultBufferDef();
+    def.size = 256;
+    mrhiResourceId e = {0};
+    mrhiResourceId r = {0};
+    CHECK(mrhiDeclareBuffer(device, &def, &e) == mrhi_success &&
+              mrhiDeclareBuffer(device, &def, &r) == mrhi_success,
+          "declared buffers");
+    mrhiAccess uses[3] = {Whole(scene->u, mrhi_accessUniform),
+                          Whole(scene->d, mrhi_accessStorageReadWrite),
+                          Whole(scene->w, mrhi_accessSampled)};
+    mrhiPassDef computeDef = mrhiDefaultPassDef();
+    computeDef.passClass = mrhi_passAsyncCompute;
+    computeDef.accesses = uses;
+    computeDef.accessCount = 3;
+    computeDef.neverCull = true;
+    computeDef.timestampQuerySet = times;
+    computeDef.timestampBegin = 0;
+    computeDef.timestampEnd = 1;
+    LABEL(computeDef, "timed compute");
+    mrhiPassId compute = {0};
+    CHECK(mrhiAddPass(device, &computeDef, &compute) == mrhi_success, "a timed compute pass");
+    mrhiAccess upload = Whole(e, mrhi_accessCopyDestination);
+    mrhiPassDef transferDef = mrhiDefaultPassDef();
+    transferDef.passClass = mrhi_passTransfer;
+    transferDef.accesses = &upload;
+    transferDef.accessCount = 1;
+    transferDef.timestampQuerySet = times;
+    transferDef.timestampBegin = 2;
+    transferDef.timestampEnd = 3;
+    LABEL(transferDef, "timed transfer");
+    mrhiPassId transfer = {0};
+    CHECK(mrhiAddPass(device, &transferDef, &transfer) == mrhi_success, "a timed transfer pass");
+    mrhiAccess resolves = Whole(r, mrhi_accessQueryResolve);
+    mrhiPassId resolve = CopyPass(device, &resolves, 1);
+    mrhiAccess reads[2] = {Whole(e, mrhi_accessCopySource), Whole(r, mrhi_accessCopySource)};
+    mrhiPassId read = CopyPass(device, reads, 2);
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    const uint32_t marks[4] = {9, 8, 7, 6};
+    const float five[4] = {5.0f, 0.0f, 0.0f, 0.0f};
+    CHECK(mrhiBeginPass(device, compute) == mrhi_success &&
+              mrhiSetComputePipeline(device, compute, scene->adding) == mrhi_success &&
+              mrhiSetRootBlock(device, compute, 0, five, sizeof(five)) == mrhi_success,
+          "an adding pipeline set");
+    BindScene(scene, compute);
+    CHECK(mrhiDispatch(device, compute, 1, 1, 1) == mrhi_success &&
+              mrhiEndPass(device, compute) == mrhi_success &&
+              mrhiBeginPass(device, transfer) == mrhi_success &&
+              mrhiWriteBuffer(device, transfer, e, 0, marks, sizeof(marks)) == mrhi_success &&
+              mrhiEndPass(device, transfer) == mrhi_success,
+          "dispatched and uploaded");
+    mrhiRequestId marked = {0};
+    mrhiRequestId stamps = {0};
+    CHECK(mrhiBeginPass(device, resolve) == mrhi_success &&
+              mrhiResolveQueries(device, resolve, times, 0, 4, r, 0) == mrhi_success &&
+              mrhiEndPass(device, resolve) == mrhi_success &&
+              mrhiBeginPass(device, read) == mrhi_success &&
+              mrhiReadBuffer(device, read, e, 0, sizeof(marks), &marked) == mrhi_success &&
+              mrhiReadBuffer(device, read, r, 0, 32, &stamps) == mrhi_success &&
+              mrhiEndPass(device, read) == mrhi_success,
+          "read");
+    Finish(device, 2);
+    CHECK(Taken(device, marked, (const uint8_t*)marks, sizeof(marks)), "the upload");
+    uint64_t ticks[4] = {0};
+    size_t size = 0;
+    CHECK(mrhiTakeReadback(device, stamps, ticks, sizeof(ticks), &size) == mrhi_success &&
+              size == sizeof(ticks),
+          "the timestamps");
+    CHECK(!s_runs || (ticks[0] != 0 && ticks[1] >= ticks[0]), "the compute pass's timestamps");
+    CHECK(!s_runs || (ticks[2] != 0 && ticks[3] >= ticks[2]), "the transfer pass's timestamps");
+    CHECK(mrhiDestroyQuerySet(device, times) == mrhi_success, "destroyed");
+}
+
 // A multiview pass: one draw into two layers of a target, red in view 0
 // and green in view 1; on a device without multiview, the shader
 // reading the view index and a pass of two views refused.
@@ -3149,6 +3230,10 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     });
     RUN("binding.culling", CheckCulling(&scene));
     RUN("api.queries", CheckQueries(&scene, timestamps));
+    if (timestamps)
+    {
+        RUN("api.pass_timestamps", CheckPassTimestamps(&scene));
+    }
     RUN("binding.render_state", CheckRenderState(&scene));
     if (features.unclippedDepth)
     {
