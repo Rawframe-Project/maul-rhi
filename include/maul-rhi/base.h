@@ -29,7 +29,7 @@ extern "C"
 #define MRHI_VERSION_MINOR 4
 // x-release-please-end
 // x-release-please-start-patch
-#define MRHI_VERSION_PATCH 0
+#define MRHI_VERSION_PATCH 1
 // x-release-please-end
 
 // The binary interface the headers describe, which the root def carries: the

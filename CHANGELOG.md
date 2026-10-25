@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.4.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.4.0...v0.4.1) (2026-10-25)
+
+
+### Fixed
+
+* **d3d12:** wait for a failed frame's queued work before releasing it ([#86](https://github.com/Rawframe-Project/maul-rhi/issues/86)) ([54b77f0](https://github.com/Rawframe-Project/maul-rhi/commit/54b77f09dff0b50d288d7450a3a087dab21f0c34)), closes [#84](https://github.com/Rawframe-Project/maul-rhi/issues/84)
+
 ## [0.4.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.3.0...v0.4.0) (2026-10-25)
 
 ### Changed
