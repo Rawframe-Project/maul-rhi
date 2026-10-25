@@ -37,8 +37,18 @@ mrhiResult mrhiImportPipelineCache(mrhiDevice* device, const void* bytes, size_t
         return mrhi_empty;
     }
     const uint8_t* data = bytes;
-    if (size < HEADER_BYTES || memcmp(data, MAGIC, sizeof(MAGIC)) != 0 ||
-        mrhiRead64(data + 8) != size)
+    if (size < HEADER_BYTES || memcmp(data, MAGIC, sizeof(MAGIC)) != 0)
+    {
+        return mrhi_errorInvalid;
+    }
+    // Every envelope version keeps the magic and its version here; the
+    // rest of another version's header may lie elsewhere, so the version
+    // is read before anything it places.
+    if (mrhiRead32(data + 4) != CACHE_VERSION)
+    {
+        return mrhi_errorVersion;
+    }
+    if (mrhiRead64(data + 8) != size)
     {
         return mrhi_errorInvalid;
     }
@@ -48,7 +58,7 @@ mrhiResult mrhiImportPipelineCache(mrhiDevice* device, const void* bytes, size_t
     {
         return mrhi_errorInvalid;
     }
-    if (mrhiRead32(data + 4) != CACHE_VERSION || mrhiRead32(data + 48) != MRHI_ABI_VERSION)
+    if (mrhiRead32(data + 48) != MRHI_ABI_VERSION)
     {
         return mrhi_errorVersion;
     }

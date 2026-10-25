@@ -13,7 +13,8 @@
 
 #include <stdlib.h>
 
-#define CACHE_ROOM 256
+#define CACHE_ROOM  256
+#define HEADER_ROOM 64
 
 static uint8_t s_cache[CACHE_ROOM];
 static size_t s_cacheSize;
@@ -212,6 +213,18 @@ static void TestVersion(void)
     CHECK(Outcome(s_cacheSize) == mrhi_errorVersion, "another envelope version");
     Forge(4, 2);
     CHECK(Outcome(s_cacheSize) == mrhi_success, "restored");
+    // A later envelope laid out otherwise: neither its size field nor its
+    // digest is where this version reads them.
+    Put32(s_cache + 4, 3);
+    Put64(s_cache + 8, 0);
+    s_cache[16] ^= 0xFF;
+    CHECK(Outcome(s_cacheSize) == mrhi_errorVersion, "a later envelope of another layout");
+    CHECK(Outcome(HEADER_ROOM) == mrhi_errorVersion, "a later envelope of the least size");
+    CHECK(Outcome(HEADER_ROOM - 1) == mrhi_errorInvalid, "shorter than any envelope");
+    Put64(s_cache + 8, s_cacheSize);
+    s_cache[16] ^= 0xFF;
+    Forge(4, 2);
+    CHECK(Outcome(s_cacheSize) == mrhi_success, "restored again");
 }
 
 static void TestMisuse(void)
