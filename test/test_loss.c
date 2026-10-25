@@ -274,6 +274,7 @@ static void TestSimulated(void)
     CHECK(mrhiSimulateDeviceLoss(s_device) == mrhi_success &&
               mrhiGetDeviceState(s_device) == mrhi_deviceLost,
           "lost at once");
+    CHECK(mrhiWaitDeviceNotification(s_device, 0) == mrhi_success, "a wait finds the notice");
     CHECK(Next(mrhi_deviceLostNotice, 0), "the notice first");
     CHECK(Next(mrhi_deviceFrameDone, token.index1) &&
               Next(mrhi_deviceReadbackReady, readback.index1),
@@ -281,6 +282,8 @@ static void TestSimulated(void)
     CHECK(Next(mrhi_devicePipelineReady, pipeline.index1), "the pipeline");
     mrhiDeviceNotification record;
     CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_empty, "nothing else");
+    CHECK(mrhiWaitDeviceNotification(s_device, UINT64_MAX) == mrhi_empty,
+          "and a wait owed nothing, at once");
     mrhiDeviceLossReport report;
     static const char message[] = "Lost through mrhiSimulateDeviceLoss";
     CHECK(mrhiGetDeviceLossReport(s_device, &report) == mrhi_success &&

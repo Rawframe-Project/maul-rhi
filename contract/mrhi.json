@@ -11811,7 +11811,7 @@
         {
           "kind": "function",
           "name": "next_device_notification",
-          "doc": "Takes the oldest record from the device's notification queue, first taking in the frames the GPU finished.",
+          "doc": "Takes the oldest record from the device's notification queue, first taking in the frames the GPU finished. mrhiWaitDeviceNotification waits for one.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success` with a record; `mrhi_empty` when the queue is drained; `mrhi_errorInvalid` for a NULL argument."
@@ -11835,6 +11835,51 @@
             "object": "the device"
           },
           "library": "reads the library's own notification queue"
+        },
+        {
+          "kind": "function",
+          "name": "wait_device_notification",
+          "doc": "Waits until the device's notification queue holds a record, or the deadline passes, without taking it; the record is then taken with mrhiNextDeviceNotification. It first takes in what the driver finished, and then waits for the oldest running frame, whose end is the next answer GPU work brings. On the web, where nothing may block, it only takes in what the browser has settled: with nothing settled it times out at once, whatever the deadline, and a program keeps yielding to the browser between calls.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success` once the queue holds a record, a lost device's notice included; `mrhi_timeout` when the deadline passed first, or at once on the web; `mrhi_empty` at once when the queue is empty and the device owes no answer, with no pipeline pending and no frame running (a readback is owed only once its frame is submitted); `mrhi_errorInvalid` for a NULL device."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "timeout_ns",
+              "type": "uint64",
+              "doc": "The longest wait in nanoseconds; 0 only checks."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "mapping": {
+            "vulkan": {
+              "class": "direct",
+              "note": "vkWaitForFences on the oldest running frame's fence with the deadline"
+            },
+            "d3d12": {
+              "class": "direct",
+              "note": "SetEventOnCompletion for the oldest running frame and a wait on the event with the deadline"
+            },
+            "metal": {
+              "class": "emulated",
+              "note": "the oldest running frame's completed handler signalling a semaphore waited on with the deadline",
+              "cost": "a semaphore signal per frame"
+            },
+            "web_gpu": {
+              "class": "restricted",
+              "note": "promises settle only while the page's event loop runs: a wait that would block returns mrhi_timeout at once"
+            }
+          }
         },
         {
           "kind": "id",
@@ -22141,5 +22186,5 @@
       ]
     }
   ],
-  "contract_version": 7
+  "contract_version": 8
 }

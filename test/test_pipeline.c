@@ -103,6 +103,36 @@ static void TestCreate(void)
     Close(device);
 }
 
+// A wait on the device's queue wakes on a pipeline's answer: the queue
+// is empty until the driver is polled, and the wait polls it, leaving
+// the record to be taken. With the answer taken and nothing pending, a
+// wait returns empty at once.
+static void TestWait(void)
+{
+    mrhiDevice* device = Open(4, 16, true);
+    Reset();
+    mrhiShaderId shader = Shader(device);
+    mrhiComputePipelineDef def = Def(shader, "cs");
+    CHECK(mrhiWaitDeviceNotification(device, 0) == mrhi_empty, "nothing owed");
+    mrhiComputePipelineId pipeline = {0};
+    mrhiRequestId request = {0};
+    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_success,
+          "a pipeline, pending");
+    CHECK(mrhiWaitDeviceNotification(device, UINT64_MAX) == mrhi_success, "woken by its answer");
+    CHECK(mrhiWaitDeviceNotification(device, 0) == mrhi_success, "still there, not taken");
+    mrhiDeviceNotification record = Next(device);
+    CHECK(record.kind == mrhi_devicePipelineReady && record.request.index1 == request.index1,
+          "the pipeline's answer");
+    CHECK(mrhiWaitDeviceNotification(device, UINT64_MAX) == mrhi_empty,
+          "nothing owed again, at once");
+    CHECK(mrhiWaitDeviceNotification(nullptr, 0) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "no misuse");
+    CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
+              mrhiDestroyShader(device, shader) == mrhi_success,
+          "destroyed");
+    Close(device);
+}
+
 static void TestRequestsShared(void)
 {
     mrhiDevice* device = Open(4, 16, true);
@@ -429,6 +459,7 @@ int main(void)
 {
     ResetAdapter();
     TestCreate();
+    TestWait();
     TestRequestsShared();
     TestInvalid();
     TestConstants();

@@ -167,6 +167,40 @@ static mrhiResult NextDevice(mrhiDevice* device, mrhiDeviceNotification* recordO
     return status;
 }
 
+// The device's queue waited on: a device that owes nothing answers empty
+// at once, whatever the deadline; a frame submitted is then the next
+// record a wait finds, left in the queue. On the web the wait never
+// blocks, so it times out until the page has yielded and the frame's
+// completion settled.
+static void CheckNotificationWait(mrhiDevice* device)
+{
+    mrhiDeviceNotification record;
+    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    {
+    }
+    CHECK(mrhiWaitDeviceNotification(device, UINT64_C(10000000000)) == mrhi_empty,
+          "nothing owed, at once");
+    mrhiFrameDef def = mrhiDefaultFrameDef();
+    mrhiRequestId token = {0};
+    CHECK(mrhiBeginFrame(device, &def) == mrhi_success &&
+              mrhiSubmitFrame(device, &token) == mrhi_success,
+          "a frame submitted");
+    mrhiResult status = mrhiWaitDeviceNotification(device, UINT64_C(10000000000));
+#ifdef MRHI_TEST_WEB
+    for (int slept = 0; status == mrhi_timeout && slept < 10000; ++slept)
+    {
+        // hygiene: the browser answers only while its event loop runs
+        Sleep();
+        status = mrhiWaitDeviceNotification(device, 0);
+    }
+#endif
+    CHECK(status == mrhi_success, "woken by the frame's end");
+    CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+              record.kind == mrhi_deviceFrameDone && record.request.index1 == token.index1 &&
+              record.outcome == mrhi_success,
+          "the frame's answer");
+}
+
 // Waits for a frame; a browser never blocks, so on the web the suite
 // sleeps until it has finished.
 static mrhiResult WaitFor(mrhiDevice* device, mrhiRequestId token)
@@ -519,6 +553,7 @@ static Case s_cases[] = {
     {"api.queries", 0, 0},
     {"api.pass_timestamps", 0, 0},
     {"api.statistics", 0, 0},
+    {"api.notification_wait", 0, 0},
     {"capabilities.limits", 0, 0},
     {"capabilities.formats", 0, 0},
     {"capabilities.feature_formats", 0, 0},
@@ -3568,6 +3603,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
           "ready at the next poll");
     CHECK(mrhiGetDeviceState(device) == mrhi_deviceReady, "ready");
     RUN("api.devices", CheckOpened(device, asked));
+    RUN("api.notification_wait", CheckNotificationWait(device));
     RUN("api.objects", CheckObjects(device, asked->timestampQuery));
     RUN("hazards.frame_memory", {
         CheckFrameMemory(device);

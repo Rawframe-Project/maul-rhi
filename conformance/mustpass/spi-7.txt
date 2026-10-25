@@ -8,6 +8,7 @@ api.cache_import
 api.queries
 api.pass_timestamps
 api.statistics
+api.notification_wait
 capabilities.limits
 capabilities.formats
 capabilities.feature_formats

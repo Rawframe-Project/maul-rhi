@@ -356,3 +356,37 @@ mrhiResult mrhiNextDeviceNotification(mrhiDevice* device, mrhiDeviceNotification
     --device->queueCount;
     return mrhi_success;
 }
+
+mrhiResult mrhiWaitDeviceNotification(mrhiDevice* device, uint64_t timeoutNs)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (device->queueCount == 0)
+    {
+        TakeFinished(device);
+    }
+    // The oldest running frame, the smallest token, ends first: its end
+    // is the next answer GPU work brings, its readbacks with it. A pending
+    // pipeline needs no wait: a native driver makes it at its creation and
+    // answers at the poll above, and the web, which never blocks here,
+    // settles it in the browser.
+    uint32_t oldest = 0;
+    for (uint32_t i = 0; i < device->runningCount && device->queueCount == 0; ++i)
+    {
+        oldest = oldest == 0 || device->running[i] < oldest ? device->running[i] : oldest;
+    }
+    if (oldest != 0 && device->driver.vtable->waitFrame(device->driver.self, oldest, timeoutNs))
+    {
+        TakeFinished(device);
+    }
+    if (device->queueCount > 0)
+    {
+        return mrhi_success;
+    }
+    // A readback is owed once its frame is submitted, and its frame then
+    // runs; one recorded in the open frame waits for the submit.
+    bool owed = device->runningCount > 0 || device->pendingCount > 0;
+    return owed ? mrhi_timeout : mrhi_empty;
+}

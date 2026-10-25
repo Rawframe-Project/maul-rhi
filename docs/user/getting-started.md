@@ -99,7 +99,7 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
 
 ## The rules every call follows
 
-**Requests and notifications.** Whatever finishes later (an adapter search, a device opening, a pipeline, a frame, a readback) returns a request id at once and is answered by exactly one record in its owner's queue: the instance's (`mrhiNextInstanceNotification`) or the device's (`mrhiNextDeviceNotification`). The library starts no thread and never calls the program. A native driver's answers arrive when the program drains the queue; a browser's come between the page's tasks, so a web program drains again on a later frame instead of waiting.
+**Requests and notifications.** Whatever finishes later (an adapter search, a device opening, a pipeline, a frame, a readback) returns a request id at once and is answered by exactly one record in its owner's queue: the instance's (`mrhiNextInstanceNotification`) or the device's (`mrhiNextDeviceNotification`). The library starts no thread and never calls the program. A native driver's answers arrive when the program drains the queue; a browser's come between the page's tasks, so a web program drains again on a later frame instead of waiting. `mrhiWaitDeviceNotification` blocks until the device's queue holds a record, with a timeout, so a native program waiting for a pipeline or a frame need not spin; it returns `mrhi_empty` at once when the device owes no answer, and on the web it never blocks (below).
 
 **Results.** Every fallible function returns an `mrhiResult`. `mrhi_success` is zero. A few positive values are outcomes, not failures: `mrhi_empty` for a drained queue, `mrhi_suboptimal` and `mrhi_occluded` for surfaces, `mrhi_timeout`. The errors:
 
