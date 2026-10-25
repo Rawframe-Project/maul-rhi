@@ -447,7 +447,6 @@ static void CheckLostFrame(mrhiDevice* device)
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiBufferDef def = mrhiDefaultBufferDef();
     def.size = sizeof(kWords);
-    def.usage = mrhi_bufferCopySource | mrhi_bufferCopyDestination;
     mrhiResourceId b = {0};
     CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
               mrhiDeclareBuffer(device, &def, &b) == mrhi_success,
