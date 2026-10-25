@@ -128,13 +128,28 @@ def constant_defines(writer, constants, fixed):
     return declaration, defines
 
 
+# A statement of a continue block: not a block's start or end, and not a
+# branch, a loop, a jump or a label. SPIRV-Cross puts every brace on a
+# line of its own, so a line's start says what it is; hand-written HLSL
+# would need a tokenizer.
+PLAIN = re.compile(r"(?!(if|else|for|while|do|switch|case|default|return|break)\b)[^{}]")
+# The ends of a continue block: a for loop's continue, and a do-while
+# loop's condition, which reads the stepped value as the loop means it.
+CONTINUED = re.compile(r"continue;$|\}\s*while\s*\(")
+
+
 def stale_reads(source):
     """Each read of a loop's variable after its continue block has stepped
     it, as (line, variable), in SPIRV-Cross's HLSL. SPIRV-Cross writes a
     continue block as one statement per loop variable, and may fold a load
     into a later one's: `_5736++;` then `_5737 += ...Load(_5736 * 4)...`
     reads the next iteration's element where the SPIR-V reads this one's.
-    SPIRV-Cross's MSL copies the variable first, so only HLSL shows it."""
+    A continue block is plain statements up to the loop's `continue;`, or
+    to `} while (` where SPIRV-Cross writes a loop branching back on a
+    condition as a do-while; a step with a branch, a loop or a block's end
+    before that is the body's own, as the WGSL steps it, and a read after
+    it wants the stepped value. SPIRV-Cross's MSL copies the variable first, so only HLSL shows
+    it."""
     found = []
     lines = source.splitlines()
     for at, line in enumerate(lines):
@@ -142,13 +157,18 @@ def stale_reads(source):
         if not stepped:
             continue
         variable = re.compile(rf"\b{stepped.group(1)}\b")
+        read = None
         for later in range(at + 1, len(lines)):
             text = lines[later].strip()
-            if text in ("continue;", "break;") or text.startswith("}"):
+            if not text:
+                continue
+            if CONTINUED.match(text):
+                found += [read] if read else []
                 break
-            if variable.search(text):
-                found.append((later + 1, stepped.group(1)))
+            if not PLAIN.match(text):
                 break
+            if read is None and variable.search(text):
+                read = (later + 1, stepped.group(1))
     return found
 
 
