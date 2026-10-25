@@ -5,6 +5,18 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.4.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.4.0...v0.4.1) (2026-10-25)
+
+### Fixed
+
+- D3D12: a frame that fails after part of it was queued waits for that
+  work before releasing its transients. It used to release them at
+  once, so a queue still holding the frame could run it against
+  released memory. A failed frame now queues nothing after the first
+  wait or signal that fails, and every queue is drained before the
+  frame's resources go
+  ([#86](https://github.com/Rawframe-Project/maul-rhi/pull/86)).
+
 ## [0.4.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.3.0...v0.4.0) (2026-10-25)
 
 ### Changed
