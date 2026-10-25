@@ -10,8 +10,11 @@
 // writing a texture runs on the compute queue, and one reading a texture
 // a graphics pass left in a shader read state on the direct queue; an
 // async compute pass on the direct queue waits for the one before it on
-// the compute queue; and a frame whose compute list D3D12 makes not fails
-// without running anything, and the next runs. Under the debug layer,
+// the compute queue; a frame whose compute list D3D12 makes not fails
+// without running anything, and the next runs; and a frame whose last
+// signal fails, its work held behind a fence of the suite's, is waited
+// for before its device goes, so nothing the GPU still reads is
+// released. Under the debug layer,
 // whose errors fail the suite. Skipped where there is no D3D12 adapter,
 // unless MAUL_RHI_REQUIRE_D3D12 is set.
 
@@ -72,8 +75,10 @@ static FenceFn s_signal;
 static CreateListFn s_createList;
 static Call s_calls[CALLS];
 static uint32_t s_callCount;
-// While set, D3D12 makes no compute list.
+// While set, D3D12 makes no compute list; and the direct queue's next
+// signal fails.
 static bool s_failCompute;
+static bool s_failSignal;
 
 static void Note(ID3D12CommandQueue* queue, CallKind kind, ID3D12Fence* fence, uint64_t value)
 {
@@ -102,6 +107,11 @@ static HRESULT STDMETHODCALLTYPE Wait(ID3D12CommandQueue* queue, ID3D12Fence* fe
 static HRESULT STDMETHODCALLTYPE Signal(ID3D12CommandQueue* queue, ID3D12Fence* fence, UINT64 value)
 {
     Note(queue, CALL_SIGNAL, fence, value);
+    if (s_failSignal && s_calls[s_callCount - 1].queue == D3D12_COMMAND_LIST_TYPE_DIRECT)
+    {
+        s_failSignal = false;
+        return E_FAIL;
+    }
     return s_signal(queue, fence, value);
 }
 
@@ -172,6 +182,7 @@ static void Unhook(void)
     s_queueTable = nullptr;
     s_deviceTable = nullptr;
     s_failCompute = false;
+    s_failSignal = false;
 }
 
 // The lists a kind of queue ran since the hooks went in.
@@ -410,6 +421,72 @@ static void CheckFailedList(mrhiDevice* device, mrhiBufferId buffer, mrhiCompute
     }
 }
 
+// Signals the suite's fence a while after it starts, letting the queue
+// behind it run.
+static DWORD WINAPI Unblock(LPVOID fence)
+{
+    Sleep(300);
+    return SUCCEEDED(ID3D12Fence_Signal((ID3D12Fence*)fence, 1)) ? 0 : 1;
+}
+
+// A frame filling a transient and reading it back, queued behind a wait
+// for a fence of the suite's, whose last signal fails: the device is
+// lost. Its work runs once the fence is signalled, so the frame's lists,
+// allocators and transient must outlive it, and the device's teardown
+// must not release them first, as the debug layer and the run check.
+static void CheckLostFrame(mrhiDevice* device)
+{
+    void* native = nullptr;
+    void* queue = nullptr;
+    ID3D12Fence* fence = nullptr;
+    CHECK(mrhiGetD3d12Device(device, &native, &queue) == mrhi_success &&
+              SUCCEEDED(ID3D12Device_CreateFence((ID3D12Device*)native, 0, D3D12_FENCE_FLAG_NONE,
+                                                 &IID_ID3D12Fence, (void**)&fence)) &&
+              SUCCEEDED(ID3D12CommandQueue_Wait((ID3D12CommandQueue*)queue, fence, 1)),
+          "the direct queue held behind a fence");
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiBufferDef def = mrhiDefaultBufferDef();
+    def.size = sizeof(kWords);
+    def.usage = mrhi_bufferCopySource | mrhi_bufferCopyDestination;
+    mrhiResourceId b = {0};
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiDeclareBuffer(device, &def, &b) == mrhi_success,
+          "a frame with a transient");
+    mrhiAccess write = Whole(b, mrhi_accessCopyDestination);
+    mrhiAccess read = Whole(b, mrhi_accessCopySource);
+    mrhiPassId upload = AddPass(device, mrhi_passGraphics, &write);
+    mrhiPassId back = AddPass(device, mrhi_passGraphics, &read);
+    mrhiRequestId request = {0};
+    CHECK(mrhiCompileFrame(device) == mrhi_success &&
+              mrhiBeginPass(device, upload) == mrhi_success &&
+              mrhiWriteBuffer(device, upload, b, 0, kWords, sizeof(kWords)) == mrhi_success &&
+              mrhiEndPass(device, upload) == mrhi_success &&
+              mrhiBeginPass(device, back) == mrhi_success &&
+              mrhiReadBuffer(device, back, b, 0, sizeof(kWords), &request) == mrhi_success &&
+              mrhiEndPass(device, back) == mrhi_success,
+          "recorded");
+    HANDLE thread =
+        fence == nullptr ? nullptr : CreateThread(nullptr, 0, Unblock, fence, 0, nullptr);
+    Hook(device);
+    s_failSignal = true;
+    mrhiRequestId token = {0};
+    CHECK(mrhiSubmitFrame(device, &token) == mrhi_errorDeviceLost, "the frame's signal failed");
+    Unhook();
+    CHECK(thread != nullptr, "the fence's signaller");
+    mrhiDestroyDevice(device);
+    // Whatever the queue still held runs now, if it has not.
+    if (thread != nullptr)
+    {
+        (void)WaitForSingleObject(thread, INFINITE);
+        (void)CloseHandle(thread);
+    }
+    Sleep(500);
+    if (fence != nullptr)
+    {
+        ID3D12Fence_Release(fence);
+    }
+}
+
 static mrhiDevice* OpenDevice(mrhiInstance* instance, mrhiAdapterId adapter)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
@@ -507,6 +584,11 @@ int main(void)
     {
         CheckDevice(instance, adapter, false);
         CheckDevice(instance, adapter, true);
+        mrhiDevice* lost = OpenDevice(instance, adapter);
+        if (lost != nullptr)
+        {
+            CheckLostFrame(lost);
+        }
     }
     else
     {
