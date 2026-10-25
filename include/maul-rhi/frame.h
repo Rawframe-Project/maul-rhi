@@ -127,7 +127,8 @@ extern "C"
                                                      uint64_t timeoutNs);
 
     /// Takes the oldest record from the device's notification queue, first
-    /// taking in the frames the GPU finished.
+    /// taking in the frames the GPU finished. mrhiWaitDeviceNotification waits
+    /// for one.
     ///
     /// @param device           The device.
     /// @param notificationOut  Receives the record.
@@ -137,6 +138,27 @@ extern "C"
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult
     mrhiNextDeviceNotification(mrhiDevice* device, mrhiDeviceNotification* notificationOut);
+
+    /// Waits until the device's notification queue holds a record, or the
+    /// deadline passes, without taking it; the record is then taken with
+    /// mrhiNextDeviceNotification. It first takes in what the driver finished,
+    /// and then waits for the oldest running frame, whose end is the next
+    /// answer GPU work brings. On the web, where nothing may block, it only
+    /// takes in what the browser has settled: with nothing settled it times out
+    /// at once, whatever the deadline, and a program keeps yielding to the
+    /// browser between calls.
+    ///
+    /// @param device     The device.
+    /// @param timeoutNs  The longest wait in nanoseconds; 0 only checks.
+    /// @return `mrhi_success` once the queue holds a record, a lost device's
+    /// notice included; `mrhi_timeout` when the deadline passed first, or at
+    /// once on the web; `mrhi_empty` at once when the queue is empty and the
+    /// device owes no answer, with no pipeline pending and no frame running;
+    /// `mrhi_errorInvalid` for a NULL device.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiWaitDeviceNotification(mrhiDevice* device,
+                                                                  uint64_t timeoutNs);
 
     // A resource of the open frame: a declared texture or buffer, or an
     // imported one. It ends with the frame.

@@ -11,7 +11,7 @@ The four APIs finish work in four shapes: WebGPU only through promises, Metal th
 - **The instance's queue** (`mrhiNextInstanceNotification`) answers adapter searches (`mrhi_instanceAdaptersFound`) and device openings (`mrhi_instanceDeviceReady`).
 - **A device's queue** (`mrhiNextDeviceNotification`) answers pipelines (`mrhi_devicePipelineReady`), frames (`mrhi_deviceFrameDone`), readbacks (`mrhi_deviceReadbackReady`) and the loss notice.
 
-Taking from a queue first polls the driver for what it finished, a small batch at a time, and turns each driver event into its record. A driver never calls the core; the only way its answers arrive is this poll.
+Taking from a queue first polls the driver for what it finished, a small batch at a time, and turns each driver event into its record. A driver never calls the core; the only way its answers arrive is this poll. `mrhiWaitDeviceNotification` adds no driver call: it polls, and if nothing came, waits for the oldest running frame through the driver's `waitFrame` and polls again, since a frame's end is the only answer native work brings later (pipelines are made at their creation). On the web `waitFrame` never blocks, so the wait times out at once.
 
 ## Never losing an answer
 

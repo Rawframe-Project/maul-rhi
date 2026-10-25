@@ -87,7 +87,7 @@ static bool DrawAndRead(mrhiDevice* device, mrhiGraphicsPipelineId pipeline, con
 
 **Recording.** Between `mrhiBeginPass` and `mrhiEndPass`, the encoder calls record a kept pass: pipelines, bindings, the root block, dynamic state, draws, dispatches, copies, debug groups and queries. Passes may record on several threads at once, each pass on one. Every call is checked against WebGPU's rules and against the pass's declarations, on every driver: a binding, copy or draw that touches a resource the pass did not declare is refused. A kept pass that is never begun records nothing, but still loads and stores its targets.
 
-**Submitting.** `mrhiSubmitFrame` returns a token that `mrhi_deviceFrameDone` answers in the device's queue. `mrhiWaitFrame` waits for it with a timeout where the platform allows blocking; on the web it never blocks. `mrhiDropFrame` abandons an open frame: nothing of it runs.
+**Submitting.** `mrhiSubmitFrame` returns a token that `mrhi_deviceFrameDone` answers in the device's queue. `mrhiWaitFrame` waits for it with a timeout where the platform allows blocking; on the web it never blocks. `mrhiWaitDeviceNotification` waits instead for the device's next record, whatever it answers: it takes in what the driver finished, then waits for the oldest running frame, and returns `mrhi_success` with the record left in the queue, `mrhi_timeout`, or `mrhi_empty` at once when nothing is owed. A pending pipeline needs no wait on a native driver, which makes it at its creation and answers at the next poll. `mrhiDropFrame` abandons an open frame: nothing of it runs.
 
 ## Moving bytes
 

@@ -3,7 +3,7 @@
 //
 // Frames on test driver devices: one open at a time, tokens answered once
 // in the device's queue, the frames in flight limit, waits with and
-// without a deadline, and a failing driver.
+// without a deadline, waits on the device's queue, and a failing driver.
 
 #include "test_device_setup.h"
 
@@ -142,6 +142,33 @@ static void TestRunningNeedRoom(void)
     Close(device);
 }
 
+// A wait on the device's queue waits for the oldest running frame: a
+// held frame times out a check, finishes when waited on with a deadline,
+// and its answer is then in the queue. Two frames are answered in their
+// order of finishing, the oldest waited on first.
+static void TestWaitNotification(void)
+{
+    s_adapter.holdFrames = true;
+    mrhiDevice* device = OpenWith(mrhiDefaultDeviceDef(), true);
+    CHECK(mrhiWaitDeviceNotification(device, 1000) == mrhi_empty, "nothing owed, at once");
+    mrhiRequestId first = Run(device);
+    mrhiRequestId second = Run(device);
+    CHECK(mrhiWaitDeviceNotification(device, 0) == mrhi_timeout, "a check of held frames");
+    CHECK(mrhiWaitDeviceNotification(device, 1000) == mrhi_success, "the oldest finished");
+    mrhiDeviceNotification record;
+    CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+              record.kind == mrhi_deviceFrameDone && record.request.index1 == first.index1,
+          "its answer");
+    CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_empty, "the second still held");
+    CHECK(mrhiWaitDeviceNotification(device, 1000) == mrhi_success &&
+              mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+              record.request.index1 == second.index1,
+          "then the second");
+    CHECK(mrhiWaitDeviceNotification(device, 1000) == mrhi_empty, "nothing owed after");
+    Close(device);
+    s_adapter.holdFrames = false;
+}
+
 // A frame that fails on the GPU is answered with the error.
 static void TestFrameOutcome(void)
 {
@@ -213,6 +240,7 @@ int main(void)
     TestQueueWraps();
     TestRunningNeedRoom();
     TestFrameOutcome();
+    TestWaitNotification();
     TestRefusals();
     TestFailure();
     return s_failures == 0 ? 0 : 1;
