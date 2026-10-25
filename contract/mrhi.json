@@ -6498,7 +6498,7 @@
             },
             "d3d12": {
               "class": "direct",
-              "note": "D3D12CreateDevice at the minimum feature level, then a direct queue"
+              "note": "D3D12CreateDevice at the minimum feature level, then a direct, a compute and a copy queue"
             },
             "metal": {
               "class": "direct",
@@ -12161,8 +12161,8 @@
                   "note": "a compute-only queue family, where there is one"
                 },
                 "d3d12": {
-                  "class": "direct",
-                  "note": "a compute queue"
+                  "class": "restricted",
+                  "note": "the compute queue, where a compute list makes the pass's texture transitions; else the direct queue"
                 },
                 "metal": {
                   "class": "direct",
@@ -12185,8 +12185,8 @@
                   "note": "a transfer-only queue family, where there is one"
                 },
                 "d3d12": {
-                  "class": "direct",
-                  "note": "the direct queue, as every pass"
+                  "class": "restricted",
+                  "note": "the copy queue for a pass touching buffers only, else the compute queue where a compute list makes its texture transitions, else the direct queue"
                 },
                 "metal": {
                   "class": "direct",

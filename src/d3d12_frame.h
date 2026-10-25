@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// A D3D12 device's frames: a slot per frame in flight with its command
-// allocator and list, its mapped staging, the descriptor heaps its
-// targets' views and its bindings take, its scratch buffer, its
-// transients with the heap they are placed in, and the readbacks it
-// fills; the fence whose value counts the frames finished; the
-// readback buffer, the command signatures of indirect work and the
-// zeros of unwritten queries; the recorder; and the queue of destroyed
-// objects, released once the next frame submitted after their
-// destruction finishes. Included by the driver's files only.
+// A D3D12 device's frames: a slot per frame in flight with a command
+// allocator and lists for each lane and the batches they run in, its
+// mapped staging, the descriptor heaps its targets' views and its
+// bindings take, its scratch buffer, its transients with the heap they
+// are placed in, and the readbacks it fills; the lanes' queues and
+// fences; the fence whose value counts the frames finished; the readback
+// buffer, the command signatures of indirect work and the zeros of
+// unwritten queries; the recorder; and the queue of destroyed objects,
+// released once the next frame submitted after their destruction
+// finishes. Included by the driver's files only.
 
 #ifndef MAUL_RHI_SRC_D3D12_FRAME_H
 #define MAUL_RHI_SRC_D3D12_FRAME_H
 
+#include "d3d12_lanes.h"
 #include "d3d12_pipeline.h"
 #include "d3d12_state.h"
 #include "d3d12_swapchain.h"
@@ -32,16 +34,8 @@ typedef struct mrhiD3d12Retiree
 
 typedef struct mrhiD3d12Slot
 {
-    ID3D12CommandAllocator* allocator;
-    // The lists the frame records into, one after another on the
-    // allocator: the first, then after each native pass the
-    // next.
-    ID3D12GraphicsCommandList* parts[1 + MRHI_NATIVE_PASSES];
-    uint32_t partsUsed;
-    // The lists the frame runs, in order, each in its own
-    // ExecuteCommandLists: its parts with the native passes' between.
-    ID3D12CommandList* runs[1 + 2 * MRHI_NATIVE_PASSES];
-    uint32_t runCount;
+    // Its lanes' allocators and lists, and the frame's batches.
+    mrhiD3d12LaneSlot lanes;
     // The core's tag while its frame runs; 0 when idle.
     uint64_t tag;
     // The frame's serial, the fence value its end signals.
@@ -74,6 +68,7 @@ typedef struct mrhiD3d12Slot
 typedef struct mrhiD3d12Frames
 {
     ID3D12Device* device;
+    // The direct queue, the device's own, which the lanes start from.
     ID3D12CommandQueue* queue;
     mrhiD3d12Objects* objects;
     mrhiD3d12Pipelines* pipelines;
@@ -111,6 +106,7 @@ typedef struct mrhiD3d12Frames
     ID3D12Resource* zeros;
     // The frame being recorded's state, kept here for its size.
     mrhiD3d12Recorder recorder;
+    mrhiD3d12Lanes lanes;
     // Frames submitted, and frames reported finished.
     uint64_t submitted;
     uint64_t finished;
@@ -131,6 +127,12 @@ typedef struct mrhiD3d12Frames
 typedef struct mrhiD3d12FrameRoom
 {
     size_t slots;
+    size_t lists;
+    size_t runs;
+    size_t batches;
+    size_t passLanes;
+    size_t passBatches;
+    size_t followed;
     size_t table;
     size_t transients;
     size_t readbacks;
@@ -154,9 +156,10 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
                         const mrhiD3d12FrameRoom* room, const mrhiDeviceLimits* limits,
                         uint32_t slots);
 
-// Makes the fence, each slot's allocator, list, staging and descriptor
-// heaps, and the readback buffer: success, or mrhi_errorCapacity when
-// D3D12 makes one of them not.
+// Makes the compute and copy queues, the fences, each slot's
+// allocators, first lists, staging and descriptor heaps, and the
+// readback buffer: success, or mrhi_errorCapacity when D3D12 makes one
+// of them not.
 mrhiResult mrhiD3d12OpenFrames(mrhiD3d12Frames* frames);
 
 // Waits for every frame, then releases everything the frames hold, the
