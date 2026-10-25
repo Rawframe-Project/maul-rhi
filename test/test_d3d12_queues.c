@@ -79,6 +79,12 @@ static uint32_t s_callCount;
 // signal fails.
 static bool s_failCompute;
 static bool s_failSignal;
+// While set, the direct queue's next signal goes in and then this fence
+// is signalled to 1, the fence and value it took kept in s_drained and
+// s_drainedValue, with a reference.
+static ID3D12Fence* s_release;
+static ID3D12Fence* s_drained;
+static uint64_t s_drainedValue;
 
 static void Note(ID3D12CommandQueue* queue, CallKind kind, ID3D12Fence* fence, uint64_t value)
 {
@@ -112,7 +118,16 @@ static HRESULT STDMETHODCALLTYPE Signal(ID3D12CommandQueue* queue, ID3D12Fence* 
         s_failSignal = false;
         return E_FAIL;
     }
-    return s_signal(queue, fence, value);
+    HRESULT result = s_signal(queue, fence, value);
+    if (s_release != nullptr && s_calls[s_callCount - 1].queue == D3D12_COMMAND_LIST_TYPE_DIRECT)
+    {
+        ID3D12Fence_AddRef(fence);
+        s_drained = fence;
+        s_drainedValue = value;
+        (void)ID3D12Fence_Signal(s_release, 1);
+        s_release = nullptr;
+    }
+    return result;
 }
 
 static HRESULT STDMETHODCALLTYPE CreateList(ID3D12Device* device, UINT mask,
@@ -183,6 +198,7 @@ static void Unhook(void)
     s_deviceTable = nullptr;
     s_failCompute = false;
     s_failSignal = false;
+    s_release = nullptr;
 }
 
 // The lists a kind of queue ran since the hooks went in.
@@ -421,24 +437,13 @@ static void CheckFailedList(mrhiDevice* device, mrhiBufferId buffer, mrhiCompute
     }
 }
 
-// Set by Unblock just before it lets the held queue run.
-static volatile LONG s_unblocked = 0;
-
-// Signals the suite's fence a while after it starts, letting the queue
-// behind it run.
-static DWORD WINAPI Unblock(LPVOID fence)
-{
-    Sleep(1000);
-    (void)InterlockedExchange(&s_unblocked, 1);
-    return SUCCEEDED(ID3D12Fence_Signal((ID3D12Fence*)fence, 1)) ? 0 : 1;
-}
-
 // A frame filling a transient and reading it back, queued behind a wait
 // for a fence of the suite's, whose last signal fails: the device is
 // lost. Its work runs once the fence is signalled, so the frame's lists,
-// allocators and transient must outlive it: the device's teardown waits
-// for that work before releasing them, so it returns only after the
-// fence was signalled.
+// allocators and transient must outlive it: the device's teardown must
+// signal the direct queue and wait for that signal before releasing
+// them. The fence is signalled only from inside that signal, so a
+// teardown that waits for nothing returns with the frame still held.
 static void CheckLostFrame(mrhiDevice* device)
 {
     void* native = nullptr;
@@ -469,26 +474,24 @@ static void CheckLostFrame(mrhiDevice* device)
               mrhiReadBuffer(device, back, b, 0, sizeof(kWords), &request) == mrhi_success &&
               mrhiEndPass(device, back) == mrhi_success,
           "recorded");
-    HANDLE thread =
-        fence == nullptr ? nullptr : CreateThread(nullptr, 0, Unblock, fence, 0, nullptr);
     Hook(device);
     s_failSignal = true;
     mrhiRequestId token = {0};
     CHECK(mrhiSubmitFrame(device, &token) == mrhi_errorDeviceLost, "the frame's signal failed");
-    Unhook();
-    CHECK(thread != nullptr, "the fence's signaller");
+    s_release = fence;
     mrhiDestroyDevice(device);
-    CHECK(thread == nullptr || InterlockedCompareExchange(&s_unblocked, 0, 0) == 1,
+    Unhook();
+    CHECK(s_drained != nullptr && ID3D12Fence_GetCompletedValue(s_drained) >= s_drainedValue,
           "the teardown waited for the queued frame");
-    // Whatever the queue still held runs now, if it has not.
-    if (thread != nullptr)
+    if (s_drained != nullptr)
     {
-        (void)WaitForSingleObject(thread, INFINITE);
-        (void)CloseHandle(thread);
+        ID3D12Fence_Release(s_drained);
+        s_drained = nullptr;
     }
-    Sleep(500);
     if (fence != nullptr)
     {
+        // Whatever the queue still holds may run.
+        (void)ID3D12Fence_Signal(fence, 1);
         ID3D12Fence_Release(fence);
     }
 }
