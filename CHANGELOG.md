@@ -5,6 +5,17 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.4.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.3.0...v0.4.0) (2026-10-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **conformance:** drivers built outside the tree against SPI versions 4 to 6 no longer have a mustpass list to be admitted on, and programs may see diagnostic codes renumbered or removed between releases.
+
+### Chores
+
+* **conformance:** drop old mustpass lists and code stability promises ([#88](https://github.com/Rawframe-Project/maul-rhi/issues/88)) ([578bae5](https://github.com/Rawframe-Project/maul-rhi/commit/578bae57f5c447a634448aee9fbc032ddfadf138)), closes [#87](https://github.com/Rawframe-Project/maul-rhi/issues/87)
+
 ## [0.3.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.2.1...v0.3.0) (2026-10-25)
 
 Async compute and transfer passes run on queues of their own on D3D12.
