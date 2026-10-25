@@ -193,7 +193,7 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticPassViews:
         return "A pass def with several views on a native pass or on one without targets.";
     case mrhi_diagnosticPassQueries:
-        return "A pass def's query sets do not fit: an occlusion set that is not one or on a pass without targets, or timestamps that are not a graphics pass's two different queries, in range and not yet written this frame.";
+        return "A pass def's query sets do not fit: an occlusion set that is not one or on a pass without targets, or timestamps that are not two different queries, in range and not yet written this frame.";
     case mrhi_diagnosticPassUses:
         return "A pass def's accesses or targets do not fit: a kind the resource's usage lacks, a range past it, a write to a sealed resource, targets whose sizes, samples, mips or layers disagree, uses that conflict within the pass, or a read of a declared resource no earlier pass wrote.";
     default:

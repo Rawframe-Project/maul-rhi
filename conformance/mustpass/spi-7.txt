@@ -6,6 +6,7 @@ api.objects
 api.pipelines
 api.cache_import
 api.queries
+api.pass_timestamps
 api.statistics
 capabilities.limits
 capabilities.formats

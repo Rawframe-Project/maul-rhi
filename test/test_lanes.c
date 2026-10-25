@@ -6,8 +6,9 @@
 // another class's write; a write after reads in two other classes; a read
 // that needs no barrier, which follows the pass that set the part's state;
 // parts that do not meet; memory a placed resource takes over from another
-// class's resources; native passes; and passes of one class, which follow
-// one another by order alone. Each frame is captured as the test driver is
+// class's resources; native passes; timed passes and the passes that may
+// resolve their queries; and passes of one class, which follow one
+// another by order alone. Each frame is captured as the test driver is
 // handed it.
 
 #include "device_core.h"
@@ -43,13 +44,18 @@ static mrhiResult Capture(void* self, const mrhiDriverFrame* frame, uint64_t tag
     return s_handedTo->submitFrame(self, frame, tag);
 }
 
-static void Open(void)
+static void OpenDef(mrhiDeviceDef def)
 {
-    s_device = OpenWith(mrhiDefaultDeviceDef(), true);
+    s_device = OpenWith(def, true);
     s_handedTo = s_device->driver.vtable;
     s_capture = *s_handedTo;
     s_capture.submitFrame = Capture;
     s_device->driver.vtable = &s_capture;
+}
+
+static void Open(void)
+{
+    OpenDef(mrhiDefaultDeviceDef());
 }
 
 static void Begin(void)
@@ -346,6 +352,81 @@ static void TestNative(void)
     Close(s_device);
 }
 
+// A pass of a class writing a buffer, timed by two queries of a set.
+static mrhiPassId TimedPass(mrhiPassClass passClass, mrhiAccess access, mrhiQuerySetId set,
+                            uint32_t begin)
+{
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.passClass = passClass;
+    def.accesses = &access;
+    def.accessCount = 1;
+    def.neverCull = true;
+    def.timestampQuerySet = set;
+    def.timestampBegin = begin;
+    def.timestampEnd = begin + 1;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "a timed pass");
+    return pass;
+}
+
+// An imported buffer, which takes no frame memory to order it.
+static mrhiResourceId Imported(mrhiBufferUsage usage)
+{
+    mrhiBufferDef def = mrhiDefaultBufferDef();
+    def.size = 256;
+    def.usage = usage;
+    mrhiBufferId object = {0};
+    mrhiResourceId buffer = {0};
+    CHECK(mrhiCreateBuffer(s_device, &def, &object) == mrhi_success &&
+              mrhiImportBuffer(s_device, object, &buffer) == mrhi_success,
+          "an imported buffer");
+    return buffer;
+}
+
+// A pass that may resolve queries, with a query resolve access, follows
+// every class's timed passes before it, which share no resource with it;
+// a timed pass after it follows it, and an untimed one does not. The
+// resolve is recorded only after the compile, so the access is what
+// orders it.
+static void TestTimestamps(void)
+{
+    s_adapter.features.timestampQuery = true;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.features.timestampQuery = true;
+    OpenDef(deviceDef);
+    mrhiQuerySetDef setDef = mrhiDefaultQuerySetDef();
+    setDef.type = mrhi_queryTimestamp;
+    setDef.count = 8;
+    mrhiQuerySetId set = {0};
+    CHECK(mrhiCreateQuerySet(s_device, &setDef, &set) == mrhi_success, "a timestamp set");
+    Begin();
+    mrhiPassId compute =
+        TimedPass(mrhi_passAsyncCompute,
+                  Access(Imported(mrhi_bufferStorage), mrhi_accessStorageWrite, 0), set, 0);
+    mrhiPassId transfer = TimedPass(
+        mrhi_passTransfer,
+        Access(Imported(mrhi_bufferCopyDestination), mrhi_accessCopyDestination, 0), set, 2);
+    mrhiPassId plain =
+        Pass(mrhi_passGraphics,
+             Access(Imported(mrhi_bufferCopyDestination), mrhi_accessCopyDestination, 0), true);
+    mrhiPassId resolve =
+        Pass(mrhi_passGraphics,
+             Access(Imported(mrhi_bufferQueryResolve), mrhi_accessQueryResolve, 0), true);
+    mrhiPassId later =
+        TimedPass(mrhi_passAsyncCompute,
+                  Access(Imported(mrhi_bufferStorage), mrhi_accessStorageWrite, 0), set, 4);
+    mrhiPassId untimed =
+        Pass(mrhi_passTransfer,
+             Access(Imported(mrhi_bufferCopyDestination), mrhi_accessCopyDestination, 0), true);
+    Submit();
+    CHECK(Waits(plain, kNone, kNone, kNone), "a graphics pass that resolves nothing follows none");
+    CHECK(Waits(resolve, kNone, compute, transfer), "the resolving pass follows the timed passes");
+    CHECK(Waits(later, resolve, kNone, kNone), "a later timed pass follows the resolving pass");
+    CHECK(Waits(untimed, kNone, kNone, kNone), "an untimed pass follows none");
+    Close(s_device);
+    s_adapter.features.timestampQuery = false;
+}
+
 // Passes of one class follow one another by order alone.
 static void TestOneClass(void)
 {
@@ -374,6 +455,7 @@ int main(void)
     TestPlanes();
     TestAliasing();
     TestNative();
+    TestTimestamps();
     TestOneClass();
     return s_failures == 0 ? 0 : 1;
 }
