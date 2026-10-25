@@ -5,6 +5,17 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.2.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.2.0...v0.2.1) (2026-10-25)
+
+### Fixed
+
+- D3D12: after a native pass, a dispatch or draw whose pipeline came
+  from the same shader container as one used before the native pass
+  ran with no root signature set. The debug layer reported it, and a
+  GPU could run the work with whatever arguments it found. Such passes
+  now set their root signature again
+  ([#78](https://github.com/Rawframe-Project/maul-rhi/pull/78)).
+
 ## [0.2.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.1.0...v0.2.0) (2026-10-24)
 
 The core now tells a driver which passes of other classes each pass
