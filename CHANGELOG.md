@@ -5,6 +5,18 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.3.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.2.1...v0.3.0) (2026-10-25)
+
+
+### Added
+
+* **d3d12:** run async compute and transfer passes on their own queues ([#79](https://github.com/Rawframe-Project/maul-rhi/issues/79)) ([43ac31c](https://github.com/Rawframe-Project/maul-rhi/commit/43ac31c6285df99bd608f08e7886d518a53856fc)), closes [#76](https://github.com/Rawframe-Project/maul-rhi/issues/76)
+
+
+### Fixed
+
+* **tools:** refuse only a continue block's step as a stale read ([#82](https://github.com/Rawframe-Project/maul-rhi/issues/82)) ([d4b2ee9](https://github.com/Rawframe-Project/maul-rhi/commit/d4b2ee945147280f5448138965b9570a15bd83d3)), closes [#80](https://github.com/Rawframe-Project/maul-rhi/issues/80)
+
 ## [0.2.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.2.0...v0.2.1) (2026-10-25)
 
 ### Fixed
