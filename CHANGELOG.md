@@ -34,8 +34,8 @@ may change the API, the ABI and every data format.
 ### Changed
 
 - The library is built with SSE math on 32-bit x86 and the compiler's
-  default trapping math, from the family's shared flags. No result
-  changes on 64-bit builds
+  default trapping math, from the family's shared flags. 64-bit builds'
+  tests pass unchanged
   ([#101](https://github.com/Rawframe-Project/maul-rhi/pull/101)).
 
 ## [0.4.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.4.0...v0.4.1) (2026-10-25)
