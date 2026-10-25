@@ -61,6 +61,7 @@ typedef struct Call
 
 typedef void(STDMETHODCALLTYPE* ExecuteFn)(ID3D12CommandQueue*, UINT, ID3D12CommandList* const*);
 typedef HRESULT(STDMETHODCALLTYPE* FenceFn)(ID3D12CommandQueue*, ID3D12Fence*, UINT64);
+typedef HRESULT(STDMETHODCALLTYPE* SetEventFn)(ID3D12Fence*, UINT64, HANDLE);
 typedef HRESULT(STDMETHODCALLTYPE* CreateListFn)(ID3D12Device*, UINT, D3D12_COMMAND_LIST_TYPE,
                                                  ID3D12CommandAllocator*, ID3D12PipelineState*,
                                                  REFIID, void**);
@@ -69,17 +70,28 @@ typedef HRESULT(STDMETHODCALLTYPE* CreateListFn)(ID3D12Device*, UINT, D3D12_COMM
 // since the hooks went in.
 static ID3D12CommandQueueVtbl* s_queueTable;
 static ID3D12DeviceVtbl* s_deviceTable;
+static ID3D12FenceVtbl* s_fenceTable;
 static ExecuteFn s_execute;
 static FenceFn s_wait;
 static FenceFn s_signal;
 static CreateListFn s_createList;
+static SetEventFn s_setEvent;
 static Call s_calls[CALLS];
 static uint32_t s_callCount;
-// While set, D3D12 makes no compute list; and the next signal of the
-// queue of kind s_failQueue fails.
+// While set, D3D12 makes no compute list; and a signal of the queue of
+// kind s_failQueue fails, after s_failAfter of them go in, its fence and
+// value kept in s_failedFence and s_failedValue.
 static bool s_failCompute;
 static bool s_failSignal;
 static D3D12_COMMAND_LIST_TYPE s_failQueue;
+static uint32_t s_failAfter;
+static ID3D12Fence* s_failedFence;
+static uint64_t s_failedValue;
+// While set, each kind of queue first waits for this fence to reach 1,
+// before its first call; the fence is signalled from the CPU when a
+// fence's event is first set, that is when the library first waits.
+static ID3D12Fence* s_hold;
+static bool s_held[4];
 // While set, the direct queue's next signal that does not fail goes in
 // and then this fence is signalled to 1, the fence and value it took kept in s_drained and
 // s_drainedValue, with a reference.
@@ -95,6 +107,11 @@ static void Note(ID3D12CommandQueue* queue, CallKind kind, ID3D12Fence* fence, u
     {
         s_calls[s_callCount++] =
             (Call){.kind = kind, .queue = desc.Type, .fence = fence, .value = value};
+    }
+    if (s_hold != nullptr && desc.Type < 4 && !s_held[desc.Type])
+    {
+        s_held[desc.Type] = true;
+        (void)s_wait(queue, s_hold, 1);
     }
 }
 
@@ -114,9 +131,15 @@ static HRESULT STDMETHODCALLTYPE Wait(ID3D12CommandQueue* queue, ID3D12Fence* fe
 static HRESULT STDMETHODCALLTYPE Signal(ID3D12CommandQueue* queue, ID3D12Fence* fence, UINT64 value)
 {
     Note(queue, CALL_SIGNAL, fence, value);
-    if (s_failSignal && s_calls[s_callCount - 1].queue == s_failQueue)
+    if (s_failSignal && s_calls[s_callCount - 1].queue == s_failQueue && s_failAfter > 0)
+    {
+        --s_failAfter;
+    }
+    else if (s_failSignal && s_calls[s_callCount - 1].queue == s_failQueue)
     {
         s_failSignal = false;
+        s_failedFence = fence;
+        s_failedValue = value;
         return E_FAIL;
     }
     HRESULT result = s_signal(queue, fence, value);
@@ -129,6 +152,16 @@ static HRESULT STDMETHODCALLTYPE Signal(ID3D12CommandQueue* queue, ID3D12Fence* 
         s_release = nullptr;
     }
     return result;
+}
+
+static HRESULT STDMETHODCALLTYPE SetEventOn(ID3D12Fence* fence, UINT64 value, HANDLE event)
+{
+    if (s_hold != nullptr)
+    {
+        (void)ID3D12Fence_Signal(s_hold, 1);
+        s_hold = nullptr;
+    }
+    return s_setEvent(fence, value, event);
 }
 
 static HRESULT STDMETHODCALLTYPE CreateList(ID3D12Device* device, UINT mask,
@@ -183,10 +216,34 @@ static void Hook(mrhiDevice* device)
     Patch(&s_deviceTable->CreateCommandList, &create, sizeof(create));
 }
 
+// Holds each queue's first call behind a fence until a fence's event is
+// first set, through the fence table, which Unhook puts back.
+static void Hold(ID3D12Fence* fence)
+{
+    if (fence == nullptr || s_fenceTable != nullptr)
+    {
+        return;
+    }
+    s_fenceTable = (ID3D12FenceVtbl*)fence->lpVtbl;
+    s_setEvent = s_fenceTable->SetEventOnCompletion;
+    const SetEventFn setEvent = SetEventOn;
+    Patch(&s_fenceTable->SetEventOnCompletion, &setEvent, sizeof(setEvent));
+    s_hold = fence;
+    memset(s_held, 0, sizeof(s_held));
+}
+
 // Puts the tables back as they were; every check ends with it, so a
 // failed one leaves the next its own D3D12.
 static void Unhook(void)
 {
+    if (s_fenceTable != nullptr)
+    {
+        Patch(&s_fenceTable->SetEventOnCompletion, &s_setEvent, sizeof(s_setEvent));
+        s_fenceTable = nullptr;
+    }
+    s_hold = nullptr;
+    s_failAfter = 0;
+    s_failedFence = nullptr;
     if (s_queueTable == nullptr)
     {
         return;
@@ -275,6 +332,19 @@ static bool Waits(D3D12_COMMAND_LIST_TYPE waiter, D3D12_COMMAND_LIST_TYPE signal
             {
                 return true;
             }
+        }
+    }
+    return false;
+}
+
+// Whether any queue waited for a fence to reach a value or past it.
+static bool WaitedFor(const ID3D12Fence* fence, uint64_t value)
+{
+    for (uint32_t i = 0; i < s_callCount; ++i)
+    {
+        if (s_calls[i].kind == CALL_WAIT && s_calls[i].fence == fence && s_calls[i].value >= value)
+        {
+            return true;
         }
     }
     return false;
@@ -598,26 +668,32 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, bool fail
     mrhiDestroyDevice(device);
 }
 
-// A dispatch in an async compute pass and a graphics pass after it,
-// whose compute queue's first signal fails: the direct queue still waits
-// for that signal. With back set, the graphics pass writes the buffer
-// and a second async compute pass follows it, so the compute queue
-// waits for the direct queue's signal in turn and the waits chain back
-// to the failed lane. The failed submit must pass every wait the frame
-// queued, or a queue's drain signal stays behind one and the submit
-// never returns.
-static void CheckLostLane(mrhiInstance* instance, mrhiAdapterId adapter, bool back)
+// Five passes alternating async compute and graphics on one buffer,
+// each following the one before, with the compute and direct queues held
+// until the failed submit first waits: compute signals c1, direct waits
+// for it and signals d1, compute waits for that and signals c2, and so
+// on. The compute queue's signal after failAfter of them fails. Nothing
+// may wait for the failed signal, since the lanes stop queuing there,
+// and the submit must return once the queues run.
+static void CheckLostLane(mrhiInstance* instance, mrhiAdapterId adapter, uint32_t failAfter)
 {
     mrhiDevice* device = OpenDevice(instance, adapter);
     if (device == nullptr)
     {
         return;
     }
+    void* native = nullptr;
+    void* queue = nullptr;
+    ID3D12Fence* hold = nullptr;
+    CHECK(mrhiGetD3d12Device(device, &native, &queue) == mrhi_success &&
+              SUCCEEDED(ID3D12Device_CreateFence((ID3D12Device*)native, 0, D3D12_FENCE_FLAG_NONE,
+                                                 &IID_ID3D12Fence, (void**)&hold)),
+          "a fence to hold the queues");
     mrhiShaderId shader = {0};
     mrhiComputePipelineId pipeline = NoopPipeline(device, &shader);
     mrhiBufferDef def = mrhiDefaultBufferDef();
     def.size = sizeof(kWords);
-    def.usage = mrhi_bufferStorage | mrhi_bufferCopySource | mrhi_bufferCopyDestination;
+    def.usage = mrhi_bufferStorage | mrhi_bufferCopyDestination;
     mrhiBufferId buffer = {0};
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId b = {0};
@@ -626,39 +702,59 @@ static void CheckLostLane(mrhiInstance* instance, mrhiAdapterId adapter, bool ba
               mrhiImportBuffer(device, buffer, &b) == mrhi_success,
           "a frame with a buffer");
     mrhiAccess storage = Whole(b, mrhi_accessStorageReadWrite);
-    mrhiAccess copy = Whole(b, back ? mrhi_accessCopyDestination : mrhi_accessCopySource);
-    mrhiPassId compute = AddPass(device, mrhi_passAsyncCompute, &storage);
-    mrhiPassId graphics = AddPass(device, mrhi_passGraphics, &copy);
-    mrhiPassId again = back ? AddPass(device, mrhi_passAsyncCompute, &storage) : (mrhiPassId){0};
-    mrhiRequestId request = {0};
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
-    Dispatch(device, compute, pipeline);
-    CHECK(mrhiBeginPass(device, graphics) == mrhi_success &&
-              (back ? mrhiWriteBuffer(device, graphics, b, 0, kWords, sizeof(kWords))
-                    : mrhiReadBuffer(device, graphics, b, 0, sizeof(kWords), &request)) ==
-                  mrhi_success &&
-              mrhiEndPass(device, graphics) == mrhi_success,
-          "the graphics pass");
-    if (back)
+    mrhiAccess write = Whole(b, mrhi_accessCopyDestination);
+    mrhiPassId passes[5];
+    for (int i = 0; i < 5; ++i)
     {
-        Dispatch(device, again, pipeline);
+        passes[i] = i % 2 == 0 ? AddPass(device, mrhi_passAsyncCompute, &storage)
+                               : AddPass(device, mrhi_passGraphics, &write);
+    }
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    for (int i = 0; i < 5; ++i)
+    {
+        if (i % 2 == 0)
+        {
+            Dispatch(device, passes[i], pipeline);
+        }
+        else
+        {
+            CHECK(mrhiBeginPass(device, passes[i]) == mrhi_success &&
+                      mrhiWriteBuffer(device, passes[i], b, 0, kWords, sizeof(kWords)) ==
+                          mrhi_success &&
+                      mrhiEndPass(device, passes[i]) == mrhi_success,
+                  "a write");
+        }
     }
     Hook(device);
+    Hold(hold);
     s_failSignal = true;
     s_failQueue = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+    s_failAfter = failAfter;
     mrhiRequestId token = {0};
     CHECK(mrhiSubmitFrame(device, &token) == mrhi_errorDeviceLost,
           "the compute queue's signal failed");
-    CHECK(FirstRunWaits(D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_LIST_TYPE_COMPUTE),
-          "the direct queue waited for the failed signal");
-    CHECK(!back || Waits(D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_LIST_TYPE_DIRECT),
-          "the compute queue waited for the direct queue");
+    CHECK(s_hold == nullptr, "the queues held until the submit waited");
+    CHECK(failAfter == 0 ||
+              (Waits(D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_LIST_TYPE_COMPUTE) &&
+               Waits(D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_LIST_TYPE_DIRECT)),
+          "the queues waited for each other before the failed signal");
+    CHECK(s_failedFence != nullptr && !WaitedFor(s_failedFence, s_failedValue),
+          "nothing waited for the failed signal");
+    if (s_hold != nullptr)
+    {
+        // A teardown with a queue still held does not return.
+        (void)ID3D12Fence_Signal(s_hold, 1);
+    }
     Unhook();
     CHECK(mrhiDestroyBuffer(device, buffer) == mrhi_success &&
               mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
               mrhiDestroyShader(device, shader) == mrhi_success,
           "the objects ended");
     mrhiDestroyDevice(device);
+    if (hold != nullptr)
+    {
+        ID3D12Fence_Release(hold);
+    }
 }
 
 int main(void)
@@ -687,8 +783,8 @@ int main(void)
         {
             CheckLostFrame(lost);
         }
-        CheckLostLane(instance, adapter, false);
-        CheckLostLane(instance, adapter, true);
+        CheckLostLane(instance, adapter, 0);
+        CheckLostLane(instance, adapter, 1);
     }
     else
     {
