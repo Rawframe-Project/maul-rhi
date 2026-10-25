@@ -46,6 +46,7 @@
 #include <emscripten/emscripten.h>
 #define MRHI_TEST_WEB
 // Waits a millisecond while the page runs its event loop (JSPI).
+// hygiene: the browser answers only while its event loop runs
 static void Sleep(void)
 {
     emscripten_sleep(1);
@@ -64,6 +65,7 @@ EM_JS(void, ResizeCanvas, (int width), {
 __attribute__((import_module("env"), import_name("mrhiTestSleep"))) void mrhiTestSleep(void);
 __attribute__((import_module("env"), import_name("mrhiTestResizeCanvas"))) void
 mrhiTestResizeCanvas(int width);
+// hygiene: the browser answers only while its event loop runs
 static void Sleep(void)
 {
     mrhiTestSleep();
@@ -141,6 +143,7 @@ static mrhiResult NextInstance(mrhiInstance* instance, mrhiInstanceNotification*
 #ifdef MRHI_TEST_WEB
     for (int slept = 0; status == mrhi_empty && slept < 10000; ++slept)
     {
+        // hygiene: the browser answers only while its event loop runs
         Sleep();
         status = mrhiNextInstanceNotification(instance, recordOut);
     }
@@ -156,6 +159,7 @@ static mrhiResult NextDevice(mrhiDevice* device, mrhiDeviceNotification* recordO
 #ifdef MRHI_TEST_WEB
     for (int slept = 0; status == mrhi_empty && slept < 10000; ++slept)
     {
+        // hygiene: the browser answers only while its event loop runs
         Sleep();
         status = mrhiNextDeviceNotification(device, recordOut);
     }
@@ -171,6 +175,7 @@ static mrhiResult WaitFor(mrhiDevice* device, mrhiRequestId token)
 #ifdef MRHI_TEST_WEB
     for (int slept = 0; status == mrhi_timeout && slept < 10000; ++slept)
     {
+        // hygiene: the browser answers only while its event loop runs
         Sleep();
         status = mrhiWaitFrame(device, token, 0);
     }

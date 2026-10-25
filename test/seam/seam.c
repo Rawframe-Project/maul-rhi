@@ -13,6 +13,13 @@
 
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
+#else
+// clock_gettime, for the watchdog's monotonic clock; Darwin keeps its
+// other interfaces with _DARWIN_C_SOURCE.
+#define _POSIX_C_SOURCE 200809L
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE
+#endif
 #endif
 
 #include "harness.h"
@@ -22,9 +29,14 @@
 #include "maul-window/native.h"
 #include "maul-window/window.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -36,6 +48,19 @@
 // check is bounded by time, not by frames.
 #define DEADLINE_SECONDS 10
 #define PRESENTS         3
+
+// Milliseconds on a monotonic clock, for the watchdog: the wall clock
+// may jump.
+static uint64_t Milliseconds(void)
+{
+#ifdef _WIN32
+    return GetTickCount64();
+#else
+    struct timespec now = {0};
+    (void)clock_gettime(CLOCK_MONOTONIC, &now);
+    return (uint64_t)now.tv_sec * 1000u + (uint64_t)now.tv_nsec / 1000000u;
+#endif
+}
 
 // One surface source of each kind, the one a bundle fills.
 typedef union SeamSource
@@ -154,7 +179,8 @@ typedef struct Program
     int submitted;
     int finished;
     int resizedFrom;
-    time_t deadline;
+    // The watchdog's deadline, in milliseconds of Milliseconds().
+    uint64_t deadline;
     // The window system the surface came from.
     const char* platform;
     // Why the check could not run: a window system or surface missing.
@@ -354,7 +380,7 @@ static mwinFrameResult Frame(mwinContext* context, void* user)
     Program* program = user;
     Collect(program, context);
     TakeAnswers(program);
-    if (time(nullptr) > program->deadline)
+    if (Milliseconds() > program->deadline)
     {
         SampleCheck(program->sample, false, "every phase in time");
         return mwin_frameStop;
@@ -423,7 +449,7 @@ int main(void)
     static Program program;
     program = (Program){.sample = &sample,
                         .resizedFrom = -1,
-                        .deadline = time(nullptr) + DEADLINE_SECONDS,
+                        .deadline = Milliseconds() + DEADLINE_SECONDS * UINT64_C(1000),
                         .status = -1};
     mwinAppDef def = mwinDefaultAppDef();
     def.init = Init;
@@ -440,5 +466,6 @@ int main(void)
     bool require = required != nullptr && required[0] != '\0';
     printf("%s: the window program did not start (%d)\n", require ? "FAIL" : "skip", (int)ran);
     SampleClose(&sample);
+    // hygiene: no window system here is a skip, and CI requires one
     return require ? 1 : SAMPLE_SKIPPED;
 }

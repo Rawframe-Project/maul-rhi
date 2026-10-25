@@ -152,6 +152,7 @@ int main(void)
         {
             mrhiDestroyInstance(sample.instance);
         }
+        // hygiene: no device is a skip, and CI requires one
         return require ? 1 : SAMPLE_SKIPPED;
     }
     mrhiShaderId shader = SampleShader(&sample, s_triangleContainer, sizeof(s_triangleContainer));
