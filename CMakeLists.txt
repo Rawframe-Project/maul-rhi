@@ -262,6 +262,9 @@ if(MAUL_RHI_BUILD_TESTS)
             target_include_directories(test_${test} SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
             target_link_libraries(test_${test} PRIVATE d3d12 dxgi)
         endforeach()
+        # A failed frame's drain that never returns is a hang: the suite
+        # runs in about a second on CI.
+        set_tests_properties(d3d12_queues PROPERTIES TIMEOUT 10)
         # GPU-based validation's false state errors (#7) reproduced without
         # library code: built with the tests so that it keeps compiling,
         # run by hand as docs/operations/debugging.md says.

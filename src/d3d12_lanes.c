@@ -514,28 +514,35 @@ mrhiResult mrhiD3d12RunLanes(const mrhiD3d12Lanes* lanes, const mrhiD3d12LaneSlo
                              ID3D12Fence* frameFence, [[maybe_unused]] const mrhiDriverFrame* frame)
 {
     MRHI_ASSERT(HoldsFollows(lanes, slot, frame));
-    bool queued = true;
+    // Stops at the first wait or signal that fails, on any lane: a batch
+    // waits only for earlier batches, so every wait queued then refers to
+    // a signal that went in, and what was queued finishes by itself.
     for (uint32_t b = 0; b < slot->batchCount; ++b)
     {
         const mrhiD3d12Batch* batch = &slot->batches[b];
         ID3D12CommandQueue* queue = lanes->queues[batch->lane];
         for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
         {
-            queued =
-                (batch->waits[lane] == 0 || SUCCEEDED(ID3D12CommandQueue_Wait(
-                                                queue, lanes->fences[lane], batch->waits[lane]))) &&
-                queued;
+            if (batch->waits[lane] != 0 &&
+                FAILED(ID3D12CommandQueue_Wait(queue, lanes->fences[lane], batch->waits[lane])))
+            {
+                return mrhi_errorDeviceLost;
+            }
         }
-        queued = (batch->frameWait == 0 ||
-                  SUCCEEDED(ID3D12CommandQueue_Wait(queue, frameFence, batch->frameWait))) &&
-                 queued;
+        if (batch->frameWait != 0 &&
+            FAILED(ID3D12CommandQueue_Wait(queue, frameFence, batch->frameWait)))
+        {
+            return mrhi_errorDeviceLost;
+        }
         for (uint32_t i = 0; i < batch->runCount; ++i)
         {
             ID3D12CommandQueue_ExecuteCommandLists(queue, 1, &slot->runs[batch->firstRun + i]);
         }
-        queued = (batch->signal == 0 || SUCCEEDED(ID3D12CommandQueue_Signal(
-                                            queue, lanes->fences[batch->lane], batch->signal))) &&
-                 queued;
+        if (batch->signal != 0 &&
+            FAILED(ID3D12CommandQueue_Signal(queue, lanes->fences[batch->lane], batch->signal)))
+        {
+            return mrhi_errorDeviceLost;
+        }
     }
-    return queued ? mrhi_success : mrhi_errorDeviceLost;
+    return mrhi_success;
 }
