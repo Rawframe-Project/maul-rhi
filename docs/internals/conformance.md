@@ -18,7 +18,7 @@ On Linux CI the suite runs on lavapipe under the Khronos validation layer with s
 
 ## Mustpass lists
 
-A driver built outside the tree is admitted on a run that passes every case of its SPI version's list, `conformance/mustpass/spi-<N>.txt`. The `mustpass` test compares the current version's list with the suite's `--list`, so a case added, renamed or dropped must be recorded, and a new SPI version needs a list of its own. Lists of earlier versions are never edited: they record what drivers of those versions were admitted on.
+A driver built outside the tree is admitted on a run that passes every case of the current SPI version's list, `conformance/mustpass/spi-<N>.txt`. The `mustpass` test compares that list with the suite's `--list`, so a case added, renamed or dropped must be recorded there. Raising the SPI version renames the list; only the current version has one.
 
 Without an outside driver, a Linux build hands the suite its own Vulkan driver through the outside-driver path (`test_conformance_external`), so that path is exercised in CI. `test/external/` builds a minimal driver against an install of the library alone.
 

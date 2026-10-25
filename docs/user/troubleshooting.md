@@ -8,7 +8,7 @@ Every `mrhi_errorInvalid` counts one misuse on its instance or device (`mrhiGetI
 
 To learn which check refused a call, give the instance's or the device's limits a `diagnostics` capacity (0 by default, keeping none). Each refusal, `mrhi_errorInvalid` or `mrhi_errorFormat`, is then also a record in a bounded queue, taken with `mrhiNextInstanceDiagnostic` or `mrhiNextDeviceDiagnostic`. A record holds an `mrhiDiagnosticCode`, which names the check, and a count: a refusal by the same check as the newest record adds to its count. A full queue keeps its first records and drops new ones; the misuse counts stay exact.
 
-`mrhiDiagnosticText` gives each code's English sentence. Compare codes, not texts: codes are fixed once released, and texts may be reworded.
+`mrhiDiagnosticText` gives each code's English sentence. Compare codes, not texts: texts may be reworded.
 
 Results other than `mrhi_errorInvalid` say what went wrong by themselves; [getting started](getting-started.md#the-rules-every-call-follows) lists them, and each function's documentation says when it returns each.
 
