@@ -2,8 +2,8 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Pipeline caches on the test driver: written in their envelope, taken
-// by a later device of the same library version, driver and adapter,
-// and otherwise ignored and reported, never failing the device.
+// by a later device of the same ABI version, driver and adapter, and
+// otherwise ignored and reported, never failing the device.
 
 #include "sha256.h"
 #include "test_container.h"
@@ -67,6 +67,12 @@ static uint64_t CachedCount(void)
         count = count << 8 | s_cache[64 + 8 + i];
     }
     return count;
+}
+
+// Reads a little-endian 32-bit field.
+static uint32_t Get32(const uint8_t* at)
+{
+    return (uint32_t)at[0] | (uint32_t)at[1] << 8 | (uint32_t)at[2] << 16 | (uint32_t)at[3] << 24;
 }
 
 // Sets a 32-bit field of s_cache and seals it again.
@@ -167,15 +173,12 @@ static void TestStale(void)
     mrhiDevice* device = OpenCached(nullptr, 0);
     Export(device);
     Close(device);
-    size_t fields[] = {4, 48, 52, 56, 60};
+    size_t fields[] = {52, 56, 60};
     for (size_t i = 0; i < sizeof(fields) / sizeof(fields[0]); ++i)
     {
-        uint32_t value = (uint32_t)s_cache[fields[i]] | (uint32_t)s_cache[fields[i] + 1] << 8 |
-                         (uint32_t)s_cache[fields[i] + 2] << 16 |
-                         (uint32_t)s_cache[fields[i] + 3] << 24;
+        uint32_t value = Get32(s_cache + fields[i]);
         Forge(fields[i], value + 1);
-        CHECK(Outcome(s_cacheSize) == mrhi_errorStale,
-              "another version, library, driver, vendor or device");
+        CHECK(Outcome(s_cacheSize) == mrhi_errorStale, "another driver, vendor or device");
         Forge(fields[i], value);
     }
     CHECK(Outcome(s_cacheSize) == mrhi_success, "restored");
@@ -189,6 +192,26 @@ static void TestStale(void)
     s_adapter.info.vendorId = 0x10DE;
     CHECK(Outcome(s_cacheSize) == mrhi_errorStale, "another adapter's");
     ResetAdapter();
+}
+
+static void TestVersion(void)
+{
+    mrhiDevice* device = OpenCached(nullptr, 0);
+    Export(device);
+    Close(device);
+    CHECK(Get32(s_cache + 4) == 2 && Get32(s_cache + 48) == MRHI_ABI_VERSION,
+          "the envelope's version and the ABI version");
+    // Another ABI version: the next patch, which is another ABI before
+    // 1.0, then another minor.
+    Forge(48, MRHI_ABI_VERSION + 1);
+    CHECK(Outcome(s_cacheSize) == mrhi_errorVersion, "another ABI version");
+    Forge(48, MRHI_ABI_VERSION + (1u << 8));
+    CHECK(Outcome(s_cacheSize) == mrhi_errorVersion, "another minor version");
+    Forge(48, MRHI_ABI_VERSION);
+    Forge(4, 1);
+    CHECK(Outcome(s_cacheSize) == mrhi_errorVersion, "another envelope version");
+    Forge(4, 2);
+    CHECK(Outcome(s_cacheSize) == mrhi_success, "restored");
 }
 
 static void TestMisuse(void)
@@ -225,6 +248,7 @@ int main(void)
     TestRoundTrip();
     TestDamaged();
     TestStale();
+    TestVersion();
     TestIdentity();
     TestMisuse();
     return s_failures == 0 ? 0 : 1;

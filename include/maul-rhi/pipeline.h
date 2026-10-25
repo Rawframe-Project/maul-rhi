@@ -618,8 +618,9 @@ extern "C"
     ///
     /// @param device  The device.
     /// @return `mrhi_success` for a cache the driver took; `mrhi_empty` when
-    /// the def gave none; `mrhi_errorStale` for one from another library
-    /// version, driver or adapter, or one the driver declined;
+    /// the def gave none; `mrhi_errorVersion` for one of another ABI version
+    /// (MRHI_ABI_VERSION) or envelope version; `mrhi_errorStale` for one from
+    /// another driver or adapter, or one the driver declined;
     /// `mrhi_errorInvalid` for a damaged one, or a NULL device.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.

@@ -119,7 +119,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         }
     }
     mrhiResult status = mrhiImportPipelineCache(s_device, bytes, bytesSize);
-    Expect(status == mrhi_success || status == mrhi_errorInvalid || status == mrhi_errorStale);
+    Expect(status == mrhi_success || status == mrhi_errorInvalid || status == mrhi_errorStale ||
+           status == mrhi_errorVersion);
     if (status == mrhi_success)
     {
         // Taken: the envelope held, and the payload was the test
