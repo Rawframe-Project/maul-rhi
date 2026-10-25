@@ -260,6 +260,26 @@ static mrhiPassId AddPass(mrhiDevice* device, mrhiPassClass passClass, const mrh
     return pass;
 }
 
+// Whether a kind of queue waited at any point for a value another kind
+// of queue signalled before the wait.
+static bool Waits(D3D12_COMMAND_LIST_TYPE waiter, D3D12_COMMAND_LIST_TYPE signaller)
+{
+    for (uint32_t i = 0; i < s_callCount; ++i)
+    {
+        const Call* call = &s_calls[i];
+        for (uint32_t j = 0; j < i && call->kind == CALL_WAIT && call->queue == waiter; ++j)
+        {
+            const Call* signal = &s_calls[j];
+            if (signal->kind == CALL_SIGNAL && signal->queue == signaller &&
+                signal->fence == call->fence && signal->value <= call->value)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 // Records a dispatch of the noop kernel in a pass.
 static void Dispatch(mrhiDevice* device, mrhiPassId pass, mrhiComputePipelineId pipeline)
 {
@@ -578,13 +598,15 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, bool fail
     mrhiDestroyDevice(device);
 }
 
-// A dispatch in an async compute pass and a readback after it in a
-// graphics pass, whose compute queue's signal fails: the direct queue
-// still waits for that signal. The failed submit must signal every queue
-// before waiting for any, or the direct queue's drain stays behind a
-// value that only the compute queue's drain reaches, and the submit
+// A dispatch in an async compute pass and a graphics pass after it,
+// whose compute queue's first signal fails: the direct queue still waits
+// for that signal. With back set, the graphics pass writes the buffer
+// and a second async compute pass follows it, so the compute queue
+// waits for the direct queue's signal in turn and the waits chain back
+// to the failed lane. The failed submit must pass every wait the frame
+// queued, or a queue's drain signal stays behind one and the submit
 // never returns.
-static void CheckLostLane(mrhiInstance* instance, mrhiAdapterId adapter)
+static void CheckLostLane(mrhiInstance* instance, mrhiAdapterId adapter, bool back)
 {
     mrhiDevice* device = OpenDevice(instance, adapter);
     if (device == nullptr)
@@ -595,7 +617,7 @@ static void CheckLostLane(mrhiInstance* instance, mrhiAdapterId adapter)
     mrhiComputePipelineId pipeline = NoopPipeline(device, &shader);
     mrhiBufferDef def = mrhiDefaultBufferDef();
     def.size = sizeof(kWords);
-    def.usage = mrhi_bufferStorage | mrhi_bufferCopySource;
+    def.usage = mrhi_bufferStorage | mrhi_bufferCopySource | mrhi_bufferCopyDestination;
     mrhiBufferId buffer = {0};
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId b = {0};
@@ -604,16 +626,23 @@ static void CheckLostLane(mrhiInstance* instance, mrhiAdapterId adapter)
               mrhiImportBuffer(device, buffer, &b) == mrhi_success,
           "a frame with a buffer");
     mrhiAccess storage = Whole(b, mrhi_accessStorageReadWrite);
-    mrhiAccess read = Whole(b, mrhi_accessCopySource);
+    mrhiAccess copy = Whole(b, back ? mrhi_accessCopyDestination : mrhi_accessCopySource);
     mrhiPassId compute = AddPass(device, mrhi_passAsyncCompute, &storage);
-    mrhiPassId back = AddPass(device, mrhi_passGraphics, &read);
+    mrhiPassId graphics = AddPass(device, mrhi_passGraphics, &copy);
+    mrhiPassId again = back ? AddPass(device, mrhi_passAsyncCompute, &storage) : (mrhiPassId){0};
     mrhiRequestId request = {0};
     CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
     Dispatch(device, compute, pipeline);
-    CHECK(mrhiBeginPass(device, back) == mrhi_success &&
-              mrhiReadBuffer(device, back, b, 0, sizeof(kWords), &request) == mrhi_success &&
-              mrhiEndPass(device, back) == mrhi_success,
-          "read back");
+    CHECK(mrhiBeginPass(device, graphics) == mrhi_success &&
+              (back ? mrhiWriteBuffer(device, graphics, b, 0, kWords, sizeof(kWords))
+                    : mrhiReadBuffer(device, graphics, b, 0, sizeof(kWords), &request)) ==
+                  mrhi_success &&
+              mrhiEndPass(device, graphics) == mrhi_success,
+          "the graphics pass");
+    if (back)
+    {
+        Dispatch(device, again, pipeline);
+    }
     Hook(device);
     s_failSignal = true;
     s_failQueue = D3D12_COMMAND_LIST_TYPE_COMPUTE;
@@ -622,6 +651,8 @@ static void CheckLostLane(mrhiInstance* instance, mrhiAdapterId adapter)
           "the compute queue's signal failed");
     CHECK(FirstRunWaits(D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_LIST_TYPE_COMPUTE),
           "the direct queue waited for the failed signal");
+    CHECK(!back || Waits(D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_LIST_TYPE_DIRECT),
+          "the compute queue waited for the direct queue");
     Unhook();
     CHECK(mrhiDestroyBuffer(device, buffer) == mrhi_success &&
               mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
@@ -656,7 +687,8 @@ int main(void)
         {
             CheckLostFrame(lost);
         }
-        CheckLostLane(instance, adapter);
+        CheckLostLane(instance, adapter, false);
+        CheckLostLane(instance, adapter, true);
     }
     else
     {
