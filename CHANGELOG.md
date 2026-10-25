@@ -5,6 +5,39 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.5.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.4.1...v0.5.0) (2026-10-25)
+
+### Added
+
+- Passes of every class take timestamps. An async compute or transfer
+  pass may name a timestamp set and the queries written at its start
+  and end, as a graphics pass could. A pass that declares a query
+  resolve access runs after every timed pass before it, and a timed
+  pass after every such pass, whatever their classes and queues, so a
+  resolve reads the times of the passes before it in the frame's order
+  and zero for the others. A pass's end is never before its start, but
+  two passes' times are not ordered against each other. WebGPU writes a
+  transfer pass's times in empty compute passes. Drivers built outside
+  the tree meet timestamps on passes of every class and the new
+  `waitFor` edges; the SPI headers do not change, and the new
+  conformance case is in `spi-7.txt`
+  ([#92](https://github.com/Rawframe-Project/maul-rhi/pull/92)).
+- D3D12 runs a timed pass on the compute queue when that queue's
+  timestamp frequency matches the direct queue's. A timed async compute
+  pass stays on the compute queue wherever an untimed one would run,
+  and a timed transfer pass runs there too: it measures the compute
+  engine's time and loses its overlap with the copy queue, for that pass
+  only. Where the frequencies differ, a timed pass runs on the direct
+  queue. The copy queue takes no timed pass
+  ([#96](https://github.com/Rawframe-Project/maul-rhi/pull/96)).
+
+### Changed
+
+- The library is built with SSE math on 32-bit x86 and the compiler's
+  default trapping math, from the family's shared flags. 64-bit builds'
+  tests pass unchanged
+  ([#101](https://github.com/Rawframe-Project/maul-rhi/pull/101)).
+
 ## [0.4.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.4.0...v0.4.1) (2026-10-25)
 
 ### Fixed
