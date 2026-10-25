@@ -79,8 +79,8 @@ static uint32_t s_callCount;
 // signal fails.
 static bool s_failCompute;
 static bool s_failSignal;
-// While set, the direct queue's next signal goes in and then this fence
-// is signalled to 1, the fence and value it took kept in s_drained and
+// While set, the direct queue's next signal that does not fail goes in
+// and then this fence is signalled to 1, the fence and value it took kept in s_drained and
 // s_drainedValue, with a reference.
 static ID3D12Fence* s_release;
 static ID3D12Fence* s_drained;
@@ -440,10 +440,10 @@ static void CheckFailedList(mrhiDevice* device, mrhiBufferId buffer, mrhiCompute
 // A frame filling a transient and reading it back, queued behind a wait
 // for a fence of the suite's, whose last signal fails: the device is
 // lost. Its work runs once the fence is signalled, so the frame's lists,
-// allocators and transient must outlive it: the device's teardown must
-// signal the direct queue and wait for that signal before releasing
-// them. The fence is signalled only from inside that signal, so a
-// teardown that waits for nothing returns with the frame still held.
+// allocators and transient must outlive it: the failed submit must
+// signal the direct queue again and wait for that signal before
+// releasing them. The fence is signalled only from inside that signal,
+// so a submit that waits for nothing returns with the frame still held.
 static void CheckLostFrame(mrhiDevice* device)
 {
     void* native = nullptr;
@@ -476,13 +476,13 @@ static void CheckLostFrame(mrhiDevice* device)
           "recorded");
     Hook(device);
     s_failSignal = true;
+    s_release = fence;
     mrhiRequestId token = {0};
     CHECK(mrhiSubmitFrame(device, &token) == mrhi_errorDeviceLost, "the frame's signal failed");
-    s_release = fence;
-    mrhiDestroyDevice(device);
-    Unhook();
     CHECK(s_drained != nullptr && ID3D12Fence_GetCompletedValue(s_drained) >= s_drainedValue,
-          "the teardown waited for the queued frame");
+          "the failed submit waited for its queued work");
+    Unhook();
+    mrhiDestroyDevice(device);
     if (s_drained != nullptr)
     {
         ID3D12Fence_Release(s_drained);
