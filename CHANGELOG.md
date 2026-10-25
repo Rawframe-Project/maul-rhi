@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.6.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.5.0...v0.6.0) (2026-10-25)
+
+
+### Added
+
+* **device:** wait for a device's next notification ([#102](https://github.com/Rawframe-Project/maul-rhi/issues/102)) ([059ca2f](https://github.com/Rawframe-Project/maul-rhi/commit/059ca2f04771e1f3605ba1e515cc8822ffb0a332)), closes [#98](https://github.com/Rawframe-Project/maul-rhi/issues/98)
+
 ## [0.5.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.4.1...v0.5.0) (2026-10-25)
 
 ### Added
