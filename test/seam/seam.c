@@ -354,6 +354,7 @@ static mwinFrameResult Frame(mwinContext* context, void* user)
     Program* program = user;
     Collect(program, context);
     TakeAnswers(program);
+    // hygiene: a watchdog deadline, which no result depends on
     if (time(nullptr) > program->deadline)
     {
         SampleCheck(program->sample, false, "every phase in time");
@@ -423,6 +424,7 @@ int main(void)
     static Program program;
     program = (Program){.sample = &sample,
                         .resizedFrom = -1,
+                        // hygiene: a watchdog deadline, which no result depends on
                         .deadline = time(nullptr) + DEADLINE_SECONDS,
                         .status = -1};
     mwinAppDef def = mwinDefaultAppDef();
@@ -440,5 +442,6 @@ int main(void)
     bool require = required != nullptr && required[0] != '\0';
     printf("%s: the window program did not start (%d)\n", require ? "FAIL" : "skip", (int)ran);
     SampleClose(&sample);
+    // hygiene: no window system here is a skip, and CI requires one
     return require ? 1 : SAMPLE_SKIPPED;
 }

@@ -369,6 +369,7 @@ if(MAUL_RHI_BUILD_TESTS)
         add_test(NAME conformance_worker
                  COMMAND node ${PROJECT_SOURCE_DIR}/test/web_runner.cjs --worker
                          $<TARGET_FILE:test_conformance>)
+        # hygiene: no adapter is exit 77, and CI fails any skipped test
         set_tests_properties(conformance conformance_worker PROPERTIES SKIP_RETURN_CODE 77)
     else()
         maul_add_test(conformance)
@@ -546,6 +547,7 @@ if(MAUL_RHI_BUILD_TESTS AND NOT (EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "WASI"
     target_include_directories(test_guide PRIVATE ${PROJECT_SOURCE_DIR}/samples)
     maul_apply_flags(test_guide)
     add_test(NAME guide COMMAND test_guide)
+    # hygiene: no adapter is exit 77, and CI fails any skipped test
     set_tests_properties(guide PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "${maul_rhi_test_env}"
                          FAIL_REGULAR_EXPRESSION "Validation Error" LABELS "guide;integration")
 endif()

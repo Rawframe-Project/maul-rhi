@@ -65,6 +65,7 @@ preset() {
     shift
     step "preset $name"
     cmake --preset "$name" >"$out/$name.log"
+    python3 tools/check_test_hygiene.py --ctest "out/$name"
     cmake --build --preset "$name" -j "$jobs" >>"$out/$name.log"
     # -noreset: an X server that resets when its last client leaves
     # refuses the clients that connect meanwhile.
@@ -72,12 +73,14 @@ preset() {
 }
 
 source_checks() {
-    step "source, module, length, documentation and snippet rules"
+    step "source, module, length, documentation, snippet and test hygiene rules"
     python3 tools/check_source.py
     python3 tools/check_modules.py
     python3 tools/check_lengths.py
     python3 tools/check_docs.py
     python3 tools/check_guide.py
+    python3 tools/check_test_hygiene.py --self-test
+    python3 tools/check_test_hygiene.py
     python3 tools/gen_contract.py --check
     # The committed shader headers against their inputs and pins, and
     # each check proven on a copy of the tree.
@@ -166,6 +169,7 @@ done
 
 step "preset linux-seam-wayland, on weston's headless compositor"
 cmake --preset linux-seam-wayland >"$out/linux-seam-wayland.log"
+python3 tools/check_test_hygiene.py --ctest out/linux-seam-wayland
 cmake --build --preset linux-seam-wayland -j "$jobs" >>"$out/linux-seam-wayland.log"
 runtime=$(mktemp -d)
 XDG_RUNTIME_DIR=$runtime weston --backend=headless --socket=wayland-check --idle-time=0 \

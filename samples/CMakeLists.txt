@@ -51,6 +51,7 @@ function(maul_rhi_add_sample name)
     else()
         add_test(NAME ${target} COMMAND ${target})
     endif()
+    # hygiene: no adapter is exit 77, and CI fails any skipped test
     set_tests_properties(${target} PROPERTIES SKIP_RETURN_CODE 77
                          ENVIRONMENT "${maul_rhi_test_env}"
                          FAIL_REGULAR_EXPRESSION "Validation Error" LABELS "sample;integration")

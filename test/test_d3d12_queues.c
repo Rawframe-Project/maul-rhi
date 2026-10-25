@@ -499,7 +499,7 @@ static void CheckClassOrder(mrhiDevice* device, mrhiBufferId buffer, mrhiTexture
 // the same frame then runs.
 static void CheckFailedList(mrhiDevice* device, mrhiBufferId buffer, mrhiComputePipelineId pipeline)
 {
-    for (int attempt = 0; attempt < 2; ++attempt)
+    for (int run = 0; run < 2; ++run)
     {
         mrhiFrameDef frame = mrhiDefaultFrameDef();
         mrhiResourceId b = {0};
@@ -511,7 +511,7 @@ static void CheckFailedList(mrhiDevice* device, mrhiBufferId buffer, mrhiCompute
         CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
         Dispatch(device, compute, pipeline);
         Hook(device);
-        if (attempt == 0)
+        if (run == 0)
         {
             s_failCompute = true;
             mrhiRequestId token = {0};

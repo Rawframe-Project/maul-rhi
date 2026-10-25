@@ -8,7 +8,7 @@ What to run before pushing, what each tier covers, and what the test presets exp
 
 | Tier | Runs | Budget |
 |---|---|---|
-| `changed` | The source, module, length, documentation and snippet rules; the contract's generated files; the organization's documentation check; clang-format on the changed files; the `linux-clang-20-asan` preset's tests without the `integration` label. A change to documentation alone builds nothing. | under 2 minutes |
+| `changed` | The source, module, length, documentation, snippet and test hygiene rules; the contract's generated files; the organization's documentation check; clang-format on the changed files; the `linux-clang-20-asan` preset's tests without the `integration` label. A change to documentation alone builds nothing. | under 2 minutes |
 | `pr` | Every rule; clang-format on every file; clang-tidy on the sources it can see on Linux; the `linux-clang-20-asan` and `linux-gcc-14` presets, integration tests included, on lavapipe under Xvfb; the seam check on X11; 10 seconds of fuzzing per target. | under 10 minutes |
 | `full` | Also ThreadSanitizer, the shared library, labels compiled out, the Vulkan driver's lanes split (`linux-lanes`), the seam check on Wayland under weston's headless compositor, and 60 seconds of fuzzing per target. | under 20 minutes |
 
@@ -18,7 +18,7 @@ Run `changed` before every push. Run `pr` and `full` through the workspace's hea
 /home/rawframe-project/tools/heavy.sh tools/check.sh full
 ```
 
-The macOS, Windows, Android, iOS and web cells run in CI only. The organization's documentation check runs when the `.github` repository is checked out beside the workspace (`ORG_DEFAULTS` overrides where).
+Every preset the script configures is followed by `check_test_hygiene.py --ctest`, which fails a test without a label and a build that registers none; the tree scan rejects a sleep, the wall clock, a retry or a skip in the tests unless it is marked `// hygiene: <reason>`. The macOS, Windows, Android, iOS and web cells run in CI only. The organization's documentation check runs when the `.github` repository is checked out beside the workspace (`ORG_DEFAULTS` overrides where).
 
 ## Continuous integration
 
@@ -27,8 +27,8 @@ The macOS, Windows, Android, iOS and web cells run in CI only. The organization'
 | Job | What it runs |
 |---|---|
 | `changes` | Whether anything beyond documentation changed; the builds skip when not. |
-| `docs`, `zizmor` | The organization's documentation check (with `khronos/` and `directx/` left out) and the workflow audit. |
-| `checks` | In the CI image: clang-format on every file, the rules below, the contract's files, the documentation site, and clang-tidy on the native sources and, against `wasm32-wasi`, the web sources. |
+| `docs`, `zizmor` | The organization's documentation check, from the `docs-check` action at the pinned commit (with `khronos/` and `directx/` left out), and the workflow audit. |
+| `checks` | In the CI image: clang-format on every file, the rules below, the test hygiene check and every test's label, the contract's files, the documentation site, and clang-tidy on the native sources and, against `wasm32-wasi`, the web sources. |
 | `build` | One cell per preset through the organization's `cpp.yml`, with a setup script run before configuring: the Linux presets in the CI image with Xvfb, or weston for `linux-seam-wayland` (`tools/ci_display.sh`); `web-wasi` in the image with Puppeteer's headless Chrome (`tools/ci_browser.sh`); `macos-clang` on macOS 15 and `macos-clang-debug` on macOS 26 after the Metal texture usage check (`tools/ci_metal.sh`); `windows-d3d12` with the Agility SDK, its download checked by digest (`tools/ci_agility.sh`), and `windows-vulkan`. `linux-lanes` builds the Vulkan driver with a lane per pass class (`MAUL_RHI_VULKAN_SPLIT_LANES`, [vulkan.md](../internals/vulkan.md#frames)). On a pull request `linux-clang-20-asan` runs each test up to three times, so a flaky one fails before it merges. |
 | `msvc-headers` | The public headers alone under MSVC's `cl`, as C17 and C++17 with `/W4 /WX`. |
 | `web-emscripten` | The `web-emscripten` preset on the runner with the emsdk action and a pinned Emscripten, and the library's size at `-Oz` against `tools/wasm_size.py`'s budget. |
