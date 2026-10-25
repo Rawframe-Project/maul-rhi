@@ -433,18 +433,40 @@ void mrhiD3d12RetireLater(mrhiD3d12Frames* frames, mrhiD3d12Kind kind, uint64_t 
     ++frames->retireCount;
 }
 
-// Waits, without end, until the fence reaches a value or the device is
+// Waits, without end, until a fence reaches a value or the device is
 // removed.
-static void WaitFor(mrhiD3d12Frames* frames, uint64_t serial)
+static void WaitOn(mrhiD3d12Frames* frames, ID3D12Fence* fence, uint64_t value)
 {
-    if (ID3D12Fence_GetCompletedValue(frames->fence) >= serial)
+    if (ID3D12Fence_GetCompletedValue(fence) >= value)
     {
         return;
     }
     (void)ResetEvent(frames->event);
-    if (SUCCEEDED(ID3D12Fence_SetEventOnCompletion(frames->fence, serial, frames->event)))
+    if (SUCCEEDED(ID3D12Fence_SetEventOnCompletion(fence, value, frames->event)))
     {
         (void)WaitForSingleObject(frames->event, INFINITE);
+    }
+}
+
+static void WaitFor(mrhiD3d12Frames* frames, uint64_t serial)
+{
+    WaitOn(frames, frames->fence, serial);
+}
+
+// After a frame failed with some of its work queued, which no serial
+// counts: waits for each queue to finish what it holds, so that the
+// slot's lists, allocators and transients are not released under it. A
+// queue that takes no signal, as on a removed device, is not waited for.
+static void Drain(mrhiD3d12Frames* frames)
+{
+    mrhiD3d12Lanes* lanes = &frames->lanes;
+    for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
+    {
+        uint64_t value = ++lanes->values[lane];
+        if (SUCCEEDED(ID3D12CommandQueue_Signal(lanes->queues[lane], lanes->fences[lane], value)))
+        {
+            WaitOn(frames, lanes->fences[lane], value);
+        }
     }
 }
 
@@ -782,6 +804,8 @@ mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame
         memcpy(slot->stagingBytes, frame->staging, frame->stagingBytes);
     }
     mrhiResult status = Record(frames, slot, frame);
+    // A frame recorded whole may be queued in part when it fails after.
+    bool queued = status == mrhi_success;
     if (status == mrhi_success)
     {
         status = mrhiD3d12RunLanes(&frames->lanes, &slot->lanes, frames->fence, frame);
@@ -797,6 +821,10 @@ mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame
     }
     if (status != mrhi_success)
     {
+        if (queued)
+        {
+            Drain(frames);
+        }
         DropTransients(slot);
         slot->readbackCount = 0;
         if (status == mrhi_errorDeviceLost)
