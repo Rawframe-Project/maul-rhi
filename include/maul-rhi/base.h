@@ -29,7 +29,7 @@ extern "C"
 #define MRHI_VERSION_MINOR 4
 // x-release-please-end
 // x-release-please-start-patch
-#define MRHI_VERSION_PATCH 0
+#define MRHI_VERSION_PATCH 1
 // x-release-please-end
 
 // The binary interface the headers describe, which the root def carries: the
@@ -504,9 +504,8 @@ extern "C"
         // targets.
         mrhi_diagnosticPassViews = 105,
         // A pass def's query sets do not fit: an occlusion set that is not one
-        // or on a pass without targets, or timestamps that are not a graphics
-        // pass's two different queries, in range and not yet written this
-        // frame.
+        // or on a pass without targets, or timestamps that are not two
+        // different queries, in range and not yet written this frame.
         mrhi_diagnosticPassQueries = 106,
         // A pass def's accesses or targets do not fit: a kind the resource's
         // usage lacks, a range past it, a write to a sealed resource, targets

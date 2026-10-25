@@ -32,7 +32,8 @@ Declaration order is execution order within a class. Across classes, the compile
 - the passes whose uses of a part race its own, either writing or changing a texture's state;
 - for a part it reads without a barrier, the pass whose barrier or write set the part's state;
 - every class's last pass over memory that a placed resource takes from earlier ones;
-- every class's passes before a native pass, and the native pass for every class's passes after it, since the program's commands may reach past what it declares.
+- every class's passes before a native pass, and the native pass for every class's passes after it, since the program's commands may reach past what it declares;
+- every class's timed passes before a pass that declares a query resolve access, and every such pass for a timed pass after it, since the resolve itself is recorded after the compile ([recording.md](recording.md#queries)).
 
 Planning tracks this per part beside the state, so parts that never meet order nothing. The class limits what a pass may do (a transfer pass only copies; vertex, index and query resolve accesses are graphics only), so a driver can move async compute and transfer passes onto queues of their own without a change to the API, ordering each pass after the passes it must follow. The D3D12 driver runs async compute and transfer passes on a compute and a copy queue where those queues can record them ([d3d12.md](d3d12.md#queues)); the other drivers run every pass on one queue in declaration order, which keeps those orders as well.
 

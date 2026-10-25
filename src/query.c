@@ -184,9 +184,8 @@ mrhiResult mrhiCheckPassQueries(const mrhiDevice* device, const mrhiPassDef* def
     }
     const mrhiQuerySetSlot* slot = &device->querySetSlots[set.index1 - 1];
     // Passes are added on one thread, so a load and a later store suffice.
-    bool valid = slot->type == mrhi_queryTimestamp && def->passClass == mrhi_passGraphics &&
-                 begin != end && IsTimestampFree(device, slot, begin) &&
-                 IsTimestampFree(device, slot, end);
+    bool valid = slot->type == mrhi_queryTimestamp && begin != end &&
+                 IsTimestampFree(device, slot, begin) && IsTimestampFree(device, slot, end);
     return valid ? mrhi_success : mrhi_errorInvalid;
 }
 
