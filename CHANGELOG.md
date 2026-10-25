@@ -24,11 +24,18 @@ may change the API, the ABI and every data format.
   ([#92](https://github.com/Rawframe-Project/maul-rhi/pull/92)).
 - D3D12 runs a timed pass on the compute queue when that queue's
   timestamp frequency matches the direct queue's. A timed async compute
-  pass keeps its queue, and a timed transfer pass runs there too: it
-  measures the compute engine's time and loses its overlap with the
+  pass stays on the compute queue wherever an untimed one would run,
+  and a timed transfer pass runs there too: it measures the compute engine's time and loses its overlap with the
   copy queue, for that pass only. Where the frequencies differ, a timed
   pass runs on the direct queue. The copy queue takes no timed pass
   ([#96](https://github.com/Rawframe-Project/maul-rhi/pull/96)).
+
+### Changed
+
+- The library is built with SSE math on 32-bit x86 and the compiler's
+  default trapping math, from the family's shared flags. No result
+  changes on 64-bit builds
+  ([#101](https://github.com/Rawframe-Project/maul-rhi/pull/101)).
 
 ## [0.4.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.4.0...v0.4.1) (2026-10-25)
 
