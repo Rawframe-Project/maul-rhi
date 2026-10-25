@@ -22,9 +22,12 @@ void Good(void)
     int again = 1;
     int entries = 2;
     int against = 3;
+    // A name of the library's own API is not a test's retry.
+    int due = fixRetryDue(1);
     (void)text;
     (void)used;
     (void)again;
     (void)entries;
     (void)against;
+    (void)due;
 }

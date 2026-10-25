@@ -27,6 +27,8 @@ int Bad(void)
     }
     int maxTries = 3;     // expect: retry
     bool tryAgain = true; // expect: retry
+    retries = 0;          // expect: retry
+    int retryDue = 0;     // expect: retry
     // A marker must be in a comment and give a reason of three words.
     const char* text = "// hygiene: a marker in a string does not count";
     usleep(1); // expect: sleep

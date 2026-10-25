@@ -14,10 +14,11 @@ void Bad()
     const char* text = R"(a raw string
 over two lines)";
     std::this_thread::sleep_until(std::chrono::steady_clock::now()); // expect: sleep
-    auto now = std::chrono::system_clock::now(); // expect: wall-clock
-    auto utc = std::chrono::utc_clock::now();    // expect: wall-clock
-    auto high = std::chrono::high_resolution_clock::now(); // expect: wall-clock
-    int big = 1'000; sleep(1);                   // expect: sleep
+    auto now = std::chrono::system_clock::now();                     // expect: wall-clock
+    auto utc = std::chrono::utc_clock::now();                        // expect: wall-clock
+    auto high = std::chrono::high_resolution_clock::now();           // expect: wall-clock
+    // A digit separator before a sleep on the same line must not hide it.
+    int big = 1'000 + sleep(1); // expect: sleep
     (void)text;
     (void)now;
     (void)utc;

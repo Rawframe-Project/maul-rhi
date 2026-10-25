@@ -19,7 +19,9 @@
 #   attempts or tries, or the parts try and again together (as in maxTries
 #   or try_again, not entries, against, or again alone, which tests use
 #   for a result computed a second time), the shape of a loop that runs an
-#   assertion until it passes;
+#   assertion until it passes. A name of more than one part that a header
+#   of the library declares (include/ and src/, and each listed part's) is
+#   the library's own API, which a test may call, and does not count;
 # - skip: 77 anywhere in a return or exit expression, a name with SKIP in
 #   it anywhere in a return expression, and macros named like SKIP
 #   (GTEST_SKIP), and in the CMake files the SKIP_RETURN_CODE,
@@ -182,15 +184,30 @@ def marked(notes):
     return False
 
 
-def retry_word(code):
+def retry_word(code, library):
     for identifier in IDENTIFIER.findall(code):
         parts = [p.lower() for piece in identifier.split("_") for p in WORD_PART.findall(piece)]
+        if len(parts) > 1 and identifier in library:
+            continue
         if RETRY_WORDS.intersection(parts) or {"try", "again"} <= set(parts):
             return True
     return False
 
 
-def scan_file(path, rel, findings):
+def library_names(folders):
+    """Every identifier in the code of the headers under the folders: the
+    names the library declares, which its tests call."""
+    names = set()
+    for folder in folders:
+        if os.path.isdir(folder):
+            for path in walk(folder, lambda n: n.endswith((".h", ".hpp"))):
+                codes, _ = tokens(open(path, encoding="utf-8", errors="replace").read())
+                for code in codes:
+                    names.update(IDENTIFIER.findall(code))
+    return names
+
+
+def scan_file(path, rel, findings, library=frozenset()):
     text = open(path, encoding="utf-8", errors="replace").read()
     if path.endswith(C_SUFFIXES):
         rules = C_RULES
@@ -200,7 +217,7 @@ def scan_file(path, rel, findings):
         codes, comments = cmake_tokens(text.split("\n"))
     for index, code in enumerate(codes):
         for rule, pattern, reason in rules:
-            hit = retry_word(code) if pattern is None else pattern.search(code)
+            hit = retry_word(code, library) if pattern is None else pattern.search(code)
             if not hit:
                 continue
             if marked(comments[index]) or (index > 0 and marked(comments[index - 1])):
@@ -239,11 +256,13 @@ def is_cmake(name):
 
 
 def scan_tree(findings):
-    for top in ["test"] + [os.path.join(d, "test") for d in source_dirs()]:
+    parts = [""] + source_dirs()
+    library = library_names([os.path.join(ROOT, d, sub) for d in parts for sub in ("include", "src")])
+    for top in [os.path.join(d, "test") for d in parts]:
         folder = os.path.join(ROOT, top)
         if os.path.isdir(folder):
             for path in walk(folder, lambda n: n.endswith(C_SUFFIXES)):
-                scan_file(path, os.path.relpath(path, ROOT), findings)
+                scan_file(path, os.path.relpath(path, ROOT), findings, library)
     skipped = [os.path.join(ROOT, d) for d in external_dirs()] + [FIXTURES]
     for path in walk(ROOT, is_cmake):
         if not any(path.startswith(d + os.sep) for d in skipped):
@@ -270,9 +289,10 @@ def ctest_json(build):
 def self_test():
     findings = []
     expected = set()
+    library = library_names([os.path.join(FIXTURES, "include")])
     for path in walk(FIXTURES, lambda n: n.endswith(C_SUFFIXES) or is_cmake(n)):
         rel = os.path.relpath(path, ROOT)
-        scan_file(path, rel, findings)
+        scan_file(path, rel, findings, library)
         for number, line in enumerate(open(path, encoding="utf-8").read().split("\n"), 1):
             for rule in EXPECT.findall(line):
                 expected.add((rel, number, rule))
