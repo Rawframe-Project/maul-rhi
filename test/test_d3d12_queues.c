@@ -843,11 +843,12 @@ static bool SameFrequencies(mrhiDevice* device)
 }
 
 // A frame with a pass of a class timed by queries 0 and 1, uploading a
-// buffer or, for an async compute pass, dispatching over it, and an
-// untimed transfer pass uploading another buffer; then a
+// buffer or, for an async compute pass, dispatching over it, and with
+// beside set an untimed transfer pass uploading another buffer; then a
 // graphics pass resolving the set and one reading the times back. The
 // times are checked; the calls the queues took stay in the log.
-static void TimeFrame(mrhiDevice* device, mrhiPassClass passClass, mrhiComputePipelineId pipeline)
+static void TimeFrame(mrhiDevice* device, mrhiPassClass passClass, mrhiComputePipelineId pipeline,
+                      bool beside)
 {
     mrhiQuerySetDef setDef = mrhiDefaultQuerySetDef();
     setDef.type = mrhi_queryTimestamp;
@@ -866,8 +867,12 @@ static void TimeFrame(mrhiDevice* device, mrhiPassClass passClass, mrhiComputePi
     mrhiPassId work = Timed(
         device, passClass,
         Whole(timed, dispatch ? mrhi_accessStorageReadWrite : mrhi_accessCopyDestination), set, 0);
-    mrhiPassId untimed = Timed(device, mrhi_passTransfer, Whole(other, mrhi_accessCopyDestination),
-                               (mrhiQuerySetId){0}, 0);
+    mrhiPassId untimed = {0};
+    if (beside)
+    {
+        untimed = Timed(device, mrhi_passTransfer, Whole(other, mrhi_accessCopyDestination),
+                        (mrhiQuerySetId){0}, 0);
+    }
     mrhiPassId resolve = Timed(device, mrhi_passGraphics, Whole(times, mrhi_accessQueryResolve),
                                (mrhiQuerySetId){0}, 0);
     mrhiPassId back = Timed(device, mrhi_passGraphics, Whole(times, mrhi_accessCopySource),
@@ -884,17 +889,19 @@ static void TimeFrame(mrhiDevice* device, mrhiPassClass passClass, mrhiComputePi
                   mrhiEndPass(device, work) == mrhi_success,
               "a timed upload");
     }
+    CHECK(!beside ||
+              (mrhiBeginPass(device, untimed) == mrhi_success &&
+               mrhiWriteBuffer(device, untimed, other, 0, kWords, sizeof(kWords)) == mrhi_success &&
+               mrhiEndPass(device, untimed) == mrhi_success),
+          "an untimed upload");
     mrhiRequestId request = {0};
-    CHECK(mrhiBeginPass(device, untimed) == mrhi_success &&
-              mrhiWriteBuffer(device, untimed, other, 0, kWords, sizeof(kWords)) == mrhi_success &&
-              mrhiEndPass(device, untimed) == mrhi_success &&
-              mrhiBeginPass(device, resolve) == mrhi_success &&
+    CHECK(mrhiBeginPass(device, resolve) == mrhi_success &&
               mrhiResolveQueries(device, resolve, set, 0, 2, times, 0) == mrhi_success &&
               mrhiEndPass(device, resolve) == mrhi_success &&
               mrhiBeginPass(device, back) == mrhi_success &&
               mrhiReadBuffer(device, back, times, 0, 16, &request) == mrhi_success &&
               mrhiEndPass(device, back) == mrhi_success,
-          "an untimed upload, the resolve and the readback");
+          "the resolve and the readback");
     Hook(device);
     Finish(device);
     uint64_t ticks[2] = {0};
@@ -914,8 +921,9 @@ static void TimeFrame(mrhiDevice* device, mrhiPassClass passClass, mrhiComputePi
 // queue while an untimed one in the same frame runs on the copy queue,
 // a timed async compute pass on the compute queue, and the resolve on the
 // direct queue after a wait for the compute queue. A second device whose
-// compute queue is made to tick otherwise runs a timed transfer pass on
-// the direct queue, and an untimed one still on the copy queue.
+// compute queue is made to tick otherwise runs a timed transfer pass,
+// alone in its frame, on the direct queue, and an untimed one beside it
+// still on the copy queue.
 static void CheckTimed(mrhiInstance* instance, mrhiAdapterId adapter)
 {
     mrhiDevice* device = OpenWith(instance, adapter, true);
@@ -926,7 +934,7 @@ static void CheckTimed(mrhiInstance* instance, mrhiAdapterId adapter)
     mrhiShaderId shader = {0};
     mrhiComputePipelineId pipeline = NoopPipeline(device, &shader);
     bool same = SameFrequencies(device);
-    TimeFrame(device, mrhi_passTransfer, pipeline);
+    TimeFrame(device, mrhi_passTransfer, pipeline, true);
     CHECK(Runs(D3D12_COMMAND_LIST_TYPE_COPY) > 0, "the untimed transfer on the copy queue");
     CHECK(!same || (Runs(D3D12_COMMAND_LIST_TYPE_COMPUTE) > 0 &&
                     Waits(D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_LIST_TYPE_COMPUTE)),
@@ -934,7 +942,7 @@ static void CheckTimed(mrhiInstance* instance, mrhiAdapterId adapter)
     CHECK(same || Runs(D3D12_COMMAND_LIST_TYPE_COMPUTE) == 0,
           "the timed transfer on the direct queue");
     Unhook();
-    TimeFrame(device, mrhi_passAsyncCompute, pipeline);
+    TimeFrame(device, mrhi_passAsyncCompute, pipeline, true);
     CHECK(!same || (Runs(D3D12_COMMAND_LIST_TYPE_COMPUTE) > 0 &&
                     Waits(D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_LIST_TYPE_COMPUTE)),
           "the timed dispatch on the compute queue, the resolve after it");
@@ -946,9 +954,15 @@ static void CheckTimed(mrhiInstance* instance, mrhiAdapterId adapter)
     Unhook();
     if (skewed != nullptr)
     {
-        TimeFrame(skewed, mrhi_passTransfer, pipeline);
-        CHECK(Runs(D3D12_COMMAND_LIST_TYPE_COMPUTE) == 0 && Runs(D3D12_COMMAND_LIST_TYPE_COPY) > 0,
+        // The timed pass alone, so that no other pass's lists stand in
+        // for it on any queue.
+        TimeFrame(skewed, mrhi_passTransfer, pipeline, false);
+        CHECK(Runs(D3D12_COMMAND_LIST_TYPE_COMPUTE) == 0 && Runs(D3D12_COMMAND_LIST_TYPE_COPY) == 0,
               "a timed transfer on the direct queue where the compute queue ticks otherwise");
+        Unhook();
+        TimeFrame(skewed, mrhi_passTransfer, pipeline, true);
+        CHECK(Runs(D3D12_COMMAND_LIST_TYPE_COMPUTE) == 0 && Runs(D3D12_COMMAND_LIST_TYPE_COPY) > 0,
+              "and an untimed one beside it still on the copy queue");
         Unhook();
         mrhiDestroyDevice(skewed);
     }
