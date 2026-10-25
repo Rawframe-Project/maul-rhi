@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The container's parse: the header and digest, the section table's
-// bounds and overlaps, then every record against the rules of
+// The container's parse: the header and section table
+// (container_table.c), then every record against the rules of
 // docs/user/shader-container-format.md. Every read is bounded by the sizes checked
 // before it, and bytes are read one at a time, so nothing depends on the
 // caller's alignment.
@@ -12,16 +12,14 @@
 #include "bytes.h"
 #include "capabilities_core.h"
 #include "container_interface.h"
+#include "container_table.h"
 #include "invariant.h"
 #include "label.h"
-#include "sha256.h"
 #include "spirv_caps.h"
 
 #include <stdckdint.h>
 #include <string.h>
 
-#define HEADER_BYTES      64
-#define SECTION_BYTES     24
 #define ENTRY_BYTES       48
 #define BINDING_BYTES     24
 #define CONSTANT_BYTES    16
@@ -29,8 +27,6 @@
 #define D3D12_HEAD_BYTES  32
 #define D3D12_ENTRY_BYTES 16
 #define D3D12_RANGE_BYTES 16
-#define SECTION_TYPES     15
-#define MAX_SECTIONS      64
 #define MAX_ROOT_BLOCK    256
 #define MAX_NAME          256
 // The records an array section holds at most, which also bounds the
@@ -56,6 +52,7 @@ enum
     SECTION_D3D12_MAP,
     SECTION_DXIL,
 };
+static_assert(SECTION_DXIL == MRHI_CONTAINER_TYPES, "every section type known to the table");
 
 // Metal's argument indices per class: buffers, textures and samplers.
 #define METAL_BUFFERS  31
@@ -67,91 +64,9 @@ enum
 #define D3D12_SPACES      0xFFFFFFF0u
 #define DXBC_HEADER_BYTES 32
 
-static bool IsZero(const uint8_t* at, size_t count)
-{
-    for (size_t i = 0; i < count; ++i)
-    {
-        if (at[i] != 0)
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-// A section as the table gives it.
-typedef struct Section
-{
-    uint32_t type;
-    uint64_t offset;
-    uint64_t size;
-} Section;
-
-// Checks the header: success with the section count, version or format.
-static mrhiResult CheckHeader(const uint8_t* bytes, size_t size, uint32_t* countOut)
-{
-    if (size < HEADER_BYTES || bytes[0] != 'M' || bytes[1] != 'R' || bytes[2] != 'S' ||
-        bytes[3] != 'C')
-    {
-        return mrhi_errorFormat;
-    }
-    if (mrhiRead32(bytes + 4) != 1)
-    {
-        return mrhi_errorVersion;
-    }
-    uint32_t count = mrhiRead32(bytes + 48);
-    if (mrhiRead64(bytes + 8) != size || !IsZero(bytes + 52, 12) || count > MAX_SECTIONS ||
-        count * (uint64_t)SECTION_BYTES > size - HEADER_BYTES)
-    {
-        return mrhi_errorFormat;
-    }
-    uint8_t digest[MRHI_DIGEST_BYTES];
-    mrhiSha256(bytes + 48, size - 48, digest);
-    for (int i = 0; i < MRHI_DIGEST_BYTES; ++i)
-    {
-        if (digest[i] != bytes[16 + i])
-        {
-            return mrhi_errorFormat;
-        }
-    }
-    *countOut = count;
-    return mrhi_success;
-}
-
-// Reads and checks the section table: every section after the table,
-// inside the container, 8-byte aligned, apart from the others, and each
-// known type at most once.
-static bool ReadSections(const uint8_t* bytes, size_t size, uint32_t count, Section* sections)
-{
-    uint64_t tableEnd = HEADER_BYTES + (uint64_t)count * SECTION_BYTES;
-    for (uint32_t i = 0; i < count; ++i)
-    {
-        const uint8_t* record = bytes + HEADER_BYTES + (size_t)i * SECTION_BYTES;
-        Section section = {mrhiRead32(record), mrhiRead64(record + 8), mrhiRead64(record + 16)};
-        uint64_t end = 0;
-        if (mrhiRead32(record + 4) != 0 || section.offset % 8 != 0 || section.offset < tableEnd ||
-            ckd_add(&end, section.offset, section.size) || end > size)
-        {
-            return false;
-        }
-        for (uint32_t j = 0; j < i; ++j)
-        {
-            bool apart = sections[j].offset + sections[j].size <= section.offset ||
-                         end <= sections[j].offset;
-            bool repeated = sections[j].type == section.type && section.type <= SECTION_TYPES;
-            if (!apart || repeated)
-            {
-                return false;
-            }
-        }
-        sections[i] = section;
-    }
-    return true;
-}
-
 // Finds a section by type: its bytes and size, or NULL when absent.
-static const uint8_t* FindSection(const uint8_t* bytes, const Section* sections, uint32_t count,
-                                  uint32_t type, uint64_t* sizeOut)
+static const uint8_t* FindSection(const uint8_t* bytes, const mrhiContainerSection* sections,
+                                  uint32_t count, uint32_t type, uint64_t* sizeOut)
 {
     for (uint32_t i = 0; i < count; ++i)
     {
@@ -167,8 +82,9 @@ static const uint8_t* FindSection(const uint8_t* bytes, const Section* sections,
 
 // Takes an array section: false when its size is not a whole number of
 // records, or holds more than MAX_RECORDS.
-static bool TakeArray(const uint8_t* bytes, const Section* sections, uint32_t count, uint32_t type,
-                      uint32_t recordBytes, const uint8_t** arrayOut, uint32_t* countOut)
+static bool TakeArray(const uint8_t* bytes, const mrhiContainerSection* sections, uint32_t count,
+                      uint32_t type, uint32_t recordBytes, const uint8_t** arrayOut,
+                      uint32_t* countOut)
 {
     uint64_t size = 0;
     *arrayOut = FindSection(bytes, sections, count, type, &size);
@@ -496,7 +412,7 @@ static bool IsConstantValid(const mrhiContainer* container, uint32_t index)
 {
     const uint8_t* raw = container->constants + (size_t)index * CONSTANT_BYTES;
     mrhiShaderConstant constant = mrhiContainerConstant(container, index);
-    if (!IsZero(raw + 5, 3) || raw[12] > 1 || !IsZero(raw + 13, 3) ||
+    if (!mrhiIsZero(raw + 5, 3) || raw[12] > 1 || !mrhiIsZero(raw + 13, 3) ||
         constant.type == mrhi_constantNone || constant.type > mrhi_constantFloat32 ||
         (constant.type == mrhi_constantBool && constant.bits > 1) ||
         (constant.required && constant.bits != 0))
@@ -592,7 +508,7 @@ static bool IsMetalEntryValid(const mrhiContainer* container, uint32_t index)
     bool sizes =
         entry.sizesIndex == MRHI_METAL_NONE ||
         (entry.sizesIndex < METAL_BUFFERS && !IsMetalBufferTaken(container, entry.sizesIndex));
-    return IsZero(raw + 9, 7) && code && sizes;
+    return mrhiIsZero(raw + 9, 7) && code && sizes;
 }
 
 // Whether the Metal code agrees with the rules: the map exactly when
@@ -614,7 +530,7 @@ static bool IsMetalValid(const mrhiContainer* container)
     uint8_t root = mrhiContainerMetalRoot(container);
     bool rootValid =
         container->rootBlockBytes == 0 ? root == MRHI_METAL_NONE : root < METAL_BUFFERS;
-    if (!IsZero(container->metalMap + 1, 7) || !rootValid || !AreMetalBindingsValid(container))
+    if (!mrhiIsZero(container->metalMap + 1, 7) || !rootValid || !AreMetalBindingsValid(container))
     {
         return false;
     }
@@ -734,7 +650,7 @@ static bool IsD3d12EntryValid(const mrhiContainer* container, uint32_t index)
     mrhiD3d12Entry entry = mrhiContainerD3d12Entry(container, index);
     uint32_t reads = mrhiRead32(raw + 8);
     uint64_t end = (uint64_t)entry.dxilOffset + entry.dxilLength;
-    if (!IsZero(raw + 12, 4) || reads > 1 || entry.dxilOffset % 4 != 0 ||
+    if (!mrhiIsZero(raw + 12, 4) || reads > 1 || entry.dxilOffset % 4 != 0 ||
         entry.dxilLength < DXBC_HEADER_BYTES || end > container->dxilBytes ||
         (reads == 1 && mrhiContainerEntry(container, index).stage != mrhi_stageVertex))
     {
@@ -757,7 +673,7 @@ static bool AreD3d12HeapRangesValid(const mrhiContainer* container)
     {
         const uint8_t* raw = D3d12HeapRanges(container) + (size_t)i * D3D12_RANGE_BYTES;
         mrhiD3d12HeapRange range = mrhiContainerD3d12HeapRange(container, i);
-        if (mrhiRead32(raw) > mrhiD3d12HeapSampler || !IsZero(raw + 12, 4) ||
+        if (mrhiRead32(raw) > mrhiD3d12HeapSampler || !mrhiIsZero(raw + 12, 4) ||
             range.space < MRHI_D3D12_HEAP_SPACE || range.space >= D3D12_SPACES)
         {
             return false;
@@ -798,7 +714,7 @@ static bool IsD3d12Valid(const mrhiContainer* container)
                     (uint64_t)container->bindingCount * 8 + (uint64_t)ranges * D3D12_RANGE_BYTES +
                     container->constantCount;
     if (ranges > MAX_RECORDS || container->d3d12MapBytes != size ||
-        !IsZero(container->d3d12Map + 28, 4) || !AreD3d12HeapRangesValid(container))
+        !mrhiIsZero(container->d3d12Map + 28, 4) || !AreD3d12HeapRangesValid(container))
     {
         return false;
     }
@@ -878,21 +794,22 @@ static bool AreRecordsValid(mrhiContainer* container)
 }
 
 // Takes the meta, strings and code sections. An absent section has size
-// 0, so the size checks require the meta and SPIR-V; the strings are
+// 0, so the size checks require the SPIR-V; an absent meta is a root
+// block of 0 bytes, which a present one never holds; the strings are
 // required by the entries' names, and the WGSL unless an entry uses a heap
 // or the view index or the SPIR-V declares 64-bit integers.
 // A metallib has its magic; the Metal map, MSL, D3D12 map and DXIL are
 // checked with the records.
-static bool TakeParts(const uint8_t* bytes, const Section* sections, uint32_t count,
+static bool TakeParts(const uint8_t* bytes, const mrhiContainerSection* sections, uint32_t count,
                       mrhiContainer* container)
 {
     uint64_t size = 0;
     const uint8_t* meta = FindSection(bytes, sections, count, SECTION_META, &size);
-    if (size != 16 || !IsZero(meta + 4, 12))
+    if (meta != nullptr && (size != 16 || mrhiRead32(meta) == 0 || !mrhiIsZero(meta + 4, 12)))
     {
         return false;
     }
-    container->rootBlockBytes = mrhiRead32(meta);
+    container->rootBlockBytes = meta != nullptr ? mrhiRead32(meta) : 0;
     container->strings = FindSection(bytes, sections, count, SECTION_STRINGS, &size);
     container->stringBytes = (uint32_t)size;
     bool strings = size <= UINT32_MAX;
@@ -964,19 +881,18 @@ mrhiResult mrhiParseContainer(const void* bytes, size_t size, mrhiContainer* con
 {
     const uint8_t* data = bytes;
     uint32_t count = 0;
-    mrhiResult status = CheckHeader(data, size, &count);
+    mrhiContainerSection sections[MRHI_CONTAINER_SECTIONS];
+    mrhiResult status = mrhiReadContainerTable(data, size, sections, &count);
     if (status != mrhi_success)
     {
         return status;
     }
-    Section sections[MAX_SECTIONS];
     mrhiContainer container = {0};
     for (int i = 0; i < MRHI_DIGEST_BYTES; ++i)
     {
         container.digest[i] = data[16 + i];
     }
-    bool valid = ReadSections(data, size, count, sections) &&
-                 TakeParts(data, sections, count, &container) &&
+    bool valid = TakeParts(data, sections, count, &container) &&
                  TakeArray(data, sections, count, SECTION_ENTRIES, ENTRY_BYTES, &container.entries,
                            &container.entryCount) &&
                  TakeArray(data, sections, count, SECTION_BINDINGS, BINDING_BYTES,

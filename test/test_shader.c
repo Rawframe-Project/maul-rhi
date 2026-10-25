@@ -82,9 +82,34 @@ static void TestDefault(void)
         CHECK(Built() == mrhi_success, "an optional section left out");
     }
     Reset();
-    s_sections[s_sectionCount++] = (Section){.type = 100, .size = 3};
-    s_sections[s_sectionCount++] = (Section){.type = 100, .size = 0};
-    CHECK(Built() == mrhi_success, "unknown sections skipped, even repeated");
+    s_sections[META].size = 0;
+    mrhiContainer bare;
+    Assemble();
+    CHECK(mrhiParseContainer(s_container, s_size, &bare) == mrhi_success &&
+              bare.rootBlockBytes == 0,
+          "the meta left out: an empty root block");
+}
+
+// A tag the library does not know is a later version's, wherever it
+// lies and whatever else is wrong with the table.
+static void TestTags(void)
+{
+    uint32_t unknown[] = {0, 16, 100, UINT32_MAX};
+    for (size_t i = 0; i < sizeof(unknown) / sizeof(unknown[0]); ++i)
+    {
+        Reset();
+        s_sections[s_sectionCount++] = (Section){.type = unknown[i], .size = 3};
+        CHECK(Built() == mrhi_errorVersion, "an unknown tag after the known ones");
+        Reset();
+        s_sections[WGSL].type = unknown[i];
+        CHECK(Built() == mrhi_errorVersion, "an unknown tag in a known one's place");
+    }
+    Reset();
+    s_sections[s_sectionCount++] = (Section){.type = 100, .size = 8};
+    Assemble();
+    Put64(s_container + 64 + (size_t)(s_sectionCount - 1) * 24 + 8, 0);
+    Seal();
+    CHECK(Parse() == mrhi_errorVersion, "an unknown tag over the header");
 }
 
 static void TestHeader(void)
@@ -96,8 +121,11 @@ static void TestHeader(void)
     s_container[0] = 'm';
     CHECK(Parse() == mrhi_errorFormat, "another magic");
     Assemble();
-    Put32(s_container + 4, 2);
-    CHECK(Parse() == mrhi_errorVersion, "another version");
+    Put32(s_container + 4, 1);
+    CHECK(Parse() == mrhi_errorVersion, "the earlier version");
+    Assemble();
+    Put32(s_container + 4, 3);
+    CHECK(Parse() == mrhi_errorVersion, "a later version");
     Assemble();
     Put32(s_container + 4, 0);
     CHECK(Parse() == mrhi_errorVersion, "version 0");
@@ -159,26 +187,18 @@ static void TestSections(void)
     Move(META, 64, 16);
     CHECK(Parse() == mrhi_errorFormat, "a section in the table");
     Reset();
-    s_sections[s_sectionCount++] = (Section){.type = 100};
     Assemble();
-    Move(s_sectionCount - 1, 64 + (uint64_t)s_sectionCount * 24 - 8, 0);
-    CHECK(Parse() == mrhi_errorFormat, "an empty section in the table's last record");
-    Move(s_sectionCount - 1, s_size, 0);
-    CHECK(Parse() == mrhi_success, "an empty section at the end");
-    s_sections[s_sectionCount - 1].size = 8;
+    Move(WGSL, s_size, 0);
+    CHECK(Parse() == mrhi_errorFormat, "an empty section at the end");
     Assemble();
-    Move(s_sectionCount - 1, OffsetOf(s_sectionCount - 1), 9);
-    CHECK(Parse() == mrhi_errorFormat, "an unknown section a byte past the end");
-    Move(s_sectionCount - 1, OffsetOf(s_sectionCount - 1), 0 - OffsetOf(s_sectionCount - 1));
-    CHECK(Parse() == mrhi_errorFormat, "an unknown section whose end wraps to 0");
+    Move(WGSL, OffsetOf(WGSL), 0 - OffsetOf(WGSL));
+    CHECK(Parse() == mrhi_errorFormat, "a section whose end wraps to 0");
     Reset();
-    while (s_sectionCount < 64)
+    while (s_sectionCount < 65)
     {
-        s_sections[s_sectionCount++] = (Section){.type = 100};
+        s_sections[s_sectionCount++] = (Section){.type = 100, .size = 8};
     }
-    CHECK(Built() == mrhi_success, "64 sections");
-    s_sections[s_sectionCount++] = (Section){.type = 100};
-    CHECK(Built() == mrhi_errorFormat, "65 sections");
+    CHECK(Built() == mrhi_errorFormat, "65 sections, counted before any tag is read");
     Reset();
     Assemble();
     uint32_t fit = (uint32_t)((s_size - 64) / 24);
@@ -211,12 +231,7 @@ static void TestSections(void)
     Reset();
     s_sections[s_sectionCount++] = s_sections[WGSL];
     CHECK(Built() == mrhi_errorFormat, "the last known section twice");
-    Reset();
-    s_sections[s_sectionCount++] = (Section){.type = 100, .size = 8};
-    Assemble();
-    Move(s_sectionCount - 1, OffsetOf(WGSL), 8);
-    CHECK(Parse() == mrhi_errorFormat, "an unknown section overlapping");
-    uint32_t required[] = {META, STRINGS, ENTRIES, SPIRV, WGSL};
+    uint32_t required[] = {STRINGS, ENTRIES, SPIRV, WGSL};
     for (size_t i = 0; i < sizeof(required) / sizeof(required[0]); ++i)
     {
         Reset();
@@ -226,6 +241,19 @@ static void TestSections(void)
     Reset();
     s_sections[ENTRIES].size = 0;
     CHECK(Built() == mrhi_errorFormat, "no entries");
+    // The constants laid out last, then emptied where they lie, so that
+    // only their size breaks a rule: no entry names them.
+    Reset();
+    Section constants = s_sections[CONSTANTS];
+    s_sections[CONSTANTS] = s_sections[VARIABLES];
+    s_sections[VARIABLES] = constants;
+    Assemble();
+    s_size = OffsetOf(VARIABLES);
+    Put64(s_container + 8, s_size);
+    Move(VARIABLES, s_size, 0);
+    CHECK(Parse() == mrhi_errorFormat, "an empty section, which a writer leaves out");
+    s_sections[VARIABLES].size = 0;
+    CHECK(Built() == mrhi_success, "the same container without it");
     uint32_t arrays[] = {ENTRIES, BINDINGS, INPUTS, OUTPUTS, CONSTANTS, VARIABLES};
     for (size_t i = 0; i < sizeof(arrays) / sizeof(arrays[0]); ++i)
     {
@@ -252,6 +280,35 @@ static void TestMeta(void)
     Reset();
     s_sections[META].bytes[15] = 1;
     CHECK(Built() == mrhi_errorFormat, "a meta zero that is not zero");
+    Reset();
+    Put32(s_sections[META].bytes, 0);
+    CHECK(Built() == mrhi_errorFormat, "a meta holding its default, which a writer leaves out");
+}
+
+// The sections fill the container: each starts where the one before
+// ends, padded with zeros to 8 bytes, and the last ends the container.
+static void TestLayout(void)
+{
+    Reset();
+    Assemble();
+    CHECK(Parse() == mrhi_success, "the default, its 6 bytes of strings padded to 8");
+    s_container[OffsetOf(STRINGS) + 7] = 1;
+    Seal();
+    CHECK(Parse() == mrhi_errorFormat, "padding that is not zero");
+    Assemble();
+    size_t last = OffsetOf(VARIABLES);
+    memmove(s_container + last + 8, s_container + last, s_size - last);
+    memset(s_container + last, 0, 8);
+    s_size += 8;
+    Put64(s_container + 8, s_size);
+    Move(VARIABLES, last + 8, 16);
+    CHECK(Parse() == mrhi_errorFormat, "a gap of zeros before a section");
+    Assemble();
+    memset(s_container + s_size, 0, 8);
+    s_size += 8;
+    Put64(s_container + 8, s_size);
+    Seal();
+    CHECK(Parse() == mrhi_errorFormat, "zeros past the last section");
 }
 
 static void TestEntries(void)
@@ -732,7 +789,7 @@ static void TestMetalCode(void)
     CHECK(Built() == mrhi_errorFormat, "a metallib without a map");
     Reset();
     AddMetal(true, true);
-    s_sections[s_sectionCount++] = (Section){.type = 11};
+    s_sections[s_sectionCount++] = (Section){.type = 11, .size = 8};
     CHECK(Built() == mrhi_errorFormat, "a repeated map");
     Reset();
     AddMetal(true, true);
@@ -769,7 +826,7 @@ static void TestMetalMap(void)
     CHECK(MapWith(0, 255) == mrhi_errorFormat, "no root block's index for one");
     CHECK(MapWith(0, 1) == mrhi_errorFormat, "the root block on a binding's buffer");
     Reset();
-    Put32(Record(META, 0, 16), 0);
+    s_sections[META].size = 0;
     AddMetal(true, true);
     s_sections[METAL_MAP].bytes[0] = 255;
     CHECK(Built() == mrhi_success, "no root block, no index");
@@ -827,13 +884,16 @@ static void TestMetalSources(void)
     CHECK(Built() == mrhi_errorFormat, "an MSL offset without MSL");
 }
 
-// A container whose input section is moved past the others and holds
-// count records, each valid on its own.
+// A container whose input section is laid out last and holds count
+// records, each valid on its own.
 static mrhiResult WithInputs(uint32_t count)
 {
     Reset();
+    Section inputs = s_sections[INPUTS];
+    s_sections[INPUTS] = s_sections[VARIABLES];
+    s_sections[VARIABLES] = inputs;
     Assemble();
-    size_t offset = s_size;
+    size_t offset = OffsetOf(VARIABLES);
     for (uint32_t i = 0; i < count; ++i)
     {
         uint8_t* input = s_container + offset + (size_t)i * 8;
@@ -843,7 +903,7 @@ static mrhiResult WithInputs(uint32_t count)
     }
     s_size = offset + (size_t)count * 8;
     Put64(s_container + 8, s_size);
-    Move(INPUTS, offset, (uint64_t)count * 8);
+    Move(VARIABLES, offset, (uint64_t)count * 8);
     return Parse();
 }
 
@@ -971,7 +1031,7 @@ static void TestRefusals(void)
     def = Def();
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorFormat, "a damaged container");
     Assemble();
-    Put32(s_container + 4, 2);
+    Put32(s_container + 4, 1);
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorVersion, "another version");
     Put32(s_sections[META].bytes, mrhiDefaultLimits().rootBlockBytes + 4);
     Assemble();
@@ -1550,7 +1610,9 @@ int main(int argc, char** argv)
     }
     TestDefault();
     TestHeader();
+    TestTags();
     TestSections();
+    TestLayout();
     TestMeta();
     TestEntries();
     TestInterfaces();

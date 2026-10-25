@@ -266,18 +266,29 @@ static inline void Seal(void)
     mrhiSha256(s_container + 48, s_size - 48, s_container + 16);
 }
 
-// Lays the sections out after the header and table, 8-byte aligned,
-// and seals the container.
+// Lays the sections out after the header and table, 8-byte aligned, and
+// seals the container. An empty section is left out, as the writer leaves
+// out a section that holds its default, so the table's records follow
+// the sections' order only while none is empty.
 static inline void Assemble(void)
 {
     memset(s_container, 0, sizeof(s_container));
     memcpy(s_container, "MRSC", 4);
-    Put32(s_container + 4, 1);
-    Put32(s_container + 48, s_sectionCount);
-    size_t offset = 64 + (size_t)s_sectionCount * 24;
+    Put32(s_container + 4, 2);
+    uint32_t count = 0;
     for (uint32_t i = 0; i < s_sectionCount; ++i)
     {
-        uint8_t* record = s_container + 64 + (size_t)i * 24;
+        count += s_sections[i].size > 0 ? 1 : 0;
+    }
+    Put32(s_container + 48, count);
+    size_t offset = 64 + (size_t)count * 24;
+    for (uint32_t i = 0, at = 0; i < s_sectionCount; ++i)
+    {
+        if (s_sections[i].size == 0)
+        {
+            continue;
+        }
+        uint8_t* record = s_container + 64 + (size_t)at++ * 24;
         Put32(record, s_sections[i].type);
         Put64(record + 8, offset);
         Put64(record + 16, s_sections[i].size);
