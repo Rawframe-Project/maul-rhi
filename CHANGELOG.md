@@ -7,15 +7,36 @@ may change the API, the ABI and every data format.
 
 ## [0.3.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.2.1...v0.3.0) (2026-10-25)
 
+Async compute and transfer passes run on queues of their own on D3D12.
 
 ### Added
 
-* **d3d12:** run async compute and transfer passes on their own queues ([#79](https://github.com/Rawframe-Project/maul-rhi/issues/79)) ([43ac31c](https://github.com/Rawframe-Project/maul-rhi/commit/43ac31c6285df99bd608f08e7886d518a53856fc)), closes [#76](https://github.com/Rawframe-Project/maul-rhi/issues/76)
+- D3D12: async compute and transfer passes run on a compute and a copy
+  queue of their own, beside the graphics work, each after the passes
+  it depends on. A transfer pass that touches only buffers runs on the
+  copy queue. An async compute pass, or a transfer pass that touches a
+  texture, runs on the compute queue when its textures are only stored
+  to, copied, or untouched before. An async compute or transfer pass that
+  samples a texture, or uses one a graphics pass left as a target or
+  sampled, runs with the graphics work in the frame's order, as every
+  pass did before. A frame of graphics passes only runs as before
+  ([#79](https://github.com/Rawframe-Project/maul-rhi/pull/79)).
 
+### Changed
+
+- D3D12: a device makes a compute and a copy queue beside its direct
+  one, and takes more memory from the program's allocator when it is
+  made, for the lists and batches each frame runs on them. A frame's
+  work on the compute and copy queues starts only once the frame
+  before it has finished
+  ([#79](https://github.com/Rawframe-Project/maul-rhi/pull/79)).
 
 ### Fixed
 
-* **tools:** refuse only a continue block's step as a stale read ([#82](https://github.com/Rawframe-Project/maul-rhi/issues/82)) ([d4b2ee9](https://github.com/Rawframe-Project/maul-rhi/commit/d4b2ee945147280f5448138965b9570a15bd83d3)), closes [#80](https://github.com/Rawframe-Project/maul-rhi/issues/80)
+- `tools/mrhi_dxil.py` no longer refuses HLSL that steps a loop
+  variable in the loop's body and then reads the stepped value; only a
+  read after a step in a loop's continue block is refused
+  ([#82](https://github.com/Rawframe-Project/maul-rhi/pull/82)).
 
 ## [0.2.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.2.0...v0.2.1) (2026-10-25)
 
