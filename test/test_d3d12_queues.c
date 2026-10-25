@@ -482,6 +482,12 @@ static void CheckLostFrame(mrhiDevice* device)
     CHECK(s_drained != nullptr && ID3D12Fence_GetCompletedValue(s_drained) >= s_drainedValue,
           "the failed submit waited for its queued work");
     Unhook();
+    if (fence != nullptr)
+    {
+        // Whatever the queue still holds may run: D3D12 releases a queue
+        // only once it is idle.
+        (void)ID3D12Fence_Signal(fence, 1);
+    }
     mrhiDestroyDevice(device);
     if (s_drained != nullptr)
     {
@@ -490,8 +496,6 @@ static void CheckLostFrame(mrhiDevice* device)
     }
     if (fence != nullptr)
     {
-        // Whatever the queue still holds may run.
-        (void)ID3D12Fence_Signal(fence, 1);
         ID3D12Fence_Release(fence);
     }
 }
