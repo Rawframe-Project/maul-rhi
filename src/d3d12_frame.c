@@ -210,10 +210,16 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
             .transients = transients + (size_t)i * limits->frameResources,
             .readbacks = readbacks + (size_t)i * limits->readbacks,
         };
+        // A list not made yet is null: the block comes from the
+        // program's allocator as it is.
         for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
         {
             lanes->listLimit[lane] = ListLimit(limits, (mrhiD3d12Lane)lane);
             slot->lanes.lists[lane] = lists;
+            for (uint32_t list = 0; list < lanes->listLimit[lane]; ++list)
+            {
+                lists[list] = nullptr;
+            }
             lists += lanes->listLimit[lane];
         }
     }
