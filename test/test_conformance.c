@@ -3262,6 +3262,10 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     {
         RUN("api.pass_timestamps", CheckPassTimestamps(&scene));
     }
+    else
+    {
+        Skip("api.pass_timestamps", "without timestampQuery");
+    }
     RUN("binding.render_state", CheckRenderState(&scene));
     if (features.unclippedDepth)
     {
