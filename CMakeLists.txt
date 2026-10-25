@@ -107,6 +107,7 @@ add_library(maul-rhi ${MAUL_LIBRARY_KIND}
     src/metal_external.c
     src/compile.c
     src/container.c
+    src/container_table.c
     src/container_interface.c
     src/spirv_caps.c
     src/device.c
