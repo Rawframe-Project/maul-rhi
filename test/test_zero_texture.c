@@ -200,8 +200,9 @@ static void TestElision(void)
     Close(device);
 }
 
-// A transient texture is never cleared: a pass reads it only after one
-// wrote it.
+// A transient texture is never cleared: a pass reads one the frame
+// declares only after one wrote it, and a device texture made transient
+// keeps its contents only inside a render pass.
 static void TestTransient(void)
 {
     mrhiDevice* device = Open(mrhiDefaultDeviceDef());
@@ -218,6 +219,12 @@ static void TestTransient(void)
     (void)Use(device, transient, mrhi_accessCopySource);
     Submit(device);
     CHECK(s_log.passes == 2 && s_log.commands == 0, "rendered and read, never cleared");
+    def.usage = mrhi_textureRenderTarget | mrhi_textureTransient;
+    mrhiTextureId onChip = {0};
+    CHECK(mrhiCreateTexture(device, &def, &onChip) == mrhi_success, "a transient device texture");
+    Render(device, Begin(device, onChip), false, mrhi_loadDiscard, mrhi_storeKeep, mrhi_loadKeep);
+    Submit(device);
+    CHECK(s_log.passes == 1 && s_log.commands == 0, "its contents live in a pass, never cleared");
     Close(device);
 }
 

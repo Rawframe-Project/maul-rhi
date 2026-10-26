@@ -135,7 +135,8 @@ typedef struct mrhiTextureSlot
     mrhiTextureDef def;
     uint32_t firstView;
     // Whether no submitted frame has imported it, so the next that does
-    // zeroes it first; an adopted image never is.
+    // zeroes it first; an adopted image and a transient texture never
+    // are.
     bool fresh;
     mrhiImport import;
     // The state frames leave it in, and the one every frame ends an

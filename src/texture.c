@@ -274,7 +274,8 @@ mrhiResult mrhiCreateTexture(mrhiDevice* device, const mrhiTextureDef* def,
     mrhiResourceState resting = RestingOf(def);
     *slot = (mrhiTextureSlot){.handle = handle,
                               .def = *def,
-                              .fresh = resting == mrhi_stateUndefined,
+                              .fresh = resting == mrhi_stateUndefined &&
+                                       (def->usage & mrhi_textureTransient) == 0,
                               .state = resting,
                               .resting = resting};
     slot->def.next = nullptr;
