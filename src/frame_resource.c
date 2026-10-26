@@ -121,6 +121,9 @@ mrhiResult mrhiImportTexture(mrhiDevice* device, mrhiTextureId texture, mrhiReso
         return mrhi_errorStale;
     }
     const mrhiTextureSlot* slot = &device->textureSlots[texture.index1 - 1];
+    // The frame's first pass zeroes a fresh texture the first time the
+    // frame imports it.
+    bool zero = slot->fresh && !(device->frameOpen && slot->import.frame == device->frameSerial);
     mrhiFrameResource resource = {
         .kind = mrhiImportedTexture,
         .texture = slot->def,
@@ -131,7 +134,13 @@ mrhiResult mrhiImportTexture(mrhiDevice* device, mrhiTextureId texture, mrhiReso
         .sealed = slot->state == mrhi_stateSealed,
         .resting = slot->resting,
     };
-    return Import(device, &device->textureSlots[texture.index1 - 1].import, resource, resourceOut);
+    mrhiResult status =
+        Import(device, &device->textureSlots[texture.index1 - 1].import, resource, resourceOut);
+    if (zero && status == mrhi_success)
+    {
+        mrhiZeroOnFirstUse(device, resourceOut->index1);
+    }
+    return status;
 }
 
 mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer, mrhiResourceId* resourceOut)

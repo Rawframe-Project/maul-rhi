@@ -339,14 +339,15 @@ static void ForgetPasses(mrhiFrameResource* resource)
     }
 }
 
-// Whether a use in pass index p makes the library's barriers: the first
-// program use of a resource the clear left in its state, after which it
-// no longer is.
+// Whether a use in pass index p makes the library's barriers: one of the
+// first pass's, which a texture's clear takes from the undefined state,
+// or the first program use of a buffer the clear left in its state,
+// after which it no longer is.
 static bool IsLibraryMove(bool* zeroState, uint32_t p)
 {
     bool library = *zeroState && p >= MRHI_LIBRARY_PASSES;
     *zeroState = *zeroState && !library;
-    return library;
+    return library || p < MRHI_LIBRARY_PASSES;
 }
 
 // Plans one resource over the kept passes, then its end: an imported

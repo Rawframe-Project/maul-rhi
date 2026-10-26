@@ -272,7 +272,11 @@ mrhiResult mrhiCreateTexture(mrhiDevice* device, const mrhiTextureDef* def,
     }
     mrhiTextureSlot* slot = &device->textureSlots[index1 - 1];
     mrhiResourceState resting = RestingOf(def);
-    *slot = (mrhiTextureSlot){.handle = handle, .def = *def, .state = resting, .resting = resting};
+    *slot = (mrhiTextureSlot){.handle = handle,
+                              .def = *def,
+                              .fresh = resting == mrhi_stateUndefined,
+                              .state = resting,
+                              .resting = resting};
     slot->def.next = nullptr;
     slot->def.label = nullptr;
     slot->def.labelLength = 0;
