@@ -8522,7 +8522,7 @@
           "name": "texture_def",
           "def": true,
           "mapped": true,
-          "doc": "How a texture is made. Build it with mrhiDefaultTextureDef and set its format, size and usage. Its contents are undefined until the frame graph writes them.",
+          "doc": "How a texture is made. Build it with mrhiDefaultTextureDef and set its format, size and usage. A new texture reads as zeros, as mrhiCreateTexture says.",
           "members": [
             {
               "name": "label",
@@ -8798,7 +8798,7 @@
         {
           "kind": "function",
           "name": "create_texture",
-          "doc": "Makes a texture on a ready device.",
+          "doc": "Makes a texture on a ready device. It reads as zeros until the frame graph writes it, in every mip, layer and aspect: the first frame that imports it clears it whole, in a pass of the library's own that takes nothing from the frame's budgets, so the program's first use of it sees zeros. Passes that do not use it may run beside that clear. A texture of one mip and layer whose first use is a target that clears it and keeps the result is not cleared before, as that use writes all of it. A transient texture is never cleared, as its contents live only inside a render pass.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, an unknown kind, format, usage or view format, a zero size, a size or layer count that does not fit the kind or the format's block, too many mips, an unusable sample count, or a transient texture that is not only a render target; `mrhi_errorUnsupported` for a size past the device's limits, a usage or sample count the format cannot take on the device, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's texture limit is reached; `mrhi_errorPlatform` when the driver fails."
@@ -8830,15 +8830,15 @@
           "mapping": {
             "vulkan": {
               "class": "direct",
-              "note": "vkCreateImage, bound to a block of device memory"
+              "note": "vkCreateImage, bound to a block of device memory; every texture but a transient one takes TRANSFER_DST, for its first frame's clear"
             },
             "d3d12": {
               "class": "direct",
-              "note": "CreatePlacedResource in a heap, or a committed resource"
+              "note": "CreatePlacedResource in a heap, or a committed resource; every depth texture takes ALLOW_DEPTH_STENCIL, for its first frame's clear"
             },
             "metal": {
               "class": "direct",
-              "note": "newTextureWithDescriptor"
+              "note": "newTextureWithDescriptor; every depth texture takes MTLTextureUsageRenderTarget, for its first frame's clear"
             },
             "web_gpu": {
               "class": "direct",
@@ -22188,5 +22188,5 @@
       ]
     }
   ],
-  "contract_version": 16
+  "contract_version": 17
 }

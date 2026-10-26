@@ -847,6 +847,9 @@ static void Copy(int state, const mrhiDriverFrame* frame, const mrhiCommand* com
     case mrhiCommandClearBuffer:
         mrhiJsClearBuffer(state, command->a, (double)command->c, (double)command->d);
         break;
+    case mrhiCommandClearTexture:
+        // WebGPU gives every new texture zeros already.
+        break;
     default:
         CopyWithTexture(state, frame, command);
         break;

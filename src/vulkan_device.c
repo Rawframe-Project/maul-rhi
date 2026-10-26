@@ -844,7 +844,8 @@ mrhiResult mrhiCreateVulkanDevice(const mrhiAllocator* allocator, const mrhiVulk
     }
     if (status == mrhi_success)
     {
-        status = mrhiVulkanFramesInit(&device->frames, device->family, &def->deviceLimits);
+        status = mrhiVulkanFramesInit(&device->frames, device->family, &def->deviceLimits,
+                                      def->limits.textureDimension2d);
     }
     if (status != mrhi_success)
     {

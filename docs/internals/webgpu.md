@@ -29,7 +29,7 @@ A frame is recorded at submission into one command encoder, one call into JavaSc
 - Uploads are written into one staging buffer before the frame's commands, so queue order keeps them apart from earlier frames'. Readbacks are copied into a mirror of the ring, mapped after submission and copied into the ring before the frame is reported finished. A frame without readbacks finishes when the queue has done its work. Frames are reported in order.
 - Declared resources come from a pool keyed by their descriptors, each its own object, never aliased; one no frame took in the last 8 is destroyed.
 - A query set keeps its values across frames, so the queries a frame did not write are cleared to zero after a resolve.
-- `mrhiClearBuffer` is `clearBuffer`. Counted multi-draw, multiview, pipeline statistics, native passes and heaps are never granted.
+- `mrhiClearBuffer` is `clearBuffer`. The core's clear of a new texture records nothing, as WebGPU gives every new texture zeros itself. Counted multi-draw, multiview, pipeline statistics, native passes and heaps are never granted.
 
 ## Canvases
 

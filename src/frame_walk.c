@@ -173,6 +173,9 @@ static void CheckCommand(Walk* walk, const mrhiCommand* command)
         WALK_CHECK(Names(walk, command->a, true) && command->c % 4 == 0 && command->d > 0 &&
                    command->d % 4 == 0);
         break;
+    case mrhiCommandClearTexture:
+        WALK_CHECK(Names(walk, command->a, false) && command->payload == 0);
+        break;
     default:
         WALK_CHECK(command->type != 0 && command->type < mrhiCommandTypeEnd);
         break;

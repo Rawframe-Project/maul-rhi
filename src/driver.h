@@ -19,7 +19,7 @@
 
 // The SPI version a driver's vtable must carry. Any change to the SPI
 // headers raises it; 4 is the first installed.
-#define MRHI_SPI_VERSION 7
+#define MRHI_SPI_VERSION 8
 
 // The pass classes (mrhiPassClass): graphics, async compute and transfer.
 #define MRHI_PASS_CLASSES 3

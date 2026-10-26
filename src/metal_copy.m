@@ -189,6 +189,53 @@ void mrhiMetalCopy(mrhiMetalEncoder* encoder, const mrhiCommand* command)
     }
 }
 
+// Copies the device's zeros over a mip's layer or depth slice, in bands
+// of as many rows of blocks as the zeros hold, which hold a row of the
+// widest texture.
+static void CopyZerosToMip(const mrhiMetalEncoder* encoder, id<MTLTexture> texture,
+                           const mrhiTextureDef* def, uint32_t mip, uint32_t z)
+{
+    mrhiFormatBlock block = mrhiGetFormatBlock(def->format);
+    bool volume = def->kind == mrhi_texture3d;
+    uint32_t width = def->width >> mip > 0 ? def->width >> mip : 1;
+    uint32_t height = def->height >> mip > 0 ? def->height >> mip : 1;
+    uint32_t rowBytes = (width + block.width - 1) / block.width *
+                        mrhiGetFormatCopy(def->format, mrhi_aspectAll).bytes;
+    MRHI_ASSERT(rowBytes > 0 && rowBytes <= MRHI_METAL_ZERO_BYTES);
+    uint32_t band = MRHI_METAL_ZERO_BYTES / rowBytes * block.height;
+    for (uint32_t y = 0; y < height; y += band)
+    {
+        uint32_t h = height - y < band ? height - y : band;
+        uint32_t rows = (h + block.height - 1) / block.height;
+        [encoder->blit copyFromBuffer:encoder->zeros
+                         sourceOffset:0
+                    sourceBytesPerRow:rowBytes
+                  sourceBytesPerImage:volume ? rowBytes * rows : 0
+                           sourceSize:MTLSizeMake(width, h, 1)
+                            toTexture:texture
+                     destinationSlice:volume ? 0 : z
+                     destinationLevel:mip
+                    destinationOrigin:MTLOriginMake(0, y, volume ? z : 0)
+                              options:MTLBlitOptionNone];
+    }
+}
+
+void mrhiMetalCopyZeros(mrhiMetalEncoder* encoder, const mrhiCommand* command)
+{
+    MRHI_ASSERT(encoder->blit != nil);
+    const mrhiTextureDef* def = TextureOf(encoder, command->a);
+    id<MTLTexture> texture = encoder->objects[command->a - 1];
+    for (uint32_t mip = 0; mip < def->mipLevels; ++mip)
+    {
+        uint32_t depth = def->depthOrLayers >> mip > 0 ? def->depthOrLayers >> mip : 1;
+        uint32_t slices = def->kind == mrhi_texture3d ? depth : def->depthOrLayers;
+        for (uint32_t z = 0; z < slices; ++z)
+        {
+            CopyZerosToMip(encoder, texture, def, mip, z);
+        }
+    }
+}
+
 void mrhiMetalResolve(mrhiMetalEncoder* encoder, const mrhiCommand* command)
 {
     MRHI_ASSERT(encoder->blit != nil);

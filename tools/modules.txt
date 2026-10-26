@@ -39,7 +39,7 @@ d3d12_swapchain: allocator d3d12_api d3d12_names d3d12_slots d3d12_surface drive
 d3d12_surface: d3d12_api driver invariant
 d3d12_heap: d3d12_frame d3d12_resource d3d12_slots driver invariant
 d3d12_frame: allocator d3d12_barrier d3d12_lanes d3d12_pipeline d3d12_record d3d12_resource d3d12_state d3d12_swapchain invariant
-d3d12_lanes: d3d12_barrier d3d12_state invariant
+d3d12_lanes: d3d12_barrier d3d12_copy d3d12_state invariant
 d3d12_record: capabilities_core d3d12_barrier d3d12_bind d3d12_copy d3d12_draw d3d12_names d3d12_state invariant
 d3d12_bind: command d3d12_barrier d3d12_state invariant
 d3d12_draw: command d3d12_barrier d3d12_bind d3d12_copy d3d12_resource d3d12_state invariant
@@ -64,7 +64,7 @@ metal_copy: capabilities_core invariant metal_resource metal_state
 metal_state: driver metal_pipeline
 metal_pipeline: allocator container driver invariant metal_graphics metal_names reflection
 metal_graphics: capabilities_core invariant metal_names
-metal_resource: driver invariant metal_names
+metal_resource: capabilities_core driver invariant metal_names
 metal_names: capabilities_core invariant
 driver_webgpu: allocator driver format_caps invariant web_js webgpu_device webgpu_names
 webgpu_device: allocator capabilities_core driver invariant web_js webgpu_frame webgpu_names webgpu_pipeline
@@ -87,7 +87,7 @@ frame_resource: device_core instance_core
 heap: allocator device_core heap_core invariant label
 heap_core: device_core
 pass: capabilities_core device_core heap_core label
-compile: device_core encoder_core invariant label
+compile: capabilities_core device_core encoder_core invariant label
 plan: device_core invariant
 memory: device_core invariant
 sha256:

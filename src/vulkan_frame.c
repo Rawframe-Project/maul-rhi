@@ -114,12 +114,29 @@ static VkResult MakeLanes(mrhiVulkanFrames* frames)
 }
 
 mrhiResult mrhiVulkanFramesInit(mrhiVulkanFrames* frames, uint32_t family,
-                                const mrhiDeviceLimits* limits)
+                                const mrhiDeviceLimits* limits, uint32_t widest)
 {
     VkResult result = MakeLanes(frames);
     for (uint32_t i = 0; i < frames->slotCount && result == VK_SUCCESS; ++i)
     {
         result = MakeSlot(frames, &frames->slots[i], family, limits);
+    }
+    if (result == VK_SUCCESS)
+    {
+        VkMemoryPropertyFlags flags = 0;
+        uint8_t* zeros = nullptr;
+        // A row of blocks of 16 bytes, the most a compressed block takes,
+        // each at least 4 texels across.
+        uint64_t row = ((uint64_t)widest + 3) / 4 * 16;
+        frames->zeroBytes = row > MRHI_VULKAN_ZERO_BYTES ? row : MRHI_VULKAN_ZERO_BYTES;
+        result =
+            MakeMapped(frames, frames->zeroBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                       0, &frames->zeros, &frames->zerosMemory, &zeros, &flags);
+        if (zeros != nullptr)
+        {
+            memset(zeros, 0, frames->zeroBytes);
+        }
     }
     if (result == VK_SUCCESS && limits->readbackBytes > 0)
     {
@@ -227,6 +244,8 @@ void mrhiVulkanFramesDestroy(mrhiVulkanFrames* frames)
             frames->api->vkDestroyDescriptorPool(frames->device, slot->pools[p], nullptr);
         }
     }
+    frames->api->vkDestroyBuffer(frames->device, frames->zeros, nullptr);
+    frames->api->vkFreeMemory(frames->device, frames->zerosMemory, nullptr);
     frames->api->vkDestroyBuffer(frames->device, frames->readback, nullptr);
     frames->api->vkFreeMemory(frames->device, frames->readbackMemory, nullptr);
     for (uint32_t l = 0; l < MRHI_VULKAN_LANES; ++l)

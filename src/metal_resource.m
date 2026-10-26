@@ -10,6 +10,7 @@
 
 #include "metal_resource.h"
 
+#include "capabilities_core.h"
 #include "invariant.h"
 #include "metal_names.h"
 
@@ -63,7 +64,11 @@ static MTLTextureUsage UsageOf(const mrhiTextureDef* def)
     usage |= (def->usage & mrhi_textureStorage) != 0
                  ? MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite
                  : 0;
-    usage |= (def->usage & mrhi_textureRenderTarget) != 0 ? MTLTextureUsageRenderTarget : 0;
+    // Every depth texture, so that its first frame clears it in a render
+    // pass.
+    usage |= (def->usage & mrhi_textureRenderTarget) != 0 || mrhiFormatHasDepth(def->format)
+                 ? MTLTextureUsageRenderTarget
+                 : 0;
     bool views = def->format == mrhi_formatDepthStencil;
     for (int i = 0; i < MRHI_VIEW_FORMATS; ++i)
     {

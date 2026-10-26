@@ -39,7 +39,9 @@ What checks the lanes, each for its own part:
 
 On one queue a barrier also waits for every earlier batch, so no check here sees whether a semaphore wait alone orders two lanes on the GPU. That, and a second queue family, wait for an adapter that has one ([#64](https://github.com/Rawframe-Project/maul-rhi/issues/64)).
 
-The core's resource states map to Vulkan stages, accesses and layouts for its barriers. A barrier marked aliasing waits for all commands' writes. A copy destination's barriers name the clear stage beside the copy stage, since `mrhiClearBuffer` is `vkCmdFillBuffer`.
+The core's resource states map to Vulkan stages, accesses and layouts for its barriers. A barrier marked aliasing waits for all commands' writes. A copy destination's barriers name the clear stage beside the copy stage, since `mrhiClearBuffer` is `vkCmdFillBuffer` and the core's clear of a new texture is a clear command too.
+
+The core's clear of a new texture runs in the transfer destination layout: `vkCmdClearColorImage` over every mip and layer of a color format, `vkCmdClearDepthStencilImage` of a depth format, and for a compressed format, which no clear takes, copies from a host-visible buffer of zeros the device keeps, in bands of as many rows of blocks as it holds: 64 KiB, or a row of blocks of the widest texture the device takes where that is more. So every image but a transient one is made with `TRANSFER_DST`; an adopted image is never cleared.
 
 ## Passes
 

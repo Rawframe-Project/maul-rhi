@@ -86,6 +86,8 @@
     X(vkCmdCopyBufferToImage)                                                                      \
     X(vkCmdCopyImageToBuffer)                                                                      \
     X(vkCmdCopyImage)                                                                              \
+    X(vkCmdClearColorImage)                                                                        \
+    X(vkCmdClearDepthStencilImage)                                                                 \
     X(vkCreateDescriptorPool)                                                                      \
     X(vkDestroyDescriptorPool)                                                                     \
     X(vkResetDescriptorPool)                                                                       \

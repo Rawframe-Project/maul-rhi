@@ -18,4 +18,8 @@ void mrhiMetalCopy(mrhiMetalEncoder* encoder, const mrhiCommand* command);
 // Encodes a query resolve: the set's results copied into a buffer.
 void mrhiMetalResolve(mrhiMetalEncoder* encoder, const mrhiCommand* command);
 
+// Zeroes a new color texture whole, every mip and layer or depth slice,
+// by copies of the device's zeros.
+void mrhiMetalCopyZeros(mrhiMetalEncoder* encoder, const mrhiCommand* command);
+
 #endif // MAUL_RHI_SRC_METAL_COPY_H

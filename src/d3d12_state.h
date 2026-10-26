@@ -39,9 +39,10 @@ typedef enum mrhiD3d12Lane
 // undefined parts are in the initial state; a placed target is discarded
 // at its first use, which D3D12 asks of placed render target and depth
 // textures before anything else. The bytes of a device's zeros, which
-// resolves and clears copy in pieces: D3D12's placement alignment, so no
-// smaller buffer takes less memory.
-#define MRHI_D3D12_ZERO_BYTES UINT64_C(65536)
+// resolves and clears copy in pieces: enough that a texture's clear by
+// copies is not slowed by their count, which made 64 KiB of them take
+// 2.5 times as long on WARP.
+#define MRHI_D3D12_ZERO_BYTES UINT64_C(1048576)
 // The views a slot holds for clears beside one a frame resource: a clear
 // past them copies zeros instead.
 #define MRHI_D3D12_CLEAR_VIEWS 256u

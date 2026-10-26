@@ -86,6 +86,10 @@ typedef enum mrhiCommandType
     // Zeros a buffer's range. a: the frame resource's slot plus one;
     // c: the offset; d: the bytes, a positive multiple of 4.
     mrhiCommandClearBuffer,
+    // Zeros a whole texture, every mip, layer or depth slice and aspect,
+    // in the copy destination state. a: the frame resource's slot plus
+    // one, an imported texture.
+    mrhiCommandClearTexture,
     // One past the last type.
     mrhiCommandTypeEnd,
 } mrhiCommandType;

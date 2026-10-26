@@ -40,6 +40,8 @@ typedef struct mrhiMetalFrames
     mrhiMetalLanes lanes;
     // The depth and stencil state of a pipeline without one.
     id<MTLDepthStencilState> noDepth;
+    // The zeros copies into new textures read.
+    id<MTLBuffer> zeros;
     // Whether the device draws counted multi-draws, and the kernel that
     // clamps their records, made when it does.
     bool counted;

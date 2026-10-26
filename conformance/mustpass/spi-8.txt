@@ -1,4 +1,4 @@
-# Maul RHI conformance cases, SPI version 7.
+# Maul RHI conformance cases, SPI version 8.
 # A driver is admitted on a run that passes every case listed.
 api.adapters
 api.devices
@@ -33,6 +33,7 @@ hazards.read_states
 transfers.round_trip
 transfers.clear
 transfers.zeroed_buffers
+transfers.zeroed_textures
 swapchain.foreign_sources
 swapchain.present
 loss.simulated

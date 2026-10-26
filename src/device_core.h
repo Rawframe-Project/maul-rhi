@@ -134,6 +134,10 @@ typedef struct mrhiTextureSlot
     uint64_t handle;
     mrhiTextureDef def;
     uint32_t firstView;
+    // Whether no submitted frame has imported it, so the next that does
+    // zeroes it first; an adopted image and a transient texture never
+    // are.
+    bool fresh;
     mrhiImport import;
     // The state frames leave it in, and the one every frame ends an
     // adopted image in (undefined for the others).
@@ -709,15 +713,15 @@ void mrhiApplyFinalStates(mrhiDevice* device);
 mrhiResult mrhiCompile(mrhiDevice* device);
 
 // Opens the frame's first pass, the library's own, which zeroes the
-// fresh buffers the frame imports.
+// fresh buffers and textures the frame imports.
 void mrhiBeginZeroPass(mrhiDevice* device);
 
-// Gives the first pass a whole-buffer copy destination use of a fresh
-// buffer the frame has just imported, by its frame slot plus one.
+// Gives the first pass a whole copy destination use of a fresh buffer or
+// texture the frame has just imported, by its frame slot plus one.
 void mrhiZeroOnFirstUse(mrhiDevice* device, uint32_t resource);
 
-// After a frame was submitted: the buffers its first pass zeroed are no
-// longer fresh.
+// After a frame was submitted: the buffers and textures it imported are
+// no longer fresh.
 void mrhiMarkZeroed(mrhiDevice* device);
 
 // Whether a format can take the usages on the device.
