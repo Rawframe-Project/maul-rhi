@@ -30,7 +30,7 @@ defaults:
 jobs:
   # Whether anything beyond documentation changed; the builds skip when not.
   changes:
-    uses: Rawframe-Project/.github/.github/workflows/changes.yml@c3e9ba81140f28b7df1ccfb172c031b6e164a73f # v0.0.24
+    uses: Rawframe-Project/.github/.github/workflows/changes.yml@56543e92d01e59abdb4299c4824a0c1facdc08ce # v0.0.25
     permissions:
       pull-requests: read
 
@@ -46,12 +46,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Rawframe-Project/.github/.github/actions/docs-check@c3e9ba81140f28b7df1ccfb172c031b6e164a73f # v0.0.24
+      - uses: Rawframe-Project/.github/.github/actions/docs-check@56543e92d01e59abdb4299c4824a0c1facdc08ce # v0.0.25
         with:
           exclude: khronos directx
 
   zizmor:
-    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@c3e9ba81140f28b7df1ccfb172c031b6e164a73f # v0.0.24
+    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@56543e92d01e59abdb4299c4824a0c1facdc08ce # v0.0.25
     permissions:
       contents: read
 
@@ -140,7 +140,7 @@ jobs:
           - { preset: macos-clang-debug, runner: macos-26, setup: tools/ci_metal.sh }
           - { preset: windows-d3d12, runner: windows-2025, setup: tools/ci_agility.sh }
           - { preset: windows-vulkan, runner: windows-2025 }
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@c3e9ba81140f28b7df1ccfb172c031b6e164a73f # v0.0.24
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@56543e92d01e59abdb4299c4824a0c1facdc08ce # v0.0.25
     permissions:
       contents: read
     with:
@@ -280,10 +280,11 @@ jobs:
   # changed restores its latest corpus of an earlier build, since a corpus
   # is only inputs, which stay valid against a new binary. After the run
   # the fuzzer's merge minimizes the seeds and the corpus together against
-  # this binary, and the result is saved for the next night. The summary
-  # compares the seeds' coverage with the corpus's. No run uploads the
-  # corpus or a finding: the corpus stays in the cache, and a finding is
-  # reported without its input.
+  # this binary, and the result is saved for the next night unless the
+  # run found something, as its corpus holds inputs near the finding. The
+  # summary compares the seeds' coverage with the corpus's. No run uploads
+  # the corpus or a finding: the corpus stays in the cache, and a finding
+  # is reported without its input.
   fuzz-nightly:
     needs: fuzz-targets
     strategy:
@@ -372,7 +373,7 @@ jobs:
   # and never retried, until the Agility SDK fixes it.
   windows-d3d12-states:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@c3e9ba81140f28b7df1ccfb172c031b6e164a73f # v0.0.24
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@56543e92d01e59abdb4299c4824a0c1facdc08ce # v0.0.25
     permissions:
       contents: read
     with:
