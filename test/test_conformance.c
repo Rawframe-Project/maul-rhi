@@ -577,6 +577,7 @@ static Case s_cases[] = {
     {"hazards.read_states", 0, 0},
     {"transfers.round_trip", 0, 0},
     {"transfers.clear", 0, 0},
+    {"transfers.zeroed_buffers", 0, 0},
     {"swapchain.foreign_sources", 0, 0},
     {"swapchain.present", 0, 0},
     {"loss.simulated", 0, 0},
@@ -668,6 +669,69 @@ static bool Taken(mrhiDevice* device, mrhiRequestId request, const uint8_t* expe
 // read back; then read again in a frame that
 // destroys the buffer after recording, which it must keep until the
 // frame finishes.
+// Reads a buffer back whole in a frame of its own, after an upload of
+// pattern when it is not NULL: whether the bytes taken are expected.
+static bool ReadsAs(mrhiDevice* device, mrhiBufferId buffer, const uint8_t* pattern,
+                    const uint8_t* expected, size_t bytes)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId b = {0};
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportBuffer(device, buffer, &b) == mrhi_success,
+          "a frame with the buffer");
+    mrhiAccess write = Whole(b, mrhi_accessCopyDestination);
+    mrhiPassId upload = pattern != nullptr ? CopyPass(device, &write, 1) : (mrhiPassId){0};
+    mrhiAccess read = Whole(b, mrhi_accessCopySource);
+    mrhiPassId back = CopyPass(device, &read, 1);
+    mrhiRequestId request = {0};
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(pattern == nullptr ||
+              (mrhiBeginPass(device, upload) == mrhi_success &&
+               mrhiWriteBuffer(device, upload, b, 0, pattern, bytes) == mrhi_success &&
+               mrhiEndPass(device, upload) == mrhi_success),
+          "the pattern uploaded");
+    CHECK(mrhiBeginPass(device, back) == mrhi_success &&
+              mrhiReadBuffer(device, back, b, 0, bytes, &request) == mrhi_success &&
+              mrhiEndPass(device, back) == mrhi_success,
+          "read back");
+    Finish(device, 1);
+    static uint8_t taken[4096];
+    size_t size = 0;
+    return bytes <= sizeof(taken) &&
+           mrhiTakeReadback(device, request, taken, sizeof(taken), &size) == mrhi_success &&
+           size == bytes && (!s_runs || memcmp(taken, expected, bytes) == 0);
+}
+
+// A new buffer reads as zeros in its first frame, on every driver: one
+// that has never been written, and one made, after a buffer of its size
+// was filled and destroyed, where an allocator may give it the same
+// memory.
+static void CheckZeroedBuffers(mrhiDevice* device)
+{
+    enum
+    {
+        BYTES = 4096,
+    };
+    static uint8_t zeros[BYTES];
+    static uint8_t pattern[BYTES];
+    for (size_t i = 0; i < BYTES; ++i)
+    {
+        pattern[i] = (uint8_t)(0xA5 ^ i);
+    }
+    mrhiBufferId first = MakeBuffer(device, BYTES);
+    CHECK(ReadsAs(device, first, nullptr, zeros, BYTES), "a new buffer reads as zeros");
+    CHECK(ReadsAs(device, first, pattern, pattern, BYTES), "then holds what was written");
+    CHECK(mrhiDestroyBuffer(device, first) == mrhi_success, "destroyed");
+    // A frame of its own, so that the destroyed buffer's memory is free.
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "an empty frame");
+    Finish(device, 0);
+    mrhiBufferId again = MakeBuffer(device, BYTES);
+    CHECK(ReadsAs(device, again, nullptr, zeros, BYTES),
+          "a buffer made where a filled one was reads as zeros");
+    CHECK(mrhiDestroyBuffer(device, again) == mrhi_success, "the objects ended");
+}
+
 static void CheckRoundTrip(mrhiDevice* device)
 {
     uint8_t pattern[1024];
@@ -3615,6 +3679,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     RUN("hazards.read_states", CheckStorageBindings(device, true));
     RUN("api.pipelines", CheckPipelines(device));
     RUN("transfers.round_trip", CheckRoundTrip(device));
+    RUN("transfers.zeroed_buffers", CheckZeroedBuffers(device));
     RUN("hazards.aliasing", CheckAliasing(device));
     RUN("capabilities.feature_formats", CheckFeatureFormats(device, asked));
     CheckDrawing(device, asked->timestampQuery);

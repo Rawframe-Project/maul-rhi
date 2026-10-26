@@ -113,7 +113,6 @@ static void Compile(void)
 enum
 {
     END = 0,
-    ZEROING = 1,
 };
 
 static bool Moves(size_t at, uint32_t pass, mrhiResourceState before, mrhiResourceState after)
@@ -230,9 +229,8 @@ static void TestSealedBuffer(void)
     CHECK(mrhiSealResource(s_device, ImportBuffer(buffer)) == mrhi_success, "sealed");
     Compile();
     // The new buffer is cleared first, so a heap reading it sealed reads
-    // zeros.
-    CHECK(s_count == 2 && Moves(0, ZEROING, mrhi_stateUndefined, mrhi_stateCopyDestination) &&
-              Moves(1, END, mrhi_stateCopyDestination, mrhi_stateSealed),
+    // zeros; a buffer's first use takes no barrier.
+    CHECK(s_count == 1 && Moves(0, END, mrhi_stateCopyDestination, mrhi_stateSealed),
           "zeroed, then sealed at the end");
     Submit();
 
