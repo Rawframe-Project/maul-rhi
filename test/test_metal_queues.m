@@ -89,6 +89,12 @@ static RenderFn s_render;
 static Seen s_seen[BUFFERS];
 static uint32_t s_seenCount;
 static uint32_t s_commitCount;
+// The class of the device's command buffers. A validation layer wraps a
+// command buffer in another of a class that may inherit the same methods,
+// so only calls on objects of this very class are the library's.
+static Class s_class;
+// The failures before the hooks went in.
+static int s_failuresBefore;
 
 static int LaneOf(id<MTLCommandBuffer> buffer)
 {
@@ -104,9 +110,14 @@ static int LaneOf(id<MTLCommandBuffer> buffer)
     return [label isEqualToString:@LABEL] ? LANE_GRAPHICS : -1;
 }
 
-// The command buffer's record, made on first sight: NULL past BUFFERS.
+// The command buffer's record, made on first sight: NULL past BUFFERS,
+// and for an object a layer wraps.
 static Seen* See(id<MTLCommandBuffer> buffer)
 {
+    if (object_getClass(buffer) != s_class)
+    {
+        return nullptr;
+    }
     for (uint32_t i = 0; i < s_seenCount; ++i)
     {
         if (s_seen[i].buffer == (const void*)buffer)
@@ -206,6 +217,7 @@ static void Hook(mrhiDevice* device)
 {
     s_seenCount = 0;
     s_commitCount = 0;
+    s_failuresBefore = s_failures;
     void* native = nullptr;
     void* queue = nullptr;
     CHECK(mrhiGetMetalDevice(device, &native, &queue) == mrhi_success && queue != nullptr,
@@ -217,8 +229,9 @@ static void Hook(mrhiDevice* device)
     Class class_ = nil;
     @autoreleasepool
     {
-        class_ = [[(id<MTLCommandQueue>)queue commandBuffer] class];
+        class_ = object_getClass([(id<MTLCommandQueue>)queue commandBuffer]);
     }
+    s_class = class_;
     s_waitMethod = Swap(class_, @selector(encodeWaitForEvent:value:), (IMP)WaitHook, (IMP*)&s_wait);
     s_signalMethod =
         Swap(class_, @selector(encodeSignalEvent:value:), (IMP)SignalHook, (IMP*)&s_signal);
@@ -230,13 +243,36 @@ static void Hook(mrhiDevice* device)
                           (IMP*)&s_render);
 }
 
-// Puts the methods back as they were; every check ends with it, so a
+// Prints the command buffers seen: lane, place among the commits,
+// encoders, waits and signal.
+static void Dump(void)
+{
+    for (uint32_t i = 0; i < s_seenCount; ++i)
+    {
+        const Seen* seen = &s_seen[i];
+        printf("buffer %u: lane %d, committed %u, encoders %u/%u/%u, signal %p=%llu after %u\n", i,
+               seen->lane, seen->committed, seen->render, seen->compute, seen->blit,
+               seen->signalEvent, (unsigned long long)seen->signal, seen->encodedBeforeSignal);
+        for (uint32_t w = 0; w < seen->waitCount; ++w)
+        {
+            printf("  wait %p>=%llu after %u\n", seen->waitEvents[w],
+                   (unsigned long long)seen->waitValues[w], seen->encodedBeforeWait[w]);
+        }
+    }
+}
+
+// Puts the methods back as they were, after printing what was seen when a
+// check since the hooks went in failed; every check ends with it, so a
 // failed one leaves the next its own Metal.
 static void Unhook(void)
 {
     if (s_commitMethod == nullptr)
     {
         return;
+    }
+    if (s_failures > s_failuresBefore)
+    {
+        Dump();
     }
     method_setImplementation(s_waitMethod, (IMP)s_wait);
     method_setImplementation(s_signalMethod, (IMP)s_signal);
