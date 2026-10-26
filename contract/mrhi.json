@@ -6502,7 +6502,7 @@
             },
             "metal": {
               "class": "direct",
-              "note": "the MTLDevice and a new command queue"
+              "note": "the MTLDevice and a new command queue, with an async compute and a transfer queue beside it"
             },
             "web_gpu": {
               "class": "direct",
@@ -6573,7 +6573,7 @@
             },
             "metal": {
               "class": "direct",
-              "note": "newCommandQueue on the device at the next poll"
+              "note": "newCommandQueue on the device for each lane, and newEvent for their order, at the next poll"
             },
             "web_gpu": {
               "class": "direct",
@@ -6609,7 +6609,7 @@
             },
             "metal": {
               "class": "direct",
-              "note": "waiting on the last command buffer, then releasing the queue"
+              "note": "waiting on the last command buffers, then releasing the queues and events"
             },
             "web_gpu": {
               "class": "direct",
@@ -12210,8 +12210,8 @@
                   "note": "the compute queue, where a compute list makes the pass's texture transitions; else the direct queue"
                 },
                 "metal": {
-                  "class": "direct",
-                  "note": "a second command queue"
+                  "class": "restricted",
+                  "note": "the async compute command queue, after the passes it follows through MTLEvent waits; the graphics queue for a pass touching a surface image"
                 },
                 "web_gpu": {
                   "class": "emulated",
@@ -12234,8 +12234,8 @@
                   "note": "the copy queue for a pass touching buffers only, else the compute queue where a compute list makes its texture transitions, else the direct queue"
                 },
                 "metal": {
-                  "class": "direct",
-                  "note": "a blit encoder"
+                  "class": "restricted",
+                  "note": "a blit encoder on the transfer command queue, after the passes it follows through MTLEvent waits; the graphics queue for a pass touching a surface image"
                 },
                 "web_gpu": {
                   "class": "direct",
@@ -21815,7 +21815,7 @@
               "name": "queue_out",
               "type": "void",
               "pointer": "out",
-              "doc": "Receives the id<MTLCommandQueue> the device commits to."
+              "doc": "Receives the id<MTLCommandQueue> of the device's graphics passes, which a native pass's command buffer comes from."
             }
           ],
           "thread_safety": {
@@ -21825,7 +21825,7 @@
           "mapping": {
             "metal": {
               "class": "direct",
-              "note": "the device and its queue"
+              "note": "the device and its graphics queue"
             },
             "vulkan": {
               "class": "absent_rejected",
@@ -21894,7 +21894,7 @@
         {
           "kind": "function",
           "name": "set_metal_pass_commands",
-          "doc": "Hands a native pass the command buffer the program encoded for it: an id<MTLCommandBuffer> from the device's queue (mrhiGetMetalDevice), with no encoder open, neither enqueued nor committed. The library commits it at the pass's place in the frame, after the library's command buffer before it and before the one after it, and the frame is done only once it has completed too. The program keeps it alive until then.",
+          "doc": "Hands a native pass the command buffer the program encoded for it: an id<MTLCommandBuffer> from the device's graphics queue (mrhiGetMetalDevice), with no encoder open, neither enqueued nor committed. The library commits it at the pass's place in the frame, after the work the pass follows and before the work that follows it, and the frame is done only once it has completed too. The program keeps it alive until then.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success`; `mrhi_errorUnsupported` where the device's driver is not Metal; `mrhi_errorState` outside the pass's recording, or for a pass that already has one; `mrhi_errorInvalid` for a NULL command buffer or a pass that is not native."
@@ -22186,5 +22186,5 @@
       ]
     }
   ],
-  "contract_version": 11
+  "contract_version": 12
 }
