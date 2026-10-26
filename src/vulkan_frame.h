@@ -30,7 +30,11 @@
 // recorded in one lane, a frame's one submission.
 #ifdef MAUL_RHI_VULKAN_SPLIT_LANES
 #define MRHI_VULKAN_LANES 3
-#define MRHI_VULKAN_SPLIT true
+
+// The bytes of the device's zeros, which a texture's clear copies where
+// no clear takes its format, a band of blocks at a time.
+#define MRHI_VULKAN_ZERO_BYTES 65536
+#define MRHI_VULKAN_SPLIT      true
 #else
 #define MRHI_VULKAN_LANES 1
 #define MRHI_VULKAN_SPLIT false
@@ -171,6 +175,8 @@ typedef struct mrhiVulkanFrames
     // under the same serial, resets it again.
     uint64_t recorded;
     uint64_t finished;
+    VkDeviceMemory zerosMemory;
+    VkBuffer zeros;
     VkDeviceMemory readbackMemory;
     VkBuffer readback;
     uint8_t* readbackBytes;

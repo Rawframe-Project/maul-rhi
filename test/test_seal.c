@@ -190,10 +190,11 @@ static void TestSealedTexture(void)
     CHECK(Use(resource, mrhi_accessCopySource, mrhi_passTransfer) == mrhi_success,
           "a later pass of the sealing frame takes any use");
     Compile();
-    CHECK(s_count == 3 && Moves(0, 2, mrhi_stateUndefined, mrhi_stateCopyDestination) &&
-              Moves(1, 3, mrhi_stateCopyDestination, mrhi_stateCopySource) &&
-              Moves(2, END, mrhi_stateCopySource, mrhi_stateSealed),
-          "sealed after the frame's passes");
+    CHECK(s_count == 4 && Moves(0, 1, mrhi_stateUndefined, mrhi_stateCopyDestination) &&
+              Moves(1, 2, mrhi_stateCopyDestination, mrhi_stateCopyDestination) &&
+              Moves(2, 3, mrhi_stateCopyDestination, mrhi_stateCopySource) &&
+              Moves(3, END, mrhi_stateCopySource, mrhi_stateSealed),
+          "zeroed, uploaded, then sealed after the frame's passes");
     Submit();
 
     Begin();

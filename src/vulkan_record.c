@@ -356,6 +356,119 @@ static void CopyTextures(const mrhiVulkanRecording* recording, const mrhiCommand
                                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 }
 
+// The regions one copy of zeros takes at most.
+#define ZERO_REGIONS 32
+
+// The copies of zeros that cover a mip's layer or depth slice, from the
+// device's zeros: rows of blocks in bands as long as the zeros hold, or
+// parts of a row where a row is longer. Each region is laid out tightly
+// from the zeros' start. Returns the regions it added.
+static uint32_t ZeroRegions(VkBufferImageCopy* regions, uint32_t count, const mrhiTextureDef* def,
+                            uint32_t mip, uint32_t z, uint32_t* nextBand, uint32_t* nextColumn)
+{
+    mrhiFormatBlock block = mrhiGetFormatBlock(def->format);
+    uint32_t bytes = mrhiGetFormatCopy(def->format, mrhi_aspectAll).bytes;
+    bool volume = def->kind == mrhi_texture3d;
+    uint32_t width = def->width >> mip > 0 ? def->width >> mip : 1;
+    uint32_t height = def->height >> mip > 0 ? def->height >> mip : 1;
+    uint32_t across = (width + block.width - 1) / block.width;
+    uint32_t down = (height + block.height - 1) / block.height;
+    uint32_t perRow =
+        MRHI_VULKAN_ZERO_BYTES / bytes < across ? MRHI_VULKAN_ZERO_BYTES / bytes : across;
+    uint32_t rows = perRow < across ? 1 : MRHI_VULKAN_ZERO_BYTES / (across * bytes);
+    uint32_t added = 0;
+    for (; *nextBand < down && count + added < ZERO_REGIONS; *nextBand += rows)
+    {
+        for (; *nextColumn < across && count + added < ZERO_REGIONS; *nextColumn += perRow)
+        {
+            uint32_t x = *nextColumn * block.width;
+            uint32_t y = *nextBand * block.height;
+            regions[count + added++] = (VkBufferImageCopy){
+                .imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, mip, volume ? 0 : z, 1},
+                .imageOffset = {(int32_t)x, (int32_t)y, volume ? (int32_t)z : 0},
+                .imageExtent = {width - x < perRow * block.width ? width - x : perRow * block.width,
+                                height - y < rows * block.height ? height - y : rows * block.height,
+                                1},
+            };
+        }
+        if (*nextColumn < across)
+        {
+            break;
+        }
+        *nextColumn = 0;
+    }
+    return added;
+}
+
+// Zeroes a compressed texture, which no clear takes, by copies from the
+// device's zeros, ZERO_REGIONS at a time.
+static void CopyZeros(const mrhiVulkanRecording* recording, mrhiVulkanFrameTexture image)
+{
+    const mrhiTextureDef* def = image.def;
+    bool volume = def->kind == mrhi_texture3d;
+    VkBufferImageCopy regions[ZERO_REGIONS];
+    uint32_t count = 0;
+    for (uint32_t mip = 0; mip < def->mipLevels; ++mip)
+    {
+        uint32_t depth = def->depthOrLayers >> mip > 0 ? def->depthOrLayers >> mip : 1;
+        for (uint32_t z = 0; z < (volume ? depth : def->depthOrLayers); ++z)
+        {
+            uint32_t band = 0;
+            uint32_t column = 0;
+            uint32_t added = 0;
+            do
+            {
+                added = ZeroRegions(regions, count, def, mip, z, &band, &column);
+                count += added;
+                if (count == ZERO_REGIONS)
+                {
+                    recording->frames->api->vkCmdCopyBufferToImage(
+                        recording->slot->commands, recording->frames->zeros, image.image,
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, count, regions);
+                    count = 0;
+                }
+            } while (added > 0);
+        }
+    }
+    if (count > 0)
+    {
+        recording->frames->api->vkCmdCopyBufferToImage(
+            recording->slot->commands, recording->frames->zeros, image.image,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, count, regions);
+    }
+}
+
+// Zeroes a whole texture in the transfer destination layout: one clear
+// of every mip and layer for a color or depth format, copies of zeros
+// for a compressed one.
+static void ClearTexture(const mrhiVulkanRecording* recording, const mrhiCommand* command)
+{
+    mrhiVulkanFrameTexture image = mrhiVulkanFrameImage(recording, command->a);
+    const mrhiTextureDef* def = image.def;
+    const mrhiVulkanDevice* api = recording->frames->api;
+    const VkImageSubresourceRange range = {
+        .aspectMask = mrhiVulkanAspect(mrhi_aspectAll, def->format),
+        .levelCount = VK_REMAINING_MIP_LEVELS,
+        .layerCount = VK_REMAINING_ARRAY_LAYERS,
+    };
+    if (mrhiFormatHasDepth(def->format) || mrhiFormatHasStencil(def->format))
+    {
+        const VkClearDepthStencilValue zero = {0};
+        api->vkCmdClearDepthStencilImage(recording->slot->commands, image.image,
+                                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &zero, 1, &range);
+        return;
+    }
+    mrhiFormatBlock block = mrhiGetFormatBlock(def->format);
+    if (block.width == 1 && block.height == 1)
+    {
+        const VkClearColorValue zero = {0};
+        api->vkCmdClearColorImage(recording->slot->commands, image.image,
+                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &zero, 1, &range);
+        return;
+    }
+    CopyZeros(recording, image);
+}
+
 static void SetPipeline(mrhiVulkanRecording* recording, const mrhiCommand* command)
 {
     const mrhiVulkanPipeline* pipeline = &recording->frames->pipelines->pipelines[command->b - 1];
@@ -528,6 +641,9 @@ static void RecordCommand(mrhiVulkanRecording* recording, const mrhiCommand* com
         recording->frames->api->vkCmdFillBuffer(recording->slot->commands,
                                                 mrhiVulkanFrameBuffer(recording, command->a),
                                                 command->c, command->d, 0);
+        break;
+    case mrhiCommandClearTexture:
+        ClearTexture(recording, command);
         break;
     case mrhiCommandBeginOcclusionQuery:
     case mrhiCommandEndOcclusionQuery:

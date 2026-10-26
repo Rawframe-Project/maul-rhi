@@ -108,6 +108,8 @@ mrhiResult mrhiVulkanCreateTexture(mrhiVulkanObjects* objects, const mrhiTexture
     }
     mrhiVulkanImage image;
     mrhiVulkanImageOf(def, objects->depthStencil, &image);
+    // Every texture, so that the first frame that imports it can clear it.
+    image.info.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     VkResult result =
         objects->api->vkCreateImage(objects->device, &image.info, nullptr, &made->image);
     mrhiResult status = result == VK_SUCCESS ? mrhiVulkanPlace(objects->memory, VK_NULL_HANDLE,

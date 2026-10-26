@@ -122,9 +122,17 @@ static mrhiResourcePlan Plan(mrhiResourceId resource)
 }
 
 static const mrhiPassId kEnd = {0, 0};
+
+// The frame's first pass, the library's, which zeroes new objects.
+static mrhiPassId Zeroing(mrhiPassId any)
+{
+    return (mrhiPassId){1, any.generation};
+}
 static const mrhiTextureAspect kAll = mrhi_aspectAll;
 
 // Render, sample, present; the window's state carried between frames.
+// The window is new, and its first use clears it whole, so no clear of
+// the library's comes first.
 static void TestRenderThenSample(void)
 {
     mrhiTextureId windowTexture = MakeTexture(1, mrhi_textureRenderTarget | mrhi_textureSampled);
@@ -134,7 +142,7 @@ static void TestRenderThenSample(void)
     CHECK(mrhiImportTexture(s_device, windowTexture, &window) == mrhi_success, "imported");
     mrhiPassId draw = Target(scene, mrhi_loadClear, nullptr, 0);
     mrhiAccess sample = Access(scene, mrhi_accessSampled, 0, 1);
-    mrhiPassId compose = Target(window, mrhi_loadDiscard, &sample, 1);
+    mrhiPassId compose = Target(window, mrhi_loadClear, &sample, 1);
     CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 3, "three barriers");
@@ -358,27 +366,31 @@ static void TestLayers(void)
     mrhiPassId fill = Compute(&whole, 1, false);
     CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
-    CHECK(s_count == 7, "seven barriers");
-    CHECK(Is(0, first, array, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateStorageWrite) &&
-              s_barriers[0].range.baseLayer == 1 && s_barriers[0].range.layerCount == 1,
+    CHECK(s_count == 8, "eight barriers");
+    CHECK(Is(0, Zeroing(fill), slices, 0, 1, kAll, mrhi_stateUndefined,
+             mrhi_stateCopyDestination) &&
+              s_barriers[0].range.layerCount == 1,
+          "the new volume zeroed first, as one layer");
+    CHECK(Is(1, first, array, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateStorageWrite) &&
+              s_barriers[1].range.baseLayer == 1 && s_barriers[1].range.layerCount == 1,
           "layer 1 written");
-    CHECK(Is(1, second, array, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateStorageWrite) &&
-              s_barriers[1].range.baseLayer == 2,
+    CHECK(Is(2, second, array, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateStorageWrite) &&
+              s_barriers[2].range.baseLayer == 2,
           "layer 2 written, not from layer 1's state");
-    CHECK(Is(2, read, array, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateSampled) &&
-              s_barriers[2].range.baseLayer == 0 && s_barriers[2].range.layerCount == 1,
-          "layer 0 read");
     CHECK(Is(3, read, array, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateSampled) &&
-              s_barriers[3].range.baseLayer == 3,
+              s_barriers[3].range.baseLayer == 0 && s_barriers[3].range.layerCount == 1,
+          "layer 0 read");
+    CHECK(Is(4, read, array, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateSampled) &&
+              s_barriers[4].range.baseLayer == 3,
           "layer 3 read");
-    CHECK(Is(4, read, array, 0, 1, kAll, mrhi_stateStorageWrite, mrhi_stateSampled) &&
-              s_barriers[4].range.baseLayer == 1,
-          "layer 1 read");
     CHECK(Is(5, read, array, 0, 1, kAll, mrhi_stateStorageWrite, mrhi_stateSampled) &&
-              s_barriers[5].range.baseLayer == 2,
+              s_barriers[5].range.baseLayer == 1,
+          "layer 1 read");
+    CHECK(Is(6, read, array, 0, 1, kAll, mrhi_stateStorageWrite, mrhi_stateSampled) &&
+              s_barriers[6].range.baseLayer == 2,
           "layer 2 read");
-    CHECK(Is(6, fill, slices, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateStorageWrite) &&
-              s_barriers[6].range.layerCount == 1,
+    CHECK(Is(7, fill, slices, 0, 1, kAll, mrhi_stateCopyDestination, mrhi_stateStorageWrite) &&
+              s_barriers[7].range.layerCount == 1,
           "a volume is one layer, with nothing left at the end");
     CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
     CHECK(mrhiDestroyTexture(s_device, volume) == mrhi_success, "done");
@@ -519,10 +531,13 @@ static void TestUnified(void)
     mrhiPassId pass = Compute(&write, 1, false);
     CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
-    CHECK(s_count == 2, "two barriers");
-    CHECK(Is(0, pass, imported, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateStorageWrite),
+    CHECK(s_count == 3, "three barriers");
+    CHECK(Is(0, Zeroing(pass), imported, 0, 3, kAll, mrhi_stateUndefined,
+             mrhi_stateCopyDestination),
+          "the new texture zeroed whole first");
+    CHECK(Is(1, pass, imported, 0, 1, kAll, mrhi_stateCopyDestination, mrhi_stateStorageWrite),
           "mip 0 written");
-    CHECK(Is(1, kEnd, imported, 1, 2, kAll, mrhi_stateUndefined, mrhi_stateStorageWrite),
+    CHECK(Is(2, kEnd, imported, 1, 2, kAll, mrhi_stateCopyDestination, mrhi_stateStorageWrite),
           "the other mips follow at the end");
     Submit();
     Begin();
