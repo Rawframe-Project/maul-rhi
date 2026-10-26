@@ -37,7 +37,7 @@ What checks the lanes, each for its own part:
 - The `linux-lanes` cell runs every suite in the split build with those assertions on, under synchronization validation, which checks every barrier in the queue's order and the timeline semaphores' use.
 - `hazards.pass_classes` reads back wrong values when a pass lands in a batch submitted before one it follows.
 
-On one queue a barrier also waits for every earlier batch, so no check here sees whether a semaphore wait alone orders two lanes on the GPU. That, and a second queue family, wait for an adapter that has one waits for an adapter that has one ([#64](https://github.com/Rawframe-Project/maul-rhi/issues/64)).
+On one queue a barrier also waits for every earlier batch, so no check here sees whether a semaphore wait alone orders two lanes on the GPU. That, and a second queue family, wait for an adapter that has one ([#64](https://github.com/Rawframe-Project/maul-rhi/issues/64)).
 
 The core's resource states map to Vulkan stages, accesses and layouts for its barriers. A barrier marked aliasing waits for all commands' writes. A copy destination's barriers name the clear stage beside the copy stage, since `mrhiClearBuffer` is `vkCmdFillBuffer`.
 
