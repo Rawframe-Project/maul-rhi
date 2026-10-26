@@ -578,6 +578,7 @@ static Case s_cases[] = {
     {"transfers.round_trip", 0, 0},
     {"transfers.clear", 0, 0},
     {"transfers.zeroed_buffers", 0, 0},
+    {"transfers.zeroed_textures", 0, 0},
     {"swapchain.foreign_sources", 0, 0},
     {"swapchain.present", 0, 0},
     {"loss.simulated", 0, 0},
@@ -730,6 +731,155 @@ static void CheckZeroedBuffers(mrhiDevice* device)
     CHECK(ReadsAs(device, again, nullptr, zeros, BYTES),
           "a buffer made where a filled one was reads as zeros");
     CHECK(mrhiDestroyBuffer(device, again) == mrhi_success, "the objects ended");
+}
+
+// A texture of the zeroed textures case: what it is, and its def.
+typedef struct ZeroedTexture
+{
+    const char* what;
+    mrhiFormat format;
+    mrhiTextureKind kind;
+    uint32_t size;
+    uint32_t depthOrLayers;
+    uint32_t mips;
+    mrhiTextureUsage usage;
+} ZeroedTexture;
+
+static mrhiTextureId MakeZeroed(mrhiDevice* device, const ZeroedTexture* z)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = z->format;
+    def.kind = z->kind;
+    def.width = z->size;
+    def.height = z->size;
+    def.depthOrLayers = z->depthOrLayers;
+    def.mipLevels = z->mips;
+    def.usage = z->usage | mrhi_textureCopySource;
+    LABEL(def, "zeroed texture");
+    mrhiTextureId texture = {0};
+    CHECK(mrhiCreateTexture(device, &def, &texture) == mrhi_success, z->what);
+    return texture;
+}
+
+// Reads every mip and layer of a texture, or every depth slice of a
+// volume, in a frame that does nothing else: whether each reads as
+// zeros.
+static bool ReadsZeros(mrhiDevice* device, mrhiTextureId texture, const ZeroedTexture* z)
+{
+    enum
+    {
+        READS = 16,
+    };
+    static const uint8_t zeros[4096];
+    bool depth = z->format == mrhi_formatDepth32Float;
+    bool volume = z->kind == mrhi_texture3d;
+    // BC1 is 4 by 4 texels in 8 bytes; the others, 4 bytes a texel.
+    uint32_t block = z->format == mrhi_formatBc1RgbaUnorm ? 4 : 1;
+    uint32_t bytes = block == 1 ? 4 : 8;
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId t = {0};
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportTexture(device, texture, &t) == mrhi_success,
+          "a frame reading it");
+    mrhiAccess whole = {
+        .resource = t,
+        .kind = mrhi_accessCopySource,
+        .range = {.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING},
+    };
+    mrhiPassId read = CopyPass(device, &whole, 1);
+    CHECK(mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, read) == mrhi_success,
+          "compiled");
+    mrhiRequestId requests[READS];
+    size_t sizes[READS];
+    uint32_t count = 0;
+    for (uint32_t mip = 0; mip < z->mips; ++mip)
+    {
+        uint32_t size = z->size >> mip;
+        uint32_t layers = volume ? 1 : z->depthOrLayers;
+        mrhiExtent3d extent = {size, size, volume ? z->depthOrLayers : 1};
+        for (uint32_t layer = 0; layer < layers && count < READS; ++layer, ++count)
+        {
+            const mrhiTextureCopy source = {
+                .resource = t,
+                .mip = mip,
+                .z = layer,
+                .aspect = depth ? mrhi_aspectDepthOnly : mrhi_aspectAll,
+            };
+            sizes[count] = (size_t)(size / block) * (size / block) * bytes * extent.depthOrLayers;
+            CHECK(mrhiReadTexture(device, read, &source, &extent, &requests[count]) == mrhi_success,
+                  "a mip and layer read");
+        }
+    }
+    CHECK(mrhiEndPass(device, read) == mrhi_success, "read");
+    Finish(device, count);
+    bool zeroed = true;
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        zeroed = Taken(device, requests[i], zeros, sizes[i]) && zeroed;
+    }
+    return zeroed;
+}
+
+// A new texture reads as zeros in every mip and layer, on every driver,
+// whichever way the driver clears it: one only sampled, a render target,
+// a storage texture, a depth target, a volume and, where the device has
+// them, BC1 blocks; and a render target made, after one of its size was
+// cleared to ones and destroyed, where an allocator may give it the same
+// memory.
+static void CheckZeroedTextures(mrhiDevice* device, const mrhiFeatures* granted)
+{
+    const ZeroedTexture textures[] = {
+        {"sampled mips and layers", mrhi_formatRgba8Unorm, mrhi_texture2dArray, 16, 2, 3,
+         mrhi_textureSampled},
+        {"a render target", mrhi_formatRgba8Unorm, mrhi_texture2d, 16, 1, 1,
+         mrhi_textureRenderTarget},
+        {"a storage texture", mrhi_formatR32Float, mrhi_texture2d, 16, 1, 1, mrhi_textureStorage},
+        {"a depth target", mrhi_formatDepth32Float, mrhi_texture2d, 16, 1, 1,
+         mrhi_textureRenderTarget},
+        {"a volume", mrhi_formatRgba8Unorm, mrhi_texture3d, 8, 4, 1, mrhi_textureSampled},
+        {"BC1 blocks", mrhi_formatBc1RgbaUnorm, mrhi_texture2d, 16, 1, 2, mrhi_textureSampled},
+    };
+    for (size_t i = 0; i < sizeof(textures) / sizeof(textures[0]); ++i)
+    {
+        const ZeroedTexture* z = &textures[i];
+        if (z->format == mrhi_formatBc1RgbaUnorm && !granted->textureCompressionBc)
+        {
+            continue;
+        }
+        mrhiTextureId texture = MakeZeroed(device, z);
+        CHECK(ReadsZeros(device, texture, z), z->what);
+        CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "ended");
+    }
+    const ZeroedTexture* target = &textures[1];
+    mrhiTextureId filled = MakeZeroed(device, target);
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId t = {0};
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportTexture(device, filled, &t) == mrhi_success,
+          "a frame filling a target");
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.colorTargets[0] = (mrhiColorTarget){
+        .resource = t,
+        .load = mrhi_loadClear,
+        .store = mrhi_storeKeep,
+        .clear = {1.0, 1.0, 1.0, 1.0},
+    };
+    def.colorTargetCount = 1;
+    mrhiPassId fill = {0};
+    CHECK(mrhiAddPass(device, &def, &fill) == mrhi_success &&
+              mrhiCompileFrame(device) == mrhi_success &&
+              mrhiBeginPass(device, fill) == mrhi_success &&
+              mrhiEndPass(device, fill) == mrhi_success,
+          "cleared to ones");
+    Finish(device, 0);
+    CHECK(mrhiDestroyTexture(device, filled) == mrhi_success, "destroyed");
+    // A frame of its own, so that the destroyed texture's memory is free.
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "an empty frame");
+    Finish(device, 0);
+    mrhiTextureId again = MakeZeroed(device, target);
+    CHECK(ReadsZeros(device, again, target),
+          "a texture made where a filled one was reads as zeros");
+    CHECK(mrhiDestroyTexture(device, again) == mrhi_success, "the objects ended");
 }
 
 static void CheckRoundTrip(mrhiDevice* device)
@@ -3680,6 +3830,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     RUN("api.pipelines", CheckPipelines(device));
     RUN("transfers.round_trip", CheckRoundTrip(device));
     RUN("transfers.zeroed_buffers", CheckZeroedBuffers(device));
+    RUN("transfers.zeroed_textures", CheckZeroedTextures(device, asked));
     RUN("hazards.aliasing", CheckAliasing(device));
     RUN("capabilities.feature_formats", CheckFeatureFormats(device, asked));
     CheckDrawing(device, asked->timestampQuery);

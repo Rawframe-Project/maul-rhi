@@ -33,6 +33,7 @@ hazards.read_states
 transfers.round_trip
 transfers.clear
 transfers.zeroed_buffers
+transfers.zeroed_textures
 swapchain.foreign_sources
 swapchain.present
 loss.simulated
