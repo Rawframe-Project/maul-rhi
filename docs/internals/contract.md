@@ -96,4 +96,4 @@ Several numbers version different things, and each changes for its own reason:
 - **The contract version** (`MRHI_CONTRACT_VERSION`): the revision of `contract/mrhi.json` the headers were generated from.
 - **The SPI version** (`MRHI_SPI_VERSION` in `src/driver.h`): the driver interface's. Any change to the installed SPI headers raises it, and the conformance suite's mustpass list is renamed to it ([conformance.md](conformance.md)).
 - **The container version** (2, in the container's header): any change to the container's bytes raises it ([shaders.md](shaders.md)).
-- **The pipeline cache envelope's version**, beside the library version, driver and adapter it names: a cache from anything else is reported stale and ignored.
+- **The pipeline cache envelope's version**, beside the ABI version, driver and adapter it names: a cache of another envelope or ABI version is refused with `mrhi_errorVersion`, and one from another driver or adapter is reported stale; either is ignored.

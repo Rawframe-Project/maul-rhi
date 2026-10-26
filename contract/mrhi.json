@@ -6483,7 +6483,7 @@
               "name": "pipeline_cache",
               "type": "void",
               "pointer": "const",
-              "doc": "A pipeline cache mrhiGetPipelineCache wrote, or NULL: checked as hostile input, it is used when it came from this library version, driver and adapter, and otherwise ignored. Only read during the call."
+              "doc": "A pipeline cache mrhiGetPipelineCache wrote, or NULL: checked as hostile input, it is used when it came from this ABI version (MRHI_ABI_VERSION), driver and adapter, and otherwise ignored. Only read during the call."
             },
             {
               "name": "pipeline_cache_bytes",
@@ -18494,7 +18494,7 @@
           "doc": "Reports what became of the pipeline cache the device's def gave. An unusable cache never fails a device; it only goes unused.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` for a cache the driver took; `mrhi_empty` when the def gave none; `mrhi_errorStale` for one from another library version, driver or adapter, or one the driver declined; `mrhi_errorInvalid` for a damaged one, or a NULL device."
+            "doc": "`mrhi_success` for a cache the driver took; `mrhi_empty` when the def gave none; `mrhi_errorVersion` for one of another ABI version (MRHI_ABI_VERSION) or envelope version; `mrhi_errorStale` for one from another driver or adapter, or one the driver declined; `mrhi_errorInvalid` for a damaged one, or a NULL device."
           },
           "args": [
             {
@@ -22186,5 +22186,5 @@
       ]
     }
   ],
-  "contract_version": 9
+  "contract_version": 10
 }

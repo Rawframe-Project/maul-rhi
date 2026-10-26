@@ -118,8 +118,9 @@ extern "C"
         mrhiDeviceLimits deviceLimits;
         mrhiAllocator allocator;
         // A pipeline cache mrhiGetPipelineCache wrote, or NULL: checked as
-        // hostile input, it is used when it came from this library version,
-        // driver and adapter, and otherwise ignored. Only read during the call.
+        // hostile input, it is used when it came from this ABI version
+        // (MRHI_ABI_VERSION), driver and adapter, and otherwise ignored. Only
+        // read during the call.
         const void* pipelineCache;
         // Its size.
         size_t pipelineCacheBytes;

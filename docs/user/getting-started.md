@@ -111,7 +111,7 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
 | `mrhi_errorCapacity` | A limit is reached. |
 | `mrhi_errorUnsupported` | The adapter or driver cannot do it. |
 | `mrhi_errorState` | The object is in the wrong state for the call. |
-| `mrhi_errorVersion` | The program was built against other headers, or a container or cache has another format version. |
+| `mrhi_errorVersion` | The program was built against other headers, a container has another format version, or a pipeline cache another ABI or envelope version. |
 | `mrhi_errorOutOfDate` | A surface must be configured again. |
 | `mrhi_errorPlatform` | The platform refused, for a reason the library cannot name. |
 | `mrhi_errorDeviceLost` | The device is lost; see [devices](devices.md#device-loss). |
