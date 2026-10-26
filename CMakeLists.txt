@@ -182,8 +182,8 @@ if(MAUL_RHI_METAL_DRIVER)
     enable_language(OBJC)
     target_sources(maul-rhi PRIVATE src/driver_metal.m src/metal_device.m src/metal_names.m
                                    src/metal_copy.m src/metal_encode.m src/metal_frame.m
-                                   src/metal_graphics.m src/metal_pipeline.m src/metal_resource.m
-                                   src/metal_surface.m)
+                                   src/metal_graphics.m src/metal_lanes.m src/metal_pipeline.m
+                                   src/metal_resource.m src/metal_surface.m)
     target_compile_definitions(maul-rhi PRIVATE MAUL_RHI_METAL_DRIVER)
     # The family's C23 for Objective-C, with manual retain and release so
     # that Metal objects sit in plain C structs.
@@ -242,16 +242,19 @@ if(MAUL_RHI_BUILD_TESTS)
         endforeach()
     endif()
     if(MAUL_RHI_METAL_DRIVER)
-        # A native pass on Metal, in Objective-C as the driver is, without
-        # ARC.
-        add_executable(test_metal_native test/test_metal_native.m)
-        target_link_libraries(test_metal_native PRIVATE maul-rhi "-framework Metal"
-                              "-framework Foundation")
-        set_target_properties(test_metal_native PROPERTIES OBJC_STANDARD 23
-                                                           OBJC_STANDARD_REQUIRED ON)
-        target_compile_options(test_metal_native PRIVATE -fno-objc-arc)
-        maul_apply_flags(test_metal_native)
-        add_test(NAME metal_native COMMAND test_metal_native)
+        # A native pass on Metal, and the queues a frame's passes run on,
+        # seen through the command buffers' methods the suite swaps; in
+        # Objective-C as the driver is, without ARC.
+        foreach(test metal_native metal_queues)
+            add_executable(test_${test} test/test_${test}.m)
+            target_link_libraries(test_${test} PRIVATE maul-rhi "-framework Metal"
+                                  "-framework Foundation")
+            set_target_properties(test_${test} PROPERTIES OBJC_STANDARD 23
+                                                          OBJC_STANDARD_REQUIRED ON)
+            target_compile_options(test_${test} PRIVATE -fno-objc-arc)
+            maul_apply_flags(test_${test})
+            add_test(NAME ${test} COMMAND test_${test})
+        endforeach()
     endif()
     if(MAUL_RHI_D3D12_DRIVER)
         # A native pass on D3D12, and the queues a frame's passes run on,
@@ -494,7 +497,7 @@ if(MAUL_RHI_BUILD_TESTS)
     # The tests that drive a real GPU, window or browser: the changed-files
     # check leaves them out, every other check runs them.
     foreach(test conformance conformance_worker conformance_external conformance_app
-                 vulkan_external vulkan_frame metal_native d3d12_native d3d12_queues
+                 vulkan_external vulkan_frame metal_native metal_queues d3d12_native d3d12_queues
                  external_build)
         if(TEST ${test})
             set_property(TEST ${test} APPEND PROPERTY LABELS integration)

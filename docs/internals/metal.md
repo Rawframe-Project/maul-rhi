@@ -34,9 +34,9 @@ Vertex attributes take their locations as attribute indices, and vertex buffer n
 
 ## Frames
 
-A frame is recorded at submission into one command buffer: a render encoder for a pass with targets, a compute encoder for one without, a blit encoder for a transfer pass. Copies and resolves in a compute pass leave it for a blit encoder, and the next compute encoder takes up the pipeline and state again, the pass's debug groups closed and reopened per encoder. Bindings, the root block and SPIRV-Cross's buffer sizes are applied through the pipeline's map before each draw or dispatch.
+A frame is recorded at submission into command buffers on its lanes (below): a render encoder for a pass with targets, a compute encoder for one without, a blit encoder for a transfer pass. Copies and resolves in a compute pass leave it for a blit encoder, and the next compute encoder takes up the pipeline and state again, the pass's debug groups closed and reopened per encoder. Bindings, the root block and SPIRV-Cross's buffer sizes are applied through the pipeline's map before each draw or dispatch.
 
-Metal tracks hazards between encoders itself, so the core's barriers need no commands. Uploads are copied into the slot's shared staging buffer, and readbacks land in a shared mirror of the ring, copied into it once the frame finishes. The query sets a frame resolves are cleared first, so a query it does not write reads zero. A poll reads each command buffer's status in order; a waiting program waits on a semaphore the completion signals; a failed command buffer is the device's loss. A destroyed pipeline is released after the next frame's commit.
+Metal tracks hazards between encoders on a queue itself, so the core's barriers need no commands. Uploads are copied into the slot's shared staging buffer, and readbacks land in a shared mirror of the ring, copied into it once the frame finishes. The query sets a frame resolves are cleared first, so a query it does not write reads zero. A poll reads the status of every command buffer the frame committed; a waiting program waits on a semaphore the last completion signals; a failed command buffer is the device's loss. A destroyed pipeline is released after the next frame's commit.
 
 `mrhiClearBuffer` is `fillBuffer:range:value:`. Counted multi-draw is emulated: a compute pass of the library's copies the records into scratch, every record past the count drawing no instances, then `maxCount` indirect draws run from the scratch. Multiview is vertex amplification onto layers, as many views as the device amplifies to; the container's MSL for a view-index entry reads the amplification id (vertex) or the render target array index (fragment), which `tools/mrhi_msl.py` substitutes for SPIRV-Cross's constant view index. Draws and indirect records stay as they are, where instanced views would have changed every vertex entry and every indirect draw.
 
@@ -44,9 +44,19 @@ Metal tracks hazards between encoders itself, so the core's barriers need no com
 
 A surface is a retained `CAMetalLayer`, and every adapter presents to it: 8-bit sRGB in Rec. 709 and Display P3, and linear half floats of standard or extended range in both; fifo, and immediate on macOS; opaque or premultiplied alpha. Configuring sets the layer's device, pixel format, color space, extended range, drawable size, synchronization and opacity. The program's size is its own, since the layer scales drawables to its bounds. An acquire takes the next drawable: out of date when something else resized the drawables, suboptimal while the layer's bounds in pixels differ. A frame presents each image it acquired after its work.
 
+## Queues
+
+A device holds three command queues, one per lane (`metal_lanes.m`): the graphics queue, which `mrhiGetMetalDevice` returns, and an async compute and a transfer queue beside it, labelled as the device is with the lane's name after. A pass runs on its class's queue, except that a pass touching a surface image runs on the graphics queue, where the frame presents. Metal's queues are not typed, so every other pass can run where its class says.
+
+The lanes are ordered with an `MTLEvent` per lane. A pass follows the passes its `waitFor` names and the pass of its class before it. A lane's passes go in the frame's order into batches: a new batch where a pass follows a pass on another lane, and the batch ends after a pass that another lane follows. A batch is one command buffer, committed when it ends. It first waits for the other lanes' batches its first pass follows. It then signals its lane's event with the lane's next value.
+
+Metal updates an event once the command buffer's earlier commands have finished, not the queue's, so a signal alone does not show that the lane's earlier command buffers have finished. Each batch therefore also waits for its lane's batch before it, which makes each signal stand for all of the lane's work up to it. Each lane's first batch of a frame waits for every event's value before the frame, so a frame's work follows all of the frame before. A wait names only batches committed before it, so no wait can block for good.
+
+That a second queue overlaps the first is not measured: CI's macOS runners have the Apple Paravirtual device, and `test_metal_queues` checks the batches, their waits and their signals, not the timing.
+
 ## Native passes
 
-`mrhiSetMetalPassCommands` takes a command buffer from the device's queue with no encoder open, not committed. The driver commits its own command buffer, the program's, and its next one, in order; Metal tracks the hazards between them. A frame is done when every command buffer it committed has completed, the program's included.
+`mrhiSetMetalPassCommands` takes a command buffer from the device's graphics queue with no encoder open, not committed. The program's command buffer can take no wait at its start, so the driver commits its graphics batch, then a command buffer that only waits for what the native pass follows and for that batch, then the program's. The graphics queue does not run past a wait until it is met. The driver encodes a signal of a native event at the end of the program's command buffer before committing it, and every later batch that follows the native pass waits for that signal. A frame is done when every command buffer it committed has completed, the program's included.
 
 ## Debugging
 
