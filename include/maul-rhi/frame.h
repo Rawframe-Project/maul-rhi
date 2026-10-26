@@ -98,7 +98,7 @@ extern "C"
     /// closes it. Its token is answered by one mrhi_deviceFrameDone record.
     ///
     /// @param device    The device.
-    /// @param tokenOut  Receives the frame's token.
+    /// @param tokenOut  Receives the frame's token; the null id on any failure.
     /// @return `mrhi_success` with the token; `mrhi_errorInvalid` for a NULL
     /// argument; `mrhi_errorState` for a device without an open frame, or a
     /// pass begun and not ended, the frame staying open;
@@ -175,7 +175,8 @@ extern "C"
     ///
     /// @param device       The device.
     /// @param def          The texture, with a usage of 0.
-    /// @param resourceOut  Receives the frame's id for it.
+    /// @param resourceOut  Receives the frame's id for it; the null id on any
+    ///                     failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a label that is not UTF-8 without NUL within
     /// MRHI_LABEL_BYTES, a usage other than 0, or a shape mrhiCreateTexture
@@ -195,7 +196,8 @@ extern "C"
     ///
     /// @param device       The device.
     /// @param def          The buffer, with a usage of 0.
-    /// @param resourceOut  Receives the frame's id for it.
+    /// @param resourceOut  Receives the frame's id for it; the null id on any
+    ///                     failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a label that is not UTF-8 without NUL within
     /// MRHI_LABEL_BYTES, a usage other than 0, or a size that is zero or not a
@@ -214,7 +216,8 @@ extern "C"
     ///
     /// @param device       The device.
     /// @param texture      The texture.
-    /// @param resourceOut  Receives the frame's id for it.
+    /// @param resourceOut  Receives the frame's id for it; the null id on any
+    ///                     failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
     /// `mrhi_errorStale` for a texture the device no longer has;
     /// `mrhi_errorState` for a device without an open frame;
@@ -229,7 +232,8 @@ extern "C"
     ///
     /// @param device       The device.
     /// @param buffer       The buffer.
-    /// @param resourceOut  Receives the frame's id for it.
+    /// @param resourceOut  Receives the frame's id for it; the null id on any
+    ///                     failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
     /// `mrhi_errorStale` for a buffer the device no longer has;
     /// `mrhi_errorState` for a device without an open frame;
@@ -248,7 +252,7 @@ extern "C"
     /// @param device    The device.
     /// @param surface   A surface configured on the device.
     /// @param imageOut  Receives the frame's id for the image, or a null id
-    ///                  without one.
+    ///                  without one or on any failure.
     /// @return `mrhi_success` or `mrhi_suboptimal` with an image;
     /// `mrhi_occluded` without one, the window hidden or without size;
     /// `mrhi_errorOutOfDate` without one, the surface to be configured again
@@ -545,7 +549,7 @@ extern "C"
     ///
     /// @param device   The device.
     /// @param def      The pass.
-    /// @param passOut  Receives the pass.
+    /// @param passOut  Receives the pass; the null id on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a bad label, an unknown class, kind, aspect or
     /// operation, an access or target its resource cannot take (a kind for the

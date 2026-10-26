@@ -284,7 +284,7 @@ extern "C"
     ///
     /// @param device     The device.
     /// @param def        The container.
-    /// @param shaderOut  Receives the shader.
+    /// @param shaderOut  Receives the shader; the null id on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a bad label, or bytes that are not 8-byte aligned;
     /// `mrhi_errorFormat` for a container that is malformed, damaged or

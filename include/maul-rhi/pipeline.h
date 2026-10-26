@@ -474,8 +474,9 @@ extern "C"
     ///
     /// @param device       The device.
     /// @param def          The pipeline to make.
-    /// @param pipelineOut  Receives the pipeline.
-    /// @param requestOut   Receives the id its ready record answers.
+    /// @param pipelineOut  Receives the pipeline; the null id on any failure.
+    /// @param requestOut   Receives the id its ready record answers; the null
+    ///                     id on any failure.
     /// @return `mrhi_success` with the pipeline pending; `mrhi_errorInvalid`
     /// for a NULL argument, a def without its cookie, a bad label, a NULL
     /// vertex entry, a NULL fragment entry with a length, constants as for
@@ -564,8 +565,9 @@ extern "C"
     ///
     /// @param device       The device.
     /// @param def          The pipeline to make.
-    /// @param pipelineOut  Receives the pipeline.
-    /// @param requestOut   Receives the id its ready record answers.
+    /// @param pipelineOut  Receives the pipeline; the null id on any failure.
+    /// @param requestOut   Receives the id its ready record answers; the null
+    ///                     id on any failure.
     /// @return `mrhi_success` with the pipeline pending; `mrhi_errorInvalid`
     /// for a NULL argument, a def without its cookie, a bad label, a NULL
     /// entry, NULL constants with a count, or a constant given twice;

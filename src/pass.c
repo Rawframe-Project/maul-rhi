@@ -591,6 +591,10 @@ static void MeasureTargets(const mrhiDevice* device, mrhiFramePass* pass)
 
 mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* passOut)
 {
+    if (passOut != nullptr)
+    {
+        *passOut = (mrhiPassId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;

@@ -28,6 +28,10 @@ static mrhiResult Add(mrhiDevice* device, mrhiFrameResource resource, mrhiResour
 mrhiResult mrhiDeclareTexture(mrhiDevice* device, const mrhiTextureDef* def,
                               mrhiResourceId* resourceOut)
 {
+    if (resourceOut != nullptr)
+    {
+        *resourceOut = (mrhiResourceId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
@@ -55,6 +59,10 @@ mrhiResult mrhiDeclareTexture(mrhiDevice* device, const mrhiTextureDef* def,
 mrhiResult mrhiDeclareBuffer(mrhiDevice* device, const mrhiBufferDef* def,
                              mrhiResourceId* resourceOut)
 {
+    if (resourceOut != nullptr)
+    {
+        *resourceOut = (mrhiResourceId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
@@ -96,6 +104,10 @@ static mrhiResult Import(mrhiDevice* device, mrhiImport* import, mrhiFrameResour
 
 mrhiResult mrhiImportTexture(mrhiDevice* device, mrhiTextureId texture, mrhiResourceId* resourceOut)
 {
+    if (resourceOut != nullptr)
+    {
+        *resourceOut = (mrhiResourceId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
@@ -124,6 +136,10 @@ mrhiResult mrhiImportTexture(mrhiDevice* device, mrhiTextureId texture, mrhiReso
 
 mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer, mrhiResourceId* resourceOut)
 {
+    if (resourceOut != nullptr)
+    {
+        *resourceOut = (mrhiResourceId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
@@ -234,6 +250,10 @@ static mrhiTextureDef ImageDef(const mrhiSurfaceConfig* config)
 mrhiResult mrhiAcquireSurfaceImage(mrhiDevice* device, mrhiSurfaceId surface,
                                    mrhiResourceId* imageOut)
 {
+    if (imageOut != nullptr)
+    {
+        *imageOut = (mrhiResourceId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
@@ -242,7 +262,6 @@ mrhiResult mrhiAcquireSurfaceImage(mrhiDevice* device, mrhiSurfaceId surface,
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
-    *imageOut = (mrhiResourceId){0};
     if (mrhiFindSurface(device->instance, surface) == 0)
     {
         return mrhi_errorStale;

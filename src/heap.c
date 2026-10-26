@@ -34,6 +34,10 @@ static size_t TableBytes(uint32_t entries, uint32_t samplers)
 
 mrhiResult mrhiCreateHeap(mrhiDevice* device, const mrhiHeapDef* def, mrhiHeapId* heapOut)
 {
+    if (heapOut != nullptr)
+    {
+        *heapOut = (mrhiHeapId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;

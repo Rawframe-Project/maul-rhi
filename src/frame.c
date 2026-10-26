@@ -248,6 +248,10 @@ mrhiResult mrhiDropFrame(mrhiDevice* device)
 
 mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
 {
+    if (tokenOut != nullptr)
+    {
+        *tokenOut = (mrhiRequestId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;

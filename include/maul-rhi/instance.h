@@ -298,7 +298,8 @@ extern "C"
     ///
     /// @param instance    The instance.
     /// @param def         The adapters to look for.
-    /// @param requestOut  Receives the request's id.
+    /// @param requestOut  Receives the request's id; the null id on any
+    ///                    failure.
     /// @return `mrhi_success` with the request accepted; `mrhi_errorInvalid`
     /// for a NULL argument or a def without its cookie; `mrhi_errorStale` for a
     /// compatible surface the instance no longer has; `mrhi_errorUnsupported`

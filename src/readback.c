@@ -137,6 +137,10 @@ static uint64_t RingOffset(const mrhiDevice* device, const mrhiReadback* readbac
 mrhiResult mrhiReadBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId resource,
                           uint64_t offset, uint64_t size, mrhiRequestId* requestOut)
 {
+    if (requestOut != nullptr)
+    {
+        *requestOut = (mrhiRequestId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
@@ -191,6 +195,10 @@ mrhiResult mrhiReadBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId reso
 mrhiResult mrhiReadTexture(mrhiDevice* device, mrhiPassId id, const mrhiTextureCopy* source,
                            const mrhiExtent3d* size, mrhiRequestId* requestOut)
 {
+    if (requestOut != nullptr)
+    {
+        *requestOut = (mrhiRequestId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;

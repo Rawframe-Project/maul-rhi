@@ -167,6 +167,10 @@ static mrhiResult CheckShaderDef(mrhiDevice* device, const mrhiShaderDef* def,
 
 mrhiResult mrhiCreateShader(mrhiDevice* device, const mrhiShaderDef* def, mrhiShaderId* shaderOut)
 {
+    if (shaderOut != nullptr)
+    {
+        *shaderOut = (mrhiShaderId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;

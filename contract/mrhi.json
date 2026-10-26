@@ -1448,7 +1448,7 @@
               "name": "request_out",
               "type": "id.request_id",
               "pointer": "mutable",
-              "doc": "Receives the request's id."
+              "doc": "Receives the request's id; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -6549,13 +6549,13 @@
               "name": "device_out",
               "type": "opaque.device",
               "pointer": "out",
-              "doc": "Receives the device; set to NULL on failure."
+              "doc": "Receives the device; set to NULL on any failure."
             },
             {
               "name": "request_out",
               "type": "id.request_id",
               "pointer": "mutable",
-              "doc": "Receives the id its ready record answers."
+              "doc": "Receives the id its ready record answers; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -7755,7 +7755,7 @@
               "name": "sampler_out",
               "type": "id.sampler_id",
               "pointer": "mutable",
-              "doc": "Receives the sampler."
+              "doc": "Receives the sampler; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -8164,7 +8164,7 @@
               "name": "buffer_out",
               "type": "id.buffer_id",
               "pointer": "mutable",
-              "doc": "Receives the buffer."
+              "doc": "Receives the buffer; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -8820,7 +8820,7 @@
               "name": "texture_out",
               "type": "id.texture_id",
               "pointer": "mutable",
-              "doc": "Receives the texture."
+              "doc": "Receives the texture; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -9281,7 +9281,7 @@
               "name": "view_out",
               "type": "id.view_id",
               "pointer": "mutable",
-              "doc": "Receives the view."
+              "doc": "Receives the view; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -9581,7 +9581,7 @@
               "name": "set_out",
               "type": "id.query_set_id",
               "pointer": "mutable",
-              "doc": "Receives the query set."
+              "doc": "Receives the query set; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -10030,7 +10030,7 @@
               "name": "heap_out",
               "type": "id.heap_id",
               "pointer": "mutable",
-              "doc": "Receives the heap."
+              "doc": "Receives the heap; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -11088,7 +11088,7 @@
               "name": "surface_out",
               "type": "id.surface_id",
               "pointer": "mutable",
-              "doc": "Receives the surface."
+              "doc": "Receives the surface; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -11732,7 +11732,7 @@
               "name": "token_out",
               "type": "id.request_id",
               "pointer": "mutable",
-              "doc": "Receives the frame's token."
+              "doc": "Receives the frame's token; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -11911,7 +11911,7 @@
               "name": "resource_out",
               "type": "id.resource_id",
               "pointer": "mutable",
-              "doc": "Receives the frame's id for it."
+              "doc": "Receives the frame's id for it; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -11963,7 +11963,7 @@
               "name": "resource_out",
               "type": "id.resource_id",
               "pointer": "mutable",
-              "doc": "Receives the frame's id for it."
+              "doc": "Receives the frame's id for it; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -12014,7 +12014,7 @@
               "name": "resource_out",
               "type": "id.resource_id",
               "pointer": "mutable",
-              "doc": "Receives the frame's id for it."
+              "doc": "Receives the frame's id for it; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -12047,7 +12047,7 @@
               "name": "resource_out",
               "type": "id.resource_id",
               "pointer": "mutable",
-              "doc": "Receives the frame's id for it."
+              "doc": "Receives the frame's id for it; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -12080,7 +12080,7 @@
               "name": "image_out",
               "type": "id.resource_id",
               "pointer": "mutable",
-              "doc": "Receives the frame's id for the image, or a null id without one."
+              "doc": "Receives the frame's id for the image, or a null id without one or on any failure."
             }
           ],
           "thread_safety": {
@@ -13064,7 +13064,7 @@
               "name": "pass_out",
               "type": "id.pass_id",
               "pointer": "mutable",
-              "doc": "Receives the pass."
+              "doc": "Receives the pass; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -15208,7 +15208,7 @@
               "name": "shader_out",
               "type": "id.shader_id",
               "pointer": "mutable",
-              "doc": "Receives the shader."
+              "doc": "Receives the shader; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -18172,13 +18172,13 @@
               "name": "pipeline_out",
               "type": "id.graphics_pipeline_id",
               "pointer": "mutable",
-              "doc": "Receives the pipeline."
+              "doc": "Receives the pipeline; the null id on any failure."
             },
             {
               "name": "request_out",
               "type": "id.request_id",
               "pointer": "mutable",
-              "doc": "Receives the id its ready record answers."
+              "doc": "Receives the id its ready record answers; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -18356,13 +18356,13 @@
               "name": "pipeline_out",
               "type": "id.compute_pipeline_id",
               "pointer": "mutable",
-              "doc": "Receives the pipeline."
+              "doc": "Receives the pipeline; the null id on any failure."
             },
             {
               "name": "request_out",
               "type": "id.request_id",
               "pointer": "mutable",
-              "doc": "Receives the id its ready record answers."
+              "doc": "Receives the id its ready record answers; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -20484,7 +20484,7 @@
               "name": "request_out",
               "type": "id.request_id",
               "pointer": "mutable",
-              "doc": "The readback's request, answered by mrhi_deviceReadbackReady after the frame; untouched on failure."
+              "doc": "The readback's request, answered by mrhi_deviceReadbackReady after the frame; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -20546,7 +20546,7 @@
               "name": "request_out",
               "type": "id.request_id",
               "pointer": "mutable",
-              "doc": "The readback's request, answered by mrhi_deviceReadbackReady after the frame; untouched on failure."
+              "doc": "The readback's request, answered by mrhi_deviceReadbackReady after the frame; the null id on any failure."
             }
           ],
           "thread_safety": {
@@ -22186,5 +22186,5 @@
       ]
     }
   ],
-  "contract_version": 10
+  "contract_version": 11
 }

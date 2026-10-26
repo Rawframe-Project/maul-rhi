@@ -397,19 +397,22 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
 mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
                             mrhiDevice** deviceOut, mrhiRequestId* requestOut)
 {
+    if (deviceOut != nullptr)
+    {
+        *deviceOut = nullptr;
+    }
+    if (requestOut != nullptr)
+    {
+        *requestOut = (mrhiRequestId){0};
+    }
     if (instance == nullptr)
     {
         return mrhi_errorInvalid;
     }
     if (deviceOut == nullptr || requestOut == nullptr || def == nullptr)
     {
-        if (deviceOut != nullptr)
-        {
-            *deviceOut = nullptr;
-        }
         return mrhiMisuse(instance, mrhi_diagnosticNullArgument);
     }
-    *deviceOut = nullptr;
     mrhiResult status = mrhi_success;
     const mrhiDriverAdapter* adapter = mrhiCheckDeviceDef(instance, def, &status);
     if (adapter == nullptr)

@@ -201,6 +201,14 @@ static mrhiShaderSlot* CheckComputeDef(mrhiDevice* device, const mrhiComputePipe
 mrhiResult mrhiCreateComputePipeline(mrhiDevice* device, const mrhiComputePipelineDef* def,
                                      mrhiComputePipelineId* pipelineOut, mrhiRequestId* requestOut)
 {
+    if (pipelineOut != nullptr)
+    {
+        *pipelineOut = (mrhiComputePipelineId){0};
+    }
+    if (requestOut != nullptr)
+    {
+        *requestOut = (mrhiRequestId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
