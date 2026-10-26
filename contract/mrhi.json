@@ -8142,7 +8142,7 @@
         {
           "kind": "function",
           "name": "create_buffer",
-          "doc": "Makes a buffer on a ready device. It reads as zeros until the frame graph writes it: the first frame that imports it clears it whole, in a pass of the library's own that runs before the program's passes and takes nothing from its budgets.",
+          "doc": "Makes a buffer on a ready device. It reads as zeros until the frame graph writes it: the first frame that imports it clears it whole, in a pass of the library's own that takes nothing from the frame's budgets, so the program's first use of it sees zeros. Passes that do not use it may run beside that clear.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a size of 0 or not a multiple of 4, or no usage or an unknown one; `mrhi_errorUnsupported` for a size beyond the device's bufferBytes limit or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's buffer limit is reached; `mrhi_errorPlatform` when the driver fails."
