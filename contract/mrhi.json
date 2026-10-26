@@ -6379,7 +6379,7 @@
             {
               "name": "frame_barriers",
               "type": "uint32",
-              "doc": "Barriers one frame's compile plans; 4096 by default."
+              "doc": "Barriers one frame's compile plans; 4096 by default. The barriers that follow the library's zeroing of new buffers come beside them."
             },
             {
               "name": "shaders",

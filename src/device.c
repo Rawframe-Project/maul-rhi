@@ -77,8 +77,10 @@ static bool AreDeviceLimitsValid(const mrhiDeviceLimits* limits)
            limits->textures != 0 && limits->views != 0 && limits->surfaces != 0 &&
            limits->frameResources != 0 && limits->framePasses != 0 &&
            limits->framePasses <= UINT32_MAX - MRHI_LIBRARY_PASSES && limits->frameAccesses != 0 &&
-           limits->frameBarriers != 0 && limits->shaders != 0 && limits->pipelines != 0 &&
-           limits->frameCommandBytes >= MRHI_CHUNK_BYTES && limits->readbackBytes % 512 == 0;
+           limits->frameBarriers != 0 &&
+           limits->frameBarriers <= UINT32_MAX - limits->frameResources && limits->shaders != 0 &&
+           limits->pipelines != 0 && limits->frameCommandBytes >= MRHI_CHUNK_BYTES &&
+           limits->readbackBytes % 512 == 0;
 }
 
 // The check a device def fails first, or 0 when it is well formed.
@@ -269,6 +271,7 @@ typedef struct FrameParts
     size_t uses;
     size_t barriers;
     size_t scratch;
+    size_t barrierLimit;
     size_t counts;
     size_t boxes;
     size_t boxLimit;
@@ -291,9 +294,12 @@ static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
     // The first pass's use and clear of each fresh buffer a frame imports,
     // at most one a resource.
     size_t clears = limits->frameResources;
+    // And a barrier each, for the first use after the clear.
+    size_t barriers = (size_t)limits->frameBarriers + limits->frameResources;
     FrameParts parts = {
         .boxLimit = (size_t)limits->frameAccesses * 4 + 16,
         .programChunks = limits->frameCommandBytes / MRHI_CHUNK_BYTES,
+        .barrierLimit = barriers,
     };
     parts.chunkCount =
         parts.programChunks + (uint32_t)((clears + MRHI_CHUNK_COMMANDS - 1) / MRHI_CHUNK_COMMANDS);
@@ -302,10 +308,8 @@ static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
     parts.passes = mrhiLayoutAdd(layout, passes, sizeof(mrhiFramePass), alignof(mrhiFramePass));
     parts.uses = mrhiLayoutAdd(layout, limits->frameAccesses + clears, sizeof(mrhiFrameUse),
                                alignof(mrhiFrameUse));
-    parts.barriers =
-        mrhiLayoutAdd(layout, limits->frameBarriers, sizeof(mrhiBarrier), alignof(mrhiBarrier));
-    parts.scratch =
-        mrhiLayoutAdd(layout, limits->frameBarriers, sizeof(mrhiBarrier), alignof(mrhiBarrier));
+    parts.barriers = mrhiLayoutAdd(layout, barriers, sizeof(mrhiBarrier), alignof(mrhiBarrier));
+    parts.scratch = mrhiLayoutAdd(layout, barriers, sizeof(mrhiBarrier), alignof(mrhiBarrier));
     parts.counts = mrhiLayoutAdd(layout, passes + 2, sizeof(uint32_t), alignof(uint32_t));
     parts.boxes = mrhiLayoutAdd(layout, parts.boxLimit, sizeof(mrhiBox), alignof(mrhiBox));
     parts.order =
@@ -332,6 +336,7 @@ static void PlaceFrameParts(mrhiDevice* device, unsigned char* block, const Fram
     device->frameUses = (mrhiFrameUse*)(block + parts->uses);
     device->frameBarriers = (mrhiBarrier*)(block + parts->barriers);
     device->frameBarrierScratch = (mrhiBarrier*)(block + parts->scratch);
+    device->frameBarrierLimit = (uint32_t)parts->barrierLimit;
     device->frameCounts = (uint32_t*)(block + parts->counts);
     device->frameBoxes = (mrhiBox*)(block + parts->boxes);
     device->frameBoxLimit = (uint32_t)parts->boxLimit;
@@ -449,8 +454,10 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     MRHI_ASSERT(instance->driver.vtable != nullptr);
     mrhiDeviceDef driverDef = *def;
     mrhiDropLabel(&driverDef.label, &driverDef.labelLength);
-    // A frame holds the library's passes beside the program's.
+    // A frame holds the library's passes and their barriers beside the
+    // program's.
     driverDef.deviceLimits.framePasses += MRHI_LIBRARY_PASSES;
+    driverDef.deviceLimits.frameBarriers += def->deviceLimits.frameResources;
     status = instance->driver.vtable->createDevice(instance->driver.self, adapter->handle,
                                                    &driverDef, device->request, &device->driver);
     if (status == mrhi_success)

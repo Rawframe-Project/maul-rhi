@@ -63,7 +63,8 @@ extern "C"
         // Accesses and targets one frame's passes declare in all; 4096 by
         // default.
         uint32_t frameAccesses;
-        // Barriers one frame's compile plans; 4096 by default.
+        // Barriers one frame's compile plans; 4096 by default. The barriers
+        // that follow the library's zeroing of new buffers come beside them.
         uint32_t frameBarriers;
         // Shader containers the device holds at once; 256 by default.
         uint32_t shaders;

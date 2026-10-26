@@ -183,6 +183,46 @@ static void TestBudgets(void)
     Close(device);
 }
 
+// Imports both buffers into a frame whose first pass writes the old one
+// and whose second reads the new one: whether it compiles.
+static bool CompilesBeside(mrhiDevice* device, mrhiBufferId old, mrhiBufferId fresh)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId resources[2] = {{0}, {0}};
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportBuffer(device, old, &resources[0]) == mrhi_success &&
+              mrhiImportBuffer(device, fresh, &resources[1]) == mrhi_success,
+          "a frame with both");
+    mrhiAccess write = {.resource = resources[0], .kind = mrhi_accessCopyDestination};
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.passClass = mrhi_passTransfer;
+    def.accesses = &write;
+    def.accessCount = 1;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(device, &def, &pass) == mrhi_success, "a pass writing the old buffer");
+    (void)Read(device, resources[1]);
+    return mrhiCompileFrame(device) == mrhi_success;
+}
+
+// A device whose frames plan one barrier: a frame that spends it on an
+// old buffer still compiles beside a new buffer, whose read after the
+// clear takes one more.
+static void TestBarrierBudget(void)
+{
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.deviceLimits.frameBarriers = 1;
+    mrhiDevice* device = Open(deviceDef);
+    mrhiBufferId old = MakeBuffer(device);
+    (void)Read(device, Begin(device, old));
+    Submit(device);
+    CHECK(s_log.barriers == 1, "the old buffer read after its clear");
+    mrhiBufferId other = MakeBuffer(device);
+    CHECK(CompilesBeside(device, old, other), "the program's barrier beside the clear's");
+    Submit(device);
+    CHECK(s_log.barriers == 2 && s_log.commands == 1, "both run");
+    Close(device);
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -190,5 +230,6 @@ int main(void)
     TestDroppedAndUnused();
     TestReusedSlot();
     TestBudgets();
+    TestBarrierBudget();
     return s_failures == 0 ? 0 : 1;
 }

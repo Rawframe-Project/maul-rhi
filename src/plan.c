@@ -178,7 +178,7 @@ static void Emit(Map* map, uint32_t pass, const mrhiBox* part, mrhiResourceState
     MRHI_ASSERT(pass != 0 || part->state != after);
     MRHI_ASSERT(pass == 0 || device->framePasses[pass - 1].kept);
     MRHI_ASSERT(part->mipCount > 0 && part->layerCount > 0 && part->planes != 0);
-    if (device->frameBarrierCount == device->deviceLimits.frameBarriers)
+    if (device->frameBarrierCount == device->frameBarrierLimit)
     {
         map->full = true;
         return;
@@ -643,7 +643,7 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
         {
             continue;
         }
-        if (device->frameBarrierCount == device->deviceLimits.frameBarriers)
+        if (device->frameBarrierCount == device->frameBarrierLimit)
         {
             return mrhi_errorCapacity;
         }

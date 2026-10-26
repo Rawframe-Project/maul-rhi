@@ -489,6 +489,11 @@ struct mrhiDevice
     mrhiBarrier* frameBarriers;
     mrhiBarrier* frameBarrierScratch;
     uint32_t frameBarrierCount;
+    // The program's frameBarriers and one more a resource: a buffer the
+    // first pass zeroes leaves it in the copy destination state, so its
+    // next first use, in that frame or a later one, may take a barrier
+    // it would not have taken.
+    uint32_t frameBarrierLimit;
     uint32_t* frameCounts;
     mrhiBox* frameBoxes;
     uint32_t frameBoxLimit;
