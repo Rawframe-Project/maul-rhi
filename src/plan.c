@@ -339,6 +339,16 @@ static void ForgetPasses(mrhiFrameResource* resource)
     }
 }
 
+// Whether a use in pass index p makes the library's barriers: the first
+// program use of a resource the clear left in its state, after which it
+// no longer is.
+static bool IsLibraryMove(bool* zeroState, uint32_t p)
+{
+    bool library = *zeroState && p >= MRHI_LIBRARY_PASSES;
+    *zeroState = *zeroState && !library;
+    return library;
+}
+
 // Plans one resource over the kept passes, then its end: an imported
 // object's parts all move to its last use's state.
 static bool PlanResource(mrhiDevice* device, uint32_t slot)
@@ -387,8 +397,7 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
             MRHI_ASSERT(cut.baseMip + cut.mipCount <= whole.mipCount &&
                         cut.baseLayer + cut.layerCount <= whole.layerCount &&
                         (cut.planes & ~whole.planes) == 0);
-            map.library = zeroState && p >= MRHI_LIBRARY_PASSES;
-            zeroState = zeroState && !map.library;
+            map.library = IsLibraryMove(&zeroState, p);
             Move(&map, p + 1, cut);
             map.library = false;
         }
