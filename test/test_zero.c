@@ -131,9 +131,10 @@ static void TestReusedSlot(void)
     Close(device);
 }
 
-// Records clears into the frame's one pass until the arena is full:
-// how many fit.
-static uint32_t FillArena(mrhiDevice* device, mrhiResourceId resource)
+// Records up to `most` clears into the frame's one pass: how many fit.
+// A pass that runs out of room cannot be submitted, so a frame filled to
+// the end is dropped.
+static uint32_t Fill(mrhiDevice* device, mrhiResourceId resource, uint32_t most)
 {
     mrhiAccess access = {.resource = resource, .kind = mrhi_accessCopyDestination};
     mrhiPassDef def = mrhiDefaultPassDef();
@@ -147,7 +148,7 @@ static uint32_t FillArena(mrhiDevice* device, mrhiResourceId resource)
     CHECK(mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, pass) == mrhi_success,
           "begun");
     uint32_t fitted = 0;
-    while (fitted < 100000 && mrhiClearBuffer(device, pass, resource, 0, 4) == mrhi_success)
+    while (fitted < most && mrhiClearBuffer(device, pass, resource, 0, 4) == mrhi_success)
     {
         ++fitted;
     }
@@ -166,13 +167,14 @@ static void TestBudgets(void)
     deviceDef.deviceLimits.frameCommandBytes = 4096;
     mrhiDevice* device = Open(deviceDef);
     mrhiBufferId buffer = MakeBuffer(device);
-    uint32_t first = FillArena(device, Begin(device, buffer));
+    uint32_t first = Fill(device, Begin(device, buffer), UINT32_MAX);
+    CHECK(first > 0 && mrhiDropFrame(device) == mrhi_success, "room for clears beside the zeroing");
+    CHECK(Fill(device, Begin(device, buffer), first) == first, "all of them again");
     Submit(device);
-    CHECK(s_log.passes == 2 && s_log.commands == first + 1, "beside the library's clear");
-    uint32_t later = FillArena(device, Begin(device, buffer));
-    Submit(device);
-    CHECK(first > 0 && first == later && s_log.commands == later,
-          "the program's whole arena either way");
+    CHECK(s_log.passes == 2 && s_log.commands == first + 1, "submitted beside the library's clear");
+    uint32_t later = Fill(device, Begin(device, buffer), UINT32_MAX);
+    CHECK(later == first && mrhiDropFrame(device) == mrhi_success,
+          "as much room in a frame that clears nothing of its own");
     Close(device);
 }
 
