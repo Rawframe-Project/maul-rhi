@@ -42,6 +42,9 @@ typedef enum mrhiD3d12Lane
 // resolves and clears copy in pieces: D3D12's placement alignment, so no
 // smaller buffer takes less memory.
 #define MRHI_D3D12_ZERO_BYTES UINT64_C(65536)
+// The views a slot holds for clears beside one a frame resource: a clear
+// past them copies zeros instead.
+#define MRHI_D3D12_CLEAR_VIEWS 256u
 
 typedef struct mrhiD3d12Object
 {
@@ -169,8 +172,10 @@ typedef struct mrhiD3d12Recorder
     uint32_t openQuery;
     ID3D12CommandSignature* const* signatures;
     // The zeros a resolve copies for queries the frame did not write,
-    // and a clear copies, MRHI_D3D12_ZERO_BYTES of them.
+    // and a clear copies, MRHI_D3D12_ZERO_BYTES of them, and the CPU-only
+    // views a clear of a buffer's view names.
     ID3D12Resource* zeros;
+    mrhiD3d12Ring clears;
     // The slot's buffer that indirect draws setting the vertex
     // information copy their arguments into, made at its first use, and
     // its state.

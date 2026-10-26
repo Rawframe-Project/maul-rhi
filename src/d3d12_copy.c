@@ -226,6 +226,64 @@ static void CopyTexture(const mrhiD3d12Recorder* recorder, const mrhiCommand* co
     }
 }
 
+// Takes a clear's views, its CPU-only one and a shader-visible one:
+// false, with neither taken, when either ring has run out.
+static bool TakeClearViews(mrhiD3d12Recorder* recorder, D3D12_CPU_DESCRIPTOR_HANDLE* cpuOut,
+                           D3D12_CPU_DESCRIPTOR_HANDLE* visibleOut,
+                           D3D12_GPU_DESCRIPTOR_HANDLE* gpuOut)
+{
+    mrhiD3d12Ring* clears = &recorder->clears;
+    mrhiD3d12GpuRing* views = &recorder->views;
+    if (clears->taken == clears->capacity || views->taken == views->capacity)
+    {
+        return false;
+    }
+    cpuOut->ptr = clears->start.ptr + (SIZE_T)clears->step * clears->taken++;
+    visibleOut->ptr = views->cpu.ptr + (SIZE_T)views->step * views->taken;
+    gpuOut->ptr = views->gpu.ptr + (UINT64)views->step * views->taken++;
+    return true;
+}
+
+// Zeroes a buffer's range with ClearUnorderedAccessViewUint, many times
+// faster than copies of zeros (#130), on the lists that take it: every
+// lane but the copy lane, which no pass that clears runs on. A clear
+// past the slot's views, or of more words than one view holds, copies
+// zeros instead. Either way it ends in the copy destination state the
+// frame's plan gives it, so the frame's next use of the buffer waits
+// for it.
+static void Clear(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
+{
+    MRHI_ASSERT(recorder->lane != mrhiD3d12LaneCopy);
+    uint64_t words = command->d / sizeof(uint32_t);
+    D3D12_CPU_DESCRIPTOR_HANDLE cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE visible;
+    D3D12_GPU_DESCRIPTOR_HANDLE gpu;
+    if (words > (UINT64_C(1) << D3D12_REQ_BUFFER_RESOURCE_TEXEL_COUNT_2_TO_EXP) ||
+        !TakeClearViews(recorder, &cpu, &visible, &gpu))
+    {
+        ID3D12Resource* target =
+            BufferOf(recorder, command->a, false, D3D12_RESOURCE_STATE_COPY_DEST);
+        mrhiD3d12FlushBarriers(recorder);
+        mrhiD3d12CopyZeros(recorder, target, command->c, command->d);
+        return;
+    }
+    ID3D12Resource* target =
+        BufferOf(recorder, command->a, false, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    mrhiD3d12FlushBarriers(recorder);
+    const D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {
+        .Format = DXGI_FORMAT_R32_UINT,
+        .ViewDimension = D3D12_UAV_DIMENSION_BUFFER,
+        .Buffer = {.FirstElement = command->c / sizeof(uint32_t), .NumElements = (UINT)words},
+    };
+    ID3D12Device_CreateUnorderedAccessView(recorder->device, target, nullptr, &desc, cpu);
+    ID3D12Device_CreateUnorderedAccessView(recorder->device, target, nullptr, &desc, visible);
+    static const UINT zeros[4] = {0, 0, 0, 0};
+    ID3D12GraphicsCommandList_ClearUnorderedAccessViewUint(recorder->list, gpu, cpu, target, zeros,
+                                                           0, nullptr);
+    (void)BufferOf(recorder, command->a, false, D3D12_RESOURCE_STATE_COPY_DEST);
+    mrhiD3d12FlushBarriers(recorder);
+}
+
 void mrhiD3d12Copy(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
 {
     switch (command->type)
@@ -254,13 +312,8 @@ void mrhiD3d12Copy(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
         CopyTexture(recorder, command);
         break;
     case mrhiCommandClearBuffer:
-    {
-        ID3D12Resource* target =
-            BufferOf(recorder, command->a, false, D3D12_RESOURCE_STATE_COPY_DEST);
-        mrhiD3d12FlushBarriers(recorder);
-        mrhiD3d12CopyZeros(recorder, target, command->c, command->d);
+        Clear(recorder, command);
         break;
-    }
     default:
         CopyWithTexture(recorder, command);
         break;

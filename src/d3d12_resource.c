@@ -131,8 +131,8 @@ static D3D12_RESOURCE_DESC DescribeBuffer(const mrhiBufferDef* def)
         .MipLevels = 1,
         .SampleDesc = {.Count = 1},
         .Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-        .Flags = (def->usage & mrhi_bufferStorage) != 0 ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
-                                                        : D3D12_RESOURCE_FLAG_NONE,
+        // Every buffer, so that a clear of it is ClearUnorderedAccessViewUint.
+        .Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
     };
 }
 

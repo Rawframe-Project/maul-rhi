@@ -48,6 +48,8 @@ typedef struct mrhiD3d12Slot
     // heaps' regions.
     ID3D12DescriptorHeap* viewHeap;
     ID3D12DescriptorHeap* samplerHeap;
+    // The CPU-only views of the buffers its clears zero.
+    ID3D12DescriptorHeap* clearHeap;
     // Where indirect draws setting the vertex information copy their
     // arguments; made at its first use.
     ID3D12Resource* scratch;
@@ -90,6 +92,7 @@ typedef struct mrhiD3d12Frames
     uint32_t depthLimit;
     uint32_t viewLimit;
     uint32_t samplerLimit;
+    uint32_t clearLimit;
     uint32_t readbackLimit;
     uint64_t uploadBytes;
     uint64_t scratchBytes;

@@ -14,7 +14,8 @@
 // without running anything, and the next runs; and a frame whose last
 // signal fails, its work held behind a fence of the suite's, is waited
 // for before its device goes, so nothing the GPU still reads is
-// released. Under the debug layer,
+// released. A transfer pass that clears runs on the compute queue, and
+// clears past a slot's views zero their words too. Under the debug layer,
 // whose errors fail the suite. Skipped where there is no D3D12 adapter,
 // unless MAUL_RHI_REQUIRE_D3D12 is set.
 
@@ -396,6 +397,18 @@ static void Finish(mrhiDevice* device)
     }
 }
 
+// Submits a frame importing a new buffer, whose clear runs on the
+// compute queue, so that later frames hold only the passes they check.
+static void Zero(mrhiDevice* device, mrhiBufferId buffer)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId resource = {0};
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+              mrhiImportBuffer(device, buffer, &resource) == mrhi_success,
+          "the clearing frame");
+    Finish(device);
+}
+
 static bool Took(mrhiDevice* device, mrhiRequestId request, const void* expected, size_t bytes)
 {
     uint8_t taken[64] = {0};
@@ -677,13 +690,15 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, bool fail
     CHECK(mrhiCreateBuffer(device, &bufferDef, &buffer) == mrhi_success &&
               mrhiCreateTexture(device, &textureDef, &texture) == mrhi_success,
           "a buffer and a texture");
-    // A new device has made no compute list yet.
+    // A new device has made no compute list yet; the buffer's clear,
+    // which runs on the compute queue, is in the failing frame.
     if (failing)
     {
         CheckFailedList(device, buffer, pipeline);
     }
     else
     {
+        Zero(device, buffer);
         CheckLanes(device, buffer, pipeline);
         CheckTextures(device, texture);
         CheckClassOrder(device, buffer, texture, pipeline);
@@ -991,6 +1006,103 @@ static void CheckTimed(mrhiInstance* instance, mrhiAdapterId adapter)
     mrhiDestroyDevice(device);
 }
 
+// Fills a buffer of words with 1, 2, 3 and on in a transfer pass,
+// zeroes the given words of it in another, and reads it back in a
+// graphics pass, under the hooks: whether every step was recorded.
+static bool ClearFrame(mrhiDevice* device, mrhiBufferId buffer, const uint32_t* words,
+                       uint32_t count, uint32_t first, uint32_t cleared, mrhiRequestId* requestOut)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId b = {0};
+    if (mrhiBeginFrame(device, &frame) != mrhi_success ||
+        mrhiImportBuffer(device, buffer, &b) != mrhi_success)
+    {
+        return false;
+    }
+    mrhiAccess write = Whole(b, mrhi_accessCopyDestination);
+    mrhiAccess read = Whole(b, mrhi_accessCopySource);
+    mrhiPassId upload = AddPass(device, mrhi_passTransfer, &write);
+    mrhiPassId clear = AddPass(device, mrhi_passTransfer, &write);
+    mrhiPassId back = AddPass(device, mrhi_passGraphics, &read);
+    bool recorded =
+        mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, upload) == mrhi_success &&
+        mrhiWriteBuffer(device, upload, b, 0, words, count * sizeof(uint32_t)) == mrhi_success &&
+        mrhiEndPass(device, upload) == mrhi_success && mrhiBeginPass(device, clear) == mrhi_success;
+    // One clear a word, so that each takes a view of its own.
+    for (uint32_t i = first; i < first + cleared && recorded; ++i)
+    {
+        recorded = mrhiClearBuffer(device, clear, b, i * sizeof(uint32_t), sizeof(uint32_t)) ==
+                   mrhi_success;
+    }
+    recorded =
+        recorded && mrhiEndPass(device, clear) == mrhi_success &&
+        mrhiBeginPass(device, back) == mrhi_success &&
+        mrhiReadBuffer(device, back, b, 0, count * sizeof(uint32_t), requestOut) == mrhi_success &&
+        mrhiEndPass(device, back) == mrhi_success;
+    Hook(device);
+    Finish(device);
+    return recorded;
+}
+
+// Clears: a transfer pass that clears runs on the compute queue, whose
+// lists take ClearUnorderedAccessViewUint, after the copy queue's upload
+// of the words it zeroes some of. On a device of one frame resource,
+// whose slots hold 257 clear views, 300 clears of a word each zero the
+// words past the views too, with copies.
+static void CheckClears(mrhiInstance* instance, mrhiAdapterId adapter)
+{
+    enum
+    {
+        WORDS = 300
+    };
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.adapter = adapter;
+    def.deviceLimits.frameResources = 1;
+    mrhiDevice* device = nullptr;
+    mrhiRequestId opened = {0};
+    mrhiInstanceNotification record;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &opened) == mrhi_success &&
+              mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+              record.outcome == mrhi_success,
+          "a device of one frame resource");
+    if (device == nullptr)
+    {
+        return;
+    }
+    mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
+    bufferDef.size = WORDS * sizeof(uint32_t);
+    bufferDef.usage = mrhi_bufferCopySource | mrhi_bufferCopyDestination;
+    mrhiBufferId buffer = {0};
+    CHECK(mrhiCreateBuffer(device, &bufferDef, &buffer) == mrhi_success, "a buffer of words");
+    Zero(device, buffer);
+    static uint32_t words[WORDS];
+    for (uint32_t i = 0; i < WORDS; ++i)
+    {
+        words[i] = i + 1;
+    }
+    mrhiRequestId request = {0};
+    CHECK(ClearFrame(device, buffer, words, 8, 1, 3, &request), "three words cleared");
+    CHECK(Runs(D3D12_COMMAND_LIST_TYPE_COPY) == 1 && Runs(D3D12_COMMAND_LIST_TYPE_COMPUTE) == 1 &&
+              FirstRunWaits(D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_LIST_TYPE_COPY),
+          "the upload on the copy queue, the clear on the compute queue after it");
+    Unhook();
+    const uint32_t expected[8] = {1, 0, 0, 0, 5, 6, 7, 8};
+    CHECK(Took(device, request, expected, sizeof(expected)), "the three words zeroed");
+    CHECK(ClearFrame(device, buffer, words, WORDS, 0, WORDS, &request), "every word cleared");
+    Unhook();
+    static uint32_t taken[WORDS];
+    size_t size = 0;
+    bool zeroed = mrhiTakeReadback(device, request, taken, sizeof(taken), &size) == mrhi_success &&
+                  size == sizeof(taken);
+    for (uint32_t i = 0; i < WORDS && zeroed; ++i)
+    {
+        zeroed = taken[i] == 0;
+    }
+    CHECK(zeroed, "every word zeroed, past the clear views too");
+    CHECK(mrhiDestroyBuffer(device, buffer) == mrhi_success, "the buffer ended");
+    mrhiDestroyDevice(device);
+}
+
 int main(void)
 {
     // Before the library opens a device, as the debug layer needs.
@@ -1020,6 +1132,7 @@ int main(void)
         CheckLostLane(instance, adapter, 0);
         CheckLostLane(instance, adapter, 1);
         CheckTimed(instance, adapter);
+        CheckClears(instance, adapter);
     }
     else
     {
