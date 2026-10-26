@@ -104,12 +104,22 @@ typedef struct mrhiQuerySetSlot
     mrhiQueryType type;
 } mrhiQuerySetSlot;
 
-// A buffer as its device keeps it.
+// The passes of every frame that are the library's own, before the
+// program's: the first zeroes the buffers no frame has run with yet, and
+// is culled when the frame imports none.
+#define MRHI_LIBRARY_PASSES 1
+
+// A buffer as its device keeps it: whether no submitted frame has
+// zeroed it yet, which its first frame's first pass does.
 typedef struct mrhiBufferSlot
 {
     uint64_t handle;
     uint64_t size;
     mrhiBufferUsage usage;
+    bool fresh;
+    // Whether the state frames left it in is the one the first pass's
+    // clear left, no program pass having used it since.
+    bool zeroState;
     mrhiImport import;
     // The state frames leave it in.
     mrhiResourceState state;
@@ -181,6 +191,10 @@ typedef struct mrhiFrameResource
     uint64_t image;
     // Whether a pass declared so far writes it; imports count as written.
     bool written;
+    // Whether it begins the program's passes in the state the first
+    // pass's clear leaves, in this frame or carried from an earlier one:
+    // the barrier its first program use may then take is the library's.
+    bool zeroState;
     // Whether a kept pass needs it, and the usages kept passes make of
     // it, found by the compile, with the plan's transience, its first
     // and last kept passes (0 for none), the state its first use puts
@@ -472,6 +486,9 @@ struct mrhiDevice
     uint32_t frameResourceCount;
     mrhiFramePass* framePasses;
     uint32_t framePassCount;
+    // The uses of the frame's passes: the program's, frameAccesses of
+    // them, then the first pass's, one for each fresh buffer the frame
+    // imports, added as it imports it.
     mrhiFrameUse* frameUses;
     uint32_t frameUseCount;
     // The compile's plan: the barriers in the order they run, and room to
@@ -479,6 +496,13 @@ struct mrhiDevice
     mrhiBarrier* frameBarriers;
     mrhiBarrier* frameBarrierScratch;
     uint32_t frameBarrierCount;
+    // The program's frameBarriers and one more a resource, and how many
+    // of the planned barriers are the library's: a buffer the first pass
+    // zeroes is left in the copy destination state, so its next program
+    // use, in that frame or a later one, may take a barrier it would not
+    // have taken.
+    uint32_t frameBarrierLimit;
+    uint32_t frameLibraryBarriers;
     uint32_t* frameCounts;
     mrhiBox* frameBoxes;
     uint32_t frameBoxLimit;
@@ -517,8 +541,14 @@ struct mrhiDevice
     // Each pass's vertex buffers' bytes plus one (0 for unset),
     // vertexBuffers per pass.
     uint64_t* frameVertexBytes;
+    // The command arena: the program's frameCommandBytes in chunks, and
+    // beyond them room for the clears of the frame's first pass, which
+    // records first, so the program's passes may take as many chunks as
+    // the program asked for past those.
     mrhiCommandChunk* frameChunks;
     uint32_t frameChunkCount;
+    uint32_t frameProgramChunks;
+    uint32_t frameChunkLimit;
     _Atomic uint32_t frameChunksTaken;
     // Each pass's label, MRHI_LABEL_BYTES apiece; and the tables a
     // submitted frame's view is built in.
@@ -677,6 +707,18 @@ void mrhiApplyFinalStates(mrhiDevice* device);
 
 // Compiles the open frame: culls, derives usages and checks them.
 mrhiResult mrhiCompile(mrhiDevice* device);
+
+// Opens the frame's first pass, the library's own, which zeroes the
+// fresh buffers the frame imports.
+void mrhiBeginZeroPass(mrhiDevice* device);
+
+// Gives the first pass a whole-buffer copy destination use of a fresh
+// buffer the frame has just imported, by its frame slot plus one.
+void mrhiZeroOnFirstUse(mrhiDevice* device, uint32_t resource);
+
+// After a frame was submitted: the buffers its first pass zeroed are no
+// longer fresh.
+void mrhiMarkZeroed(mrhiDevice* device);
 
 // Whether a format can take the usages on the device.
 bool mrhiFormatTakes(const mrhiDevice* device, mrhiFormat format, mrhiTextureUsage usage);

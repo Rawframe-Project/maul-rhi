@@ -18,6 +18,14 @@ Importing copies the object's def or size, driver handle and carried state into 
 
 A pass (`mrhiAddPass`) has a class, its render and depth targets with load, store, clear and resolve, at most one heap, its query sets, and the accesses it makes over subranges of mips, layers and planes. Within a pass a part of a texture is used in read-only kinds or in one writable kind, as WebGPU's usage scopes require, so each part has exactly one state per pass; sampling a read-only depth target shares the depth read state. Render areas are measured and labels copied when the pass is added, so a kept pass that is never begun still clears its targets at the right size.
 
+## New buffers
+
+A device buffer reads as zeros until the frame graph writes it, on every driver. WebGPU and Metal promise that themselves, but Vulkan memory and Direct3D 12 placed resources hold whatever their memory held, and a committed resource is zeroed only in practice. So the core clears each new buffer in a pass of its own, the frame's first, a transfer pass labeled `maul-rhi: zero new buffers` (`src/compile.c`).
+
+A buffer is fresh from `mrhiCreateBuffer` until a frame that imports it is submitted. A fresh buffer's first import in a frame gives that pass a whole-buffer copy-destination use, in a region of uses past the program's `frameAccesses` that `frameResources` sizes. The pass is culled like any other, so a frame that imports no fresh buffer runs without it, and kept when it has uses, since it writes imported resources. The compile's last step records a clear for each use, from chunks past the program's `frameCommandBytes`. The clear leaves a buffer in the copy destination state, so its first program use, in that frame or a later one when nothing else used it, may take a barrier it would not have taken; that barrier alone comes from a reserve of `frameResources` barriers past the program's `frameBarriers`. So the program keeps every budget it asked for, and no more. A submitted frame ends a slot's freshness only while the slot holds the same buffer: one destroyed in its open frame may have given the slot to a new buffer, which still needs its own clear. A dropped frame clears nothing.
+
+The program's passes take ids from 2. `mrhiBeginPass`, `mrhiIsPassKept` and `mrhiGetPassPlan` answer `mrhi_errorStale` for the library's pass, which barriers, waits and resource plans may still name. Every driver buffer is made with the copy destination usage the clear needs.
+
 ## Compiling
 
 `mrhiCompileFrame` does four things, in `src/compile.c` and `src/plan.c`:

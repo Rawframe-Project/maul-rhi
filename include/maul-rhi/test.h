@@ -27,7 +27,8 @@ extern "C"
     {
         // Frames submitted.
         uint32_t frames;
-        // The last frame's kept passes.
+        // The last frame's kept passes, the library's pass that zeroes new
+        // buffers among them.
         uint32_t passes;
         // Its passes with a label.
         uint32_t labeled;
@@ -35,7 +36,8 @@ extern "C"
         uint32_t occlusionPasses;
         // Its passes writing timestamps.
         uint32_t timestampPasses;
-        // The resources its passes declare, their targets among them.
+        // The resources its passes declare, their targets and the new buffers
+        // it zeroes among them.
         uint32_t accesses;
         // Their labels' bytes together.
         uint64_t labelBytes;
@@ -53,7 +55,7 @@ extern "C"
         uint32_t presented;
         // Its command chunks walked.
         uint32_t chunks;
-        // Its commands.
+        // Its commands, a clear for each new buffer among them.
         uint32_t commands;
         // Its records, commands and their payloads.
         uint32_t records;

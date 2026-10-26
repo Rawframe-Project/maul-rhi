@@ -107,6 +107,14 @@ static void Compile(void)
 
 // Whether the barrier at an index moves a resource between two states,
 // before a pass (1 for the first) or at the frame's end (0).
+// Barriers name a pass by its id's index: the frame's first pass is the
+// library's own, which zeroes new buffers, so the program's passes count
+// from 2, and 0 is the frame's end.
+enum
+{
+    END = 0,
+};
+
 static bool Moves(size_t at, uint32_t pass, mrhiResourceState before, mrhiResourceState after)
 {
     return at < s_count && s_barriers[at].pass.index1 == pass && s_barriers[at].before == before &&
@@ -182,9 +190,9 @@ static void TestSealedTexture(void)
     CHECK(Use(resource, mrhi_accessCopySource, mrhi_passTransfer) == mrhi_success,
           "a later pass of the sealing frame takes any use");
     Compile();
-    CHECK(s_count == 3 && Moves(0, 1, mrhi_stateUndefined, mrhi_stateCopyDestination) &&
-              Moves(1, 2, mrhi_stateCopyDestination, mrhi_stateCopySource) &&
-              Moves(2, 0, mrhi_stateCopySource, mrhi_stateSealed),
+    CHECK(s_count == 3 && Moves(0, 2, mrhi_stateUndefined, mrhi_stateCopyDestination) &&
+              Moves(1, 3, mrhi_stateCopyDestination, mrhi_stateCopySource) &&
+              Moves(2, END, mrhi_stateCopySource, mrhi_stateSealed),
           "sealed after the frame's passes");
     Submit();
 
@@ -220,7 +228,10 @@ static void TestSealedBuffer(void)
     Begin();
     CHECK(mrhiSealResource(s_device, ImportBuffer(buffer)) == mrhi_success, "sealed");
     Compile();
-    CHECK(s_count == 1 && Moves(0, 0, mrhi_stateUndefined, mrhi_stateSealed), "sealed at the end");
+    // The new buffer is cleared first, so a heap reading it sealed reads
+    // zeros; a buffer's first use takes no barrier.
+    CHECK(s_count == 1 && Moves(0, END, mrhi_stateCopyDestination, mrhi_stateSealed),
+          "zeroed, then sealed at the end");
     Submit();
 
     Begin();
@@ -262,7 +273,7 @@ static void TestUnseal(void)
               Use(resource, mrhi_accessCopyDestination, mrhi_passTransfer) == mrhi_success,
           "written once unsealed");
     Compile();
-    CHECK(s_count == 1 && Moves(0, 2, mrhi_stateSealed, mrhi_stateCopyDestination),
+    CHECK(s_count == 1 && Moves(0, 3, mrhi_stateSealed, mrhi_stateCopyDestination),
           "from the sealed state, left in the last use's");
     Submit();
 
@@ -274,7 +285,7 @@ static void TestUnseal(void)
               mrhiUnsealResource(s_device, resource) == mrhi_success,
           "sealed, then unsealed");
     Compile();
-    CHECK(s_count == 1 && Moves(0, 1, mrhi_stateCopyDestination, mrhi_stateCopyDestination),
+    CHECK(s_count == 1 && Moves(0, 2, mrhi_stateCopyDestination, mrhi_stateCopyDestination),
           "the unseal wins");
     Submit();
 
@@ -288,8 +299,8 @@ static void TestUnseal(void)
           "a dropped frame seals nothing");
     CHECK(mrhiSealResource(s_device, resource) == mrhi_success, "sealed");
     Compile();
-    CHECK(s_count == 2 && Moves(0, 1, mrhi_stateCopyDestination, mrhi_stateCopyDestination) &&
-              Moves(1, 0, mrhi_stateCopyDestination, mrhi_stateSealed),
+    CHECK(s_count == 2 && Moves(0, 2, mrhi_stateCopyDestination, mrhi_stateCopyDestination) &&
+              Moves(1, END, mrhi_stateCopyDestination, mrhi_stateSealed),
           "ended sealed");
     Submit();
 
@@ -301,8 +312,8 @@ static void TestUnseal(void)
     CHECK(Use(resource, mrhi_accessCopyDestination, mrhi_passTransfer) == mrhi_success,
           "written while tracked");
     Compile();
-    CHECK(s_count == 2 && Moves(0, 1, mrhi_stateSealed, mrhi_stateCopyDestination) &&
-              Moves(1, 0, mrhi_stateCopyDestination, mrhi_stateSealed),
+    CHECK(s_count == 2 && Moves(0, 2, mrhi_stateSealed, mrhi_stateCopyDestination) &&
+              Moves(1, END, mrhi_stateCopyDestination, mrhi_stateSealed),
           "sealed again at the end");
     Submit();
     Close(s_device);

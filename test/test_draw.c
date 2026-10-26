@@ -864,7 +864,8 @@ static void TestSubmitted(void)
           "ended");
     mrhiRequestId token;
     CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
-    CHECK(log.frames == 1 && log.passes == 3 && log.commands == 11 && log.records == 11,
+    // And the library's first pass, which clears the five new buffers.
+    CHECK(log.frames == 1 && log.passes == 4 && log.commands == 16 && log.records == 16,
           "every command walked");
     CloseDevice();
     s_adapter.frameLog = nullptr;

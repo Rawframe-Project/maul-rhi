@@ -659,7 +659,10 @@ extern "C"
     // to another, before a pass or at the frame's end.
     typedef struct mrhiBarrier
     {
-        // The pass it comes before, or a null id for the frame's end.
+        // The pass it comes before, or a null id for the frame's end. It may be
+        // the library's own pass, the frame's first, which zeroes new buffers:
+        // the program's passes take the ids after it, and the program never
+        // begins it or reads its plan.
         mrhiPassId pass;
         // The resource.
         mrhiResourceId resource;
@@ -685,7 +688,8 @@ extern "C"
         // passes, which tile GPUs keep on chip; never one listing view formats,
         // which WebGPU keeps off chip.
         bool transient;
-        // The first kept pass using it, or a null id when none does.
+        // The first kept pass using it, or a null id when none does; for a new
+        // buffer, the library's own pass that zeroes it.
         mrhiPassId firstPass;
         // The last kept pass using it, or a null id when none does.
         mrhiPassId lastPass;

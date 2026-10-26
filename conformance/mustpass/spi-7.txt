@@ -32,6 +32,7 @@ hazards.frame_memory
 hazards.read_states
 transfers.round_trip
 transfers.clear
+transfers.zeroed_buffers
 swapchain.foreign_sources
 swapchain.present
 loss.simulated

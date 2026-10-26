@@ -84,6 +84,13 @@ static bool Waits(mrhiPassId pass, mrhiPassId graphics, mrhiPassId compute, mrhi
     return same;
 }
 
+// The frame's first pass, the library's own, which zeroes the buffers no
+// frame has used yet: a new imported buffer's first use follows it.
+static mrhiPassId Zeroing(mrhiPassId any)
+{
+    return (mrhiPassId){1, any.generation};
+}
+
 static mrhiResourceId Buffer(void)
 {
     mrhiBufferDef def = mrhiDefaultBufferDef();
@@ -347,7 +354,8 @@ static void TestNative(void)
           "an imported buffer");
     mrhiPassId copy = Pass(mrhi_passTransfer, Access(other, mrhi_accessCopyDestination, 0), true);
     Submit();
-    CHECK(Waits(native, kNone, compute, kNone), "the native pass follows the passes before it");
+    CHECK(Waits(native, kNone, compute, Zeroing(native)),
+          "the native pass follows the passes before it, the zeroing among them");
     CHECK(Waits(copy, native, kNone, kNone), "a later pass follows the native pass");
     Close(s_device);
 }
@@ -419,9 +427,11 @@ static void TestTimestamps(void)
         Pass(mrhi_passTransfer,
              Access(Imported(mrhi_bufferCopyDestination), mrhi_accessCopyDestination, 0), true);
     Submit();
-    CHECK(Waits(plain, kNone, kNone, kNone), "a graphics pass that resolves nothing follows none");
+    CHECK(Waits(plain, kNone, kNone, Zeroing(plain)),
+          "a graphics pass that resolves nothing follows only its new buffer's zeroing");
     CHECK(Waits(resolve, kNone, compute, transfer), "the resolving pass follows the timed passes");
-    CHECK(Waits(later, resolve, kNone, kNone), "a later timed pass follows the resolving pass");
+    CHECK(Waits(later, resolve, kNone, Zeroing(later)),
+          "a later timed pass follows the resolving pass, and its new buffer's zeroing");
     CHECK(Waits(untimed, kNone, kNone, kNone), "an untimed pass follows none");
     Close(s_device);
     s_adapter.features.timestampQuery = false;

@@ -4,7 +4,9 @@
 // The CPU cost of the library on the build's native driver: per draw
 // recorded, per pass declared and
 // recorded, the compile of a fixed frame, and a frame's start to its
-// submission; each the best of five runs. Then, exactly, the bytes an
+// submission; then what zeroing a new buffer of 1 MiB, 64 MiB and 1 GiB
+// adds to a frame, from its submission to its end; each the best of five
+// runs. Then, exactly, the bytes an
 // instance and a device with the default defs take from their
 // allocators. Given a baseline file, an earlier run's output on the same
 // machine, it prints each number's ratio to the recorded one as well. Skipped where
@@ -28,6 +30,9 @@
 #define DRAWS  10000
 #define PASSES 200
 #define RUNS   5
+
+// The sizes of new buffers whose zeroing is timed.
+#define ZERO_SIZES 3
 
 // The width of a result's name, as printed and as read back.
 #define NAME_WIDTH 32
@@ -185,6 +190,84 @@ static void PassFrame(Sample* sample, double* passesOut, double* compileOut)
     *compileOut = compiled - compiling;
 }
 
+// The seconds from submitting a frame that imports a new buffer of the
+// size given, and does nothing else, to its end, less the same frame's
+// once the buffer is no longer new: what the library's clear of it
+// costs. False where the device refuses such a buffer.
+static bool ZeroFrame(Sample* sample, uint64_t bytes, double* zeroOut)
+{
+    mrhiDevice* device = sample->device;
+    mrhiBufferDef def = mrhiDefaultBufferDef();
+    def.size = bytes;
+    def.usage = mrhi_bufferCopyDestination;
+    mrhiBufferId buffer = {0};
+    if (mrhiCreateBuffer(device, &def, &buffer) != mrhi_success)
+    {
+        return false;
+    }
+    double took[2] = {0.0, 0.0};
+    for (int i = 0; i < 2; ++i)
+    {
+        mrhiFrameDef frame = mrhiDefaultFrameDef();
+        mrhiResourceId resource = {0};
+        mrhiRequestId token = {0};
+        bool ready = mrhiBeginFrame(device, &frame) == mrhi_success &&
+                     mrhiImportBuffer(device, buffer, &resource) == mrhi_success;
+        double start = Seconds();
+        ready = ready && mrhiSubmitFrame(device, &token) == mrhi_success;
+        SampleCheck(sample, ready && SampleWait(sample, token), "the zeroing frame");
+        took[i] = Seconds() - start;
+    }
+    SampleCheck(sample, mrhiDestroyBuffer(device, buffer) == mrhi_success, "the buffer destroyed");
+    *zeroOut = took[0] - took[1];
+    return true;
+}
+
+// Reopens the sample's device with the adapter's limits, which may allow
+// larger buffers than the default's, and reports what zeroing a new
+// buffer of each size costs.
+static void ZeroTimes(Sample* sample)
+{
+    mrhiDestroyDevice(sample->device);
+    sample->device = nullptr;
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.adapter = sample->adapter;
+    mrhiRequestId opened = {0};
+    mrhiInstanceNotification record;
+    bool open =
+        mrhiGetAdapterLimits(sample->instance, sample->adapter, &def.limits) == mrhi_success &&
+        mrhiCreateDevice(sample->instance, &def, &sample->device, &opened) == mrhi_success &&
+        mrhiNextInstanceNotification(sample->instance, &record) == mrhi_success &&
+        record.outcome == mrhi_success;
+    if (!SampleCheck(sample, open, "a device with the adapter's limits"))
+    {
+        return;
+    }
+    static const uint64_t sizes[ZERO_SIZES] = {UINT64_C(1) << 20, UINT64_C(64) << 20,
+                                               UINT64_C(1) << 30};
+    static const char* const names[ZERO_SIZES] = {
+        "zero a new buffer, 1 MiB", "zero a new buffer, 64 MiB", "zero a new buffer, 1 GiB"};
+    for (int i = 0; i < ZERO_SIZES; ++i)
+    {
+        double best = 1e9;
+        bool made = true;
+        for (int run = 0; run < RUNS && made && sample->failures == 0; ++run)
+        {
+            double took = 0.0;
+            made = ZeroFrame(sample, sizes[i], &took);
+            best = took < best ? took : best;
+        }
+        if (made)
+        {
+            Report(names[i], best * 1e6, "us");
+        }
+        else
+        {
+            printf("%-*s refused by the device\n", NAME_WIDTH, names[i]);
+        }
+    }
+}
+
 // The bytes an allocator has handed out and not taken back.
 typedef struct Counted
 {
@@ -304,6 +387,7 @@ int main(int argc, char** argv)
         Report("draw frame, start to submit", drawFrame * 1e6, "us");
         Report("pass, declared and recorded", passes * 1e9 / PASSES, "ns");
         Report("compile, 200 chained passes", compile * 1e6, "us");
+        ZeroTimes(&sample);
     }
     int status = SampleClose(&sample);
     size_t instanceBytes = 0;

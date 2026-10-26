@@ -786,15 +786,30 @@ static void CheckLostLane(mrhiInstance* instance, mrhiAdapterId adapter, uint32_
 }
 
 // A device buffer of a size and usage, imported into the open frame.
-static mrhiResourceId Imported(mrhiDevice* device, mrhiBufferUsage usage, mrhiBufferId* objectOut)
+// Makes buffers of the usages given and submits the frame that clears
+// them, so that a later frame holds no pass of the library's.
+static void Cleared(mrhiDevice* device, const mrhiBufferUsage* usages, mrhiBufferId* objects,
+                    int count)
 {
-    mrhiBufferDef def = mrhiDefaultBufferDef();
-    def.size = 256;
-    def.usage = usage;
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "the clearing frame");
+    for (int i = 0; i < count; ++i)
+    {
+        mrhiBufferDef def = mrhiDefaultBufferDef();
+        def.size = 256;
+        def.usage = usages[i];
+        mrhiResourceId resource = {0};
+        CHECK(mrhiCreateBuffer(device, &def, &objects[i]) == mrhi_success &&
+                  mrhiImportBuffer(device, objects[i], &resource) == mrhi_success,
+              "a buffer cleared");
+    }
+    Finish(device);
+}
+
+static mrhiResourceId Imported(mrhiDevice* device, mrhiBufferId object)
+{
     mrhiResourceId resource = {0};
-    CHECK(mrhiCreateBuffer(device, &def, objectOut) == mrhi_success &&
-              mrhiImportBuffer(device, *objectOut, &resource) == mrhi_success,
-          "an imported buffer");
+    CHECK(mrhiImportBuffer(device, object, &resource) == mrhi_success, "an imported buffer");
     return resource;
 }
 
@@ -855,15 +870,19 @@ static void TimeFrame(mrhiDevice* device, mrhiPassClass passClass, mrhiComputePi
     setDef.count = 2;
     mrhiQuerySetId set = {0};
     CHECK(mrhiCreateQuerySet(device, &setDef, &set) == mrhi_success, "a timestamp set");
+    bool dispatch = passClass == mrhi_passAsyncCompute;
+    const mrhiBufferUsage usages[3] = {
+        dispatch ? mrhi_bufferStorage : mrhi_bufferCopyDestination,
+        mrhi_bufferCopyDestination,
+        mrhi_bufferQueryResolve | mrhi_bufferCopySource,
+    };
+    mrhiBufferId objects[3] = {0};
+    Cleared(device, usages, objects, 3);
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
-    bool dispatch = passClass == mrhi_passAsyncCompute;
-    mrhiBufferId objects[3] = {0};
-    mrhiResourceId timed =
-        Imported(device, dispatch ? mrhi_bufferStorage : mrhi_bufferCopyDestination, &objects[0]);
-    mrhiResourceId other = Imported(device, mrhi_bufferCopyDestination, &objects[1]);
-    mrhiResourceId times =
-        Imported(device, mrhi_bufferQueryResolve | mrhi_bufferCopySource, &objects[2]);
+    mrhiResourceId timed = Imported(device, objects[0]);
+    mrhiResourceId other = Imported(device, objects[1]);
+    mrhiResourceId times = Imported(device, objects[2]);
     mrhiPassId work = Timed(
         device, passClass,
         Whole(timed, dispatch ? mrhi_accessStorageReadWrite : mrhi_accessCopyDestination), set, 0);

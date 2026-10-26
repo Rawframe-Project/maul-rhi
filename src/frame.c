@@ -224,9 +224,10 @@ mrhiResult mrhiBeginFrame(mrhiDevice* device, const mrhiFrameDef* def)
     ++device->frameNumber;
     device->frameCompiled = false;
     device->frameResourceCount = 0;
-    device->framePassCount = 0;
     device->frameUseCount = 0;
     atomic_store_explicit(&device->frameChunksTaken, 0, memory_order_relaxed);
+    device->frameChunkLimit = device->frameChunkCount;
+    mrhiBeginZeroPass(device);
     return mrhi_success;
 }
 
@@ -304,6 +305,7 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
         return status;
     }
     mrhiApplyFinalStates(device);
+    mrhiMarkZeroed(device);
     device->lastRequest = token;
     device->lastSubmitted = token;
     device->runningRegions[device->runningCount] = device->stagingRegion;

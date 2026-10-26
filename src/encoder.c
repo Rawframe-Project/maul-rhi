@@ -33,7 +33,7 @@ static mrhiFramePass* Find(mrhiDevice* device, mrhiPassId id, mrhiResult* status
         *statusOut = mrhi_errorState;
         return nullptr;
     }
-    if (id.generation != device->frameSerial || id.index1 == 0 ||
+    if (id.generation != device->frameSerial || id.index1 <= MRHI_LIBRARY_PASSES ||
         id.index1 > device->framePassCount)
     {
         *statusOut = mrhi_errorStale;
@@ -127,7 +127,7 @@ mrhiCommand* mrhiTakeCommands(mrhiDevice* device, mrhiFramePass* pass, uint32_t 
     {
         uint32_t index =
             atomic_fetch_add_explicit(&device->frameChunksTaken, 1, memory_order_relaxed);
-        if (index >= device->frameChunkCount)
+        if (index >= device->frameChunkLimit)
         {
             pass->overflowed = true;
             return nullptr;

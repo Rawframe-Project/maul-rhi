@@ -87,7 +87,7 @@ frame_resource: device_core instance_core
 heap: allocator device_core heap_core invariant label
 heap_core: device_core
 pass: capabilities_core device_core heap_core label
-compile: device_core
+compile: device_core encoder_core invariant label
 plan: device_core invariant
 memory: device_core invariant
 sha256:

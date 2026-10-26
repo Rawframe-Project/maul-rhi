@@ -554,7 +554,7 @@ static mrhiResult CheckDef(mrhiDevice* device, const mrhiPassDef* def)
     // A pass has at most its accesses, two uses per color target and its
     // depth target.
     uint64_t most = (uint64_t)def->accessCount + 2u * def->colorTargetCount + 1u;
-    if (device->framePassCount == device->deviceLimits.framePasses ||
+    if (device->framePassCount - MRHI_LIBRARY_PASSES == device->deviceLimits.framePasses ||
         most > device->deviceLimits.frameAccesses - device->frameUseCount)
     {
         return mrhi_errorCapacity;
