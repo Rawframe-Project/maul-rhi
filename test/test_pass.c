@@ -161,7 +161,8 @@ static void TestCulling(void)
     CHECK(mrhiDeclareTexture(s_device, &late, &resource) == mrhi_errorState,
           "no resource after the compile");
     CHECK(mrhiIsPassKept(s_device, (mrhiPassId){0, 0}, &kept) == mrhi_errorStale, "no pass");
-    CHECK(mrhiIsPassKept(s_device, (mrhiPassId){7, draw.generation}, &kept) == mrhi_errorStale,
+    CHECK(mrhiIsPassKept(s_device, (mrhiPassId){side.index1 + 1, draw.generation}, &kept) ==
+              mrhi_errorStale,
           "past the passes");
     CHECK(mrhiIsPassKept(s_device, draw, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiIsPassKept(nullptr, draw, &kept) == mrhi_errorInvalid, "no device");
@@ -775,7 +776,7 @@ static void TestRefusals(void)
     def = mrhiDefaultPassDef();
     def.label = "shadows";
     def.labelLength = 7;
-    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success && pass.index1 == 1, "labelled");
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success && pass.index1 != 0, "labelled");
     Drop();
 }
 

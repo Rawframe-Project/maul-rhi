@@ -221,7 +221,7 @@ static void TestPhases(void)
     CHECK(mrhiBeginPass(s_device, stale) == mrhi_errorStale, "another frame's pass");
     stale = (mrhiPassId){0, s_dispatch.generation};
     CHECK(mrhiBeginPass(s_device, stale) == mrhi_errorStale, "a null pass");
-    stale = (mrhiPassId){6, s_dispatch.generation};
+    stale = (mrhiPassId){s_culled.index1 + 1, s_dispatch.generation};
     CHECK(mrhiBeginPass(s_device, stale) == mrhi_errorStale, "past the passes");
     CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
     CHECK(mrhiBeginPass(s_device, s_render) == mrhi_errorState, "the frame is gone");

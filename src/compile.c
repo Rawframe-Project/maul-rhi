@@ -83,7 +83,12 @@ void mrhiMarkZeroed(mrhiDevice* device)
     {
         const mrhiFrameResource* resource =
             &device->frameResources[device->frameUses[pass->firstUse + i].resource - 1];
-        device->bufferSlots[resource->index1 - 1].fresh = false;
+        // A buffer destroyed while the frame was open may have given its
+        // slot to a new one, which is still fresh.
+        if (mrhiPoolIsLive(&device->buffers, resource->index1, resource->generation))
+        {
+            device->bufferSlots[resource->index1 - 1].fresh = false;
+        }
     }
 }
 

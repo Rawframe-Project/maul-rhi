@@ -430,7 +430,8 @@ static void TestRefusals(void)
     CHECK(mrhiGetPassPlan(s_device, pass, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiGetPassPlan(nullptr, pass, &plan) == mrhi_errorInvalid, "no device");
     CHECK(mrhiGetPassPlan(s_device, (mrhiPassId){0, 0}, &plan) == mrhi_errorStale, "no pass");
-    CHECK(mrhiGetPassPlan(s_device, (mrhiPassId){2, pass.generation}, &plan) == mrhi_errorStale,
+    CHECK(mrhiGetPassPlan(s_device, (mrhiPassId){pass.index1 + 1, pass.generation}, &plan) ==
+              mrhi_errorStale,
           "past the passes");
     CHECK(mrhiGetFrameMemory(s_device, nullptr) == mrhi_errorInvalid, "no bytes out");
     CHECK(mrhiGetFrameMemory(nullptr, &bytes) == mrhi_errorInvalid, "no device");

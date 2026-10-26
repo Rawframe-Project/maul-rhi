@@ -152,23 +152,27 @@ static void TestView(void)
           "the painting recorded, left open to end");
     CHECK(mrhiEndPass(s_device, painting) == mrhi_success, "ended");
     mrhiRequestId first = Submit();
-    CHECK(s_log.frames == 1 && s_log.passes == 4 && s_log.labeled == (MAUL_RHI_LABELS ? 2u : 0u) &&
-              s_log.labelBytes == (MAUL_RHI_LABELS ? 10u : 0u),
+    // The library's first pass clears the new imported buffer, under a
+    // label of 26 bytes.
+    CHECK(s_log.frames == 1 && s_log.passes == 5 && s_log.labeled == (MAUL_RHI_LABELS ? 3u : 0u) &&
+              s_log.labelBytes == (MAUL_RHI_LABELS ? 10u + 26u : 0u),
           "the kept passes and their labels, which a build without labels drops");
     CHECK(s_log.barriers == barriers && s_log.memoryBytes == memory, "the plan's barriers");
     CHECK(s_log.resources == 4 && s_log.needed == 3 && s_log.transients == 2,
           "four resources, the culled pass's not needed");
-    // An upload, then a marker with two label records (none in a build
-    // without labels), then a blend constant with its color.
-    CHECK(s_log.commands == (MAUL_RHI_LABELS ? 3u : 2u) &&
-              s_log.records == (MAUL_RHI_LABELS ? 3u + 2u + 2u + 1u : 3u + 2u) && s_log.chunks == 2,
+    // The clear, an upload, then a marker with two label records (none
+    // in a build without labels), then a blend constant with its color.
+    CHECK(s_log.commands == (MAUL_RHI_LABELS ? 4u : 3u) &&
+              s_log.records == (MAUL_RHI_LABELS ? 1u + 3u + 2u + 2u + 1u : 1u + 3u + 2u) &&
+              s_log.chunks == 3,
           "every command walked, the marker only where labels are kept");
     CHECK(s_log.named == (MAUL_RHI_LABELS ? 1u : 0u),
           "the labelled target named, but in a build without labels");
     CHECK(s_log.stagingBytes == 512 && s_log.uploadSum == 1 + 2 + 3 + 4,
           "one upload at a 512-byte boundary, its bytes");
     CHECK(s_log.occlusionPasses == 1 && s_log.timestampPasses == 1, "the passes' query sets");
-    CHECK(s_log.accesses == 4 && s_log.sealed == 0, "each kept pass's one declared resource");
+    CHECK(s_log.accesses == 5 && s_log.sealed == 0,
+          "each kept pass's one declared resource, and the clear's");
     // The first frame still runs while the next stages its own bytes.
     CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "another frame");
     CHECK(mrhiImportBuffer(s_device, s_buffer, &buffer) == mrhi_success, "imported");
@@ -219,7 +223,8 @@ static void TestDestroyedImport(void)
           "its slot taken again");
     CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
     Submit();
-    CHECK(s_log.frames == 1 && s_log.passes == 1 && s_log.resources == 1,
+    // Beside the library's first pass, which clears the imported buffer.
+    CHECK(s_log.frames == 1 && s_log.passes == 2 && s_log.resources == 1,
           "the pass ran on the handle the frame imported");
     CloseDevice();
 }
