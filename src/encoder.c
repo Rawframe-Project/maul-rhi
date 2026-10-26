@@ -127,7 +127,7 @@ mrhiCommand* mrhiTakeCommands(mrhiDevice* device, mrhiFramePass* pass, uint32_t 
     {
         uint32_t index =
             atomic_fetch_add_explicit(&device->frameChunksTaken, 1, memory_order_relaxed);
-        if (index >= device->frameChunkCount)
+        if (index >= device->frameChunkLimit)
         {
             pass->overflowed = true;
             return nullptr;

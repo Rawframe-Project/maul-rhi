@@ -280,6 +280,7 @@ typedef struct FrameParts
     size_t driverPasses;
     size_t driverResources;
     size_t driverAccesses;
+    uint32_t programChunks;
 } FrameParts;
 
 // Lays out the tables of the open frame, sized by the device's limits.
@@ -287,15 +288,20 @@ static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
 {
     const mrhiDeviceLimits* limits = &def->deviceLimits;
     size_t passes = (size_t)limits->framePasses + MRHI_LIBRARY_PASSES;
+    // The first pass's use and clear of each fresh buffer a frame imports,
+    // at most one a resource.
+    size_t clears = limits->frameResources;
     FrameParts parts = {
         .boxLimit = (size_t)limits->frameAccesses * 4 + 16,
-        .chunkCount = limits->frameCommandBytes / MRHI_CHUNK_BYTES,
+        .programChunks = limits->frameCommandBytes / MRHI_CHUNK_BYTES,
     };
+    parts.chunkCount =
+        parts.programChunks + (uint32_t)((clears + MRHI_CHUNK_COMMANDS - 1) / MRHI_CHUNK_COMMANDS);
     parts.resources = mrhiLayoutAdd(layout, limits->frameResources, sizeof(mrhiFrameResource),
                                     alignof(mrhiFrameResource));
     parts.passes = mrhiLayoutAdd(layout, passes, sizeof(mrhiFramePass), alignof(mrhiFramePass));
-    parts.uses =
-        mrhiLayoutAdd(layout, limits->frameAccesses, sizeof(mrhiFrameUse), alignof(mrhiFrameUse));
+    parts.uses = mrhiLayoutAdd(layout, limits->frameAccesses + clears, sizeof(mrhiFrameUse),
+                               alignof(mrhiFrameUse));
     parts.barriers =
         mrhiLayoutAdd(layout, limits->frameBarriers, sizeof(mrhiBarrier), alignof(mrhiBarrier));
     parts.scratch =
@@ -313,8 +319,8 @@ static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
         mrhiLayoutAdd(layout, passes, sizeof(mrhiDriverPass), alignof(mrhiDriverPass));
     parts.driverResources = mrhiLayoutAdd(layout, limits->frameResources,
                                           sizeof(mrhiDriverResource), alignof(mrhiDriverResource));
-    parts.driverAccesses = mrhiLayoutAdd(layout, limits->frameAccesses, sizeof(mrhiDriverAccess),
-                                         alignof(mrhiDriverAccess));
+    parts.driverAccesses = mrhiLayoutAdd(layout, limits->frameAccesses + clears,
+                                         sizeof(mrhiDriverAccess), alignof(mrhiDriverAccess));
     return parts;
 }
 
@@ -333,6 +339,7 @@ static void PlaceFrameParts(mrhiDevice* device, unsigned char* block, const Fram
     device->frameVertexBytes = (uint64_t*)(block + parts->vertexBytes);
     device->frameChunks = (mrhiCommandChunk*)(block + parts->chunks);
     device->frameChunkCount = parts->chunkCount;
+    device->frameProgramChunks = parts->programChunks;
     device->frameLabels = (char*)(block + parts->labels);
     device->driverPasses = (mrhiDriverPass*)(block + parts->driverPasses);
     device->driverResources = (mrhiDriverResource*)(block + parts->driverResources);

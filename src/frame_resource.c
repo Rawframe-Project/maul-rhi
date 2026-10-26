@@ -154,13 +154,8 @@ mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer, mrhiResourc
     }
     const mrhiBufferSlot* slot = &device->bufferSlots[buffer.index1 - 1];
     // The frame's first pass zeroes a fresh buffer the first time the frame
-    // imports it, which takes one of the frame's accesses.
+    // imports it.
     bool zero = slot->fresh && !(device->frameOpen && slot->import.frame == device->frameSerial);
-    if (zero && device->frameOpen && !device->frameCompiled &&
-        device->frameUseCount + device->frameZeroUses == device->deviceLimits.frameAccesses)
-    {
-        return mrhi_errorCapacity;
-    }
     mrhiFrameResource resource = {
         .kind = mrhiImportedBuffer,
         .size = slot->size,
@@ -172,7 +167,10 @@ mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer, mrhiResourc
     };
     mrhiResult status =
         Import(device, &device->bufferSlots[buffer.index1 - 1].import, resource, resourceOut);
-    device->frameZeroUses += zero && status == mrhi_success ? 1u : 0u;
+    if (zero && status == mrhi_success)
+    {
+        mrhiZeroOnFirstUse(device, resourceOut->index1);
+    }
     return status;
 }
 

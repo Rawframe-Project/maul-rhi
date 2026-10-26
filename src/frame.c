@@ -226,6 +226,7 @@ mrhiResult mrhiBeginFrame(mrhiDevice* device, const mrhiFrameDef* def)
     device->frameResourceCount = 0;
     device->frameUseCount = 0;
     atomic_store_explicit(&device->frameChunksTaken, 0, memory_order_relaxed);
+    device->frameChunkLimit = device->frameChunkCount;
     mrhiBeginZeroPass(device);
     return mrhi_success;
 }

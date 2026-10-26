@@ -23,6 +23,7 @@ void mrhiBeginZeroPass(mrhiDevice* device)
 {
     device->framePasses[0] = (mrhiFramePass){
         .passClass = mrhi_passTransfer,
+        .firstUse = device->deviceLimits.frameAccesses,
         .labelLength = MAUL_RHI_LABELS ? (uint32_t)(sizeof(s_zeroLabel) - 1) : 0,
     };
     if (MAUL_RHI_LABELS)
@@ -30,50 +31,33 @@ void mrhiBeginZeroPass(mrhiDevice* device)
         memcpy(device->frameLabels, s_zeroLabel, sizeof(s_zeroLabel) - 1);
     }
     device->framePassCount = MRHI_LIBRARY_PASSES;
-    device->frameZeroUses = 0;
-    device->frameZeroDeclared = false;
 }
 
-// Gives the first pass a whole-buffer copy destination use of each fresh
-// buffer the frame imports, in the accesses its imports kept free.
-static void DeclareZeroes(mrhiDevice* device)
+void mrhiZeroOnFirstUse(mrhiDevice* device, uint32_t resource)
 {
-    if (device->frameZeroDeclared)
-    {
-        return;
-    }
     mrhiFramePass* pass = &device->framePasses[0];
-    pass->firstUse = device->frameUseCount;
-    for (uint32_t i = 0; i < device->frameResourceCount; ++i)
-    {
-        const mrhiFrameResource* resource = &device->frameResources[i];
-        if (resource->kind != mrhiImportedBuffer ||
-            !device->bufferSlots[resource->index1 - 1].fresh)
-        {
-            continue;
-        }
-        device->frameUses[device->frameUseCount++] = (mrhiFrameUse){
-            .resource = i + 1,
-            .use = mrhi_accessCopyDestination,
-            .state = mrhi_stateCopyDestination,
-            .planes = 1,
-            .writes = true,
-            .mipCount = 1,
-            .layerCount = 1,
-        };
-        ++pass->useCount;
-    }
-    // The imports counted the fresh buffers and kept their accesses free.
-    MRHI_ASSERT(pass->useCount == device->frameZeroUses);
-    device->frameZeroDeclared = true;
+    // A frame imports each buffer once, so its fresh ones fit.
+    MRHI_ASSERT(pass->useCount < device->deviceLimits.frameResources);
+    device->frameUses[pass->firstUse + pass->useCount++] = (mrhiFrameUse){
+        .resource = resource,
+        .use = mrhi_accessCopyDestination,
+        .state = mrhi_stateCopyDestination,
+        .planes = 1,
+        .writes = true,
+        .mipCount = 1,
+        .layerCount = 1,
+    };
 }
 
-// Records the first pass's clears, once the compile kept it: success, or
-// mrhi_errorCapacity when the command arena is full.
+// Records the first pass's clears once the compile kept it, from the
+// start of the arena: success, or mrhi_errorCapacity when it is full.
+// Then the program's passes may take their own frameCommandBytes past
+// them.
 static mrhiResult RecordZeroes(mrhiDevice* device)
 {
     mrhiFramePass* pass = &device->framePasses[0];
-    for (uint32_t i = 0; pass->kept && pass->firstChunk == 0 && i < pass->useCount; ++i)
+    MRHI_ASSERT(pass->firstChunk == 0);
+    for (uint32_t i = 0; pass->kept && i < pass->useCount; ++i)
     {
         uint32_t object = device->frameUses[pass->firstUse + i].resource;
         mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
@@ -87,6 +71,8 @@ static mrhiResult RecordZeroes(mrhiDevice* device)
             .d = device->frameResources[object - 1].size,
         };
     }
+    device->frameChunkLimit = device->frameProgramChunks +
+                              atomic_load_explicit(&device->frameChunksTaken, memory_order_relaxed);
     return mrhi_success;
 }
 
@@ -133,7 +119,6 @@ static void Cull(mrhiDevice* device)
 
 mrhiResult mrhiCompile(mrhiDevice* device)
 {
-    DeclareZeroes(device);
     Cull(device);
     mrhiResult status = mrhiPlan(device);
     if (status != mrhi_success)

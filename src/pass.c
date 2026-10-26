@@ -555,7 +555,7 @@ static mrhiResult CheckDef(mrhiDevice* device, const mrhiPassDef* def)
     // depth target.
     uint64_t most = (uint64_t)def->accessCount + 2u * def->colorTargetCount + 1u;
     if (device->framePassCount - MRHI_LIBRARY_PASSES == device->deviceLimits.framePasses ||
-        most > device->deviceLimits.frameAccesses - device->frameUseCount - device->frameZeroUses)
+        most > device->deviceLimits.frameAccesses - device->frameUseCount)
     {
         return mrhi_errorCapacity;
     }
