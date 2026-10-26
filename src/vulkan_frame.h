@@ -17,8 +17,8 @@
 
 #include "maul-rhi/device.h"
 
-// The bytes of the device's zeros, which a texture's clear copies where
-// no clear takes its format, a band of blocks at a time.
+// The bytes of the device's zeros at least, which a texture's clear
+// copies where no clear takes its format, a band of blocks at a time.
 #define MRHI_VULKAN_ZERO_BYTES 65536
 
 // The descriptor pools a frame slot has at most, and each pool's sets
@@ -177,6 +177,9 @@ typedef struct mrhiVulkanFrames
     uint64_t finished;
     VkDeviceMemory zerosMemory;
     VkBuffer zeros;
+    // Their bytes: MRHI_VULKAN_ZERO_BYTES, or a row of blocks of the
+    // widest texture the device takes where that is more.
+    uint64_t zeroBytes;
     VkDeviceMemory readbackMemory;
     VkBuffer readback;
     uint8_t* readbackBytes;
@@ -191,10 +194,11 @@ typedef struct mrhiVulkanFrames
 } mrhiVulkanFrames;
 
 // Makes each slot's command pool on the queue family, its buffer and
-// staging, and the readback buffer, for a device with these limits:
-// mrhi_success, or the error.
+// staging, the readback buffer, and the zeros, for a device with these
+// limits whose textures are at most `widest` texels across: mrhi_success,
+// or the error.
 mrhiResult mrhiVulkanFramesInit(mrhiVulkanFrames* frames, uint32_t family,
-                                const mrhiDeviceLimits* limits);
+                                const mrhiDeviceLimits* limits, uint32_t widest);
 
 // Destroys everything the frames hold, the retiring objects included,
 // on an idle device.

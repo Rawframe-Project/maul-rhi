@@ -41,7 +41,7 @@ On one queue a barrier also waits for every earlier batch, so no check here sees
 
 The core's resource states map to Vulkan stages, accesses and layouts for its barriers. A barrier marked aliasing waits for all commands' writes. A copy destination's barriers name the clear stage beside the copy stage, since `mrhiClearBuffer` is `vkCmdFillBuffer` and the core's clear of a new texture is a clear command too.
 
-The core's clear of a new texture runs in the transfer destination layout: `vkCmdClearColorImage` over every mip and layer of a color format, `vkCmdClearDepthStencilImage` of a depth format, and for a compressed format, which no clear takes, copies from a 64 KiB host-visible buffer of zeros that each frame slot set keeps, in bands of rows of blocks, or parts of a row where a row is longer. So every image but a transient one is made with `TRANSFER_DST`; an adopted image is never cleared.
+The core's clear of a new texture runs in the transfer destination layout: `vkCmdClearColorImage` over every mip and layer of a color format, `vkCmdClearDepthStencilImage` of a depth format, and for a compressed format, which no clear takes, copies from a host-visible buffer of zeros the device keeps, in bands of as many rows of blocks as it holds: 64 KiB, or a row of blocks of the widest texture the device takes where that is more. So every image but a transient one is made with `TRANSFER_DST`; an adopted image is never cleared.
 
 ## Passes
 

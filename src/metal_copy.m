@@ -189,46 +189,34 @@ void mrhiMetalCopy(mrhiMetalEncoder* encoder, const mrhiCommand* command)
     }
 }
 
-// Copies the device's zeros over a mip's layer or depth slice: in boxes
-// of rows of blocks as long as the zeros hold, or parts of a row where a
-// row is longer.
+// Copies the device's zeros over a mip's layer or depth slice, in bands
+// of as many rows of blocks as the zeros hold, which hold a row of the
+// widest texture.
 static void CopyZerosToMip(const mrhiMetalEncoder* encoder, id<MTLTexture> texture,
                            const mrhiTextureDef* def, uint32_t mip, uint32_t z)
 {
     mrhiFormatBlock block = mrhiGetFormatBlock(def->format);
-    uint32_t bytes = mrhiGetFormatCopy(def->format, mrhi_aspectAll).bytes;
     bool volume = def->kind == mrhi_texture3d;
     uint32_t width = def->width >> mip > 0 ? def->width >> mip : 1;
     uint32_t height = def->height >> mip > 0 ? def->height >> mip : 1;
-    uint32_t across = (width + block.width - 1) / block.width;
-    uint32_t down = (height + block.height - 1) / block.height;
-    uint32_t perRow =
-        MRHI_METAL_ZERO_BYTES / bytes < across ? MRHI_METAL_ZERO_BYTES / bytes : across;
-    uint32_t rows = perRow < across ? 1 : MRHI_METAL_ZERO_BYTES / (perRow * bytes);
-    for (uint32_t y = 0; y < down; y += rows)
+    uint32_t rowBytes = (width + block.width - 1) / block.width *
+                        mrhiGetFormatCopy(def->format, mrhi_aspectAll).bytes;
+    MRHI_ASSERT(rowBytes > 0 && rowBytes <= MRHI_METAL_ZERO_BYTES);
+    uint32_t band = MRHI_METAL_ZERO_BYTES / rowBytes * block.height;
+    for (uint32_t y = 0; y < height; y += band)
     {
-        for (uint32_t x = 0; x < across; x += perRow)
-        {
-            uint32_t w = across - x < perRow ? across - x : perRow;
-            uint32_t h = down - y < rows ? down - y : rows;
-            uint32_t left = x * block.width;
-            uint32_t top = y * block.height;
-            [encoder->blit
-                     copyFromBuffer:encoder->zeros
-                       sourceOffset:0
-                  sourceBytesPerRow:w * bytes
-                sourceBytesPerImage:volume ? w * bytes * h : 0
-                         sourceSize:MTLSizeMake(w * block.width < width - left ? w * block.width
-                                                                               : width - left,
-                                                h * block.height < height - top ? h * block.height
-                                                                                : height - top,
-                                                1)
-                          toTexture:texture
-                   destinationSlice:volume ? 0 : z
-                   destinationLevel:mip
-                  destinationOrigin:MTLOriginMake(left, top, volume ? z : 0)
-                            options:MTLBlitOptionNone];
-        }
+        uint32_t h = height - y < band ? height - y : band;
+        uint32_t rows = (h + block.height - 1) / block.height;
+        [encoder->blit copyFromBuffer:encoder->zeros
+                         sourceOffset:0
+                    sourceBytesPerRow:rowBytes
+                  sourceBytesPerImage:volume ? rowBytes * rows : 0
+                           sourceSize:MTLSizeMake(width, h, 1)
+                            toTexture:texture
+                     destinationSlice:volume ? 0 : z
+                     destinationLevel:mip
+                    destinationOrigin:MTLOriginMake(0, y, volume ? z : 0)
+                              options:MTLBlitOptionNone];
     }
 }
 

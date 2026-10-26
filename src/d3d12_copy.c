@@ -385,36 +385,32 @@ static void ClearStorageMip(mrhiD3d12Recorder* recorder, ID3D12Resource* resourc
                                                            zeros, 0, nullptr);
 }
 
-// Copies the device's zeros over a mip's layer or depth slice: in boxes
-// of rows of blocks as long as the zeros hold at D3D12's row pitch, or
-// parts of a row where a row is longer.
+// Copies the device's zeros over a mip's layer or depth slice, in boxes
+// of as many rows of blocks as the zeros hold at D3D12's row pitch:
+// they hold a row of the widest texture D3D12 takes, 16384 texels of 16
+// bytes.
 static void CopyZerosToMip(const mrhiD3d12Recorder* recorder, ID3D12Resource* resource,
                            const mrhiTextureDef* def, uint32_t mip, uint32_t z)
 {
     mrhiFormatBlock block = mrhiGetFormatBlock(def->format);
-    uint32_t bytes = mrhiGetFormatCopy(def->format, mrhi_aspectAll).bytes;
     bool volume = def->kind == mrhi_texture3d;
     uint32_t across =
         ((def->width >> mip > 0 ? def->width >> mip : 1) + block.width - 1) / block.width;
     uint32_t down =
         ((def->height >> mip > 0 ? def->height >> mip : 1) + block.height - 1) / block.height;
-    uint32_t perRow = (uint32_t)MRHI_D3D12_ZERO_BYTES / bytes < across
-                          ? (uint32_t)MRHI_D3D12_ZERO_BYTES / bytes
-                          : across;
-    uint32_t pitch = (perRow * bytes + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1) /
+    uint32_t pitch = (across * mrhiGetFormatCopy(def->format, mrhi_aspectAll).bytes +
+                      D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1) /
                      D3D12_TEXTURE_DATA_PITCH_ALIGNMENT * D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
-    uint32_t rows = perRow < across ? 1 : (uint32_t)MRHI_D3D12_ZERO_BYTES / pitch;
+    MRHI_ASSERT(pitch > 0 && pitch <= MRHI_D3D12_ZERO_BYTES);
+    uint32_t rows = (uint32_t)(MRHI_D3D12_ZERO_BYTES / pitch);
     UINT subresource = SubresourceOf(def, mip, volume ? 0 : z, mrhi_aspectAll);
     for (uint32_t y = 0; y < down; y += rows)
     {
-        for (uint32_t x = 0; x < across; x += perRow)
-        {
-            const uint32_t origin[3] = {x * block.width, y * block.height, volume ? z : 0};
-            const uint32_t size[3] = {(across - x < perRow ? across - x : perRow) * block.width,
-                                      (down - y < rows ? down - y : rows) * block.height, 1};
-            CopyBox(recorder, true, recorder->zeros, 0, pitch, resource, def, mrhi_aspectAll,
-                    subresource, origin, size);
-        }
+        const uint32_t origin[3] = {0, y * block.height, volume ? z : 0};
+        const uint32_t size[3] = {across * block.width,
+                                  (down - y < rows ? down - y : rows) * block.height, 1};
+        CopyBox(recorder, true, recorder->zeros, 0, pitch, resource, def, mrhi_aspectAll,
+                subresource, origin, size);
     }
 }
 

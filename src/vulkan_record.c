@@ -359,43 +359,33 @@ static void CopyTextures(const mrhiVulkanRecording* recording, const mrhiCommand
 // The regions one copy of zeros takes at most.
 #define ZERO_REGIONS 32
 
-// The copies of zeros that cover a mip's layer or depth slice, from the
-// device's zeros: rows of blocks in bands as long as the zeros hold, or
-// parts of a row where a row is longer. Each region is laid out tightly
-// from the zeros' start. Returns the regions it added.
-static uint32_t ZeroRegions(VkBufferImageCopy* regions, uint32_t count, const mrhiTextureDef* def,
-                            uint32_t mip, uint32_t z, uint32_t* nextBand, uint32_t* nextColumn)
+// The copies of zeros that cover a mip's layer or depth slice from the
+// band of rows of blocks at *nextBand on, at most `room` of them: bands
+// of as many rows as the device's zeros hold, each laid out tightly from
+// their start. The zeros hold a row of the widest texture the device
+// takes. Returns the regions it added.
+static uint32_t ZeroRegions(VkBufferImageCopy* regions, uint32_t room, const mrhiTextureDef* def,
+                            uint64_t zeroBytes, uint32_t mip, uint32_t z, uint32_t* nextBand)
 {
     mrhiFormatBlock block = mrhiGetFormatBlock(def->format);
-    uint32_t bytes = mrhiGetFormatCopy(def->format, mrhi_aspectAll).bytes;
     bool volume = def->kind == mrhi_texture3d;
     uint32_t width = def->width >> mip > 0 ? def->width >> mip : 1;
     uint32_t height = def->height >> mip > 0 ? def->height >> mip : 1;
-    uint32_t across = (width + block.width - 1) / block.width;
+    uint64_t rowBytes = (uint64_t)((width + block.width - 1) / block.width) *
+                        mrhiGetFormatCopy(def->format, mrhi_aspectAll).bytes;
+    MRHI_ASSERT(rowBytes > 0 && rowBytes <= zeroBytes);
     uint32_t down = (height + block.height - 1) / block.height;
-    uint32_t perRow =
-        MRHI_VULKAN_ZERO_BYTES / bytes < across ? MRHI_VULKAN_ZERO_BYTES / bytes : across;
-    uint32_t rows = perRow < across ? 1 : MRHI_VULKAN_ZERO_BYTES / (across * bytes);
+    uint32_t rows = (uint32_t)(zeroBytes / rowBytes);
     uint32_t added = 0;
-    for (; *nextBand < down && count + added < ZERO_REGIONS; *nextBand += rows)
+    for (; *nextBand < down && added < room; *nextBand += rows)
     {
-        for (; *nextColumn < across && count + added < ZERO_REGIONS; *nextColumn += perRow)
-        {
-            uint32_t x = *nextColumn * block.width;
-            uint32_t y = *nextBand * block.height;
-            regions[count + added++] = (VkBufferImageCopy){
-                .imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, mip, volume ? 0 : z, 1},
-                .imageOffset = {(int32_t)x, (int32_t)y, volume ? (int32_t)z : 0},
-                .imageExtent = {width - x < perRow * block.width ? width - x : perRow * block.width,
-                                height - y < rows * block.height ? height - y : rows * block.height,
-                                1},
-            };
-        }
-        if (*nextColumn < across)
-        {
-            break;
-        }
-        *nextColumn = 0;
+        uint32_t y = *nextBand * block.height;
+        regions[added++] = (VkBufferImageCopy){
+            .imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, mip, volume ? 0 : z, 1},
+            .imageOffset = {0, (int32_t)y, volume ? (int32_t)z : 0},
+            .imageExtent = {width,
+                            height - y < rows * block.height ? height - y : rows * block.height, 1},
+        };
     }
     return added;
 }
@@ -405,6 +395,7 @@ static uint32_t ZeroRegions(VkBufferImageCopy* regions, uint32_t count, const mr
 static void CopyZeros(const mrhiVulkanRecording* recording, mrhiVulkanFrameTexture image)
 {
     const mrhiTextureDef* def = image.def;
+    const mrhiVulkanFrames* frames = recording->frames;
     bool volume = def->kind == mrhi_texture3d;
     VkBufferImageCopy regions[ZERO_REGIONS];
     uint32_t count = 0;
@@ -414,16 +405,16 @@ static void CopyZeros(const mrhiVulkanRecording* recording, mrhiVulkanFrameTextu
         for (uint32_t z = 0; z < (volume ? depth : def->depthOrLayers); ++z)
         {
             uint32_t band = 0;
-            uint32_t column = 0;
             uint32_t added = 0;
             do
             {
-                added = ZeroRegions(regions, count, def, mip, z, &band, &column);
+                added = ZeroRegions(&regions[count], ZERO_REGIONS - count, def, frames->zeroBytes,
+                                    mip, z, &band);
                 count += added;
                 if (count == ZERO_REGIONS)
                 {
-                    recording->frames->api->vkCmdCopyBufferToImage(
-                        recording->slot->commands, recording->frames->zeros, image.image,
+                    frames->api->vkCmdCopyBufferToImage(
+                        recording->slot->commands, frames->zeros, image.image,
                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, count, regions);
                     count = 0;
                 }
@@ -432,9 +423,8 @@ static void CopyZeros(const mrhiVulkanRecording* recording, mrhiVulkanFrameTextu
     }
     if (count > 0)
     {
-        recording->frames->api->vkCmdCopyBufferToImage(
-            recording->slot->commands, recording->frames->zeros, image.image,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, count, regions);
+        frames->api->vkCmdCopyBufferToImage(recording->slot->commands, frames->zeros, image.image,
+                                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, count, regions);
     }
 }
 
