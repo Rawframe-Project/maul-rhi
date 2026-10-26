@@ -12233,7 +12233,7 @@
                 },
                 "d3d12": {
                   "class": "restricted",
-                  "note": "the copy queue for a pass touching buffers only, else the compute queue where a compute list makes its texture transitions, else the direct queue"
+                  "note": "the copy queue for a pass touching buffers only and clearing none, else the compute queue where a compute list makes its texture transitions, as for a pass that clears, among them the core's zeroing of new buffers, else the direct queue"
                 },
                 "metal": {
                   "class": "restricted",
