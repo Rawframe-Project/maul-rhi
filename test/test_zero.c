@@ -66,7 +66,8 @@ static void Submit(mrhiDevice* device)
 
 // The first frame that imports a buffer runs one more pass, with one
 // clear; the next frame runs the program's pass alone. The library's
-// pass, the frame's first, takes no call of the program's.
+// pass, the frame's first, takes no call of the program's, and the
+// buffer's plan shows it.
 static void TestFirstFrame(void)
 {
     mrhiDevice* device = Open(mrhiDefaultDeviceDef());
@@ -81,6 +82,10 @@ static void TestFirstFrame(void)
               mrhiIsPassKept(device, library, &kept) == mrhi_errorStale &&
               mrhiGetPassPlan(device, library, &plan) == mrhi_errorStale,
           "the library's pass refused to the program");
+    mrhiResourcePlan used;
+    CHECK(mrhiGetResourcePlan(device, resource, &used) == mrhi_success &&
+              used.firstPass.index1 == library.index1 && used.lastPass.index1 == pass.index1,
+          "the buffer first used by the library's pass");
     Submit(device);
     CHECK(s_log.passes == 2 && s_log.commands == 1 && s_log.accesses == 2,
           "the first frame clears the buffer before its pass");

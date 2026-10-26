@@ -12,7 +12,7 @@ Passes record between `mrhiCompileFrame` and `mrhiSubmitFrame`. `mrhiBeginPass` 
 
 ## The arena
 
-Each frame's commands live in the device's `frameCommandBytes` (at least 4 KiB), handed out in 4 KiB chunks by one atomic counter. A command is a 32-byte record, and its payload (root block bytes, a viewport, a color, a label, a binding table) follows it in the same chunk. Each pass links its own chunks, so passes on different threads share nothing but the counter: one atomic operation per 4 KiB.
+Each frame's commands live in the device's `frameCommandBytes` (at least 4 KiB), handed out in 4 KiB chunks by one atomic counter. The compile takes the chunks of the library's clears of new buffers first, and the program's passes then share the `frameCommandBytes` it asked for ([frame-graph.md](frame-graph.md#new-buffers)). A command is a 32-byte record, and its payload (root block bytes, a viewport, a color, a label, a binding table) follows it in the same chunk. Each pass links its own chunks, so passes on different threads share nothing but the counter: one atomic operation per 4 KiB.
 
 A command that finds no chunk is refused with `mrhi_errorCapacity` and marks its pass, which records nothing more, and the frame's submission is then refused as capacity. A command is never dropped silently. Because a table and its command must fit one chunk, a table holds at most `MRHI_TABLE_BINDINGS` bindings. Debug group pushes and pops that are refused for capacity still count, so a pass that filled the arena can still end balanced.
 

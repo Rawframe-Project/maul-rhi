@@ -6369,7 +6369,7 @@
             {
               "name": "frame_passes",
               "type": "uint32",
-              "doc": "Passes one frame declares; 256 by default."
+              "doc": "Passes one frame declares; 256 by default. The library's own pass, which zeroes new buffers, comes beside them."
             },
             {
               "name": "frame_accesses",
@@ -8142,7 +8142,7 @@
         {
           "kind": "function",
           "name": "create_buffer",
-          "doc": "Makes a buffer on a ready device. Its contents are undefined until the frame graph writes them.",
+          "doc": "Makes a buffer on a ready device. It reads as zeros until the frame graph writes it: the first frame that imports it clears it whole, in a pass of the library's own that runs before the program's passes and takes nothing from its budgets.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a size of 0 or not a multiple of 4, or no usage or an unknown one; `mrhi_errorUnsupported` for a size beyond the device's bufferBytes limit or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's buffer limit is reached; `mrhi_errorPlatform` when the driver fails."
@@ -13561,7 +13561,7 @@
             {
               "name": "pass",
               "type": "id.pass_id",
-              "doc": "The pass it comes before, or a null id for the frame's end."
+              "doc": "The pass it comes before, or a null id for the frame's end. It may be the library's own pass, the frame's first, which zeroes new buffers: the program's passes take the ids after it, and the program never begins it or reads its plan."
             },
             {
               "name": "resource",
@@ -13626,7 +13626,7 @@
             {
               "name": "first_pass",
               "type": "id.pass_id",
-              "doc": "The first kept pass using it, or a null id when none does."
+              "doc": "The first kept pass using it, or a null id when none does; for a new buffer, the library's own pass that zeroes it."
             },
             {
               "name": "last_pass",
@@ -21965,7 +21965,7 @@
             {
               "name": "passes",
               "type": "uint32",
-              "doc": "The last frame's kept passes."
+              "doc": "The last frame's kept passes, the library's pass that zeroes new buffers among them."
             },
             {
               "name": "labeled",
@@ -21985,7 +21985,7 @@
             {
               "name": "accesses",
               "type": "uint32",
-              "doc": "The resources its passes declare, their targets among them."
+              "doc": "The resources its passes declare, their targets and the new buffers it zeroes among them."
             },
             {
               "name": "label_bytes",
@@ -22030,7 +22030,7 @@
             {
               "name": "commands",
               "type": "uint32",
-              "doc": "Its commands."
+              "doc": "Its commands, a clear for each new buffer among them."
             },
             {
               "name": "records",
@@ -22188,5 +22188,5 @@
       ]
     }
   ],
-  "contract_version": 13
+  "contract_version": 14
 }

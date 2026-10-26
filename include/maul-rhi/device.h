@@ -57,7 +57,8 @@ extern "C"
         uint32_t surfaces;
         // Resources one frame declares and imports; 1024 by default.
         uint32_t frameResources;
-        // Passes one frame declares; 256 by default.
+        // Passes one frame declares; 256 by default. The library's own pass,
+        // which zeroes new buffers, comes beside them.
         uint32_t framePasses;
         // Accesses and targets one frame's passes declare in all; 4096 by
         // default.

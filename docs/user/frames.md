@@ -12,7 +12,7 @@ All GPU work reaches a device as a frame. A frame declares its resources and pas
 
 ## Resources
 
-**Device objects** outlive frames: buffers (`mrhiCreateBuffer`), textures (`mrhiCreateTexture`) and their views (`mrhiCreateView`), samplers and query sets. A texture's usages are fixed when it is made, and its view formats may name only its sRGB or linear twin. Destroying an object that a submitted frame still uses is safe: the driver keeps it until that frame has finished.
+**Device objects** outlive frames: buffers (`mrhiCreateBuffer`), textures (`mrhiCreateTexture`) and their views (`mrhiCreateView`), samplers and query sets. A texture's usages are fixed when it is made, and its view formats may name only its sRGB or linear twin. Destroying an object that a submitted frame still uses is safe: the driver keeps it until that frame has finished. A new buffer reads as zeros: the first frame that imports it clears it whole, in a pass of the library's own that runs before the program's passes and takes nothing from the device's frame budgets. That pass may appear in a frame's barriers and plans, and the program's passes never have its id.
 
 **Transient resources** live for one frame: `mrhiDeclareBuffer` and `mrhiDeclareTexture` describe them, and the compile places them in the frame's memory, overlapping those whose uses do not overlap. A render target that is only written and then discarded stays on chip on tile GPUs. A texture that lists view formats is never transient.
 

@@ -204,8 +204,10 @@ extern "C"
     /// Safe from any thread.
     MRHI_API mrhiBufferDef mrhiDefaultBufferDef(void);
 
-    /// Makes a buffer on a ready device. Its contents are undefined until the
-    /// frame graph writes them.
+    /// Makes a buffer on a ready device. It reads as zeros until the frame
+    /// graph writes it: the first frame that imports it clears it whole, in a
+    /// pass of the library's own that runs before the program's passes and
+    /// takes nothing from its budgets.
     ///
     /// @param device     The device.
     /// @param def        The buffer to make.
