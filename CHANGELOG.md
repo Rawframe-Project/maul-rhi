@@ -5,6 +5,17 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.8.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.7.0...v0.8.0) (2026-10-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **resources:** drivers built outside the tree must handle `mrhiCommandClearTexture` and declare `MRHI_SPI_VERSION` 8; a driver of SPI version 7 is refused with `mrhi_errorVersion`. Programs see new textures read as zeros.
+
+### Added
+
+* **resources:** zero new textures in their first frame ([#137](https://github.com/Rawframe-Project/maul-rhi/issues/137)) ([1d0356b](https://github.com/Rawframe-Project/maul-rhi/commit/1d0356b4516e063da4fcdb45fdf1c069f9e2294c)), closes [#136](https://github.com/Rawframe-Project/maul-rhi/issues/136)
+
 ## [0.7.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.6.0...v0.7.0) (2026-10-26)
 
 ### Added
