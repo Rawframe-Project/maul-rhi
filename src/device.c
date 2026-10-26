@@ -75,7 +75,8 @@ static bool AreDeviceLimitsValid(const mrhiDeviceLimits* limits)
 {
     return limits->notifications >= 2 && limits->samplers != 0 && limits->buffers != 0 &&
            limits->textures != 0 && limits->views != 0 && limits->surfaces != 0 &&
-           limits->frameResources != 0 && limits->framePasses != 0 && limits->frameAccesses != 0 &&
+           limits->frameResources != 0 && limits->framePasses != 0 &&
+           limits->framePasses <= UINT32_MAX - MRHI_LIBRARY_PASSES && limits->frameAccesses != 0 &&
            limits->frameBarriers != 0 && limits->shaders != 0 && limits->pipelines != 0 &&
            limits->frameCommandBytes >= MRHI_CHUNK_BYTES && limits->readbackBytes % 512 == 0;
 }
@@ -285,34 +286,31 @@ typedef struct FrameParts
 static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
 {
     const mrhiDeviceLimits* limits = &def->deviceLimits;
+    size_t passes = (size_t)limits->framePasses + MRHI_LIBRARY_PASSES;
     FrameParts parts = {
         .boxLimit = (size_t)limits->frameAccesses * 4 + 16,
         .chunkCount = limits->frameCommandBytes / MRHI_CHUNK_BYTES,
     };
     parts.resources = mrhiLayoutAdd(layout, limits->frameResources, sizeof(mrhiFrameResource),
                                     alignof(mrhiFrameResource));
-    parts.passes =
-        mrhiLayoutAdd(layout, limits->framePasses, sizeof(mrhiFramePass), alignof(mrhiFramePass));
+    parts.passes = mrhiLayoutAdd(layout, passes, sizeof(mrhiFramePass), alignof(mrhiFramePass));
     parts.uses =
         mrhiLayoutAdd(layout, limits->frameAccesses, sizeof(mrhiFrameUse), alignof(mrhiFrameUse));
     parts.barriers =
         mrhiLayoutAdd(layout, limits->frameBarriers, sizeof(mrhiBarrier), alignof(mrhiBarrier));
     parts.scratch =
         mrhiLayoutAdd(layout, limits->frameBarriers, sizeof(mrhiBarrier), alignof(mrhiBarrier));
-    parts.counts =
-        mrhiLayoutAdd(layout, (size_t)limits->framePasses + 2, sizeof(uint32_t), alignof(uint32_t));
+    parts.counts = mrhiLayoutAdd(layout, passes + 2, sizeof(uint32_t), alignof(uint32_t));
     parts.boxes = mrhiLayoutAdd(layout, parts.boxLimit, sizeof(mrhiBox), alignof(mrhiBox));
     parts.order =
         mrhiLayoutAdd(layout, limits->frameResources, sizeof(uint32_t), alignof(uint32_t));
-    parts.vertexBytes =
-        mrhiLayoutAdd(layout, (size_t)limits->framePasses * def->limits.vertexBuffers,
-                      sizeof(uint64_t), alignof(uint64_t));
+    parts.vertexBytes = mrhiLayoutAdd(layout, passes * def->limits.vertexBuffers, sizeof(uint64_t),
+                                      alignof(uint64_t));
     parts.chunks = mrhiLayoutAdd(layout, parts.chunkCount, sizeof(mrhiCommandChunk),
                                  alignof(mrhiCommandChunk));
-    parts.labels = mrhiLayoutAdd(
-        layout, MAUL_RHI_LABELS ? (size_t)limits->framePasses * MRHI_LABEL_BYTES : 0, 1, 1);
+    parts.labels = mrhiLayoutAdd(layout, MAUL_RHI_LABELS ? passes * MRHI_LABEL_BYTES : 0, 1, 1);
     parts.driverPasses =
-        mrhiLayoutAdd(layout, limits->framePasses, sizeof(mrhiDriverPass), alignof(mrhiDriverPass));
+        mrhiLayoutAdd(layout, passes, sizeof(mrhiDriverPass), alignof(mrhiDriverPass));
     parts.driverResources = mrhiLayoutAdd(layout, limits->frameResources,
                                           sizeof(mrhiDriverResource), alignof(mrhiDriverResource));
     parts.driverAccesses = mrhiLayoutAdd(layout, limits->frameAccesses, sizeof(mrhiDriverAccess),
@@ -444,6 +442,8 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     MRHI_ASSERT(instance->driver.vtable != nullptr);
     mrhiDeviceDef driverDef = *def;
     mrhiDropLabel(&driverDef.label, &driverDef.labelLength);
+    // A frame holds the library's passes beside the program's.
+    driverDef.deviceLimits.framePasses += MRHI_LIBRARY_PASSES;
     status = instance->driver.vtable->createDevice(instance->driver.self, adapter->handle,
                                                    &driverDef, device->request, &device->driver);
     if (status == mrhi_success)

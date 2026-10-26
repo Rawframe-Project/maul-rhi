@@ -104,12 +104,19 @@ typedef struct mrhiQuerySetSlot
     mrhiQueryType type;
 } mrhiQuerySetSlot;
 
-// A buffer as its device keeps it.
+// The passes of every frame that are the library's own, before the
+// program's: the first zeroes the buffers no frame has run with yet, and
+// is culled when the frame imports none.
+#define MRHI_LIBRARY_PASSES 1
+
+// A buffer as its device keeps it: whether no submitted frame has
+// zeroed it yet, which its first frame's first pass does.
 typedef struct mrhiBufferSlot
 {
     uint64_t handle;
     uint64_t size;
     mrhiBufferUsage usage;
+    bool fresh;
     mrhiImport import;
     // The state frames leave it in.
     mrhiResourceState state;
@@ -474,6 +481,11 @@ struct mrhiDevice
     uint32_t framePassCount;
     mrhiFrameUse* frameUses;
     uint32_t frameUseCount;
+    // The uses the frame's first pass takes to zero the fresh buffers it
+    // imports, kept free of the program's accesses, and whether the
+    // compile has declared them.
+    uint32_t frameZeroUses;
+    bool frameZeroDeclared;
     // The compile's plan: the barriers in the order they run, and room to
     // sort them and to map one resource's states.
     mrhiBarrier* frameBarriers;
@@ -677,6 +689,14 @@ void mrhiApplyFinalStates(mrhiDevice* device);
 
 // Compiles the open frame: culls, derives usages and checks them.
 mrhiResult mrhiCompile(mrhiDevice* device);
+
+// Opens the frame's first pass, the library's own, which zeroes the
+// fresh buffers the frame imports.
+void mrhiBeginZeroPass(mrhiDevice* device);
+
+// After a frame was submitted: the buffers its first pass zeroed are no
+// longer fresh.
+void mrhiMarkZeroed(mrhiDevice* device);
 
 // Whether a format can take the usages on the device.
 bool mrhiFormatTakes(const mrhiDevice* device, mrhiFormat format, mrhiTextureUsage usage);

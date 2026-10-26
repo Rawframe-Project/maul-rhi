@@ -153,6 +153,14 @@ mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer, mrhiResourc
         return mrhi_errorStale;
     }
     const mrhiBufferSlot* slot = &device->bufferSlots[buffer.index1 - 1];
+    // The frame's first pass zeroes a fresh buffer the first time the frame
+    // imports it, which takes one of the frame's accesses.
+    bool zero = slot->fresh && !(device->frameOpen && slot->import.frame == device->frameSerial);
+    if (zero && device->frameOpen && !device->frameCompiled &&
+        device->frameUseCount + device->frameZeroUses == device->deviceLimits.frameAccesses)
+    {
+        return mrhi_errorCapacity;
+    }
     mrhiFrameResource resource = {
         .kind = mrhiImportedBuffer,
         .size = slot->size,
@@ -162,7 +170,10 @@ mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer, mrhiResourc
         .initialState = slot->state,
         .sealed = slot->state == mrhi_stateSealed,
     };
-    return Import(device, &device->bufferSlots[buffer.index1 - 1].import, resource, resourceOut);
+    mrhiResult status =
+        Import(device, &device->bufferSlots[buffer.index1 - 1].import, resource, resourceOut);
+    device->frameZeroUses += zero && status == mrhi_success ? 1u : 0u;
+    return status;
 }
 
 // Finds an imported object of the open frame to seal or unseal: its

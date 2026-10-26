@@ -33,7 +33,7 @@ static mrhiFramePass* Find(mrhiDevice* device, mrhiPassId id, mrhiResult* status
         *statusOut = mrhi_errorState;
         return nullptr;
     }
-    if (id.generation != device->frameSerial || id.index1 == 0 ||
+    if (id.generation != device->frameSerial || id.index1 <= MRHI_LIBRARY_PASSES ||
         id.index1 > device->framePassCount)
     {
         *statusOut = mrhi_errorStale;

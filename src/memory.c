@@ -234,7 +234,7 @@ mrhiResult mrhiGetPassPlan(mrhiDevice* device, mrhiPassId pass, mrhiPassPlan* pl
     {
         return mrhi_errorState;
     }
-    if (pass.generation != device->frameSerial || pass.index1 == 0 ||
+    if (pass.generation != device->frameSerial || pass.index1 <= MRHI_LIBRARY_PASSES ||
         pass.index1 > device->framePassCount)
     {
         return mrhi_errorStale;
