@@ -367,10 +367,10 @@ static void TestLayers(void)
     CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 8, "eight barriers");
-    CHECK(Is(0, Zeroing(fill), slices, 0, 1, kAll, mrhi_stateUndefined,
-             mrhi_stateCopyDestination) &&
-              s_barriers[0].range.layerCount == 1,
-          "the new volume zeroed first, as one layer");
+    CHECK(
+        Is(0, Zeroing(fill), slices, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateCopyDestination) &&
+            s_barriers[0].range.layerCount == 1,
+        "the new volume zeroed first, as one layer");
     CHECK(Is(1, first, array, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateStorageWrite) &&
               s_barriers[1].range.baseLayer == 1 && s_barriers[1].range.layerCount == 1,
           "layer 1 written");
@@ -532,9 +532,9 @@ static void TestUnified(void)
     CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 3, "three barriers");
-    CHECK(Is(0, Zeroing(pass), imported, 0, 3, kAll, mrhi_stateUndefined,
-             mrhi_stateCopyDestination),
-          "the new texture zeroed whole first");
+    CHECK(
+        Is(0, Zeroing(pass), imported, 0, 3, kAll, mrhi_stateUndefined, mrhi_stateCopyDestination),
+        "the new texture zeroed whole first");
     CHECK(Is(1, pass, imported, 0, 1, kAll, mrhi_stateCopyDestination, mrhi_stateStorageWrite),
           "mip 0 written");
     CHECK(Is(2, kEnd, imported, 1, 2, kAll, mrhi_stateCopyDestination, mrhi_stateStorageWrite),
