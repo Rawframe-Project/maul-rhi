@@ -77,16 +77,18 @@ typedef struct DirtyRegion
 
 // The compressed textures, whose blocks are 4 by 4 texels: 20 by 12 at
 // the top, so that their second and third mips, 10 by 6 and 5 by 3, are
-// not whole blocks. BC1 takes 8 bytes a block, and BC7, as two layers,
-// ETC2 and ASTC take 16. A suite makes those its device has the feature
-// for. Inline, as a suite without compressed textures takes neither this
-// nor DirtyGranted.
+// not whole blocks. BC1 takes 8 bytes a block, and ETC2 and ASTC 16.
+// BC7, of 16 bytes too, is two layers of 260 by 12: its rows of 1040
+// bytes, and 528 and 272 at its mips of 130 and 65 texels, pass D3D12's
+// 256-byte pitch alignment, so a pitch too short for a row shows. A
+// suite makes those its device has the feature for. Inline, as a suite without compressed textures
+// takes neither this nor DirtyGranted.
 static inline void DirtyCompressedTextures(DirtyTexture textures[DIRTY_COMPRESSED])
 {
     textures[0] = DirtyTextureOf("BC1 mips", mrhi_formatBc1RgbaUnorm, mrhi_texture2d, 20, 12, 1, 3,
                                  mrhi_textureSampled);
     textures[1] = DirtyTextureOf("BC7 mips and layers", mrhi_formatBc7RgbaUnorm,
-                                 mrhi_texture2dArray, 20, 12, 2, 3, mrhi_textureSampled);
+                                 mrhi_texture2dArray, 260, 12, 2, 3, mrhi_textureSampled);
     textures[2] = DirtyTextureOf("ETC2 mips", mrhi_formatEtc2Rgba8Unorm, mrhi_texture2d, 20, 12, 1,
                                  3, mrhi_textureSampled);
     textures[3] = DirtyTextureOf("ASTC 4x4 mips", mrhi_formatAstc4x4Unorm, mrhi_texture2d, 20, 12,
