@@ -30,7 +30,7 @@ defaults:
 jobs:
   # Whether anything beyond documentation changed; the builds skip when not.
   changes:
-    uses: Rawframe-Project/.github/.github/workflows/changes.yml@23883e3610442d449485b0a5ec5192709efbc33c # v0.0.23
+    uses: Rawframe-Project/.github/.github/workflows/changes.yml@c3e9ba81140f28b7df1ccfb172c031b6e164a73f # v0.0.24
     permissions:
       pull-requests: read
 
@@ -46,12 +46,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Rawframe-Project/.github/.github/actions/docs-check@23883e3610442d449485b0a5ec5192709efbc33c # v0.0.23
+      - uses: Rawframe-Project/.github/.github/actions/docs-check@c3e9ba81140f28b7df1ccfb172c031b6e164a73f # v0.0.24
         with:
           exclude: khronos directx
 
   zizmor:
-    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@23883e3610442d449485b0a5ec5192709efbc33c # v0.0.23
+    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@c3e9ba81140f28b7df1ccfb172c031b6e164a73f # v0.0.24
     permissions:
       contents: read
 
@@ -140,7 +140,7 @@ jobs:
           - { preset: macos-clang-debug, runner: macos-26, setup: tools/ci_metal.sh }
           - { preset: windows-d3d12, runner: windows-2025, setup: tools/ci_agility.sh }
           - { preset: windows-vulkan, runner: windows-2025 }
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@23883e3610442d449485b0a5ec5192709efbc33c # v0.0.23
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@c3e9ba81140f28b7df1ccfb172c031b6e164a73f # v0.0.24
     permissions:
       contents: read
     with:
@@ -239,36 +239,19 @@ jobs:
             -DMAUL_RHI_BUILD_TESTS=OFF -DMAUL_RHI_WERROR=ON
           cmake --build out/fuzz
       - name: Run
-        # The targets side by side; a target's output goes to its log,
-        # printed when it finds something.
+        # The targets side by side through tools/fuzz_target.sh, which keeps
+        # each finding and log on the runner and writes a report without
+        # the input; the reports are printed once every target has finished.
         run: |
-          mkdir -p out/fuzz-logs out/corpus/fuzz_cache
+          mkdir -p out/corpus/fuzz_cache
           python3 tools/container_seed.py out/corpus/fuzz_container >/dev/null
-          fuzz_one() {
-            name=$(basename "$1")
-            if "$1" -max_total_time="$FUZZ_SECONDS" "out/corpus/$name" >"out/fuzz-logs/$name.log" 2>&1; then
-              echo "$name: no finding"
-            else
-              tail -n 60 "out/fuzz-logs/$name.log"
-              echo "::error::$name found something"
-              return 1
-            fi
-          }
-          export -f fuzz_one
-          printf '%s\n' out/fuzz/fuzz_* | xargs -P 2 -I {} bash -c 'fuzz_one "$1"' _ {}
-      - name: Fuzz logs and crash inputs
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: fuzz
-          path: |
-            out/fuzz-logs/
-            crash-*
-            leak-*
-            timeout-*
-            oom-*
-          if-no-files-found: ignore
-          retention-days: 7
+          rm -rf out/fuzz-reports
+          status=0
+          printf '%s\n' out/fuzz/fuzz_* |
+            xargs -P 2 -I {} sh -c 'tools/fuzz_target.sh "$1" -max_total_time="$FUZZ_SECONDS" "out/corpus/${1##*/}"' _ {} ||
+            status=$?
+          cat out/fuzz-reports/*.txt 2>/dev/null || true
+          exit "$status"
 
   # The fuzz targets, one per test/fuzz_*.c, for fuzz-nightly's matrix.
   fuzz-targets:
@@ -298,8 +281,9 @@ jobs:
   # is only inputs, which stay valid against a new binary. After the run
   # the fuzzer's merge minimizes the seeds and the corpus together against
   # this binary, and the result is saved for the next night. The summary
-  # compares the seeds' coverage with the corpus's, and the corpus is
-  # uploaded, to pick inputs worth adding to the seeds.
+  # compares the seeds' coverage with the corpus's. No run uploads the
+  # corpus or a finding: the corpus stays in the cache, and a finding is
+  # reported without its input.
   fuzz-nightly:
     needs: fuzz-targets
     strategy:
@@ -335,6 +319,7 @@ jobs:
           fi
       - name: Restore the corpus
         id: restore
+        if: github.event_name != 'pull_request'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out/corpus/${{ matrix.target }}
@@ -346,9 +331,13 @@ jobs:
             corpus-${{ matrix.target }}-
       - name: Fuzz
         run: |
-          mkdir -p "out/corpus/$TARGET" out/findings
-          "out/fuzz/$TARGET" -max_total_time=600 -artifact_prefix=out/findings/ \
-            "out/corpus/$TARGET" "out/seeds/$TARGET"
+          mkdir -p "out/corpus/$TARGET"
+          rm -rf out/fuzz-reports
+          status=0
+          tools/fuzz_target.sh "out/fuzz/$TARGET" -max_total_time=600 \
+            "out/corpus/$TARGET" "out/seeds/$TARGET" || status=$?
+          cat out/fuzz-reports/*.txt 2>/dev/null || true
+          exit "$status"
       - name: Minimize the corpus
         env:
           MATCHED: ${{ steps.restore.outputs.cache-matched-key }}
@@ -375,20 +364,6 @@ jobs:
         with:
           path: out/corpus/${{ matrix.target }}
           key: ${{ env.CORPUS_KEY }}-${{ github.run_id }}
-      - name: Upload the corpus
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: corpus-${{ matrix.target }}
-          path: out/corpus/${{ matrix.target }}/
-          retention-days: 7
-      - name: Upload the findings
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: findings-${{ matrix.target }}
-          path: out/findings/
-          if-no-files-found: ignore
-          retention-days: 7
 
   # The windows-d3d12 cell with GPU-based validation's resource state
   # tracking, which pull requests run without: on a device whose objects
@@ -397,7 +372,7 @@ jobs:
   # and never retried, until the Agility SDK fixes it.
   windows-d3d12-states:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@23883e3610442d449485b0a5ec5192709efbc33c # v0.0.23
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@c3e9ba81140f28b7df1ccfb172c031b6e164a73f # v0.0.24
     permissions:
       contents: read
     with:
