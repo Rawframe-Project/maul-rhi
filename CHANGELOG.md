@@ -5,6 +5,91 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.7.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.6.0...v0.7.0) (2026-10-26)
+
+### Added
+
+- Every new buffer reads as zeros until the frame graph writes it, on
+  every driver. The first frame that imports a buffer clears it whole,
+  in a transfer pass of the library's own that takes nothing from the
+  frame's budgets, so the program's first use of the buffer sees zeros;
+  passes that do not use it may run beside the clear. Before, a new
+  buffer held zeros on WebGPU and Metal, usually zeros on D3D12, and on
+  Vulkan possibly a destroyed buffer's old bytes. The cost is paid once
+  per buffer, in its first frame; a frame with no new buffer runs
+  without the pass. Measured clear times, best of five: on lavapipe 0.04
+  ms for 1 MiB, 29.4 ms for 64 MiB and 458 ms for 1 GiB; on Metal's
+  paravirtual device 1.67 ms, 28.4 ms and 196 ms; D3D12 below. A device
+  with the default def takes 157,736 more bytes on lavapipe for the
+  reserved pass, uses, command chunks and barriers. The program's pass
+  ids now start at 2, and the frame log counts the library's pass, its
+  clears and its accesses in a buffer's first frame. Drivers built
+  outside the tree meet a first transfer pass of clears, see the copy
+  destination usage on every buffer, and receive a device def whose
+  framePasses and frameBarriers include the library's share; the SPI
+  headers do not change. `contract_version` rises to 14, and to 15 for
+  the wording of the first-use promise
+  ([#132](https://github.com/Rawframe-Project/maul-rhi/pull/132),
+  [#133](https://github.com/Rawframe-Project/maul-rhi/pull/133)).
+- Metal runs async compute and transfer passes on command queues of
+  their own, beside the graphics queue, ordered by one `MTLEvent` per
+  lane, so they may overlap graphics work; a pass touching a surface
+  image stays on the graphics queue. A native pass's command buffer must
+  still come from the queue `mrhiGetMetalDevice` returns, now named the
+  graphics queue. The overlap is unmeasured: CI's macOS runners have
+  only Apple's paravirtual device. `contract_version` rises to 12
+  ([#121](https://github.com/Rawframe-Project/maul-rhi/pull/121)).
+
+### Changed
+
+- **Breaking:** shader containers are version 2, and version 1 is
+  refused with `mrhi_errorVersion`, so every container must be written
+  again with this release's `tools/mrhi_container.py`. Sections are
+  tagged fields: an unknown section type is `mrhi_errorVersion`, an
+  empty section is refused, an absent meta is a root block of 0 bytes,
+  and the sections must fill the container in order with zero padding,
+  which gives a container one encoding and one digest. Containers are 24
+  to 136 bytes smaller. A shader cook of its own must follow the layout
+  and default rules. `contract_version` rises to 9
+  ([#110](https://github.com/Rawframe-Project/maul-rhi/pull/110)).
+- **Breaking:** a pipeline cache is read only under the ABI version that
+  wrote it, `MRHI_ABI_VERSION`: before 1.0 every other release refuses
+  it, a patch release included. A cache of another ABI or envelope
+  version is refused with `mrhi_errorVersion` instead of
+  `mrhi_errorStale`, which still names another driver or adapter; the
+  device opens either way. Caches written by 0.6.0 or earlier are
+  refused. Keep shader containers, not caches, across an upgrade.
+  `contract_version` rises to 10
+  ([#108](https://github.com/Rawframe-Project/maul-rhi/pull/108)).
+- **Breaking:** every call that gives a pointer or an id sets each one
+  it was given to NULL or the null id on any failure, before checking
+  its owner: the creations, `mrhiRequestAdapters`, `mrhiCreateDevice`'s
+  request, the declarations and imports, `mrhiAcquireSurfaceImage`,
+  `mrhiAddPass`, `mrhiReadBuffer`, `mrhiReadTexture` and
+  `mrhiSubmitFrame`. Before, most left their outputs as they were, and
+  the two reads documented their request as untouched on failure.
+  `contract_version` rises to 11
+  ([#117](https://github.com/Rawframe-Project/maul-rhi/pull/117)).
+- D3D12 clears a buffer, for `mrhiClearBuffer` and for the zeroing of
+  new buffers, with `ClearUnorderedAccessViewUint` instead of copies
+  from a 64 KiB buffer of zeros; past a frame slot's views it still
+  copies. Every D3D12 buffer allows unordered access, and a transfer
+  pass that clears runs on the compute queue, since copy lists cannot
+  clear: it loses its overlap with async compute work. Transfer passes
+  without clears stay on the copy queue. On WARP, zeroing a new buffer
+  went from 615.6 to 189.8 us for 1 MiB and from 29.8 to 1.45 ms for 64
+  MiB; a standalone program cleared 1 GiB in 21.6 ms instead of 496 ms.
+  No hardware GPU was measured. `contract_version` rises to 16
+  ([#134](https://github.com/Rawframe-Project/maul-rhi/pull/134)).
+
+### Fixed
+
+- The Vulkan mapping rows of async compute and transfer passes said a
+  compute-only and a transfer-only queue family; they now say the
+  graphics queue, in frame order, which is what the driver does. Only
+  readers of the mapping tables see a change. `contract_version` rises
+  to 13 ([#123](https://github.com/Rawframe-Project/maul-rhi/pull/123)).
+
 ## [0.6.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.5.0...v0.6.0) (2026-10-25)
 
 ### Added
