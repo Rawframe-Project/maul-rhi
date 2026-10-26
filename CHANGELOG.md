@@ -5,6 +5,43 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.8.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.7.0...v0.8.0) (2026-10-26)
+
+### Changed
+
+- **Breaking:** every new device texture reads as zeros in its first
+  frame, on every driver, as buffers have since 0.7.0. The first frame
+  that imports a new texture clears it whole, every mip, layer and
+  aspect, in the library's zero pass, now labeled `maul-rhi: zero new
+  objects`, which takes nothing from the program's budgets. Before, a
+  new texture held whatever its memory held on Vulkan, Metal and
+  Direct3D 12, and zeros on WebGPU.
+  - A texture of one mip and layer, not a volume, whose first use in
+    the frame is a whole color target that clears and keeps it, or a
+    depth target that clears and keeps depth and any stencil, with no
+    other use in that pass, is not cleared, since that use writes all of
+    it. Textures a frame declares keep their read-before-write rule and
+    are not zeroed, nor are adopted images or textures made
+    `mrhi_textureTransient`.
+  - The clear adds usage: on Vulkan, `TRANSFER_DST` on every image the
+    library makes but transient ones; on Direct3D 12,
+    `ALLOW_DEPTH_STENCIL` on depth textures made without render target
+    usage; on Metal, `MTLTextureUsageRenderTarget` on depth textures
+    made without render target usage. Their cost on hardware GPUs is
+    unmeasured.
+  - Measured on 64 MiB textures, best of five: on WARP, 0.7 to 0.8 ms by
+    a view clear and 5 to 7 ms by copies; on Metal's paravirtual device,
+    23 to 38 ms, about what a 64 MiB texture's own first write costs
+    there (25 to 32 ms); on lavapipe, 28 to 34 ms, of which the first
+    write alone takes 15 to 21 ms. Direct3D 12's buffer of zeros grows
+    from 64 KiB to 1 MiB.
+  - Drivers built outside the tree must handle the new
+    `mrhiCommandClearTexture` record and declare `MRHI_SPI_VERSION` 8; a
+    driver of SPI version 7 is refused with `mrhi_errorVersion`. The
+    mustpass list is `conformance/mustpass/spi-8.txt`. Shader cooks are
+    not affected. `contract_version` rises to 17
+    ([#137](https://github.com/Rawframe-Project/maul-rhi/pull/137)).
+
 ## [0.7.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.6.0...v0.7.0) (2026-10-26)
 
 ### Added
