@@ -117,6 +117,9 @@ typedef struct mrhiBufferSlot
     uint64_t size;
     mrhiBufferUsage usage;
     bool fresh;
+    // Whether the state frames left it in is the one the first pass's
+    // clear left, no program pass having used it since.
+    bool zeroState;
     mrhiImport import;
     // The state frames leave it in.
     mrhiResourceState state;
@@ -188,6 +191,10 @@ typedef struct mrhiFrameResource
     uint64_t image;
     // Whether a pass declared so far writes it; imports count as written.
     bool written;
+    // Whether it begins the program's passes in the state the first
+    // pass's clear leaves, in this frame or carried from an earlier one:
+    // the barrier its first program use may then take is the library's.
+    bool zeroState;
     // Whether a kept pass needs it, and the usages kept passes make of
     // it, found by the compile, with the plan's transience, its first
     // and last kept passes (0 for none), the state its first use puts
@@ -489,11 +496,13 @@ struct mrhiDevice
     mrhiBarrier* frameBarriers;
     mrhiBarrier* frameBarrierScratch;
     uint32_t frameBarrierCount;
-    // The program's frameBarriers and one more a resource: a buffer the
-    // first pass zeroes leaves it in the copy destination state, so its
-    // next first use, in that frame or a later one, may take a barrier
-    // it would not have taken.
+    // The program's frameBarriers and one more a resource, and how many
+    // of the planned barriers are the library's: a buffer the first pass
+    // zeroes is left in the copy destination state, so its next program
+    // use, in that frame or a later one, may take a barrier it would not
+    // have taken.
     uint32_t frameBarrierLimit;
+    uint32_t frameLibraryBarriers;
     uint32_t* frameCounts;
     mrhiBox* frameBoxes;
     uint32_t frameBoxLimit;

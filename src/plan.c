@@ -133,6 +133,8 @@ typedef struct Map
     uint32_t nextCount;
     uint32_t half;
     bool full;
+    // Whether the barriers a move makes are the library's.
+    bool library;
     // The parts of the whole, which the boxes cover exactly once.
     uint64_t volume;
 } Map;
@@ -170,6 +172,13 @@ static void Push(Map* map, mrhiBox box)
     map->next[map->nextCount++] = box;
 }
 
+// Whether the barriers that are the program's have reached its limit.
+static bool IsProgramBudgetFull(const mrhiDevice* device)
+{
+    return device->frameBarrierCount - device->frameLibraryBarriers ==
+           device->deviceLimits.frameBarriers;
+}
+
 static void Emit(Map* map, uint32_t pass, const mrhiBox* part, mrhiResourceState after)
 {
     mrhiDevice* device = map->device;
@@ -178,11 +187,13 @@ static void Emit(Map* map, uint32_t pass, const mrhiBox* part, mrhiResourceState
     MRHI_ASSERT(pass != 0 || part->state != after);
     MRHI_ASSERT(pass == 0 || device->framePasses[pass - 1].kept);
     MRHI_ASSERT(part->mipCount > 0 && part->layerCount > 0 && part->planes != 0);
-    if (device->frameBarrierCount == device->frameBarrierLimit)
+    if (map->library ? device->frameBarrierCount == device->frameBarrierLimit
+                     : IsProgramBudgetFull(device))
     {
         map->full = true;
         return;
     }
+    device->frameLibraryBarriers += map->library ? 1 : 0;
     uint32_t serial = device->frameSerial;
     device->frameBarriers[device->frameBarrierCount++] = (mrhiBarrier){
         .pass = {pass, pass == 0 ? 0 : serial},
@@ -352,6 +363,8 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
     ForgetPasses(resource);
     resource->finalState = whole.state;
     bool targetsOnly = true;
+    // The first program use of a buffer the clear left in its state.
+    bool zeroState = resource->zeroState;
     for (uint32_t p = 0; p < device->framePassCount && !map.full; ++p)
     {
         const mrhiFramePass* pass = &device->framePasses[p];
@@ -374,7 +387,10 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
             MRHI_ASSERT(cut.baseMip + cut.mipCount <= whole.mipCount &&
                         cut.baseLayer + cut.layerCount <= whole.layerCount &&
                         (cut.planes & ~whole.planes) == 0);
+            map.library = zeroState && p >= MRHI_LIBRARY_PASSES;
+            zeroState = zeroState && !map.library;
             Move(&map, p + 1, cut);
+            map.library = false;
         }
     }
     // A texture with view formats may be rendered in one, which WebGPU's
@@ -540,6 +556,7 @@ static void Sort(mrhiDevice* device)
 mrhiResult mrhiPlan(mrhiDevice* device)
 {
     device->frameBarrierCount = 0;
+    device->frameLibraryBarriers = 0;
     for (uint32_t p = 0; p < device->framePassCount; ++p)
     {
         for (uint32_t c = 0; c < MRHI_PASS_CLASSES; ++c)
@@ -643,7 +660,7 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
         {
             continue;
         }
-        if (device->frameBarrierCount == device->frameBarrierLimit)
+        if (IsProgramBudgetFull(device))
         {
             return mrhi_errorCapacity;
         }

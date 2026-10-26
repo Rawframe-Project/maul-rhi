@@ -206,7 +206,9 @@ static bool CompilesBeside(mrhiDevice* device, mrhiBufferId old, mrhiBufferId fr
 
 // A device whose frames plan one barrier: a frame that spends it on an
 // old buffer still compiles beside a new buffer, whose read after the
-// clear takes one more.
+// clear takes one more, and beside a buffer whose clear an earlier frame
+// made and nothing used since; a frame that needs two barriers of its
+// own is refused.
 static void TestBarrierBudget(void)
 {
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
@@ -220,6 +222,26 @@ static void TestBarrierBudget(void)
     CHECK(CompilesBeside(device, old, other), "the program's barrier beside the clear's");
     Submit(device);
     CHECK(s_log.barriers == 2 && s_log.commands == 1, "both run");
+    mrhiBufferId third = MakeBuffer(device);
+    (void)Begin(device, third);
+    Submit(device);
+    CHECK(s_log.passes == 1 && s_log.barriers == 0, "cleared, and used nowhere else");
+    CHECK(CompilesBeside(device, other, third), "the clear's barrier a frame later");
+    Submit(device);
+    CHECK(s_log.passes == 2 && s_log.barriers == 2, "both run again");
+    mrhiAccess reads[2] = {{.resource = Begin(device, old), .kind = mrhi_accessCopySource},
+                           {.kind = mrhi_accessCopySource}};
+    CHECK(mrhiImportBuffer(device, other, &reads[1].resource) == mrhi_success, "both written last");
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.passClass = mrhi_passTransfer;
+    def.neverCull = true;
+    def.accesses = reads;
+    def.accessCount = 2;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(device, &def, &pass) == mrhi_success &&
+              mrhiCompileFrame(device) == mrhi_errorCapacity &&
+              mrhiDropFrame(device) == mrhi_success,
+          "two barriers of the program's own refused");
     Close(device);
 }
 

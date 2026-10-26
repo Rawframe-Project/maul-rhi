@@ -78,17 +78,21 @@ static mrhiResult RecordZeroes(mrhiDevice* device)
 
 void mrhiMarkZeroed(mrhiDevice* device)
 {
-    const mrhiFramePass* pass = &device->framePasses[0];
-    for (uint32_t i = 0; pass->kept && i < pass->useCount; ++i)
+    for (uint32_t i = 0; i < device->frameResourceCount; ++i)
     {
-        const mrhiFrameResource* resource =
-            &device->frameResources[device->frameUses[pass->firstUse + i].resource - 1];
+        const mrhiFrameResource* resource = &device->frameResources[i];
         // A buffer destroyed while the frame was open may have given its
         // slot to a new one, which is still fresh.
-        if (mrhiPoolIsLive(&device->buffers, resource->index1, resource->generation))
+        if (resource->kind != mrhiImportedBuffer ||
+            !mrhiPoolIsLive(&device->buffers, resource->index1, resource->generation))
         {
-            device->bufferSlots[resource->index1 - 1].fresh = false;
+            continue;
         }
+        mrhiBufferSlot* slot = &device->bufferSlots[resource->index1 - 1];
+        // A fresh buffer the frame imported was cleared in it.
+        slot->fresh = false;
+        slot->zeroState = resource->zeroState && resource->lastPass <= MRHI_LIBRARY_PASSES &&
+                          resource->finalState == mrhi_stateCopyDestination;
     }
 }
 

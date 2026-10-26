@@ -164,6 +164,7 @@ mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer, mrhiResourc
         .generation = buffer.generation,
         .initialState = slot->state,
         .sealed = slot->state == mrhi_stateSealed,
+        .zeroState = zero || slot->zeroState,
     };
     mrhiResult status =
         Import(device, &device->bufferSlots[buffer.index1 - 1].import, resource, resourceOut);
