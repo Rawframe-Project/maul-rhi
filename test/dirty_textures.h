@@ -79,9 +79,10 @@ typedef struct DirtyRegion
 // the top, so that their second and third mips, 10 by 6 and 5 by 3, are
 // not whole blocks. BC1 takes 8 bytes a block, and ETC2 and ASTC 16.
 // BC7, of 16 bytes too, is two layers of 260 by 12: its rows of 1040
-// bytes, and 528 and 272 at its mips of 130 and 65 texels, pass D3D12's
-// 256-byte pitch alignment, so a pitch too short for a row shows. A
-// suite makes those its device has the feature for. Inline, as a suite without compressed textures
+// bytes, and 528 and 272 at its mips of 130 and 65 texels, are longer
+// than one of D3D12's 256-byte pitch units, so its copies take pitches
+// padded to 1280, 768 and 512 bytes. A suite makes those its device has
+// the feature for. Inline, as a suite without compressed textures
 // takes neither this nor DirtyGranted.
 static inline void DirtyCompressedTextures(DirtyTexture textures[DIRTY_COMPRESSED])
 {
