@@ -23,16 +23,18 @@ may change the API, the ABI and every data format.
     it. Textures a frame declares keep their read-before-write rule and
     are not zeroed, nor are adopted images or textures made
     `mrhi_textureTransient`.
-  - The clear adds usage: on Vulkan, `TRANSFER_DST` on every image but
-    transient ones; on Direct3D 12, `ALLOW_DEPTH_STENCIL` on depth
-    textures that were only sampled; on Metal,
-    `MTLTextureUsageRenderTarget` on depth textures that were only
-    sampled. Their cost on hardware GPUs is unmeasured.
+  - The clear adds usage: on Vulkan, `TRANSFER_DST` on every image the
+    library makes but transient ones; on Direct3D 12,
+    `ALLOW_DEPTH_STENCIL` on depth textures made without render target
+    usage; on Metal, `MTLTextureUsageRenderTarget` on depth textures
+    made without render target usage. Their cost on hardware GPUs is
+    unmeasured.
   - Measured on 64 MiB textures, best of five: on WARP, 0.7 to 0.8 ms by
-    a view clear and 5 to 7 ms by copies; on lavapipe and Metal's
-    paravirtual device, 24 to 38 ms, about what the texture's own first
-    write costs there. Direct3D 12's buffer of zeros grows from 64 KiB
-    to 1 MiB.
+    a view clear and 5 to 7 ms by copies; on Metal's paravirtual device,
+    23 to 38 ms, about what a 64 MiB texture's own first write costs
+    there (25 to 32 ms); on lavapipe, 28 to 34 ms, of which the first
+    write alone takes 15 to 21 ms. Direct3D 12's buffer of zeros grows
+    from 64 KiB to 1 MiB.
   - Drivers built outside the tree must handle the new
     `mrhiCommandClearTexture` record and declare `MRHI_SPI_VERSION` 8; a
     driver of SPI version 7 is refused with `mrhi_errorVersion`. The
