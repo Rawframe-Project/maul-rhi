@@ -171,7 +171,10 @@ extern "C"
 
     /// Declares a texture the open frame's graph makes, aliases and ends with
     /// the frame. Its usages are derived from the passes that use it, and
-    /// checked against its format when the frame is compiled.
+    /// checked against its format when the frame is compiled. A pass may read
+    /// it, or load a target of it, only after an earlier pass wrote it; texels
+    /// no pass wrote, beside a write to part of it, are undefined and differ by
+    /// backend.
     ///
     /// @param device       The device.
     /// @param def          The texture, with a usage of 0.

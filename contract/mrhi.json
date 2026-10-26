@@ -11889,7 +11889,7 @@
         {
           "kind": "function",
           "name": "declare_texture",
-          "doc": "Declares a texture the open frame's graph makes, aliases and ends with the frame. Its usages are derived from the passes that use it, and checked against its format when the frame is compiled.",
+          "doc": "Declares a texture the open frame's graph makes, aliases and ends with the frame. Its usages are derived from the passes that use it, and checked against its format when the frame is compiled. A pass may read it, or load a target of it, only after an earlier pass wrote it; texels no pass wrote, beside a write to part of it, are undefined and differ by backend.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a usage other than 0, or a shape mrhiCreateTexture refuses as invalid; `mrhi_errorUnsupported` for a size past the device's limits, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's frameResources limit is reached."
