@@ -163,15 +163,18 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
     frames->targetLimit = limits->framePasses * MRHI_COLOR_TARGETS;
     frames->depthLimit = limits->framePasses;
     // Each binding of a table is a record of the frame's commands, and
-    // takes one descriptor at most; a slot's rings take what its
-    // shader-visible heaps hold past the program's heaps at most.
+    // takes one descriptor at most, as each clear does, the library's of
+    // new buffers among them; a slot's rings take what its shader-visible
+    // heaps hold past the program's heaps at most.
     uint32_t records = limits->frameCommandBytes / (uint32_t)sizeof(mrhiCommand);
     records = records > 0 ? records : 1;
+    frames->clearLimit = limits->frameResources + MRHI_D3D12_CLEAR_VIEWS;
     uint32_t views = RingRoom(D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_1,
                               frames->heapCount, frames->heapEntries);
     uint32_t samplers = RingRoom(D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE, frames->heapCount,
                                  frames->heapSamplers);
-    frames->viewLimit = records < views ? records : views;
+    uint64_t viewRecords = (uint64_t)records + limits->frameResources;
+    frames->viewLimit = viewRecords < views ? (uint32_t)viewRecords : views;
     frames->samplerLimit = records < samplers ? records : samplers;
     // Each indirect draw is a record, larger than the arguments it
     // copies; each counted draw expanded takes an indexed draw's
@@ -259,13 +262,16 @@ static bool OpenSlot(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot)
     slot->samplerHeap =
         MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
                  frames->heapCount * frames->heapSamplers + frames->samplerLimit, true);
+    slot->clearHeap =
+        MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, frames->clearLimit, false);
     if (frames->uploadBytes > 0)
     {
         slot->staging =
             MakeMapped(device, D3D12_HEAP_TYPE_UPLOAD, frames->uploadBytes, &slot->stagingBytes);
     }
     return slot->targetHeap != nullptr && slot->depthHeap != nullptr && slot->viewHeap != nullptr &&
-           slot->samplerHeap != nullptr && (frames->uploadBytes == 0 || slot->staging != nullptr);
+           slot->samplerHeap != nullptr && slot->clearHeap != nullptr &&
+           (frames->uploadBytes == 0 || slot->staging != nullptr);
 }
 
 // The command signature of an indirect draw or dispatch reading its
@@ -519,6 +525,7 @@ void mrhiD3d12CloseFrames(mrhiD3d12Frames* frames)
         Drop(slot->depthHeap);
         Drop(slot->viewHeap);
         Drop(slot->samplerHeap);
+        Drop(slot->clearHeap);
         for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
         {
             for (uint32_t list = 0; list < frames->lanes.listLimit[lane]; ++list)
@@ -726,6 +733,8 @@ static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrh
                          frames->depthLimit),
         .views = GpuRingOf(frames->device, slot->viewHeap, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
                            frames->heapCount * frames->heapEntries, frames->viewLimit),
+        .clears = RingOf(frames->device, slot->clearHeap, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+                         frames->clearLimit),
         .samplers = GpuRingOf(frames->device, slot->samplerHeap, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
                               frames->heapCount * frames->heapSamplers, frames->samplerLimit),
         .heapEntries = frames->heapEntries,

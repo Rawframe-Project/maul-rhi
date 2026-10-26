@@ -71,13 +71,31 @@ static void Lower(mrhiD3d12Lanes* lanes, mrhiPassId pass, mrhiD3d12Lane most)
     *lane = *lane < most ? *lane : most;
 }
 
+// Whether a pass clears a buffer: a copy list has no
+// ClearUnorderedAccessViewUint.
+static bool Clears(const mrhiDriverFrame* frame, const mrhiDriverPass* pass)
+{
+    for (uint32_t chunk = pass->firstChunk; chunk != 0; chunk = frame->chunks[chunk - 1].next)
+    {
+        const mrhiCommandChunk* at = &frame->chunks[chunk - 1];
+        for (uint32_t i = 0; i < at->count; i += 1u + at->commands[i].payload)
+        {
+            if (at->commands[i].type == mrhiCommandClearBuffer)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 static bool ComputeTakes(D3D12_RESOURCE_STATES state)
 {
     return (state & ~COMPUTE_STATES) == 0;
 }
 
 // Places each pass on its class's lane, or an earlier one where its
-// textures, their barriers or an aliasing barrier ask it. A placed
+// clears, its textures, their barriers or an aliasing barrier ask it. A placed
 // target's first use discards it in a target state.
 static void Place(mrhiD3d12Lanes* lanes)
 {
@@ -88,6 +106,10 @@ static void Place(mrhiD3d12Lanes* lanes)
         const mrhiDriverPass* pass = &frame->passes[p];
         lanes->passLanes[pass->id.index1] =
             pass->native ? mrhiD3d12LaneDirect : LaneOfClass(pass->passClass);
+        if (lanes->passLanes[pass->id.index1] == mrhiD3d12LaneCopy && Clears(frame, pass))
+        {
+            Lower(lanes, pass->id, mrhiD3d12LaneCompute);
+        }
         // A timed pass runs where its times tick as the direct queue's,
         // whose frequency is the device's timestamp period: on the compute
         // queue where its frequency is the same, which also takes every
