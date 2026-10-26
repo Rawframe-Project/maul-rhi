@@ -289,8 +289,9 @@ extern "C"
     /// without its cookie, a bad label, or bytes that are not 8-byte aligned;
     /// `mrhi_errorFormat` for a container that is malformed, damaged or
     /// contradicts itself; `mrhi_errorVersion` for a container of another
-    /// version; `mrhi_errorUnsupported` for a root block, bindings, a workgroup
-    /// or interface variables past the device's limits, a table of more than
+    /// version or holding a section type the library does not know;
+    /// `mrhi_errorUnsupported` for a root block, bindings, a workgroup or
+    /// interface variables past the device's limits, a table of more than
     /// MRHI_TABLE_BINDINGS bindings, 16-bit floats on a device without
     /// shaderF16, the primitive index builtin, heap uses on a device without
     /// bindless_sampling, or storage ones without bindless_heterogeneous, or a

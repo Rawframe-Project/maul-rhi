@@ -90,6 +90,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTRACT = os.path.join(ROOT, "contract", "mrhi.json")
+VERSION = 2
 SPIRV_MAGIC = 0x07230203
 COLOR_TARGETS = 8
 MAX_ROOT_BLOCK = 256
@@ -814,7 +815,9 @@ def build(spirv, wgsl, reflection, enums, msl=None, metallib=None, dxil=None):
         (9, wgsl),
         (10, b"".join(r for _, r in variables)),
     ]
-    sections = [(kind, data) for kind, data in sections if kind != 9 or data]
+    # A section that holds its default is left out: the meta of an empty
+    # root block, and every empty array or code section.
+    sections = [(kind, data) for kind, data in sections if data and (kind != 1 or root)]
     sections += metal_sections(reflection, root, msl, metallib)
     sections += d3d12_sections(reflection, root, spirv, dxil)
     offset = 64 + 24 * len(sections)
@@ -826,7 +829,7 @@ def build(spirv, wgsl, reflection, enums, msl=None, metallib=None, dxil=None):
     size = offset + len(body)
     signed = struct.pack("<I12x", len(sections)) + table + body
     digest = hashlib.sha256(signed).digest()
-    return b"MRSC" + struct.pack("<IQ", 1, size) + digest + signed
+    return b"MRSC" + struct.pack("<IQ", VERSION, size) + digest + signed
 
 
 def read_entries(reflection, folder, suffix):

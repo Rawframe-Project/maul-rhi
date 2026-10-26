@@ -1,6 +1,6 @@
 # Shader container format
 
-The byte layout of a shader container, version 1, for anyone writing a cook of their own instead of `tools/mrhi_container.py`. [Shaders and pipelines](shaders.md) explains what a container is for and how to make one with the library's tools.
+The byte layout of a shader container, version 2, for anyone writing a cook of their own instead of `tools/mrhi_container.py`. [Shaders and pipelines](shaders.md) explains what a container is for and how to make one with the library's tools.
 
 ## Contents
 
@@ -19,9 +19,9 @@ The byte layout of a shader container, version 1, for anyone writing a cook of t
 
 ## Layout
 
-Every number is little-endian, and `mrhiCreateShader` reads byte by byte, so a container means the same on every host. The program hands the container over 8-byte aligned, so that its sections are aligned too and drivers can pass SPIR-V words on as they are. Every byte is checked as hostile input before anything is kept: a container that breaks any rule below is `mrhi_errorFormat`, counting no misuse, one of another version is `mrhi_errorVersion`, and one that needs what the device lacks is `mrhi_errorUnsupported`.
+Every number is little-endian, and `mrhiCreateShader` reads byte by byte, so a container means the same on every host. The program hands the container over 8-byte aligned, so that its sections are aligned too and drivers can pass SPIR-V words on as they are. Every byte is checked as hostile input before anything is kept: a container that breaks any rule below is `mrhi_errorFormat`, counting no misuse, one of another version or holding a section type the library does not know is `mrhi_errorVersion`, and one that needs what the device lacks is `mrhi_errorUnsupported`.
 
-A container is a header, a table of sections, and the sections. Array sections are made of fixed-size records, at most 4096 of each, and every record is checked whether or not an entry refers to it. Names live in one strings section and are referred to by offset and length.
+A container is a header, a table of sections, and the sections. The sections are its fields: each is named by its type, a 32-bit tag, and the format grows by new types, never by longer records, so a record whose meaning changes gets a section of a new type. Array sections are made of fixed-size records, at most 4096 of each, and every record is checked whether or not an entry refers to it. Names live in one strings section and are referred to by offset and length.
 
 ## Header
 
@@ -30,7 +30,7 @@ The first 64 bytes:
 | Offset | Type | Field |
 |---|---|---|
 | 0 | 4 bytes | `MRSC` |
-| 4 | u32 | the format version, 1 |
+| 4 | u32 | the format version, 2 |
 | 8 | u64 | the container's size in bytes, which must be the size handed over |
 | 16 | 32 bytes | the SHA-256 digest of every byte from offset 48 to the end |
 | 48 | u32 | the number of sections, at most 64 |
@@ -49,20 +49,22 @@ One 24-byte record per section follows the header:
 | 8 | u64 | the section's offset from the container's start, a multiple of 8 |
 | 16 | u64 | its size in bytes |
 
-Sections lie after the table and inside the container, and never overlap. A type appears at most once. A reader skips a type it does not know after checking its bounds, so a later writer can add sections without a new version.
+The sections fill the container after the table: the table may list them in any order, but laid out by offset, the first starts right after the table and each one starts at the first multiple of 8 after the one before ends, with zero bytes in between; the last one's padding ends the container. A type appears at most once, and no section is empty.
+
+A section holding its default is left out, and a reader gives an absent section its default: the meta's is a root block of 0 bytes, and an array or code section's is empty. A writer therefore never writes an empty section or a meta of 0 bytes, and a reader refuses either, so a container has one encoding and one digest. A type the reader does not know is `mrhi_errorVersion`, since only a later version writes one.
 
 | Type | Section | Present | Contents |
 |---|---|---|---|
-| 1 | meta | always | 16 bytes: the root block's size (u32, a multiple of 4, at most 256), then 12 zero bytes |
+| 1 | meta | with a root block | 16 bytes: the root block's size (u32, a multiple of 4, 4 to 256), then 12 zero bytes |
 | 2 | strings | always | UTF-8 names |
 | 3 | entries | always | 48-byte entry points, at least one |
-| 4 | bindings | optional | 24-byte bindings |
-| 5 | vertex inputs | optional | 8-byte interface records |
-| 6 | color outputs | optional | 8-byte interface records |
-| 7 | constants | optional | 16-byte specialization constants |
+| 4 | bindings | when there are any | 24-byte bindings |
+| 5 | vertex inputs | when there are any | 8-byte interface records |
+| 6 | color outputs | when there are any | 8-byte interface records |
+| 7 | constants | when there are any | 16-byte specialization constants |
 | 8 | SPIR-V | always | one module holding every entry point |
 | 9 | WGSL | see below | one module holding every entry point |
-| 10 | inter-stage variables | optional | 8-byte interface records |
+| 10 | inter-stage variables | when there are any | 8-byte interface records |
 | 11 | Metal map | with Metal code | where each binding lies in Metal, and each entry's MSL |
 | 12 | MSL | optional | Metal Shading Language sources |
 | 13 | metallib | optional | a Metal library of every entry point |
