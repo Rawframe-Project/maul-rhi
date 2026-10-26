@@ -6,9 +6,11 @@
 # contract/mrhi.json and with nothing else (docs/internals/contract.md,
 # Versions): against a base commit, the contract in the working tree
 # must either be the same, version included, or differ beyond its
-# version and carry a higher one. A base without the contract checks
-# nothing. --self-test plants each case in a scratch git repository and
-# proves the check takes the right ones and refuses the others.
+# version and carry a higher one. A base that names no commit is refused,
+# so a typo or an unfetched commit cannot pass; a commit without the
+# contract checks nothing. --self-test plants each case in a scratch git
+# repository and proves the check takes the right ones and refuses the
+# others.
 #
 # usage: check_contract_version.py BASE | --self-test
 
@@ -23,11 +25,18 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTRACT = "contract/mrhi.json"
 
 
-def at_base(root, base):
-    """The contract at the base commit, parsed; None where it has none."""
-    shown = subprocess.run(["git", "-C", root, "show", f"{base}:{CONTRACT}"],
-                           capture_output=True, text=True)
-    return json.loads(shown.stdout) if shown.returncode == 0 else None
+def git(root, *args):
+    return subprocess.run(["git", "-C", root, *args], capture_output=True, text=True)
+
+
+def at_base(root, commit):
+    """The contract at a commit, parsed; None where the commit has none."""
+    if not git(root, "ls-tree", "--name-only", commit, "--", CONTRACT).stdout.strip():
+        return None
+    shown = git(root, "show", f"{commit}:{CONTRACT}")
+    if shown.returncode != 0:
+        raise RuntimeError(f"git show {commit}:{CONTRACT}: {shown.stderr.strip()}")
+    return json.loads(shown.stdout)
 
 
 def without_version(contract):
@@ -52,7 +61,13 @@ def problem(before, after):
 
 
 def check(root, base, quiet=False):
-    before = at_base(root, base)
+    resolved = git(root, "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}")
+    if resolved.returncode != 0:
+        if not quiet:
+            print(f"contract version: {base} names no commit here; fetch it or fix the name",
+                  file=sys.stderr)
+        return 1
+    before = at_base(root, resolved.stdout.strip())
     if before is None:
         if not quiet:
             print(f"contract version: {base} has no {CONTRACT}; nothing to compare")
@@ -98,16 +113,16 @@ def self_test():
         os.makedirs(os.path.join(work, "contract"))
         path = os.path.join(work, CONTRACT)
 
-        def git(*args):
+        def run(*args):
             subprocess.run(["git", "-C", work, *args], check=True, capture_output=True)
 
-        git("init", "-q")
+        run("init", "-q")
         identity = ("-c", "user.name=self-test", "-c", "user.email=self-test@invalid")
-        git(*identity, "commit", "-q", "--allow-empty", "-m", "before the contract")
+        run(*identity, "commit", "-q", "--allow-empty", "-m", "before the contract")
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(json.dumps(base, indent=2) + "\n")
-        git("add", CONTRACT)
-        git(*identity, "commit", "-qm", "base")
+        run("add", CONTRACT)
+        run(*identity, "commit", "-qm", "base")
         for name, contract, takes in cases:
             with open(path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(json.dumps(contract, indent=2) + "\n")
@@ -119,7 +134,10 @@ def self_test():
         if check(work, "HEAD~1", quiet=True) != 0:
             print("self-test: a base without the contract was refused", file=sys.stderr)
             failures += 1
-    print(f"self-test: {len(cases) + 1 - failures} of {len(cases) + 1} cases right")
+        if check(work, "no-such-commit", quiet=True) == 0:
+            print("self-test: a base that names no commit was taken", file=sys.stderr)
+            failures += 1
+    print(f"self-test: {len(cases) + 2 - failures} of {len(cases) + 2} cases right")
     return 1 if failures else 0
 
 
