@@ -12202,8 +12202,9 @@
               "doc": "Compute beside the graphics work; no targets, vertices or indices.",
               "mapping": {
                 "vulkan": {
-                  "class": "restricted",
-                  "note": "a compute-only queue family, where there is one"
+                  "class": "emulated",
+                  "note": "the graphics queue, in frame order",
+                  "cost": "no overlap: the pass runs in order with the graphics work"
                 },
                 "d3d12": {
                   "class": "restricted",
@@ -12226,8 +12227,9 @@
               "doc": "Copies only.",
               "mapping": {
                 "vulkan": {
-                  "class": "restricted",
-                  "note": "a transfer-only queue family, where there is one"
+                  "class": "emulated",
+                  "note": "the graphics queue, in frame order",
+                  "cost": "no overlap: the pass runs in order with the graphics work"
                 },
                 "d3d12": {
                   "class": "restricted",
@@ -22186,5 +22188,5 @@
       ]
     }
   ],
-  "contract_version": 12
+  "contract_version": 13
 }
