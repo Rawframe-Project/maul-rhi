@@ -82,6 +82,7 @@ source_checks() {
     python3 tools/check_test_hygiene.py --self-test
     python3 tools/check_test_hygiene.py
     python3 tools/gen_contract.py --check
+    python3 tools/check_contract_version.py --self-test
     # The committed shader headers against their inputs and pins, and
     # each check proven on a copy of the tree.
     python3 tools/gen_test_shaders.py --check
@@ -110,6 +111,7 @@ if [ "$tier" = changed ]; then
         exit 0
     fi
     source_checks
+    python3 tools/check_contract_version.py "$base"
     mapfile -t c_files < <(printf '%s\n' "${changed[@]}" | grep -E '\.[chm]$' | grep -v '^src/generated/' || true)
     present=()
     for f in "${c_files[@]+"${c_files[@]}"}"; do [ -f "$f" ] && present+=("$f"); done
