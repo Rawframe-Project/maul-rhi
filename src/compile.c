@@ -10,6 +10,9 @@
 // so that every backend's new buffer reads as zeros.
 
 #include "device_core.h"
+#include "encoder_core.h"
+#include "invariant.h"
+#include "label.h"
 
 #include <string.h>
 
