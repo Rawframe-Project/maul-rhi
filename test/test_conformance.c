@@ -743,6 +743,11 @@ typedef struct ZeroedTexture
     uint32_t depthOrLayers;
     uint32_t mips;
     mrhiTextureUsage usage;
+    // Its height when it is not as tall as it is wide, and whether it is
+    // larger than a driver's zeros, so that only the first and the last
+    // row of blocks of its first mip are read.
+    uint32_t height;
+    bool large;
 } ZeroedTexture;
 
 static mrhiTextureId MakeZeroed(mrhiDevice* device, const ZeroedTexture* z)
@@ -751,7 +756,7 @@ static mrhiTextureId MakeZeroed(mrhiDevice* device, const ZeroedTexture* z)
     def.format = z->format;
     def.kind = z->kind;
     def.width = z->size;
-    def.height = z->size;
+    def.height = z->height != 0 ? z->height : z->size;
     def.depthOrLayers = z->depthOrLayers;
     def.mipLevels = z->mips;
     def.usage = z->usage | mrhi_textureCopySource;
@@ -762,8 +767,8 @@ static mrhiTextureId MakeZeroed(mrhiDevice* device, const ZeroedTexture* z)
 }
 
 // Reads every mip and layer of a texture, or every depth slice of a
-// volume, in a frame that does nothing else: whether each reads as
-// zeros.
+// volume, in a frame that does nothing else, or the first and the last
+// row of blocks of a large texture: whether each reads as zeros.
 static bool ReadsZeros(mrhiDevice* device, mrhiTextureId texture, const ZeroedTexture* z)
 {
     enum
@@ -792,7 +797,16 @@ static bool ReadsZeros(mrhiDevice* device, mrhiTextureId texture, const ZeroedTe
     mrhiRequestId requests[READS];
     size_t sizes[READS];
     uint32_t count = 0;
-    for (uint32_t mip = 0; mip < z->mips; ++mip)
+    uint32_t height = z->height != 0 ? z->height : z->size;
+    for (uint32_t row = 0; z->large && row < 2; ++row, ++count)
+    {
+        const mrhiTextureCopy source = {.resource = t, .y = row * (height - block)};
+        const mrhiExtent3d extent = {z->size, block, 1};
+        sizes[count] = (size_t)(z->size / block) * bytes;
+        CHECK(mrhiReadTexture(device, read, &source, &extent, &requests[count]) == mrhi_success,
+              "a row of blocks read");
+    }
+    for (uint32_t mip = 0; !z->large && mip < z->mips; ++mip)
     {
         uint32_t size = z->size >> mip;
         uint32_t layers = volume ? 1 : z->depthOrLayers;
@@ -821,44 +835,12 @@ static bool ReadsZeros(mrhiDevice* device, mrhiTextureId texture, const ZeroedTe
     return zeroed;
 }
 
-// A new texture reads as zeros in every mip and layer, on every driver,
-// whichever way the driver clears it: one only sampled, a render target,
-// storage textures, a depth target and a depth texture only sampled,
-// volumes, one a render target, and, where the device has them, BC1
-// blocks; and a render target made, after one of its size was
-// cleared to ones and destroyed, where an allocator may give it the same
-// memory.
-static void CheckZeroedTextures(mrhiDevice* device, const mrhiFeatures* granted)
+// Makes a target, clears it to ones and destroys it, then makes a
+// texture where an allocator may give it the same memory: whether that
+// reads as zeros.
+static bool ReadsZerosWhereOnesWere(mrhiDevice* device, const ZeroedTexture* target,
+                                    const ZeroedTexture* remade)
 {
-    const ZeroedTexture textures[] = {
-        {"sampled mips and layers", mrhi_formatRgba8Unorm, mrhi_texture2dArray, 16, 2, 3,
-         mrhi_textureSampled},
-        {"a render target", mrhi_formatRgba8Unorm, mrhi_texture2d, 16, 1, 1,
-         mrhi_textureRenderTarget},
-        {"a storage texture", mrhi_formatR32Float, mrhi_texture2d, 16, 1, 1, mrhi_textureStorage},
-        {"storage mips and layers", mrhi_formatR32Float, mrhi_texture2dArray, 16, 2, 2,
-         mrhi_textureStorage},
-        {"a depth target", mrhi_formatDepth32Float, mrhi_texture2d, 16, 1, 1,
-         mrhi_textureRenderTarget},
-        {"a depth texture only sampled", mrhi_formatDepth32Float, mrhi_texture2d, 16, 1, 1,
-         mrhi_textureSampled},
-        {"a volume", mrhi_formatRgba8Unorm, mrhi_texture3d, 8, 4, 1, mrhi_textureSampled},
-        {"a volume render target", mrhi_formatRgba8Unorm, mrhi_texture3d, 8, 4, 2,
-         mrhi_textureRenderTarget},
-        {"BC1 blocks", mrhi_formatBc1RgbaUnorm, mrhi_texture2d, 16, 1, 2, mrhi_textureSampled},
-    };
-    for (size_t i = 0; i < sizeof(textures) / sizeof(textures[0]); ++i)
-    {
-        const ZeroedTexture* z = &textures[i];
-        if (z->format == mrhi_formatBc1RgbaUnorm && !granted->textureCompressionBc)
-        {
-            continue;
-        }
-        mrhiTextureId texture = MakeZeroed(device, z);
-        CHECK(ReadsZeros(device, texture, z), z->what);
-        CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "ended");
-    }
-    const ZeroedTexture* target = &textures[1];
     mrhiTextureId filled = MakeZeroed(device, target);
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId t = {0};
@@ -884,10 +866,69 @@ static void CheckZeroedTextures(mrhiDevice* device, const mrhiFeatures* granted)
     // A frame of its own, so that the destroyed texture's memory is free.
     CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "an empty frame");
     Finish(device, 0);
-    mrhiTextureId again = MakeZeroed(device, target);
-    CHECK(ReadsZeros(device, again, target),
-          "a texture made where a filled one was reads as zeros");
+    mrhiTextureId again = MakeZeroed(device, remade);
+    bool zeroed = ReadsZeros(device, again, remade);
     CHECK(mrhiDestroyTexture(device, again) == mrhi_success, "the objects ended");
+    return zeroed;
+}
+
+// A new texture reads as zeros in every mip and layer, on every driver,
+// whichever way the driver clears it: one only sampled, a render target,
+// storage textures, a depth target and a depth texture only sampled,
+// volumes, one a render target, BC1 blocks where the device has them,
+// and textures larger than a driver's zeros, read at their first and
+// last rows of blocks; and a render target made, after one of its size was
+// cleared to ones and destroyed, where an allocator may give it the same
+// memory.
+static void CheckZeroedTextures(mrhiDevice* device, const mrhiFeatures* granted)
+{
+    const ZeroedTexture textures[] = {
+        {"sampled mips and layers", mrhi_formatRgba8Unorm, mrhi_texture2dArray, 16, 2, 3,
+         mrhi_textureSampled, 0, false},
+        {"a render target", mrhi_formatRgba8Unorm, mrhi_texture2d, 16, 1, 1,
+         mrhi_textureRenderTarget, 0, false},
+        {"a storage texture", mrhi_formatR32Float, mrhi_texture2d, 16, 1, 1, mrhi_textureStorage, 0,
+         false},
+        {"storage mips and layers", mrhi_formatR32Float, mrhi_texture2dArray, 16, 2, 2,
+         mrhi_textureStorage, 0, false},
+        {"a depth target", mrhi_formatDepth32Float, mrhi_texture2d, 16, 1, 1,
+         mrhi_textureRenderTarget, 0, false},
+        {"a depth texture only sampled", mrhi_formatDepth32Float, mrhi_texture2d, 16, 1, 1,
+         mrhi_textureSampled, 0, false},
+        {"a volume", mrhi_formatRgba8Unorm, mrhi_texture3d, 8, 4, 1, mrhi_textureSampled, 0, false},
+        {"a volume render target", mrhi_formatRgba8Unorm, mrhi_texture3d, 8, 4, 2,
+         mrhi_textureRenderTarget, 0, false},
+        {"BC1 blocks", mrhi_formatBc1RgbaUnorm, mrhi_texture2d, 16, 1, 2, mrhi_textureSampled, 0,
+         false},
+        {"rows past the zeros", mrhi_formatRgba8Unorm, mrhi_texture2d, 1024, 1, 1,
+         mrhi_textureSampled, 512, true},
+        {"BC1 rows past the zeros", mrhi_formatBc1RgbaUnorm, mrhi_texture2d, 512, 1, 1,
+         mrhi_textureSampled, 0, true},
+    };
+    for (size_t i = 0; i < sizeof(textures) / sizeof(textures[0]); ++i)
+    {
+        const ZeroedTexture* z = &textures[i];
+        if (z->format == mrhi_formatBc1RgbaUnorm && !granted->textureCompressionBc)
+        {
+            continue;
+        }
+        mrhiTextureId texture = MakeZeroed(device, z);
+        CHECK(ReadsZeros(device, texture, z), z->what);
+        CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "ended");
+    }
+    CHECK(ReadsZerosWhereOnesWere(device, &textures[1], &textures[1]),
+          "a texture made where a filled one was reads as zeros");
+    const ZeroedTexture large = {"a large target",
+                                 mrhi_formatRgba8Unorm,
+                                 mrhi_texture2d,
+                                 1024,
+                                 1,
+                                 1,
+                                 mrhi_textureRenderTarget,
+                                 512,
+                                 true};
+    CHECK(ReadsZerosWhereOnesWere(device, &large, &textures[9]),
+          "a large texture made where a filled target was reads as zeros");
 }
 
 static void CheckRoundTrip(mrhiDevice* device)
