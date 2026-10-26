@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_core.h>
 
 // The device's functions the program's command buffer takes.
 typedef struct Functions
