@@ -139,7 +139,8 @@ static void CheckFrame(mrhiDevice* device, mrhiTextureId texture, id<MTLCommandB
 
 // Fills every mip and layer of a new texture with ones through the
 // device's queue, and waits: a depth texture by render passes clearing
-// it to 1, which every one takes, any other by blits of ones bytes.
+// it to 1, which every one takes, any other by blits of ones bytes, a
+// compressed one's rows of blocks at once.
 static bool Dirty(id<MTLDevice> device, id<MTLCommandQueue> queue, id<MTLTexture> texture,
                   const mrhiTextureDef* def)
 {
@@ -154,8 +155,8 @@ static bool Dirty(id<MTLDevice> device, id<MTLCommandQueue> queue, id<MTLTexture
     id<MTLCommandBuffer> commands = [queue commandBuffer];
     for (uint32_t mip = 0; mip < def->mipLevels; ++mip)
     {
-        uint32_t width = def->width >> mip;
-        uint32_t height = def->height >> mip;
+        uint32_t width = def->width >> mip > 0 ? def->width >> mip : 1;
+        uint32_t height = def->height >> mip > 0 ? def->height >> mip : 1;
         uint32_t depth = volume ? def->depthOrLayers >> mip : 1;
         for (uint32_t layer = 0; layer < (volume ? 1 : def->depthOrLayers); ++layer)
         {
@@ -171,11 +172,15 @@ static bool Dirty(id<MTLDevice> device, id<MTLCommandQueue> queue, id<MTLTexture
                 [[commands renderCommandEncoderWithDescriptor:pass] endEncoding];
                 continue;
             }
+            uint32_t block = 1;
+            uint32_t blockBytes = 4;
+            DirtyBlock(def->format, &block, &blockBytes);
+            uint32_t rowBytes = (width + block - 1) / block * blockBytes;
             id<MTLBlitCommandEncoder> blit = [commands blitCommandEncoder];
             [blit copyFromBuffer:ones
                        sourceOffset:0
-                  sourceBytesPerRow:width * 4
-                sourceBytesPerImage:volume ? width * height * 4 : 0
+                  sourceBytesPerRow:rowBytes
+                sourceBytesPerImage:volume ? rowBytes * height : 0
                          sourceSize:MTLSizeMake(width, height, depth)
                           toTexture:texture
                    destinationSlice:layer
@@ -191,25 +196,45 @@ static bool Dirty(id<MTLDevice> device, id<MTLCommandQueue> queue, id<MTLTexture
     return done;
 }
 
-// Each new texture, filled with ones before its first frame, reads as
+// A new texture, filled with ones before its first frame, reads as
 // zeros in it.
-static void CheckDirtyTextures(mrhiDevice* device, id<MTLDevice> native, id<MTLCommandQueue> queue)
+static void CheckDirty(mrhiDevice* device, id<MTLDevice> native, id<MTLCommandQueue> queue,
+                       const DirtyTexture* dirty)
+{
+    mrhiTextureId texture = {0};
+    void* made = nullptr;
+    @autoreleasepool
+    {
+        CHECK(mrhiCreateTexture(device, &dirty->def, &texture) == mrhi_success &&
+                  mrhiGetMetalTexture(device, texture, &made) == mrhi_success &&
+                  Dirty(native, queue, (id<MTLTexture>)made, &dirty->def),
+              dirty->what);
+    }
+    CHECK(ReadsZerosFirst(device, texture, &dirty->def), dirty->what);
+    CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "ended");
+}
+
+// Each new texture, compressed ones of the formats the device has among
+// them, filled with ones before its first frame, reads as zeros in it.
+static void CheckDirtyTextures(mrhiDevice* device, id<MTLDevice> native, id<MTLCommandQueue> queue,
+                               const mrhiFeatures* features)
 {
     DirtyTexture textures[DIRTY_TEXTURES];
     DirtyTextures(textures);
     for (int i = 0; i < DIRTY_TEXTURES; ++i)
     {
-        mrhiTextureId texture = {0};
-        void* made = nullptr;
-        @autoreleasepool
+        CheckDirty(device, native, queue, &textures[i]);
+    }
+    DirtyTexture compressed[DIRTY_COMPRESSED];
+    DirtyCompressedTextures(compressed);
+    for (int i = 0; i < DIRTY_COMPRESSED; ++i)
+    {
+        if (!DirtyGranted(&compressed[i].def, features))
         {
-            CHECK(mrhiCreateTexture(device, &textures[i].def, &texture) == mrhi_success &&
-                      mrhiGetMetalTexture(device, texture, &made) == mrhi_success &&
-                      Dirty(native, queue, (id<MTLTexture>)made, &textures[i].def),
-                  textures[i].what);
+            printf("skip: %s, without the feature\n", compressed[i].what);
+            continue;
         }
-        CHECK(ReadsZerosFirst(device, texture, &textures[i].def), textures[i].what);
-        CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "ended");
+        CheckDirty(device, native, queue, &compressed[i]);
     }
 }
 
@@ -273,6 +298,12 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
 {
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     deviceDef.adapter = adapter;
+    // The compressed formats the adapter has, for the zeroing checks.
+    mrhiFeatures granted = {0};
+    CHECK(mrhiGetAdapterFeatures(instance, adapter, &granted) == mrhi_success, "its features");
+    deviceDef.features.textureCompressionBc = granted.textureCompressionBc;
+    deviceDef.features.textureCompressionEtc2 = granted.textureCompressionEtc2;
+    deviceDef.features.textureCompressionAstc = granted.textureCompressionAstc;
     mrhiDevice* device = nullptr;
     mrhiRequestId opened = {0};
     mrhiInstanceNotification record;
@@ -315,7 +346,8 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
             [commands release];
             [buffer release];
         }
-        CheckDirtyTextures(device, (id<MTLDevice>)native, (id<MTLCommandQueue>)queue);
+        CheckDirtyTextures(device, (id<MTLDevice>)native, (id<MTLCommandQueue>)queue,
+                           &deviceDef.features);
     }
     CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "the texture ended");
     mrhiDestroyDevice(device);
