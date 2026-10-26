@@ -218,7 +218,7 @@ static bool ZeroFrame(Sample* sample, uint64_t bytes, double* zeroOut)
         SampleCheck(sample, ready && SampleWait(sample, token), "the zeroing frame");
         took[i] = Seconds() - start;
     }
-    mrhiDestroyBuffer(device, buffer);
+    SampleCheck(sample, mrhiDestroyBuffer(device, buffer) == mrhi_success, "the buffer destroyed");
     *zeroOut = took[0] - took[1];
     return true;
 }
