@@ -301,22 +301,42 @@ static bool Dirty(ID3D12Device* device, ID3D12CommandQueue* queue, ID3D12Resourc
     return made;
 }
 
-// Each new texture, filled with ones before its first frame, reads as
+// A new texture, filled with ones before its first frame, reads as
 // zeros in it.
-static void CheckDirtyTextures(mrhiDevice* device, ID3D12Device* native, ID3D12CommandQueue* queue)
+static void CheckDirty(mrhiDevice* device, ID3D12Device* native, ID3D12CommandQueue* queue,
+                       const DirtyTexture* dirty)
+{
+    mrhiTextureId texture = {0};
+    void* resource = nullptr;
+    CHECK(mrhiCreateTexture(device, &dirty->def, &texture) == mrhi_success &&
+              mrhiGetD3d12Texture(device, texture, &resource) == mrhi_success &&
+              Dirty(native, queue, (ID3D12Resource*)resource),
+          dirty->what);
+    CHECK(ReadsZerosFirst(device, texture, &dirty->def), dirty->what);
+    CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "ended");
+}
+
+// Each new texture, compressed ones of the formats the device has among
+// them, filled with ones before its first frame, reads as zeros in it.
+static void CheckDirtyTextures(mrhiDevice* device, ID3D12Device* native, ID3D12CommandQueue* queue,
+                               const mrhiFeatures* features)
 {
     DirtyTexture textures[DIRTY_TEXTURES];
     DirtyTextures(textures);
     for (int i = 0; i < DIRTY_TEXTURES; ++i)
     {
-        mrhiTextureId texture = {0};
-        void* resource = nullptr;
-        CHECK(mrhiCreateTexture(device, &textures[i].def, &texture) == mrhi_success &&
-                  mrhiGetD3d12Texture(device, texture, &resource) == mrhi_success &&
-                  Dirty(native, queue, (ID3D12Resource*)resource),
-              textures[i].what);
-        CHECK(ReadsZerosFirst(device, texture, &textures[i].def), textures[i].what);
-        CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "ended");
+        CheckDirty(device, native, queue, &textures[i]);
+    }
+    DirtyTexture compressed[DIRTY_COMPRESSED];
+    DirtyCompressedTextures(compressed);
+    for (int i = 0; i < DIRTY_COMPRESSED; ++i)
+    {
+        if (!DirtyGranted(&compressed[i].def, features))
+        {
+            printf("skip: %s, without the feature\n", compressed[i].what);
+            continue;
+        }
+        CheckDirty(device, native, queue, &compressed[i]);
     }
 }
 
@@ -426,6 +446,12 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
 {
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     deviceDef.adapter = adapter;
+    // The compressed formats the adapter has, for the zeroing checks.
+    mrhiFeatures granted = {0};
+    CHECK(mrhiGetAdapterFeatures(instance, adapter, &granted) == mrhi_success, "its features");
+    deviceDef.features.textureCompressionBc = granted.textureCompressionBc;
+    deviceDef.features.textureCompressionEtc2 = granted.textureCompressionEtc2;
+    deviceDef.features.textureCompressionAstc = granted.textureCompressionAstc;
     mrhiDevice* device = nullptr;
     mrhiRequestId opened = {0};
     mrhiInstanceNotification record;
@@ -468,7 +494,8 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
     CheckRoots(device);
     if (native != nullptr && queue != nullptr)
     {
-        CheckDirtyTextures(device, (ID3D12Device*)native, (ID3D12CommandQueue*)queue);
+        CheckDirtyTextures(device, (ID3D12Device*)native, (ID3D12CommandQueue*)queue,
+                           &deviceDef.features);
     }
     Release(&recorded);
     CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "the texture ended");
