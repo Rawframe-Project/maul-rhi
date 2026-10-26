@@ -344,9 +344,16 @@ jobs:
           MATCHED: ${{ steps.restore.outputs.cache-matched-key }}
         run: |
           # Minimized together: the files of the seeds and the corpus that
-          # keep every feature either reaches, seeds among them.
-          mkdir -p out/merged
-          "out/fuzz/$TARGET" -merge=1 out/merged "out/seeds/$TARGET" "out/corpus/$TARGET"
+          # keep every feature either reaches, seeds among them. The merge
+          # reruns every input, and one that crashes is dumped to its
+          # output and saved, so both stay on the runner.
+          mkdir -p out/merged out/fuzz-logs "out/fuzz-crashes/$TARGET"
+          "out/fuzz/$TARGET" -merge=1 -artifact_prefix="out/fuzz-crashes/$TARGET/" out/merged \
+            "out/seeds/$TARGET" "out/corpus/$TARGET" >"out/fuzz-logs/$TARGET.merge.log" 2>&1 || {
+            status=$?
+            echo "::error::$TARGET: the corpus merge exited with status $status"
+            exit "$status"
+          }
           rm -rf "out/corpus/$TARGET"
           mv out/merged "out/corpus/$TARGET"
           coverage() { "out/fuzz/$TARGET" -runs=0 "$@" 2>&1 | sed -n 's/.*INITED cov: \([0-9]*\).*/\1/p'; }
