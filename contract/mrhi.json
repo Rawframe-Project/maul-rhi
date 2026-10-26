@@ -20110,8 +20110,8 @@
             },
             "d3d12": {
               "class": "emulated",
-              "note": "CopyBufferRegion from a device-owned buffer of zeros, in 64 KiB pieces",
-              "cost": "64 KiB per device and one copy per 64 KiB cleared"
+              "note": "ClearUnorderedAccessViewUint on an R32_UINT view of the range, every buffer allowing unordered access; a transfer pass that clears runs on the compute queue, since copy lists cannot clear",
+              "cost": "a CPU-only and a shader-visible descriptor per clear; past a frame slot's views, CopyBufferRegion from a device-owned 64 KiB buffer of zeros, one copy per 64 KiB"
             },
             "metal": {
               "class": "direct",
@@ -22188,5 +22188,5 @@
       ]
     }
   ],
-  "contract_version": 15
+  "contract_version": 16
 }
