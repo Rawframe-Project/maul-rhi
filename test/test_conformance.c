@@ -862,7 +862,7 @@ static void CheckZeroedTextures(mrhiDevice* device, const mrhiFeatures* granted)
         .resource = t,
         .load = mrhi_loadClear,
         .store = mrhi_storeKeep,
-        .clear = {1.0, 1.0, 1.0, 1.0},
+        .clear = {1.0f, 1.0f, 1.0f, 1.0f},
     };
     def.colorTargetCount = 1;
     mrhiPassId fill = {0};
