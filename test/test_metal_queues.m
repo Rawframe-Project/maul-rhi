@@ -111,7 +111,9 @@ static int LaneOf(id<MTLCommandBuffer> buffer)
 }
 
 // The command buffer's record, made on first sight: NULL past BUFFERS,
-// and for an object a layer wraps.
+// and for an object a layer wraps. A finished command buffer is released
+// and a later one may take its address, so a record that was committed,
+// and takes nothing more, is never matched again.
 static Seen* See(id<MTLCommandBuffer> buffer)
 {
     if (object_getClass(buffer) != s_class)
@@ -120,7 +122,7 @@ static Seen* See(id<MTLCommandBuffer> buffer)
     }
     for (uint32_t i = 0; i < s_seenCount; ++i)
     {
-        if (s_seen[i].buffer == (const void*)buffer)
+        if (s_seen[i].buffer == (const void*)buffer && s_seen[i].committed == 0)
         {
             return &s_seen[i];
         }
