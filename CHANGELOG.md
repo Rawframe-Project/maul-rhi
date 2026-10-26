@@ -5,6 +5,33 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.7.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.6.0...v0.7.0) (2026-10-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **contract:** on any failure, these calls now set every pointer or id output they were given to NULL or the null id, before checking their owner, where they used to leave it as it was: mrhiRequestAdapters (requestOut), mrhiCreateDevice (requestOut, and deviceOut when the instance is NULL), mrhiCreateSurface, mrhiCreateBuffer, mrhiCreateTexture, mrhiCreateView, mrhiCreateSampler, mrhiCreateQuerySet, mrhiCreateHeap, mrhiCreateShader, mrhiCreateGraphicsPipeline and mrhiCreateComputePipeline (pipelineOut and requestOut), mrhiDeclareBuffer, mrhiDeclareTexture, mrhiImportBuffer, mrhiImportTexture, mrhiAcquireSurfaceImage (imageOut when the device is NULL), mrhiAddPass, mrhiReadBuffer and mrhiReadTexture (requestOut, documented as untouched on failure until now), and mrhiSubmitFrame (tokenOut). MRHI_CONTRACT_VERSION is 11.
+* **pipeline:** key pipeline caches by ABI version, refuse others ([#108](https://github.com/Rawframe-Project/maul-rhi/issues/108))
+* **shader:** container version 2, refusing unknown section types ([#110](https://github.com/Rawframe-Project/maul-rhi/issues/110))
+
+### Added
+
+* **metal:** run async compute and transfer passes on their own queues ([#121](https://github.com/Rawframe-Project/maul-rhi/issues/121)) ([32ac234](https://github.com/Rawframe-Project/maul-rhi/commit/32ac2346c74837bf329f5eb11508f68c19c9ac7b)), closes [#120](https://github.com/Rawframe-Project/maul-rhi/issues/120)
+* **pipeline:** key pipeline caches by ABI version, refuse others ([#108](https://github.com/Rawframe-Project/maul-rhi/issues/108)) ([9ddc480](https://github.com/Rawframe-Project/maul-rhi/commit/9ddc480eccfb6291170732ea30441efc84284882)), closes [#109](https://github.com/Rawframe-Project/maul-rhi/issues/109)
+* **resources:** zero every new buffer on every backend ([#132](https://github.com/Rawframe-Project/maul-rhi/issues/132)) ([7c63bf5](https://github.com/Rawframe-Project/maul-rhi/commit/7c63bf5b28f01ed462b411a6b5a40e14c1a58ac1)), closes [#129](https://github.com/Rawframe-Project/maul-rhi/issues/129)
+* **shader:** container version 2, refusing unknown section types ([#110](https://github.com/Rawframe-Project/maul-rhi/issues/110)) ([f8a6e29](https://github.com/Rawframe-Project/maul-rhi/commit/f8a6e2999d26d29068f2a4aa0a74fbc52d2253d4)), closes [#106](https://github.com/Rawframe-Project/maul-rhi/issues/106)
+
+
+### Fixed
+
+* **contract:** give NULL or the null id from every failed creation ([#117](https://github.com/Rawframe-Project/maul-rhi/issues/117)) ([6a39462](https://github.com/Rawframe-Project/maul-rhi/commit/6a39462f52558846c83a4a7da08dbc28beb1857e)), closes [#116](https://github.com/Rawframe-Project/maul-rhi/issues/116)
+* **contract:** say Vulkan runs async compute and transfer in order ([#123](https://github.com/Rawframe-Project/maul-rhi/issues/123)) ([005d5f1](https://github.com/Rawframe-Project/maul-rhi/commit/005d5f18c365b1228076e0e48296022b10b02f10)), closes [#122](https://github.com/Rawframe-Project/maul-rhi/issues/122)
+
+
+### Changed
+
+* **d3d12:** clear buffers with ClearUnorderedAccessViewUint ([#134](https://github.com/Rawframe-Project/maul-rhi/issues/134)) ([1b6fec4](https://github.com/Rawframe-Project/maul-rhi/commit/1b6fec4cf25802b8e11ad3d63234373e2987d1b7)), closes [#130](https://github.com/Rawframe-Project/maul-rhi/issues/130)
+
 ## [0.6.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.5.0...v0.6.0) (2026-10-25)
 
 ### Added
