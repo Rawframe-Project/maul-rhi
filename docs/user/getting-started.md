@@ -118,7 +118,7 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
 
 `mrhiResultName` names any value. [Troubleshooting](troubleshooting.md) shows how to learn which check refused a call.
 
-**Ids.** The instance and devices are pointers. Everything they own is an id with a generation: an id outlives its object harmlessly, and using it afterwards answers `mrhi_errorStale`.
+**Ids.** The instance and devices are pointers. Everything they own is an id with a generation: an id outlives its object harmlessly, and using it afterwards answers `mrhi_errorStale`. A call that gives a pointer or an id (a creation, a frame's resource or pass, a request) sets it to NULL or the null id first, so after any failure it holds nothing to destroy, wait on or use.
 
 **Defs.** Every creation takes a def. Start each from its `mrhiDefault...Def` function and change fields: the default sets a cookie, and a def without it is refused rather than read. `mrhiDefaultInstanceDef` is built into the program from the headers it includes and stamps the def with their ABI version, so an instance refuses a program built against another release with `mrhi_errorVersion` instead of reading a def of another layout. A def's `next` takes chained structs, which add to a call. A chained struct the library does not know is refused with `mrhi_errorUnsupported`, unless bit 31 of its type is set, which marks a hint an older library may skip.
 

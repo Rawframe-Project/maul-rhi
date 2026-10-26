@@ -218,7 +218,7 @@ extern "C"
     ///
     /// @param instance    The instance.
     /// @param def         The surface to make.
-    /// @param surfaceOut  Receives the surface.
+    /// @param surfaceOut  Receives the surface; the null id on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a label that is not UTF-8 without NUL within
     /// MRHI_LABEL_BYTES, or a def without exactly one source;

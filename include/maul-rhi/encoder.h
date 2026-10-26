@@ -769,8 +769,8 @@ extern "C"
     /// @param offset      Its first byte read, a multiple of 4.
     /// @param size        How many, a multiple of 4.
     /// @param requestOut  The readback's request, answered by
-    ///                    mrhi_deviceReadbackReady after the frame; untouched
-    ///                    on failure.
+    ///                    mrhi_deviceReadbackReady after the frame; the null id
+    ///                    on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or request
     /// out, a pass with targets, a resource that is not a buffer the pass
     /// declares with the copy source access, or an offset or size not a
@@ -794,8 +794,8 @@ extern "C"
     ///                    the call.
     /// @param size        The texels. Only read during the call.
     /// @param requestOut  The readback's request, answered by
-    ///                    mrhi_deviceReadbackReady after the frame; untouched
-    ///                    on failure.
+    ///                    mrhi_deviceReadbackReady after the frame; the null id
+    ///                    on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass
     /// with targets, a region off the texture's blocks or past its mip, a
     /// multisampled texture, an aspect that cannot be copied from, or a texture

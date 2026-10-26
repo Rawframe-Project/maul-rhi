@@ -587,6 +587,14 @@ mrhiResult mrhiCreateGraphicsPipeline(mrhiDevice* device, const mrhiGraphicsPipe
                                       mrhiGraphicsPipelineId* pipelineOut,
                                       mrhiRequestId* requestOut)
 {
+    if (pipelineOut != nullptr)
+    {
+        *pipelineOut = (mrhiGraphicsPipelineId){0};
+    }
+    if (requestOut != nullptr)
+    {
+        *requestOut = (mrhiRequestId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;

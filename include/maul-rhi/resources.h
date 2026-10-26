@@ -122,7 +122,7 @@ extern "C"
     ///
     /// @param device      The device.
     /// @param def         The sampler to make.
-    /// @param samplerOut  Receives the sampler.
+    /// @param samplerOut  Receives the sampler; the null id on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a label that is not UTF-8 without NUL within
     /// MRHI_LABEL_BYTES, a value out of range, anisotropy with a nearest
@@ -209,7 +209,7 @@ extern "C"
     ///
     /// @param device     The device.
     /// @param def        The buffer to make.
-    /// @param bufferOut  Receives the buffer.
+    /// @param bufferOut  Receives the buffer; the null id on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a label that is not UTF-8 without NUL within
     /// MRHI_LABEL_BYTES, a size of 0 or not a multiple of 4, or no usage or an
@@ -334,7 +334,7 @@ extern "C"
     ///
     /// @param device      The device.
     /// @param def         The texture to make.
-    /// @param textureOut  Receives the texture.
+    /// @param textureOut  Receives the texture; the null id on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a label that is not UTF-8 without NUL within
     /// MRHI_LABEL_BYTES, an unknown kind, format, usage or view format, a zero
@@ -437,7 +437,7 @@ extern "C"
     ///
     /// @param device   The device.
     /// @param def      The view to make.
-    /// @param viewOut  Receives the view.
+    /// @param viewOut  Receives the view; the null id on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a label that is not UTF-8 without NUL within
     /// MRHI_LABEL_BYTES, an unknown kind, usage or aspect, a kind the texture
@@ -527,7 +527,7 @@ extern "C"
     ///
     /// @param device  The device.
     /// @param def     The query set to make.
-    /// @param setOut  Receives the query set.
+    /// @param setOut  Receives the query set; the null id on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a label that is not UTF-8 without NUL within
     /// MRHI_LABEL_BYTES, an unknown type, or a count of 0 or past 4096;

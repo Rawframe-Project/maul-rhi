@@ -111,6 +111,10 @@ static const mrhiChain* CheckDef(mrhiInstance* instance, const mrhiSurfaceDef* d
 mrhiResult mrhiCreateSurface(mrhiInstance* instance, const mrhiSurfaceDef* def,
                              mrhiSurfaceId* surfaceOut)
 {
+    if (surfaceOut != nullptr)
+    {
+        *surfaceOut = (mrhiSurfaceId){0};
+    }
     if (instance == nullptr)
     {
         return mrhi_errorInvalid;

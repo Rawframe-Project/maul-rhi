@@ -51,6 +51,10 @@ static bool IsSamplerDefValid(const mrhiSamplerDef* def)
 mrhiResult mrhiCreateSampler(mrhiDevice* device, const mrhiSamplerDef* def,
                              mrhiSamplerId* samplerOut)
 {
+    if (samplerOut != nullptr)
+    {
+        *samplerOut = (mrhiSamplerId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
@@ -142,6 +146,10 @@ mrhiResult mrhiCheckBufferShape(mrhiDevice* device, const mrhiBufferDef* def)
 
 mrhiResult mrhiCreateBuffer(mrhiDevice* device, const mrhiBufferDef* def, mrhiBufferId* bufferOut)
 {
+    if (bufferOut != nullptr)
+    {
+        *bufferOut = (mrhiBufferId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;

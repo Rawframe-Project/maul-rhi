@@ -59,6 +59,10 @@ static bool FindRun(const mrhiDevice* device, uint32_t count, uint32_t* firstOut
 mrhiResult mrhiCreateQuerySet(mrhiDevice* device, const mrhiQuerySetDef* def,
                               mrhiQuerySetId* setOut)
 {
+    if (setOut != nullptr)
+    {
+        *setOut = (mrhiQuerySetId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;

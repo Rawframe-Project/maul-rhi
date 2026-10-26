@@ -237,6 +237,10 @@ static mrhiResourceState RestingOf(const mrhiTextureDef* def)
 mrhiResult mrhiCreateTexture(mrhiDevice* device, const mrhiTextureDef* def,
                              mrhiTextureId* textureOut)
 {
+    if (textureOut != nullptr)
+    {
+        *textureOut = (mrhiTextureId){0};
+    }
     if (device == nullptr)
     {
         return mrhi_errorInvalid;

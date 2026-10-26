@@ -175,6 +175,10 @@ mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search
 mrhiResult mrhiRequestAdapters(mrhiInstance* instance, const mrhiAdapterRequestDef* def,
                                mrhiRequestId* requestOut)
 {
+    if (requestOut != nullptr)
+    {
+        *requestOut = (mrhiRequestId){0};
+    }
     if (instance == nullptr)
     {
         return mrhi_errorInvalid;

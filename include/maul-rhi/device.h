@@ -141,8 +141,9 @@ extern "C"
     ///
     /// @param instance    The instance that found the adapter.
     /// @param def         The device to make.
-    /// @param deviceOut   Receives the device; set to NULL on failure.
-    /// @param requestOut  Receives the id its ready record answers.
+    /// @param deviceOut   Receives the device; set to NULL on any failure.
+    /// @param requestOut  Receives the id its ready record answers; the null id
+    ///                    on any failure.
     /// @return `mrhi_success` with the device opening; `mrhi_errorInvalid` for
     /// a NULL argument, a def without its cookie, a label that is not UTF-8
     /// without NUL within MRHI_LABEL_BYTES, a zero limit, limits below the
