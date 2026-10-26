@@ -10,7 +10,7 @@ Setting up a machine to build and test Maul RHI, and regenerating what is genera
 | Windows | Visual Studio with "C++ Clang tools for Windows" (`clang-cl`); the Agility SDK for the tests. |
 | macOS, iOS | Xcode's Apple Clang; a booted iOS simulator for the iOS tests. |
 | Android | The NDK r28 or newer (`ANDROID_NDK_HOME`), the SDK with an x86_64 Android 15 system image, and KVM for the emulator. |
-| The web | Emscripten, the version `ci.yml` pins for `web-emscripten` (`EMSDK` set, as `emsdk activate` does), or Clang 20 with `lld-20`, wasi-libc and `libclang-rt-20-dev-wasm32`; Node 20 or newer; Puppeteer for headless Chrome (`npm install --prefix <dir> puppeteer`, then `MRHI_NODE_MODULES=<dir>/node_modules`). |
+| The web | Emscripten, the version `ci.yml` pins for `web-emscripten` (`EMSDK` set, as `emsdk activate` does), or Clang 20 with `lld-20`, wasi-libc and `libclang-rt-20-dev-wasm32`; Node 20 or newer; Puppeteer for headless Chrome, as `test/browser`'s lockfile pins it (copy `test/browser/package*.json` to `<dir>`, run `npm ci --prefix <dir>`, then set `MRHI_NODE_MODULES=<dir>/node_modules`). |
 
 The organization's CI image has everything the Linux and WASI cells need. On the shared development machine, run full checks, large builds, fuzzing and emulators through `/home/rawframe-project/tools/heavy.sh`.
 

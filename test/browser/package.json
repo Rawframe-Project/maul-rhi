@@ -1,0 +1,8 @@
+{
+  "name": "maul-rhi-browser-tests",
+  "private": true,
+  "description": "The headless Chrome test/web_runner.cjs drives, installed with npm ci.",
+  "dependencies": {
+    "puppeteer": "24.43.1"
+  }
+}
