@@ -287,8 +287,8 @@ extern "C"
     } mrhiTextureId;
 
     // How a texture is made. Build it with mrhiDefaultTextureDef and set its
-    // format, size and usage. Its contents are undefined until the frame graph
-    // writes them.
+    // format, size and usage. A new texture reads as zeros, as
+    // mrhiCreateTexture says.
     typedef struct mrhiTextureDef
     {
         uint32_t cookie;
@@ -333,7 +333,15 @@ extern "C"
     /// Safe from any thread.
     MRHI_API mrhiTextureDef mrhiDefaultTextureDef(void);
 
-    /// Makes a texture on a ready device.
+    /// Makes a texture on a ready device. It reads as zeros until the frame
+    /// graph writes it, in every mip, layer and aspect: the first frame that
+    /// imports it clears it whole, in a pass of the library's own that takes
+    /// nothing from the frame's budgets, so the program's first use of it sees
+    /// zeros. Passes that do not use it may run beside that clear. A texture of
+    /// one mip and layer whose first use is a target that clears it and keeps
+    /// the result is not cleared before, as that use writes all of it. A
+    /// transient texture is never cleared, as its contents live only inside a
+    /// render pass.
     ///
     /// @param device      The device.
     /// @param def         The texture to make.
