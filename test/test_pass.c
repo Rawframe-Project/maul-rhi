@@ -332,6 +332,10 @@ static void TestScopes(void)
     mrhiAccess first = Access(texture, mrhi_accessSampled);
     CHECK(Add(Pass((mrhiColorTarget){0}, &first, 1)) == mrhi_errorInvalid,
           "read before any pass wrote it");
+    mrhiAccess unwritten = Access(buffer, mrhi_accessCopySource);
+    CHECK(Add(Pass((mrhiColorTarget){0}, &unwritten, 1)) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticPassUses,
+          "a buffer read before any pass wrote it");
     mrhiAccess init[2] = {Access(texture, mrhi_accessStorageWrite),
                           Access(buffer, mrhi_accessStorageWrite)};
     CHECK(Add(Pass((mrhiColorTarget){0}, init, 2)) == mrhi_success, "written");
