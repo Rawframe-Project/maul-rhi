@@ -835,9 +835,9 @@ static bool ReadsZeros(mrhiDevice* device, mrhiTextureId texture, const ZeroedTe
     return zeroed;
 }
 
-// Makes a target, clears it to ones and destroys it, then makes a
-// texture where an allocator may give it the same memory: whether that
-// reads as zeros.
+// Makes a color or depth target, clears it to ones and destroys it, then
+// makes a texture where an allocator may give it the same memory:
+// whether that reads as zeros.
 static bool ReadsZerosWhereOnesWere(mrhiDevice* device, const ZeroedTexture* target,
                                     const ZeroedTexture* remade)
 {
@@ -848,13 +848,25 @@ static bool ReadsZerosWhereOnesWere(mrhiDevice* device, const ZeroedTexture* tar
               mrhiImportTexture(device, filled, &t) == mrhi_success,
           "a frame filling a target");
     mrhiPassDef def = mrhiDefaultPassDef();
-    def.colorTargets[0] = (mrhiColorTarget){
-        .resource = t,
-        .load = mrhi_loadClear,
-        .store = mrhi_storeKeep,
-        .clear = {1.0f, 1.0f, 1.0f, 1.0f},
-    };
-    def.colorTargetCount = 1;
+    if (target->format == mrhi_formatDepth32Float)
+    {
+        def.depthTarget = (mrhiDepthTarget){
+            .resource = t,
+            .depthLoad = mrhi_loadClear,
+            .depthStore = mrhi_storeKeep,
+            .clearDepth = 1.0f,
+        };
+    }
+    else
+    {
+        def.colorTargets[0] = (mrhiColorTarget){
+            .resource = t,
+            .load = mrhi_loadClear,
+            .store = mrhi_storeKeep,
+            .clear = {1.0f, 1.0f, 1.0f, 1.0f},
+        };
+        def.colorTargetCount = 1;
+    }
     mrhiPassId fill = {0};
     CHECK(mrhiAddPass(device, &def, &fill) == mrhi_success &&
               mrhiCompileFrame(device) == mrhi_success &&
@@ -877,9 +889,9 @@ static bool ReadsZerosWhereOnesWere(mrhiDevice* device, const ZeroedTexture* tar
 // storage textures, a depth target and a depth texture only sampled,
 // volumes, one a render target, BC1 blocks where the device has them,
 // and textures larger than a driver's zeros, read at their first and
-// last rows of blocks; and a render target made, after one of its size was
-// cleared to ones and destroyed, where an allocator may give it the same
-// memory.
+// last rows of blocks; and a render target, depth textures and a large
+// texture made, after a target of their size was cleared to ones and
+// destroyed, where an allocator may give them the same memory.
 static void CheckZeroedTextures(mrhiDevice* device, const mrhiFeatures* granted)
 {
     const ZeroedTexture textures[] = {
@@ -918,6 +930,9 @@ static void CheckZeroedTextures(mrhiDevice* device, const mrhiFeatures* granted)
     }
     CHECK(ReadsZerosWhereOnesWere(device, &textures[1], &textures[1]),
           "a texture made where a filled one was reads as zeros");
+    CHECK(ReadsZerosWhereOnesWere(device, &textures[4], &textures[4]) &&
+              ReadsZerosWhereOnesWere(device, &textures[4], &textures[5]),
+          "depth textures made where a filled one was read as zeros");
     const ZeroedTexture large = {"a large target",
                                  mrhi_formatRgba8Unorm,
                                  mrhi_texture2d,

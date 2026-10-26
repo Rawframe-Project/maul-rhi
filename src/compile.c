@@ -70,18 +70,17 @@ static bool IsClearedFirst(const mrhiDevice* device, uint32_t resource)
         const mrhiFramePass* pass = &device->framePasses[p];
         const mrhiFrameUse* uses = &device->frameUses[pass->firstUse];
         bool used = false;
-        bool other = false;
         for (uint32_t i = 0; i < pass->useCount; ++i)
         {
-            bool target = uses[i].use == mrhiUseColorTarget || uses[i].use == mrhiUseDepthTarget;
             used = used || uses[i].resource == resource;
-            other = other || (uses[i].resource == resource && !target);
         }
         if (!used)
         {
             continue;
         }
-        for (uint32_t c = 0; c < pass->colorTargetCount && !other; ++c)
+        // A pass uses a target's one subresource in no other way, as its
+        // uses' scope allows.
+        for (uint32_t c = 0; c < pass->colorTargetCount; ++c)
         {
             const mrhiColorTarget* color = &pass->colorTargets[c];
             if (color->resource.index1 == resource)
@@ -90,7 +89,7 @@ static bool IsClearedFirst(const mrhiDevice* device, uint32_t resource)
             }
         }
         const mrhiDepthTarget* depth = &pass->depthTarget;
-        return !other && depth->resource.index1 == resource && !depth->readOnly &&
+        return depth->resource.index1 == resource && !depth->readOnly &&
                depth->depthLoad == mrhi_loadClear && depth->depthStore == mrhi_storeKeep &&
                (!mrhiFormatHasStencil(def->format) ||
                 (depth->stencilLoad == mrhi_loadClear && depth->stencilStore == mrhi_storeKeep));
