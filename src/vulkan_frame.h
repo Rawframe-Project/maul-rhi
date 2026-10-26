@@ -17,6 +17,10 @@
 
 #include "maul-rhi/device.h"
 
+// The bytes of the device's zeros, which a texture's clear copies where
+// no clear takes its format, a band of blocks at a time.
+#define MRHI_VULKAN_ZERO_BYTES 65536
+
 // The descriptor pools a frame slot has at most, and each pool's sets
 // and descriptors of every type.
 #define MRHI_VULKAN_POOLS            64
@@ -30,11 +34,7 @@
 // recorded in one lane, a frame's one submission.
 #ifdef MAUL_RHI_VULKAN_SPLIT_LANES
 #define MRHI_VULKAN_LANES 3
-
-// The bytes of the device's zeros, which a texture's clear copies where
-// no clear takes its format, a band of blocks at a time.
-#define MRHI_VULKAN_ZERO_BYTES 65536
-#define MRHI_VULKAN_SPLIT      true
+#define MRHI_VULKAN_SPLIT true
 #else
 #define MRHI_VULKAN_LANES 1
 #define MRHI_VULKAN_SPLIT false
