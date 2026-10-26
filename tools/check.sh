@@ -128,7 +128,8 @@ fi
 source_checks
 
 step "clang-format on every file"
-clang-format --dry-run -Werror $(all_c_files)
+mapfile -t all_files < <(all_c_files)
+clang-format --dry-run -Werror "${all_files[@]}"
 
 step "clang-tidy"
 # The web sources need Emscripten's sysroot, the D3D12 ones Windows' headers
