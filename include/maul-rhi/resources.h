@@ -206,8 +206,9 @@ extern "C"
 
     /// Makes a buffer on a ready device. It reads as zeros until the frame
     /// graph writes it: the first frame that imports it clears it whole, in a
-    /// pass of the library's own that runs before the program's passes and
-    /// takes nothing from its budgets.
+    /// pass of the library's own that takes nothing from the frame's budgets,
+    /// so the program's first use of it sees zeros. Passes that do not use it
+    /// may run beside that clear.
     ///
     /// @param device     The device.
     /// @param def        The buffer to make.
