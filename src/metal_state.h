@@ -26,6 +26,8 @@
 #define MRHI_METAL_ROOT_BYTES 256
 // The views a multiview pass amplifies to at most.
 #define MRHI_METAL_VIEWS 32
+// The bytes of the device's zeros, which copies into new textures read.
+#define MRHI_METAL_ZERO_BYTES 65536u
 
 // A table's binding as bound: its slot, kind, Metal object (a buffer, a
 // texture or its view, or a sampler state), and a buffer's offset and
@@ -47,6 +49,7 @@ typedef struct mrhiMetalEncoder
     id* objects;
     id<MTLBuffer> staging;
     id<MTLBuffer> readback;
+    id<MTLBuffer> zeros;
     // The kernel clamping counted multi-draws' records, the buffer they
     // are clamped into, and where the next counted draw's records lie in
     // it.

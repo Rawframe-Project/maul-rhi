@@ -67,8 +67,15 @@ mrhiResult mrhiMetalOpenFrames(mrhiMetalFrames* frames)
             [[[MTLDepthStencilDescriptor alloc] init] autorelease];
         frames->noDepth = [frames->device newDepthStencilStateWithDescriptor:descriptor];
         frames->clamp = frames->counted ? MakeClamp(frames->device) : nil;
+        frames->zeros = [frames->device newBufferWithLength:MRHI_METAL_ZERO_BYTES
+                                                    options:MTLResourceStorageModeShared];
+        if (frames->zeros != nil)
+        {
+            memset(frames->zeros.contents, 0, MRHI_METAL_ZERO_BYTES);
+        }
     }
-    return frames->noDepth != nil && (frames->clamp != nil || !frames->counted)
+    return frames->noDepth != nil && frames->zeros != nil &&
+                   (frames->clamp != nil || !frames->counted)
                ? mrhi_success
                : mrhi_errorPlatform;
 }
@@ -136,6 +143,7 @@ void mrhiMetalCloseFrames(mrhiMetalFrames* frames)
     }
     [frames->clamp release];
     [frames->noDepth release];
+    [frames->zeros release];
 }
 
 // Grows a slot's shared buffer to hold bytes: false when Metal makes
@@ -278,6 +286,7 @@ static void Record(mrhiMetalFrames* frames, mrhiMetalSlot* slot, const mrhiDrive
         .objects = frames->objects,
         .staging = slot->staging,
         .readback = slot->readback,
+        .zeros = frames->zeros,
         .clamp = frames->clamp,
         .clamped = slot->clamped,
         .commands = commands,

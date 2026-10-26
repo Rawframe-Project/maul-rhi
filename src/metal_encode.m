@@ -716,6 +716,49 @@ static void Occlusion(const mrhiMetalEncoder* encoder, const mrhiCommand* comman
                                       offset:(NSUInteger)command->a * 8];
 }
 
+// Zeroes a new texture whole: a depth texture, which every one is made
+// to take a render pass, and a render target of one layer by render
+// passes that clear each mip and layer, faster than copies; any other by
+// copies of zeros, which take no usage. The pass's blit encoder is open
+// after.
+static void ClearTexture(mrhiMetalEncoder* encoder, const mrhiCommand* command)
+{
+    const mrhiTextureDef* def = encoder->frame->resources[command->a - 1].texture;
+    bool depth = mrhiFormatHasDepth(def->format);
+    bool target = (def->usage & mrhi_textureRenderTarget) != 0 && def->kind != mrhi_texture3d &&
+                  def->depthOrLayers == 1;
+    if (!depth && !target)
+    {
+        mrhiMetalCopyZeros(encoder, command);
+        return;
+    }
+    id<MTLTexture> texture = encoder->objects[command->a - 1];
+    EndEncoder(encoder);
+    for (uint32_t mip = 0; mip < def->mipLevels; ++mip)
+    {
+        for (uint32_t layer = 0; layer < def->depthOrLayers; ++layer)
+        {
+            MTLRenderPassDescriptor* descriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+            descriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 0.0);
+            descriptor.depthAttachment.clearDepth = 0.0;
+            descriptor.stencilAttachment.clearStencil = 0;
+            MTLRenderPassAttachmentDescriptor* attachments[2] = {
+                depth ? (MTLRenderPassAttachmentDescriptor*)descriptor.depthAttachment
+                      : descriptor.colorAttachments[0],
+                mrhiFormatHasStencil(def->format) ? descriptor.stencilAttachment : nil,
+            };
+            for (int i = 0; i < 2 && attachments[i] != nil; ++i)
+            {
+                Place(attachments[i], texture, mip, layer);
+                attachments[i].loadAction = MTLLoadActionClear;
+                attachments[i].storeAction = MTLStoreActionStore;
+            }
+            [[encoder->commands renderCommandEncoderWithDescriptor:descriptor] endEncoding];
+        }
+    }
+    StartBlit(encoder);
+}
+
 static bool IsLabel(const mrhiCommand* command)
 {
     return command->type >= mrhiCommandPushDebugGroup && command->type <= mrhiCommandDebugMarker;
@@ -771,6 +814,9 @@ static void Encode(mrhiMetalEncoder* encoder, Work work, const mrhiCommand* comm
         break;
     case mrhiCommandResolveQueries:
         mrhiMetalResolve(encoder, command);
+        break;
+    case mrhiCommandClearTexture:
+        ClearTexture(encoder, command);
         break;
     default:
         if (command->type >= mrhiCommandCopyBuffer)

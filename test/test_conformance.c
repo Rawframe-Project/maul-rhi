@@ -796,7 +796,8 @@ static bool ReadsZeros(mrhiDevice* device, mrhiTextureId texture, const ZeroedTe
     {
         uint32_t size = z->size >> mip;
         uint32_t layers = volume ? 1 : z->depthOrLayers;
-        mrhiExtent3d extent = {size, size, volume ? z->depthOrLayers : 1};
+        uint32_t slices = z->depthOrLayers >> mip > 0 ? z->depthOrLayers >> mip : 1;
+        mrhiExtent3d extent = {size, size, volume ? slices : 1};
         for (uint32_t layer = 0; layer < layers && count < READS; ++layer, ++count)
         {
             const mrhiTextureCopy source = {
@@ -822,8 +823,9 @@ static bool ReadsZeros(mrhiDevice* device, mrhiTextureId texture, const ZeroedTe
 
 // A new texture reads as zeros in every mip and layer, on every driver,
 // whichever way the driver clears it: one only sampled, a render target,
-// a storage texture, a depth target, a volume and, where the device has
-// them, BC1 blocks; and a render target made, after one of its size was
+// storage textures, a depth target and a depth texture only sampled,
+// volumes, one a render target, and, where the device has them, BC1
+// blocks; and a render target made, after one of its size was
 // cleared to ones and destroyed, where an allocator may give it the same
 // memory.
 static void CheckZeroedTextures(mrhiDevice* device, const mrhiFeatures* granted)
@@ -834,9 +836,15 @@ static void CheckZeroedTextures(mrhiDevice* device, const mrhiFeatures* granted)
         {"a render target", mrhi_formatRgba8Unorm, mrhi_texture2d, 16, 1, 1,
          mrhi_textureRenderTarget},
         {"a storage texture", mrhi_formatR32Float, mrhi_texture2d, 16, 1, 1, mrhi_textureStorage},
+        {"storage mips and layers", mrhi_formatR32Float, mrhi_texture2dArray, 16, 2, 2,
+         mrhi_textureStorage},
         {"a depth target", mrhi_formatDepth32Float, mrhi_texture2d, 16, 1, 1,
          mrhi_textureRenderTarget},
+        {"a depth texture only sampled", mrhi_formatDepth32Float, mrhi_texture2d, 16, 1, 1,
+         mrhi_textureSampled},
         {"a volume", mrhi_formatRgba8Unorm, mrhi_texture3d, 8, 4, 1, mrhi_textureSampled},
+        {"a volume render target", mrhi_formatRgba8Unorm, mrhi_texture3d, 8, 4, 2,
+         mrhi_textureRenderTarget},
         {"BC1 blocks", mrhi_formatBc1RgbaUnorm, mrhi_texture2d, 16, 1, 2, mrhi_textureSampled},
     };
     for (size_t i = 0; i < sizeof(textures) / sizeof(textures[0]); ++i)

@@ -64,7 +64,7 @@ metal_copy: capabilities_core invariant metal_resource metal_state
 metal_state: driver metal_pipeline
 metal_pipeline: allocator container driver invariant metal_graphics metal_names reflection
 metal_graphics: capabilities_core invariant metal_names
-metal_resource: driver invariant metal_names
+metal_resource: capabilities_core driver invariant metal_names
 metal_names: capabilities_core invariant
 driver_webgpu: allocator driver format_caps invariant web_js webgpu_device webgpu_names
 webgpu_device: allocator capabilities_core driver invariant web_js webgpu_frame webgpu_names webgpu_pipeline
