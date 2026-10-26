@@ -11941,7 +11941,7 @@
         {
           "kind": "function",
           "name": "declare_buffer",
-          "doc": "Declares a buffer the open frame's graph makes, aliases and ends with the frame. Its usages are derived from the passes that use it.",
+          "doc": "Declares a buffer the open frame's graph makes, aliases and ends with the frame. Its usages are derived from the passes that use it. A pass may read it only after an earlier pass wrote it; bytes no pass wrote, beside a write to part of it, are undefined and differ by backend.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a usage other than 0, or a size that is zero or not a multiple of 4; `mrhi_errorUnsupported` for a size past the device's bufferBytes, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's frameResources limit is reached."
@@ -22188,5 +22188,5 @@
       ]
     }
   ],
-  "contract_version": 14
+  "contract_version": 15
 }

@@ -192,7 +192,9 @@ extern "C"
                                                           mrhiResourceId* resourceOut);
 
     /// Declares a buffer the open frame's graph makes, aliases and ends with
-    /// the frame. Its usages are derived from the passes that use it.
+    /// the frame. Its usages are derived from the passes that use it. A pass
+    /// may read it only after an earlier pass wrote it; bytes no pass wrote,
+    /// beside a write to part of it, are undefined and differ by backend.
     ///
     /// @param device       The device.
     /// @param def          The buffer, with a usage of 0.
