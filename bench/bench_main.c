@@ -223,6 +223,51 @@ static bool ZeroFrame(Sample* sample, uint64_t bytes, double* zeroOut)
     return true;
 }
 
+// Reopens the sample's device with the adapter's limits, which may allow
+// larger buffers than the default's, and reports what zeroing a new
+// buffer of each size costs.
+static void ZeroTimes(Sample* sample)
+{
+    mrhiDestroyDevice(sample->device);
+    sample->device = nullptr;
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.adapter = sample->adapter;
+    mrhiRequestId opened = {0};
+    mrhiInstanceNotification record;
+    bool open =
+        mrhiGetAdapterLimits(sample->instance, sample->adapter, &def.limits) == mrhi_success &&
+        mrhiCreateDevice(sample->instance, &def, &sample->device, &opened) == mrhi_success &&
+        mrhiNextInstanceNotification(sample->instance, &record) == mrhi_success &&
+        record.outcome == mrhi_success;
+    if (!SampleCheck(sample, open, "a device with the adapter's limits"))
+    {
+        return;
+    }
+    static const uint64_t sizes[ZERO_SIZES] = {UINT64_C(1) << 20, UINT64_C(64) << 20,
+                                               UINT64_C(1) << 30};
+    static const char* const names[ZERO_SIZES] = {
+        "zero a new buffer, 1 MiB", "zero a new buffer, 64 MiB", "zero a new buffer, 1 GiB"};
+    for (int i = 0; i < ZERO_SIZES; ++i)
+    {
+        double best = 1e9;
+        bool made = true;
+        for (int run = 0; run < RUNS && made && sample->failures == 0; ++run)
+        {
+            double took = 0.0;
+            made = ZeroFrame(sample, sizes[i], &took);
+            best = took < best ? took : best;
+        }
+        if (made)
+        {
+            Report(names[i], best * 1e6, "us");
+        }
+        else
+        {
+            printf("%-*s refused by the device\n", NAME_WIDTH, names[i]);
+        }
+    }
+}
+
 // The bytes an allocator has handed out and not taken back.
 typedef struct Counted
 {
@@ -325,10 +370,6 @@ int main(int argc, char** argv)
     double drawFrame = 1e9;
     double passes = 1e9;
     double compile = 1e9;
-    static const uint64_t zeroBytes[ZERO_SIZES] = {UINT64_C(1) << 20, UINT64_C(64) << 20,
-                                                   UINT64_C(1) << 30};
-    double zero[ZERO_SIZES] = {1e9, 1e9, 1e9};
-    bool zeroed[ZERO_SIZES] = {true, true, true};
     for (int run = 0; run < RUNS && sample.failures == 0; ++run)
     {
         double a = 0.0;
@@ -339,11 +380,6 @@ int main(int argc, char** argv)
         PassFrame(&sample, &a, &b);
         passes = a < passes ? a : passes;
         compile = b < compile ? b : compile;
-        for (int i = 0; i < ZERO_SIZES; ++i)
-        {
-            zeroed[i] = zeroed[i] && ZeroFrame(&sample, zeroBytes[i], &a);
-            zero[i] = zeroed[i] && a < zero[i] ? a : zero[i];
-        }
     }
     if (sample.failures == 0)
     {
@@ -351,19 +387,7 @@ int main(int argc, char** argv)
         Report("draw frame, start to submit", drawFrame * 1e6, "us");
         Report("pass, declared and recorded", passes * 1e9 / PASSES, "ns");
         Report("compile, 200 chained passes", compile * 1e6, "us");
-        static const char* const zeroNames[ZERO_SIZES] = {
-            "zero a new buffer, 1 MiB", "zero a new buffer, 64 MiB", "zero a new buffer, 1 GiB"};
-        for (int i = 0; i < ZERO_SIZES; ++i)
-        {
-            if (zeroed[i])
-            {
-                Report(zeroNames[i], zero[i] * 1e6, "us");
-            }
-            else
-            {
-                printf("%-*s refused by the device\n", NAME_WIDTH, zeroNames[i]);
-            }
-        }
+        ZeroTimes(&sample);
     }
     int status = SampleClose(&sample);
     size_t instanceBytes = 0;
