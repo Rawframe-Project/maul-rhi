@@ -245,8 +245,8 @@ static bool TakeClearViews(mrhiD3d12Recorder* recorder, D3D12_CPU_DESCRIPTOR_HAN
 }
 
 // Zeroes a buffer's range with ClearUnorderedAccessViewUint, many times
-// faster than copies of zeros (#130), on the lists that take it: every
-// lane but the copy lane, which no pass that clears runs on. A clear
+// faster than copies of zeros, on the lists that take it: every lane but
+// the copy lane, which no pass that clears runs on. A clear
 // past the slot's views, or of more words than one view holds, copies
 // zeros instead. Either way it ends in the copy destination state the
 // frame's plan gives it, so the frame's next use of the buffer waits
