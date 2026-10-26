@@ -170,11 +170,14 @@ static D3D12_RESOURCE_DESC DescribeTexture(const mrhiTextureDef* def)
     {
         views = views || def->viewFormats[i] != mrhi_formatNone;
     }
-    D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
-    if ((def->usage & mrhi_textureRenderTarget) != 0)
+    // Every depth texture takes a depth view, so that its first frame
+    // clears it: D3D12 copies into a depth texture only whole
+    // subresources at once, from a buffer as large.
+    D3D12_RESOURCE_FLAGS flags =
+        depth ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE;
+    if (!depth && (def->usage & mrhi_textureRenderTarget) != 0)
     {
-        flags |= depth ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL
-                       : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
     }
     if ((def->usage & mrhi_textureStorage) != 0)
     {

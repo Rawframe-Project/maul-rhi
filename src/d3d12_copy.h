@@ -18,4 +18,9 @@ void mrhiD3d12Copy(mrhiD3d12Recorder* recorder, const mrhiCommand* command);
 void mrhiD3d12CopyZeros(const mrhiD3d12Recorder* recorder, ID3D12Resource* target, uint64_t offset,
                         uint64_t bytes);
 
+// Whether a new texture's clear is one only a direct list makes: a
+// render target's or a depth texture's, through a view of the kind it
+// was made to take.
+bool mrhiD3d12ClearsOnDirect(const mrhiTextureDef* def);
+
 #endif // MAUL_RHI_SRC_D3D12_COPY_H

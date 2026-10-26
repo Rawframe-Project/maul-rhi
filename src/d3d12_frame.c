@@ -253,10 +253,11 @@ static bool OpenSlot(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot)
             return false;
         }
     }
-    slot->targetHeap = MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
-                                frames->targetLimit > 0 ? frames->targetLimit : 1, false);
-    slot->depthHeap = MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
-                               frames->depthLimit > 0 ? frames->depthLimit : 1, false);
+    // One view past each ring, which every clear of a new texture takes.
+    slot->targetHeap =
+        MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, frames->targetLimit + 1, false);
+    slot->depthHeap =
+        MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, frames->depthLimit + 1, false);
     slot->viewHeap = MakeHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
                               frames->heapCount * frames->heapEntries + frames->viewLimit, true);
     slot->samplerHeap =

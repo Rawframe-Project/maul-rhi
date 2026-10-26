@@ -11,6 +11,7 @@
 #include "d3d12_lanes.h"
 
 #include "d3d12_barrier.h"
+#include "d3d12_copy.h"
 #include "invariant.h"
 
 // The states a compute list takes, and a copy list.
@@ -71,22 +72,31 @@ static void Lower(mrhiD3d12Lanes* lanes, mrhiPassId pass, mrhiD3d12Lane most)
     *lane = *lane < most ? *lane : most;
 }
 
-// Whether a pass clears a buffer: a copy list has no
-// ClearUnorderedAccessViewUint.
-static bool Clears(const mrhiDriverFrame* frame, const mrhiDriverPass* pass)
+// The latest lane whose lists make a pass's clears: a copy list has no
+// ClearUnorderedAccessViewUint, and only a direct list clears a render
+// target's or a depth texture's view.
+static mrhiD3d12Lane ClearLane(const mrhiD3d12Recorder* recorder, const mrhiDriverPass* pass)
 {
+    const mrhiDriverFrame* frame = recorder->frame;
+    mrhiD3d12Lane lane = mrhiD3d12LaneCopy;
     for (uint32_t chunk = pass->firstChunk; chunk != 0; chunk = frame->chunks[chunk - 1].next)
     {
         const mrhiCommandChunk* at = &frame->chunks[chunk - 1];
         for (uint32_t i = 0; i < at->count; i += 1u + at->commands[i].payload)
         {
-            if (at->commands[i].type == mrhiCommandClearBuffer)
+            const mrhiCommand* command = &at->commands[i];
+            if (command->type == mrhiCommandClearTexture &&
+                mrhiD3d12ClearsOnDirect(recorder->table[command->a - 1].texture))
             {
-                return true;
+                return mrhiD3d12LaneDirect;
+            }
+            if (command->type == mrhiCommandClearBuffer || command->type == mrhiCommandClearTexture)
+            {
+                lane = mrhiD3d12LaneCompute;
             }
         }
     }
-    return false;
+    return lane;
 }
 
 static bool ComputeTakes(D3D12_RESOURCE_STATES state)
@@ -106,10 +116,7 @@ static void Place(mrhiD3d12Lanes* lanes)
         const mrhiDriverPass* pass = &frame->passes[p];
         lanes->passLanes[pass->id.index1] =
             pass->native ? mrhiD3d12LaneDirect : LaneOfClass(pass->passClass);
-        if (lanes->passLanes[pass->id.index1] == mrhiD3d12LaneCopy && Clears(frame, pass))
-        {
-            Lower(lanes, pass->id, mrhiD3d12LaneCompute);
-        }
+        Lower(lanes, pass->id, ClearLane(recorder, pass));
         // A timed pass runs where its times tick as the direct queue's,
         // whose frequency is the device's timestamp period: on the compute
         // queue where its frequency is the same, which also takes every
