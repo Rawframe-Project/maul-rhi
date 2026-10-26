@@ -4,10 +4,13 @@
 // A native pass on Metal (maul-rhi/metal.h): a texture uploaded by the
 // library, overwritten by the program's own command buffer blitting in
 // texels of its own, and read back by the library, the program's texels
-// coming back; the device's native objects, the refusals, and the usage
-// flags of the textures the library makes. Skipped
+// coming back; new textures filled with ones through the device's queue
+// before their first frame reading as zeros in it, whichever clear Metal
+// takes; the device's native objects, the refusals, and the usage flags
+// of the textures the library makes. Skipped
 // where there is no Metal adapter, unless MAUL_RHI_REQUIRE_METAL is set.
 
+#include "dirty_textures.h"
 #include "test_harness.h"
 
 #include "maul-rhi/encoder.h"
@@ -134,6 +137,82 @@ static void CheckFrame(mrhiDevice* device, mrhiTextureId texture, id<MTLCommandB
     CHECK(copied, "the program's texels, after the upload and before the readback");
 }
 
+// Fills every mip and layer of a new texture with ones through the
+// device's queue, and waits: a depth texture by render passes clearing
+// it to 1, which every one takes, any other by blits of ones bytes.
+static bool Dirty(id<MTLDevice> device, id<MTLCommandQueue> queue, id<MTLTexture> texture,
+                  const mrhiTextureDef* def)
+{
+    bool volume = def->kind == mrhi_texture3d;
+    NSUInteger bytes = (NSUInteger)def->width * def->height * def->depthOrLayers * 4;
+    id<MTLBuffer> ones = [device newBufferWithLength:bytes options:MTLResourceStorageModeShared];
+    if (ones == nil)
+    {
+        return false;
+    }
+    memset(ones.contents, 0xFF, bytes);
+    id<MTLCommandBuffer> commands = [queue commandBuffer];
+    for (uint32_t mip = 0; mip < def->mipLevels; ++mip)
+    {
+        uint32_t width = def->width >> mip;
+        uint32_t height = def->height >> mip;
+        uint32_t depth = volume ? def->depthOrLayers >> mip : 1;
+        for (uint32_t layer = 0; layer < (volume ? 1 : def->depthOrLayers); ++layer)
+        {
+            if (def->format == mrhi_formatDepth32Float)
+            {
+                MTLRenderPassDescriptor* pass = [MTLRenderPassDescriptor renderPassDescriptor];
+                pass.depthAttachment.texture = texture;
+                pass.depthAttachment.level = mip;
+                pass.depthAttachment.slice = layer;
+                pass.depthAttachment.loadAction = MTLLoadActionClear;
+                pass.depthAttachment.storeAction = MTLStoreActionStore;
+                pass.depthAttachment.clearDepth = 1.0;
+                [[commands renderCommandEncoderWithDescriptor:pass] endEncoding];
+                continue;
+            }
+            id<MTLBlitCommandEncoder> blit = [commands blitCommandEncoder];
+            [blit copyFromBuffer:ones
+                       sourceOffset:0
+                  sourceBytesPerRow:width * 4
+                sourceBytesPerImage:volume ? width * height * 4 : 0
+                         sourceSize:MTLSizeMake(width, height, depth)
+                          toTexture:texture
+                   destinationSlice:layer
+                   destinationLevel:mip
+                  destinationOrigin:MTLOriginMake(0, 0, 0)];
+            [blit endEncoding];
+        }
+    }
+    [commands commit];
+    [commands waitUntilCompleted];
+    bool done = commands.status == MTLCommandBufferStatusCompleted;
+    [ones release];
+    return done;
+}
+
+// Each new texture, filled with ones before its first frame, reads as
+// zeros in it.
+static void CheckDirtyTextures(mrhiDevice* device, id<MTLDevice> native, id<MTLCommandQueue> queue)
+{
+    DirtyTexture textures[DIRTY_TEXTURES];
+    DirtyTextures(textures);
+    for (int i = 0; i < DIRTY_TEXTURES; ++i)
+    {
+        mrhiTextureId texture = {0};
+        void* made = nullptr;
+        @autoreleasepool
+        {
+            CHECK(mrhiCreateTexture(device, &textures[i].def, &texture) == mrhi_success &&
+                      mrhiGetMetalTexture(device, texture, &made) == mrhi_success &&
+                      Dirty(native, queue, (id<MTLTexture>)made, &textures[i].def),
+                  textures[i].what);
+        }
+        CHECK(ReadsZerosFirst(device, texture, &textures[i].def), textures[i].what);
+        CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "ended");
+    }
+}
+
 // One texture usage and the MTLTextureUsage the shader access it allows
 // needs, which Metal's texture usage validation would check at run time.
 typedef struct UsageCase
@@ -236,6 +315,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
             [commands release];
             [buffer release];
         }
+        CheckDirtyTextures(device, (id<MTLDevice>)native, (id<MTLCommandQueue>)queue);
     }
     CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "the texture ended");
     mrhiDestroyDevice(device);

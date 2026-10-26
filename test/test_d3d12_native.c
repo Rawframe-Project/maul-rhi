@@ -5,7 +5,9 @@
 // library, overwritten by the program's own command list copying in
 // texels of its own, and read back by the library, the program's texels
 // coming back; pipelines dispatching and drawing on both sides of a
-// native pass, after which the library records into a list of its own; the device's
+// native pass, after which the library records into a list of its own; new
+// textures filled with ones through the device's queue before their first
+// frame reading as zeros in it, whichever clear D3D12 takes; the device's
 // native objects, and the refusals. Under the
 // debug layer, whose errors fail the suite. Skipped where there is no
 // D3D12 adapter, unless MAUL_RHI_REQUIRE_D3D12 is set.
@@ -16,6 +18,7 @@
 #define COBJMACROS
 
 #include "d3d12_debug.h"
+#include "dirty_textures.h"
 #include "test_harness.h"
 
 #include "maul-rhi/d3d12.h"
@@ -194,6 +197,129 @@ static void CheckFrame(mrhiDevice* device, mrhiTextureId texture, ID3D12Graphics
     CHECK(copied, "the program's texels, after the upload and before the readback");
 }
 
+// Fills every subresource of a new texture with ones bytes through the
+// device's queue, and waits: copies from an upload buffer, between
+// transitions out of and back into the common state the library finds a
+// new texture in. Whole subresources, as a depth texture takes.
+static bool Dirty(ID3D12Device* device, ID3D12CommandQueue* queue, ID3D12Resource* texture)
+{
+    D3D12_RESOURCE_DESC desc;
+    ID3D12Resource_GetDesc(texture, &desc);
+    UINT count = desc.MipLevels *
+                 (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? 1 : desc.DepthOrArraySize);
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts[8];
+    UINT64 total = 0;
+    if (count > 8)
+    {
+        return false;
+    }
+    ID3D12Device_GetCopyableFootprints(device, &desc, 0, count, 0, layouts, nullptr, nullptr,
+                                       &total);
+    const D3D12_HEAP_PROPERTIES heap = {.Type = D3D12_HEAP_TYPE_UPLOAD};
+    const D3D12_RESOURCE_DESC bufferDesc = {
+        .Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+        .Width = total,
+        .Height = 1,
+        .DepthOrArraySize = 1,
+        .MipLevels = 1,
+        .SampleDesc = {.Count = 1},
+        .Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+    };
+    ID3D12Resource* upload = nullptr;
+    ID3D12CommandAllocator* allocator = nullptr;
+    ID3D12GraphicsCommandList* list = nullptr;
+    ID3D12Fence* fence = nullptr;
+    uint8_t* bytes = nullptr;
+    bool made =
+        SUCCEEDED(ID3D12Device_CreateCommittedResource(
+            device, &heap, D3D12_HEAP_FLAG_NONE, &bufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr, &IID_ID3D12Resource, (void**)&upload)) &&
+        SUCCEEDED(ID3D12Resource_Map(upload, 0, nullptr, (void**)&bytes)) &&
+        SUCCEEDED(ID3D12Device_CreateCommandAllocator(device, D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                                      &IID_ID3D12CommandAllocator,
+                                                      (void**)&allocator)) &&
+        SUCCEEDED(ID3D12Device_CreateCommandList(device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                                 allocator, nullptr, &IID_ID3D12GraphicsCommandList,
+                                                 (void**)&list)) &&
+        SUCCEEDED(ID3D12Device_CreateFence(device, 0, D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence,
+                                           (void**)&fence));
+    if (made)
+    {
+        memset(bytes, 0xFF, (size_t)total);
+        ID3D12Resource_Unmap(upload, 0, nullptr);
+        D3D12_RESOURCE_BARRIER barrier = {
+            .Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+            .Transition = {.pResource = texture,
+                           .Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                           .StateBefore = D3D12_RESOURCE_STATE_COMMON,
+                           .StateAfter = D3D12_RESOURCE_STATE_COPY_DEST},
+        };
+        ID3D12GraphicsCommandList_ResourceBarrier(list, 1, &barrier);
+        for (UINT i = 0; i < count; ++i)
+        {
+            const D3D12_TEXTURE_COPY_LOCATION to = {
+                .pResource = texture,
+                .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+                .SubresourceIndex = i,
+            };
+            const D3D12_TEXTURE_COPY_LOCATION from = {
+                .pResource = upload,
+                .Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
+                .PlacedFootprint = layouts[i],
+            };
+            ID3D12GraphicsCommandList_CopyTextureRegion(list, &to, 0, 0, 0, &from, nullptr);
+        }
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COMMON;
+        ID3D12GraphicsCommandList_ResourceBarrier(list, 1, &barrier);
+        ID3D12CommandList* lists[1] = {(ID3D12CommandList*)list};
+        made = SUCCEEDED(ID3D12GraphicsCommandList_Close(list));
+        if (made)
+        {
+            ID3D12CommandQueue_ExecuteCommandLists(queue, 1, lists);
+        }
+        // A null event blocks until the fence reaches the value.
+        made = made && SUCCEEDED(ID3D12CommandQueue_Signal(queue, fence, 1)) &&
+               SUCCEEDED(ID3D12Fence_SetEventOnCompletion(fence, 1, nullptr));
+    }
+    if (fence != nullptr)
+    {
+        ID3D12Fence_Release(fence);
+    }
+    if (list != nullptr)
+    {
+        ID3D12GraphicsCommandList_Release(list);
+    }
+    if (allocator != nullptr)
+    {
+        ID3D12CommandAllocator_Release(allocator);
+    }
+    if (upload != nullptr)
+    {
+        ID3D12Resource_Release(upload);
+    }
+    return made;
+}
+
+// Each new texture, filled with ones before its first frame, reads as
+// zeros in it.
+static void CheckDirtyTextures(mrhiDevice* device, ID3D12Device* native, ID3D12CommandQueue* queue)
+{
+    DirtyTexture textures[DIRTY_TEXTURES];
+    DirtyTextures(textures);
+    for (int i = 0; i < DIRTY_TEXTURES; ++i)
+    {
+        mrhiTextureId texture = {0};
+        void* resource = nullptr;
+        CHECK(mrhiCreateTexture(device, &textures[i].def, &texture) == mrhi_success &&
+                  mrhiGetD3d12Texture(device, texture, &resource) == mrhi_success &&
+                  Dirty(native, queue, (ID3D12Resource*)resource),
+              textures[i].what);
+        CHECK(ReadsZerosFirst(device, texture, &textures[i].def), textures[i].what);
+        CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "ended");
+    }
+}
+
 // The noop kernel's compute pipeline and its draw's graphics pipeline,
 // into an RGBA8 target.
 static void MakePipelines(mrhiDevice* device, mrhiShaderId* shaderOut,
@@ -340,6 +466,10 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
         CheckFrame(device, texture, recorded.list);
     }
     CheckRoots(device);
+    if (native != nullptr && queue != nullptr)
+    {
+        CheckDirtyTextures(device, (ID3D12Device*)native, (ID3D12CommandQueue*)queue);
+    }
     Release(&recorded);
     CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "the texture ended");
     mrhiDestroyDevice(device);
