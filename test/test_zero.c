@@ -155,14 +155,14 @@ static uint32_t FillArena(mrhiDevice* device, mrhiResourceId resource)
     return fitted;
 }
 
-// A device whose frames take one pass, one access and 4096 bytes of
-// commands gives the program as much of each in a frame that clears a
-// new buffer as in one that does not.
+// A device whose frames take one pass, the two accesses AddPass holds
+// for it and 4096 bytes of commands gives the program as much of each in
+// a frame that clears a new buffer as in one that does not.
 static void TestBudgets(void)
 {
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     deviceDef.deviceLimits.framePasses = 1;
-    deviceDef.deviceLimits.frameAccesses = 1;
+    deviceDef.deviceLimits.frameAccesses = 2;
     deviceDef.deviceLimits.frameCommandBytes = 4096;
     mrhiDevice* device = Open(deviceDef);
     mrhiBufferId buffer = MakeBuffer(device);
