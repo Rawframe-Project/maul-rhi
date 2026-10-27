@@ -899,8 +899,13 @@ static void TestMultisample(void)
     CHECK(Made(device, &def) == mrhi_success, "four samples of depth alone");
     def.alphaToCoverage = true;
     CHECK(Made(device, &def) == mrhi_errorInvalid, "alpha to coverage with no color target");
+    // Def()'s rgba8 target, so that only the missing fragment entry
+    // stands between alpha to coverage and its first target's output.
+    def = Def();
     def.fragmentEntry = nullptr;
     def.fragmentEntryLength = 0;
+    def.sampleCount = 4;
+    def.alphaToCoverage = true;
     CHECK(Made(device, &def) == mrhi_errorInvalid, "alpha to coverage with no fragment entry");
     Close(device);
     Reset();
