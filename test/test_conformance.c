@@ -3829,9 +3829,47 @@ static void CheckLoss(mrhiInstance* instance, mrhiAdapterId adapter)
     mrhiDestroyDevice(device);
 }
 
-// A device made with the cache the last one exported takes it.
+// Opens a device on the adapter, makes a compute pipeline on it and
+// exports its pipeline cache into s_cache.
+static void ExportCache(mrhiInstance* instance, mrhiAdapterId adapter)
+{
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.adapter = adapter;
+    mrhiDevice* device = nullptr;
+    mrhiRequestId request;
+    mrhiInstanceNotification record;
+    bool ready = mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success &&
+                 NextInstance(instance, &record) == mrhi_success && record.outcome == mrhi_success;
+    CHECK(ready, "a device to export from");
+    if (!ready)
+    {
+        return;
+    }
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_conformanceContainer;
+    shaderDef.byteCount = sizeof(s_conformanceContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "a shader to cache");
+    mrhiComputePipelineDef compute = mrhiDefaultComputePipelineDef();
+    compute.shader = shader;
+    compute.entry = "cs";
+    compute.entryLength = 2;
+    const mrhiConstantValue scale = {.id = 0, .value = 3.0};
+    compute.constants = &scale;
+    compute.constantCount = 1;
+    mrhiComputePipelineId pipeline = {0};
+    CHECK(mrhiCreateComputePipeline(device, &compute, &pipeline, &request) == mrhi_success,
+          "a compute pipeline to cache");
+    AwaitPipelines(device, 1, 0);
+    CHECK(mrhiGetPipelineCache(device, s_cache, sizeof(s_cache), &s_cacheBytes) == mrhi_success,
+          "the cache exported");
+    mrhiDestroyDevice(device);
+}
+
+// A device made with the cache the one before it exported takes it.
 static void CheckCacheImport(mrhiInstance* instance, mrhiAdapterId adapter)
 {
+    ExportCache(instance, adapter);
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
     def.pipelineCache = s_cache;
