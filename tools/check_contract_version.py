@@ -7,10 +7,10 @@
 # Versions): against a base commit, the contract in the working tree
 # must either be the same, version included, or differ beyond its
 # version and carry a higher one. A base that names no commit is refused,
-# so a typo or an unfetched commit cannot pass; a commit without the
-# contract checks nothing. --self-test plants each case in a scratch git
-# repository and proves the check takes the right ones and refuses the
-# others.
+# so a typo or an unfetched commit cannot pass, and so is one whose tree
+# git cannot read; a commit without the contract checks nothing.
+# --self-test plants each case in a scratch git repository and proves the
+# check takes the right ones and refuses the others.
 #
 # usage: check_contract_version.py BASE | --self-test
 
@@ -31,7 +31,10 @@ def git(root, *args):
 
 def at_base(root, commit):
     """The contract at a commit, parsed; None where the commit has none."""
-    if not git(root, "ls-tree", "--name-only", commit, "--", CONTRACT).stdout.strip():
+    listed = git(root, "ls-tree", "--name-only", commit, "--", CONTRACT)
+    if listed.returncode != 0:
+        raise RuntimeError(f"git ls-tree {commit}: {listed.stderr.strip()}")
+    if not listed.stdout.strip():
         return None
     shown = git(root, "show", f"{commit}:{CONTRACT}")
     if shown.returncode != 0:
@@ -67,7 +70,12 @@ def check(root, base, quiet=False):
             print(f"contract version: {base} names no commit here; fetch it or fix the name",
                   file=sys.stderr)
         return 1
-    before = at_base(root, resolved.stdout.strip())
+    try:
+        before = at_base(root, resolved.stdout.strip())
+    except RuntimeError as failed:
+        if not quiet:
+            print(f"contract version: {failed}", file=sys.stderr)
+        return 1
     if before is None:
         if not quiet:
             print(f"contract version: {base} has no {CONTRACT}; nothing to compare")
@@ -137,7 +145,16 @@ def self_test():
         if check(work, "no-such-commit", quiet=True) == 0:
             print("self-test: a base that names no commit was taken", file=sys.stderr)
             failures += 1
-    print(f"self-test: {len(cases) + 2 - failures} of {len(cases) + 2} cases right")
+        # A commit whose tree is missing, as in a treeless partial clone
+        # without network: git can resolve the commit but not list it.
+        run(*identity, "commit", "-q", "--allow-empty", "-m", "its tree goes missing")
+        tree = subprocess.run(["git", "-C", work, "rev-parse", "HEAD^{tree}"], check=True,
+                              capture_output=True, text=True).stdout.strip()
+        os.remove(os.path.join(work, ".git", "objects", tree[:2], tree[2:]))
+        if check(work, "HEAD", quiet=True) == 0:
+            print("self-test: a base whose tree cannot be read was taken", file=sys.stderr)
+            failures += 1
+    print(f"self-test: {len(cases) + 3 - failures} of {len(cases) + 3} cases right")
     return 1 if failures else 0
 
 
