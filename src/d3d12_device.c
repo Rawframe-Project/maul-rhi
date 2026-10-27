@@ -230,10 +230,11 @@ static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* b
     mrhiD3d12BufferMemory(&device->objects, def, bytesOut, alignmentOut);
 }
 
-static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag)
+static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag,
+                              mrhiDiagnosticCode* budgetOut)
 {
     D3d12Device* device = self;
-    return mrhiD3d12Submit(&device->frames, frame, tag);
+    return mrhiD3d12Submit(&device->frames, frame, tag, budgetOut);
 }
 
 static size_t Poll(void* self, mrhiDriverEvent* events, size_t capacity)

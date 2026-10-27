@@ -332,7 +332,7 @@
           "kind": "enum",
           "name": "diagnostic_code",
           "width": "uint16",
-          "doc": "The check a diagnostic record reports: one check of the core that refused a call as invalid input, one limit a frame call reached, or, in a build with the validation layer, one rule of the driver SPI that the driver broke (the driver codes, recorded in the instance's queue). mrhiDiagnosticText gives each one's text.",
+          "doc": "The check a diagnostic record reports: one check of the core that refused a call as invalid input, one limit a frame call reached or driver budget a submission ran out of, or, in a build with the validation layer, one rule of the driver SPI that the driver broke (the driver codes, recorded in the instance's queue). mrhiDiagnosticText gives each one's text.",
           "values": [
             {
               "name": "diagnostic_null_argument",
@@ -853,6 +853,31 @@
               "name": "diagnostic_native_passes",
               "value": 119,
               "doc": "A native pass added past MRHI_NATIVE_PASSES in one frame."
+            },
+            {
+              "name": "diagnostic_submit_memory",
+              "value": 120,
+              "doc": "A driver refused a frame's submission for memory: for its transients, or for the buffers it stages, reads back or clamps through."
+            },
+            {
+              "name": "diagnostic_submit_descriptors",
+              "value": 121,
+              "doc": "A driver refused a frame's submission when the descriptors it binds the frame's tables through ran out: Direct3D 12's descriptor rings, Vulkan's descriptor pools."
+            },
+            {
+              "name": "diagnostic_submit_scratch",
+              "value": 122,
+              "doc": "A driver refused a frame's submission when its scratch buffer ran out: the room Direct3D 12 writes indirect commands' arguments in."
+            },
+            {
+              "name": "diagnostic_submit_command_lists",
+              "value": 123,
+              "doc": "A driver refused a frame's submission when it could not make, end or begin a command list or buffer for a part of the frame."
+            },
+            {
+              "name": "diagnostic_driver_submit_budget",
+              "value": 124,
+              "doc": "A driver refused a frame for capacity without naming one of the submit codes for the budget that ran out, or named one with another result."
             }
           ],
           "library": "names the library's own checks"
@@ -6854,7 +6879,7 @@
         {
           "kind": "function",
           "name": "next_device_diagnostic",
-          "doc": "Takes the oldest record from the device's diagnostic queue, which holds a record for each call the device refused as invalid input or bad data, and for each frame call refused at one of its limits, up to the diagnostics limit; refusals past it are counted but not recorded.",
+          "doc": "Takes the oldest record from the device's diagnostic queue, which holds a record for each call the device refused as invalid input or bad data, for each frame call refused at one of its limits, and for each submission its driver refused for a budget it names, up to the diagnostics limit; refusals past it are counted but not recorded.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success` with a record; `mrhi_empty` when the queue is drained or keeps none; `mrhi_errorInvalid` for a NULL argument."
@@ -22238,6 +22263,11 @@
               "doc": "The outcome its devices' frames finish with; mrhi_success by default."
             },
             {
+              "name": "submit_budget",
+              "type": "enum.diagnostic_code",
+              "doc": "A budget its devices' drivers run out of at every submission, refusing the frame with mrhi_errorCapacity and naming it; 0 for none."
+            },
+            {
               "name": "pipeline_outcome",
               "type": "result",
               "doc": "What pipelines made on the adapter's devices are answered with at the next poll: mrhi_success, or the error their creation fails with."
@@ -22319,5 +22349,5 @@
       ]
     }
   ],
-  "contract_version": 18
+  "contract_version": 19
 }

@@ -188,9 +188,21 @@ typedef struct mrhiD3d12Recorder
     // draws them.
     ID3D12RootSignature* expandRoot;
     ID3D12PipelineState* expand;
-    // mrhi_errorCapacity once a descriptor ring or the scratch buffer
-    // runs out, which fails the frame.
+    // mrhi_errorCapacity once a descriptor ring, the scratch buffer or a
+    // command list runs out, which fails the frame, and the budget that
+    // ran out.
     mrhiResult status;
+    mrhiDiagnosticCode budget;
 } mrhiD3d12Recorder;
+
+// Fails the frame for a budget that ran out, unless it failed already.
+static inline void mrhiD3d12RunOut(mrhiD3d12Recorder* recorder, mrhiDiagnosticCode budget)
+{
+    if (recorder->status == mrhi_success)
+    {
+        recorder->status = mrhi_errorCapacity;
+        recorder->budget = budget;
+    }
+}
 
 #endif // MAUL_RHI_SRC_D3D12_STATE_H

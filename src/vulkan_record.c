@@ -670,6 +670,7 @@ static void RunNative(mrhiVulkanRecording* recording)
     if (!mrhiVulkanNextPart(recording, recording->pass->nativeCommands))
     {
         recording->status = mrhi_errorCapacity;
+        recording->budget = mrhi_diagnosticSubmitCommandLists;
         return;
     }
     const VkMemoryBarrier2 after = {
@@ -735,7 +736,8 @@ static void RecordPass(mrhiVulkanRecording* recording, size_t* barrier)
 }
 
 mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
-                            const mrhiDriverFrame* frame, VkResult* resultOut)
+                            const mrhiDriverFrame* frame, VkResult* resultOut,
+                            mrhiDiagnosticCode* budgetOut)
 {
     mrhiVulkanRecording recording = {
         .frames = frames,
@@ -766,5 +768,6 @@ mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
         MRHI_ASSERT(barrier == frame->barrierCount);
     }
     *resultOut = recording.result;
+    *budgetOut = recording.budget;
     return recording.status;
 }

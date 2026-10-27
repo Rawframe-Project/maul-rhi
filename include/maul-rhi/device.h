@@ -238,7 +238,8 @@ extern "C"
 
     /// Takes the oldest record from the device's diagnostic queue, which holds
     /// a record for each call the device refused as invalid input or bad data,
-    /// and for each frame call refused at one of its limits, up to the
+    /// for each frame call refused at one of its limits, and for each
+    /// submission its driver refused for a budget it names, up to the
     /// diagnostics limit; refusals past it are counted but not recorded.
     ///
     /// @param device         The device.

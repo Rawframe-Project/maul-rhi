@@ -50,7 +50,7 @@ extern "C"
 
 // The revision of the contract the headers are generated from
 // (contract/mrhi.json).
-#define MRHI_CONTRACT_VERSION 18
+#define MRHI_CONTRACT_VERSION 19
 
 // MRHI_API marks the public functions: dllexport or dllimport in a
 // shared Windows build (maul_rhi_EXPORTS is defined while building
@@ -233,10 +233,10 @@ extern "C"
     MRHI_API const char* mrhiResultName(mrhiResult result);
 
     // The check a diagnostic record reports: one check of the core that refused
-    // a call as invalid input, one limit a frame call reached, or, in a build
-    // with the validation layer, one rule of the driver SPI that the driver
-    // broke (the driver codes, recorded in the instance's queue).
-    // mrhiDiagnosticText gives each one's text.
+    // a call as invalid input, one limit a frame call reached or driver budget
+    // a submission ran out of, or, in a build with the validation layer, one
+    // rule of the driver SPI that the driver broke (the driver codes, recorded
+    // in the instance's queue). mrhiDiagnosticText gives each one's text.
     typedef uint16_t mrhiDiagnosticCode;
 
     enum
@@ -552,6 +552,23 @@ extern "C"
         mrhi_diagnosticNotifications = 118,
         // A native pass added past MRHI_NATIVE_PASSES in one frame.
         mrhi_diagnosticNativePasses = 119,
+        // A driver refused a frame's submission for memory: for its transients,
+        // or for the buffers it stages, reads back or clamps through.
+        mrhi_diagnosticSubmitMemory = 120,
+        // A driver refused a frame's submission when the descriptors it binds
+        // the frame's tables through ran out: Direct3D 12's descriptor rings,
+        // Vulkan's descriptor pools.
+        mrhi_diagnosticSubmitDescriptors = 121,
+        // A driver refused a frame's submission when its scratch buffer ran
+        // out: the room Direct3D 12 writes indirect commands' arguments in.
+        mrhi_diagnosticSubmitScratch = 122,
+        // A driver refused a frame's submission when it could not make, end or
+        // begin a command list or buffer for a part of the frame.
+        mrhi_diagnosticSubmitCommandLists = 123,
+        // A driver refused a frame for capacity without naming one of the
+        // submit codes for the budget that ran out, or named one with another
+        // result.
+        mrhi_diagnosticDriverSubmitBudget = 124,
     };
 
     // A record from an instance's or a device's diagnostic queue.

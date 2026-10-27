@@ -5,7 +5,7 @@
 // what the frame begun last took, the library's own pass left out, kept
 // after a refusal and a submission until the next frame begins; and the
 // limit each capacity refusal names in the device's diagnostics, counted
-// as no misuse.
+// as no misuse, a driver's budgets at the submission among them.
 
 #include "test_device_setup.h"
 
@@ -490,6 +490,21 @@ static void TestNotifications(void)
     CloseDevice();
 }
 
+// A driver that runs out of a budget at the submission names it; the
+// frame closes, as at any refusal of its driver.
+static void TestDriverBudget(void)
+{
+    s_adapter.submitBudget = mrhi_diagnosticSubmitDescriptors;
+    Open(mrhiDefaultDeviceDef());
+    Begin();
+    mrhiRequestId token;
+    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorCapacity &&
+              Refused(mrhi_diagnosticSubmitDescriptors, 1),
+          "the driver's budget");
+    CHECK(mrhiDropFrame(s_device) == mrhi_errorState, "the frame closed");
+    CloseDevice();
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -504,5 +519,6 @@ int main(void)
     TestReadbacks();
     TestFramesInFlight();
     TestNotifications();
+    TestDriverBudget();
     return s_failures == 0 ? 0 : 1;
 }

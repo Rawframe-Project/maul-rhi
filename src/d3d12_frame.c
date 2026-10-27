@@ -812,7 +812,8 @@ static mrhiResult Present(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame)
     return presented ? mrhi_success : mrhi_errorDeviceLost;
 }
 
-mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame, uint64_t tag)
+mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame, uint64_t tag,
+                           mrhiDiagnosticCode* budgetOut)
 {
     if (frames->lost)
     {
@@ -823,7 +824,9 @@ mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame
     if (!TakeObjects(frames, slot, frame))
     {
         DropTransients(slot);
-        return Removed(frames) ? mrhi_errorDeviceLost : mrhi_errorCapacity;
+        bool removed = Removed(frames);
+        *budgetOut = removed ? 0 : mrhi_diagnosticSubmitMemory;
+        return removed ? mrhi_errorDeviceLost : mrhi_errorCapacity;
     }
     if (frame->stagingBytes > 0)
     {
@@ -861,6 +864,7 @@ mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame
             (void)Removed(frames);
             frames->lost = true;
         }
+        *budgetOut = status == mrhi_errorCapacity ? frames->recorder.budget : 0;
         return status;
     }
     ++frames->submitted;

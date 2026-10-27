@@ -351,10 +351,11 @@ static size_t Poll(void* self, mrhiDriverEvent* events, size_t capacity)
     return moved + mrhiVulkanPollFrames(&device->frames, events + moved, capacity - moved);
 }
 
-static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag)
+static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag,
+                              mrhiDiagnosticCode* budgetOut)
 {
     VulkanDevice* device = self;
-    return mrhiVulkanSubmit(&device->frames, frame, tag);
+    return mrhiVulkanSubmit(&device->frames, frame, tag, budgetOut);
 }
 
 static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)

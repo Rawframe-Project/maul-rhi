@@ -170,9 +170,10 @@ mrhiResult mrhiD3d12OpenFrames(mrhiD3d12Frames* frames);
 void mrhiD3d12CloseFrames(mrhiD3d12Frames* frames);
 
 // Records and submits a frame, then presents its surface images:
-// success, mrhi_errorCapacity when D3D12 makes no transient or a ring
-// runs out, or mrhi_errorDeviceLost.
-mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame, uint64_t tag);
+// success, mrhi_errorCapacity when D3D12 makes no transient or list or a
+// ring runs out, with the budget in budgetOut, or mrhi_errorDeviceLost.
+mrhiResult mrhiD3d12Submit(mrhiD3d12Frames* frames, const mrhiDriverFrame* frame, uint64_t tag,
+                           mrhiDiagnosticCode* budgetOut);
 
 // Moves up to capacity finished frames into events, in order, their
 // readbacks filled and their transients and the objects they retire
