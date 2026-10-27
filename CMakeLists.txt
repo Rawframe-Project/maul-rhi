@@ -234,8 +234,9 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(vulkan_external WHITEBOX)
         maul_add_test(vulkan_frame WHITEBOX)
         maul_add_test(vulkan_zero)
+        maul_add_test(vulkan_cache WHITEBOX)
         foreach(test vulkan_label vulkan_limits vulkan_facts vulkan_surface vulkan_swapchain
-                     vulkan_external vulkan_frame vulkan_zero)
+                     vulkan_external vulkan_frame vulkan_zero vulkan_cache)
             if(TARGET test_${test})
                 target_include_directories(test_${test} SYSTEM PRIVATE
                                            ${PROJECT_SOURCE_DIR}/khronos)
@@ -500,8 +501,8 @@ if(MAUL_RHI_BUILD_TESTS)
     # The tests that drive a real GPU, window or browser: the changed-files
     # check leaves them out, every other check runs them.
     foreach(test conformance conformance_worker conformance_external conformance_app
-                 vulkan_external vulkan_frame vulkan_zero metal_native metal_queues d3d12_native
-                 d3d12_queues external_build)
+                 vulkan_external vulkan_frame vulkan_zero vulkan_cache metal_native metal_queues
+                 d3d12_native d3d12_queues external_build)
         if(TEST ${test})
             set_property(TEST ${test} APPEND PROPERTY LABELS integration)
         endif()
@@ -511,8 +512,9 @@ endif()
 # The fuzz targets: test/fuzz_<area>.c, run as fuzz_<area> <corpus dir>,
 # over the bytes programs load from disk and hand the library.
 # tools/container_seed.py writes fuzz_container's seeds; fuzz_cache makes
-# its own envelopes. test/fuzz_coverage_ignore.txt names the sources
-# coverage leaves out.
+# its own envelopes, and fuzz_vulkan_cache seals its own around the
+# Vulkan driver's payload on the first Vulkan adapter.
+# test/fuzz_coverage_ignore.txt names the sources coverage leaves out.
 if(MAUL_RHI_FUZZ)
     # The library is instrumented too: its coverage guides libFuzzer, and
     # the sanitizers watch its code, not only the targets'. Undefined
@@ -523,7 +525,11 @@ if(MAUL_RHI_FUZZ)
                                             -fno-sanitize-recover=all
                                             -fsanitize-coverage-ignorelist=${ignored})
     target_link_options(maul-rhi PUBLIC -fsanitize=address,undefined)
-    foreach(area container cache)
+    set(areas container cache)
+    if(MAUL_RHI_VULKAN_DRIVER)
+        list(APPEND areas vulkan_cache)
+    endif()
+    foreach(area ${areas})
         add_executable(fuzz_${area} test/fuzz_${area}.c)
         target_link_libraries(fuzz_${area} PRIVATE maul-rhi)
         # The targets reach the library's own functions.
