@@ -7,21 +7,67 @@ may change the API, the ABI and every data format.
 
 ## [0.9.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.8.0...v0.9.0) (2026-10-27)
 
-
-### ⚠ BREAKING CHANGES
-
-* **spi:** MRHI_SPI_VERSION is 9. `submitFrame` takes a fourth argument, `mrhiDiagnosticCode* budgetOut`. A driver sets it to the `mrhi_diagnosticSubmit` code of the budget that ran out when it returns `mrhi_errorCapacity`, and leaves it 0 otherwise. The mustpass list is `conformance/mustpass/spi-9.txt`.
-
 ### Added
 
-* **graph:** read a frame's usage and name the limit a refusal hit ([#161](https://github.com/Rawframe-Project/maul-rhi/issues/161)) ([06ab4fa](https://github.com/Rawframe-Project/maul-rhi/commit/06ab4fa5b4d7e0b7c53f2af6a1ac858a514f402e)), closes [#160](https://github.com/Rawframe-Project/maul-rhi/issues/160)
-* **spi:** name the budget a driver's submission ran out of ([#163](https://github.com/Rawframe-Project/maul-rhi/issues/163)) ([f2714d1](https://github.com/Rawframe-Project/maul-rhi/commit/f2714d12e4830b44f4056d6f8322e451fe892253)), closes [#162](https://github.com/Rawframe-Project/maul-rhi/issues/162)
+- `mrhiGetFrameUsage(device, &usage)` fills `mrhiFrameUsage` with what
+  the frame begun last took of each frame limit: `frameResources`,
+  `framePasses`, `frameAccesses`, `frameBarriers`, `frameCommandBytes`,
+  `frameUploadBytes` and `frameIndirectDraws`, each named after the
+  `mrhiDeviceLimits` member it is measured against, so the headroom is
+  the difference from `mrhiGetDeviceOwnLimits`. It can be read while
+  the frame is open, once compiled, after a refusal and after the frame
+  is submitted or dropped, until the next frame begins; before the
+  first frame every field is 0. The library's own zeroing pass is left
+  out, and command bytes count in whole 4 KiB chunks.
+  ([#161](https://github.com/Rawframe-Project/maul-rhi/pull/161))
+- A frame call's `mrhi_errorCapacity` now names the limit it hit in the
+  device's diagnostic queue, and counts no misuse. Twelve codes cover
+  the frame limits (`mrhi_diagnosticFrameResources`, `FramePasses`,
+  `FrameAccesses`, `FrameBarriers`, `FrameCommandBytes`,
+  `FrameUploadBytes`, `FrameIndirectDraws`), the readback limits
+  (`Readbacks`, `ReadbackBytes`) and `FramesInFlight`, `Notifications`
+  and `NativePasses`. A pass that found the command arena or the
+  staging full keeps that code, so its later calls and the frame's
+  submission are refused under it too. Object limits outside frames
+  still refuse without a code.
+  ([#161](https://github.com/Rawframe-Project/maul-rhi/pull/161))
+- A driver's refusal of a frame's submission names the budget that ran
+  out: `mrhi_diagnosticSubmitMemory`, `SubmitDescriptors`,
+  `SubmitScratch` or `SubmitCommandLists`, recorded beside the frame
+  limits' codes with no misuse counted. Direct3D 12, Vulkan and Metal
+  fill it in; WebGPU never refuses for capacity. The validation layer
+  counts `mrhi_diagnosticDriverSubmitBudget` when a driver's capacity
+  refusal names no submit code or another code, or when a code comes
+  with another result. `mrhiTestAdapter.submitBudget` makes the test
+  driver run out of a budget at every submission.
+  ([#163](https://github.com/Rawframe-Project/maul-rhi/pull/163))
 
+### Changed
+
+- **Breaking for drivers built outside the tree:** `MRHI_SPI_VERSION` is
+  9, and `submitFrame` takes a fourth argument,
+  `mrhiDiagnosticCode* budgetOut`. A driver sets it to the submit code
+  of the budget that ran out when it returns `mrhi_errorCapacity`, and
+  leaves it 0 otherwise. The mustpass list is
+  `conformance/mustpass/spi-9.txt`. Programs and shader cooks see only
+  the new codes; contract_version is 20.
+  ([#163](https://github.com/Rawframe-Project/maul-rhi/pull/163))
 
 ### Fixed
 
-* **tools:** refuse a contract base whose tree git cannot read ([#144](https://github.com/Rawframe-Project/maul-rhi/issues/144)) ([347c646](https://github.com/Rawframe-Project/maul-rhi/commit/347c64693d8cd77acb6e33b1b0641e092ebca672)), closes [#143](https://github.com/Rawframe-Project/maul-rhi/issues/143)
-* **vulkan:** name the command lists budget when a command buffer fails ([#165](https://github.com/Rawframe-Project/maul-rhi/issues/165)) ([8bf5e7c](https://github.com/Rawframe-Project/maul-rhi/commit/8bf5e7c44f8f64a304f8ec190b2f2b06859eda6e)), closes [#164](https://github.com/Rawframe-Project/maul-rhi/issues/164)
+- A refused upload leaves the staging as it was. Before, its bytes were
+  added to the staging anyway, so later uploads in other passes of the
+  frame could be refused too. `mrhiBeginFrame` also clears the last
+  frame's barrier count.
+  ([#161](https://github.com/Rawframe-Project/maul-rhi/pull/161))
+- On Vulkan, a command buffer that fails to begin or end, and a command
+  pool that fails to reset, name `mrhi_diagnosticSubmitCommandLists`
+  instead of `mrhi_diagnosticSubmitMemory`, and the two codes' texts now
+  say what each covers.
+  ([#165](https://github.com/Rawframe-Project/maul-rhi/pull/165))
+- `tools/check_contract_version.py` refuses a base commit whose tree git
+  cannot read, instead of passing as if the base had no contract.
+  ([#144](https://github.com/Rawframe-Project/maul-rhi/pull/144))
 
 ## [0.8.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.7.0...v0.8.0) (2026-10-26)
 
