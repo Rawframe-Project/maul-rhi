@@ -13,7 +13,9 @@
 // input, the two XORed, so that mutations reach the driver's reading of
 // a real cache body, which gives the fuzzer no coverage of its own. A
 // payload is taken only with a header the driver must take; then the
-// device still exports its cache.
+// device still exports its cache. Without a Vulkan adapter the target
+// cannot run: it says so and exits 77 before any input, as a test that
+// finds no adapter does, and CI skips it instead of reporting a finding.
 
 #include "bytes.h"
 #include "device_core.h"
@@ -26,6 +28,7 @@
 #include "shaders/storage_container.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -91,10 +94,14 @@ static void Open(void)
     mrhiInstanceNotification record;
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     size_t count = 0;
-    Expect(mrhiRequestAdapters(s_instance, &search, &request) == mrhi_success &&
-           mrhiNextInstanceNotification(s_instance, &record) == mrhi_success &&
-           mrhiGetAdapters(s_instance, &deviceDef.adapter, 1, &count) == mrhi_success &&
-           count >= 1);
+    if (mrhiRequestAdapters(s_instance, &search, &request) != mrhi_success ||
+        mrhiNextInstanceNotification(s_instance, &record) != mrhi_success ||
+        mrhiGetAdapters(s_instance, &deviceDef.adapter, 1, &count) != mrhi_success || count == 0)
+    {
+        fputs("fuzz_vulkan_cache: no Vulkan adapter, so nothing to fuzz here\n", stderr);
+        // hygiene: no adapter is exit 77, which CI skips with a notice
+        exit(77);
+    }
     Expect(mrhiCreateDevice(s_instance, &deviceDef, &s_device, &request) == mrhi_success &&
            mrhiNextInstanceNotification(s_instance, &record) == mrhi_success &&
            record.outcome == mrhi_success);
@@ -128,14 +135,21 @@ static bool IsTakeable(const uint8_t* payload, size_t size)
            memcmp(payload + VENDOR_AT, s_header + VENDOR_AT, HEADER_BYTES - VENDOR_AT) == 0;
 }
 
+int LLVMFuzzerInitialize(int* argc, char*** argv);
 int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
+
+// Opens the device before any input, so that a run without an adapter
+// ends at once.
+int LLVMFuzzerInitialize(int* argc, char*** argv)
+{
+    (void)argc;
+    (void)argv;
+    Open();
+    return 0;
+}
 
 int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 {
-    if (s_device == nullptr)
-    {
-        Open();
-    }
     if (size == 0)
     {
         return 0;

@@ -156,6 +156,14 @@ for target in "$out"/check-fuzz/fuzz_*; do
     name=$(basename "$target")
     corpus=$out/corpus/$name
     mkdir -p "$corpus"
+    # A target that cannot run here (a Vulkan target without an adapter)
+    # exits 77 before any input.
+    status=0
+    "$target" -runs=0 "$(mktemp -d)" >/dev/null 2>&1 || status=$?
+    if [ "$status" = 77 ]; then
+        echo "$name: skipped, it cannot run here"
+        continue
+    fi
     "$target" -max_total_time=$fuzz_seconds "$corpus" >"$out/$name.log" 2>&1 ||
         {
             tail -30 "$out/$name.log"
