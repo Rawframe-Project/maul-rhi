@@ -132,7 +132,8 @@ typedef struct Map
     uint32_t count;
     uint32_t nextCount;
     uint32_t half;
-    bool full;
+    // The code of the limit the map found full: 0 for none.
+    mrhiDiagnosticCode full;
     // Whether the barriers a move makes are the library's.
     bool library;
     // The parts of the whole, which the boxes cover exactly once.
@@ -164,9 +165,10 @@ static uint64_t Volume(const mrhiBox* box)
 
 static void Push(Map* map, mrhiBox box)
 {
+    // The boxes are sized from the accesses.
     if (map->nextCount == map->half)
     {
-        map->full = true;
+        map->full = mrhi_diagnosticFrameAccesses;
         return;
     }
     map->next[map->nextCount++] = box;
@@ -190,7 +192,7 @@ static void Emit(Map* map, uint32_t pass, const mrhiBox* part, mrhiResourceState
     if (map->library ? device->frameBarrierCount == device->frameBarrierLimit
                      : IsProgramBudgetFull(device))
     {
-        map->full = true;
+        map->full = mrhi_diagnosticFrameBarriers;
         return;
     }
     device->frameLibraryBarriers += map->library ? 1 : 0;
@@ -325,7 +327,7 @@ static void Move(Map* map, uint32_t pass, mrhiBox cut)
     }
     Push(map, cut);
     Swap(map);
-    MRHI_ASSERT(map->full || CoversWhole(map));
+    MRHI_ASSERT(map->full != 0 || CoversWhole(map));
 }
 
 // Forgets the kept passes a resource's last plan found.
@@ -351,8 +353,9 @@ static bool IsLibraryMove(bool* zeroState, uint32_t p)
 }
 
 // Plans one resource over the kept passes, then its end: an imported
-// object's parts all move to its last use's state.
-static bool PlanResource(mrhiDevice* device, uint32_t slot)
+// object's parts all move to its last use's state. Returns the code of
+// the limit it found full, 0 for none.
+static mrhiDiagnosticCode PlanResource(mrhiDevice* device, uint32_t slot)
 {
     mrhiFrameResource* resource = &device->frameResources[slot - 1];
     mrhiBox whole = WholeOf(resource);
@@ -376,7 +379,7 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
     bool targetsOnly = true;
     // The first program use of a buffer the clear left in its state.
     bool zeroState = resource->zeroState;
-    for (uint32_t p = 0; p < device->framePassCount && !map.full; ++p)
+    for (uint32_t p = 0; p < device->framePassCount && map.full == 0; ++p)
     {
         const mrhiFramePass* pass = &device->framePasses[p];
         const mrhiFrameUse* uses = &device->frameUses[pass->firstUse];
@@ -426,7 +429,7 @@ static bool PlanResource(mrhiDevice* device, uint32_t slot)
         whole.state = resource->finalState;
         Move(&map, 0, whole);
     }
-    return !map.full;
+    return map.full;
 }
 
 // Whether the barriers are in the order they run: by pass, the frame's
@@ -576,9 +579,10 @@ mrhiResult mrhiPlan(mrhiDevice* device)
     }
     for (uint32_t slot = 1; slot <= device->frameResourceCount; ++slot)
     {
-        if (!PlanResource(device, slot))
+        mrhiDiagnosticCode full = PlanResource(device, slot);
+        if (full != 0)
         {
-            return mrhi_errorCapacity;
+            return mrhiDeviceFull(device, full);
         }
     }
     Sort(device);
@@ -672,7 +676,7 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
         }
         if (IsProgramBudgetFull(device))
         {
-            return mrhi_errorCapacity;
+            return mrhiDeviceFull(device, mrhi_diagnosticFrameBarriers);
         }
         device->frameBarriers[device->frameBarrierCount++] = (mrhiBarrier){
             .pass = {resource->firstPass, serial},

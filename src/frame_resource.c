@@ -18,7 +18,7 @@ static mrhiResult Add(mrhiDevice* device, mrhiFrameResource resource, mrhiResour
     }
     if (device->frameResourceCount == device->deviceLimits.frameResources)
     {
-        return mrhi_errorCapacity;
+        return mrhiDeviceFull(device, mrhi_diagnosticFrameResources);
     }
     device->frameResources[device->frameResourceCount++] = resource;
     *resourceOut = (mrhiResourceId){device->frameResourceCount, device->frameSerial};
@@ -304,7 +304,7 @@ mrhiResult mrhiAcquireSurfaceImage(mrhiDevice* device, mrhiSurfaceId surface,
     // Room first, so that an image is never acquired and then lost.
     if (device->frameResourceCount == device->deviceLimits.frameResources)
     {
-        return mrhi_errorCapacity;
+        return mrhiDeviceFull(device, mrhi_diagnosticFrameResources);
     }
     uint64_t image = 0;
     mrhiResult outcome =

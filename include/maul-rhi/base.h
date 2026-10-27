@@ -50,7 +50,7 @@ extern "C"
 
 // The revision of the contract the headers are generated from
 // (contract/mrhi.json).
-#define MRHI_CONTRACT_VERSION 17
+#define MRHI_CONTRACT_VERSION 18
 
 // MRHI_API marks the public functions: dllexport or dllimport in a
 // shared Windows build (maul_rhi_EXPORTS is defined while building
@@ -233,9 +233,10 @@ extern "C"
     MRHI_API const char* mrhiResultName(mrhiResult result);
 
     // The check a diagnostic record reports: one check of the core that refused
-    // a call as invalid input, or, in a build with the validation layer, one
-    // rule of the driver SPI that the driver broke (the driver codes, recorded
-    // in the instance's queue). mrhiDiagnosticText gives each one's text.
+    // a call as invalid input, one limit a frame call reached, or, in a build
+    // with the validation layer, one rule of the driver SPI that the driver
+    // broke (the driver codes, recorded in the instance's queue).
+    // mrhiDiagnosticText gives each one's text.
     typedef uint16_t mrhiDiagnosticCode;
 
     enum
@@ -513,12 +514,50 @@ extern "C"
         // within the pass, or a read of a declared resource no earlier pass
         // wrote.
         mrhi_diagnosticPassUses = 107,
+        // A frame reached the device's frameResources limit: a resource
+        // declared, imported or acquired past it.
+        mrhi_diagnosticFrameResources = 108,
+        // A frame reached the device's framePasses limit: a pass added past it.
+        mrhi_diagnosticFramePasses = 109,
+        // A pass whose accesses, with two for each color target and one for the
+        // depth target, could take the frame past the device's frameAccesses
+        // limit; or a compile that split a resource's parts into more than that
+        // limit leaves room for.
+        mrhi_diagnosticFrameAccesses = 110,
+        // A compile that planned more barriers than the device's frameBarriers
+        // limit.
+        mrhi_diagnosticFrameBarriers = 111,
+        // A command past the device's frameCommandBytes limit: the call that
+        // found the arena full, the later calls of its pass and the frame's
+        // submission.
+        mrhi_diagnosticFrameCommandBytes = 112,
+        // An upload past the device's frameUploadBytes limit: the call that
+        // found the staging full, the later calls of its pass and the frame's
+        // submission.
+        mrhi_diagnosticFrameUploadBytes = 113,
+        // A counted multi-draw whose maxCount takes the frame past the device's
+        // frameIndirectDraws limit.
+        mrhi_diagnosticFrameIndirectDraws = 114,
+        // A readback recorded while the device's readbacks limit of them wait
+        // to be taken.
+        mrhi_diagnosticReadbacks = 115,
+        // A readback whose bytes do not fit the room of the device's
+        // readbackBytes ring that readbacks not yet taken leave.
+        mrhi_diagnosticReadbackBytes = 116,
+        // A frame begun while the device's framesInFlight frames still run.
+        mrhi_diagnosticFramesInFlight = 117,
+        // A frame submitted or a readback recorded while the device's
+        // notification queue has no room for its answer: take the records
+        // waiting there.
+        mrhi_diagnosticNotifications = 118,
+        // A native pass added past MRHI_NATIVE_PASSES in one frame.
+        mrhi_diagnosticNativePasses = 119,
     };
 
     // A record from an instance's or a device's diagnostic queue.
     typedef struct mrhiDiagnostic
     {
-        // The check that refused the call.
+        // The check or the limit that refused the call.
         mrhiDiagnosticCode code;
         // How many refusals in a row the record stands for: a refusal by the
         // newest record's check adds to its count instead of taking room.

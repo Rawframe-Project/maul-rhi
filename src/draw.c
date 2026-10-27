@@ -479,7 +479,7 @@ static mrhiResult RecordCounted(mrhiDevice* device, mrhiPassId id, bool indexed,
     {
         if (maxCount > device->deviceLimits.frameIndirectDraws - taken)
         {
-            return mrhi_errorCapacity;
+            return mrhiDeviceFull(device, mrhi_diagnosticFrameIndirectDraws);
         }
     } while (!atomic_compare_exchange_weak_explicit(&device->countedTaken, &taken, taken + maxCount,
                                                     memory_order_relaxed, memory_order_relaxed));

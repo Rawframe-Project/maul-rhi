@@ -37,8 +37,9 @@ mrhiResult mrhiSetNativeCommands(mrhiDevice* device, mrhiPassId id, void* comman
 mrhiFramePass* mrhiOpenPass(mrhiDevice* device, mrhiPassId id, mrhiResult* statusOut);
 
 // Takes count records, at most a chunk's, in the pass's last chunk or a
-// new one: the records, or NULL when the arena is full, which marks the
-// pass so that its frame is never submitted without the command.
+// new one: the records, or NULL when the arena or the staging was full,
+// recorded as a refusal by that limit. A full arena marks the pass so
+// that its frame is never submitted without the command.
 mrhiCommand* mrhiTakeCommands(mrhiDevice* device, mrhiFramePass* pass, uint32_t count);
 
 // The access kinds as bits, for the kinds a command accepts.

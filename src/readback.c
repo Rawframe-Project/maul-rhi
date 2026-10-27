@@ -96,7 +96,8 @@ static bool TakeRing(mrhiDevice* device, uint64_t bytes, uint64_t* positionOut)
 
 // Records a readback of ring bytes that the program takes as size bytes
 // of rows: its record, or NULL when the device lacks a record, the
-// bytes, or answer room for it and its frame.
+// bytes, or answer room for it and its frame, recorded as a refusal by
+// that limit.
 static mrhiReadback* Reserve(mrhiDevice* device, uint64_t ringBytes, uint64_t size, uint32_t pitch,
                              uint32_t rowBytes, uint32_t rows)
 {
@@ -106,9 +107,20 @@ static mrhiReadback* Reserve(mrhiDevice* device, uint64_t ringBytes, uint64_t si
     uint64_t rounded = (ringBytes + PLACEMENT - 1) / PLACEMENT * PLACEMENT;
     uint64_t position = 0;
     mrhiReadback* readback = nullptr;
-    if (device->readbackHead - device->readbackTail < device->deviceLimits.readbacks &&
-        mrhiAnswerRoom(device) >= 2 && ringBytes <= UINT64_MAX - PLACEMENT &&
-        TakeRing(device, rounded, &position))
+    mrhiDiagnosticCode full = 0;
+    if (device->readbackHead - device->readbackTail >= device->deviceLimits.readbacks)
+    {
+        full = mrhi_diagnosticReadbacks;
+    }
+    else if (mrhiAnswerRoom(device) < 2)
+    {
+        full = mrhi_diagnosticNotifications;
+    }
+    else if (ringBytes > UINT64_MAX - PLACEMENT || !TakeRing(device, rounded, &position))
+    {
+        full = mrhi_diagnosticReadbackBytes;
+    }
+    else
     {
         readback = RecordAt(device, device->readbackHead++);
         *readback = (mrhiReadback){
@@ -124,6 +136,10 @@ static mrhiReadback* Reserve(mrhiDevice* device, uint64_t ringBytes, uint64_t si
         ++device->readbackPending;
     }
     atomic_flag_clear_explicit(&device->readbackLock, memory_order_release);
+    if (full != 0)
+    {
+        mrhiRecordDiagnostic(&device->diagnostics, full);
+    }
     return readback;
 }
 

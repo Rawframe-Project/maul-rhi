@@ -213,7 +213,7 @@ mrhiResult mrhiBeginFrame(mrhiDevice* device, const mrhiFrameDef* def)
     TakeFinished(device);
     if (device->runningCount == device->limits.framesInFlight)
     {
-        return mrhi_errorCapacity;
+        return mrhiDeviceFull(device, mrhi_diagnosticFramesInFlight);
     }
     device->frameOpen = true;
     device->stagingRegion = FreeRegion(device);
@@ -225,6 +225,8 @@ mrhiResult mrhiBeginFrame(mrhiDevice* device, const mrhiFrameDef* def)
     device->frameCompiled = false;
     device->frameResourceCount = 0;
     device->frameUseCount = 0;
+    device->frameBarrierCount = 0;
+    device->frameLibraryBarriers = 0;
     atomic_store_explicit(&device->frameChunksTaken, 0, memory_order_relaxed);
     device->frameChunkLimit = device->frameChunkCount;
     mrhiBeginZeroPass(device);
@@ -283,14 +285,14 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
         {
             return mrhi_errorState;
         }
-        if (pass->overflowed)
+        if (pass->overflow != 0)
         {
-            return mrhi_errorCapacity;
+            return mrhiDeviceFull(device, pass->overflow);
         }
     }
     if (!mrhiHasAnswerRoom(device))
     {
-        return mrhi_errorCapacity;
+        return mrhiDeviceFull(device, mrhi_diagnosticNotifications);
     }
     mrhiDriverFrame view;
     mrhiViewFrame(device, &view);
@@ -314,6 +316,41 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
         device->readbackHead - device->frameReadbackFirst;
     device->running[device->runningCount++] = token;
     *tokenOut = (mrhiRequestId){token, 1};
+    return mrhi_success;
+}
+
+mrhiResult mrhiGetFrameUsage(mrhiDevice* device, mrhiFrameUsage* usageOut)
+{
+    if (device == nullptr)
+    {
+        return mrhi_errorInvalid;
+    }
+    if (usageOut == nullptr)
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
+    }
+    const mrhiDeviceLimits* limits = &device->deviceLimits;
+    // Before the first frame no pass is counted, not even the library's.
+    // A refused take may have counted past the room, which was then full.
+    // Once the frame compiled, the library's own pass had recorded first,
+    // into the chunks past the program's.
+    uint32_t libraryPasses = device->framePassCount > 0 ? MRHI_LIBRARY_PASSES : 0;
+    uint64_t staged = atomic_load_explicit(&device->stagingTaken, memory_order_relaxed);
+    uint32_t chunks = atomic_load_explicit(&device->frameChunksTaken, memory_order_relaxed);
+    uint32_t libraryChunks =
+        device->frameCompiled ? device->frameChunkLimit - device->frameProgramChunks : 0;
+    chunks = chunks < device->frameChunkLimit ? chunks : device->frameChunkLimit;
+    *usageOut = (mrhiFrameUsage){
+        .frameResources = device->frameResourceCount,
+        .framePasses = device->framePassCount - libraryPasses,
+        .frameAccesses = device->frameUseCount,
+        .frameBarriers = device->frameBarrierCount - device->frameLibraryBarriers,
+        .frameCommandBytes = (chunks - libraryChunks) * MRHI_CHUNK_BYTES,
+        .frameUploadBytes =
+            (uint32_t)(staged < limits->frameUploadBytes ? staged : limits->frameUploadBytes),
+        .frameIndirectDraws =
+            (uint32_t)atomic_load_explicit(&device->countedTaken, memory_order_relaxed),
+    };
     return mrhi_success;
 }
 

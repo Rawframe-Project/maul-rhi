@@ -196,6 +196,30 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "A pass def's query sets do not fit: an occlusion set that is not one or on a pass without targets, or timestamps that are not two different queries, in range and not yet written this frame.";
     case mrhi_diagnosticPassUses:
         return "A pass def's accesses or targets do not fit: a kind the resource's usage lacks, a range past it, a write to a sealed resource, targets whose sizes, samples, mips or layers disagree, uses that conflict within the pass, or a read of a declared resource no earlier pass wrote.";
+    case mrhi_diagnosticFrameResources:
+        return "A frame reached the device's frameResources limit: a resource declared, imported or acquired past it.";
+    case mrhi_diagnosticFramePasses:
+        return "A frame reached the device's framePasses limit: a pass added past it.";
+    case mrhi_diagnosticFrameAccesses:
+        return "A pass whose accesses, with two for each color target and one for the depth target, could take the frame past the device's frameAccesses limit; or a compile that split a resource's parts into more than that limit leaves room for.";
+    case mrhi_diagnosticFrameBarriers:
+        return "A compile that planned more barriers than the device's frameBarriers limit.";
+    case mrhi_diagnosticFrameCommandBytes:
+        return "A command past the device's frameCommandBytes limit: the call that found the arena full, the later calls of its pass and the frame's submission.";
+    case mrhi_diagnosticFrameUploadBytes:
+        return "An upload past the device's frameUploadBytes limit: the call that found the staging full, the later calls of its pass and the frame's submission.";
+    case mrhi_diagnosticFrameIndirectDraws:
+        return "A counted multi-draw whose maxCount takes the frame past the device's frameIndirectDraws limit.";
+    case mrhi_diagnosticReadbacks:
+        return "A readback recorded while the device's readbacks limit of them wait to be taken.";
+    case mrhi_diagnosticReadbackBytes:
+        return "A readback whose bytes do not fit the room of the device's readbackBytes ring that readbacks not yet taken leave.";
+    case mrhi_diagnosticFramesInFlight:
+        return "A frame begun while the device's framesInFlight frames still run.";
+    case mrhi_diagnosticNotifications:
+        return "A frame submitted or a readback recorded while the device's notification queue has no room for its answer: take the records waiting there.";
+    case mrhi_diagnosticNativePasses:
+        return "A native pass added past MRHI_NATIVE_PASSES in one frame.";
     default:
         return "An unknown diagnostic code.";
     }
