@@ -51,14 +51,15 @@ may change the API, the ABI and every data format.
   leaves it 0 otherwise. The mustpass list is
   `conformance/mustpass/spi-9.txt`. Programs and shader cooks see only
   the new codes; contract_version is 20.
-  ([#163](https://github.com/Rawframe-Project/maul-rhi/pull/163))
+  ([#161](https://github.com/Rawframe-Project/maul-rhi/pull/161),
+  [#163](https://github.com/Rawframe-Project/maul-rhi/pull/163),
+  [#165](https://github.com/Rawframe-Project/maul-rhi/pull/165))
 
 ### Fixed
 
 - A refused upload leaves the staging as it was. Before, its bytes were
   added to the staging anyway, so later uploads in other passes of the
-  frame could be refused too. `mrhiBeginFrame` also clears the last
-  frame's barrier count.
+  frame could be refused too.
   ([#161](https://github.com/Rawframe-Project/maul-rhi/pull/161))
 - On Vulkan, a command buffer that fails to begin or end, and a command
   pool that fails to reset, name `mrhi_diagnosticSubmitCommandLists`
