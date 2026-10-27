@@ -11,6 +11,7 @@
 #include "format_caps.h"
 #include "frame_walk.h"
 #include "invariant.h"
+#include "pipeline_walk.h"
 
 #include <stdalign.h>
 #include <string.h>
@@ -198,6 +199,9 @@ typedef struct TestDevice
     uint32_t textures;
     uint32_t querySets;
     uint32_t heaps;
+    // The limits the device was opened with, which pipelines are walked
+    // against.
+    mrhiLimits limits;
     // Live shaders and pipelines; the core destroys each before the device.
     uint32_t shaders;
     uint32_t pipelines;
@@ -517,6 +521,8 @@ static size_t ExportPipelineCache(void* self, void* bytes, size_t capacity)
     return 16;
 }
 
+// Holds a pipeline's creation, trapping on a pipeline that breaks a rule
+// of its shader's reflection, as no driver could make it.
 static mrhiResult CreateComputePipeline(void* self, const mrhiDriverComputePipeline* pipeline,
                                         uint64_t tag, uint64_t* handleOut)
 {
@@ -525,6 +531,7 @@ static mrhiResult CreateComputePipeline(void* self, const mrhiDriverComputePipel
     MRHI_ASSERT(pipeline->shader != 0 && tag > UINT32_MAX &&
                 pipeline->entry < pipeline->reflection->entryCount &&
                 pipeline->reflection->entries[pipeline->entry].stage == mrhi_stageCompute);
+    MRHI_ASSERT(mrhiWalkComputePipeline(pipeline) == 0);
     return HoldPipeline(device, tag, handleOut);
 }
 
@@ -539,6 +546,7 @@ static mrhiResult CreateGraphicsPipeline(void* self, const mrhiDriverGraphicsPip
         pipeline->reflection->entries[pipeline->vertexEntry].stage == mrhi_stageVertex &&
         (pipeline->fragmentEntry == pipeline->reflection->entryCount ||
          pipeline->reflection->entries[pipeline->fragmentEntry].stage == mrhi_stageFragment));
+    MRHI_ASSERT(mrhiWalkGraphicsPipeline(pipeline, &device->limits) == 0);
     return HoldPipeline(device, tag, handleOut);
 }
 
@@ -829,6 +837,7 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
         .allocator = def->allocator,
         .nextHandle = HANDLE_BASE,
         .madeBeforeFailure = driver->adapters[adapter - 1].objectsBeforeFailure,
+        .limits = def->limits,
         .holdFrames = driver->adapters[adapter - 1].holdFrames,
         .frameOutcome = driver->adapters[adapter - 1].frameOutcome,
         .submitBudget = driver->adapters[adapter - 1].submitBudget,

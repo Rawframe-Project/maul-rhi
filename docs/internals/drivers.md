@@ -1,6 +1,6 @@
 # Drivers
 
-The driver SPI is the line between the core, which decides, and a driver, which translates. This page explains the interface's shape and the rules on each side, the test driver, the frame walk and the validation layer. Each API's own driver is on its page: [vulkan.md](vulkan.md), [d3d12.md](d3d12.md), [metal.md](metal.md), [webgpu.md](webgpu.md).
+The driver SPI is the line between the core, which decides, and a driver, which translates. This page explains the interface's shape and the rules on each side, the test driver, the frame walk, the pipeline walk and the validation layer. Each API's own driver is on its page: [vulkan.md](vulkan.md), [d3d12.md](d3d12.md), [metal.md](metal.md), [webgpu.md](webgpu.md).
 
 ## The interface
 
@@ -35,6 +35,10 @@ It traps (`MRHI_ASSERT`) when the core breaks the SPI: work asked of a lost devi
 ## The frame walk
 
 `src/frame_walk.c` reads a submitted frame as a driver would: every resource, pass and barrier; each pass's waits, each naming an earlier pass of its class or none; every command record, its payload inside its chunk, every frame resource it names of the right type, every handle one the driver made; every upload and readback inside the staging and the ring. The test driver traps on any fault it finds and fills the `mrhiTestFrameLog` a test asked for. Every frame a test submits is therefore also a check of the recorded streams.
+
+## The pipeline walk
+
+`src/pipeline_walk.c` checks a pipeline the core hands a driver against the rules its shader's reflection decides: every vertex input fed by an attribute of its scalar class, the binding tables and vertex buffers within their joint limit, each written color target fed by an output with its channels, its scalar class and, when its color blend reads alpha, four components, a second blend source written when a target blends from one, no color targets without a fragment entry, no alpha to coverage beside a written sample mask, each fragment input matched by a vertex output, room for a point list's point size, and constant values that name the shader's constants once, fit their types and give every required one. The rules are written again from WebGPU's, not by calling the core's checks in `graphics.c` and `pipeline.c`, so a slip in one does not hide in the other. The test driver traps on any rule a pipeline breaks, so a test or fuzz input that gets a broken def past the core stops there. `test/test_pipeline_walk.c` breaks each rule once.
 
 ## The validation layer
 
