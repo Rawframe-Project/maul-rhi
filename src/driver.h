@@ -19,7 +19,7 @@
 
 // The SPI version a driver's vtable must carry. Any change to the SPI
 // headers raises it; 4 is the first installed.
-#define MRHI_SPI_VERSION 8
+#define MRHI_SPI_VERSION 9
 
 // The pass classes (mrhiPassClass): graphics, async compute and transfer.
 #define MRHI_PASS_CLASSES 3
@@ -297,8 +297,11 @@ typedef struct mrhiDeviceDriverVtable
     void (*bufferMemory)(const void* self, const mrhiBufferDef* def, uint64_t* bytesOut,
                          uint64_t* alignmentOut);
     // Runs a frame on the GPU; finished, it is reported by poll with the
-    // tag.
-    mrhiResult (*submitFrame)(void* self, const mrhiDriverFrame* frame, uint64_t tag);
+    // tag. A refusal for capacity names the budget that ran out in
+    // budgetOut, one of the mrhi_diagnosticSubmit codes; any other
+    // answer leaves it 0.
+    mrhiResult (*submitFrame)(void* self, const mrhiDriverFrame* frame, uint64_t tag,
+                              mrhiDiagnosticCode* budgetOut);
     // Moves up to capacity finished frames and pipelines into events and
     // returns how many it moved.
     size_t (*poll)(void* self, mrhiDriverEvent* events, size_t capacity);

@@ -33,8 +33,10 @@ typedef struct mrhiVulkanRecording
     VkCommandBufferSubmitInfo laneSubmits[MRHI_VULKAN_LANES][MRHI_VULKAN_BATCH_SUBMITS];
     uint32_t laneSubmitCount[MRHI_VULKAN_LANES];
     // The first failure: views or descriptors the device could not make,
-    // or a command buffer it could not begin or end.
+    // or a command buffer it could not begin or end; and with a capacity
+    // status, the budget that ran out.
     mrhiResult status;
+    mrhiDiagnosticCode budget;
     VkResult result;
 } mrhiVulkanRecording;
 

@@ -205,8 +205,10 @@ mrhiResult mrhiVulkanFramesInit(mrhiVulkanFrames* frames, uint32_t family,
 void mrhiVulkanFramesDestroy(mrhiVulkanFrames* frames);
 
 // Records and submits a frame, then presents its surface images:
-// mrhi_success, mrhi_errorCapacity, or mrhi_errorDeviceLost.
-mrhiResult mrhiVulkanSubmit(mrhiVulkanFrames* frames, const mrhiDriverFrame* frame, uint64_t tag);
+// mrhi_success, mrhi_errorCapacity with the budget that ran out in
+// budgetOut, or mrhi_errorDeviceLost.
+mrhiResult mrhiVulkanSubmit(mrhiVulkanFrames* frames, const mrhiDriverFrame* frame, uint64_t tag,
+                            mrhiDiagnosticCode* budgetOut);
 
 // Moves up to capacity finished frames into events, in order, their
 // readbacks filled and their objects and the objects they retire gone;
@@ -221,9 +223,10 @@ void mrhiVulkanRetireLater(mrhiVulkanFrames* frames, mrhiVulkanRetired kind, uin
 
 // Records a frame's work into its slot's batches (vulkan_record.c):
 // mrhi_success, or mrhi_errorCapacity when views or descriptor sets run
-// out; resultOut is the device's failure to begin or end a command
-// buffer, VK_SUCCESS without one.
+// out, with the budget in budgetOut; resultOut is the device's failure
+// to begin or end a command buffer, VK_SUCCESS without one.
 mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
-                            const mrhiDriverFrame* frame, VkResult* resultOut);
+                            const mrhiDriverFrame* frame, VkResult* resultOut,
+                            mrhiDiagnosticCode* budgetOut);
 
 #endif // MAUL_RHI_SRC_VULKAN_FRAME_H

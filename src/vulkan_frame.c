@@ -533,7 +533,7 @@ static VkResult SubmitBatches(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
 // Records a frame into its slot's batches and submits them, the last
 // signalling its serial.
 static VkResult Run(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, const mrhiDriverFrame* frame,
-                    mrhiResult* statusOut)
+                    mrhiResult* statusOut, mrhiDiagnosticCode* budgetOut)
 {
     VkResult result = frames->api->vkResetCommandPool(frames->device, slot->pool, 0);
     slot->partsUsed = 0;
@@ -542,7 +542,7 @@ static VkResult Run(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, const mrhiDr
     *statusOut = mrhi_success;
     if (result == VK_SUCCESS)
     {
-        *statusOut = mrhiVulkanRecord(frames, slot, frame, &result);
+        *statusOut = mrhiVulkanRecord(frames, slot, frame, &result, budgetOut);
     }
     if (result != VK_SUCCESS || *statusOut != mrhi_success)
     {
@@ -551,7 +551,8 @@ static VkResult Run(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, const mrhiDr
     return SubmitBatches(frames, slot, frame);
 }
 
-mrhiResult mrhiVulkanSubmit(mrhiVulkanFrames* frames, const mrhiDriverFrame* frame, uint64_t tag)
+mrhiResult mrhiVulkanSubmit(mrhiVulkanFrames* frames, const mrhiDriverFrame* frame, uint64_t tag,
+                            mrhiDiagnosticCode* budgetOut)
 {
     if (frames->lost)
     {
@@ -565,16 +566,24 @@ mrhiResult mrhiVulkanSubmit(mrhiVulkanFrames* frames, const mrhiDriverFrame* fra
         memcpy(slot->stagingBytes, frame->staging, frame->stagingBytes);
     }
     mrhiResult status = mrhi_success;
+    mrhiDiagnosticCode budget = 0;
     if (result == VK_SUCCESS)
     {
-        result = Run(frames, slot, frame, &status);
+        result = Run(frames, slot, frame, &status, &budget);
     }
     if (result != VK_SUCCESS || status != mrhi_success)
     {
         DropTransients(frames, slot);
         slot->readbackCount = 0;
         frames->lost = result == VK_ERROR_DEVICE_LOST;
-        return status != mrhi_success ? status : mrhiVulkanStatus(result);
+        // A recording names what ran out; Vulkan itself runs out of
+        // memory.
+        status = status != mrhi_success ? status : mrhiVulkanStatus(result);
+        if (status == mrhi_errorCapacity)
+        {
+            *budgetOut = budget != 0 ? budget : mrhi_diagnosticSubmitMemory;
+        }
+        return status;
     }
     ++frames->submitted;
     slot->serial = frames->submitted;

@@ -24,7 +24,8 @@ static const mrhiDeviceDriverVtable* s_handedTo;
 static mrhiPassId s_waits[MAX_PASSES + 1][MRHI_PASS_CLASSES];
 static bool s_handed[MAX_PASSES + 1];
 
-static mrhiResult Capture(void* self, const mrhiDriverFrame* frame, uint64_t tag)
+static mrhiResult Capture(void* self, const mrhiDriverFrame* frame, uint64_t tag,
+                          mrhiDiagnosticCode* budgetOut)
 {
     for (uint32_t i = 0; i <= MAX_PASSES; ++i)
     {
@@ -41,7 +42,7 @@ static mrhiResult Capture(void* self, const mrhiDriverFrame* frame, uint64_t tag
             s_waits[index][c] = pass->waitFor[c];
         }
     }
-    return s_handedTo->submitFrame(self, frame, tag);
+    return s_handedTo->submitFrame(self, frame, tag, budgetOut);
 }
 
 static void OpenDef(mrhiDeviceDef def)

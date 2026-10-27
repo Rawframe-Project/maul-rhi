@@ -623,8 +623,11 @@ static void ReleaseImage(void* self, uint64_t swapchain, uint64_t image)
     mrhiJsForget(device->state, (int)image);
 }
 
-static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag)
+// The browser holds a frame's budgets: a submission never runs out here.
+static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag,
+                              mrhiDiagnosticCode* budgetOut)
 {
+    (void)budgetOut;
     WebGpuDevice* device = self;
     device->submitted += 1;
     MRHI_ASSERT(device->submitted - device->finished <= device->tagCount);

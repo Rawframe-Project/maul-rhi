@@ -94,6 +94,9 @@ extern "C"
         bool holdFrames;
         // The outcome its devices' frames finish with; mrhi_success by default.
         mrhiResult frameOutcome;
+        // A budget its devices' drivers run out of at every submission,
+        // refusing the frame with mrhi_errorCapacity and naming it; 0 for none.
+        mrhiDiagnosticCode submitBudget;
         // What pipelines made on the adapter's devices are answered with at the
         // next poll: mrhi_success, or the error their creation fails with.
         mrhiResult pipelineOutcome;

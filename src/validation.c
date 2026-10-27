@@ -452,12 +452,25 @@ static bool IsHandle(const void* handles, uint64_t handle)
     return handle != 0;
 }
 
-static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag)
+// Whether a code is one a driver names a submission's budget with.
+static bool IsSubmitBudget(mrhiDiagnosticCode code)
+{
+    return code == mrhi_diagnosticSubmitMemory || code == mrhi_diagnosticSubmitDescriptors ||
+           code == mrhi_diagnosticSubmitScratch || code == mrhi_diagnosticSubmitCommandLists;
+}
+
+static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag,
+                              mrhiDiagnosticCode* budgetOut)
 {
     DeviceLayer* device = self;
     Expect(&device->watch, mrhiWalkFrame(frame, IsHandle, nullptr, nullptr) == 0,
            mrhi_diagnosticDriverFrameWalk);
-    return device->inner.vtable->submitFrame(device->inner.self, frame, tag);
+    mrhiResult status =
+        device->inner.vtable->submitFrame(device->inner.self, frame, tag, budgetOut);
+    Expect(&device->watch,
+           status == mrhi_errorCapacity ? IsSubmitBudget(*budgetOut) : *budgetOut == 0,
+           mrhi_diagnosticDriverSubmitBudget);
+    return status;
 }
 
 static size_t PollDevice(void* self, mrhiDriverEvent* events, size_t capacity)

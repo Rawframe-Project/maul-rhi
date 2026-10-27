@@ -220,6 +220,16 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "A frame submitted or a readback recorded while the device's notification queue has no room for its answer: take the records waiting there.";
     case mrhi_diagnosticNativePasses:
         return "A native pass added past MRHI_NATIVE_PASSES in one frame.";
+    case mrhi_diagnosticSubmitMemory:
+        return "A driver refused a frame's submission for memory: for its transients, or for the buffers it stages, reads back or clamps through.";
+    case mrhi_diagnosticSubmitDescriptors:
+        return "A driver refused a frame's submission when the descriptors it binds the frame's tables through ran out: Direct3D 12's descriptor rings, Vulkan's descriptor pools.";
+    case mrhi_diagnosticSubmitScratch:
+        return "A driver refused a frame's submission when its scratch buffer ran out: the room Direct3D 12 writes indirect commands' arguments in.";
+    case mrhi_diagnosticSubmitCommandLists:
+        return "A driver refused a frame's submission when it could not make, end or begin a command list or buffer for a part of the frame.";
+    case mrhi_diagnosticDriverSubmitBudget:
+        return "A driver refused a frame for capacity without naming one of the submit codes for the budget that ran out, or named one with another result.";
     default:
         return "An unknown diagnostic code.";
     }

@@ -89,7 +89,7 @@ static bool TakeScratch(mrhiD3d12Recorder* recorder, uint64_t bytes, uint64_t* o
     }
     if (*recorder->scratch == nullptr || recorder->scratchBytes - recorder->scratchUsed < bytes)
     {
-        recorder->status = mrhi_errorCapacity;
+        mrhiD3d12RunOut(recorder, mrhi_diagnosticSubmitScratch);
         return false;
     }
     *offsetOut = recorder->scratchUsed;

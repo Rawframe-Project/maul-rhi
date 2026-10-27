@@ -298,8 +298,13 @@ mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     mrhiViewFrame(device, &view);
     device->frameOpen = false;
     uint32_t token = device->lastRequest + 1;
+    mrhiDiagnosticCode budget = 0;
     mrhiResult status = mrhiDriverStatus(
-        device, device->driver.vtable->submitFrame(device->driver.self, &view, token));
+        device, device->driver.vtable->submitFrame(device->driver.self, &view, token, &budget));
+    if (status == mrhi_errorCapacity && budget != 0)
+    {
+        mrhiRecordDiagnostic(&device->diagnostics, budget);
+    }
     if (status != mrhi_success)
     {
         mrhiDropReadbacks(device);

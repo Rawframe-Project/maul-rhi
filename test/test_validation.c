@@ -294,13 +294,19 @@ static mrhiResult MakeNothing(void* self, const mrhiBufferDef* def, uint64_t* ha
     return status;
 }
 
+// What TakeAnything answers, and the budget it names.
+static mrhiResult s_submitStatus;
+static mrhiDiagnosticCode s_submitBudget;
+
 // Takes any frame without the test driver's own walk, which would trap.
-static mrhiResult TakeAnything(void* self, const mrhiDriverFrame* frame, uint64_t tag)
+static mrhiResult TakeAnything(void* self, const mrhiDriverFrame* frame, uint64_t tag,
+                               mrhiDiagnosticCode* budgetOut)
 {
     (void)self;
     (void)frame;
     (void)tag;
-    return mrhi_success;
+    *budgetOut = s_submitBudget;
+    return s_submitStatus;
 }
 
 static mrhiResult CreateBreakingDevice(void* self, uint64_t adapter, const mrhiDeviceDef* def,
@@ -343,10 +349,42 @@ static void TestDeviceAnswers(void)
     // hands frames: one pass whose chunk the frame lacks.
     mrhiDriverPass pass = {.id = {1, 1}, .firstChunk = 1};
     mrhiDriverFrame frame = {.passes = &pass, .passCount = 1};
-    CHECK(device->driver.vtable->submitFrame(device->driver.self, &frame, 1) == mrhi_success &&
+    mrhiDiagnosticCode budget = 0;
+    CHECK(device->driver.vtable->submitFrame(device->driver.self, &frame, 1, &budget) ==
+                  mrhi_success &&
               mrhiGetDriverFaults(instance) == 2 &&
               Recorded(instance) == mrhi_diagnosticDriverFrameWalk,
           "a frame walked and found wanting");
+    // A refusal for capacity names a submit budget, and only it does.
+    mrhiDriverFrame empty = {0};
+    s_submitStatus = mrhi_errorCapacity;
+    s_submitBudget = mrhi_diagnosticSubmitScratch;
+    CHECK(device->driver.vtable->submitFrame(device->driver.self, &empty, 2, &budget) ==
+                  mrhi_errorCapacity &&
+              budget == mrhi_diagnosticSubmitScratch && mrhiGetDriverFaults(instance) == 2,
+          "a budget named");
+    s_submitBudget = 0;
+    budget = 0;
+    CHECK(device->driver.vtable->submitFrame(device->driver.self, &empty, 3, &budget) ==
+                  mrhi_errorCapacity &&
+              mrhiGetDriverFaults(instance) == 3 &&
+              Recorded(instance) == mrhi_diagnosticDriverSubmitBudget,
+          "no budget named");
+    s_submitBudget = mrhi_diagnosticFramePasses;
+    CHECK(device->driver.vtable->submitFrame(device->driver.self, &empty, 4, &budget) ==
+                  mrhi_errorCapacity &&
+              mrhiGetDriverFaults(instance) == 4 &&
+              Recorded(instance) == mrhi_diagnosticDriverSubmitBudget,
+          "a code that is no submit budget");
+    s_submitStatus = mrhi_success;
+    s_submitBudget = mrhi_diagnosticSubmitMemory;
+    budget = 0;
+    CHECK(device->driver.vtable->submitFrame(device->driver.self, &empty, 5, &budget) ==
+                  mrhi_success &&
+              mrhiGetDriverFaults(instance) == 5 &&
+              Recorded(instance) == mrhi_diagnosticDriverSubmitBudget,
+          "a budget named with success");
+    s_submitBudget = 0;
     mrhiDestroyDevice(device);
     mrhiDestroyInstance(instance);
 }

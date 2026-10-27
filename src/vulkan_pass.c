@@ -103,6 +103,7 @@ static VkImageView MakeView(mrhiVulkanRecording* recording, VkImage image, const
     if (result != VK_SUCCESS)
     {
         recording->status = mrhiVulkanStatus(result);
+        recording->budget = mrhi_diagnosticSubmitMemory;
         return VK_NULL_HANDLE;
     }
     slot->views[slot->viewCount++] = view;
@@ -340,6 +341,8 @@ static VkDescriptorSet TakeSet(mrhiVulkanRecording* recording, VkDescriptorSetLa
         if (!full || slot->poolInUse == MRHI_VULKAN_POOLS - 1)
         {
             recording->status = full ? mrhi_errorCapacity : mrhiVulkanStatus(result);
+            recording->budget =
+                full ? mrhi_diagnosticSubmitDescriptors : mrhi_diagnosticSubmitMemory;
             return VK_NULL_HANDLE;
         }
         ++slot->poolInUse;

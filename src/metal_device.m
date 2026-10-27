@@ -234,10 +234,17 @@ static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* b
     mrhiMetalBufferMemory(device->device, def, bytesOut, alignmentOut);
 }
 
-static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag)
+static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t tag,
+                              mrhiDiagnosticCode* budgetOut)
 {
     MetalDevice* device = self;
     mrhiResult status = mrhiMetalSubmitFrame(&device->frames, frame, tag);
+    // Metal runs out only of the memory a frame's buffers and transients
+    // take.
+    if (status == mrhi_errorCapacity)
+    {
+        *budgetOut = mrhi_diagnosticSubmitMemory;
+    }
     if (status == mrhi_success)
     {
         ReleaseRetirees(device);

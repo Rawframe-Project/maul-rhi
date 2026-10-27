@@ -245,7 +245,7 @@ static void BeginPart(mrhiD3d12Lanes* lanes, mrhiD3d12Lane lane)
                                                   &IID_ID3D12GraphicsCommandList, (void**)list)))
         {
             *list = nullptr;
-            Fail(recorder, mrhi_errorCapacity);
+            mrhiD3d12RunOut(recorder, mrhi_diagnosticSubmitCommandLists);
             return;
         }
     }
