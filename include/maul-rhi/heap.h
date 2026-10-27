@@ -72,8 +72,8 @@ extern "C"
         // Extensions, or NULL.
         const mrhiChain* next;
         // A name for debugging tools: UTF-8 without NUL, labelLength bytes, at
-        // most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during
-        // the call.
+        // most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read
+        // during the call.
         const char* label;
         // The label's bytes.
         size_t labelLength;
@@ -96,13 +96,13 @@ extern "C"
     /// @param def      The heap to make.
     /// @param heapOut  Receives the heap; the null id on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
-    /// without its cookie, a label that is not UTF-8 without NUL within
-    /// MRHI_LABEL_BYTES, or 0 entries; `mrhi_errorState` for a device that is
-    /// not ready; `mrhi_errorUnsupported` for a critical extension the library
-    /// does not know, a device without the bindless_sampling feature, or
-    /// entries or samplers past its heapSize or samplerHeapSize;
-    /// `mrhi_errorCapacity` when the device's heaps limit is reached or the
-    /// allocator fails.
+    /// without its cookie, a label that is not UTF-8 without NUL, or 0 entries;
+    /// `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES;
+    /// `mrhi_errorState` for a device that is not ready;
+    /// `mrhi_errorUnsupported` for a critical extension the library does not
+    /// know, a device without the bindless_sampling feature, or entries or
+    /// samplers past its heapSize or samplerHeapSize; `mrhi_errorCapacity` when
+    /// the device's heaps limit is reached or the allocator fails.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateHeap(mrhiDevice* device, const mrhiHeapDef* def,

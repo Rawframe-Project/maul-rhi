@@ -19,7 +19,7 @@
 
 // The SPI version a driver's vtable must carry. Any change to the SPI
 // headers raises it; 4 is the first installed.
-#define MRHI_SPI_VERSION 10
+#define MRHI_SPI_VERSION 11
 
 // The pass classes (mrhiPassClass): graphics, async compute and transfer.
 #define MRHI_PASS_CLASSES 3
@@ -144,8 +144,8 @@ typedef struct mrhiDriverPass
     mrhiPassClass passClass;
     const char* label;
     size_t labelLength;
-    mrhiColorTarget colorTargets[MRHI_COLOR_TARGETS];
-    mrhiStoreOp colorStores[MRHI_COLOR_TARGETS];
+    mrhiColorTarget colorTargets[MRHI_MAX_COLOR_TARGETS];
+    mrhiStoreOp colorStores[MRHI_MAX_COLOR_TARGETS];
     uint32_t colorTargetCount;
     mrhiDepthTarget depthTarget;
     mrhiStoreOp depthStore;

@@ -221,7 +221,7 @@ static void WalkPass(Walk* walk, const mrhiDriverPass* pass)
 {
     const mrhiDriverFrame* frame = walk->frame;
     WALK_CHECK(pass->id.index1 != 0 && mrhiIsLabelValid(pass->label, pass->labelLength) &&
-               pass->colorTargetCount <= MRHI_COLOR_TARGETS);
+               pass->colorTargetCount <= MRHI_MAX_COLOR_TARGETS);
     for (uint32_t i = 0; i < pass->colorTargetCount; ++i)
     {
         WALK_CHECK(Names(walk, pass->colorTargets[i].resource.index1, false));

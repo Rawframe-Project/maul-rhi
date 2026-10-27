@@ -11,6 +11,7 @@
 // unread.
 
 #include "capabilities_core.h"
+#include "invariant.h"
 #include "label.h"
 #include "pipeline_core.h"
 
@@ -38,7 +39,7 @@ mrhiGraphicsPipelineDef mrhiDefaultGraphicsPipelineDef(void)
     def.stencilWriteMask = UINT32_MAX;
     def.sampleCount = 1;
     def.sampleMask = UINT32_MAX;
-    for (uint32_t i = 0; i < MRHI_COLOR_TARGETS; ++i)
+    for (uint32_t i = 0; i < MRHI_MAX_COLOR_TARGETS; ++i)
     {
         def.colorTargets[i].color =
             (mrhiBlendComponent){mrhi_blendOne, mrhi_blendZero, mrhi_blendAdd};
@@ -347,14 +348,14 @@ static mrhiResult CheckTarget(const mrhiDevice* device, const mrhiColorTargetSta
     return Worse(status, Within(caps.rendering && (!target->blend || caps.blending)));
 }
 
-// The color targets: at most MRHI_COLOR_TARGETS and none without a
+// The color targets, at most MRHI_MAX_COLOR_TARGETS: none without a
 // fragment entry, each checked, their bytes per sample within the
 // limit, and some attachment, color or depth.
 static mrhiResult CheckTargets(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
                                Stages stages)
 {
-    if (def->colorTargetCount > MRHI_COLOR_TARGETS ||
-        (stages.fragment == nullptr && def->colorTargetCount > 0))
+    MRHI_ASSERT(def->colorTargetCount <= MRHI_MAX_COLOR_TARGETS);
+    if (stages.fragment == nullptr && def->colorTargetCount > 0)
     {
         return mrhi_errorInvalid;
     }
@@ -403,7 +404,7 @@ static mrhiResult CheckMultisample(const mrhiDevice* device, const mrhiGraphicsP
     mrhiResult status = Need(count > 0 && count <= 16 && (count & (count - 1)) == 0);
     bool taken = def->depthStencilFormat == mrhi_formatNone ||
                  (CapsOf(device, def->depthStencilFormat).sampleCounts & count) != 0;
-    for (uint32_t i = 0; i < def->colorTargetCount && i < MRHI_COLOR_TARGETS; ++i)
+    for (uint32_t i = 0; i < def->colorTargetCount && i < MRHI_MAX_COLOR_TARGETS; ++i)
     {
         mrhiFormat format = def->colorTargets[i].format;
         taken = taken &&
@@ -535,6 +536,12 @@ static mrhiShaderSlot* CheckGraphicsDef(mrhiDevice* device, const mrhiGraphicsPi
         device, MRHI_DEF_HEAD(def), GRAPHICS_PIPELINE_DEF_COOKIE, def->shader, statusOut);
     if (shader == nullptr)
     {
+        return nullptr;
+    }
+    // More color targets than the def holds are refused first, unread.
+    if (def->colorTargetCount > MRHI_MAX_COLOR_TARGETS)
+    {
+        *statusOut = mrhiDeviceOverLimit(device, mrhi_diagnosticGraphicsTargets);
         return nullptr;
     }
     mrhiResult found = FindStages(shader, def, stagesOut);

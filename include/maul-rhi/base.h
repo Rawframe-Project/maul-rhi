@@ -50,7 +50,7 @@ extern "C"
 
 // The revision of the contract the headers are generated from
 // (contract/mrhi.json).
-#define MRHI_CONTRACT_VERSION 20
+#define MRHI_CONTRACT_VERSION 21
 
 // MRHI_API marks the public functions: dllexport or dllimport in a
 // shared Windows build (maul_rhi_EXPORTS is defined while building
@@ -116,16 +116,23 @@ extern "C"
         mrhi_errorState = -6,
         // The program was built against another contract version.
         mrhi_errorVersion = -7,
+        // The data is malformed or does not contain what was asked for: a
+        // damaged shader container or pipeline cache, or an entry, constants or
+        // pipeline state its reflection does not take. Every check on such
+        // bytes fails with it, a bound included. Bad data is not a bug in the
+        // calling code, so it counts no misuse.
+        mrhi_errorFormat = -8,
+        // An argument passes a fixed bound of the library, published as a named
+        // constant (MRHI_MAX_LABEL_BYTES, MRHI_MAX_COLOR_TARGETS,
+        // MRHI_MAX_INDIRECT_DRAWS, MRHI_MAX_NATIVE_PASSES,
+        // MRHI_MAX_QUERY_SET_QUERIES). More room would not help. It counts one
+        // misuse, as invalid input does.
+        mrhi_errorLimit = -9,
         // A surface no longer matches its window: configure it again before
         // acquiring.
-        mrhi_errorOutOfDate = -8,
+        mrhi_errorOutOfDate = -32,
         // The device is lost: the GPU was reset, removed or its driver failed.
-        mrhi_errorDeviceLost = -9,
-        // The data is malformed or does not contain what was asked for: a
-        // damaged shader container, or an entry, constants or pipeline state
-        // its reflection does not take. Bad data is not a bug in the calling
-        // code, so it counts no misuse.
-        mrhi_errorFormat = -10,
+        mrhi_errorDeviceLost = -33,
     };
 
     // A library version: major, minor and patch.
@@ -207,7 +214,7 @@ extern "C"
     } mrhiChain;
 
 // The bytes a debug label may take, in UTF-8.
-#define MRHI_LABEL_BYTES 256
+#define MRHI_MAX_LABEL_BYTES 256
 
     // A request, answered by exactly one notification in its owner's queue.
     typedef struct mrhiRequestId
@@ -245,7 +252,7 @@ extern "C"
         mrhi_diagnosticNullArgument = 1,
         // A def lacks its cookie (start from its default def), carries a
         // malformed extension chain or one deeper than the chainDepth limit, or
-        // a label that is not UTF-8 of at most MRHI_LABEL_BYTES.
+        // a label that is not UTF-8 of at most MRHI_MAX_LABEL_BYTES.
         mrhi_diagnosticDefHeader = 2,
         // An adapter request def is NULL, lacks its cookie or names an unknown
         // power preference.
@@ -310,7 +317,7 @@ extern "C"
         // workgroupsPerDimension limit.
         mrhi_diagnosticDispatchSize = 29,
         // A counted indirect draw whose maxCount is zero or past
-        // MRHI_INDIRECT_DRAWS.
+        // MRHI_MAX_INDIRECT_DRAWS.
         mrhi_diagnosticIndirectCountLimit = 31,
         // A viewport wider or taller than the textureDimension2d limit, outside
         // twice that range, or with depths outside [0, 1] or in reverse order.
@@ -320,7 +327,7 @@ extern "C"
         // A blend constant that is not finite.
         mrhi_diagnosticBlendConstant = 34,
         // A debug label that is empty, not UTF-8, or longer than
-        // MRHI_LABEL_BYTES.
+        // MRHI_MAX_LABEL_BYTES.
         mrhi_diagnosticDebugLabel = 35,
         // A debug group popped with none open.
         mrhi_diagnosticDebugGroupUnderflow = 36,
@@ -450,10 +457,10 @@ extern "C"
         // is not finite or set for points and lines, or no depth format while
         // the fragment entry writes depth.
         mrhi_diagnosticGraphicsDepthStencil = 87,
-        // A graphics pipeline's color targets are more than MRHI_COLOR_TARGETS,
-        // present without a fragment entry, malformed (format, blend or
-        // writes), not written by the fragment entry's outputs as their types
-        // allow, or absent with no depth either.
+        // A graphics pipeline's color targets are more than
+        // MRHI_MAX_COLOR_TARGETS, present without a fragment entry, malformed
+        // (format, blend or writes), not written by the fragment entry's
+        // outputs as their types allow, or absent with no depth either.
         mrhi_diagnosticGraphicsTargets = 88,
         // A graphics pipeline's sample count is not a power of two, or alpha to
         // coverage is asked single-sampled, without a first target that has
@@ -499,7 +506,7 @@ extern "C"
         mrhi_diagnosticUndeclaredAccess = 102,
         // A pass def with an unknown pass class.
         mrhi_diagnosticPassClass = 103,
-        // A pass def with more than MRHI_COLOR_TARGETS color targets.
+        // A pass def with more than MRHI_MAX_COLOR_TARGETS color targets.
         mrhi_diagnosticPassColorTargets = 104,
         // A pass def with several views on a native pass or on one without
         // targets.
@@ -550,7 +557,7 @@ extern "C"
         // notification queue has no room for its answer: take the records
         // waiting there.
         mrhi_diagnosticNotifications = 118,
-        // A native pass added past MRHI_NATIVE_PASSES in one frame.
+        // A native pass added past MRHI_MAX_NATIVE_PASSES in one frame.
         mrhi_diagnosticNativePasses = 119,
         // A driver refused a frame's submission for memory: for its transients,
         // for the views, descriptor sets and buffers it makes to run the frame,

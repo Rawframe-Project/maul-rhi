@@ -123,7 +123,12 @@ static void TestRefusals(void)
     def.label = "\xFF";
     def.labelLength = 1;
     CHECK(mrhiCreateSurface(instance, &def, &surface) == mrhi_errorInvalid, "a label of FF");
-    CHECK(mrhiGetInstanceMisuse(instance) == 4, "each counted");
+    static char longLabel[MRHI_MAX_LABEL_BYTES + 1];
+    memset(longLabel, 's', sizeof(longLabel));
+    def.label = longLabel;
+    def.labelLength = MRHI_MAX_LABEL_BYTES + 1;
+    CHECK(mrhiCreateSurface(instance, &def, &surface) == mrhi_errorLimit, "a label past the bound");
+    CHECK(mrhiGetInstanceMisuse(instance) == 5, "each counted");
     test.fail = true;
     CHECK(Make(instance, &test.chain, &surface) == mrhi_errorPlatform, "the driver fails");
     test.fail = false;

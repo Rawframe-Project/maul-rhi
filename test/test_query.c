@@ -60,8 +60,10 @@ static void TestInvalidDefs(void)
     mrhiQuerySetId set;
     mrhiQuerySetDef def = Def(mrhi_queryOcclusion, 0);
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorInvalid, "no queries");
-    def.count = 4097;
-    CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorInvalid, "past 4096");
+    def.count = MRHI_MAX_QUERY_SET_QUERIES;
+    CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_success, "at the bound");
+    def.count = MRHI_MAX_QUERY_SET_QUERIES + 1;
+    CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorLimit, "past the bound");
     def = Def(3, 1);
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorInvalid, "a type");
     def = mrhiDefaultQuerySetDef();

@@ -270,7 +270,7 @@ typedef struct mrhiFrameUse
 // depth or stencil is written.
 typedef struct mrhiRenderLayout
 {
-    mrhiFormat colors[MRHI_COLOR_TARGETS];
+    mrhiFormat colors[MRHI_MAX_COLOR_TARGETS];
     mrhiFormat depth;
     uint32_t samples;
     // The views rendered: 1 without multiview.
@@ -300,13 +300,13 @@ typedef struct mrhiFramePass
     void* nativeCommands;
     uint32_t firstUse;
     uint32_t useCount;
-    mrhiColorTarget colorTargets[MRHI_COLOR_TARGETS];
+    mrhiColorTarget colorTargets[MRHI_MAX_COLOR_TARGETS];
     uint32_t colorTargetCount;
     mrhiDepthTarget depthTarget;
     // The views it renders: 1 without multiview.
     uint32_t viewCount;
     // The stores the compile derived for its targets.
-    mrhiStoreOp colorStores[MRHI_COLOR_TARGETS];
+    mrhiStoreOp colorStores[MRHI_MAX_COLOR_TARGETS];
     mrhiStoreOp depthStore;
     mrhiStoreOp stencilStore;
     // Its recording: an mrhiRecording, claimed atomically by the thread
@@ -555,7 +555,7 @@ struct mrhiDevice
     uint32_t frameProgramChunks;
     uint32_t frameChunkLimit;
     _Atomic uint32_t frameChunksTaken;
-    // Each pass's label, MRHI_LABEL_BYTES apiece; and the tables a
+    // Each pass's label, MRHI_MAX_LABEL_BYTES apiece; and the tables a
     // submitted frame's view is built in.
     char* frameLabels;
     mrhiDriverPass* driverPasses;
@@ -593,6 +593,10 @@ const mrhiDriverAdapter* mrhiCheckDeviceDef(mrhiInstance* instance, const mrhiDe
 // Counts one misuse refused by a check on the device, records it, and
 // returns mrhi_errorInvalid.
 mrhiResult mrhiDeviceMisuse(mrhiDevice* device, mrhiDiagnosticCode code);
+
+// Counts one misuse refused by a fixed bound of the library, records it,
+// and returns mrhi_errorLimit.
+mrhiResult mrhiDeviceOverLimit(mrhiDevice* device, mrhiDiagnosticCode code);
 
 // Records bad untrusted data refused by a check on the device, counting no
 // misuse, and returns mrhi_errorFormat.

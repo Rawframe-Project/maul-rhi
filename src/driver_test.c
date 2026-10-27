@@ -233,7 +233,7 @@ typedef struct TestDevice
     uint64_t pipelinesMade;
     uint64_t pipelinesCached;
     // The last label an object was given, copied as a real driver would.
-    char label[MRHI_LABEL_BYTES + 1];
+    char label[MRHI_MAX_LABEL_BYTES + 1];
     // Configured surfaces; the core ends each before the device.
     uint32_t swapchains;
     // Running frames; held ones finish only through a wait.
@@ -253,7 +253,7 @@ typedef struct TestDevice
 // allow.
 static void Name(TestDevice* device, const char* label, size_t length)
 {
-    MRHI_ASSERT(length <= MRHI_LABEL_BYTES && (label != nullptr || length == 0));
+    MRHI_ASSERT(length <= MRHI_MAX_LABEL_BYTES && (label != nullptr || length == 0));
     device->named += length > 0 ? 1 : 0;
     for (size_t i = 0; i < length; ++i)
     {

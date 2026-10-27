@@ -54,10 +54,13 @@ static mrhiDevice* s_device;
 // rounded down to a multiple of 8.
 #define MAX_SAFE_MULTIPLE_OF_8 UINT64_C(9007199254740984)
 
-// Reports a case whose outcome differs from the CTS's.
+// Reports a case whose outcome differs from the CTS's. A validation
+// error is input a correct program never passes: invalid, or past a
+// fixed bound of the library.
 static void Expect(const char* test, mrhiResult result, bool succeeds)
 {
-    bool ok = succeeds ? result == mrhi_success : result == mrhi_errorInvalid;
+    bool ok = succeeds ? result == mrhi_success
+                       : result == mrhi_errorInvalid || result == mrhi_errorLimit;
     if (!ok)
     {
         printf("FAIL: %s: %d, the CTS expects %s\n", test, (int)result,
@@ -1637,13 +1640,13 @@ static mrhiTextureId MakeAttachment(const Attachment* a)
 static mrhiResult RenderPass(const Attachment* colors, const Attachment* resolves, uint32_t count,
                              Attachment depth)
 {
-    mrhiTextureId textures[2 * MRHI_COLOR_TARGETS + 2] = {0};
+    mrhiTextureId textures[2 * MRHI_MAX_COLOR_TARGETS + 2] = {0};
     uint32_t made = 0;
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success, "a frame");
     mrhiPassDef def = mrhiDefaultPassDef();
     def.neverCull = true;
-    for (uint32_t i = 0; i < count && i < MRHI_COLOR_TARGETS; ++i)
+    for (uint32_t i = 0; i < count && i < MRHI_MAX_COLOR_TARGETS; ++i)
     {
         mrhiColorTarget* target = &def.colorTargets[i];
         textures[made] = MakeAttachment(&colors[i]);
@@ -1712,11 +1715,11 @@ static void TestRenderPasses(void)
     Expect("render_pass_descriptor:attachments,one_depth_stencil_attachment",
            RenderPass(nullptr, nullptr, 0, depth), true);
     // color_attachments,limits,maxColorAttachments.
-    const Attachment many[MRHI_COLOR_TARGETS + 1] = {r8, r8, r8, r8, r8, r8, r8, r8, r8};
+    const Attachment many[MRHI_MAX_COLOR_TARGETS + 1] = {r8, r8, r8, r8, r8, r8, r8, r8, r8};
     Expect("render_pass_descriptor:color_attachments,limits,maxColorAttachments 8",
-           RenderPass(many, nullptr, MRHI_COLOR_TARGETS, s_none), true);
+           RenderPass(many, nullptr, MRHI_MAX_COLOR_TARGETS, s_none), true);
     Expect("render_pass_descriptor:color_attachments,limits,maxColorAttachments 9",
-           RenderPass(many, nullptr, MRHI_COLOR_TARGETS + 1, s_none), false);
+           RenderPass(many, nullptr, MRHI_MAX_COLOR_TARGETS + 1, s_none), false);
     // attachments,same_size.
     const Attachment ones[2] = {one, one};
     const Attachment oneTwo[2] = {one, two};

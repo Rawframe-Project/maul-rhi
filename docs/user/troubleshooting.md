@@ -4,13 +4,13 @@ How to learn why a call was refused, check a driver, see names in GPU debuggers,
 
 ## Why a call was refused
 
-Every `mrhi_errorInvalid` counts one misuse on its instance or device (`mrhiGetInstanceMisuse`, `mrhiGetDeviceMisuse`), which a release build can watch cheaply: a count that grows means the program has a bug. Bad data, a damaged container or an entry, constants or pipeline state its reflection refuses, is `mrhi_errorFormat` and counts none, so data a program does not control cannot move the count.
+Every `mrhi_errorInvalid` and `mrhi_errorLimit` counts one misuse on its instance or device (`mrhiGetInstanceMisuse`, `mrhiGetDeviceMisuse`), which a release build can watch cheaply: a count that grows means the program has a bug. Bad data, a damaged container or an entry, constants or pipeline state its reflection refuses, is `mrhi_errorFormat` and counts none, so data a program does not control cannot move the count.
 
-To learn which check refused a call, give the instance's or the device's limits a `diagnostics` capacity (0 by default, keeping none). Each refusal, `mrhi_errorInvalid` or `mrhi_errorFormat`, is then also a record in a bounded queue, as is each `mrhi_errorCapacity` of a frame call, under a code naming the limit it reached or, for a submission its driver refused, the driver's budget that ran out, taken with `mrhiNextInstanceDiagnostic` or `mrhiNextDeviceDiagnostic`. A record holds an `mrhiDiagnosticCode`, which names the check, and a count: a refusal by the same check as the newest record adds to its count. A full queue keeps its first records and drops new ones; the misuse counts stay exact.
+To learn which check refused a call, give the instance's or the device's limits a `diagnostics` capacity (0 by default, keeping none). Each refusal, `mrhi_errorInvalid`, `mrhi_errorLimit` or `mrhi_errorFormat`, is then also a record in a bounded queue, as is each `mrhi_errorCapacity` of a frame call, under a code naming the limit it reached or, for a submission its driver refused, the driver's budget that ran out, taken with `mrhiNextInstanceDiagnostic` or `mrhiNextDeviceDiagnostic`. A record holds an `mrhiDiagnosticCode`, which names the check, and a count: a refusal by the same check as the newest record adds to its count. A full queue keeps its first records and drops new ones; the misuse counts stay exact.
 
 `mrhiDiagnosticText` gives each code's English sentence. Compare codes, not texts: texts may be reworded.
 
-Results other than `mrhi_errorInvalid` say what went wrong by themselves; [getting started](getting-started.md#the-rules-every-call-follows) lists them, and each function's documentation says when it returns each.
+Results other than `mrhi_errorInvalid` and `mrhi_errorLimit` say what went wrong by themselves; [getting started](getting-started.md#the-rules-every-call-follows) lists them, and each function's documentation says when it returns each.
 
 ## The validation layer
 

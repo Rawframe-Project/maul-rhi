@@ -131,8 +131,8 @@ static void TestCodes(void)
               Refusal(device) == mrhi_diagnosticGraphicsDepthStencil,
           "an infinite bias");
     def = Def();
-    def.colorTargetCount = MRHI_COLOR_TARGETS + 1;
-    CHECK(Made(device, &def) == mrhi_errorInvalid &&
+    def.colorTargetCount = MRHI_MAX_COLOR_TARGETS + 1;
+    CHECK(Made(device, &def) == mrhi_errorLimit &&
               Refusal(device) == mrhi_diagnosticGraphicsTargets,
           "too many targets");
     def = Def();
@@ -589,8 +589,8 @@ static void TestTargets(void)
 {
     mrhiDevice* device = Open();
     mrhiGraphicsPipelineDef def = Def();
-    def.colorTargetCount = MRHI_COLOR_TARGETS + 1;
-    CHECK(Made(device, &def) == mrhi_errorInvalid, "more targets than there are");
+    def.colorTargetCount = MRHI_MAX_COLOR_TARGETS + 1;
+    CHECK(Made(device, &def) == mrhi_errorLimit, "more targets than there are");
     def = Def();
     def.colorTargets[0].format = mrhi_formatDepth32Float;
     CHECK(Made(device, &def) == mrhi_errorInvalid, "a depth format as color");

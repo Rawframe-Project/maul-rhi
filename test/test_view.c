@@ -270,13 +270,13 @@ static void TestRefusalsAndState(void)
     def.cookie = 0;
     CHECK(Make(def) == mrhi_errorInvalid, "no cookie");
     def = Def(texture, mrhi_texture2d);
-    char label[MRHI_LABEL_BYTES + 1];
+    char label[MRHI_MAX_LABEL_BYTES + 1];
     memset(label, 'v', sizeof(label));
     def.label = label;
-    def.labelLength = MRHI_LABEL_BYTES;
+    def.labelLength = MRHI_MAX_LABEL_BYTES;
     CHECK(Make(def) == mrhi_success, "a label at the bound");
-    def.labelLength = MRHI_LABEL_BYTES + 1;
-    CHECK(Make(def) == mrhi_errorInvalid, "a label past the bound");
+    def.labelLength = MRHI_MAX_LABEL_BYTES + 1;
+    CHECK(Make(def) == mrhi_errorLimit, "a label past the bound");
     def = Def((mrhiTextureId){0, 0}, mrhi_texture2d);
     CHECK(Make(def) == mrhi_errorStale, "no texture");
     CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "done");

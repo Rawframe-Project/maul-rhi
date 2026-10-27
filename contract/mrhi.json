@@ -80,19 +80,24 @@
               "doc": "The program was built against another contract version."
             },
             {
-              "name": "error_out_of_date",
+              "name": "error_format",
               "value": -8,
+              "doc": "The data is malformed or does not contain what was asked for: a damaged shader container or pipeline cache, or an entry, constants or pipeline state its reflection does not take. Every check on such bytes fails with it, a bound included. Bad data is not a bug in the calling code, so it counts no misuse."
+            },
+            {
+              "name": "error_limit",
+              "value": -9,
+              "doc": "An argument passes a fixed bound of the library, published as a named constant (MRHI_MAX_LABEL_BYTES, MRHI_MAX_COLOR_TARGETS, MRHI_MAX_INDIRECT_DRAWS, MRHI_MAX_NATIVE_PASSES, MRHI_MAX_QUERY_SET_QUERIES). More room would not help. It counts one misuse, as invalid input does."
+            },
+            {
+              "name": "error_out_of_date",
+              "value": -32,
               "doc": "A surface no longer matches its window: configure it again before acquiring."
             },
             {
               "name": "error_device_lost",
-              "value": -9,
+              "value": -33,
               "doc": "The device is lost: the GPU was reset, removed or its driver failed."
-            },
-            {
-              "name": "error_format",
-              "value": -10,
-              "doc": "The data is malformed or does not contain what was asked for: a damaged shader container, or an entry, constants or pipeline state its reflection does not take. Bad data is not a bug in the calling code, so it counts no misuse."
             }
           ]
         },
@@ -285,7 +290,7 @@
         },
         {
           "kind": "constant",
-          "name": "label_bytes",
+          "name": "max_label_bytes",
           "value": 256,
           "doc": "The bytes a debug label may take, in UTF-8."
         },
@@ -342,7 +347,7 @@
             {
               "name": "diagnostic_def_header",
               "value": 2,
-              "doc": "A def lacks its cookie (start from its default def), carries a malformed extension chain or one deeper than the chainDepth limit, or a label that is not UTF-8 of at most MRHI_LABEL_BYTES."
+              "doc": "A def lacks its cookie (start from its default def), carries a malformed extension chain or one deeper than the chainDepth limit, or a label that is not UTF-8 of at most MRHI_MAX_LABEL_BYTES."
             },
             {
               "name": "diagnostic_adapter_request_def",
@@ -457,7 +462,7 @@
             {
               "name": "diagnostic_indirect_count_limit",
               "value": 31,
-              "doc": "A counted indirect draw whose maxCount is zero or past MRHI_INDIRECT_DRAWS."
+              "doc": "A counted indirect draw whose maxCount is zero or past MRHI_MAX_INDIRECT_DRAWS."
             },
             {
               "name": "diagnostic_viewport",
@@ -477,7 +482,7 @@
             {
               "name": "diagnostic_debug_label",
               "value": 35,
-              "doc": "A debug label that is empty, not UTF-8, or longer than MRHI_LABEL_BYTES."
+              "doc": "A debug label that is empty, not UTF-8, or longer than MRHI_MAX_LABEL_BYTES."
             },
             {
               "name": "diagnostic_debug_group_underflow",
@@ -697,7 +702,7 @@
             {
               "name": "diagnostic_graphics_targets",
               "value": 88,
-              "doc": "A graphics pipeline's color targets are more than MRHI_COLOR_TARGETS, present without a fragment entry, malformed (format, blend or writes), not written by the fragment entry's outputs as their types allow, or absent with no depth either."
+              "doc": "A graphics pipeline's color targets are more than MRHI_MAX_COLOR_TARGETS, present without a fragment entry, malformed (format, blend or writes), not written by the fragment entry's outputs as their types allow, or absent with no depth either."
             },
             {
               "name": "diagnostic_graphics_multisample",
@@ -777,7 +782,7 @@
             {
               "name": "diagnostic_pass_color_targets",
               "value": 104,
-              "doc": "A pass def with more than MRHI_COLOR_TARGETS color targets."
+              "doc": "A pass def with more than MRHI_MAX_COLOR_TARGETS color targets."
             },
             {
               "name": "diagnostic_pass_views",
@@ -852,7 +857,7 @@
             {
               "name": "diagnostic_native_passes",
               "value": 119,
-              "doc": "A native pass added past MRHI_NATIVE_PASSES in one frame."
+              "doc": "A native pass added past MRHI_MAX_NATIVE_PASSES in one frame."
             },
             {
               "name": "diagnostic_submit_memory",
@@ -6534,7 +6539,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
             },
             {
               "name": "label_length",
@@ -6615,7 +6620,7 @@
           "doc": "Makes a device on an adapter. It returns at once with the device opening, and the instance's queue answers the request with mrhi_instanceDeviceReady.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` with the device opening; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a zero limit, limits below the floor or an allocator with one function; `mrhi_errorStale` for an adapter the instance no longer has; `mrhi_errorUnsupported` for features or limits beyond the adapter's, or a critical extension the library does not know; `mrhi_errorCapacity` when the instance's queue has no room for the answer or an allocator fails."
+            "doc": "`mrhi_success` with the device opening; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a zero limit, limits below the floor or an allocator with one function; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for an adapter the instance no longer has; `mrhi_errorUnsupported` for features or limits beyond the adapter's, or a critical extension the library does not know; `mrhi_errorCapacity` when the instance's queue has no room for the answer or an allocator fails."
           },
           "args": [
             {
@@ -7529,7 +7534,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
               "mapping": {
                 "vulkan": {
                   "class": "restricted",
@@ -7821,7 +7826,7 @@
           "doc": "Makes a sampler on a ready device.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a value out of range, anisotropy with a nearest filter, or levels of detail out of order; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the device's sampler limit is reached."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a value out of range, anisotropy with a nearest filter, or levels of detail out of order; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the device's sampler limit is reached."
           },
           "args": [
             {
@@ -8119,7 +8124,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
               "mapping": {
                 "vulkan": {
                   "class": "restricted",
@@ -8230,7 +8235,7 @@
           "doc": "Makes a buffer on a ready device. It reads as zeros until the frame graph writes it: the first frame that imports it clears it whole, in a pass of the library's own that takes nothing from the frame's budgets, so the program's first use of it sees zeros. Passes that do not use it may run beside that clear.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a size of 0 or not a multiple of 4, or no usage or an unknown one; `mrhi_errorUnsupported` for a size beyond the device's bufferBytes limit or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's buffer limit is reached; `mrhi_errorPlatform` when the driver fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a size of 0 or not a multiple of 4, or no usage or an unknown one; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size beyond the device's bufferBytes limit or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's buffer limit is reached; `mrhi_errorPlatform` when the driver fails."
           },
           "args": [
             {
@@ -8613,7 +8618,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
               "mapping": {
                 "vulkan": {
                   "class": "restricted",
@@ -8886,7 +8891,7 @@
           "doc": "Makes a texture on a ready device. It reads as zeros until the frame graph writes it, in every mip, layer and aspect: the first frame that imports it clears it whole, in a pass of the library's own that takes nothing from the frame's budgets, so the program's first use of it sees zeros. Passes that do not use it may run beside that clear. A texture of one mip and layer whose first use is a target that clears it and keeps the result is not cleared before, as that use writes all of it. A transient texture is never cleared, as its contents live only inside a render pass.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, an unknown kind, format, usage or view format, a zero size, a size or layer count that does not fit the kind or the format's block, too many mips, an unusable sample count, or a transient texture that is not only a render target; `mrhi_errorUnsupported` for a size past the device's limits, a usage or sample count the format cannot take on the device, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's texture limit is reached; `mrhi_errorPlatform` when the driver fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, an unknown kind, format, usage or view format, a zero size, a size or layer count that does not fit the kind or the format's block, too many mips, an unusable sample count, or a transient texture that is not only a render target; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the device's limits, a usage or sample count the format cannot take on the device, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's texture limit is reached; `mrhi_errorPlatform` when the driver fails."
           },
           "args": [
             {
@@ -9075,7 +9080,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
               "mapping": {
                 "vulkan": {
                   "class": "restricted",
@@ -9347,7 +9352,7 @@
           "doc": "Makes a view of a texture on a ready device.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, an unknown kind, usage or aspect, a kind the texture cannot be seen as, a format the texture was not given, uses the texture lacks, an aspect its format lacks, or a mip or layer range that is empty, past the texture's end or wrong for the kind; `mrhi_errorStale` for a texture the device no longer has; `mrhi_errorUnsupported` for a use the view's format cannot take on the device, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's view limit is reached; `mrhi_errorPlatform` when the driver fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, an unknown kind, usage or aspect, a kind the texture cannot be seen as, a format the texture was not given, uses the texture lacks, an aspect its format lacks, or a mip or layer range that is empty, past the texture's end or wrong for the kind; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for a texture the device no longer has; `mrhi_errorUnsupported` for a use the view's format cannot take on the device, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's view limit is reached; `mrhi_errorPlatform` when the driver fails."
           },
           "args": [
             {
@@ -9526,6 +9531,12 @@
           "doc": "A query index that names no query."
         },
         {
+          "kind": "constant",
+          "name": "max_query_set_queries",
+          "value": 4096,
+          "doc": "The queries a query set holds at most."
+        },
+        {
           "kind": "struct",
           "name": "query_set_def",
           "def": true,
@@ -9536,7 +9547,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
               "mapping": {
                 "vulkan": {
                   "class": "restricted",
@@ -9605,7 +9616,7 @@
             {
               "name": "count",
               "type": "uint32",
-              "doc": "Its queries, 1 to 4096.",
+              "doc": "Its queries, 1 to MRHI_MAX_QUERY_SET_QUERIES.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -9647,7 +9658,7 @@
           "doc": "Makes a query set on a ready device.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, an unknown type, or a count of 0 or past 4096; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know, timestamps without the timestamp_query feature, or pipeline statistics without the pipeline_statistics_query feature; `mrhi_errorCapacity` when the device's querySets limit is reached or its queries limit lacks a run of count queries."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, an unknown type, or a count of 0; `mrhi_errorLimit` for a count past MRHI_MAX_QUERY_SET_QUERIES or a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know, timestamps without the timestamp_query feature, or pipeline statistics without the pipeline_statistics_query feature; `mrhi_errorCapacity` when the device's querySets limit is reached or its queries limit lacks a run of count queries."
           },
           "args": [
             {
@@ -9985,7 +9996,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read during the call.",
               "mapping": {
                 "vulkan": {
                   "class": "restricted",
@@ -10096,7 +10107,7 @@
           "doc": "Makes a bindless heap on a ready device, every entry empty.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, or 0 entries; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know, a device without the bindless_sampling feature, or entries or samplers past its heapSize or samplerHeapSize; `mrhi_errorCapacity` when the device's heaps limit is reached or the allocator fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, or 0 entries; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know, a device without the bindless_sampling feature, or entries or samplers past its heapSize or samplerHeapSize; `mrhi_errorCapacity` when the device's heaps limit is reached or the allocator fails."
           },
           "args": [
             {
@@ -11107,7 +11118,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
             },
             {
               "name": "label_length",
@@ -11154,7 +11165,7 @@
           "doc": "Makes a surface from a window's native handles.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, or a def without exactly one source; `mrhi_errorUnsupported` for a source the instance's driver cannot use, an instance without a driver, or a critical extension the library does not know; `mrhi_errorCapacity` when the instance's surface limit is reached; `mrhi_errorPlatform` when the driver fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, or a def without exactly one source; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a source the instance's driver cannot use, an instance without a driver, or a critical extension the library does not know; `mrhi_errorCapacity` when the instance's surface limit is reached; `mrhi_errorPlatform` when the driver fails."
           },
           "args": [
             {
@@ -11977,7 +11988,7 @@
           "doc": "Declares a texture the open frame's graph makes, aliases and ends with the frame. Its usages are derived from the passes that use it, and checked against its format when the frame is compiled. A pass may read it, or load a target of it, only after an earlier pass wrote it; texels no pass wrote, beside a write to part of it, are undefined and differ by backend.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a usage other than 0, or a shape mrhiCreateTexture refuses as invalid; `mrhi_errorUnsupported` for a size past the device's limits, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's frameResources limit is reached."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a usage other than 0, or a shape mrhiCreateTexture refuses as invalid; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the device's limits, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's frameResources limit is reached."
           },
           "args": [
             {
@@ -12029,7 +12040,7 @@
           "doc": "Declares a buffer the open frame's graph makes, aliases and ends with the frame. Its usages are derived from the passes that use it. A pass may read it only after an earlier pass wrote it; bytes no pass wrote, beside a write to part of it, are undefined and differ by backend.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL within MRHI_LABEL_BYTES, a usage other than 0, or a size that is zero or not a multiple of 4; `mrhi_errorUnsupported` for a size past the device's bufferBytes, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's frameResources limit is reached."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a usage other than 0, or a size that is zero or not a multiple of 4; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the device's bufferBytes, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's frameResources limit is reached."
           },
           "args": [
             {
@@ -12247,7 +12258,7 @@
         },
         {
           "kind": "constant",
-          "name": "native_passes",
+          "name": "max_native_passes",
           "value": 8,
           "doc": "The native passes a frame holds at most (mrhiPassDef's native)."
         },
@@ -12803,7 +12814,7 @@
         },
         {
           "kind": "constant",
-          "name": "color_targets",
+          "name": "max_color_targets",
           "value": 8,
           "doc": "The color targets one pass writes at most."
         },
@@ -13013,7 +13024,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "A name for debugging tools, shown around the pass's work: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
+              "doc": "A name for debugging tools, shown around the pass's work: UTF-8 without NUL, labelLength bytes, at most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
             },
             {
               "name": "label_length",
@@ -13049,13 +13060,13 @@
             {
               "name": "color_targets",
               "type": "struct.color_target",
-              "array": "color_targets",
+              "array": "max_color_targets",
               "doc": "Its color targets, colorTargetCount of them."
             },
             {
               "name": "color_target_count",
               "type": "uint32",
-              "doc": "How many, at most MRHI_COLOR_TARGETS."
+              "doc": "How many, at most MRHI_MAX_COLOR_TARGETS."
             },
             {
               "name": "depth_target",
@@ -13132,7 +13143,7 @@
           "doc": "Declares a pass of the open frame, after the passes declared before it in its class.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an unknown class, kind, aspect or operation, an access or target its resource cannot take (a kind for the other resource type, a range outside the texture, a use an imported object was not made with, a target that does not render or depth-test, a use of a sealed resource other than the reads its sealed state allows), targets of different sizes or sample counts, views past one on a native pass or one without targets, targets without a layer for each view or of a 3D texture with views past one, a resolve that does not match, a subresource written and used otherwise in the pass, an access the class does not allow, a declared resource read before any pass wrote it, an occlusion query set that is not one or is named by a pass without targets, or timestamps of a set that is not a timestamp set, without a set, with neither query, with both the same, or with a query past the set's count or already written in this frame; `mrhi_errorStale` for a resource of another frame, an imported object destroyed since, or a query set or heap the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know, or views past one without the multiview feature or past its limit; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorCapacity` when the device's framePasses or frameAccesses limit is reached."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an unknown class, kind, aspect or operation, an access or target its resource cannot take (a kind for the other resource type, a range outside the texture, a use an imported object was not made with, a target that does not render or depth-test, a use of a sealed resource other than the reads its sealed state allows), targets of different sizes or sample counts, views past one on a native pass or one without targets, targets without a layer for each view or of a 3D texture with views past one, a resolve that does not match, a subresource written and used otherwise in the pass, an access the class does not allow, a declared resource read before any pass wrote it, an occlusion query set that is not one or is named by a pass without targets, or timestamps of a set that is not a timestamp set, without a set, with neither query, with both the same, or with a query past the set's count or already written in this frame; `mrhi_errorLimit` for more than MRHI_MAX_COLOR_TARGETS color targets, a native pass past MRHI_MAX_NATIVE_PASSES in the frame or a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for a resource of another frame, an imported object destroyed since, or a query set or heap the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know, or views past one without the multiview feature or past its limit; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorCapacity` when the device's framePasses or frameAccesses limit is reached."
           },
           "args": [
             {
@@ -13816,7 +13827,7 @@
             {
               "name": "color_stores",
               "type": "enum.store_op",
-              "array": "color_targets",
+              "array": "max_color_targets",
               "doc": "What each color target keeps: its own store, made a discard when nothing later reads it and it is not imported."
             },
             {
@@ -14206,7 +14217,7 @@
         },
         {
           "kind": "constant",
-          "name": "table_bindings",
+          "name": "max_table_bindings",
           "value": 126,
           "doc": "The bindings one table of a container holds at most: a table set while recording fits one chunk of the frame's commands."
         },
@@ -15255,7 +15266,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
             },
             {
               "name": "label_length",
@@ -15347,7 +15358,7 @@
           "doc": "Loads a shader container on a ready device, checking every byte of it as hostile input.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, or bytes that are not 8-byte aligned; `mrhi_errorFormat` for a container that is malformed, damaged or contradicts itself; `mrhi_errorVersion` for a container of another version or holding a section type the library does not know; `mrhi_errorUnsupported` for a root block, bindings, a workgroup or interface variables past the device's limits, a table of more than MRHI_TABLE_BINDINGS bindings, 16-bit floats on a device without shaderF16, the primitive index builtin, heap uses on a device without bindless_sampling, or storage ones without bindless_heterogeneous, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's shader limit is reached or its allocator fails; `mrhi_errorPlatform` when the driver refuses the code."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, or bytes that are not 8-byte aligned; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorFormat` for a container that is malformed, damaged or contradicts itself, or holds a table of more than MRHI_MAX_TABLE_BINDINGS bindings; `mrhi_errorVersion` for a container of another version or holding a section type the library does not know; `mrhi_errorUnsupported` for a root block, bindings, a workgroup or interface variables past the device's limits, 16-bit floats on a device without shaderF16, the primitive index builtin, heap uses on a device without bindless_sampling, or storage ones without bindless_heterogeneous, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's shader limit is reached or its allocator fails; `mrhi_errorPlatform` when the driver refuses the code."
           },
           "args": [
             {
@@ -18098,7 +18109,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
             },
             {
               "name": "label_length",
@@ -18247,13 +18258,13 @@
             {
               "name": "color_targets",
               "type": "struct.color_target_state",
-              "array": "color_targets",
+              "array": "max_color_targets",
               "doc": "The color targets by location, colorTargetCount of them."
             },
             {
               "name": "color_target_count",
               "type": "uint32",
-              "doc": "How many, at most MRHI_COLOR_TARGETS; 0 without a fragment entry."
+              "doc": "How many, at most MRHI_MAX_COLOR_TARGETS; 0 without a fragment entry."
             },
             {
               "name": "constants",
@@ -18311,7 +18322,7 @@
           "doc": "Makes a graphics pipeline on a ready device, checked against its shader's reflection and the device as WebGPU checks it. It returns at once with the pipeline pending, and the device's queue answers the request with mrhi_devicePipelineReady; a pipeline is usable once that answer is mrhi_success.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` with the pipeline pending; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, a NULL vertex entry, a NULL fragment entry with a length, constants as for compute pipelines, or state that contradicts itself or WebGPU's rules; `mrhi_errorFormat` for entries the shader has not as vertex and fragment entries, constants as for compute pipelines, or state the reflection refuses: a vertex input without an attribute of its scalar class, a fragment depth without a depth format, a target its fragment output does not fit, blending by an alpha or a second source the output lacks, alpha to coverage with a written sample mask, or a fragment input no vertex output matches; invalid input outranks format, and format outranks unsupported; `mrhi_errorStale` for a shader the device no longer has; `mrhi_errorUnsupported` for vertex buffers, attributes, strides, inter-stage variables or color bytes past the device's limits, target formats the device cannot render, blend or multisample as asked, unclipped depth without its feature, views past one without multiview or past its limit, a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's pipeline limit is reached or its queue has no room for the answer; `mrhi_errorPlatform` when the driver refuses at once."
+            "doc": "`mrhi_success` with the pipeline pending; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, a NULL vertex entry, a NULL fragment entry with a length, constants as for compute pipelines, or state that contradicts itself or WebGPU's rules; `mrhi_errorLimit` for more than MRHI_MAX_COLOR_TARGETS color targets or a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorFormat` for entries the shader has not as vertex and fragment entries, constants as for compute pipelines, or state the reflection refuses: a vertex input without an attribute of its scalar class, a fragment depth without a depth format, a target its fragment output does not fit, blending by an alpha or a second source the output lacks, alpha to coverage with a written sample mask, or a fragment input no vertex output matches; more color targets than the bound are refused first, unread; invalid input outranks format, and format outranks unsupported; `mrhi_errorStale` for a shader the device no longer has; `mrhi_errorUnsupported` for vertex buffers, attributes, strides, inter-stage variables or color bytes past the device's limits, target formats the device cannot render, blend or multisample as asked, unclipped depth without its feature, views past one without multiview or past its limit, a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's pipeline limit is reached or its queue has no room for the answer; `mrhi_errorPlatform` when the driver refuses at once."
           },
           "args": [
             {
@@ -18421,7 +18432,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
+              "doc": "A name for debugging tools: UTF-8 without NUL, labelLength bytes, at most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read during the call."
             },
             {
               "name": "label_length",
@@ -18495,7 +18506,7 @@
           "doc": "Makes a compute pipeline on a ready device. It returns at once with the pipeline pending, and the device's queue answers the request with mrhi_devicePipelineReady; a pipeline is usable once that answer is mrhi_success.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` with the pipeline pending; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, a NULL entry, NULL constants with a count, or a constant given twice; `mrhi_errorFormat` for an entry the shader has not as a compute entry, a constant the shader has not or with a value its type cannot hold, or a constant without a default left unset; `mrhi_errorStale` for a shader the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's pipeline limit is reached or its queue has no room for the answer; `mrhi_errorPlatform` when the driver refuses at once."
+            "doc": "`mrhi_success` with the pipeline pending; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, a NULL entry, NULL constants with a count, or a constant given twice; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorFormat` for an entry the shader has not as a compute entry, a constant the shader has not or with a value its type cannot hold, or a constant without a default left unset; `mrhi_errorStale` for a shader the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's pipeline limit is reached or its queue has no room for the answer; `mrhi_errorPlatform` when the driver refuses at once."
           },
           "args": [
             {
@@ -18652,7 +18663,7 @@
           "doc": "Reports what became of the pipeline cache the device's def gave. An unusable cache never fails a device; it only goes unused.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` for a cache the driver took; `mrhi_empty` when the def gave none; `mrhi_errorVersion` for one of another ABI version (MRHI_ABI_VERSION) or envelope version; `mrhi_errorStale` for one from another driver or adapter, or one the driver declined; `mrhi_errorInvalid` for a damaged one, or a NULL device."
+            "doc": "`mrhi_success` for a cache the driver took; `mrhi_empty` when the def gave none; `mrhi_errorVersion` for one of another ABI version (MRHI_ABI_VERSION) or envelope version; `mrhi_errorStale` for one from another driver or adapter, or one the driver declined; `mrhi_errorFormat` for a damaged one; `mrhi_errorInvalid` for a NULL device."
           },
           "args": [
             {
@@ -19689,7 +19700,7 @@
         },
         {
           "kind": "constant",
-          "name": "indirect_draws",
+          "name": "max_indirect_draws",
           "value": 65535,
           "doc": "The draws a counted multi-draw makes at most (mrhiDrawIndirectCount's maxCount)."
         },
@@ -19699,7 +19710,7 @@
           "doc": "Draws up to maxCount non-indexed draws with the pass's pipeline, tables and buffers, each from its own record of the single indirect draw's layout (16 bytes, packed one after another), the number drawn read on the GPU from a 32-bit count and clamped to maxCount. Each record follows the single draw's rules. Needs the multi_draw_indirect_count feature.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorUnsupported` for a device without the multi_draw_indirect_count feature; `mrhi_errorInvalid` for a NULL device, a maxCount of 0 or past MRHI_INDIRECT_DRAWS, a pass without targets, or an arguments or count resource that is not a buffer the pass declares with the indirect access, or an offset not a multiple of 4 or without maxCount records, or the count's 4 bytes, after it; `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or a resource that is not live; `mrhi_errorState` for a pass that is not recording, has no pipeline set, or lacks a table or vertex buffer the pipeline reads; `mrhi_errorCapacity` when the frame's commands are full, or its counted draws would pass the device's frameIndirectDraws."
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` for a device without the multi_draw_indirect_count feature; `mrhi_errorInvalid` for a NULL device, a maxCount of 0, a pass without targets, or an arguments or count resource that is not a buffer the pass declares with the indirect access, or an offset not a multiple of 4 or without maxCount records, or the count's 4 bytes, after it; `mrhi_errorLimit` for a maxCount past MRHI_MAX_INDIRECT_DRAWS; `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or a resource that is not live; `mrhi_errorState` for a pass that is not recording, has no pipeline set, or lacks a table or vertex buffer the pipeline reads; `mrhi_errorCapacity` when the frame's commands are full, or its counted draws would pass the device's frameIndirectDraws."
           },
           "args": [
             {
@@ -19736,7 +19747,7 @@
             {
               "name": "max_count",
               "type": "uint32",
-              "doc": "The draws made at most, 1 to MRHI_INDIRECT_DRAWS."
+              "doc": "The draws made at most, 1 to MRHI_MAX_INDIRECT_DRAWS."
             }
           ],
           "thread_safety": {
@@ -19770,7 +19781,7 @@
           "doc": "Draws up to maxCount indexed draws with the pass's pipeline, tables and buffers, each from its own record of the single indirect draw's layout (20 bytes, packed one after another), the number drawn read on the GPU from a 32-bit count and clamped to maxCount. Each record follows the single draw's rules. Needs the multi_draw_indirect_count feature.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorUnsupported` for a device without the multi_draw_indirect_count feature; `mrhi_errorInvalid` for a NULL device, a maxCount of 0 or past MRHI_INDIRECT_DRAWS, a pass without targets, or an arguments or count resource that is not a buffer the pass declares with the indirect access, or an offset not a multiple of 4 or without maxCount records, or the count's 4 bytes, after it; `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or a resource that is not live; `mrhi_errorState` for a pass that is not recording, has no pipeline set, lacks a table or vertex buffer the pipeline reads, or has no index buffer of the pipeline's strip index format; `mrhi_errorCapacity` when the frame's commands are full, or its counted draws would pass the device's frameIndirectDraws."
+            "doc": "`mrhi_success`; `mrhi_errorUnsupported` for a device without the multi_draw_indirect_count feature; `mrhi_errorInvalid` for a NULL device, a maxCount of 0, a pass without targets, or an arguments or count resource that is not a buffer the pass declares with the indirect access, or an offset not a multiple of 4 or without maxCount records, or the count's 4 bytes, after it; `mrhi_errorLimit` for a maxCount past MRHI_MAX_INDIRECT_DRAWS; `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or a resource that is not live; `mrhi_errorState` for a pass that is not recording, has no pipeline set, lacks a table or vertex buffer the pipeline reads, or has no index buffer of the pipeline's strip index format; `mrhi_errorCapacity` when the frame's commands are full, or its counted draws would pass the device's frameIndirectDraws."
           },
           "args": [
             {
@@ -19807,7 +19818,7 @@
             {
               "name": "max_count",
               "type": "uint32",
-              "doc": "The draws made at most, 1 to MRHI_INDIRECT_DRAWS."
+              "doc": "The draws made at most, 1 to MRHI_MAX_INDIRECT_DRAWS."
             }
           ],
           "thread_safety": {
@@ -21039,7 +21050,7 @@
           "doc": "Opens a named group of the pass's commands for debugging tools.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or a bad label; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or a bad label; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
           },
           "args": [
             {
@@ -21057,7 +21068,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "Its name: UTF-8 without NUL, labelLength bytes, 1 to MRHI_LABEL_BYTES. Only read during the call."
+              "doc": "Its name: UTF-8 without NUL, labelLength bytes, 1 to MRHI_MAX_LABEL_BYTES. Only read during the call."
             },
             {
               "name": "label_length",
@@ -21138,7 +21149,7 @@
           "doc": "Marks a point among the pass's commands for debugging tools.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or a bad label; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or a bad label; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
           },
           "args": [
             {
@@ -21156,7 +21167,7 @@
               "name": "label",
               "type": "char",
               "pointer": "const",
-              "doc": "Its name: UTF-8 without NUL, labelLength bytes, 1 to MRHI_LABEL_BYTES. Only read during the call."
+              "doc": "Its name: UTF-8 without NUL, labelLength bytes, 1 to MRHI_MAX_LABEL_BYTES. Only read during the call."
             },
             {
               "name": "label_length",
@@ -22349,5 +22360,5 @@
       ]
     }
   ],
-  "contract_version": 20
+  "contract_version": 21
 }

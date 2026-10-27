@@ -21,7 +21,7 @@ FSR, DLSS (through Streamline), XeSS and MetalFX record their work into a comman
 - Set `native` on the pass def. A native pass declares its accesses as any pass does, to imported resources only, with no targets, query sets or heap. Every encoder call refuses it.
 - While recording, hand it a command buffer the program recorded itself: `mrhiSetVulkanPassCommands` (a primary `VkCommandBuffer` from the program's own pool on the device's queue family), `mrhiSetD3d12PassCommands` (a closed direct `ID3D12GraphicsCommandList`) or `mrhiSetMetalPassCommands` (an `MTLCommandBuffer` from the device's queue, with no encoder open, not committed). WebGPU refuses native passes.
 - At submission the driver runs the program's commands between its own, with every declared resource in its access's state: on Vulkan, `SHADER_READ_ONLY_OPTIMAL` for sampled textures, `GENERAL` for storage, `TRANSFER_SRC_OPTIMAL` and `TRANSFER_DST_OPTIMAL` for copies; on Direct3D 12 the matching resource states, with buffers in the common state; Metal tracks the hazards itself. The program's commands must leave every declared resource in the same state.
-- A frame holds at most `MRHI_NATIVE_PASSES` native passes, and each costs a full barrier on each side.
+- A frame holds at most `MRHI_MAX_NATIVE_PASSES` native passes, and each costs a full barrier on each side.
 
 The native objects an upscaler is made from are borrowed for the device's life: `mrhiGetVulkanDevice` (the instance, physical device, device and the library's `vkGetInstanceProcAddr` and `vkGetDeviceProcAddr`), `mrhiGetD3d12Device` (the device and its queue), `mrhiGetMetalDevice` (the device and its queue), and `mrhiGetVulkanTexture`, `mrhiGetD3d12Texture` and `mrhiGetMetalTexture` for a device texture's native object.
 

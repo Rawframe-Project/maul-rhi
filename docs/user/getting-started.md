@@ -106,7 +106,8 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
 | Result | Meaning |
 |---|---|
 | `mrhi_errorInvalid` | An argument the call can never take. It also counts one misuse on the instance or device. |
-| `mrhi_errorFormat` | The data is malformed or does not contain what was asked for: a damaged shader container, or an entry, constants or pipeline state its reflection refuses. Bad data is not a bug in the program, so it counts no misuse. |
+| `mrhi_errorLimit` | An argument past a fixed bound of the library, each a named constant: `MRHI_MAX_LABEL_BYTES`, `MRHI_MAX_COLOR_TARGETS`, `MRHI_MAX_INDIRECT_DRAWS`, `MRHI_MAX_NATIVE_PASSES`, `MRHI_MAX_QUERY_SET_QUERIES`. More room would not help. It counts one misuse, as invalid input does. |
+| `mrhi_errorFormat` | The data is malformed or does not contain what was asked for: a damaged shader container or pipeline cache, or an entry, constants or pipeline state its reflection refuses. Bad data is not a bug in the program, so it counts no misuse. |
 | `mrhi_errorStale` | An id whose object is gone. |
 | `mrhi_errorCapacity` | A limit is reached. |
 | `mrhi_errorUnsupported` | The adapter or driver cannot do it. |
@@ -116,7 +117,7 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
 | `mrhi_errorPlatform` | The platform refused, for a reason the library cannot name. |
 | `mrhi_errorDeviceLost` | The device is lost; see [devices](devices.md#device-loss). |
 
-`mrhiResultName` names any value. [Troubleshooting](troubleshooting.md) shows how to learn which check refused a call.
+The values follow the Maul family's numbering, so a raw value logged by a program reads the same in every Maul library: the shared errors are -1 to -9, and Maul RHI's own, `mrhi_errorOutOfDate` and `mrhi_errorDeviceLost`, are -32 and -33. `mrhiResultName` names any value. [Troubleshooting](troubleshooting.md) shows how to learn which check refused a call.
 
 **Ids.** The instance and devices are pointers. Everything they own is an id with a generation: an id outlives its object harmlessly, and using it afterwards answers `mrhi_errorStale`. A call that gives a pointer or an id (a creation, a frame's resource or pass, a request) sets it to NULL or the null id first, so after any failure it holds nothing to destroy, wait on or use.
 

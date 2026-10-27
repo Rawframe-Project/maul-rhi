@@ -515,8 +515,9 @@ static mrhiResult CheckNative(mrhiDevice* device, const mrhiPassDef* def)
     {
         natives += device->framePasses[i].native ? 1u : 0u;
     }
-    return natives < MRHI_NATIVE_PASSES ? mrhi_success
-                                        : mrhiDeviceFull(device, mrhi_diagnosticNativePasses);
+    return natives < MRHI_MAX_NATIVE_PASSES
+               ? mrhi_success
+               : mrhiDeviceOverLimit(device, mrhi_diagnosticNativePasses);
 }
 
 static mrhiResult CheckDef(mrhiDevice* device, const mrhiPassDef* def)
@@ -535,9 +536,9 @@ static mrhiResult CheckDef(mrhiDevice* device, const mrhiPassDef* def)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
-    if (def->colorTargetCount > MRHI_COLOR_TARGETS)
+    if (def->colorTargetCount > MRHI_MAX_COLOR_TARGETS)
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticPassColorTargets);
+        return mrhiDeviceOverLimit(device, mrhi_diagnosticPassColorTargets);
     }
     if (ViewsOf(def) > 1 && (def->native || !targets))
     {
@@ -654,7 +655,7 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
     }
     if (pass->labelLength > 0)
     {
-        memcpy(&device->frameLabels[(size_t)(device->framePassCount - 1) * MRHI_LABEL_BYTES],
+        memcpy(&device->frameLabels[(size_t)(device->framePassCount - 1) * MRHI_MAX_LABEL_BYTES],
                def->label, def->labelLength);
     }
     mrhiMarkPassTimestamps(device, def, pass);

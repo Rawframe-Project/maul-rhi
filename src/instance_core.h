@@ -94,6 +94,10 @@ struct mrhiInstance
 // mrhi_errorInvalid, for a refusal of invalid input on a live instance.
 mrhiResult mrhiMisuse(mrhiInstance* instance, mrhiDiagnosticCode code);
 
+// Counts one misuse refused by a fixed bound of the library, records it,
+// and returns mrhi_errorLimit.
+mrhiResult mrhiOverLimit(mrhiInstance* instance, mrhiDiagnosticCode code);
+
 // Appends a record; the caller has made sure there is room.
 void mrhiPushInstanceNotification(mrhiInstance* instance, mrhiInstanceNotification notification);
 

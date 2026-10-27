@@ -88,7 +88,7 @@ static mrhiDiagnosticCode DeviceDefFault(const mrhiDeviceDef* def, mrhiResult ch
 {
     mrhiLimits floor = mrhiDefaultLimits();
     if (def->cookie != DEVICE_DEF_COOKIE || chain == mrhi_errorInvalid ||
-        !mrhiIsLabelValid(def->label, def->labelLength))
+        mrhiCheckLabel(def->label, def->labelLength) == mrhi_errorInvalid)
     {
         return mrhi_diagnosticDefHeader;
     }
@@ -123,6 +123,11 @@ const mrhiDriverAdapter* mrhiCheckDeviceDef(mrhiInstance* instance, const mrhiDe
     if (fault != 0)
     {
         *statusOut = mrhiMisuse(instance, fault);
+        return nullptr;
+    }
+    if (mrhiCheckLabel(def->label, def->labelLength) == mrhi_errorLimit)
+    {
+        *statusOut = mrhiOverLimit(instance, mrhi_diagnosticDefHeader);
         return nullptr;
     }
     const mrhiDriverAdapter* adapter = mrhiFindAdapter(instance, def->adapter);
@@ -318,7 +323,7 @@ static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
                                       alignof(uint64_t));
     parts.chunks = mrhiLayoutAdd(layout, parts.chunkCount, sizeof(mrhiCommandChunk),
                                  alignof(mrhiCommandChunk));
-    parts.labels = mrhiLayoutAdd(layout, MAUL_RHI_LABELS ? passes * MRHI_LABEL_BYTES : 0, 1, 1);
+    parts.labels = mrhiLayoutAdd(layout, MAUL_RHI_LABELS ? passes * MRHI_MAX_LABEL_BYTES : 0, 1, 1);
     parts.driverPasses =
         mrhiLayoutAdd(layout, passes, sizeof(mrhiDriverPass), alignof(mrhiDriverPass));
     parts.driverResources = mrhiLayoutAdd(layout, limits->frameResources,
@@ -535,6 +540,12 @@ mrhiResult mrhiDeviceMisuse(mrhiDevice* device, mrhiDiagnosticCode code)
     return mrhi_errorInvalid;
 }
 
+mrhiResult mrhiDeviceOverLimit(mrhiDevice* device, mrhiDiagnosticCode code)
+{
+    mrhiDeviceMisuse(device, code);
+    return mrhi_errorLimit;
+}
+
 mrhiResult mrhiDeviceBadData(mrhiDevice* device, mrhiDiagnosticCode code)
 {
     mrhiRecordDiagnostic(&device->diagnostics, code);
@@ -652,10 +663,10 @@ mrhiResult mrhiCheckObjectDefWith(mrhiDevice* device, mrhiDefHead head, uint32_t
 {
     mrhiResult chain =
         mrhiCheckChain(head.next, known, knownCount, device->instance->limits.chainDepth);
-    if (head.cookie != expected || chain == mrhi_errorInvalid ||
-        !mrhiIsLabelValid(head.label, head.labelLength))
+    mrhiResult label = mrhiCheckLabel(head.label, head.labelLength);
+    if (head.cookie != expected || chain == mrhi_errorInvalid || label == mrhi_errorInvalid)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticDefHeader);
     }
-    return chain;
+    return label == mrhi_errorLimit ? mrhiDeviceOverLimit(device, mrhi_diagnosticDefHeader) : chain;
 }

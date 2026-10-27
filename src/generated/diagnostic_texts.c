@@ -15,7 +15,7 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticNullArgument:
         return "A required pointer is NULL, or an array is NULL with a nonzero count.";
     case mrhi_diagnosticDefHeader:
-        return "A def lacks its cookie (start from its default def), carries a malformed extension chain or one deeper than the chainDepth limit, or a label that is not UTF-8 of at most MRHI_LABEL_BYTES.";
+        return "A def lacks its cookie (start from its default def), carries a malformed extension chain or one deeper than the chainDepth limit, or a label that is not UTF-8 of at most MRHI_MAX_LABEL_BYTES.";
     case mrhi_diagnosticAdapterRequestDef:
         return "An adapter request def is NULL, lacks its cookie or names an unknown power preference.";
     case mrhi_diagnosticInstanceHasDevices:
@@ -61,7 +61,7 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticDispatchSize:
         return "A dispatch of more workgroups in a dimension than the workgroupsPerDimension limit.";
     case mrhi_diagnosticIndirectCountLimit:
-        return "A counted indirect draw whose maxCount is zero or past MRHI_INDIRECT_DRAWS.";
+        return "A counted indirect draw whose maxCount is zero or past MRHI_MAX_INDIRECT_DRAWS.";
     case mrhi_diagnosticViewport:
         return "A viewport wider or taller than the textureDimension2d limit, outside twice that range, or with depths outside [0, 1] or in reverse order.";
     case mrhi_diagnosticScissor:
@@ -69,7 +69,7 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticBlendConstant:
         return "A blend constant that is not finite.";
     case mrhi_diagnosticDebugLabel:
-        return "A debug label that is empty, not UTF-8, or longer than MRHI_LABEL_BYTES.";
+        return "A debug label that is empty, not UTF-8, or longer than MRHI_MAX_LABEL_BYTES.";
     case mrhi_diagnosticDebugGroupUnderflow:
         return "A debug group popped with none open.";
     case mrhi_diagnosticResourceKind:
@@ -157,7 +157,7 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticGraphicsDepthStencil:
         return "A graphics pipeline's depth and stencil state has an unknown value, an aspect's fields set without the aspect in the format, a bias that is not finite or set for points and lines, or no depth format while the fragment entry writes depth.";
     case mrhi_diagnosticGraphicsTargets:
-        return "A graphics pipeline's color targets are more than MRHI_COLOR_TARGETS, present without a fragment entry, malformed (format, blend or writes), not written by the fragment entry's outputs as their types allow, or absent with no depth either.";
+        return "A graphics pipeline's color targets are more than MRHI_MAX_COLOR_TARGETS, present without a fragment entry, malformed (format, blend or writes), not written by the fragment entry's outputs as their types allow, or absent with no depth either.";
     case mrhi_diagnosticGraphicsMultisample:
         return "A graphics pipeline's sample count is not a power of two, or alpha to coverage is asked single-sampled, without a first target that has alpha, or while the fragment entry writes the sample mask.";
     case mrhi_diagnosticGraphicsInterface:
@@ -189,7 +189,7 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticPassClass:
         return "A pass def with an unknown pass class.";
     case mrhi_diagnosticPassColorTargets:
-        return "A pass def with more than MRHI_COLOR_TARGETS color targets.";
+        return "A pass def with more than MRHI_MAX_COLOR_TARGETS color targets.";
     case mrhi_diagnosticPassViews:
         return "A pass def with several views on a native pass or on one without targets.";
     case mrhi_diagnosticPassQueries:
@@ -219,7 +219,7 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticNotifications:
         return "A frame submitted or a readback recorded while the device's notification queue has no room for its answer: take the records waiting there.";
     case mrhi_diagnosticNativePasses:
-        return "A native pass added past MRHI_NATIVE_PASSES in one frame.";
+        return "A native pass added past MRHI_MAX_NATIVE_PASSES in one frame.";
     case mrhi_diagnosticSubmitMemory:
         return "A driver refused a frame's submission for memory: for its transients, for the views, descriptor sets and buffers it makes to run the frame, or for the submission itself.";
     case mrhi_diagnosticSubmitDescriptors:

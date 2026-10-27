@@ -143,22 +143,22 @@ static void TestDamaged(void)
     Close(device);
     size_t size = s_cacheSize;
     CHECK(Outcome(size) == mrhi_success, "the cache as written");
-    CHECK(Outcome(63) == mrhi_errorInvalid, "shorter than an envelope");
-    CHECK(Outcome(size - 1) == mrhi_errorInvalid, "shorter than its size");
+    CHECK(Outcome(63) == mrhi_errorFormat, "shorter than an envelope");
+    CHECK(Outcome(size - 1) == mrhi_errorFormat, "shorter than its size");
     s_cache[size - 1] ^= 1;
-    CHECK(Outcome(size) == mrhi_errorInvalid, "a damaged byte");
+    CHECK(Outcome(size) == mrhi_errorFormat, "a damaged byte");
     s_cache[size - 1] ^= 1;
     s_cache[20] ^= 1;
-    CHECK(Outcome(size) == mrhi_errorInvalid, "a damaged digest");
+    CHECK(Outcome(size) == mrhi_errorFormat, "a damaged digest");
     s_cache[20] ^= 1;
     s_cache[47] ^= 1;
-    CHECK(Outcome(size) == mrhi_errorInvalid, "a digest damaged in its last byte");
+    CHECK(Outcome(size) == mrhi_errorFormat, "a digest damaged in its last byte");
     s_cache[47] ^= 1;
     s_cache[0] = 'm';
-    CHECK(Outcome(size) == mrhi_errorInvalid, "another magic");
+    CHECK(Outcome(size) == mrhi_errorFormat, "another magic");
     s_cache[0] = 'M';
     Put64(s_cache + 8, size + 1);
-    CHECK(Outcome(size) == mrhi_errorInvalid, "a size past its bytes");
+    CHECK(Outcome(size) == mrhi_errorFormat, "a size past its bytes");
     Put64(s_cache + 8, size);
     CHECK(Outcome(size) == mrhi_success, "restored");
     // A blob shorter than the envelope that claims its own size, so that
@@ -167,7 +167,7 @@ static void TestDamaged(void)
     memcpy(shortBlob, s_cache, 40);
     Put64(shortBlob + 8, 40);
     device = OpenCached(shortBlob, 40);
-    CHECK(mrhiGetPipelineCacheOutcome(device) == mrhi_errorInvalid, "shorter than an envelope");
+    CHECK(mrhiGetPipelineCacheOutcome(device) == mrhi_errorFormat, "shorter than an envelope");
     Close(device);
     free(shortBlob);
 }
@@ -239,7 +239,7 @@ static void TestVersion(void)
     s_cache[16] ^= 0xFF;
     CHECK(Outcome(s_cacheSize) == mrhi_errorVersion, "a later envelope of another layout");
     CHECK(Outcome(HEADER_ROOM) == mrhi_errorVersion, "a later envelope of the least size");
-    CHECK(Outcome(HEADER_ROOM - 1) == mrhi_errorInvalid, "shorter than any envelope");
+    CHECK(Outcome(HEADER_ROOM - 1) == mrhi_errorFormat, "shorter than any envelope");
     Put64(s_cache + 8, s_cacheSize);
     s_cache[16] ^= 0xFF;
     Forge(4, 2);
