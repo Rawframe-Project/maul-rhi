@@ -804,6 +804,50 @@ static void TestColorBytes(void)
     Close(device);
 }
 
+// Values past the last of their enum, on the depth test and the front
+// stencil face, which the back face's checks above leave out.
+static void TestUnknownValues(void)
+{
+    mrhiDevice* device = Open();
+    mrhiGraphicsPipelineDef def = Def();
+    def.depthStencilFormat = mrhi_formatDepthStencil;
+    CHECK(Made(device, &def) == mrhi_success, "a depth and stencil format");
+    def.depthCompare = mrhi_compareAlways + 1;
+    CHECK(Made(device, &def) == mrhi_errorInvalid, "a depth comparison past always");
+    def.depthCompare = mrhi_compareAlways;
+    def.stencilFront.compare = mrhi_compareAlways + 1;
+    CHECK(Made(device, &def) == mrhi_errorInvalid, "a stencil comparison past always");
+    def.stencilFront.compare = mrhi_compareEqual;
+    def.stencilFront.failOp = mrhi_stencilDecrementWrap + 1;
+    CHECK(Made(device, &def) == mrhi_errorInvalid, "an unknown failing operation in front");
+    def.stencilFront.failOp = mrhi_stencilKeep;
+    def.stencilFront.depthFailOp = mrhi_stencilDecrementWrap + 1;
+    CHECK(Made(device, &def) == mrhi_errorInvalid, "an unknown depth failing one in front");
+    def.stencilFront.depthFailOp = mrhi_stencilKeep;
+    def.stencilFront.passOp = mrhi_stencilDecrementWrap + 1;
+    CHECK(Made(device, &def) == mrhi_errorInvalid, "an unknown passing one in front");
+    def.stencilFront.passOp = mrhi_stencilDecrementWrap;
+    CHECK(Made(device, &def) == mrhi_success, "every one known in front");
+    Close(device);
+}
+
+// A device whose pipelines are all taken refuses one more for capacity.
+static void TestCapacity(void)
+{
+    Reset();
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.deviceLimits.pipelines = 1;
+    mrhiDevice* device = OpenWithShader(deviceDef);
+    mrhiGraphicsPipelineDef def = Def();
+    mrhiGraphicsPipelineId pipeline;
+    mrhiRequestId request;
+    CHECK(mrhiCreateGraphicsPipeline(device, &def, &pipeline, &request) == mrhi_success,
+          "the one pipeline the device holds");
+    CHECK(mrhiCreateGraphicsPipeline(device, &def, &pipeline, &request) == mrhi_errorCapacity,
+          "one past its limit");
+    Close(device);
+}
+
 static void TestMultisample(void)
 {
     mrhiDevice* device = Open();
@@ -848,6 +892,16 @@ static void TestMultisample(void)
     def.depthStencilFormat = mrhi_formatDepth32Float;
     def.colorTargets[0].writeMask = 0;
     CHECK(Made(device, &def) == mrhi_errorInvalid, "alpha to coverage without a first target");
+    def = Def();
+    def.colorTargetCount = 0;
+    def.depthStencilFormat = mrhi_formatDepth32Float;
+    def.sampleCount = 4;
+    CHECK(Made(device, &def) == mrhi_success, "four samples of depth alone");
+    def.alphaToCoverage = true;
+    CHECK(Made(device, &def) == mrhi_errorInvalid, "alpha to coverage with no color target");
+    def.fragmentEntry = nullptr;
+    def.fragmentEntryLength = 0;
+    CHECK(Made(device, &def) == mrhi_errorInvalid, "alpha to coverage with no fragment entry");
     Close(device);
     Reset();
     Put32(Record(ENTRIES, 1, 48) + 36, mrhi_builtinSampleMaskOut);
@@ -1073,6 +1127,8 @@ int main(void)
     TestDualSource();
     TestColorBytes();
     TestMultisample();
+    TestUnknownValues();
+    TestCapacity();
     ResetAdapter();
     TestInterface();
     TestHalfFloats();
