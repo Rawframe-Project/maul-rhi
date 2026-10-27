@@ -226,8 +226,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # Each fuzz target over the bytes programs load from disk and hand the
-  # library (shader containers and pipeline caches), from its seeds:
+  # Each fuzz target over what programs load from disk or fill from their
+  # own data and hand the library (shader containers, pipeline caches and
+  # pipeline defs), from its seeds:
   # briefly on a pull request, longer on main. The nightly run is
   # fuzz-nightly.
   fuzz:
@@ -304,8 +305,9 @@ jobs:
   # the targets run at once, from its seeds and its corpus of the nights
   # before, carried in an Actions cache. The seeds are the floor:
   # fuzz_container's are what tools/container_seed.py writes, and
-  # fuzz_cache has none, as the target builds each envelope from the
-  # input's first byte. The cache is keyed by the target and by the fuzz
+  # fuzz_cache and fuzz_pipeline have none, as the one builds each
+  # envelope from the input's first byte and the other starts each def
+  # from a valid one. The cache is keyed by the target and by the fuzz
   # build's inputs (the library, its CMake, the target and the compiler), so
   # an unchanged build restores its own corpus exactly; a target whose build
   # changed restores its latest corpus of an earlier build, since a corpus

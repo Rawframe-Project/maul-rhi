@@ -33,7 +33,7 @@ endif()
 option(MAUL_RHI_COVERAGE "Instrument for gcov coverage" OFF)
 option(MAUL_RHI_FUZZ "Build the libFuzzer targets (Clang)" OFF)
 option(MAUL_RHI_SEAM "Build the check against Maul Window, fetched for it (test only)" OFF)
-# The tests run on the test driver, and so does fuzz_cache.
+# The tests run on the test driver, and so do fuzz_cache and fuzz_pipeline.
 if(MAUL_RHI_BUILD_TESTS OR MAUL_RHI_FUZZ)
     set(maul_rhi_test_driver ON)
 else()
@@ -511,10 +511,11 @@ if(MAUL_RHI_BUILD_TESTS)
 endif()
 
 # The fuzz targets: test/fuzz_<area>.c, run as fuzz_<area> <corpus dir>,
-# over the bytes programs load from disk and hand the library.
-# tools/container_seed.py writes fuzz_container's seeds; fuzz_cache makes
-# its own envelopes, and fuzz_vulkan_cache seals its own around the
-# Vulkan driver's payload on the first Vulkan adapter.
+# over what programs load from disk or fill from their own data and hand
+# the library. tools/container_seed.py writes fuzz_container's seeds;
+# fuzz_cache makes its own envelopes, fuzz_vulkan_cache seals its own
+# around the Vulkan driver's payload on the first Vulkan adapter, and
+# fuzz_pipeline starts each pipeline def from a valid one.
 # test/fuzz_coverage_ignore.txt names the sources coverage leaves out.
 if(MAUL_RHI_FUZZ)
     # The library is instrumented too: its coverage guides libFuzzer, and
@@ -526,7 +527,7 @@ if(MAUL_RHI_FUZZ)
                                             -fno-sanitize-recover=all
                                             -fsanitize-coverage-ignorelist=${ignored})
     target_link_options(maul-rhi PUBLIC -fsanitize=address,undefined)
-    set(areas container cache)
+    set(areas container cache pipeline)
     if(MAUL_RHI_VULKAN_DRIVER)
         list(APPEND areas vulkan_cache)
     endif()
