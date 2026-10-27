@@ -73,7 +73,22 @@ MINIMAL = {
     "min_view_index": ({"entries": [dict(VERTEX, builtins=["view_index"]), FRAGMENT]},
                        (CAPABILITY_MULTIVIEW,), True),
     "min_int64": ({"entries": [COMPUTE]}, (CAPABILITY_INT64,), True),
+    "min_heap_places": ({"entries": [dict(COMPUTE, heap_uses=["sampled_textures", "samplers"])]},
+                        (), False),
+    "min_metallib": ({"entries": [COMPUTE]}, (), True),
 }
+
+# Seeds whose D3D12 heap ranges are not one per class, each a (class,
+# space, register): resource ranges of one class on two registers of one
+# space and on one register of two spaces, which the library takes; only
+# a class repeated on one place is refused.
+RANGES = {
+    "min_heap_places": [(PSV_SRV, 16, 0), (PSV_SRV, 16, 1), (PSV_SRV, 18, 0), (PSV_SAMPLER, 17, 0)],
+}
+
+# Seeds that carry a Metal library beside their MSL: its magic and
+# version, which the library checks.
+METALLIBS = {"min_metallib": b"MTLB\1\0\0\0"}
 
 
 def compiled(header):
@@ -119,10 +134,11 @@ def msl(entries):
 
 def dxil(entry, ranges):
     """A DXIL container of the entry's stage: a program header and a PSV0
-    part declaring the heap ranges given as (class, space)."""
+    part declaring the heap ranges given as (class, space, register)."""
     kind = mrhi_container.DXIL_KINDS[entry["stage"]]
     program = struct.pack("<I4x", kind << 16)
-    records = b"".join(struct.pack("<4I", cls, space, 0, 0xFFFFFFFF) for cls, space in ranges)
+    records = b"".join(struct.pack("<4I", cls, space, reg, 0xFFFFFFFF)
+                       for cls, space, reg in ranges)
     psv = struct.pack("<II", 0, len(ranges)) + (struct.pack("<I", 16) if ranges else b"")
     psv += records
     parts = [(b"DXIL", program), (b"PSV0", psv)]
@@ -150,12 +166,14 @@ def minimal(enums):
         bare = heaps or capabilities
         ranges = []
         if "sampled_textures" in heaps:
-            ranges.append((PSV_SRV, 16))
+            ranges.append((PSV_SRV, 16, 0))
         if "samplers" in heaps:
-            ranges.append((PSV_SAMPLER, 17))
+            ranges.append((PSV_SAMPLER, 17, 0))
+        ranges = RANGES.get(name, ranges)
         blobs = {e["name"]: dxil(e, ranges) for e in entries}
         data = mrhi_container.build(code, None if bare else wgsl(entries), reflection, enums,
                                     msl=msl(entries) if native else None,
+                                    metallib=METALLIBS.get(name),
                                     dxil=blobs if native or ranges else None)
         heap_bits = 0
         for use in heaps:

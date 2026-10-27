@@ -317,6 +317,12 @@ static void TestHeapRanges(void)
     const uint32_t shared[3][3] = {{0, 0, 16}, {1, 0, 16}, {2, 0, 16}};
     AddRanges(sampling | mrhi_heapUseStorageBuffers, shared, 3);
     CHECK(Built() == mrhi_success, "ranges of three classes on one place");
+    const uint32_t registers[3][3] = {{0, 0, 16}, {0, 1, 16}, {2, 0, 17}};
+    AddRanges(sampling, registers, 3);
+    CHECK(Built() == mrhi_success, "ranges of one class on two registers");
+    const uint32_t spaces[3][3] = {{0, 0, 16}, {0, 0, 18}, {2, 0, 17}};
+    AddRanges(sampling, spaces, 3);
+    CHECK(Built() == mrhi_success, "ranges of one class on one register of two spaces");
     AddRanges(sampling, both, 2);
     Map()[MAP_FIXED + 12] = 1;
     CHECK(Built() == mrhi_errorFormat, "a range's zero that is not zero");

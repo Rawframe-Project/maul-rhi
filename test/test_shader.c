@@ -776,6 +776,14 @@ static void TestMetalCode(void)
     Reset();
     AddMetal(false, true);
     CHECK(Built() == mrhi_success, "a metallib alone");
+    // Without MSL the metallib is the last section.
+    Section* library = &s_sections[s_sectionCount - 1];
+    CHECK(library->type == 13, "the metallib last");
+    library->bytes[0] = 'X';
+    CHECK(Built() == mrhi_errorFormat, "a metallib without its magic");
+    library->bytes[0] = 'M';
+    library->size = 3;
+    CHECK(Built() == mrhi_errorFormat, "a metallib shorter than its magic");
     Reset();
     AddMetal(false, false);
     CHECK(Built() == mrhi_errorFormat, "a map without code");
