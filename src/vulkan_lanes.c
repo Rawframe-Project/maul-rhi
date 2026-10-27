@@ -15,7 +15,14 @@
 // Notes a failure of the device, the first only.
 static void Note(mrhiVulkanRecording* recording, VkResult result)
 {
-    recording->result = recording->result == VK_SUCCESS ? result : recording->result;
+    if (recording->result == VK_SUCCESS && result != VK_SUCCESS)
+    {
+        recording->result = result;
+        // A command buffer it cannot begin or end is out of the command
+        // lists budget, unless the frame failed already for another.
+        recording->budget =
+            recording->budget != 0 ? recording->budget : mrhi_diagnosticSubmitCommandLists;
+    }
 }
 
 // Begins a lane's next part and makes it the command buffer recording.

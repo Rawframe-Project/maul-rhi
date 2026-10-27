@@ -544,6 +544,11 @@ static VkResult Run(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, const mrhiDr
     {
         *statusOut = mrhiVulkanRecord(frames, slot, frame, &result, budgetOut);
     }
+    else
+    {
+        // The slot's command buffers could not be reset.
+        *budgetOut = mrhi_diagnosticSubmitCommandLists;
+    }
     if (result != VK_SUCCESS || *statusOut != mrhi_success)
     {
         return result;
