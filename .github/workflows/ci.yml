@@ -240,6 +240,8 @@ jobs:
       contents: read
     env:
       FUZZ_SECONDS: ${{ github.event_name == 'pull_request' && 30 || 300 }}
+      # The CI image has lavapipe, so every target must run.
+      MAUL_RHI_FUZZ_REQUIRE_ADAPTER: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -253,14 +255,32 @@ jobs:
         # The targets side by side through tools/fuzz_target.sh, which keeps
         # each finding and log on the runner and writes a report without
         # the input; the reports are printed once every target has finished.
+        # Each target gets a corpus directory. One that cannot run here (a
+        # Vulkan target without an adapter) exits 77 before any input; the
+        # CI image has lavapipe, so here that fails the step, as the image
+        # broke, rather than leaving the target unfuzzed behind a notice.
         run: |
-          mkdir -p out/corpus/fuzz_cache
           python3 tools/container_seed.py out/corpus/fuzz_container >/dev/null
           rm -rf out/fuzz-reports
+          probe=$(mktemp -d)
+          : >out/fuzz-run.txt
+          for target in out/fuzz/fuzz_*; do
+            name=${target##*/}
+            mkdir -p "out/corpus/$name"
+            status=0
+            "$target" -runs=0 "$probe" >/dev/null 2>&1 || status=$?
+            if [ "$status" = 77 ] && [ "${MAUL_RHI_FUZZ_REQUIRE_ADAPTER:-}" = 1 ]; then
+              echo "::error::$name cannot run: the CI image has no Vulkan adapter"
+              exit 1
+            elif [ "$status" = 77 ]; then
+              echo "::notice::$name skipped: it cannot run on this runner"
+            else
+              echo "$target" >>out/fuzz-run.txt
+            fi
+          done
           status=0
-          printf '%s\n' out/fuzz/fuzz_* |
-            xargs -P 2 -I {} sh -c 'tools/fuzz_target.sh "$1" -max_total_time="$FUZZ_SECONDS" "out/corpus/${1##*/}"' _ {} ||
-            status=$?
+          xargs -P 2 -I {} sh -c 'tools/fuzz_target.sh "$1" -max_total_time="$FUZZ_SECONDS" "out/corpus/${1##*/}"' _ {} \
+            <out/fuzz-run.txt || status=$?
           cat out/fuzz-reports/*.txt 2>/dev/null || true
           exit "$status"
 
@@ -309,6 +329,8 @@ jobs:
       contents: read
     env:
       TARGET: ${{ matrix.target }}
+      # The CI image has lavapipe, so every target must run.
+      MAUL_RHI_FUZZ_REQUIRE_ADAPTER: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -329,9 +351,26 @@ jobs:
           if [ "$TARGET" = fuzz_container ]; then
             python3 tools/container_seed.py "out/seeds/$TARGET" >/dev/null
           fi
+      # A target that cannot run on this runner (a Vulkan target without an
+      # adapter) exits 77 before any input. The CI image has lavapipe, so
+      # with MAUL_RHI_FUZZ_REQUIRE_ADAPTER that fails the job; without it
+      # the target is skipped with a notice, and the steps after it with it.
+      - name: Probe
+        run: |
+          status=0
+          "out/fuzz/$TARGET" -runs=0 "$(mktemp -d)" >/dev/null 2>&1 || status=$?
+          if [ "$status" = 77 ] && [ "${MAUL_RHI_FUZZ_REQUIRE_ADAPTER:-}" = 1 ]; then
+            echo "::error::$TARGET cannot run: the CI image has no Vulkan adapter"
+            exit 1
+          elif [ "$status" = 77 ]; then
+            echo "::notice::$TARGET skipped: it cannot run on this runner"
+            echo "RUNNABLE=0" >>"$GITHUB_ENV"
+          else
+            echo "RUNNABLE=1" >>"$GITHUB_ENV"
+          fi
       - name: Restore the corpus
         id: restore
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && env.RUNNABLE == '1'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out/corpus/${{ matrix.target }}
@@ -342,6 +381,7 @@ jobs:
             ${{ env.CORPUS_KEY }}-
             corpus-${{ matrix.target }}-
       - name: Fuzz
+        if: env.RUNNABLE == '1'
         run: |
           mkdir -p "out/corpus/$TARGET"
           rm -rf out/fuzz-reports
@@ -351,6 +391,7 @@ jobs:
           cat out/fuzz-reports/*.txt 2>/dev/null || true
           exit "$status"
       - name: Minimize the corpus
+        if: env.RUNNABLE == '1'
         env:
           MATCHED: ${{ steps.restore.outputs.cache-matched-key }}
         run: |
@@ -380,6 +421,7 @@ jobs:
             echo "| \`$TARGET\` | $restored | $(coverage "out/seeds/$TARGET") | $(coverage "out/corpus/$TARGET") | $(ls "out/corpus/$TARGET" | wc -l) |"
           } >>"$GITHUB_STEP_SUMMARY"
       - name: Save the corpus
+        if: env.RUNNABLE == '1'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out/corpus/${{ matrix.target }}
