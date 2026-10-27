@@ -15,7 +15,9 @@
 // payload is taken only with a header the driver must take; then the
 // device still exports its cache. Without a Vulkan adapter the target
 // cannot run: it says so and exits 77 before any input, as a test that
-// finds no adapter does, and CI skips it instead of reporting a finding.
+// finds no adapter does. CI's fuzz jobs, whose image has lavapipe, fail
+// on that; tools/check.sh and runs without MAUL_RHI_FUZZ_REQUIRE_ADAPTER
+// skip the target instead of reporting a finding.
 
 #include "bytes.h"
 #include "device_core.h"
@@ -99,7 +101,7 @@ static void Open(void)
         mrhiGetAdapters(s_instance, &deviceDef.adapter, 1, &count) != mrhi_success || count == 0)
     {
         fputs("fuzz_vulkan_cache: no Vulkan adapter, so nothing to fuzz here\n", stderr);
-        // hygiene: no adapter is exit 77, which CI skips with a notice
+        // hygiene: no adapter is exit 77, which CI fails and check.sh skips
         exit(77);
     }
     Expect(mrhiCreateDevice(s_instance, &deviceDef, &s_device, &request) == mrhi_success &&
