@@ -240,6 +240,8 @@ jobs:
       contents: read
     env:
       FUZZ_SECONDS: ${{ github.event_name == 'pull_request' && 30 || 300 }}
+      # The CI image has lavapipe, so every target must run.
+      MAUL_RHI_FUZZ_REQUIRE_ADAPTER: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -253,9 +255,10 @@ jobs:
         # The targets side by side through tools/fuzz_target.sh, which keeps
         # each finding and log on the runner and writes a report without
         # the input; the reports are printed once every target has finished.
-        # Each target gets a corpus directory; one that cannot run here (a
-        # Vulkan target without an adapter) exits 77 before any input, and
-        # is skipped with a notice rather than reported as a finding.
+        # Each target gets a corpus directory. One that cannot run here (a
+        # Vulkan target without an adapter) exits 77 before any input; the
+        # CI image has lavapipe, so here that fails the step, as the image
+        # broke, rather than leaving the target unfuzzed behind a notice.
         run: |
           python3 tools/container_seed.py out/corpus/fuzz_container >/dev/null
           rm -rf out/fuzz-reports
@@ -266,7 +269,10 @@ jobs:
             mkdir -p "out/corpus/$name"
             status=0
             "$target" -runs=0 "$probe" >/dev/null 2>&1 || status=$?
-            if [ "$status" = 77 ]; then
+            if [ "$status" = 77 ] && [ "${MAUL_RHI_FUZZ_REQUIRE_ADAPTER:-}" = 1 ]; then
+              echo "::error::$name cannot run: the CI image has no Vulkan adapter"
+              exit 1
+            elif [ "$status" = 77 ]; then
               echo "::notice::$name skipped: it cannot run on this runner"
             else
               echo "$target" >>out/fuzz-run.txt
@@ -323,6 +329,8 @@ jobs:
       contents: read
     env:
       TARGET: ${{ matrix.target }}
+      # The CI image has lavapipe, so every target must run.
+      MAUL_RHI_FUZZ_REQUIRE_ADAPTER: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -344,13 +352,17 @@ jobs:
             python3 tools/container_seed.py "out/seeds/$TARGET" >/dev/null
           fi
       # A target that cannot run on this runner (a Vulkan target without an
-      # adapter) exits 77 before any input: it is skipped with a notice,
-      # and the steps after it with it.
+      # adapter) exits 77 before any input. The CI image has lavapipe, so
+      # with MAUL_RHI_FUZZ_REQUIRE_ADAPTER that fails the job; without it
+      # the target is skipped with a notice, and the steps after it with it.
       - name: Probe
         run: |
           status=0
           "out/fuzz/$TARGET" -runs=0 "$(mktemp -d)" >/dev/null 2>&1 || status=$?
-          if [ "$status" = 77 ]; then
+          if [ "$status" = 77 ] && [ "${MAUL_RHI_FUZZ_REQUIRE_ADAPTER:-}" = 1 ]; then
+            echo "::error::$TARGET cannot run: the CI image has no Vulkan adapter"
+            exit 1
+          elif [ "$status" = 77 ]; then
             echo "::notice::$TARGET skipped: it cannot run on this runner"
             echo "RUNNABLE=0" >>"$GITHUB_ENV"
           else
