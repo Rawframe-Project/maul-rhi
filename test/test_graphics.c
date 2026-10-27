@@ -268,8 +268,25 @@ static void TestVertexBuffers(void)
     }
     def.vertexBufferCount = limits.vertexBuffers;
     CHECK(Made(device, &def) == mrhi_success, "as many buffers as the limit");
+    s_attributes[0].offset = 2;
+    CHECK(Made(device, &def) == mrhi_errorInvalid, "attributes checked with buffers at the limit");
+    s_attributes[0].offset = 0;
     def.vertexBufferCount = limits.vertexBuffers + 1;
     CHECK(Made(device, &def) == mrhi_errorUnsupported, "a buffer past the limit");
+    // Arrays past their limit are refused unread, and so is a buffer an
+    // attribute names past the limit: its 4-byte stride is never read, so
+    // the attribute's 12 bytes do not make the def invalid, and an array
+    // of 8 with a count of 9 is never read past its end.
+    s_attributes[0].buffer = limits.vertexBuffers;
+    CHECK(Made(device, &def) == mrhi_errorUnsupported, "an attribute's buffer past the limit");
+    mrhiVertexBufferLayout* exact = malloc(sizeof(mrhiVertexBufferLayout) * limits.vertexBuffers);
+    for (uint32_t i = 0; i < limits.vertexBuffers; ++i)
+    {
+        exact[i] = s_buffers[i];
+    }
+    def.vertexBuffers = exact;
+    CHECK(Made(device, &def) == mrhi_errorUnsupported, "an array past the limit, unread");
+    free(exact);
     Close(device);
     // More buffers than the floor, so that tables and buffers pass their
     // limit together: two tables and 23 buffers exceed 24.

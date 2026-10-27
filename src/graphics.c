@@ -157,8 +157,10 @@ static uint32_t TablesOf(const mrhiReflection* reflection)
 static mrhiResult CheckVertex(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
                               Stages stages)
 {
+    // Buffers past their limit are refused unread, and so is the buffer
+    // an attribute names among them.
     mrhiResult status = CheckBuffers(device, def);
-    if (status == mrhi_errorInvalid)
+    if (status == mrhi_errorInvalid || def->vertexBufferCount > device->limits.vertexBuffers)
     {
         return status;
     }
