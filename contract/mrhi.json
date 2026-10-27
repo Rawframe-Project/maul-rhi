@@ -857,7 +857,7 @@
             {
               "name": "diagnostic_submit_memory",
               "value": 120,
-              "doc": "A driver refused a frame's submission for memory: for its transients, or for the buffers it stages, reads back or clamps through."
+              "doc": "A driver refused a frame's submission for memory: for its transients, for the views, descriptor sets and buffers it makes to run the frame, or for the submission itself."
             },
             {
               "name": "diagnostic_submit_descriptors",
@@ -872,7 +872,7 @@
             {
               "name": "diagnostic_submit_command_lists",
               "value": 123,
-              "doc": "A driver refused a frame's submission when it could not make, end or begin a command list or buffer for a part of the frame."
+              "doc": "A driver refused a frame's submission when it could not make, reset, begin or end a command list or buffer for a part of the frame."
             },
             {
               "name": "diagnostic_driver_submit_budget",
@@ -22349,5 +22349,5 @@
       ]
     }
   ],
-  "contract_version": 19
+  "contract_version": 20
 }

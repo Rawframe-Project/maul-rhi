@@ -50,7 +50,7 @@ extern "C"
 
 // The revision of the contract the headers are generated from
 // (contract/mrhi.json).
-#define MRHI_CONTRACT_VERSION 19
+#define MRHI_CONTRACT_VERSION 20
 
 // MRHI_API marks the public functions: dllexport or dllimport in a
 // shared Windows build (maul_rhi_EXPORTS is defined while building
@@ -553,7 +553,8 @@ extern "C"
         // A native pass added past MRHI_NATIVE_PASSES in one frame.
         mrhi_diagnosticNativePasses = 119,
         // A driver refused a frame's submission for memory: for its transients,
-        // or for the buffers it stages, reads back or clamps through.
+        // for the views, descriptor sets and buffers it makes to run the frame,
+        // or for the submission itself.
         mrhi_diagnosticSubmitMemory = 120,
         // A driver refused a frame's submission when the descriptors it binds
         // the frame's tables through ran out: Direct3D 12's descriptor rings,
@@ -562,8 +563,8 @@ extern "C"
         // A driver refused a frame's submission when its scratch buffer ran
         // out: the room Direct3D 12 writes indirect commands' arguments in.
         mrhi_diagnosticSubmitScratch = 122,
-        // A driver refused a frame's submission when it could not make, end or
-        // begin a command list or buffer for a part of the frame.
+        // A driver refused a frame's submission when it could not make, reset,
+        // begin or end a command list or buffer for a part of the frame.
         mrhi_diagnosticSubmitCommandLists = 123,
         // A driver refused a frame for capacity without naming one of the
         // submit codes for the budget that ran out, or named one with another

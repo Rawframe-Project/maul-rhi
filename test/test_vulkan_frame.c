@@ -6,7 +6,8 @@
 // vkGetDeviceProcAddr hands the library a vkBeginCommandBuffer that
 // fails on the begin chosen. The frame then records nothing more into
 // that buffer, ends nothing it holds, submits nothing, reports the
-// failure, and the device runs its next frame. Each begin a frame makes
+// failure under the command lists budget, and the device runs its next
+// frame. A command pool that fails to reset is refused the same way. Each begin a frame makes
 // fails in turn: the frame's first, the one after its native pass, and
 // with a lane per class each lane's batches'. Skipped
 // where there is no Vulkan 1.3 adapter, unless MAUL_RHI_REQUIRE_VULKAN is
@@ -37,6 +38,7 @@ static PFN_vkCmdPipelineBarrier2 s_barrier;
 static PFN_vkCmdResetQueryPool s_resetQueries;
 static PFN_vkCmdWriteTimestamp2 s_timestamp;
 static PFN_vkQueueSubmit2 s_submit;
+static PFN_vkResetCommandPool s_reset;
 
 // The begins of the frame so far, the one that fails (0 for none), and
 // the command buffer it failed.
@@ -45,6 +47,8 @@ static uint32_t s_failAt;
 static VkCommandBuffer s_failed;
 // The calls made on the failed buffer, and the submissions after it.
 static uint32_t s_misuses;
+// Whether the next reset of a command pool fails.
+static bool s_failReset;
 
 static VKAPI_ATTR VkResult VKAPI_CALL Begin(VkCommandBuffer commands,
                                             const VkCommandBufferBeginInfo* info)
@@ -104,6 +108,17 @@ static VKAPI_ATTR VkResult VKAPI_CALL Submit(VkQueue queue, uint32_t count,
     return s_failed != VK_NULL_HANDLE ? VK_SUCCESS : s_submit(queue, count, submits, fence);
 }
 
+static VKAPI_ATTR VkResult VKAPI_CALL Reset(VkDevice device, VkCommandPool pool,
+                                            VkCommandPoolResetFlags flags)
+{
+    if (s_failReset)
+    {
+        s_failReset = false;
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+    return s_reset(device, pool, flags);
+}
+
 // A function the wrappers replace: its wrapper, keeping the device's own.
 static PFN_vkVoidFunction Wrap(const char* name, PFN_vkVoidFunction own)
 {
@@ -120,6 +135,7 @@ static PFN_vkVoidFunction Wrap(const char* name, PFN_vkVoidFunction own)
          (PFN_vkVoidFunction)ResetQueries},
         {"vkCmdWriteTimestamp2", (PFN_vkVoidFunction*)&s_timestamp, (PFN_vkVoidFunction)Timestamp},
         {"vkQueueSubmit2", (PFN_vkVoidFunction*)&s_submit, (PFN_vkVoidFunction)Submit},
+        {"vkResetCommandPool", (PFN_vkVoidFunction*)&s_reset, (PFN_vkVoidFunction)Reset},
     };
     for (size_t i = 0; own != nullptr && i < sizeof(wrapped) / sizeof(wrapped[0]); ++i)
     {
@@ -191,6 +207,7 @@ static mrhiDevice* OpenDevice(mrhiInstance* instance, bool* timestampsOut)
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
     def.features.timestampQuery = features.timestampQuery;
+    def.deviceLimits.diagnostics = 8;
     *timestampsOut = features.timestampQuery;
     mrhiDevice* device = nullptr;
     mrhiRequestId ready;
@@ -287,9 +304,22 @@ static mrhiResult SubmitFrame(mrhiDevice* device, mrhiQuerySetId times)
     return status;
 }
 
+// The code of the device's latest diagnostic, draining them; 0 for none.
+static mrhiDiagnosticCode LastDiagnostic(mrhiDevice* device)
+{
+    mrhiDiagnosticCode code = 0;
+    mrhiDiagnostic record;
+    while (mrhiNextDeviceDiagnostic(device, &record) == mrhi_success)
+    {
+        code = record.code;
+    }
+    return code;
+}
+
 // Fails each begin of the frame in turn: each failed frame is refused for
-// want of memory, with nothing recorded into or ended on the failed
-// buffer and nothing submitted, and the next frame runs.
+// want of memory under the command lists budget, with nothing recorded
+// into or ended on the failed buffer and nothing submitted, and the next
+// frame runs.
 static void CheckFailedBegins(mrhiDevice* device, bool timestamps)
 {
     mrhiQuerySetId times = {0};
@@ -312,6 +342,8 @@ static void CheckFailedBegins(mrhiDevice* device, bool timestamps)
         s_misuses = 0;
         CHECK(SubmitFrame(device, times) == mrhi_errorCapacity, "a failed begin refused");
         CHECK(s_failed != VK_NULL_HANDLE, "the begin failed");
+        CHECK(LastDiagnostic(device) == mrhi_diagnosticSubmitCommandLists,
+              "the command lists budget named");
         if (s_misuses != 0)
         {
             printf("begin %u of %u: %u calls after it\n", n, begins, s_misuses);
@@ -321,6 +353,11 @@ static void CheckFailedBegins(mrhiDevice* device, bool timestamps)
         s_failed = VK_NULL_HANDLE;
         CHECK(SubmitFrame(device, times) == mrhi_success, "the next frame runs");
     }
+    s_failReset = true;
+    CHECK(SubmitFrame(device, times) == mrhi_errorCapacity &&
+              LastDiagnostic(device) == mrhi_diagnosticSubmitCommandLists,
+          "a failed reset refused under the command lists budget");
+    CHECK(SubmitFrame(device, times) == mrhi_success, "the next frame runs");
     CHECK(!timestamps || mrhiDestroyQuerySet(device, times) == mrhi_success, "destroyed");
 }
 
