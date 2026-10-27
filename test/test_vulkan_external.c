@@ -559,6 +559,13 @@ static void CheckNativePass(mrhiDevice* device, VkDevice made, VkInstance instan
     CHECK(added && mrhiAddPass(device, &nativeDef, &refused) == mrhi_errorCapacity &&
               mrhiDropFrame(device) == mrhi_success,
           "native passes up to their limit");
+    mrhiDiagnostic diagnostic = {0};
+    mrhiDiagnosticCode last = 0;
+    while (mrhiNextDeviceDiagnostic(device, &diagnostic) == mrhi_success)
+    {
+        last = diagnostic.code;
+    }
+    CHECK(last == mrhi_diagnosticNativePasses, "the limit named");
 }
 
 // Whether a create info's features hold the merged ones beside the
@@ -640,6 +647,7 @@ static void CheckDeviceAdoption(mrhiInstance* instance, mrhiAdapterId adapter)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
+    def.deviceLimits.diagnostics = 8;
     // Sealing, which adopted images refuse, where the adapter grants it.
     mrhiFeatures granted = {0};
     CHECK(mrhiGetAdapterFeatures(instance, adapter, &granted) == mrhi_success, "the features");

@@ -332,7 +332,7 @@
           "kind": "enum",
           "name": "diagnostic_code",
           "width": "uint16",
-          "doc": "The check a diagnostic record reports: one check of the core that refused a call as invalid input, or, in a build with the validation layer, one rule of the driver SPI that the driver broke (the driver codes, recorded in the instance's queue). mrhiDiagnosticText gives each one's text.",
+          "doc": "The check a diagnostic record reports: one check of the core that refused a call as invalid input, one limit a frame call reached, or, in a build with the validation layer, one rule of the driver SPI that the driver broke (the driver codes, recorded in the instance's queue). mrhiDiagnosticText gives each one's text.",
           "values": [
             {
               "name": "diagnostic_null_argument",
@@ -793,6 +793,66 @@
               "name": "diagnostic_pass_uses",
               "value": 107,
               "doc": "A pass def's accesses or targets do not fit: a kind the resource's usage lacks, a range past it, a write to a sealed resource, targets whose sizes, samples, mips or layers disagree, uses that conflict within the pass, or a read of a declared resource no earlier pass wrote."
+            },
+            {
+              "name": "diagnostic_frame_resources",
+              "value": 108,
+              "doc": "A frame reached the device's frameResources limit: a resource declared, imported or acquired past it."
+            },
+            {
+              "name": "diagnostic_frame_passes",
+              "value": 109,
+              "doc": "A frame reached the device's framePasses limit: a pass added past it."
+            },
+            {
+              "name": "diagnostic_frame_accesses",
+              "value": 110,
+              "doc": "A pass whose accesses, with two for each color target and one for the depth target, could take the frame past the device's frameAccesses limit; or a compile that split a resource's parts into more than that limit leaves room for."
+            },
+            {
+              "name": "diagnostic_frame_barriers",
+              "value": 111,
+              "doc": "A compile that planned more barriers than the device's frameBarriers limit."
+            },
+            {
+              "name": "diagnostic_frame_command_bytes",
+              "value": 112,
+              "doc": "A command past the device's frameCommandBytes limit: the call that found the arena full, the later calls of its pass and the frame's submission."
+            },
+            {
+              "name": "diagnostic_frame_upload_bytes",
+              "value": 113,
+              "doc": "An upload past the device's frameUploadBytes limit: the call that found the staging full, the later calls of its pass and the frame's submission."
+            },
+            {
+              "name": "diagnostic_frame_indirect_draws",
+              "value": 114,
+              "doc": "A counted multi-draw whose maxCount takes the frame past the device's frameIndirectDraws limit."
+            },
+            {
+              "name": "diagnostic_readbacks",
+              "value": 115,
+              "doc": "A readback recorded while the device's readbacks limit of them wait to be taken."
+            },
+            {
+              "name": "diagnostic_readback_bytes",
+              "value": 116,
+              "doc": "A readback whose bytes do not fit the room of the device's readbackBytes ring that readbacks not yet taken leave."
+            },
+            {
+              "name": "diagnostic_frames_in_flight",
+              "value": 117,
+              "doc": "A frame begun while the device's framesInFlight frames still run."
+            },
+            {
+              "name": "diagnostic_notifications",
+              "value": 118,
+              "doc": "A frame submitted or a readback recorded while the device's notification queue has no room for its answer: take the records waiting there."
+            },
+            {
+              "name": "diagnostic_native_passes",
+              "value": 119,
+              "doc": "A native pass added past MRHI_NATIVE_PASSES in one frame."
             }
           ],
           "library": "names the library's own checks"
@@ -805,7 +865,7 @@
             {
               "name": "code",
               "type": "enum.diagnostic_code",
-              "doc": "The check that refused the call."
+              "doc": "The check or the limit that refused the call."
             },
             {
               "name": "count",
@@ -6794,7 +6854,7 @@
         {
           "kind": "function",
           "name": "next_device_diagnostic",
-          "doc": "Takes the oldest record from the device's diagnostic queue, which holds a record for each call the device refused as invalid input, up to the diagnostics limit; refusals past it are counted but not recorded.",
+          "doc": "Takes the oldest record from the device's diagnostic queue, which holds a record for each call the device refused as invalid input or bad data, and for each frame call refused at one of its limits, up to the diagnostics limit; refusals past it are counted but not recorded.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success` with a record; `mrhi_empty` when the queue is drained or keeps none; `mrhi_errorInvalid` for a NULL argument."
@@ -13807,6 +13867,77 @@
             "object": "the device"
           },
           "library": "reads the library's plan"
+        },
+        {
+          "kind": "struct",
+          "name": "frame_usage",
+          "doc": "What a frame has taken of each limit a frame has, each member named after the mrhiDeviceLimits member it is measured against.",
+          "members": [
+            {
+              "name": "frame_resources",
+              "type": "uint32",
+              "doc": "The resources it declared, imported and acquired."
+            },
+            {
+              "name": "frame_passes",
+              "type": "uint32",
+              "doc": "The passes it added; the library's own pass is not counted."
+            },
+            {
+              "name": "frame_accesses",
+              "type": "uint32",
+              "doc": "The accesses and targets its passes declared, as the limit counts them. A pass is refused when its accesses, with two for each color target and one for the depth target, could pass the limit, so the last pass may be refused below it."
+            },
+            {
+              "name": "frame_barriers",
+              "type": "uint32",
+              "doc": "The barriers its compile planned, the program's alone: 0 before the compile, and those planned before a compile the limit refused."
+            },
+            {
+              "name": "frame_command_bytes",
+              "type": "uint32",
+              "doc": "The bytes its passes' commands took, in whole 4 KiB chunks, so a full arena reads the limit rounded down to them; the library's own pass is not counted."
+            },
+            {
+              "name": "frame_upload_bytes",
+              "type": "uint32",
+              "doc": "The bytes its uploads took of its staging, each at a 512-byte boundary with a texture's rows at a 256-byte pitch."
+            },
+            {
+              "name": "frame_indirect_draws",
+              "type": "uint32",
+              "doc": "The maxCounts of its counted multi-draws, in all."
+            }
+          ],
+          "library": "a record of the library's own bookkeeping"
+        },
+        {
+          "kind": "function",
+          "name": "get_frame_usage",
+          "doc": "Reads what the frame begun last has taken of each frame limit: while it is open, once compiled, after a call its limits refused, and after it is submitted or dropped, until the next frame begins. Before the first frame, everything is 0. A program compares it with mrhiGetDeviceOwnLimits to learn its headroom.",
+          "returns": {
+            "type": "result",
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument."
+          },
+          "args": [
+            {
+              "name": "device",
+              "type": "opaque.device",
+              "pointer": "mutable",
+              "doc": "The device."
+            },
+            {
+              "name": "usage_out",
+              "type": "struct.frame_usage",
+              "pointer": "mutable",
+              "doc": "Receives the usage."
+            }
+          ],
+          "thread_safety": {
+            "class": "any_exclusive",
+            "object": "the device"
+          },
+          "library": "reads the library's own bookkeeping"
         }
       ]
     },
@@ -22188,5 +22319,5 @@
       ]
     }
   ],
-  "contract_version": 17
+  "contract_version": 18
 }

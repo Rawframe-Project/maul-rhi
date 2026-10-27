@@ -311,9 +311,10 @@ typedef struct mrhiFramePass
     mrhiStoreOp stencilStore;
     // Its recording: an mrhiRecording, claimed atomically by the thread
     // that begins it; its chunks (indices plus one, 0 for none); its open
-    // debug groups; whether a command found the arena full; for a render
-    // pass, its targets' layout and size; the pipeline last set (a slot
-    // plus one and its generation, 0 for none); the tables set, by bit,
+    // debug groups; the code of the limit a command or an upload found
+    // full (0 for none); for a render pass, its targets' layout and size;
+    // the pipeline last set (a slot plus one and its generation, 0 for
+    // none); the tables set, by bit,
     // with the digests of the containers they were set under; and the
     // index buffer's format (none when unset) and bytes. Its vertex
     // buffers' bytes are in the device's frameVertexBytes.
@@ -321,7 +322,7 @@ typedef struct mrhiFramePass
     uint32_t firstChunk;
     uint32_t lastChunk;
     uint32_t debugDepth;
-    bool overflowed;
+    mrhiDiagnosticCode overflow;
     mrhiRenderLayout layout;
     uint32_t width;
     uint32_t height;
@@ -596,6 +597,10 @@ mrhiResult mrhiDeviceMisuse(mrhiDevice* device, mrhiDiagnosticCode code);
 // Records bad untrusted data refused by a check on the device, counting no
 // misuse, and returns mrhi_errorFormat.
 mrhiResult mrhiDeviceBadData(mrhiDevice* device, mrhiDiagnosticCode code);
+
+// Records a refusal by the limit a code names, counting no misuse, and
+// returns mrhi_errorCapacity.
+mrhiResult mrhiDeviceFull(mrhiDevice* device, mrhiDiagnosticCode code);
 
 // The head every object def opens with.
 typedef struct mrhiDefHead

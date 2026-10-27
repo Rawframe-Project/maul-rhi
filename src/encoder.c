@@ -117,8 +117,9 @@ mrhiFramePass* mrhiRecordingPass(mrhiDevice* device, mrhiPassId id, mrhiResult* 
 mrhiCommand* mrhiTakeCommands(mrhiDevice* device, mrhiFramePass* pass, uint32_t count)
 {
     MRHI_ASSERT(count <= MRHI_CHUNK_COMMANDS);
-    if (pass->overflowed)
+    if (pass->overflow != 0)
     {
+        mrhiRecordDiagnostic(&device->diagnostics, pass->overflow);
         return nullptr;
     }
     mrhiCommandChunk* chunk =
@@ -129,7 +130,8 @@ mrhiCommand* mrhiTakeCommands(mrhiDevice* device, mrhiFramePass* pass, uint32_t 
             atomic_fetch_add_explicit(&device->frameChunksTaken, 1, memory_order_relaxed);
         if (index >= device->frameChunkLimit)
         {
-            pass->overflowed = true;
+            pass->overflow = mrhi_diagnosticFrameCommandBytes;
+            mrhiRecordDiagnostic(&device->diagnostics, pass->overflow);
             return nullptr;
         }
         mrhiCommandChunk* fresh = &device->frameChunks[index];

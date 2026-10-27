@@ -30,6 +30,8 @@ A device has exactly what it asked for, not what the adapter could give: asking 
 
 A device's own budgets, `mrhiDeviceLimits`, size everything it allocates when it is made: the buffers, textures, views, samplers, shaders, pipelines, query sets and heaps it holds at once, a frame's resources, passes, accesses and barriers, and the bytes for recorded commands (`frameCommandBytes`), uploads (`frameUploadBytes`) and readbacks (`readbackBytes`). A call past one answers `mrhi_errorCapacity`. The limit `framesInFlight` bounds the frames submitted and not yet finished; past it, beginning a frame is refused for capacity rather than blocking.
 
+To size a frame's budgets from what frames take, read `mrhiGetFrameUsage` after a frame compiles or is submitted. It holds what the frame begun last took of each frame limit, each member named after the `mrhiDeviceLimits` member it is measured against, so the headroom is the difference. The library's own pass, which zeroes new objects, is left out. After a refusal it holds what the frame took before it, until the next frame begins. With a `diagnostics` capacity, each refusal by a frame's limit also records a code naming the limit, such as `mrhi_diagnosticFramePasses` or `mrhi_diagnosticFrameUploadBytes`; it counts no misuse.
+
 An instance refuses to be destroyed while devices made on it exist, counting the call as misuse. A device destroyed while it is still opening answers its request with `mrhi_errorStale`.
 
 ## Device loss

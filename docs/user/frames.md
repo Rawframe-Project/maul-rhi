@@ -96,7 +96,7 @@ static bool DrawAndRead(mrhiDevice* device, mrhiGraphicsPipelineId pipeline, con
 - **Clears.** `mrhiClearBuffer` zeros a range of a buffer, without staging, in a pass that declares it a copy destination: counters, indirect arguments and a culling pass's output start this way.
 - **Copies.** `mrhiCopyBuffer`, `mrhiCopyBufferToTexture`, `mrhiCopyTextureToBuffer` and `mrhiCopyTexture` record in passes without targets, checked as WebGPU checks them. An empty copy, write or read records nothing; a read is still answered, with no bytes.
 
-A full command arena, staging or ring refuses the call with `mrhi_errorCapacity` and marks its pass; the frame's submission is then refused too, so nothing is dropped silently. Raise the device limit and try again on the next frame.
+A full command arena, staging or ring refuses the call with `mrhi_errorCapacity` and marks its pass; the frame's submission is then refused too, so nothing is dropped silently. The device's diagnostics name the limit, and `mrhiGetFrameUsage` shows how much of each the frame took ([devices](devices.md#opening-a-device)). Raise the device limit and try again on the next frame.
 
 ## Draws beyond the basics
 

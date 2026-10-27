@@ -784,8 +784,12 @@ static void TestCountedDraws(void)
                       mrhi_errorCapacity &&
                   mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 2) == mrhi_success &&
                   mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) ==
-                      mrhi_errorCapacity,
+                      mrhi_errorCapacity &&
+                  Refusal() == mrhi_diagnosticFrameIndirectDraws,
               "five draws in a frame");
+        mrhiFrameUsage usage = {0};
+        CHECK(mrhiGetFrameUsage(s_device, &usage) == mrhi_success && usage.frameIndirectDraws == 5,
+              "all of them taken");
         Drop();
     }
     CHECK(mrhiGetDeviceMisuse(s_device) == 0, "the limit is no misuse");
@@ -903,6 +907,7 @@ static void TestArena(void)
               mrhiDispatch(s_device, s_compute, 1, 1, 1) == mrhi_errorCapacity &&
               mrhiDispatchIndirect(s_device, s_compute, s_a, 0) == mrhi_errorCapacity,
           "for every pass");
+    CHECK(Refusal() == mrhi_diagnosticFrameCommandBytes, "the limit named");
     Drop();
     CloseDevice();
 }

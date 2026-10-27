@@ -774,6 +774,47 @@ extern "C"
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiGetFrameMemory(mrhiDevice* device, uint64_t* bytesOut);
 
+    // What a frame has taken of each limit a frame has, each member named after
+    // the mrhiDeviceLimits member it is measured against.
+    typedef struct mrhiFrameUsage
+    {
+        // The resources it declared, imported and acquired.
+        uint32_t frameResources;
+        // The passes it added; the library's own pass is not counted.
+        uint32_t framePasses;
+        // The accesses and targets its passes declared, as the limit counts
+        // them. A pass is refused when its accesses, with two for each color
+        // target and one for the depth target, could pass the limit, so the
+        // last pass may be refused below it.
+        uint32_t frameAccesses;
+        // The barriers its compile planned, the program's alone: 0 before the
+        // compile, and those planned before a compile the limit refused.
+        uint32_t frameBarriers;
+        // The bytes its passes' commands took, in whole 4 KiB chunks, so a full
+        // arena reads the limit rounded down to them; the library's own pass is
+        // not counted.
+        uint32_t frameCommandBytes;
+        // The bytes its uploads took of its staging, each at a 512-byte
+        // boundary with a texture's rows at a 256-byte pitch.
+        uint32_t frameUploadBytes;
+        // The maxCounts of its counted multi-draws, in all.
+        uint32_t frameIndirectDraws;
+    } mrhiFrameUsage;
+
+    /// Reads what the frame begun last has taken of each frame limit: while it
+    /// is open, once compiled, after a call its limits refused, and after it is
+    /// submitted or dropped, until the next frame begins. Before the first
+    /// frame, everything is 0. A program compares it with
+    /// mrhiGetDeviceOwnLimits to learn its headroom.
+    ///
+    /// @param device    The device.
+    /// @param usageOut  Receives the usage.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument.
+    /// @par Thread safety
+    /// Safe from any thread; the device is used by one thread at a time.
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetFrameUsage(mrhiDevice* device,
+                                                         mrhiFrameUsage* usageOut);
+
 #ifdef __cplusplus
 }
 #endif
