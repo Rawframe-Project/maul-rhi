@@ -10,6 +10,10 @@
 // then takes a pipeline and exports. Skipped where there is no Vulkan
 // adapter, unless MAUL_RHI_REQUIRE_VULKAN is set.
 
+#ifdef _WIN32
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include "bytes.h"
 #include "sha256.h"
 #include "test_harness.h"
