@@ -98,7 +98,8 @@ mrhiResult mrhiWriteBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId res
         {.offset = staged},
         {.object = object, .offset = offset},
     };
-    memcpy(&records[1], sides, sizeof(sides));
+    memcpy(&records[1], &sides[0], sizeof(sides[0]));
+    memcpy(&records[2], &sides[1], sizeof(sides[1]));
     return mrhi_success;
 }
 

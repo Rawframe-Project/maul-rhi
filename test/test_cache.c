@@ -117,6 +117,25 @@ static void TestRoundTrip(void)
     Close(device);
 }
 
+// The cache's bytes are the same whatever the caller's buffer held
+// before: once over zeros and once over 0xFF.
+static void TestPatterns(void)
+{
+    mrhiDevice* device = OpenCached(nullptr, 0);
+    MakePipelines(device, 2);
+    static uint8_t patterns[2][CACHE_ROOM];
+    size_t sizes[2] = {0, 0};
+    for (int i = 0; i < 2; ++i)
+    {
+        memset(patterns[i], i == 0 ? 0x00 : 0xFF, CACHE_ROOM);
+        CHECK(mrhiGetPipelineCache(device, patterns[i], CACHE_ROOM, &sizes[i]) == mrhi_success,
+              "the cache written over a pattern");
+    }
+    CHECK(sizes[0] == 80 && sizes[1] == 80 && memcmp(patterns[0], patterns[1], 80) == 0,
+          "the same bytes over either pattern");
+    Close(device);
+}
+
 static void TestDamaged(void)
 {
     mrhiDevice* device = OpenCached(nullptr, 0);
@@ -259,6 +278,7 @@ int main(void)
 {
     ResetAdapter();
     TestRoundTrip();
+    TestPatterns();
     TestDamaged();
     TestStale();
     TestVersion();

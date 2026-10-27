@@ -827,7 +827,8 @@ static void Copy(int state, const mrhiDriverFrame* frame, const mrhiCommand* com
     case mrhiCommandReadBuffer:
     {
         mrhiCommandBufferSide sides[2];
-        memcpy(sides, &command[1], sizeof(sides));
+        memcpy(&sides[0], &command[1], sizeof(sides[0]));
+        memcpy(&sides[1], &command[2], sizeof(sides[1]));
         mrhiJsCopyBuffer(state, sides[0].object, (double)sides[0].offset, sides[1].object,
                          (double)sides[1].offset, (double)command->b);
         break;
@@ -835,7 +836,8 @@ static void Copy(int state, const mrhiDriverFrame* frame, const mrhiCommand* com
     case mrhiCommandCopyTexture:
     {
         mrhiCommandTextureSide sides[2];
-        memcpy(sides, &command[1], sizeof(sides));
+        memcpy(&sides[0], &command[1], sizeof(sides[0]));
+        memcpy(&sides[1], &command[2], sizeof(sides[1]));
         const uint32_t source[6] = {sides[0].object, sides[0].mip, sides[0].x,
                                     sides[0].y,      sides[0].z,   sides[0].aspect};
         const uint32_t target[6] = {sides[1].object, sides[1].mip, sides[1].x,

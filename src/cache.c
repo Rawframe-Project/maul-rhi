@@ -101,6 +101,9 @@ mrhiResult mrhiGetPipelineCache(mrhiDevice* device, void* bytes, size_t capacity
     {
         return mrhi_errorPlatform;
     }
+    // The header is built field by field over zeros, so nothing the
+    // caller's bytes held stays in it.
+    memset(data, 0, HEADER_BYTES);
     memcpy(data, MAGIC, sizeof(MAGIC));
     mrhiWrite32(data + 4, CACHE_VERSION);
     mrhiWrite64(data + 8, *sizeOut);
