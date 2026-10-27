@@ -5,6 +5,24 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.9.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.8.0...v0.9.0) (2026-10-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **spi:** MRHI_SPI_VERSION is 9. `submitFrame` takes a fourth argument, `mrhiDiagnosticCode* budgetOut`. A driver sets it to the `mrhi_diagnosticSubmit` code of the budget that ran out when it returns `mrhi_errorCapacity`, and leaves it 0 otherwise. The mustpass list is `conformance/mustpass/spi-9.txt`.
+
+### Added
+
+* **graph:** read a frame's usage and name the limit a refusal hit ([#161](https://github.com/Rawframe-Project/maul-rhi/issues/161)) ([06ab4fa](https://github.com/Rawframe-Project/maul-rhi/commit/06ab4fa5b4d7e0b7c53f2af6a1ac858a514f402e)), closes [#160](https://github.com/Rawframe-Project/maul-rhi/issues/160)
+* **spi:** name the budget a driver's submission ran out of ([#163](https://github.com/Rawframe-Project/maul-rhi/issues/163)) ([f2714d1](https://github.com/Rawframe-Project/maul-rhi/commit/f2714d12e4830b44f4056d6f8322e451fe892253)), closes [#162](https://github.com/Rawframe-Project/maul-rhi/issues/162)
+
+
+### Fixed
+
+* **tools:** refuse a contract base whose tree git cannot read ([#144](https://github.com/Rawframe-Project/maul-rhi/issues/144)) ([347c646](https://github.com/Rawframe-Project/maul-rhi/commit/347c64693d8cd77acb6e33b1b0641e092ebca672)), closes [#143](https://github.com/Rawframe-Project/maul-rhi/issues/143)
+* **vulkan:** name the command lists budget when a command buffer fails ([#165](https://github.com/Rawframe-Project/maul-rhi/issues/165)) ([8bf5e7c](https://github.com/Rawframe-Project/maul-rhi/commit/8bf5e7c44f8f64a304f8ec190b2f2b06859eda6e)), closes [#164](https://github.com/Rawframe-Project/maul-rhi/issues/164)
+
 ## [0.8.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.7.0...v0.8.0) (2026-10-26)
 
 ### Changed
