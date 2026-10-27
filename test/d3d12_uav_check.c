@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Whether GPU-based validation tracks a texture's state right on this
-// machine, with no Maul RHI code (#7): the commands the D3D12 driver
+// machine, with no Maul RHI code: the commands the D3D12 driver
 // records for the conformance suite's storage bindings, in raw D3D12 on
 // the first adapter under the debug layer with GPU-based validation
 // (test/d3d12_debug.c, with MAUL_RHI_D3D12_DEBUG set). Each frame makes a 4 by 1 rgba8 texture in
@@ -10,10 +10,9 @@
 // table of three data-volatile ranges and copies it out. Rounds make a queue, heaps, a root
 // signature, a pipeline and two frame slots on the adapter's one D3D12 device and release them
 // again, as each device the library opens does. With rounds, the state tracking of the 1.619
-// Agility SDK on WARP sometimes reports the texture still in the common state at the dispatch,
-// though every value comes out right: about 1 run in 70 of "d3d12_uav_check 2 4".
-// MAUL_RHI_D3D12_GBV_STATES=0 turns the state tracking off, and the
-// error with it.
+// Agility SDK on WARP sometimes reported the texture still in the common state at the dispatch,
+// though every value came out right: 6 of 300 runs of "d3d12_uav_check 20 8" on 1.619.5, none
+// on 1.620.1. The nightly canary runs it on the pinned SDK, so an SDK that brings it back shows.
 //
 // usage: d3d12_uav_check [frames [rounds]]: one frame in one round by
 // default. Prints "uav check:" with whether the values came out right

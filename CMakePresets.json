@@ -144,11 +144,6 @@
       }
     },
     {
-      "name": "windows-d3d12-states",
-      "displayName": "windows-d3d12 with GPU-based validation's state tracking, nightly",
-      "inherits": "windows-d3d12"
-    },
-    {
       "name": "windows-vulkan",
       "displayName": "clang-cl, the Vulkan driver instead of D3D12",
       "inherits": "windows",
@@ -171,7 +166,6 @@
     { "name": "macos-clang-debug", "configurePreset": "macos-clang-debug" },
     { "name": "ios-simulator", "configurePreset": "ios-simulator" },
     { "name": "windows-d3d12", "configurePreset": "windows-d3d12", "configuration": "Debug" },
-    { "name": "windows-d3d12-states", "configurePreset": "windows-d3d12-states", "configuration": "Debug" },
     { "name": "windows-vulkan", "configurePreset": "windows-vulkan", "configuration": "Release" }
   ],
   "testPresets": [
@@ -265,23 +259,15 @@
       "inherits": "base",
       "configurePreset": "windows-d3d12",
       "configuration": "Debug",
-      "description": "WARP, which must be found, under the Agility SDK's debug layer and GPU-based validation, whose errors fail the tests. The validation's resource state tracking is off: it reports false errors on a device whose objects were made and released before (#7), and windows-d3d12-states runs it nightly.",
+      "description": "WARP, which must be found, under the Agility SDK's debug layer and GPU-based validation, whose errors fail the tests.",
       "environment": {
         "MAUL_RHI_REQUIRE_D3D12": "1",
         "MAUL_RHI_REQUIRE_SURFACE": "1",
         "MAUL_RHI_REQUIRE_BINDLESS": "1",
         "MAUL_RHI_REQUIRE_STATISTICS": "1",
         "MAUL_RHI_REQUIRE_TIMESTAMPS": "1",
-        "MAUL_RHI_D3D12_DEBUG": "1",
-        "MAUL_RHI_D3D12_GBV_STATES": "0"
+        "MAUL_RHI_D3D12_DEBUG": "1"
       }
-    },
-    {
-      "name": "windows-d3d12-states",
-      "inherits": "windows-d3d12",
-      "configurePreset": "windows-d3d12-states",
-      "description": "windows-d3d12 with GPU-based validation's resource state tracking, nightly only while it reports false errors (#7).",
-      "environment": { "MAUL_RHI_D3D12_GBV_STATES": null }
     },
     {
       "name": "windows-vulkan",

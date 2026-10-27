@@ -3,10 +3,10 @@
 //
 // The D3D12 debug layer for the suites (d3d12_debug.h). The exe exports
 // the Agility SDK it runs on, from D3D12/ beside it where CI places
-// the SDK's NuGet package (the version the directx/ headers are, 619),
-// falling back to the system's runtime without it. The watched devices
-// are held until the process ends, so that each adapter keeps the one
-// device the library then opens.
+// the SDK's NuGet package (tools/ci_agility.sh, 1.620), falling back
+// to the system's runtime without it. The watched devices are held
+// until the process ends, so that each adapter keeps the one device
+// the library then opens.
 
 // getenv is standard C; MSVC's runtime deprecates it for its own.
 #define _CRT_SECURE_NO_WARNINGS
@@ -20,10 +20,9 @@
 #include <dxgi1_6.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <windows.h>
 
-__declspec(dllexport) const UINT D3D12SDKVersion = 619;
+__declspec(dllexport) const UINT D3D12SDKVersion = 620;
 __declspec(dllexport) const char* D3D12SDKPath = ".\\D3D12\\";
 
 static uint32_t s_errors;
@@ -82,19 +81,6 @@ void mrhiTestWatchD3d12(void)
     {
         ID3D12Debug1_SetEnableGPUBasedValidation(validation, TRUE);
         ID3D12Debug1_Release(validation);
-    }
-    // MAUL_RHI_D3D12_GBV_STATES=0 keeps GPU-based validation but its
-    // resource state tracking, which reports false errors on a device
-    // whose objects were made and released before (#7). The debug layer
-    // still checks every barrier's states when a list is executed.
-    const char* states = getenv("MAUL_RHI_D3D12_GBV_STATES");
-    ID3D12Debug3* flags = nullptr;
-    if (states != nullptr && strcmp(states, "0") == 0 &&
-        SUCCEEDED(ID3D12Debug_QueryInterface(debug, &IID_ID3D12Debug3, (void**)&flags)))
-    {
-        ID3D12Debug3_SetGPUBasedValidationFlags(
-            flags, D3D12_GPU_BASED_VALIDATION_FLAGS_DISABLE_STATE_TRACKING);
-        ID3D12Debug3_Release(flags);
     }
     ID3D12Debug_Release(debug);
     IDXGIFactory4* factory = nullptr;
