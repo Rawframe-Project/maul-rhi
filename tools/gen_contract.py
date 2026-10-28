@@ -689,6 +689,13 @@ def emit_capability_checks(contract):
         sign = ">=" if member.get("better") == "lower" else "<="
         lines.append(f"        && asked->{name} {sign} granted->{name}")
     lines[-1] += ";"
+    lines += ["}", "", "bool mrhiAlignmentsValid(const mrhiLimits* limits)", "{", "    return true"]
+    for member in limits["members"]:
+        if member.get("better") == "lower":
+            name = camel(member["name"])
+            lines.append(f"        && limits->{name} != 0"
+                         f" && (limits->{name} & (limits->{name} - 1)) == 0")
+    lines[-1] += ";"
     lines += ["}", "", "void mrhiMaskFeatures(mrhiFeatures* features, mrhiDriverKind driver)", "{",
               "    switch (driver)", "    {"]
     for api, _ in APIS:

@@ -83,12 +83,12 @@ mrhiFormatCaps mrhiAdapterFormatCaps(const mrhiInstance* instance, const mrhiDri
     return caps;
 }
 
-// Whether an adapter meets the floor: the floor limits, and the floor
-// capabilities of every format.
+// Whether an adapter meets the floor: the floor limits, alignments that
+// are powers of two, and the floor capabilities of every format.
 static bool MeetsFloor(const mrhiInstance* instance, const mrhiDriverAdapter* adapter)
 {
     mrhiLimits floor = mrhiDefaultLimits();
-    if (!mrhiLimitsWithin(&floor, &adapter->limits))
+    if (!mrhiLimitsWithin(&floor, &adapter->limits) || !mrhiAlignmentsValid(&adapter->limits))
     {
         return false;
     }
