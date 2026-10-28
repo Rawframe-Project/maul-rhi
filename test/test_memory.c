@@ -87,9 +87,9 @@ static mrhiPassPlan PassPlan(mrhiPassId pass)
 
 static uint64_t Memory(void)
 {
-    uint64_t bytes = 0;
-    CHECK(mrhiGetFrameMemory(s_device, &bytes) == mrhi_success, "the memory");
-    return bytes;
+    mrhiFrameUsage usage = {0};
+    CHECK(mrhiGetFrameUsage(s_device, &usage) == mrhi_success, "the usage");
+    return usage.frameMemoryBytes;
 }
 
 static const uint64_t kTexture = 64 * 64 * 4;
@@ -418,13 +418,10 @@ static void TestStores(mrhiTextureId windowTexture)
 static void TestRefusals(void)
 {
     mrhiPassPlan plan;
-    uint64_t bytes;
-    CHECK(mrhiGetFrameMemory(s_device, &bytes) == mrhi_errorState, "no frame");
     Begin();
     mrhiResourceId target = Declare(mrhi_formatRgba8Unorm, 1);
     mrhiPassId pass = Draw(target, mrhi_storeKeep, nullptr, 0);
     CHECK(mrhiGetPassPlan(s_device, pass, &plan) == mrhi_errorState, "not compiled");
-    CHECK(mrhiGetFrameMemory(s_device, &bytes) == mrhi_errorState, "not compiled");
     CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(Memory() == 0, "a culled frame takes nothing");
     CHECK(mrhiGetPassPlan(s_device, pass, nullptr) == mrhi_errorInvalid, "no out");
@@ -433,8 +430,6 @@ static void TestRefusals(void)
     CHECK(mrhiGetPassPlan(s_device, (mrhiPassId){pass.index1 + 1, pass.generation}, &plan) ==
               mrhi_errorStale,
           "past the passes");
-    CHECK(mrhiGetFrameMemory(s_device, nullptr) == mrhi_errorInvalid, "no bytes out");
-    CHECK(mrhiGetFrameMemory(nullptr, &bytes) == mrhi_errorInvalid, "no device");
     Drop();
     Begin();
     Draw(Declare(mrhi_formatRgba8Unorm, 1), mrhi_storeKeep, nullptr, 0);

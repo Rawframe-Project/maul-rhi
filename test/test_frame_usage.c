@@ -157,9 +157,13 @@ static void TestCounts(void)
     mrhiFrameUsage usage = Usage();
     CHECK(usage.frameResources == 2 && usage.framePasses == 2 && usage.frameAccesses == 3 &&
               usage.frameBarriers == 0 && usage.frameCommandBytes == 0 &&
-              usage.frameUploadBytes == 0 && usage.frameIndirectDraws == 0,
+              usage.frameUploadBytes == 0 && usage.frameIndirectDraws == 0 &&
+              usage.frameMemoryBytes == 0,
           "resources, passes and accesses before the compile");
     CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    // The two buffers are both written in the first pass, so they share
+    // no bytes.
+    CHECK(Usage().frameMemoryBytes >= 2048, "the declared buffers' memory once compiled");
     size_t barriers = 0;
     CHECK(mrhiGetFrameBarriers(s_device, nullptr, 0, &barriers) == mrhi_success && barriers > 0,
           "barriers planned");

@@ -267,6 +267,7 @@ static inline void mrhiOutFrameUsage(
     out->frameCommandBytes = from->frameCommandBytes;
     out->frameUploadBytes = from->frameUploadBytes;
     out->frameIndirectDraws = from->frameIndirectDraws;
+    out->frameMemoryBytes = from->frameMemoryBytes;
 }
 
 static inline void mrhiOutShaderInfo(

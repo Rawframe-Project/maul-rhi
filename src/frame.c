@@ -373,6 +373,7 @@ mrhiResult mrhiGetFrameUsage(mrhiDevice* device, mrhiFrameUsage* usageOut)
             (uint32_t)(staged < limits->frameUploadBytes ? staged : limits->frameUploadBytes),
         .frameIndirectDraws =
             (uint32_t)atomic_load_explicit(&device->countedTaken, memory_order_relaxed),
+        .frameMemoryBytes = device->frameCompiled ? device->frameMemory : 0,
     };
     mrhiOutFrameUsage(usageOut, &usage);
     return mrhi_success;

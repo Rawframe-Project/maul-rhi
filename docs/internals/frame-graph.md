@@ -60,7 +60,7 @@ When the first use of a transient lands on memory that resources used earlier in
 
 ## The readable plan
 
-After the compile, `mrhiIsPassKept`, `mrhiGetPassPlan`, `mrhiGetResourcePlan`, `mrhiGetFrameBarriers` and `mrhiGetFrameMemory` expose the plan. They exist for conformance tests and graph tools, and they are why the hazards and aliasing cases of the conformance suite can be checked exactly on any driver.
+After the compile, `mrhiIsPassKept`, `mrhiGetPassPlan`, `mrhiGetResourcePlan` and `mrhiGetFrameBarriers` expose the plan, and `mrhiGetFrameUsage` its memory. They exist for conformance tests and graph tools, and they are why the hazards and aliasing cases of the conformance suite can be checked exactly on any driver.
 
 ## Submission
 

@@ -254,21 +254,3 @@ mrhiResult mrhiGetPassPlan(mrhiDevice* device, mrhiPassId pass, mrhiPassPlan* pl
     mrhiOutPassPlan(planOut, &plan);
     return mrhi_success;
 }
-
-mrhiResult mrhiGetFrameMemory(mrhiDevice* device, uint64_t* bytesOut)
-{
-    if (device == nullptr)
-    {
-        return mrhi_errorInvalid;
-    }
-    if (bytesOut == nullptr)
-    {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
-    }
-    if (!device->frameOpen || !device->frameCompiled)
-    {
-        return mrhi_errorState;
-    }
-    *bytesOut = device->frameMemory;
-    return mrhi_success;
-}
