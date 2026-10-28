@@ -30,7 +30,7 @@ defaults:
 jobs:
   # Whether anything beyond documentation changed; the builds skip when not.
   changes:
-    uses: Rawframe-Project/.github/.github/workflows/changes.yml@fe75bcddbe570e4bcfad0c64eea4edf720e4c57b # v0.0.32
+    uses: Rawframe-Project/.github/.github/workflows/changes.yml@b6e8a6f50a3c8789f11a06858675374ae2ff90a9 # v0.0.33
     permissions:
       pull-requests: read
 
@@ -46,12 +46,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Rawframe-Project/.github/.github/actions/docs-check@fe75bcddbe570e4bcfad0c64eea4edf720e4c57b # v0.0.32
+      - uses: Rawframe-Project/.github/.github/actions/docs-check@b6e8a6f50a3c8789f11a06858675374ae2ff90a9 # v0.0.33
         with:
           exclude: khronos directx
 
   zizmor:
-    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@fe75bcddbe570e4bcfad0c64eea4edf720e4c57b # v0.0.32
+    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@b6e8a6f50a3c8789f11a06858675374ae2ff90a9 # v0.0.33
     permissions:
       contents: read
 
@@ -152,7 +152,7 @@ jobs:
           - { preset: macos-clang-debug, runner: macos-26, setup: tools/ci_metal.sh }
           - { preset: windows-d3d12, runner: windows-2025, setup: tools/ci_agility.sh }
           - { preset: windows-vulkan, runner: windows-2025 }
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@fe75bcddbe570e4bcfad0c64eea4edf720e4c57b # v0.0.32
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@b6e8a6f50a3c8789f11a06858675374ae2ff90a9 # v0.0.33
     permissions:
       contents: read
     with:
@@ -439,7 +439,7 @@ jobs:
   # and never retried, until the Agility SDK fixes it.
   windows-d3d12-states:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@fe75bcddbe570e4bcfad0c64eea4edf720e4c57b # v0.0.32
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@b6e8a6f50a3c8789f11a06858675374ae2ff90a9 # v0.0.33
     permissions:
       contents: read
     with:
