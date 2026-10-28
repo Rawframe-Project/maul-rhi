@@ -579,16 +579,20 @@ static void DestroyPipeline(void* self, uint64_t handle)
 // Gives back a configured swapchain's record.
 static void EndSwapchain(TestDevice* device, uint64_t handle)
 {
-    TestSwapchain** link = &device->swapchainRecords;
-    while (*link != nullptr && (*link)->handle != handle)
+    for (TestSwapchain** link = &device->swapchainRecords; *link != nullptr; link = &(*link)->next)
     {
-        link = &(*link)->next;
+        TestSwapchain* record = *link;
+        if (record->handle == handle)
+        {
+            MRHI_ASSERT(device->swapchains > 0);
+            *link = record->next;
+            --device->swapchains;
+            mrhiRelease(&device->allocator, record, sizeof(TestSwapchain), alignof(TestSwapchain));
+            return;
+        }
     }
-    TestSwapchain* record = *link;
-    MRHI_ASSERT(record != nullptr && device->swapchains > 0);
-    *link = record->next;
-    --device->swapchains;
-    mrhiRelease(&device->allocator, record, sizeof(TestSwapchain), alignof(TestSwapchain));
+    // The core ends only the swapchains it configured, each once.
+    MRHI_ASSERT(false);
 }
 
 static mrhiResult ConfigureSurface(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
