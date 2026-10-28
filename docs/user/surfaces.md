@@ -36,7 +36,7 @@ Every presenting adapter offers fifo, opaque alpha, the render target usage and 
 `mrhiConfigureSurface` configures a surface on a device with a color the caps report (or its twin, as above), its usages, a nonzero size, one present mode and one alpha mode. Anything the caps do not offer is refused, never quietly replaced.
 
 - A surface is configured on one device at a time; another device finds it in `mrhi_errorState`.
-- Configuring again reconfigures. A reconfiguration that fails leaves the surface unconfigured.
+- Configuring again reconfigures. A refused reconfiguration keeps the surface configured as it was. Only a platform call that fails after retiring the old swapchain leaves the surface unconfigured: Vulkan retires it whatever `vkCreateSwapchainKHR` answers, and D3D12 releases it first, as a window holds one swapchain.
 - Where the window fixes its images' size (Vulkan on Win32 and X11), a size other than the window's is `mrhi_errorOutOfDate`: configure again at the window's size. Elsewhere the program's size is kept and the platform scales the images to the window.
 - When the window's pixel size changes, configure again at the new size.
 - `mrhiUnconfigureSurface` ends a configuration. Destroying the surface or the device ends it too.

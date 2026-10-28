@@ -7,10 +7,10 @@
 // Each failure answers mrhi_errorCapacity, changes nothing a program can
 // see, leaks nothing and leaves the objects usable: the call run again
 // answers as a clean run does. A call that absorbs the failure answers
-// as a clean run does. A failed reconfiguration leaves the surface
-// unconfigured, as its driver retires the old swapchain whatever happens.
-// A driver refusing an object for memory changes nothing either: the
-// next one made takes the id a clean run gives it.
+// as a clean run does. A driver refusing an object for memory changes
+// nothing either: the next one made takes the id a clean run gives it.
+// Only a reconfiguration whose platform call ran, retiring the old
+// swapchain, leaves the surface unconfigured.
 
 #include "test_harness.h"
 
@@ -403,7 +403,7 @@ static const Step s_steps[] = {
     {"create shader", Opened, CreateShader, false},
     {"create heap", Opened, CreateHeap, false},
     {"configure surface", WithSurface, Configure, false},
-    {"reconfigure surface", Configured, Configure, true},
+    {"reconfigure surface", Configured, Configure, false},
 };
 
 // Every creation whose driver can refuse it.
@@ -418,6 +418,8 @@ static const Step s_refused[] = {
     {"create query set", Opened, CreateQuerySet, false},
     {"create compute pipeline", WithShader, CreateComputePipeline, false},
     {"create graphics pipeline", WithShader, CreateGraphicsPipeline, false},
+    {"configure surface", WithSurface, Configure, false},
+    {"reconfigure surface", Configured, Configure, true},
 };
 
 static uint64_t InstanceDigest(World* world)

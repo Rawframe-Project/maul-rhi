@@ -8,6 +8,10 @@
 
 #include "test_device_setup.h"
 
+#include "maul-rhi/frame.h"
+
+#include <stdlib.h>
+
 // A test surface on the instance, presenting on the adapters in the mask,
 // in BGRA8 sRGB and RGBA16F extended linear, with copies.
 static mrhiSurfaceId MakeSurface(uint32_t presenting)
@@ -293,7 +297,8 @@ static void TestOwnership(void)
     Close(device);
 }
 
-// A failing driver leaves the surface unconfigured, and loses no slot.
+// A failing platform call leaves the surface unconfigured, as it has
+// retired the old swapchain, and loses no slot.
 static void TestFailures(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
@@ -310,6 +315,96 @@ static void TestFailures(void)
     Close(device);
 }
 
+// Whether the device's allocations fail.
+static bool s_outOfMemory;
+
+static void* Alloc(size_t size, size_t alignment, void* context)
+{
+    (void)alignment;
+    (void)context;
+    return s_outOfMemory ? nullptr : malloc(size);
+}
+
+static void Free(void* memory, size_t size, size_t alignment, void* context)
+{
+    (void)size;
+    (void)alignment;
+    (void)context;
+    free(memory);
+}
+
+// Whether the surface is still configured on its device: a second
+// device's configuration is then refused as the device's surface, before
+// the caps refuse its mode.
+static bool IsConfigured(mrhiDevice* second, mrhiSurfaceId surface)
+{
+    mrhiSurfaceConfig config = Config(surface);
+    config.presentMode = mrhi_presentMailbox;
+    return mrhiConfigureSurface(second, &config) == mrhi_errorState;
+}
+
+// A reconfiguration refused before the platform keeps the surface
+// configured as it was, whatever refuses it: the core's checks, or the
+// driver for memory before its platform call. Once the platform call
+// runs it retires the old swapchain, even when it fails for memory.
+static void TestRefusalsKeep(void)
+{
+    s_adapter.limits.textureDimension2d = 16384;
+    bool refuse = false;
+    s_adapter.refuseObjects = &refuse;
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.allocator = (mrhiAllocator){.alloc = Alloc, .free = Free};
+    mrhiDevice* device = OpenWith(def, true);
+    mrhiDevice* second = OpenSecond();
+    mrhiSurfaceId surface = MakeSurface(1);
+    mrhiSurfaceConfig config = Config(surface);
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success && IsConfigured(second, surface),
+          "configured");
+    config.cookie = 0;
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorInvalid &&
+              IsConfigured(second, surface),
+          "a malformed config");
+    config = Config(surface);
+    config.color.format = mrhi_formatRgba8Unorm;
+    config.viewFormats[0] = mrhi_formatRgba8UnormSrgb;
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported &&
+              IsConfigured(second, surface),
+          "a format the surface does not report");
+    config = Config(surface);
+    config.width = 16385;
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported &&
+              IsConfigured(second, surface),
+          "past the adapter's size");
+    config.width = 8193;
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorCapacity &&
+              IsConfigured(second, surface),
+          "past the device's size");
+    mrhiFrameDef frameDef = mrhiDefaultFrameDef();
+    mrhiResourceId image = {0};
+    CHECK(mrhiBeginFrame(device, &frameDef) == mrhi_success &&
+              mrhiAcquireSurfaceImage(device, surface, &image) == mrhi_success,
+          "an image held");
+    config = Config(surface);
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorState && IsConfigured(second, surface),
+          "while the frame holds an image");
+    CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
+    s_outOfMemory = true;
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorCapacity &&
+              IsConfigured(second, surface),
+          "the driver out of memory before the platform");
+    s_outOfMemory = false;
+    CHECK(mrhiUnconfigureSurface(device, surface) == mrhi_success, "and the old one works");
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "configured again");
+    refuse = true;
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorCapacity &&
+              !IsConfigured(second, surface),
+          "the platform out of memory retires it");
+    refuse = false;
+    CHECK(mrhiGetDeviceMisuse(device) == 1, "the malformed config counted");
+    mrhiDestroyDevice(second);
+    Close(device);
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -320,5 +415,6 @@ int main(void)
     TestTwins();
     TestOwnership();
     TestFailures();
+    TestRefusalsKeep();
     return s_failures == 0 ? 0 : 1;
 }

@@ -320,7 +320,9 @@ extern "C"
     MRHI_API mrhiSurfaceConfig mrhiDefaultSurfaceConfig(void);
 
     /// Configures a surface on a ready device, or reconfigures one the device
-    /// holds. A failed reconfiguration leaves the surface unconfigured.
+    /// holds. A refused reconfiguration keeps the surface configured as it was,
+    /// unless the platform's call failed after retiring the old swapchain,
+    /// which leaves the surface unconfigured.
     ///
     /// @param device  The device.
     /// @param config  The configuration.

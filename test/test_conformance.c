@@ -4312,9 +4312,9 @@ static void CheckEveryColor(mrhiDevice* device, mrhiSurfaceId surface, const mrh
 // cleared and read back, more than the images and their semaphores; an
 // image given back and taken again; one presented unwritten; a
 // reconfiguration; every color listed; and, where the window fixes its
-// images' size, a size it does not take, which leaves the surface
-// unconfigured until it is configured again, or else a size of the
-// program's own.
+// images' size, a size it does not take, refused before the platform
+// sees it so that the surface presents as it was configured, or else a
+// size of the program's own.
 static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiSurfaceId surface,
                             const mrhiSurfaceCaps* caps, bool fixedSize)
 {
@@ -4348,7 +4348,8 @@ static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiS
     {
         CHECK(Configure(device, surface, caps, 32, 32) == mrhi_errorOutOfDate,
               "a size the window does not take");
-        CHECK(PresentRed(device, surface, false, pixel) == mrhi_errorState, "unconfigured");
+        CHECK(IsAcquired(PresentRed(device, surface, false, pixel)),
+              "still presenting as it was configured");
     }
     else
     {

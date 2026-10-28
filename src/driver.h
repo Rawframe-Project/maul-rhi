@@ -241,7 +241,10 @@ typedef struct mrhiDeviceDriverVtable
     void (*destroyView)(void* self, uint64_t handle);
     // Configures a surface, by its instance driver's handle, from a
     // config the core has checked; its swapchain handle, never zero.
-    // oldSwapchain, 0 for none, is retired whether or not this succeeds.
+    // oldSwapchain, 0 for none, is retired when this succeeds. On a
+    // failure, swapchainOut is oldSwapchain while it still works: a
+    // refusal before the platform retired it. It is 0 once the platform
+    // has retired it, which a failed platform call may also do.
     mrhiResult (*configureSurface)(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
                                    uint64_t oldSwapchain, uint64_t* swapchainOut);
     void (*unconfigureSurface)(void* self, uint64_t swapchain);

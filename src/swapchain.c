@@ -199,6 +199,11 @@ mrhiResult mrhiConfigureSurface(mrhiDevice* device, const mrhiSurfaceConfig* con
         mrhiDriverStatus(device, device->driver.vtable->configureSurface(
                                      device->driver.self, surface->handle, config, old, &handle));
     mrhiReleaseInstance(device->instance, held);
+    // A refusal the platform never saw keeps the old swapchain working.
+    if (status != mrhi_success && old != 0 && handle == old)
+    {
+        return status;
+    }
     if (status != mrhi_success)
     {
         mrhiPoolRelease(&device->swapchains, index1);
