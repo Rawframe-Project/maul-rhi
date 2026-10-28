@@ -178,12 +178,13 @@ mrhiResult mrhiCheckTextureShape(mrhiDevice* device, const mrhiTextureDef* def, 
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticTextureViewFormats);
     }
-    if (!FitsLimits(def, &device->limits) ||
-        !mrhiFormatFamilyGranted(def->format, &device->features))
+    if (!mrhiFormatFamilyGranted(def->format, &device->features))
     {
         return mrhi_errorUnsupported;
     }
-    return mrhi_success;
+    return FitsLimits(def, &device->limits)
+               ? mrhi_success
+               : mrhiPastLimits(FitsLimits(def, &device->adapterLimits));
 }
 
 mrhiResult mrhiCheckTextureUsage(mrhiDevice* device, const mrhiTextureDef* def)

@@ -433,7 +433,11 @@ struct mrhiDevice
     uint64_t adapter;
     mrhiAllocator allocator;
     mrhiFeatures features;
+    // The limits it was granted, and those of its adapter, which tell a
+    // value past a granted limit the program could ask for from one the
+    // adapter lacks.
     mrhiLimits limits;
+    mrhiLimits adapterLimits;
     mrhiDeviceLimits deviceLimits;
     mrhiDeviceState state;
     // The open request, answered when the device leaves opening.
@@ -605,6 +609,38 @@ mrhiResult mrhiDeviceBadData(mrhiDevice* device, mrhiDiagnosticCode code);
 // Records a refusal by the limit a code names, counting no misuse, and
 // returns mrhi_errorCapacity.
 mrhiResult mrhiDeviceFull(mrhiDevice* device, mrhiDiagnosticCode code);
+
+// Checks a value against one of the device's limits: success within the
+// limit it was granted; past it, mrhi_errorCapacity when the adapter's
+// limit holds the value, since a device asking for more would take it,
+// and mrhi_errorUnsupported when not.
+mrhiResult mrhiCheckLimit(uint64_t value, uint64_t granted, uint64_t adapter);
+
+// Checks an offset against one of the device's alignment limits, where
+// lower is better: success for a multiple of the granted alignment,
+// mrhi_errorCapacity for a multiple of the adapter's only, and
+// mrhi_errorUnsupported for neither.
+mrhiResult mrhiCheckAlignment(uint64_t offset, uint64_t granted, uint64_t adapter);
+
+// The refusal of a check that the device's limits fail:
+// mrhi_errorCapacity when the adapter's limits pass it, and
+// mrhi_errorUnsupported when not.
+mrhiResult mrhiPastLimits(bool adapterPasses);
+
+// Checks a value against the device's limit named field (mrhiCheckLimit).
+#define MRHI_DEVICE_LIMIT(device, field, value)                                                    \
+    mrhiCheckLimit((value), (device)->limits.field, (device)->adapterLimits.field)
+
+// Checks an offset against the device's alignment limit named field
+// (mrhiCheckAlignment).
+#define MRHI_DEVICE_ALIGNMENT(device, field, offset)                                               \
+    mrhiCheckAlignment((offset), (device)->limits.field, (device)->adapterLimits.field)
+
+// Returns a frame call's status, recording it under
+// mrhi_diagnosticDeviceLimit, counting no misuse, when it is
+// mrhi_errorCapacity: a refusal at one of the device's limits that the
+// adapter's hold.
+mrhiResult mrhiRecordPastLimit(mrhiDevice* device, mrhiResult status);
 
 // The head every object def opens with.
 typedef struct mrhiDefHead

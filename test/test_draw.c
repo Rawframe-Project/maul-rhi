@@ -259,6 +259,8 @@ static void SetVertices(void)
 
 static void TestVertexBuffers(void)
 {
+    // An adapter of twice the device's vertex buffers.
+    s_adapter.limits.vertexBuffers = 16;
     Open();
     Unbound();
     mrhiGraphicsPipelineId pipeline = MakeGraphics();
@@ -305,9 +307,11 @@ static void TestVertexBuffers(void)
               mrhiDraw(s_device, s_render, 1, 3, 0, 0) == mrhi_errorInvalid,
           "the last instance needs its attribute's 8 bytes");
     CHECK(mrhiGetDeviceMisuse(s_device) == 8, "each counted");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 8, s_v, 0, 12) == mrhi_errorInvalid &&
-              Refusal() == mrhi_diagnosticVertexBufferSlot,
-          "past the device's vertex buffers");
+    CHECK(mrhiSetVertexBuffer(s_device, s_render, 8, s_v, 0, 12) == mrhi_errorCapacity &&
+              Refusal() == mrhi_diagnosticDeviceLimit,
+          "past the device's vertex buffers, within the adapter's");
+    CHECK(mrhiSetVertexBuffer(s_device, s_render, 16, s_v, 0, 12) == mrhi_errorUnsupported,
+          "past the adapter's");
     CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 2, 12) == mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticTransferAlignment,
           "an offset not a multiple of 4");
@@ -326,7 +330,7 @@ static void TestVertexBuffers(void)
     CHECK(mrhiSetVertexBuffer(s_device, s_compute, 0, s_v, 0, 12) == mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticRenderStateOutsideRenderPass,
           "a pass without targets");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 15, "each counted");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 14, "each invalid one counted");
     mrhiResourceId none = {0};
     CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, none, 0, 12) == mrhi_errorStale, "none");
     CHECK(mrhiSetVertexBuffer(nullptr, s_render, 0, s_v, 0, 12) == mrhi_errorInvalid, "no device");
@@ -511,6 +515,8 @@ static void TestTables(void)
 
 static void TestDispatch(void)
 {
+    // An adapter of twice the device's workgroups.
+    s_adapter.limits.workgroupsPerDimension = 2 * mrhiDefaultLimits().workgroupsPerDimension;
     Open();
     Unbound();
     mrhiComputePipelineId pipeline = MakeCompute();
@@ -527,14 +533,20 @@ static void TestDispatch(void)
     uint32_t most = mrhiDefaultLimits().workgroupsPerDimension;
     CHECK(mrhiDispatch(s_device, s_compute, most, most, most) == mrhi_success, "at the limit");
     CHECK(mrhiDispatch(s_device, s_compute, 0, 0, 0) == mrhi_success, "nothing");
-    CHECK(mrhiDispatch(s_device, s_compute, most + 1, 1, 1) == mrhi_errorInvalid &&
-              mrhiDispatch(s_device, s_compute, 1, most + 1, 1) == mrhi_errorInvalid &&
-              mrhiDispatch(s_device, s_compute, 1, 1, most + 1) == mrhi_errorInvalid,
-          "past it");
+    CHECK(mrhiDispatch(s_device, s_compute, most + 1, 1, 1) == mrhi_errorCapacity &&
+              mrhiDispatch(s_device, s_compute, 1, most + 1, 1) == mrhi_errorCapacity &&
+              mrhiDispatch(s_device, s_compute, 1, 1, most + 1) == mrhi_errorCapacity &&
+              Refusal() == mrhi_diagnosticDeviceLimit,
+          "past the device's limit, within the adapter's");
+    CHECK(mrhiDispatch(s_device, s_compute, 2 * most + 1, 1, 1) == mrhi_errorUnsupported &&
+              mrhiDispatch(s_device, s_compute, 1, 2 * most + 1, most + 1) ==
+                  mrhi_errorUnsupported &&
+              mrhiDispatch(s_device, s_compute, 1, 1, UINT32_MAX) == mrhi_errorUnsupported,
+          "past the adapter's");
     CHECK(mrhiDispatch(s_device, s_render, 1, 1, 1) == mrhi_errorInvalid &&
               mrhiDispatch(s_device, s_copy, 1, 1, 1) == mrhi_errorInvalid,
           "a pass with targets or copying");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 5, "each counted");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 2, "each invalid one counted");
     CHECK(mrhiSetComputePipeline(s_device, s_compute, bound) == mrhi_success &&
               mrhiDispatch(s_device, s_compute, 1, 1, 1) == mrhi_errorState,
           "its table not set");
@@ -916,10 +928,12 @@ int main(void)
 {
     ResetAdapter();
     TestVertexBuffers();
+    ResetAdapter();
     TestAttributeReach();
     TestIndices();
     TestTables();
     TestDispatch();
+    ResetAdapter();
     TestIndirectDraws();
     TestCountedDraws();
     TestIndirectDispatch();

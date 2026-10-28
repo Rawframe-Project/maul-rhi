@@ -170,9 +170,46 @@ static void TestLimit(void)
     s_instance = instance;
 }
 
+// A declared size past the device's limits but within the adapter's is
+// capacity, recorded, which a device asking for more would take; past
+// the adapter's it is unsupported.
+static void TestPastDeviceLimits(void)
+{
+    s_adapter.limits.textureDimension2d = 16384;
+    s_adapter.limits.bufferBytes = 2 * mrhiDefaultLimits().bufferBytes;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.deviceLimits.diagnostics = 4;
+    s_device = OpenWith(deviceDef, true);
+    Begin();
+    mrhiResourceId resource;
+    mrhiTextureDef texture = Texture();
+    texture.width = 8193;
+    mrhiDiagnostic record = {0};
+    CHECK(mrhiDeclareTexture(s_device, &texture, &resource) == mrhi_errorCapacity &&
+              mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success &&
+              record.code == mrhi_diagnosticDeviceLimit,
+          "a texture past the device's 2D limit, recorded");
+    texture.width = 16385;
+    CHECK(mrhiDeclareTexture(s_device, &texture, &resource) == mrhi_errorUnsupported,
+          "past the adapter's");
+    mrhiBufferDef buffer = Buffer(mrhiDefaultLimits().bufferBytes + 4);
+    CHECK(mrhiDeclareBuffer(s_device, &buffer, &resource) == mrhi_errorCapacity &&
+              mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success &&
+              record.code == mrhi_diagnosticDeviceLimit,
+          "a buffer past the device's bytes, recorded");
+    buffer = Buffer(2 * mrhiDefaultLimits().bufferBytes + 4);
+    CHECK(mrhiDeclareBuffer(s_device, &buffer, &resource) == mrhi_errorUnsupported,
+          "past the adapter's");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "none is misuse");
+    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    Close(s_device);
+    ResetAdapter();
+}
+
 int main(void)
 {
     ResetAdapter();
+    TestPastDeviceLimits();
     s_device = OpenWith(mrhiDefaultDeviceDef(), true);
     mrhiInstance* instance = s_instance;
     TestDeclare();

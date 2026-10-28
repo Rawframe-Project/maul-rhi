@@ -217,9 +217,10 @@ extern "C"
     /// without its cookie, a label that is not UTF-8 without NUL, a size of 0
     /// or not a multiple of 4, or no usage or an unknown one; `mrhi_errorLimit`
     /// for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a
-    /// size beyond the device's bufferBytes limit or a critical extension the
+    /// size past the adapter's bufferBytes limit or a critical extension the
     /// library does not know; `mrhi_errorState` for a device that is not ready;
-    /// `mrhi_errorCapacity` when the device's buffer limit is reached;
+    /// `mrhi_errorCapacity` for a size past the device's bufferBytes limit
+    /// within the adapter's, or when the device's buffer limit is reached;
     /// `mrhi_errorPlatform` when the driver fails.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
@@ -352,12 +353,13 @@ extern "C"
     /// that does not fit the kind or the format's block, too many mips, an
     /// unusable sample count, or a transient texture that is not only a render
     /// target; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES;
-    /// `mrhi_errorUnsupported` for a size past the device's limits, a usage or
+    /// `mrhi_errorUnsupported` for a size past the adapter's limits, a usage or
     /// sample count the format cannot take on the device, a compressed format
     /// without its feature, or a critical extension the library does not know;
     /// `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity`
-    /// when the device's texture limit is reached; `mrhi_errorPlatform` when
-    /// the driver fails.
+    /// for a size past the device's limits within the adapter's, or when the
+    /// device's texture limit is reached; `mrhi_errorPlatform` when the driver
+    /// fails.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateTexture(mrhiDevice* device,

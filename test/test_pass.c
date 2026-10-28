@@ -724,7 +724,7 @@ static void TestViews(void)
     Drop();
     Close(s_device);
     s_adapter.features.multiview = true;
-    s_adapter.limits.multiviewViews = 2;
+    s_adapter.limits.multiviewViews = 4;
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     deviceDef.features.multiview = true;
     deviceDef.limits.multiviewViews = 2;
@@ -736,7 +736,9 @@ static void TestViews(void)
     mrhiResourceId volume = DeclareSized(mrhi_texture3d, 16, 16, 2, 1);
     def = Pass(Color(two, mrhi_loadClear), nullptr, 0);
     def.viewCount = 3;
-    CHECK(Add(def) == mrhi_errorUnsupported, "past the limit");
+    CHECK(Add(def) == mrhi_errorCapacity, "past the device's limit, within the adapter's");
+    def.viewCount = 5;
+    CHECK(Add(def) == mrhi_errorUnsupported, "past the adapter's");
     def.viewCount = 2;
     CHECK(Add(def) == mrhi_success, "two views on two layers");
     def.colorTargets[0].layer = 1;

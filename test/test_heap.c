@@ -15,13 +15,15 @@
 #include "maul-rhi/heap.h"
 
 // A ready device holding at most heaps heaps, with the bindless
-// features asked for, both granted by the adapter.
+// features asked for, both granted by the adapter, whose heap sizes and
+// storage alignment are twice and a quarter of the device's.
 static mrhiDevice* Open(uint32_t heaps, bool sampling, bool heterogeneous)
 {
     s_adapter.features.bindlessSampling = true;
     s_adapter.features.bindlessHeterogeneous = true;
     s_adapter.limits.heapSize = 4096;
     s_adapter.limits.samplerHeapSize = 64;
+    s_adapter.limits.storageOffsetAlignment = 64;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.deviceLimits.heaps = heaps;
     def.features.bindlessSampling = sampling;
@@ -117,10 +119,20 @@ static void TestMakeAndDestroy(void)
     CHECK(mrhiCreateHeap(nullptr, &def, &heap) == mrhi_errorInvalid, "no device");
     CHECK(mrhiGetDeviceMisuse(device) == 4, "each counted on the device");
     def.entries = 2049;
-    CHECK(mrhiCreateHeap(device, &def, &heap) == mrhi_errorUnsupported, "past heapSize");
+    CHECK(mrhiCreateHeap(device, &def, &heap) == mrhi_errorCapacity,
+          "past heapSize, within the adapter's");
+    def.entries = 4097;
+    CHECK(mrhiCreateHeap(device, &def, &heap) == mrhi_errorUnsupported, "past the adapter's");
     def.entries = 2048;
     def.samplers = 33;
-    CHECK(mrhiCreateHeap(device, &def, &heap) == mrhi_errorUnsupported, "past samplerHeapSize");
+    CHECK(mrhiCreateHeap(device, &def, &heap) == mrhi_errorCapacity,
+          "past samplerHeapSize, within the adapter's");
+    def.samplers = 65;
+    CHECK(mrhiCreateHeap(device, &def, &heap) == mrhi_errorUnsupported, "past the adapter's");
+    def.entries = 2049;
+    CHECK(mrhiCreateHeap(device, &def, &heap) == mrhi_errorUnsupported,
+          "past the adapter's beside the device's");
+    def.entries = 2048;
     def.samplers = 32;
     def.label = "materials";
     def.labelLength = 9;
@@ -188,8 +200,11 @@ static void TestStorage(void)
     entry = Storage(buffer, alignment, 64);
     entry.writable = false;
     CHECK(mrhiSetHeapEntry(device, heap, 1, &entry) == mrhi_success, "a range, read only");
+    entry = Storage(buffer, 64, 64);
+    CHECK(mrhiSetHeapEntry(device, heap, 2, &entry) == mrhi_errorCapacity,
+          "on the adapter's alignment only");
     entry = Storage(buffer, 4, 64);
-    CHECK(mrhiSetHeapEntry(device, heap, 2, &entry) == mrhi_errorInvalid, "off the alignment");
+    CHECK(mrhiSetHeapEntry(device, heap, 2, &entry) == mrhi_errorUnsupported, "off the adapter's");
     entry = Storage(buffer, 0, 6);
     CHECK(mrhiSetHeapEntry(device, heap, 2, &entry) == mrhi_errorInvalid, "not 4-byte sized");
     entry = Storage(buffer, 0, 0);

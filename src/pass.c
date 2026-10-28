@@ -544,10 +544,14 @@ static mrhiResult CheckDef(mrhiDevice* device, const mrhiPassDef* def)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticPassViews);
     }
-    if (ViewsOf(def) > 1 &&
-        (!device->features.multiview || ViewsOf(def) > device->limits.multiviewViews))
+    if (ViewsOf(def) > 1 && !device->features.multiview)
     {
         return mrhi_errorUnsupported;
+    }
+    status = mrhiRecordPastLimit(device, MRHI_DEVICE_LIMIT(device, multiviewViews, ViewsOf(def)));
+    if (status != mrhi_success)
+    {
+        return status;
     }
     if (!device->frameOpen || device->frameCompiled)
     {

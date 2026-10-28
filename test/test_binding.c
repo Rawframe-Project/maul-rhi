@@ -106,9 +106,11 @@ static mrhiSamplerId MakeSampler(mrhiFilter filter, mrhiCompareFunction compare)
 
 // Opens a ready device with the default container's pipeline and the
 // objects its tables take.
-static void Open(void)
+// Opens a device of a def with the pipeline, buffers, textures and
+// samplers.
+static void OpenOn(mrhiDeviceDef def)
 {
-    s_device = OpenWith(mrhiDefaultDeviceDef(), true);
+    s_device = OpenWith(def, true);
     Reset();
     s_pipeline = MakePipeline();
     s_uniform = MakeBuffer(1u << 17);
@@ -120,6 +122,11 @@ static void Open(void)
     s_linear = MakeSampler(mrhi_filterLinear, mrhi_compareNone);
     s_nearest = MakeSampler(mrhi_filterNearest, mrhi_compareNone);
     s_compare = MakeSampler(mrhi_filterNearest, mrhi_compareLess);
+}
+
+static void Open(void)
+{
+    OpenOn(mrhiDefaultDeviceDef());
 }
 
 static mrhiResourceId ImportBuffer(mrhiBufferId buffer)
@@ -320,8 +327,8 @@ static void TestTables(void)
           "the empty tables");
     CHECK(Nth(s_pass, 10) != nullptr && Nth(s_pass, 11) == nullptr, "one record each");
     CHECK(mrhiGetDeviceMisuse(s_device) == 0, "no misuse");
-    CHECK(mrhiSetBindings(s_device, s_pass, 4, nullptr, 0) == mrhi_errorInvalid,
-          "past the device's tables");
+    CHECK(mrhiSetBindings(s_device, s_pass, 4, nullptr, 0) == mrhi_errorUnsupported,
+          "past the adapter's tables");
     CHECK(mrhiSetBindings(s_device, s_pass, 0, bindings, 3) == mrhi_errorInvalid &&
               mrhiSetBindings(s_device, s_pass, 2, bindings, 1) == mrhi_errorInvalid,
           "fewer or more than the table's slots");
@@ -332,7 +339,7 @@ static void TestTables(void)
     CHECK(mrhiSetBindings(s_device, s_pass, 0, nullptr, 4) == mrhi_errorInvalid, "no bindings");
     CHECK(mrhiSetBindings(s_device, s_copy, 2, nullptr, 0) == mrhi_errorInvalid,
           "a pass that copies");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 7, "each counted");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 6, "each counted");
     CHECK(Nth(s_pass, 11) == nullptr, "nothing recorded");
     CHECK(mrhiSetBindings(nullptr, s_pass, 2, nullptr, 0) == mrhi_errorInvalid, "no device");
     CHECK(mrhiEndPass(s_device, s_pass) == mrhi_success, "ended");
@@ -432,7 +439,7 @@ static void TestBuffers(void)
     Table0(bindings);
     mrhiBinding uniform = bindings[0];
     uniform.offset = 128;
-    CHECK(With0(0, uniform) == mrhi_errorInvalid, "an offset off the uniform alignment");
+    CHECK(With0(0, uniform) == mrhi_errorUnsupported, "an offset off the uniform alignment");
     uniform.offset = 256;
     CHECK(With0(0, uniform) == mrhi_success, "on it");
     uniform.size = 0;
@@ -441,7 +448,7 @@ static void TestBuffers(void)
     CHECK(With0(0, uniform) == mrhi_success, "the largest uniform binding");
     uniform.offset = 0;
     uniform.size = 65540;
-    CHECK(With0(0, uniform) == mrhi_errorInvalid, "past it");
+    CHECK(With0(0, uniform) == mrhi_errorUnsupported, "past it");
     uniform.offset = 0;
     uniform.size = 60;
     CHECK(With0(0, uniform) == mrhi_errorInvalid, "below the shader's minimum");
@@ -472,8 +479,8 @@ static void TestBuffers(void)
     read.size = 8;
     CHECK(With0(2, read) == mrhi_success, "a multiple of 4");
     read.offset = 4;
-    CHECK(With0(2, read) == mrhi_errorInvalid, "off the storage alignment");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 10, "each counted");
+    CHECK(With0(2, read) == mrhi_errorUnsupported, "off the storage alignment");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 7, "each invalid one counted");
     Drop();
     CloseDevice();
 }
@@ -923,12 +930,78 @@ static void TestArena(void)
     CloseDevice();
 }
 
+// The newest diagnostic's code; 0 for none.
+static mrhiDiagnosticCode Refusal(void)
+{
+    mrhiDiagnosticCode code = 0;
+    mrhiDiagnostic record;
+    while (mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success)
+    {
+        code = record.code;
+    }
+    return code;
+}
+
+// Bindings past the device's limits on an adapter above them: within the
+// adapter's limits capacity, which a device asking for more would take,
+// recorded; past them unsupported. Neither counts misuse.
+static void TestPastDeviceLimits(void)
+{
+    s_adapter.limits.bindingTables = 8;
+    s_adapter.limits.uniformOffsetAlignment = 64;
+    s_adapter.limits.storageOffsetAlignment = 64;
+    s_adapter.limits.uniformBindingBytes = 98304;
+    s_adapter.limits.storageBindingBytes = 3u << 26;
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.deviceLimits.diagnostics = 4;
+    OpenOn(def);
+    CHECK(mrhiDestroyBuffer(s_device, s_read) == mrhi_success, "the small buffer gone");
+    s_read = MakeBuffer(1u << 28);
+    Frame();
+    mrhiBinding bindings[4];
+    Table0(bindings);
+    mrhiBinding uniform = bindings[0];
+    uniform.offset = 128;
+    CHECK(With0(0, uniform) == mrhi_errorCapacity && Refusal() == mrhi_diagnosticDeviceLimit,
+          "an offset on the adapter's uniform alignment only");
+    uniform.offset = 32;
+    CHECK(With0(0, uniform) == mrhi_errorUnsupported, "off the adapter's");
+    uniform.offset = 0;
+    uniform.size = 65540;
+    CHECK(With0(0, uniform) == mrhi_errorCapacity, "a uniform size past the device's");
+    uniform.size = 98308;
+    CHECK(With0(0, uniform) == mrhi_errorUnsupported, "past the adapter's");
+    mrhiBinding read = bindings[2];
+    read.offset = 64;
+    read.size = 8;
+    CHECK(With0(2, read) == mrhi_errorCapacity, "on the adapter's storage alignment only");
+    read.offset = 4;
+    CHECK(With0(2, read) == mrhi_errorUnsupported, "off the adapter's");
+    read.offset = 0;
+    read.size = (1u << 27) + 4;
+    CHECK(With0(2, read) == mrhi_errorCapacity, "a storage size past the device's");
+    read.size = (3u << 26) + 4;
+    CHECK(With0(2, read) == mrhi_errorUnsupported, "past the adapter's");
+    read.offset = 64;
+    CHECK(With0(2, read) == mrhi_errorUnsupported, "past the adapter's beside the device's");
+    CHECK(mrhiSetBindings(s_device, s_pass, 4, nullptr, 0) == mrhi_errorCapacity &&
+              Refusal() == mrhi_diagnosticDeviceLimit,
+          "a table past the device's");
+    CHECK(mrhiSetBindings(s_device, s_pass, 8, nullptr, 0) == mrhi_errorUnsupported,
+          "past the adapter's");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "none is misuse");
+    Drop();
+    CloseDevice();
+}
+
 int main(void)
 {
     ResetAdapter();
     TestTables();
     TestPipeline();
     TestBuffers();
+    TestPastDeviceLimits();
+    ResetAdapter();
     TestKinds();
     TestAccesses();
     TestTextures();

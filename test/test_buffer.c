@@ -101,10 +101,30 @@ static void TestStateLimitAndFailure(void)
     Close(device);
 }
 
+// A size past the device's bufferBytes but within the adapter's is
+// capacity, which a device asking for more would take; past the
+// adapter's it is unsupported. Neither is misuse.
+static void TestPastDeviceLimit(void)
+{
+    uint64_t most = mrhiDefaultLimits().bufferBytes;
+    s_adapter.limits.bufferBytes = 2 * most;
+    mrhiDevice* device = Open(4, true);
+    mrhiBufferId buffer = {0};
+    mrhiBufferDef def = Def(most + 4, mrhi_bufferStorage);
+    CHECK(mrhiCreateBuffer(device, &def, &buffer) == mrhi_errorCapacity,
+          "past the device's limit, within the adapter's");
+    def = Def(2 * most + 4, mrhi_bufferStorage);
+    CHECK(mrhiCreateBuffer(device, &def, &buffer) == mrhi_errorUnsupported, "past the adapter's");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "neither is misuse");
+    Close(device);
+    ResetAdapter();
+}
+
 int main(void)
 {
     ResetAdapter();
     TestMakeAndDestroy();
+    TestPastDeviceLimit();
     TestInvalidDefs();
     TestStateLimitAndFailure();
     return s_failures == 0 ? 0 : 1;

@@ -445,6 +445,7 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     device->allocator = def->allocator;
     device->features = def->features;
     device->limits = def->limits;
+    device->adapterLimits = adapter->limits;
     device->deviceLimits = def->deviceLimits;
     device->state = mrhi_deviceOpening;
     device->request = mrhiNextRequest(instance);
@@ -556,6 +557,29 @@ mrhiResult mrhiDeviceFull(mrhiDevice* device, mrhiDiagnosticCode code)
 {
     mrhiRecordDiagnostic(&device->diagnostics, code);
     return mrhi_errorCapacity;
+}
+
+mrhiResult mrhiCheckLimit(uint64_t value, uint64_t granted, uint64_t adapter)
+{
+    MRHI_ASSERT(granted <= adapter);
+    return value <= granted ? mrhi_success : mrhiPastLimits(value <= adapter);
+}
+
+mrhiResult mrhiCheckAlignment(uint64_t offset, uint64_t granted, uint64_t adapter)
+{
+    MRHI_ASSERT(adapter != 0 && granted % adapter == 0);
+    return offset % granted == 0 ? mrhi_success : mrhiPastLimits(offset % adapter == 0);
+}
+
+mrhiResult mrhiPastLimits(bool adapterPasses)
+{
+    return adapterPasses ? mrhi_errorCapacity : mrhi_errorUnsupported;
+}
+
+mrhiResult mrhiRecordPastLimit(mrhiDevice* device, mrhiResult status)
+{
+    return status == mrhi_errorCapacity ? mrhiDeviceFull(device, mrhi_diagnosticDeviceLimit)
+                                        : status;
 }
 
 mrhiResult mrhiDeviceUsable(const mrhiDevice* device)

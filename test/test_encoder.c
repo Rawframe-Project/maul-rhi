@@ -466,6 +466,8 @@ static void TestViews(void)
 
 static void TestViewport(void)
 {
+    // An adapter of twice the device's 2D texture limit.
+    s_adapter.limits.textureDimension2d = 16384;
     Open(4);
     Frame(false);
     CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
@@ -489,15 +491,35 @@ static void TestViewport(void)
     {
         CHECK(mrhiSetViewport(s_device, s_render, &edges[i]) == mrhi_success, "at an edge");
     }
+    // Past the device's ranges, within the adapter's: a device asking for
+    // more would take them.
     mrhiViewport past[] = {
         {.x = -2 * limit - 1, .width = 1, .height = 1, .maxDepth = 1},
         {.y = -2 * limit - 1, .width = 1, .height = 1, .maxDepth = 1},
         {.width = limit + 1, .height = 1, .maxDepth = 1},
         {.width = 1, .height = limit + 1, .maxDepth = 1},
-        {.width = -1, .height = 1, .maxDepth = 1},
-        {.width = 1, .height = -1, .maxDepth = 1},
         {.x = limit, .width = limit, .height = 1, .maxDepth = 1},
         {.y = limit, .width = 1, .height = limit, .maxDepth = 1},
+    };
+    for (size_t i = 0; i < sizeof(past) / sizeof(past[0]); ++i)
+    {
+        CHECK(mrhiSetViewport(s_device, s_render, &past[i]) == mrhi_errorCapacity,
+              "past a device range");
+    }
+    mrhiViewport beyond[] = {
+        {.x = -4 * limit - 1, .width = 1, .height = 1, .maxDepth = 1},
+        {.width = 2 * limit + 1, .height = 1, .maxDepth = 1},
+        {.y = 2 * limit, .width = 1, .height = 2 * limit, .maxDepth = 1},
+    };
+    for (size_t i = 0; i < sizeof(beyond) / sizeof(beyond[0]); ++i)
+    {
+        CHECK(mrhiSetViewport(s_device, s_render, &beyond[i]) == mrhi_errorUnsupported,
+              "past an adapter range");
+    }
+    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "neither is misuse");
+    mrhiViewport invalid[] = {
+        {.width = -1, .height = 1, .maxDepth = 1},
+        {.width = 1, .height = -1, .maxDepth = 1},
         {.width = 1, .height = 1, .minDepth = -0.25f, .maxDepth = 1},
         {.width = 1, .height = 1, .maxDepth = 1.25f},
         {.width = 1, .height = 1, .minDepth = 0.75f, .maxDepth = 0.5f},
@@ -507,11 +529,14 @@ static void TestViewport(void)
         {.width = 1, .height = NAN, .maxDepth = 1},
         {.width = 1, .height = 1, .minDepth = NAN, .maxDepth = 1},
         {.width = 1, .height = 1, .maxDepth = NAN},
+        {.x = INFINITY, .width = 1, .height = 1, .maxDepth = 1},
+        {.y = -INFINITY, .width = 1, .height = 1, .maxDepth = 1},
     };
-    uint32_t count = (uint32_t)(sizeof(past) / sizeof(past[0]));
+    uint32_t count = (uint32_t)(sizeof(invalid) / sizeof(invalid[0]));
     for (uint32_t i = 0; i < count; ++i)
     {
-        CHECK(mrhiSetViewport(s_device, s_render, &past[i]) == mrhi_errorInvalid, "past a range");
+        CHECK(mrhiSetViewport(s_device, s_render, &invalid[i]) == mrhi_errorInvalid,
+              "not well formed");
     }
     CHECK(mrhiGetDeviceMisuse(s_device) == count, "each counted");
     CHECK(mrhiSetViewport(s_device, s_dispatch, &viewport) == mrhi_errorInvalid,
@@ -596,13 +621,15 @@ static void TestScissorAndState(void)
 
 static void TestRootBlock(void)
 {
+    // An adapter of twice the device's root block.
+    s_adapter.limits.rootBlockBytes = 128;
     Open(4);
     Frame(false);
     CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
               mrhiBeginPass(s_device, s_dispatch) == mrhi_success &&
               mrhiBeginPass(s_device, s_copy) == mrhi_success,
           "begun");
-    uint8_t bytes[128];
+    uint8_t bytes[256];
     for (uint32_t i = 0; i < sizeof(bytes); ++i)
     {
         bytes[i] = (uint8_t)i;
@@ -619,10 +646,12 @@ static void TestRootBlock(void)
     CHECK(command != nullptr && command->a == 60 && command->b == 4 && command->payload == 1 &&
               memcmp(Nth(s_render, 1), bytes, 4) == 0,
           "in one payload record");
-    CHECK(mrhiSetRootBlock(s_device, s_render, 60, bytes, 8) == mrhi_errorUnsupported,
-          "past the limit");
-    CHECK(mrhiSetRootBlock(s_device, s_render, 0, bytes, 68) == mrhi_errorUnsupported,
-          "larger than it");
+    CHECK(mrhiSetRootBlock(s_device, s_render, 60, bytes, 8) == mrhi_errorCapacity,
+          "past the device's limit, within the adapter's");
+    CHECK(mrhiSetRootBlock(s_device, s_render, 0, bytes, 128) == mrhi_errorCapacity,
+          "up to the adapter's");
+    CHECK(mrhiSetRootBlock(s_device, s_render, 0, bytes, 132) == mrhi_errorUnsupported,
+          "past the adapter's limit");
     CHECK(mrhiSetRootBlock(s_device, s_render, UINT32_MAX - 3, bytes, 4) == mrhi_errorUnsupported,
           "wrapping past it");
     CHECK(mrhiGetDeviceMisuse(s_device) == 0, "not misuse");
@@ -907,8 +936,10 @@ int main(void)
     TestViewFormats();
     TestViews();
     TestViewport();
+    ResetAdapter();
     TestScissorAndState();
     TestRootBlock();
+    ResetAdapter();
     TestDebugGroups();
     TestArena();
     TestLimit();

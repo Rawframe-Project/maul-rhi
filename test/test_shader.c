@@ -1384,6 +1384,39 @@ static mrhiResult WithWorkgroup(mrhiDevice* device, uint32_t x, uint32_t y, uint
     return Made(device);
 }
 
+// A container past the device's limits but within the adapter's is
+// capacity, which a device asking for more would take; past one of the
+// adapter's it is unsupported. Neither is misuse.
+static void TestPastDeviceLimits(void)
+{
+    mrhiLimits limits = mrhiDefaultLimits();
+    s_adapter.limits.rootBlockBytes = 2 * limits.rootBlockBytes;
+    s_adapter.limits.uniformBindingBytes = 2 * limits.uniformBindingBytes;
+    s_adapter.limits.workgroupSizeX = 2 * limits.workgroupSizeX;
+    s_adapter.limits.workgroupInvocations = 2 * limits.workgroupInvocations;
+    mrhiDevice* device = Open(4, true);
+    Reset();
+    Put32(s_sections[META].bytes, limits.rootBlockBytes + 4);
+    CHECK(Made(device) == mrhi_errorCapacity, "a root block past the device's");
+    Put32(s_sections[META].bytes, 2 * limits.rootBlockBytes + 4);
+    CHECK(Made(device) == mrhi_errorUnsupported, "past the adapter's");
+    Reset();
+    Put64(Record(BINDINGS, 0, 24) + 16, limits.uniformBindingBytes + 1);
+    CHECK(Made(device) == mrhi_errorCapacity, "a uniform buffer past the device's");
+    Put64(Record(BINDINGS, 0, 24) + 16, 2 * (uint64_t)limits.uniformBindingBytes + 1);
+    CHECK(Made(device) == mrhi_errorUnsupported, "past the adapter's");
+    CHECK(WithWorkgroup(device, limits.workgroupSizeX + 1, 1, 1, 0) == mrhi_errorCapacity,
+          "a workgroup past the device's x");
+    CHECK(WithWorkgroup(device, 16, 4, 8, 0) == mrhi_errorCapacity,
+          "past its invocations, within the adapter's");
+    CHECK(WithWorkgroup(device, limits.workgroupSizeX + 1, limits.workgroupSizeY + 1, 1, 0) ==
+              mrhi_errorUnsupported,
+          "past the adapter's y beside the device's x");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "none is misuse");
+    Close(device);
+    ResetAdapter();
+}
+
 static void TestEntryLimits(void)
 {
     mrhiDevice* device = Open(4, true);
@@ -1641,6 +1674,7 @@ int main(int argc, char** argv)
     TestHeapFeatures();
     TestLimits();
     TestTableSize();
+    TestPastDeviceLimits();
     TestEntryLimits();
     TestStateAndFailure();
     return s_failures == 0 ? 0 : 1;

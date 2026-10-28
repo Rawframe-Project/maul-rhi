@@ -19,7 +19,7 @@ mrhiShaderDef mrhiDefaultShaderDef(void)
     return def;
 }
 
-// Whether a container's bindings fit the device's limits: slots, binding
+// Whether a container's bindings fit limits: slots, binding
 // sizes, and each stage's count of each kind. Tables and color outputs
 // need no check: the floor's four tables and eight color attachments are
 // the container's own bounds.
@@ -70,7 +70,7 @@ static uint32_t StageBuiltins(mrhiShaderBuiltins builtins)
     return count;
 }
 
-// Whether an entry fits the device's limits: a compute entry's
+// Whether an entry fits limits: a compute entry's
 // workgroup, and the vertex inputs and inter-stage variables of the
 // others, with the fragment builtins that count as variables.
 static bool IsEntryWithin(const mrhiLimits* limits, const mrhiContainer* container,
@@ -109,26 +109,30 @@ static bool IsEntryWithin(const mrhiLimits* limits, const mrhiContainer* contain
     return true;
 }
 
-// Whether a container fits the device: its root block, bindings and
-// entries within the limits, and the features its code needs.
-static bool IsWithin(const mrhiDevice* device, const mrhiContainer* container)
+// Whether a device has the features a container's code needs.
+static bool HasFeatures(const mrhiDevice* device, const mrhiContainer* container)
 {
-    if (container->rootBlockBytes > device->limits.rootBlockBytes ||
-        (container->float16 && !device->features.shaderF16) ||
-        (container->subgroups && !device->features.subgroups) ||
-        (container->int64 && !device->features.shaderInt64) ||
-        (container->builtins & mrhi_builtinPrimitiveIndex) != 0 ||
-        (container->heapUses != 0 && !device->features.bindlessSampling) ||
-        ((container->builtins & mrhi_builtinViewIndex) != 0 && !device->features.multiview) ||
-        ((container->heapUses & (mrhi_heapUseStorageTextures | mrhi_heapUseStorageBuffers)) != 0 &&
-         !device->features.bindlessHeterogeneous) ||
-        !AreBindingsWithin(&device->limits, container))
+    const mrhiFeatures* features = &device->features;
+    mrhiShaderHeapUses heterogeneous = mrhi_heapUseStorageTextures | mrhi_heapUseStorageBuffers;
+    return (!container->float16 || features->shaderF16) &&
+           (!container->subgroups || features->subgroups) &&
+           (!container->int64 || features->shaderInt64) &&
+           (container->builtins & mrhi_builtinPrimitiveIndex) == 0 &&
+           (container->heapUses == 0 || features->bindlessSampling) &&
+           ((container->builtins & mrhi_builtinViewIndex) == 0 || features->multiview) &&
+           ((container->heapUses & heterogeneous) == 0 || features->bindlessHeterogeneous);
+}
+
+// Whether a container fits limits: its root block, bindings and entries.
+static bool FitsLimits(const mrhiLimits* limits, const mrhiContainer* container)
+{
+    if (container->rootBlockBytes > limits->rootBlockBytes || !AreBindingsWithin(limits, container))
     {
         return false;
     }
     for (uint32_t i = 0; i < container->entryCount; ++i)
     {
-        if (!IsEntryWithin(&device->limits, container, mrhiContainerEntry(container, i)))
+        if (!IsEntryWithin(limits, container, mrhiContainerEntry(container, i)))
         {
             return false;
         }
@@ -171,8 +175,17 @@ static mrhiResult CheckShaderDef(mrhiDevice* device, const mrhiShaderDef* def,
     {
         return mrhiDeviceBadData(device, mrhi_diagnosticShaderContainer);
     }
-    return status == mrhi_success && !IsWithin(device, containerOut) ? mrhi_errorUnsupported
-                                                                     : status;
+    if (status != mrhi_success)
+    {
+        return status;
+    }
+    if (!HasFeatures(device, containerOut))
+    {
+        return mrhi_errorUnsupported;
+    }
+    return FitsLimits(&device->limits, containerOut)
+               ? mrhi_success
+               : mrhiPastLimits(FitsLimits(&device->adapterLimits, containerOut));
 }
 
 mrhiResult mrhiCreateShader(mrhiDevice* device, const mrhiShaderDef* def, mrhiShaderId* shaderOut)

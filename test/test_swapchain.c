@@ -177,6 +177,29 @@ static void TestUnsupported(void)
     Close(device);
 }
 
+// A size past the device's 2D limit but within the adapter's is
+// capacity, which a device asking for more would take; past the
+// adapter's it is unsupported.
+static void TestPastDeviceLimit(void)
+{
+    s_adapter.limits.textureDimension2d = 16384;
+    mrhiDevice* device = OpenWith(mrhiDefaultDeviceDef(), true);
+    mrhiSurfaceId surface = MakeSurface(1);
+    mrhiSurfaceConfig config = Config(surface);
+    config.width = 8193;
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorCapacity,
+          "wider than the device's limit");
+    config = Config(surface);
+    config.height = 8193;
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorCapacity, "taller");
+    config.height = 16385;
+    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported,
+          "taller than the adapter's");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "none counted");
+    Close(device);
+    ResetAdapter();
+}
+
 // A test surface in BGRA8 sRGB, presenting on the first adapter, whose
 // sRGB twin comes as images, as views, or both.
 static mrhiSurfaceId MakeTwinSurface(bool views, bool images)
@@ -293,6 +316,7 @@ int main(void)
     TestConfigure();
     TestInvalid();
     TestUnsupported();
+    TestPastDeviceLimit();
     TestTwins();
     TestOwnership();
     TestFailures();

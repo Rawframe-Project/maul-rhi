@@ -32,6 +32,12 @@ static size_t TableBytes(uint32_t entries, uint32_t samplers)
     return ((size_t)entries + samplers) * sizeof(mrhiHeapEntrySlot);
 }
 
+// Whether a heap's entries and samplers are within the limits.
+static bool FitsLimits(const mrhiHeapDef* def, const mrhiLimits* limits)
+{
+    return def->entries <= limits->heapSize && def->samplers <= limits->samplerHeapSize;
+}
+
 mrhiResult mrhiCreateHeap(mrhiDevice* device, const mrhiHeapDef* def, mrhiHeapId* heapOut)
 {
     if (heapOut != nullptr)
@@ -55,10 +61,13 @@ mrhiResult mrhiCreateHeap(mrhiDevice* device, const mrhiHeapDef* def, mrhiHeapId
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticHeapDef);
     }
-    if (!device->features.bindlessSampling || def->entries > device->limits.heapSize ||
-        def->samplers > device->limits.samplerHeapSize)
+    if (!device->features.bindlessSampling)
     {
         return mrhi_errorUnsupported;
+    }
+    if (!FitsLimits(def, &device->limits))
+    {
+        return mrhiPastLimits(FitsLimits(def, &device->adapterLimits));
     }
     status = mrhiDeviceUsable(device);
     if (status != mrhi_success)
@@ -247,11 +256,15 @@ static mrhiResult CheckBuffer(mrhiDevice* device, const mrhiHeapEntry* entry, ui
     uint64_t offset = entry->offset;
     uint64_t size = entry->size == MRHI_WHOLE_SIZE && offset <= buffer->size ? buffer->size - offset
                                                                              : entry->size;
-    if ((buffer->usage & mrhi_bufferStorage) == 0 ||
-        offset % device->limits.storageOffsetAlignment != 0 || size == 0 || size % 4 != 0 ||
+    if ((buffer->usage & mrhi_bufferStorage) == 0 || size == 0 || size % 4 != 0 ||
         offset > buffer->size || size > buffer->size - offset)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticHeapBuffer);
+    }
+    mrhiResult status = MRHI_DEVICE_ALIGNMENT(device, storageOffsetAlignment, offset);
+    if (status != mrhi_success)
+    {
+        return status;
     }
     *sizeOut = size;
     *handleOut = buffer->handle;

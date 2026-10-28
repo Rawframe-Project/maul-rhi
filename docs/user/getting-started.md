@@ -109,8 +109,8 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
 | `mrhi_errorLimit` | An argument past a fixed bound of the library, each a named constant: `MRHI_MAX_LABEL_BYTES`, `MRHI_MAX_COLOR_TARGETS`, `MRHI_MAX_INDIRECT_DRAWS`, `MRHI_MAX_NATIVE_PASSES`, `MRHI_MAX_QUERY_SET_QUERIES`. More room would not help. It counts one misuse, as invalid input does. |
 | `mrhi_errorFormat` | The data is malformed or does not contain what was asked for: a damaged shader container or pipeline cache, or an entry, constants or pipeline state its reflection refuses. Bad data is not a bug in the program, so it counts no misuse. |
 | `mrhi_errorStale` | An id whose object is gone. |
-| `mrhi_errorCapacity` | A limit is reached. |
-| `mrhi_errorUnsupported` | The adapter or driver cannot do it. |
+| `mrhi_errorCapacity` | A limit is reached: a pool, a frame limit, or one of the device's limits that the adapter's would hold, so a device asking for more would succeed ([past a device limit](devices.md#past-a-device-limit)). |
+| `mrhi_errorUnsupported` | The adapter or driver cannot do it, a value past the adapter's own limits included. |
 | `mrhi_errorState` | The object is in the wrong state for the call. |
 | `mrhi_errorVersion` | The program was built against other headers, a container has another format version, or a pipeline cache another ABI or envelope version. |
 | `mrhi_errorOutOfDate` | A surface must be configured again. |

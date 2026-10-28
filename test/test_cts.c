@@ -69,6 +69,21 @@ static void Expect(const char* test, mrhiResult result, bool succeeds)
     }
 }
 
+// Reports a case past one of the device's limits whose outcome differs
+// from the CTS's. The CTS's validation error is mrhi_errorCapacity here:
+// the adapter's limits are above the device's, so a device asking for
+// more would take it.
+static void ExpectPastLimit(const char* test, mrhiResult result, bool succeeds)
+{
+    bool ok = result == (succeeds ? mrhi_success : mrhi_errorCapacity);
+    if (!ok)
+    {
+        printf("FAIL: %s: %d, the CTS expects %s\n", test, (int)result,
+               succeeds ? "success" : "a validation error at a device limit");
+        ++s_failures;
+    }
+}
+
 static mrhiBufferId MakeBuffer(uint64_t size, mrhiBufferUsage usage)
 {
     mrhiBufferDef def = mrhiDefaultBufferDef();
@@ -1229,10 +1244,10 @@ static void TestDispatches(void)
                              indirect ? "indirect" : "direct", sizes[0], sizes[1], sizes[2]);
                     // An indirect dispatch's counts are read on the GPU,
                     // where too many dispatch nothing.
-                    Expect(name,
-                           Dispatch(indirect != 0, mrhi_bufferIndirect, 12, sizes[0], sizes[1],
-                                    sizes[2]),
-                           indirect || large[l] <= most);
+                    ExpectPastLimit(name,
+                                    Dispatch(indirect != 0, mrhi_bufferIndirect, 12, sizes[0],
+                                             sizes[1], sizes[2]),
+                                    indirect || large[l] <= most);
                 }
             }
         }
@@ -1304,8 +1319,8 @@ static void TestVertexIndexBuffers(void)
     for (size_t i = 0; i < 3; ++i)
     {
         snprintf(name, sizeof(name), "setVertexBuffer:slot %u", slots[i]);
-        Expect(name, SetBuffer(true, 16, slots[i], mrhi_indexUint32, 0, MRHI_WHOLE_SIZE),
-               slots[i] < most);
+        ExpectPastLimit(name, SetBuffer(true, 16, slots[i], mrhi_indexUint32, 0, MRHI_WHOLE_SIZE),
+                        slots[i] < most);
     }
     for (uint64_t offset = 0; offset <= 4; offset += 2)
     {
@@ -1950,6 +1965,10 @@ int main(void)
     s_adapter.features.textureCompressionBc = true;
     s_adapter.features.textureCompressionEtc2 = true;
     s_adapter.features.textureCompressionAstc = true;
+    // Limits above the device's defaults, as a GPU's are, so that a case
+    // past a device limit is one a device asking for more would take.
+    s_adapter.limits.workgroupsPerDimension = UINT32_MAX;
+    s_adapter.limits.vertexBuffers = 16;
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     deviceDef.features = s_adapter.features;
     s_device = OpenWith(deviceDef, true);

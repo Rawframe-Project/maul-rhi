@@ -43,7 +43,7 @@ mrhiResult mrhiDeclareTexture(mrhiDevice* device, const mrhiTextureDef* def,
     mrhiResult status = mrhiCheckTextureShape(device, def, false);
     if (status != mrhi_success)
     {
-        return status;
+        return mrhiRecordPastLimit(device, status);
     }
     if (def->usage != 0)
     {
@@ -74,7 +74,7 @@ mrhiResult mrhiDeclareBuffer(mrhiDevice* device, const mrhiBufferDef* def,
     mrhiResult status = mrhiCheckBufferShape(device, def);
     if (status != mrhi_success)
     {
-        return status;
+        return mrhiRecordPastLimit(device, status);
     }
     if (def->usage != 0)
     {

@@ -201,7 +201,7 @@ The library checks the structure; each driver's API checks the code itself when 
 
 ## Limits checked on a device
 
-`mrhiCreateShader` refuses as unsupported a container the device cannot run:
+`mrhiCreateShader` refuses a container the device cannot run. A container past one of the device's limits is refused as [past a device limit](devices.md#past-a-device-limit): capacity when the adapter's limit would hold it, unsupported when not. A missing feature is unsupported. The checks are:
 
 - the root block, a binding's slot or minimum size, or a stage's count of any binding kind past the device's limits (read-only storage buffers count as storage buffers);
 - a compute entry's workgroup size, invocations or workgroup storage past the limits;

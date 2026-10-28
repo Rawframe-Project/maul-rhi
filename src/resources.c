@@ -141,7 +141,7 @@ mrhiResult mrhiCheckBufferShape(mrhiDevice* device, const mrhiBufferDef* def)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticBufferSize);
     }
-    return def->size > device->limits.bufferBytes ? mrhi_errorUnsupported : mrhi_success;
+    return MRHI_DEVICE_LIMIT(device, bufferBytes, def->size);
 }
 
 mrhiResult mrhiCreateBuffer(mrhiDevice* device, const mrhiBufferDef* def, mrhiBufferId* bufferOut)
