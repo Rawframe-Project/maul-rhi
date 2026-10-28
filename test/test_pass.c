@@ -314,8 +314,8 @@ static void TestAccesses(void)
     CHECK(Add(def) == mrhi_errorInvalid && Refusal() == mrhi_diagnosticNullArgument,
           "a count without accesses");
     def = mrhiDefaultPassDef();
-    def.colorTargetCount = MRHI_COLOR_TARGETS + 1;
-    CHECK(Add(def) == mrhi_errorInvalid && Refusal() == mrhi_diagnosticPassColorTargets,
+    def.colorTargetCount = MRHI_MAX_COLOR_TARGETS + 1;
+    CHECK(Add(def) == mrhi_errorLimit && Refusal() == mrhi_diagnosticPassColorTargets,
           "too many color targets");
     def.cookie = 0;
     CHECK(Add(def) == mrhi_errorInvalid, "no cookie");

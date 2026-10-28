@@ -263,6 +263,15 @@ static void TestInvalidDefs(void)
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
           "an overlong label");
     def = Def(adapter);
+    static char longLabel[MRHI_MAX_LABEL_BYTES + 1];
+    memset(longLabel, 'd', sizeof(longLabel));
+    def.label = longLabel;
+    def.labelLength = MRHI_MAX_LABEL_BYTES + 1;
+    uint64_t misuse = mrhiGetInstanceMisuse(instance);
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorLimit &&
+              mrhiGetInstanceMisuse(instance) == misuse + 1,
+          "a label past the bound, counted");
+    def = Def(adapter);
     def.deviceLimits.notifications = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "zero");
     def.deviceLimits.notifications = 1;
@@ -322,7 +331,7 @@ static void TestInvalidDefs(void)
     def.allocator.free = CountingFree;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
           "an allocator with one function");
-    CHECK(mrhiGetInstanceMisuse(instance) == 22, "each invalid call counted");
+    CHECK(mrhiGetInstanceMisuse(instance) == 23, "each invalid or limit call counted");
     mrhiDestroyInstance(instance);
 }
 

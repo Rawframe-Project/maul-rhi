@@ -446,9 +446,13 @@ static mrhiResult RecordCounted(mrhiDevice* device, mrhiPassId id, bool indexed,
     {
         return mrhi_errorUnsupported;
     }
-    if (maxCount == 0 || maxCount > MRHI_INDIRECT_DRAWS)
+    if (maxCount == 0)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticIndirectCountLimit);
+    }
+    if (maxCount > MRHI_MAX_INDIRECT_DRAWS)
+    {
+        return mrhiDeviceOverLimit(device, mrhi_diagnosticIndirectCountLimit);
     }
     mrhiResult status = mrhi_success;
     mrhiFramePass* pass = IndirectPass(device, id, indexed, &status);

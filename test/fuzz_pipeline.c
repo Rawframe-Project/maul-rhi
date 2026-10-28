@@ -8,9 +8,10 @@
 // shader is the conformance container or one built from the input,
 // whose vertex inputs, color outputs, inter-stage variables, fragment
 // builtins and constants the reflection rules read. Every call must
-// answer a status, count misuse only for invalid input and name each
-// refusal of the def; a pipeline that is made must satisfy WebGPU's
-// rules on the def alone, be answered ready once, and be destroyed.
+// answer a status, count misuse only for invalid input or a bound
+// passed, and name each refusal of the def; a pipeline that is made
+// must satisfy WebGPU's rules on the def alone, be answered ready once,
+// and be destroyed.
 // Arrays longer than their limit are given only up to it, as the core
 // refuses them unread.
 
@@ -423,7 +424,7 @@ static mrhiBlendComponent Blend(Input* in)
 
 static void ChangeTarget(Input* in, mrhiGraphicsPipelineDef* def)
 {
-    mrhiColorTargetState* target = &def->colorTargets[Byte(in) % MRHI_COLOR_TARGETS];
+    mrhiColorTargetState* target = &def->colorTargets[Byte(in) % MRHI_MAX_COLOR_TARGETS];
     target->format = Byte(in) % 72;
     target->blend = Byte(in) % 2 != 0;
     target->color = Blend(in);
@@ -571,7 +572,7 @@ static bool KeepsGraphicsRules(const Device* device, const mrhiGraphicsPipelineD
         def->depthBias != 0 || def->depthBiasSlopeScale != 0.0f || def->depthBiasClamp != 0.0f;
     bool depth = mrhiFormatHasDepth(def->depthStencilFormat);
     bool attached = def->depthStencilFormat != mrhi_formatNone;
-    for (uint32_t i = 0; i < def->colorTargetCount && i < MRHI_COLOR_TARGETS; ++i)
+    for (uint32_t i = 0; i < def->colorTargetCount && i < MRHI_MAX_COLOR_TARGETS; ++i)
     {
         attached = attached || def->colorTargets[i].format != mrhi_formatNone;
     }
@@ -588,7 +589,7 @@ static bool KeepsGraphicsRules(const Device* device, const mrhiGraphicsPipelineD
            isfinite(def->depthBiasSlopeScale) && isfinite(def->depthBiasClamp) &&
            (triangles || !biased) &&
            (depth || (!def->depthWrite && def->depthCompare == mrhi_compareAlways && !biased)) &&
-           def->colorTargetCount <= MRHI_COLOR_TARGETS &&
+           def->colorTargetCount <= MRHI_MAX_COLOR_TARGETS &&
            (def->fragmentEntry != nullptr || def->colorTargetCount == 0) && samples >= 1 &&
            samples <= 16 && (samples & (samples - 1)) == 0 &&
            (!def->alphaToCoverage || (samples > 1 && def->colorTargetCount > 0)) && attached;
@@ -608,14 +609,16 @@ static uint32_t Diagnostics(mrhiDevice* device)
 }
 
 // Checks what a pipeline creation answered: a status it may give,
-// misuse counted for invalid input alone, and an invalid or bad def
-// named in the diagnostics.
+// misuse counted for invalid input or a fixed bound passed alone, and
+// such a def or a bad one named in the diagnostics.
 static void CheckAnswer(mrhiDevice* device, mrhiResult status, uint64_t misuse)
 {
-    Expect(status == mrhi_success || status == mrhi_errorInvalid || status == mrhi_errorFormat ||
-           status == mrhi_errorUnsupported || status == mrhi_errorStale);
-    Expect(mrhiGetDeviceMisuse(device) - misuse == (status == mrhi_errorInvalid ? 1u : 0u));
-    bool named = status == mrhi_errorInvalid || status == mrhi_errorFormat;
+    Expect(status == mrhi_success || status == mrhi_errorInvalid || status == mrhi_errorLimit ||
+           status == mrhi_errorFormat || status == mrhi_errorUnsupported ||
+           status == mrhi_errorStale);
+    bool misused = status == mrhi_errorInvalid || status == mrhi_errorLimit;
+    Expect(mrhiGetDeviceMisuse(device) - misuse == (misused ? 1u : 0u));
+    bool named = misused || status == mrhi_errorFormat;
     Expect(Diagnostics(device) == (named ? 1u : 0u));
 }
 

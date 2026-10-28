@@ -200,8 +200,8 @@ extern "C"
         // Extensions, or NULL.
         const mrhiChain* next;
         // A name for debugging tools: UTF-8 without NUL, labelLength bytes, at
-        // most MRHI_LABEL_BYTES; NULL when labelLength is 0. Only read during
-        // the call.
+        // most MRHI_MAX_LABEL_BYTES; NULL when labelLength is 0. Only read
+        // during the call.
         const char* label;
         // The label's bytes.
         size_t labelLength;
@@ -220,12 +220,13 @@ extern "C"
     /// @param def         The surface to make.
     /// @param surfaceOut  Receives the surface; the null id on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
-    /// without its cookie, a label that is not UTF-8 without NUL within
-    /// MRHI_LABEL_BYTES, or a def without exactly one source;
-    /// `mrhi_errorUnsupported` for a source the instance's driver cannot use,
-    /// an instance without a driver, or a critical extension the library does
-    /// not know; `mrhi_errorCapacity` when the instance's surface limit is
-    /// reached; `mrhi_errorPlatform` when the driver fails.
+    /// without its cookie, a label that is not UTF-8 without NUL, or a def
+    /// without exactly one source; `mrhi_errorLimit` for a label past
+    /// MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a source the
+    /// instance's driver cannot use, an instance without a driver, or a
+    /// critical extension the library does not know; `mrhi_errorCapacity` when
+    /// the instance's surface limit is reached; `mrhi_errorPlatform` when the
+    /// driver fails.
     /// @par Thread safety
     /// Safe from any thread; the instance is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateSurface(mrhiInstance* instance,

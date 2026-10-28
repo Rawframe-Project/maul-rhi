@@ -684,7 +684,7 @@ static void TestDebugGroups(void)
     const mrhiCommand* longest = Nth(s_dispatch, 0);
     CHECK(longest != nullptr && longest->payload == 8, "in eight payload records");
 #endif
-    CHECK(mrhiInsertDebugMarker(s_device, s_dispatch, label, 257) == mrhi_errorInvalid &&
+    CHECK(mrhiInsertDebugMarker(s_device, s_dispatch, label, 257) == mrhi_errorLimit &&
               mrhiPushDebugGroup(s_device, s_dispatch, label, 0) == mrhi_errorInvalid &&
               mrhiPushDebugGroup(s_device, s_dispatch, nullptr, 4) == mrhi_errorInvalid &&
               mrhiInsertDebugMarker(s_device, s_dispatch, "\xFF", 1) == mrhi_errorInvalid,

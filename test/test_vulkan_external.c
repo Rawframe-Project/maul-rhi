@@ -548,15 +548,15 @@ static void CheckNativePass(mrhiDevice* device, VkDevice made, VkInstance instan
         s_device.vkDestroyCommandPool(made, pool, nullptr);
     }
     CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "the texture ended");
-    // A frame holds MRHI_NATIVE_PASSES of them.
+    // A frame holds MRHI_MAX_NATIVE_PASSES of them.
     mrhiPassDef nativeDef = mrhiDefaultPassDef();
     nativeDef.native = true;
     bool added = mrhiBeginFrame(device, &frame) == mrhi_success;
-    for (uint32_t i = 0; i < MRHI_NATIVE_PASSES && added; ++i)
+    for (uint32_t i = 0; i < MRHI_MAX_NATIVE_PASSES && added; ++i)
     {
         added = mrhiAddPass(device, &nativeDef, &refused) == mrhi_success;
     }
-    CHECK(added && mrhiAddPass(device, &nativeDef, &refused) == mrhi_errorCapacity &&
+    CHECK(added && mrhiAddPass(device, &nativeDef, &refused) == mrhi_errorLimit &&
               mrhiDropFrame(device) == mrhi_success,
           "native passes up to their limit");
     mrhiDiagnostic diagnostic = {0};

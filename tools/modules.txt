@@ -115,7 +115,7 @@ shader: container device_core label
 reflection: allocator container invariant
 pipeline: device_core invariant label pipeline_core
 pipeline_core: device_core
-graphics: capabilities_core label pipeline_core
+graphics: capabilities_core invariant label pipeline_core
 vulkan_recipe: allocator chain vulkan_adapter vulkan_api
 vulkan_external: device_core driver_vulkan encoder_core instance_core pool vulkan_device validation
 d3d12_external: d3d12_device device_core encoder_core pool validation

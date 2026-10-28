@@ -202,13 +202,13 @@ static void TestLimits(void)
     VkPhysicalDeviceVulkan12Properties* bind = &facts.properties12;
     bind->maxPerStageDescriptorUpdateAfterBindStorageImages = 5000;
     bind->maxPerStageDescriptorUpdateAfterBindSamplers = 3000;
-    const uint32_t tables = 4u * MRHI_TABLE_BINDINGS;
+    const uint32_t tables = 4u * MRHI_MAX_TABLE_BINDINGS;
     mrhiLimits limits = mrhiVulkanLimitsOf(&facts);
-    CHECK(limits.heapSize == 5000 - tables - MRHI_COLOR_TARGETS &&
+    CHECK(limits.heapSize == 5000 - tables - MRHI_MAX_COLOR_TARGETS &&
               limits.samplerHeapSize == 3000 - tables && limits.multiviewViews == 32,
           "the heaps by their smallest limits less the reserve, 32 views at most");
     facts.mutableType.mutableDescriptorType = VK_FALSE;
-    CHECK(mrhiVulkanLimitsOf(&facts).heapSize == 100000 - tables - MRHI_COLOR_TARGETS,
+    CHECK(mrhiVulkanLimitsOf(&facts).heapSize == 100000 - tables - MRHI_MAX_COLOR_TARGETS,
           "the storage limits counted only for heterogeneous heaps");
     facts.features12.runtimeDescriptorArray = VK_FALSE;
     limits = mrhiVulkanLimitsOf(&facts);

@@ -403,7 +403,7 @@ extern "C"
 
 // The draws a counted multi-draw makes at most (mrhiDrawIndirectCount's
 // maxCount).
-#define MRHI_INDIRECT_DRAWS 65535
+#define MRHI_MAX_INDIRECT_DRAWS 65535
 
     /// Draws up to maxCount non-indexed draws with the pass's pipeline, tables
     /// and buffers, each from its own record of the single indirect draw's
@@ -422,18 +422,20 @@ extern "C"
     ///                       the records' buffer.
     /// @param countOffset    The count's first byte, a multiple of 4, with 4
     ///                       bytes after it in the buffer.
-    /// @param maxCount       The draws made at most, 1 to MRHI_INDIRECT_DRAWS.
+    /// @param maxCount       The draws made at most, 1 to
+    ///                       MRHI_MAX_INDIRECT_DRAWS.
     /// @return `mrhi_success`; `mrhi_errorUnsupported` for a device without the
     /// multi_draw_indirect_count feature; `mrhi_errorInvalid` for a NULL
-    /// device, a maxCount of 0 or past MRHI_INDIRECT_DRAWS, a pass without
-    /// targets, or an arguments or count resource that is not a buffer the pass
-    /// declares with the indirect access, or an offset not a multiple of 4 or
-    /// without maxCount records, or the count's 4 bytes, after it;
-    /// `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or
-    /// a resource that is not live; `mrhi_errorState` for a pass that is not
-    /// recording, has no pipeline set, or lacks a table or vertex buffer the
-    /// pipeline reads; `mrhi_errorCapacity` when the frame's commands are full,
-    /// or its counted draws would pass the device's frameIndirectDraws.
+    /// device, a maxCount of 0, a pass without targets, or an arguments or
+    /// count resource that is not a buffer the pass declares with the indirect
+    /// access, or an offset not a multiple of 4 or without maxCount records, or
+    /// the count's 4 bytes, after it; `mrhi_errorLimit` for a maxCount past
+    /// MRHI_MAX_INDIRECT_DRAWS; `mrhi_errorStale` for a pass of another frame,
+    /// a destroyed pipeline, or a resource that is not live; `mrhi_errorState`
+    /// for a pass that is not recording, has no pipeline set, or lacks a table
+    /// or vertex buffer the pipeline reads; `mrhi_errorCapacity` when the
+    /// frame's commands are full, or its counted draws would pass the device's
+    /// frameIndirectDraws.
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDrawIndirectCount(
@@ -458,19 +460,21 @@ extern "C"
     ///                       the records' buffer.
     /// @param countOffset    The count's first byte, a multiple of 4, with 4
     ///                       bytes after it in the buffer.
-    /// @param maxCount       The draws made at most, 1 to MRHI_INDIRECT_DRAWS.
+    /// @param maxCount       The draws made at most, 1 to
+    ///                       MRHI_MAX_INDIRECT_DRAWS.
     /// @return `mrhi_success`; `mrhi_errorUnsupported` for a device without the
     /// multi_draw_indirect_count feature; `mrhi_errorInvalid` for a NULL
-    /// device, a maxCount of 0 or past MRHI_INDIRECT_DRAWS, a pass without
-    /// targets, or an arguments or count resource that is not a buffer the pass
-    /// declares with the indirect access, or an offset not a multiple of 4 or
-    /// without maxCount records, or the count's 4 bytes, after it;
-    /// `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or
-    /// a resource that is not live; `mrhi_errorState` for a pass that is not
-    /// recording, has no pipeline set, lacks a table or vertex buffer the
-    /// pipeline reads, or has no index buffer of the pipeline's strip index
-    /// format; `mrhi_errorCapacity` when the frame's commands are full, or its
-    /// counted draws would pass the device's frameIndirectDraws.
+    /// device, a maxCount of 0, a pass without targets, or an arguments or
+    /// count resource that is not a buffer the pass declares with the indirect
+    /// access, or an offset not a multiple of 4 or without maxCount records, or
+    /// the count's 4 bytes, after it; `mrhi_errorLimit` for a maxCount past
+    /// MRHI_MAX_INDIRECT_DRAWS; `mrhi_errorStale` for a pass of another frame,
+    /// a destroyed pipeline, or a resource that is not live; `mrhi_errorState`
+    /// for a pass that is not recording, has no pipeline set, lacks a table or
+    /// vertex buffer the pipeline reads, or has no index buffer of the
+    /// pipeline's strip index format; `mrhi_errorCapacity` when the frame's
+    /// commands are full, or its counted draws would pass the device's
+    /// frameIndirectDraws.
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDrawIndexedIndirectCount(
@@ -913,12 +917,13 @@ extern "C"
     /// @param device       The device.
     /// @param pass         The pass, recording.
     /// @param label        Its name: UTF-8 without NUL, labelLength bytes, 1 to
-    ///                     MRHI_LABEL_BYTES. Only read during the call.
+    ///                     MRHI_MAX_LABEL_BYTES. Only read during the call.
     /// @param labelLength  The name's bytes.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or a bad
-    /// label; `mrhi_errorStale` for a pass of another frame or none;
-    /// `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity`
-    /// when the frame's commands are full.
+    /// label; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES;
+    /// `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState`
+    /// for a pass that is not recording; `mrhi_errorCapacity` when the frame's
+    /// commands are full.
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiPushDebugGroup(mrhiDevice* device, mrhiPassId pass,
@@ -941,12 +946,13 @@ extern "C"
     /// @param device       The device.
     /// @param pass         The pass, recording.
     /// @param label        Its name: UTF-8 without NUL, labelLength bytes, 1 to
-    ///                     MRHI_LABEL_BYTES. Only read during the call.
+    ///                     MRHI_MAX_LABEL_BYTES. Only read during the call.
     /// @param labelLength  The name's bytes.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or a bad
-    /// label; `mrhi_errorStale` for a pass of another frame or none;
-    /// `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity`
-    /// when the frame's commands are full.
+    /// label; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES;
+    /// `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState`
+    /// for a pass that is not recording; `mrhi_errorCapacity` when the frame's
+    /// commands are full.
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiInsertDebugMarker(mrhiDevice* device, mrhiPassId pass,

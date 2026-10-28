@@ -83,10 +83,16 @@ static const mrhiChain* CheckDef(mrhiInstance* instance, const mrhiSurfaceDef* d
 {
     size_t accepted = instance->external ? SOURCE_COUNT + 1 : SOURCE_COUNT;
     mrhiResult chain = mrhiCheckChain(def->next, s_sources, accepted, instance->limits.chainDepth);
+    mrhiResult label = mrhiCheckLabel(def->label, def->labelLength);
     if (def->cookie != SURFACE_DEF_COOKIE || chain == mrhi_errorInvalid ||
-        !mrhiIsLabelValid(def->label, def->labelLength))
+        label == mrhi_errorInvalid)
     {
         *statusOut = mrhiMisuse(instance, mrhi_diagnosticDefHeader);
+        return nullptr;
+    }
+    if (label == mrhi_errorLimit)
+    {
+        *statusOut = mrhiOverLimit(instance, mrhi_diagnosticDefHeader);
         return nullptr;
     }
     if (chain != mrhi_success)

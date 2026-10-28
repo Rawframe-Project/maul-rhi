@@ -63,13 +63,33 @@ static void TestIllFormed(void)
 
 static void TestBound(void)
 {
-    char bytes[MRHI_LABEL_BYTES + 1];
+    char bytes[MRHI_MAX_LABEL_BYTES + 1];
     memset(bytes, 'a', sizeof(bytes));
-    CHECK(mrhiIsLabelValid(bytes, MRHI_LABEL_BYTES), "the bound");
-    CHECK(!mrhiIsLabelValid(bytes, MRHI_LABEL_BYTES + 1), "past the bound");
-    bytes[MRHI_LABEL_BYTES - 2] = (char)0xC3;
-    bytes[MRHI_LABEL_BYTES - 1] = (char)0xB6;
-    CHECK(mrhiIsLabelValid(bytes, MRHI_LABEL_BYTES), "a sequence ending at the bound");
+    CHECK(mrhiIsLabelValid(bytes, MRHI_MAX_LABEL_BYTES), "the bound");
+    CHECK(!mrhiIsLabelValid(bytes, MRHI_MAX_LABEL_BYTES + 1), "past the bound");
+    bytes[MRHI_MAX_LABEL_BYTES - 2] = (char)0xC3;
+    bytes[MRHI_MAX_LABEL_BYTES - 1] = (char)0xB6;
+    CHECK(mrhiIsLabelValid(bytes, MRHI_MAX_LABEL_BYTES), "a sequence ending at the bound");
+}
+
+// A label's refusal: past the bound is the limit, read no further, and
+// anything else wrong with it is invalid.
+static void TestRefusal(void)
+{
+    char bytes[MRHI_MAX_LABEL_BYTES + 1];
+    memset(bytes, 'a', sizeof(bytes));
+    CHECK(mrhiCheckLabel(nullptr, 0) == mrhi_success, "none");
+    CHECK(mrhiCheckLabel(bytes, MRHI_MAX_LABEL_BYTES) == mrhi_success, "at the bound");
+    CHECK(mrhiCheckLabel(bytes, MRHI_MAX_LABEL_BYTES + 1) == mrhi_errorLimit, "past the bound");
+    CHECK(mrhiCheckLabel(nullptr, 1) == mrhi_errorInvalid &&
+              mrhiCheckLabel(nullptr, MRHI_MAX_LABEL_BYTES + 1) == mrhi_errorInvalid,
+          "NULL with a length, within the bound or past it");
+    bytes[0] = (char)0xFF;
+    CHECK(mrhiCheckLabel(bytes, MRHI_MAX_LABEL_BYTES) == mrhi_errorInvalid, "not text");
+    CHECK(mrhiCheckLabel(bytes, MRHI_MAX_LABEL_BYTES + 1) == mrhi_errorLimit,
+          "not text past the bound, unread");
+    bytes[0] = '\0';
+    CHECK(mrhiCheckLabel(bytes, 1) == mrhi_errorInvalid, "a NUL");
 }
 
 // Text is checked as labels are, at any length.
@@ -92,6 +112,7 @@ int main(void)
     TestWellFormed();
     TestIllFormed();
     TestBound();
+    TestRefusal();
     TestText();
     return s_failures == 0 ? 0 : 1;
 }

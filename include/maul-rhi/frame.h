@@ -181,13 +181,14 @@ extern "C"
     /// @param resourceOut  Receives the frame's id for it; the null id on any
     ///                     failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
-    /// without its cookie, a label that is not UTF-8 without NUL within
-    /// MRHI_LABEL_BYTES, a usage other than 0, or a shape mrhiCreateTexture
-    /// refuses as invalid; `mrhi_errorUnsupported` for a size past the device's
-    /// limits, a compressed format without its feature, or a critical extension
-    /// the library does not know; `mrhi_errorState` for a device without an
-    /// open frame; `mrhi_errorCapacity` when the device's frameResources limit
-    /// is reached.
+    /// without its cookie, a label that is not UTF-8 without NUL, a usage other
+    /// than 0, or a shape mrhiCreateTexture refuses as invalid;
+    /// `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES;
+    /// `mrhi_errorUnsupported` for a size past the device's limits, a
+    /// compressed format without its feature, or a critical extension the
+    /// library does not know; `mrhi_errorState` for a device without an open
+    /// frame; `mrhi_errorCapacity` when the device's frameResources limit is
+    /// reached.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDeclareTexture(mrhiDevice* device,
@@ -204,11 +205,11 @@ extern "C"
     /// @param resourceOut  Receives the frame's id for it; the null id on any
     ///                     failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
-    /// without its cookie, a label that is not UTF-8 without NUL within
-    /// MRHI_LABEL_BYTES, a usage other than 0, or a size that is zero or not a
-    /// multiple of 4; `mrhi_errorUnsupported` for a size past the device's
-    /// bufferBytes, or a critical extension the library does not know;
-    /// `mrhi_errorState` for a device without an open frame;
+    /// without its cookie, a label that is not UTF-8 without NUL, a usage other
+    /// than 0, or a size that is zero or not a multiple of 4; `mrhi_errorLimit`
+    /// for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a
+    /// size past the device's bufferBytes, or a critical extension the library
+    /// does not know; `mrhi_errorState` for a device without an open frame;
     /// `mrhi_errorCapacity` when the device's frameResources limit is reached.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
@@ -316,7 +317,7 @@ extern "C"
                                                           mrhiResourceId resource);
 
 // The native passes a frame holds at most (mrhiPassDef's native).
-#define MRHI_NATIVE_PASSES 8
+#define MRHI_MAX_NATIVE_PASSES 8
 
     // Where a pass runs: a hint drivers without the queue ignore, running it on
     // the graphics queue.
@@ -413,7 +414,7 @@ extern "C"
     } mrhiAccess;
 
 // The color targets one pass writes at most.
-#define MRHI_COLOR_TARGETS 8
+#define MRHI_MAX_COLOR_TARGETS 8
 
     // A color target's clear value.
     typedef struct mrhiClearColor
@@ -494,8 +495,8 @@ extern "C"
         // Extensions, or NULL.
         const mrhiChain* next;
         // A name for debugging tools, shown around the pass's work: UTF-8
-        // without NUL, labelLength bytes, at most MRHI_LABEL_BYTES; NULL when
-        // labelLength is 0. Only read during the call.
+        // without NUL, labelLength bytes, at most MRHI_MAX_LABEL_BYTES; NULL
+        // when labelLength is 0. Only read during the call.
         const char* label;
         // The label's bytes.
         size_t labelLength;
@@ -516,8 +517,8 @@ extern "C"
         // How many.
         uint32_t accessCount;
         // Its color targets, colorTargetCount of them.
-        mrhiColorTarget colorTargets[MRHI_COLOR_TARGETS];
-        // How many, at most MRHI_COLOR_TARGETS.
+        mrhiColorTarget colorTargets[MRHI_MAX_COLOR_TARGETS];
+        // How many, at most MRHI_MAX_COLOR_TARGETS.
         uint32_t colorTargetCount;
         // Its depth target, if its resource is not null.
         mrhiDepthTarget depthTarget;
@@ -569,14 +570,16 @@ extern "C"
     /// occlusion query set that is not one or is named by a pass without
     /// targets, or timestamps of a set that is not a timestamp set, without a
     /// set, with neither query, with both the same, or with a query past the
-    /// set's count or already written in this frame; `mrhi_errorStale` for a
-    /// resource of another frame, an imported object destroyed since, or a
-    /// query set or heap the device no longer has; `mrhi_errorUnsupported` for
-    /// a critical extension the library does not know, or views past one
-    /// without the multiview feature or past its limit; `mrhi_errorState` for a
-    /// device without an open frame, or a frame already compiled;
-    /// `mrhi_errorCapacity` when the device's framePasses or frameAccesses
-    /// limit is reached.
+    /// set's count or already written in this frame; `mrhi_errorLimit` for more
+    /// than MRHI_MAX_COLOR_TARGETS color targets, a native pass past
+    /// MRHI_MAX_NATIVE_PASSES in the frame or a label past
+    /// MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for a resource of another frame,
+    /// an imported object destroyed since, or a query set or heap the device no
+    /// longer has; `mrhi_errorUnsupported` for a critical extension the library
+    /// does not know, or views past one without the multiview feature or past
+    /// its limit; `mrhi_errorState` for a device without an open frame, or a
+    /// frame already compiled; `mrhi_errorCapacity` when the device's
+    /// framePasses or frameAccesses limit is reached.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def,
@@ -743,7 +746,7 @@ extern "C"
         bool kept;
         // What each color target keeps: its own store, made a discard when
         // nothing later reads it and it is not imported.
-        mrhiStoreOp colorStores[MRHI_COLOR_TARGETS];
+        mrhiStoreOp colorStores[MRHI_MAX_COLOR_TARGETS];
         // What the depth target's depth keeps, likewise.
         mrhiStoreOp depthStore;
         // What its stencil keeps, likewise.

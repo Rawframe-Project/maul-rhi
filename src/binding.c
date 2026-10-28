@@ -11,7 +11,7 @@
 
 #include <string.h>
 
-static_assert(1 + MRHI_TABLE_BINDINGS <= MRHI_CHUNK_COMMANDS, "a whole table fits a chunk");
+static_assert(1 + MRHI_MAX_TABLE_BINDINGS <= MRHI_CHUNK_COMMANDS, "a whole table fits a chunk");
 
 // The reflection of the pass's pipeline: or NULL with the refusal.
 static const mrhiReflection* ReflectionOf(const mrhiDevice* device, const mrhiFramePass* pass,
@@ -297,8 +297,8 @@ mrhiResult mrhiSetBindings(mrhiDevice* device, mrhiPassId id, uint32_t table,
         return mrhiDeviceMisuse(device, mrhi_diagnosticBindingsCount);
     }
     // Checked first, so that a refused table takes no room.
-    mrhiCommandBinding recorded[MRHI_TABLE_BINDINGS];
-    bool seen[MRHI_TABLE_BINDINGS] = {0};
+    mrhiCommandBinding recorded[MRHI_MAX_TABLE_BINDINGS];
+    bool seen[MRHI_MAX_TABLE_BINDINGS] = {0};
     for (uint32_t i = 0; i < count; ++i)
     {
         uint32_t position = 0;

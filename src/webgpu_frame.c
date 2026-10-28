@@ -693,7 +693,7 @@ static bool Splits(const mrhiDriverFrame* frame, const mrhiDriverPass* pass)
 static void Bind(int state, const mrhiCommand* command)
 {
     uint32_t count = (uint32_t)command->b;
-    MRHI_ASSERT(count <= MRHI_TABLE_BINDINGS);
+    MRHI_ASSERT(count <= MRHI_MAX_TABLE_BINDINGS);
     for (uint32_t i = 0; i < count; ++i)
     {
         mrhiCommandBinding binding;

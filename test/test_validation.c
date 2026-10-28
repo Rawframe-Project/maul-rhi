@@ -494,8 +494,8 @@ static void TestWalkEdges(void)
     CHECK(WalkOne(&chunk, &pass) == 2, "a payload one record past its chunk");
     chunk = (mrhiCommandChunk){.count = 1};
     chunk.commands[0] = (mrhiCommand){.type = mrhiCommandDraw};
-    pass.colorTargetCount = MRHI_COLOR_TARGETS;
-    for (uint32_t i = 0; i < MRHI_COLOR_TARGETS; ++i)
+    pass.colorTargetCount = MRHI_MAX_COLOR_TARGETS;
+    for (uint32_t i = 0; i < MRHI_MAX_COLOR_TARGETS; ++i)
     {
         pass.colorTargets[i].resource = (mrhiResourceId){2, 1};
     }

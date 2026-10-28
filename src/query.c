@@ -14,8 +14,6 @@
 #include <stdatomic.h>
 
 #define QUERY_SET_DEF_COOKIE 0x6D727173u
-// WebGPU's bound on a set's queries.
-#define MOST_QUERIES 4096
 
 mrhiQuerySetDef mrhiDefaultQuerySetDef(void)
 {
@@ -76,9 +74,14 @@ mrhiResult mrhiCreateQuerySet(mrhiDevice* device, const mrhiQuerySetDef* def,
     {
         return status;
     }
-    if (def->type > mrhi_queryPipelineStatistics || def->count == 0 || def->count > MOST_QUERIES)
+    if (def->type > mrhi_queryPipelineStatistics || def->count == 0)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticQuerySetDef);
+    }
+    // WebGPU's bound on a set's queries.
+    if (def->count > MRHI_MAX_QUERY_SET_QUERIES)
+    {
+        return mrhiDeviceOverLimit(device, mrhi_diagnosticQuerySetDef);
     }
     if ((def->type == mrhi_queryTimestamp && !device->features.timestampQuery) ||
         (def->type == mrhi_queryPipelineStatistics && !device->features.pipelineStatisticsQuery))

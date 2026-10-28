@@ -188,7 +188,7 @@ static uint32_t WalkFragment(const mrhiDriverGraphicsPipeline* pipeline)
     const mrhiGraphicsPipelineDef* def = pipeline->def;
     const mrhiShaderEntry* fragment = EntryOf(pipeline->reflection, pipeline->fragmentEntry);
     uint32_t faults = fragment != nullptr || def->colorTargetCount == 0 ? 0u : 1u;
-    for (uint32_t i = 0; i < def->colorTargetCount && i < MRHI_COLOR_TARGETS; ++i)
+    for (uint32_t i = 0; i < def->colorTargetCount && i < MRHI_MAX_COLOR_TARGETS; ++i)
     {
         faults += def->colorTargets[i].format == mrhi_formatNone ? 0u : WalkTarget(pipeline, i);
     }

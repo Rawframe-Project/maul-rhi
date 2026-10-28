@@ -144,8 +144,8 @@ typedef struct mrhiDriverPass
     mrhiPassClass passClass;
     const char* label;
     size_t labelLength;
-    mrhiColorTarget colorTargets[MRHI_COLOR_TARGETS];
-    mrhiStoreOp colorStores[MRHI_COLOR_TARGETS];
+    mrhiColorTarget colorTargets[MRHI_MAX_COLOR_TARGETS];
+    mrhiStoreOp colorStores[MRHI_MAX_COLOR_TARGETS];
     uint32_t colorTargetCount;
     mrhiDepthTarget depthTarget;
     mrhiStoreOp depthStore;

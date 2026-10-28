@@ -277,6 +277,12 @@ mrhiResult mrhiMisuse(mrhiInstance* instance, mrhiDiagnosticCode code)
     return mrhi_errorInvalid;
 }
 
+mrhiResult mrhiOverLimit(mrhiInstance* instance, mrhiDiagnosticCode code)
+{
+    mrhiMisuse(instance, code);
+    return mrhi_errorLimit;
+}
+
 mrhiResult mrhiNextInstanceDiagnostic(mrhiInstance* instance, mrhiDiagnostic* diagnosticOut)
 {
     if (instance == nullptr)

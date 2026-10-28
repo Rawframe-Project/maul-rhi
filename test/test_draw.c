@@ -663,7 +663,7 @@ static void CountedFrame(mrhiBufferId records, mrhiBufferId counts, mrhiResource
 // Counted multi-draws: unsupported without their feature; with it, recorded
 // with both buffers, the offsets and the most draws, and refused for records
 // or a count outside their buffers, offsets off 4, a most of 0 or past
-// MRHI_INDIRECT_DRAWS, and buffers the pass does not declare as indirect.
+// MRHI_MAX_INDIRECT_DRAWS, and buffers the pass does not declare as indirect.
 static void TestCountedDraws(void)
 {
     Open();
@@ -719,8 +719,8 @@ static void TestCountedDraws(void)
               mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 58, 1) == mrhi_errorInvalid,
           "offsets off 4");
     CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 0) == mrhi_errorInvalid &&
-              mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, MRHI_INDIRECT_DRAWS + 1) ==
-                  mrhi_errorInvalid,
+              mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60,
+                                    MRHI_MAX_INDIRECT_DRAWS + 1) == mrhi_errorLimit,
           "no draws, or too many");
     CHECK(mrhiDrawIndirectCount(s_device, s_render, s_v, 0, s_a, 60, 1) == mrhi_errorInvalid &&
               mrhiDrawIndexedIndirectCount(s_device, s_render, s_a, 0, s_u, 0, 1) ==
@@ -746,7 +746,7 @@ static void TestCountedDraws(void)
     // The most draws, in a buffer with room for one more, and the count in
     // a buffer of its own.
     mrhiBufferId records =
-        MakeBuffer((uint64_t)(MRHI_INDIRECT_DRAWS + 1) * 20 + 20, mrhi_bufferIndirect);
+        MakeBuffer((uint64_t)(MRHI_MAX_INDIRECT_DRAWS + 1) * 20 + 20, mrhi_bufferIndirect);
     mrhiBufferId counts = MakeBuffer(8, mrhi_bufferIndirect);
     mrhiResourceId r = {0};
     mrhiResourceId c = {0};
@@ -755,16 +755,16 @@ static void TestCountedDraws(void)
     SetVertices();
     CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
                   mrhi_success &&
-              mrhiDrawIndexedIndirectCount(s_device, s_render, r, 20, c, 4, MRHI_INDIRECT_DRAWS) ==
-                  mrhi_success,
+              mrhiDrawIndexedIndirectCount(s_device, s_render, r, 20, c, 4,
+                                           MRHI_MAX_INDIRECT_DRAWS) == mrhi_success,
           "the most draws");
     command = Nth(s_render, 4);
     CHECK(command != nullptr && command->a == r.index1 &&
-              command->b == ((uint64_t)MRHI_INDIRECT_DRAWS << 32 | c.index1) && command->c == 20 &&
-              command->d == 4,
+              command->b == ((uint64_t)MRHI_MAX_INDIRECT_DRAWS << 32 | c.index1) &&
+              command->c == 20 && command->d == 4,
           "recorded with the count's own buffer");
-    CHECK(mrhiDrawIndexedIndirectCount(s_device, s_render, r, 0, c, 4, MRHI_INDIRECT_DRAWS + 1) ==
-              mrhi_errorInvalid,
+    CHECK(mrhiDrawIndexedIndirectCount(s_device, s_render, r, 0, c, 4,
+                                       MRHI_MAX_INDIRECT_DRAWS + 1) == mrhi_errorLimit,
           "one past the most, though the buffer has room");
     Drop();
     CloseDevice();

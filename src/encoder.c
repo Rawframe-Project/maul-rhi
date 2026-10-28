@@ -222,7 +222,7 @@ mrhiResult mrhiEndPass(mrhiDevice* device, mrhiPassId id)
 // depth format and sample count.
 static bool AreTargetsEqual(const mrhiRenderLayout* a, const mrhiRenderLayout* b)
 {
-    for (uint32_t i = 0; i < MRHI_COLOR_TARGETS; ++i)
+    for (uint32_t i = 0; i < MRHI_MAX_COLOR_TARGETS; ++i)
     {
         if (a->colors[i] != b->colors[i])
         {
@@ -484,9 +484,11 @@ static mrhiResult Label(mrhiDevice* device, mrhiPassId id, mrhiCommandType type,
     {
         return mrhi_errorInvalid;
     }
-    if (length == 0 || !mrhiIsLabelValid(label, length))
+    mrhiResult valid = length == 0 ? mrhi_errorInvalid : mrhiCheckLabel(label, length);
+    if (valid != mrhi_success)
     {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticDebugLabel);
+        return valid == mrhi_errorLimit ? mrhiDeviceOverLimit(device, mrhi_diagnosticDebugLabel)
+                                        : mrhiDeviceMisuse(device, mrhi_diagnosticDebugLabel);
     }
     mrhiResult status = mrhi_success;
     mrhiFramePass* pass = mrhiRecordingPass(device, id, &status);

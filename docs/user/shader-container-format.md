@@ -124,7 +124,7 @@ Vertex inputs, color outputs and inter-stage variables share one 8-byte record:
 | 7 | u8 | an inter-stage variable's `mrhiSampling`, else 0 |
 
 - A vertex input is a 32-bit float or a signed or unsigned 32-bit integer.
-- A color output's location is below `MRHI_COLOR_TARGETS`.
+- A color output's location is below `MRHI_MAX_COLOR_TARGETS`.
 - Inter-stage variables are interpolated as WGSL allows: integers flat; perspective or linear at the center, the centroid or per sample; flat from the first vertex or either vertex.
 - Locations are unique within an entry's inputs, outputs and variables, except for dual-source blending: a color output of blend source 1 sits at location 0 beside one of source 0 with the same type and component count. A pipeline whose blending reads the second source needs `dualSourceBlending`, exactly one color target, and such a fragment entry.
 

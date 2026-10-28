@@ -20,10 +20,9 @@ mrhiShaderDef mrhiDefaultShaderDef(void)
 }
 
 // Whether a container's bindings fit the device's limits: slots, binding
-// sizes, and each stage's count of each kind; and each of its four
-// tables MRHI_TABLE_BINDINGS, so that a table set while recording fits
-// one chunk. Tables and color outputs need no check: the floor's four
-// tables and eight color attachments are the container's own bounds.
+// sizes, and each stage's count of each kind. Tables and color outputs
+// need no check: the floor's four tables and eight color attachments are
+// the container's own bounds.
 static bool AreBindingsWithin(const mrhiLimits* limits, const mrhiContainer* container)
 {
     for (uint32_t stage = mrhi_stageVertex; stage <= mrhi_stageCompute; stage <<= 1)
@@ -44,14 +43,9 @@ static bool AreBindingsWithin(const mrhiLimits* limits, const mrhiContainer* con
             return false;
         }
     }
-    uint32_t tables[4] = {0};
     for (uint32_t i = 0; i < container->bindingCount; ++i)
     {
         mrhiShaderBinding binding = mrhiContainerBinding(container, i);
-        if (++tables[binding.table] > MRHI_TABLE_BINDINGS)
-        {
-            return false;
-        }
         uint64_t bytes = binding.kind == mrhi_bindingUniformBuffer ? limits->uniformBindingBytes
                                                                    : limits->storageBindingBytes;
         if (binding.slot >= limits->bindingsPerTable || binding.minSize > bytes)
@@ -142,6 +136,22 @@ static bool IsWithin(const mrhiDevice* device, const mrhiContainer* container)
     return true;
 }
 
+// Whether each of a container's four tables holds at most
+// MRHI_MAX_TABLE_BINDINGS bindings, so that a table set while recording fits
+// one chunk.
+static bool AreTablesWithin(const mrhiContainer* container)
+{
+    uint32_t tables[4] = {0};
+    for (uint32_t i = 0; i < container->bindingCount; ++i)
+    {
+        if (++tables[mrhiContainerBinding(container, i).table] > MRHI_MAX_TABLE_BINDINGS)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 // Checks a def and its container: success with the container, or the
 // refusal, invalid input counted as misuse and a bad container not.
 static mrhiResult CheckShaderDef(mrhiDevice* device, const mrhiShaderDef* def,
@@ -157,7 +167,7 @@ static mrhiResult CheckShaderDef(mrhiDevice* device, const mrhiShaderDef* def,
         return mrhiDeviceMisuse(device, mrhi_diagnosticShaderBytes);
     }
     status = mrhiParseContainer(def->bytes, def->byteCount, containerOut);
-    if (status == mrhi_errorFormat)
+    if (status == mrhi_errorFormat || (status == mrhi_success && !AreTablesWithin(containerOut)))
     {
         return mrhiDeviceBadData(device, mrhi_diagnosticShaderContainer);
     }

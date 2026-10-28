@@ -13,7 +13,7 @@
 
 #include <string.h>
 
-static char s_seen[MRHI_LABEL_BYTES + 2];
+static char s_seen[MRHI_MAX_LABEL_BYTES + 2];
 static int s_begins;
 static int s_ends;
 static int s_inserts;
@@ -85,10 +85,10 @@ static void TestLabels(void)
     CHECK(s_inserts == 1 && strcmp(s_seen, "cascade 1") == 0, "a marker");
     mrhiVulkanEndLabel(&api, VK_NULL_HANDLE);
     CHECK(s_ends == 1, "the group ended");
-    char longest[MRHI_LABEL_BYTES];
+    char longest[MRHI_MAX_LABEL_BYTES];
     memset(longest, 'x', sizeof(longest));
     mrhiVulkanBeginLabel(&api, VK_NULL_HANDLE, longest, sizeof(longest));
-    CHECK(strlen(s_seen) == MRHI_LABEL_BYTES, "the longest label whole");
+    CHECK(strlen(s_seen) == MRHI_MAX_LABEL_BYTES, "the longest label whole");
     mrhiVulkanBeginLabel(&api, VK_NULL_HANDLE, "", 0);
     CHECK(s_begins == 3 && s_seen[0] == '\0', "an empty group");
 }

@@ -437,12 +437,12 @@ static void TestInterfaces(void)
     CHECK(mrhiParseContainer(s_container, s_size, &container) == mrhi_success && container.float16,
           "a 16-bit float output, noted");
     Reset();
-    Put32(Record(OUTPUTS, 0, 8), MRHI_COLOR_TARGETS);
+    Put32(Record(OUTPUTS, 0, 8), MRHI_MAX_COLOR_TARGETS);
     CHECK(Built() == mrhi_errorFormat, "an output past the color targets");
-    Put32(Record(OUTPUTS, 0, 8), MRHI_COLOR_TARGETS - 1);
+    Put32(Record(OUTPUTS, 0, 8), MRHI_MAX_COLOR_TARGETS - 1);
     CHECK(Built() == mrhi_success, "the last color target");
     Reset();
-    Variable(OUTPUTS, 1, MRHI_COLOR_TARGETS, mrhi_scalarFloat32, 4, 0, 0);
+    Variable(OUTPUTS, 1, MRHI_MAX_COLOR_TARGETS, mrhi_scalarFloat32, 4, 0, 0);
     CHECK(Built() == mrhi_errorFormat, "an output no entry names, past the targets");
     Reset();
     Variable(OUTPUTS, 1, 0, mrhi_scalarSint32, 4, 0, 0);
@@ -1302,12 +1302,12 @@ static void TestTableSize(void)
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.limits.samplersPerStage = 256;
     mrhiDevice* device = OpenWith(def, true);
-    CHECK(WithBindings(device, mrhi_bindingSampler, MRHI_TABLE_BINDINGS, mrhi_stageFragment) ==
+    CHECK(WithBindings(device, mrhi_bindingSampler, MRHI_MAX_TABLE_BINDINGS, mrhi_stageFragment) ==
               mrhi_success,
-          "a table of MRHI_TABLE_BINDINGS");
-    CHECK(WithBindings(device, mrhi_bindingSampler, MRHI_TABLE_BINDINGS + 1, mrhi_stageFragment) ==
-              mrhi_errorUnsupported,
-          "a table of more");
+          "a table of MRHI_MAX_TABLE_BINDINGS");
+    CHECK(WithBindings(device, mrhi_bindingSampler, MRHI_MAX_TABLE_BINDINGS + 1,
+                       mrhi_stageFragment) == mrhi_errorFormat,
+          "a table of more, as bad data");
     Close(device);
 }
 

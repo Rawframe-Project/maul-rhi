@@ -6,7 +6,7 @@ How shaders reach resources: binding tables and the root block on every API, bin
 
 A pipeline's layout comes from its container's reflection: up to four tables (WebGPU's `maxBindGroups`), each a set of slots of fixed kinds. `mrhiSetBindings` sets one whole table: exactly the slots the reflection lists for it, under the pipeline set in the pass, which is looked up by id again on each call. A binding is a buffer range, a texture of the frame seen through an inline view, or a sampler, each checked as WebGPU checks a bind group entry: alignment, size limits and minimum sizes; view kind, format, sample type and multisampling; sampler kind. Each bound resource also needs a declared access of the pass covering it, of the kind the slot needs.
 
-A table and its command fit one arena chunk, so a table holds at most `MRHI_TABLE_BINDINGS`. Draws need every table their pipeline reads, set under a container of the same SHA-256 digest: identical containers made apart stay compatible, which matters when two pipelines of one material come from separately loaded files.
+A table and its command fit one arena chunk, so a table holds at most `MRHI_MAX_TABLE_BINDINGS`. Draws need every table their pipeline reads, set under a container of the same SHA-256 digest: identical containers made apart stay compatible, which matters when two pipelines of one material come from separately loaded files.
 
 On each API a table becomes what it binds cheaply: a Vulkan descriptor set taken from the frame slot's pools, a pair of D3D12 descriptor tables written into the slot's shader-visible rings, Metal buffer, texture and sampler indices set before each draw, a WebGPU bind group made at its command.
 
