@@ -112,7 +112,7 @@ mrhiResult mrhiCreateQuerySet(mrhiDevice* device, const mrhiQuerySetDef* def,
         device, device->driver.vtable->createQuerySet(device->driver.self, &driverDef, &handle));
     if (status != mrhi_success)
     {
-        mrhiPoolRelease(&device->querySets, index1);
+        mrhiPoolUnacquire(&device->querySets, index1);
         return status;
     }
     device->querySetSlots[index1 - 1] = (mrhiQuerySetSlot){

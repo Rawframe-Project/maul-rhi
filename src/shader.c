@@ -242,19 +242,21 @@ mrhiResult mrhiCreateShader(mrhiDevice* device, const mrhiShaderDef* def, mrhiSh
     {
         return status;
     }
+    // The reflection first, so a refusal for memory leaves the pool as it
+    // was.
+    mrhiReflection* reflection = mrhiKeepReflection(&device->allocator, &container);
     uint32_t index1 = 0;
     uint32_t generation = 0;
-    if (!mrhiPoolAcquire(&device->shaders, &index1, &generation))
+    if (reflection == nullptr || !mrhiPoolAcquire(&device->shaders, &index1, &generation))
     {
+        if (reflection != nullptr)
+        {
+            mrhiReleaseReflection(&device->allocator, reflection);
+        }
         return mrhi_errorCapacity;
     }
     mrhiShaderSlot* slot = &device->shaderSlots[index1 - 1];
-    slot->reflection = mrhiKeepReflection(&device->allocator, &container);
-    if (slot->reflection == nullptr)
-    {
-        mrhiPoolRelease(&device->shaders, index1);
-        return mrhi_errorCapacity;
-    }
+    slot->reflection = reflection;
     mrhiShaderDef driverDef = *def;
     mrhiDropLabel(&driverDef.label, &driverDef.labelLength);
     status =
@@ -264,7 +266,7 @@ mrhiResult mrhiCreateShader(mrhiDevice* device, const mrhiShaderDef* def, mrhiSh
     {
         mrhiReleaseReflection(&device->allocator, slot->reflection);
         *slot = (mrhiShaderSlot){0};
-        mrhiPoolRelease(&device->shaders, index1);
+        mrhiPoolUnacquire(&device->shaders, index1);
         return status;
     }
     *shaderOut = (mrhiShaderId){index1, generation};

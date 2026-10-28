@@ -277,7 +277,7 @@ mrhiResult mrhiCreateTexture(mrhiDevice* device, const mrhiTextureDef* def,
         device, device->driver.vtable->createTexture(device->driver.self, &driverDef, &handle));
     if (status != mrhi_success)
     {
-        mrhiPoolRelease(&device->textures, index1);
+        mrhiPoolUnacquire(&device->textures, index1);
         return status;
     }
     mrhiTextureSlot* slot = &device->textureSlots[index1 - 1];

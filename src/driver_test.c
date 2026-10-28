@@ -227,6 +227,8 @@ typedef struct TestDevice
     uint32_t named;
     const mrhiResult* acquireOutcome;
     uint32_t imagesOut;
+    // The flag that refuses every object made, as memory running out.
+    const bool* refuseObjects;
     // The flag that loses the device, why, and whether it is lost and the
     // loss reported.
     const bool* loseDevice;
@@ -294,6 +296,10 @@ static mrhiResult MakeObject(TestDevice* device, uint64_t* handleOut)
     {
         device->lossTold = true;
         return mrhi_errorDeviceLost;
+    }
+    if (device->refuseObjects != nullptr && *device->refuseObjects)
+    {
+        return mrhi_errorCapacity;
     }
     if (device->madeBeforeFailure != 0 && device->made == device->madeBeforeFailure)
     {
@@ -888,6 +894,7 @@ static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef
         .frameLog = driver->adapters[adapter - 1].frameLog,
         .acquireOutcome = driver->adapters[adapter - 1].acquireOutcome,
         .loseDevice = driver->adapters[adapter - 1].loseDevice,
+        .refuseObjects = driver->adapters[adapter - 1].refuseObjects,
         .lossReason = driver->adapters[adapter - 1].lossReason,
         .timestampPeriod = driver->adapters[adapter - 1].timestampPeriod > 0.0
                                ? driver->adapters[adapter - 1].timestampPeriod

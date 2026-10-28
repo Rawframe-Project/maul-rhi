@@ -667,7 +667,7 @@ mrhiResult mrhiCreateGraphicsPipeline(mrhiDevice* device, const mrhiGraphicsPipe
                                           mrhiPipelineTag(device, index1), &slot->handle));
     if (status != mrhi_success)
     {
-        mrhiFreePipelineSlot(device, index1);
+        mrhiUntakePipelineSlot(device, index1);
         return status;
     }
     *pipelineOut = (mrhiGraphicsPipelineId){index1, generation};

@@ -194,7 +194,7 @@ mrhiResult mrhiCreateView(mrhiDevice* device, const mrhiViewDef* def, mrhiViewId
                                      device->driver.self, texture->handle, &resolved, &handle));
     if (status != mrhi_success)
     {
-        mrhiPoolRelease(&device->views, index1);
+        mrhiPoolUnacquire(&device->views, index1);
         return status;
     }
     device->viewSlots[index1 - 1] = (mrhiViewSlot){

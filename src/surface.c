@@ -152,7 +152,7 @@ mrhiResult mrhiCreateSurface(mrhiInstance* instance, const mrhiSurfaceDef* def,
         instance->driver.vtable->createSurface(instance->driver.self, source, &driverDef, &handle);
     if (status != mrhi_success)
     {
-        mrhiPoolRelease(&instance->surfaces, index1);
+        mrhiPoolUnacquire(&instance->surfaces, index1);
         return status;
     }
     instance->surfaceSlots[index1 - 1] = (mrhiSurfaceSlot){.handle = handle};
