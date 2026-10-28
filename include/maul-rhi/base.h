@@ -50,7 +50,7 @@ extern "C"
 
 // The revision of the contract the headers are generated from
 // (contract/mrhi.json).
-#define MRHI_CONTRACT_VERSION 20
+#define MRHI_CONTRACT_VERSION 21
 
 // MRHI_API marks the public functions: dllexport or dllimport in a
 // shared Windows build (maul_rhi_EXPORTS is defined while building
@@ -471,7 +471,8 @@ extern "C"
         // notifications, a command arena under one chunk, or readback bytes not
         // a multiple of 512.
         mrhi_diagnosticDeviceLimits = 92,
-        // A device def asks for limits below the floor every adapter reaches.
+        // A device def asks for limits below the floor every adapter reaches,
+        // or for an alignment that is not a power of two.
         mrhi_diagnosticLimitsFloor = 93,
         // An allocator with one function set and the other not.
         mrhi_diagnosticAllocator = 94,

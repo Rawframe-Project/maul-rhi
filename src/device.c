@@ -70,6 +70,11 @@ static bool AreVulkanStructsValid(const mrhiDeviceDef* def)
            (extra == nullptr || mrhiIsNameList(extra->extensions, extra->extensionsLength));
 }
 
+static bool IsPowerOfTwo(uint32_t value)
+{
+    return value != 0 && (value & (value - 1)) == 0;
+}
+
 // Whether the def's own limits on the device's bookkeeping are usable.
 static bool AreDeviceLimitsValid(const mrhiDeviceLimits* limits)
 {
@@ -100,7 +105,9 @@ static mrhiDiagnosticCode DeviceDefFault(const mrhiDeviceDef* def, mrhiResult ch
     {
         return mrhi_diagnosticDeviceLimits;
     }
-    if (!mrhiLimitsWithin(&floor, &def->limits))
+    if (!mrhiLimitsWithin(&floor, &def->limits) ||
+        !IsPowerOfTwo(def->limits.uniformOffsetAlignment) ||
+        !IsPowerOfTwo(def->limits.storageOffsetAlignment))
     {
         return mrhi_diagnosticLimitsFloor;
     }

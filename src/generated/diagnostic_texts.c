@@ -167,7 +167,7 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticDeviceLimits:
         return "A device def's device limits include a zero, fewer than 2 notifications, a command arena under one chunk, or readback bytes not a multiple of 512.";
     case mrhi_diagnosticLimitsFloor:
-        return "A device def asks for limits below the floor every adapter reaches.";
+        return "A device def asks for limits below the floor every adapter reaches, or for an alignment that is not a power of two.";
     case mrhi_diagnosticAllocator:
         return "An allocator with one function set and the other not.";
     case mrhi_diagnosticPipelineCacheBytes:
