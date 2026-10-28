@@ -134,12 +134,17 @@ step "clang-format on every file"
 mapfile -t all_files < <(all_c_files)
 clang-format --dry-run -Werror "${all_files[@]}"
 
-step "clang-tidy"
 # The web sources need Emscripten's sysroot, the D3D12 ones Windows' headers
-# and the Metal ones Apple's: CI checks those in their own cells.
-configure tidy -DCMAKE_C_COMPILER=clang-20 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-for f in $(grep -L '"web_js.h"' src/*.c | grep -v d3d12); do
-    clang-tidy-20 -p "$out/check-tidy" --quiet --warnings-as-errors='*' "$f" 2>/dev/null
+# and the Metal ones Apple's: CI checks those in their own cells. As CI's
+# checks job, on the Release preset, where the assertions compile out, and
+# with them live: each hides findings the other shows.
+for build in Release Debug; do
+    step "clang-tidy, $build"
+    configure "tidy-$build" --preset linux-clang-20 -DCMAKE_BUILD_TYPE=$build \
+        -DMAUL_RHI_LABELS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    for f in $(grep -L '"web_js.h"' src/*.c | grep -v d3d12); do
+        clang-tidy-20 -p "$out/check-tidy-$build" --quiet --warnings-as-errors='*' "$f" 2>/dev/null
+    done
 done
 
 preset linux-clang-20-asan
