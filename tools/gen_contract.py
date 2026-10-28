@@ -434,11 +434,7 @@ def preamble_version(contract, names):
         f"#if {macro}_VERSION_MAJOR == 0 && ({macro}_VERSION_MINOR > 0xFF || {macro}_VERSION_PATCH > 0xFF)",
         f'#error "before 1.0, {macro}_VERSION_MINOR and {macro}_VERSION_PATCH must fit 8 bits each"',
         "#endif",
-        "",
     ]
-    lines += comment("The revision of the contract the headers are generated from "
-                     "(contract/mrhi.json).", 0, "//")
-    lines.append(f"#define {macro}_CONTRACT_VERSION {contract['contract_version']}")
     return lines
 
 

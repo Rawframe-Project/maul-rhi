@@ -48,10 +48,6 @@ extern "C"
 #error "before 1.0, MRHI_VERSION_MINOR and MRHI_VERSION_PATCH must fit 8 bits each"
 #endif
 
-// The revision of the contract the headers are generated from
-// (contract/mrhi.json).
-#define MRHI_CONTRACT_VERSION 22
-
 // MRHI_API marks the public functions: dllexport or dllimport in a
 // shared Windows build (maul_rhi_EXPORTS is defined while building
 // the library), default visibility in a shared build elsewhere.
