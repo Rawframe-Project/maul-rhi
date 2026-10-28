@@ -100,7 +100,7 @@ static mrhiDiagnosticCode DeviceDefFault(const mrhiDeviceDef* def, mrhiResult ch
     {
         return mrhi_diagnosticDeviceLimits;
     }
-    if (!mrhiLimitsWithin(&floor, &def->limits))
+    if (!mrhiLimitsWithin(&floor, &def->limits) || !mrhiAlignmentsValid(&def->limits))
     {
         return mrhi_diagnosticLimitsFloor;
     }

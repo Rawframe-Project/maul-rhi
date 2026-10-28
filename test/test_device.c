@@ -36,8 +36,8 @@ static mrhiTestDriverDef s_driver;
 // The allocator Create gives its instance.
 static mrhiAllocator s_instanceAllocator;
 
-// An instance with one adapter that grants 16-bit floats and 16384
-// texels; found, with its id in adapterOut.
+// An instance with one adapter that grants 16-bit floats, 16384 texels
+// and 64-byte offset alignments; found, with its id in adapterOut.
 static mrhiInstance* Create(uint32_t notifications, mrhiResult openOutcome,
                             mrhiAdapterId* adapterOut)
 {
@@ -48,6 +48,8 @@ static mrhiInstance* Create(uint32_t notifications, mrhiResult openOutcome,
         .openOutcome = openOutcome,
     };
     s_adapter.limits.textureDimension2d = 16384;
+    s_adapter.limits.uniformOffsetAlignment = 64;
+    s_adapter.limits.storageOffsetAlignment = 64;
     s_driver = (mrhiTestDriverDef){
         .chain = {.next = nullptr, .type = mrhi_structTestDriver},
         .adapters = &s_adapter,
@@ -148,7 +150,7 @@ static void TestGrants(void)
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorUnsupported,
           "a limit beyond the adapter");
     def = Def(adapter);
-    def.limits.uniformOffsetAlignment = 128;
+    def.limits.uniformOffsetAlignment = 32;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorUnsupported,
           "an alignment finer than the adapter's");
     CHECK(mrhiGetInstanceMisuse(instance) == 0, "unsupported asks are not misuse");
@@ -162,6 +164,33 @@ static void TestGrants(void)
     CHECK(mrhiGetInstanceMisuse(instance) == 1, "only the invalid ask is misuse");
     mrhiInstanceNotification record;
     CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_empty, "refusals queue nothing");
+    mrhiDestroyInstance(instance);
+}
+
+// An alignment limit is a power of two, as WebGPU requires: a device
+// asking for another would hand its driver offsets the adapter cannot
+// take.
+static void TestAlignmentLimits(void)
+{
+    mrhiAdapterId adapter;
+    mrhiInstance* instance = Create(64, mrhi_success, &adapter);
+    mrhiDevice* device = nullptr;
+    mrhiRequestId request;
+    mrhiDeviceDef def = Def(adapter);
+    def.limits.uniformOffsetAlignment = 96;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
+          "a uniform alignment that is not a power of two");
+    def = Def(adapter);
+    def.limits.storageOffsetAlignment = 192;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
+          "a storage alignment that is not a power of two");
+    CHECK(mrhiGetInstanceMisuse(instance) == 2, "each is misuse");
+    def = Def(adapter);
+    def.limits.uniformOffsetAlignment = 64;
+    def.limits.storageOffsetAlignment = 128;
+    CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success,
+          "powers of two within the adapter's");
+    mrhiDestroyDevice(device);
     mrhiDestroyInstance(instance);
 }
 
@@ -334,6 +363,7 @@ int main(void)
     TestOpensLater();
     TestFailedOpening();
     TestGrants();
+    TestAlignmentLimits();
     TestDestroyWhileOpening();
     TestInstanceOutlivesDevices();
     TestQueueRoom();

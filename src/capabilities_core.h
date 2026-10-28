@@ -16,6 +16,10 @@ bool mrhiFeaturesWithin(const mrhiFeatures* asked, const mrhiFeatures* granted);
 // least it for a limit that is better lower (the alignments).
 bool mrhiLimitsWithin(const mrhiLimits* asked, const mrhiLimits* granted);
 
+// Whether every limit that is better lower (the alignments) is a power
+// of two, as WebGPU requires of an adapter's limits and a device's.
+bool mrhiAlignmentsValid(const mrhiLimits* limits);
+
 // Clears the features a driver's API cannot grant: the rows the
 // contract classes absent-rejected.
 void mrhiMaskFeatures(mrhiFeatures* features, mrhiDriverKind driver);

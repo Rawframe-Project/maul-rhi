@@ -260,6 +260,8 @@ jobs:
         # Vulkan target without an adapter) exits 77 before any input; the
         # CI image has lavapipe, so here that fails the step, as the image
         # broke, rather than leaving the target unfuzzed behind a notice.
+        # 77 is also libFuzzer's exit for a crash, so the probe exits 1 on
+        # one, and a target that fails at once is fuzzed and fails there.
         run: |
           python3 tools/container_seed.py out/corpus/fuzz_container >/dev/null
           rm -rf out/fuzz-reports
@@ -269,7 +271,7 @@ jobs:
             name=${target##*/}
             mkdir -p "out/corpus/$name"
             status=0
-            "$target" -runs=0 "$probe" >/dev/null 2>&1 || status=$?
+            "$target" -runs=0 -error_exitcode=1 "$probe" >/dev/null 2>&1 || status=$?
             if [ "$status" = 77 ] && [ "${MAUL_RHI_FUZZ_REQUIRE_ADAPTER:-}" = 1 ]; then
               echo "::error::$name cannot run: the CI image has no Vulkan adapter"
               exit 1
