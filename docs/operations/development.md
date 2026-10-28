@@ -45,7 +45,7 @@ The options a developer uses besides the user's: `MAUL_RHI_SANITIZE` (AddressSan
 
 | Files | Generator | Inputs | In CI |
 |---|---|---|---|
-| `include/maul-rhi/*.h`, `src/generated/{capabilities,defaults,diagnostic_texts,result_names}.c` | `python3 tools/gen_contract.py` | `contract/mrhi.json` | regenerated, and any difference fails |
+| `include/maul-rhi/*.h`, `src/generated/{capabilities,defaults,diagnostic_texts,result_names}.c`, `src/generated/out_copies.h` | `python3 tools/gen_contract.py` | `contract/mrhi.json` | regenerated, and any difference fails |
 | `test/shaders/*_container.h`, `samples/shaders/*_container.h` | `python3 tools/gen_test_shaders.py` | the GLSL and WGSL sources and JSON reflections beside them, the generator and writer scripts, and the contract's values the writer reads | committed and stamped; CI has no shader tools and checks the stamps |
 | `src/generated/d3d12_expand.h` | `python3 tools/gen_kernels.py [dxc]` | `src/d3d12_expand.hlsl` and the generator | committed and stamped; CI has no DXC and checks the stamp |
 | `maul-rhi.mjs` (in the build tree) | `tools/gen_web_glue.py`, run by the build | the `EM_JS` functions of the WebGPU driver | built every time |

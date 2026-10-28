@@ -9,6 +9,8 @@
 #include "device_core.h"
 #include "invariant.h"
 
+#include "generated/out_copies.h"
+
 #include <stdatomic.h>
 #include <string.h>
 
@@ -361,7 +363,7 @@ mrhiResult mrhiGetFrameUsage(mrhiDevice* device, mrhiFrameUsage* usageOut)
     uint32_t libraryChunks =
         device->frameCompiled ? device->frameChunkLimit - device->frameProgramChunks : 0;
     chunks = chunks < device->frameChunkLimit ? chunks : device->frameChunkLimit;
-    *usageOut = (mrhiFrameUsage){
+    const mrhiFrameUsage usage = {
         .frameResources = device->frameResourceCount,
         .framePasses = device->framePassCount - libraryPasses,
         .frameAccesses = device->frameUseCount,
@@ -372,6 +374,7 @@ mrhiResult mrhiGetFrameUsage(mrhiDevice* device, mrhiFrameUsage* usageOut)
         .frameIndirectDraws =
             (uint32_t)atomic_load_explicit(&device->countedTaken, memory_order_relaxed),
     };
+    mrhiOutFrameUsage(usageOut, &usage);
     return mrhi_success;
 }
 
@@ -426,7 +429,7 @@ mrhiResult mrhiNextDeviceNotification(mrhiDevice* device, mrhiDeviceNotification
     {
         return mrhi_empty;
     }
-    *notificationOut = device->queue[device->queueHead];
+    mrhiOutDeviceNotification(notificationOut, &device->queue[device->queueHead]);
     device->queueHead = (device->queueHead + 1) % device->deviceLimits.notifications;
     --device->queueCount;
     return mrhi_success;
