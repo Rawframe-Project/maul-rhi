@@ -10,7 +10,7 @@
 set -euo pipefail
 
 # Puppeteer and its dependencies as test/browser's lockfile pins them, each
-# with its integrity hash. Puppeteer 24's Chrome offers WebGPU over its own
+# with its integrity hash. Puppeteer 25's Chrome offers WebGPU over its own
 # SwiftShader.
 modules=${RUNNER_TEMP:-/tmp}/browser
 mkdir -p "$modules"
