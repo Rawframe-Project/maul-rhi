@@ -16,7 +16,7 @@ static mrhiTestAdapter Adapter(mrhiAdapterKind kind, const char* name)
         .info = {.driver = mrhi_driverTest, .kind = kind, .vendorId = 0x1234},
         .limits = mrhiDefaultLimits(),
     };
-    adapter.info.nameLength = (uint32_t)strlen(name);
+    adapter.info.nameLength = strlen(name);
     memcpy(adapter.info.name, name, adapter.info.nameLength);
     return adapter;
 }

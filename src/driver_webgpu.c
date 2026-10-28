@@ -208,7 +208,7 @@ static bool Describe(const WebGpuDriver* driver, mrhiDriverAdapter* adapterOut)
     char name[MRHI_ADAPTER_NAME_BYTES + 1];
     int length = mrhiJsAdapterName(driver->state, name, (int)sizeof(name));
     memcpy(info->name, name, (size_t)length);
-    info->nameLength = (uint32_t)length;
+    info->nameLength = (size_t)length;
     for (size_t i = 0; i < mrhiWebGpuFeatureCount; ++i)
     {
         bool has = mrhiJsAdapterHas(driver->state, mrhiWebGpuFeatures[i].name);

@@ -1269,7 +1269,7 @@
             },
             {
               "name": "name_length",
-              "type": "uint32"
+              "type": "size"
             }
           ],
           "mapping": {
@@ -7259,7 +7259,7 @@
             },
             {
               "name": "message_length",
-              "type": "uint32",
+              "type": "size",
               "doc": "Its bytes."
             }
           ],
@@ -20973,7 +20973,7 @@
             },
             {
               "name": "size",
-              "type": "uint32",
+              "type": "size",
               "doc": "How many, a multiple of 4 and at least 4, ending within the device's root block."
             }
           ],

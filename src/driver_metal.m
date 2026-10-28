@@ -107,7 +107,7 @@ static mrhiAdapterInfo InfoOf(id<MTLDevice> device)
     {
         memcpy(info.name, name, length);
     }
-    info.nameLength = (uint32_t)length;
+    info.nameLength = length;
     return info;
 }
 
