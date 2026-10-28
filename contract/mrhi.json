@@ -22336,7 +22336,7 @@
     },
     {
       "name": "test",
-      "doc": "The test driver (MAUL_RHI_TEST_DRIVER): a driver without a GPU whose adapters a test describes, for the library's tests and a program's own.",
+      "doc": "The test driver (MAUL_RHI_TEST_DRIVER): a driver without a GPU whose adapters a test describes, for the library's tests and a program's own. Test-only, and outside the 1.x promise: its structs may change in any release, a patch release too.",
       "includes": [
         "encoder"
       ],
