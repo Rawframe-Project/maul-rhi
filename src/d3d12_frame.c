@@ -958,7 +958,7 @@ bool mrhiD3d12WaitFrame(mrhiD3d12Frames* frames, uint64_t tag, uint64_t timeoutN
 }
 
 // The message of a loss: D3D12's reason as eight hex digits.
-static uint32_t Describe(char* message, HRESULT result)
+static size_t Describe(char* message, HRESULT result)
 {
     static const char text[] = "D3D12 removed the device: HRESULT 0x";
     static const char digits[] = "0123456789ABCDEF";
@@ -969,7 +969,7 @@ static uint32_t Describe(char* message, HRESULT result)
     {
         message[sizeof(text) - 1 + i] = digits[(bits >> (28 - 4 * i)) & 0xF];
     }
-    return (uint32_t)(sizeof(text) - 1 + 8);
+    return sizeof(text) - 1 + 8;
 }
 
 void mrhiD3d12LossReport(const mrhiD3d12Frames* frames, mrhiDeviceLossReport* reportOut)

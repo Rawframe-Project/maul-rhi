@@ -654,6 +654,13 @@ static void TestRootBlock(void)
           "past the adapter's limit");
     CHECK(mrhiSetRootBlock(s_device, s_render, UINT32_MAX - 3, bytes, 4) == mrhi_errorUnsupported,
           "wrapping past it");
+    CHECK(mrhiSetRootBlock(s_device, s_render, 4, bytes, SIZE_MAX - 3) == mrhi_errorUnsupported,
+          "a size wrapping its end past 64 bits");
+    // Where size_t is wider, a size whose low 32 bits alone would fit.
+    CHECK(SIZE_MAX == UINT32_MAX ||
+              mrhiSetRootBlock(s_device, s_render, 0, bytes, (size_t)UINT32_MAX + 5) ==
+                  mrhi_errorUnsupported,
+          "a size past 32 bits");
     CHECK(mrhiGetDeviceMisuse(s_device) == 0, "not misuse");
     CHECK(mrhiSetRootBlock(s_device, s_render, 2, bytes, 4) == mrhi_errorInvalid &&
               mrhiSetRootBlock(s_device, s_render, 0, bytes, 6) == mrhi_errorInvalid &&

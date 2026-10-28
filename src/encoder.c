@@ -12,6 +12,7 @@
 
 #include <math.h>
 #include <stdatomic.h>
+#include <stdckdint.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -363,7 +364,7 @@ mrhiResult mrhiSetComputePipeline(mrhiDevice* device, mrhiPassId id, mrhiCompute
 }
 
 mrhiResult mrhiSetRootBlock(mrhiDevice* device, mrhiPassId id, uint32_t offset, const void* bytes,
-                            uint32_t size)
+                            size_t size)
 {
     if (device == nullptr)
     {
@@ -383,12 +384,19 @@ mrhiResult mrhiSetRootBlock(mrhiDevice* device, mrhiPassId id, uint32_t offset, 
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticRootBlock);
     }
-    status = MRHI_DEVICE_LIMIT(device, rootBlockBytes, (uint64_t)offset + size);
+    // An end past 64 bits is past any root block.
+    uint64_t end = 0;
+    if (ckd_add(&end, (uint64_t)offset, size))
+    {
+        end = UINT64_MAX;
+    }
+    status = MRHI_DEVICE_LIMIT(device, rootBlockBytes, end);
     if (status != mrhi_success)
     {
         return status;
     }
-    mrhiCommand command = {.type = mrhiCommandRootBlock, .a = offset, .b = size};
+    // Within the root block, the size fits 32 bits.
+    mrhiCommand command = {.type = mrhiCommandRootBlock, .a = offset, .b = (uint32_t)size};
     return Record(device, pass, command, bytes, size);
 }
 
