@@ -5,6 +5,149 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.10.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.9.0...v0.10.0) (2026-10-28)
+
+### Added
+
+- `mrhi_errorBusy` (-10). The only program code the library calls is
+  the allocator a def gives an instance or a device. A function that
+  would change that object, called from inside its allocator, now
+  returns `mrhi_errorBusy` and counts one misuse, recorded under the
+  new `mrhi_diagnosticAllocatorCall`, where before it ran on an object
+  in the middle of a change. That is 7 instance functions and 43 device
+  functions; `mrhiDestroyInstance` and `mrhiDestroyDevice` called that
+  way count the misuse and destroy nothing. While
+  `mrhiConfigureSurface`, `mrhiUnconfigureSurface` or
+  `mrhiDestroyDevice` runs the device's allocator, the instance is busy
+  too, and `mrhiDestroySurface` is refused while the device the surface
+  is configured on is busy. Functions that only read, and pass
+  recording calls, are not refused.
+  ([#187](https://github.com/Rawframe-Project/maul-rhi/pull/187))
+- `mrhi_errorLimit` (-9), for an argument past a fixed bound of the
+  library, refused before anything past the bound is read and counted
+  as misuse. Each bound is a published constant:
+  `MRHI_MAX_LABEL_BYTES`, `MRHI_MAX_COLOR_TARGETS`,
+  `MRHI_MAX_INDIRECT_DRAWS`, `MRHI_MAX_NATIVE_PASSES`,
+  `MRHI_MAX_TABLE_BINDINGS` and the new `MRHI_MAX_QUERY_SET_QUERIES`
+  (4096).
+  ([#175](https://github.com/Rawframe-Project/maul-rhi/pull/175))
+- One diagnostic code per device limit, `mrhi_diagnosticLimit` and the
+  limit's name (125 to 155). Every refusal past a limit records its
+  limit's code: the device's limit for capacity, the adapter's for
+  unsupported.
+  ([#186](https://github.com/Rawframe-Project/maul-rhi/pull/186))
+- For tests on the test driver: `mrhiTestAdapter.refuseObjects`, set to
+  refuse every object its devices make with `mrhi_errorCapacity` as a
+  driver out of memory does, and `mrhiTestFrameLog.stagingSum`, the sum
+  of every byte of a frame's staging.
+  ([#194](https://github.com/Rawframe-Project/maul-rhi/pull/194),
+  [#197](https://github.com/Rawframe-Project/maul-rhi/pull/197))
+
+### Changed
+
+- **Breaking:** results follow the Maul family's shared numbering.
+  `mrhi_errorFormat` is -8, `mrhi_errorOutOfDate` is -32 and
+  `mrhi_errorDeviceLost` is -33. These refusals move:
+  - to `mrhi_errorLimit`, from `mrhi_errorInvalid`: a label past its
+    bound, more color targets than the bound on a pass or a graphics
+    pipeline, a counted multi-draw's `maxCount` past its bound, and a
+    query set past its bound;
+  - to `mrhi_errorLimit`, from `mrhi_errorCapacity`: more native passes
+    in a frame than the bound, which now counts a misuse;
+  - to `mrhi_errorFormat`, counting no misuse: a damaged pipeline cache
+    (`mrhiGetPipelineCacheOutcome`), which was `mrhi_errorInvalid`, and
+    a shader container with a table past `MRHI_MAX_TABLE_BINDINGS`,
+    which was `mrhi_errorUnsupported`.
+  
+  The bounds' constants are renamed with no aliases: `MRHI_LABEL_BYTES`
+  to `MRHI_MAX_LABEL_BYTES`, `MRHI_COLOR_TARGETS` to
+  `MRHI_MAX_COLOR_TARGETS`, `MRHI_INDIRECT_DRAWS` to
+  `MRHI_MAX_INDIRECT_DRAWS`, `MRHI_NATIVE_PASSES` to
+  `MRHI_MAX_NATIVE_PASSES` and `MRHI_TABLE_BINDINGS` to
+  `MRHI_MAX_TABLE_BINDINGS`.
+  ([#175](https://github.com/Rawframe-Project/maul-rhi/pull/175))
+- **Breaking:** a value past one of the device's limits is
+  `mrhi_errorCapacity` when the adapter's limit holds it, since a
+  device asking for more would take it, and `mrhi_errorUnsupported`
+  when not. Neither counts a misuse.
+  - Creations that answered unsupported for every such value now answer
+    capacity within the adapter's limits: a buffer's or texture's size,
+    a heap's entries, a shader container, a graphics pipeline's vertex
+    state, color bytes or views, and a surface's size. The same holds
+    for a pass's views and the root block while recording.
+  - Recording calls that answered `mrhi_errorInvalid` and counted a
+    misuse now answer capacity or unsupported: a table index, a vertex
+    buffer slot, a binding's offset alignment or size, a heap entry's
+    offset alignment, a viewport past the 2D texture limit, and a
+    dispatch past the workgroups per dimension.
+  - `mrhi_diagnosticVertexBufferSlot` and `mrhi_diagnosticDispatchSize`
+    are removed.
+  ([#186](https://github.com/Rawframe-Project/maul-rhi/pull/186))
+- A reconfiguration that `mrhiConfigureSurface` refuses keeps the
+  surface configured as it was. Before, every failed reconfiguration
+  left the surface unconfigured. Now only a platform call that fails
+  after retiring the old swapchain does: Vulkan retires it whatever
+  `vkCreateSwapchainKHR` answers, and Direct3D 12 releases it first, as
+  a window holds one swapchain.
+  ([#195](https://github.com/Rawframe-Project/maul-rhi/pull/195))
+- **Breaking for drivers built outside the tree:** `MRHI_SPI_VERSION`
+  is 10, and the mustpass list is `conformance/mustpass/spi-10.txt`.
+  - The command payload structs (`mrhiCommandBinding`,
+    `mrhiCommandBufferSide`, `mrhiCommandTextureSide`) and the chunk
+    header of `mrhiCommandChunk` lose their reserved fields. Each
+    payload struct is read from its own 32-byte record, a side is 24
+    bytes, and a chunk is 4072 bytes.
+  - `configureSurface` may hand back `oldSwapchain` in `swapchainOut`
+    when it refuses before its platform call, and the old swapchain
+    keeps working. A driver that leaves it 0 behaves as before.
+
+  Programs and shader cooks see nothing of this; contract_version is
+  21.
+  ([#174](https://github.com/Rawframe-Project/maul-rhi/pull/174),
+  [#175](https://github.com/Rawframe-Project/maul-rhi/pull/175),
+  [#195](https://github.com/Rawframe-Project/maul-rhi/pull/195))
+
+### Fixed
+
+- A device def whose `uniformOffsetAlignment` or
+  `storageOffsetAlignment` is not a power of two is refused as
+  `mrhi_errorInvalid` under `mrhi_diagnosticLimitsFloor`. Before, a
+  device could ask for 96 on an adapter whose alignment is 64, and a
+  binding at offset 96 reached the driver. An adapter whose driver
+  reports such an alignment is no longer listed.
+  ([#179](https://github.com/Rawframe-Project/maul-rhi/pull/179))
+- A graphics pipeline def with more vertex buffers than the limit is
+  refused before its attributes are read. Before, an attribute naming a
+  buffer past the limit read that buffer, past the end of an array that
+  held only the limit's entries.
+  ([#167](https://github.com/Rawframe-Project/maul-rhi/pull/167))
+- `mrhiCreateDevice` refused for memory leaves the instance as it was.
+  Before, it took a request id, so later requests got later ids. With
+  the validation layer, it also left a false driver fault in the
+  instance's diagnostics.
+  ([#192](https://github.com/Rawframe-Project/maul-rhi/pull/192))
+- A creation the driver refuses, or a shader whose reflection cannot be
+  allocated, leaves its pool as it was, so the next object gets the id
+  it would have. Before, the refused slot's generation moved on. This
+  covers samplers, buffers, textures, views, query sets, heaps,
+  shaders, compute and graphics pipelines, and surfaces.
+  ([#194](https://github.com/Rawframe-Project/maul-rhi/pull/194))
+- Two staging fixes:
+  - Staging hands drivers no bytes the program never wrote. The gaps
+    after each texture row and after each upload hold zeros. Before,
+    they held what the device's memory held, and the Vulkan,
+    Direct3D 12 and Metal drivers copy the staging whole into GPU
+    upload memory.
+  - An upload no longer takes staging past the frame's region when
+    `frameUploadBytes` is not a multiple of 512. Before, the driver was
+    handed bytes past the region, and Debug builds trapped.
+  ([#197](https://github.com/Rawframe-Project/maul-rhi/pull/197))
+- `tools/check_contract_version.py` asks a contract change for a
+  version above the latest release's and not below the base's. Before,
+  it asked every change to raise the version again, so a second
+  contract change in one release failed.
+  ([#184](https://github.com/Rawframe-Project/maul-rhi/pull/184))
+
 ## [0.9.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.8.0...v0.9.0) (2026-10-27)
 
 ### Added
