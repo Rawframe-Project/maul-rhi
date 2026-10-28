@@ -14,6 +14,8 @@ The driver's code makes its instance table before the instance and chains it on 
 
 The handshake is typed: a table of another `MRHI_SPI_VERSION` is `mrhi_errorVersion`; one smaller than the core knows, or missing a function, is `mrhi_errorInvalid`. A device table is checked when the device opens, and a refused device is destroyed through its first function, which stays `destroy` in every version. The external driver is refused beside the test driver or the Vulkan interop structs.
 
+The SPI is outside the 1.x promise: any release may change it and raise `MRHI_SPI_VERSION`, a patch release too. Build the driver with the Maul RHI release it serves, and rebuild it with each new one; a driver of another version is refused at the handshake rather than misread.
+
 **Surfaces.** Chained struct types with bit 30 set (`MRHI_STRUCT_DRIVER_DEFINED`) belong to outside drivers. An instance of such a driver takes one as a surface's source and hands it to the driver unexamined; every other instance refuses it as an unknown critical struct. A console's window system needs no change to the library.
 
 **Shader code.** Containers carry code for Vulkan, Direct3D 12, Metal and WebGPU only. A driver of another API needs its own code in containers, a new section type that readers already skip; its layout is settled with the first such driver.
