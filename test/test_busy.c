@@ -24,6 +24,8 @@
 static void (*s_hook)(void);
 static int s_skip;
 static mrhiDevice* s_device;
+// The surface a hook's instance calls destroy; none by default.
+static mrhiSurfaceId s_surface;
 // What a hook's calls returned that was not mrhi_errorBusy.
 static int s_answered;
 
@@ -44,9 +46,10 @@ static void RunHook(void)
 
 static void* Alloc(size_t size, size_t alignment, void* context)
 {
+    (void)alignment;
     (void)context;
     RunHook();
-    return aligned_alloc(alignment, (size + alignment - 1) / alignment * alignment);
+    return malloc(size);
 }
 
 static void Free(void* memory, size_t size, size_t alignment, void* context)
@@ -74,13 +77,13 @@ static void InstanceCalls(void)
     mrhiInstanceNotification notification;
     mrhiDiagnostic diagnostic;
     mrhiDevice* device = nullptr;
-    mrhiSurfaceId surface = {0};
     Busy(mrhiRequestAdapters(s_instance, nullptr, &request));
     Busy(mrhiNextInstanceNotification(s_instance, &notification));
     Busy(mrhiNextInstanceDiagnostic(s_instance, &diagnostic));
     Busy(mrhiCreateDevice(s_instance, nullptr, &device, &request));
+    mrhiSurfaceId surface = {0};
     Busy(mrhiCreateSurface(s_instance, nullptr, &surface));
-    Busy(mrhiDestroySurface(s_instance, surface));
+    Busy(mrhiDestroySurface(s_instance, s_surface));
     mrhiDestroyInstance(s_instance);
 }
 
@@ -226,6 +229,137 @@ static void TestShader(void)
     Close(s_device);
 }
 
+// A second device on the instance, with the C library's allocator.
+static mrhiDevice* s_second;
+
+// A surface on the instance, presenting on its adapter.
+static mrhiSurfaceId MakeSurface(void)
+{
+    mrhiSurfaceSourceTest source = {
+        .chain = {.next = nullptr, .type = mrhi_structSurfaceSourceTest},
+        .caps = {.colors = {{.format = mrhi_formatBgra8Unorm}}, .colorCount = 1},
+        .presentingAdapters = 1,
+    };
+    mrhiSurfaceDef def = mrhiDefaultSurfaceDef();
+    def.next = &source.chain;
+    mrhiSurfaceId surface = {0};
+    CHECK(mrhiCreateSurface(s_instance, &def, &surface) == mrhi_success, "the surface");
+    return surface;
+}
+
+static mrhiSurfaceConfig Config(uint32_t width)
+{
+    mrhiSurfaceConfig config = mrhiDefaultSurfaceConfig();
+    config.surface = s_surface;
+    config.color = (mrhiSurfaceColor){.format = mrhi_formatBgra8Unorm};
+    config.width = width;
+    config.height = 64;
+    return config;
+}
+
+// Every function of the second device that would change the instance.
+#define SECOND_CALLS 3
+static void SecondCalls(void)
+{
+    mrhiSurfaceConfig config = Config(64);
+    Busy(mrhiConfigureSurface(s_second, &config));
+    Busy(mrhiUnconfigureSurface(s_second, s_surface));
+    mrhiDestroyDevice(s_second);
+}
+
+// The calls refused while a device call holds the instance.
+static void HeldCalls(void)
+{
+    InstanceCalls();
+    SecondCalls();
+}
+
+static void DestroySurface(void)
+{
+    Busy(mrhiDestroySurface(s_instance, s_surface));
+}
+
+// The device, with s_surface configured on it, and the second device.
+static void OpenConfigured(void)
+{
+    s_device = Open();
+    s_surface = MakeSurface();
+    mrhiSurfaceConfig config = Config(64);
+    CHECK(mrhiConfigureSurface(s_device, &config) == mrhi_success, "configured");
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    size_t count = 0;
+    mrhiRequestId request;
+    CHECK(mrhiGetAdapters(s_instance, &def.adapter, 1, &count) == mrhi_success &&
+              mrhiCreateDevice(s_instance, &def, &s_second, &request) == mrhi_success,
+          "a second device");
+    s_answered = 0;
+}
+
+// Checks that a hook ran HeldCalls and each was refused and counted.
+static void CheckHeld(void)
+{
+    CHECK(s_hook == nullptr && s_answered == 0, "every call refused as busy");
+    CHECK(mrhiGetInstanceMisuse(s_instance) == INSTANCE_CALLS, "each instance call counted");
+    CHECK(mrhiGetDeviceMisuse(s_second) == SECOND_CALLS, "each second device call counted");
+}
+
+static void CloseConfigured(void)
+{
+    mrhiDestroyDevice(s_second);
+    s_second = nullptr;
+    s_surface = (mrhiSurfaceId){0};
+    Close(s_device);
+}
+
+// A surface reconfigured: the driver releases the old swapchain's
+// records, then allocates the new one's, from the device's allocator.
+// The surface's slot is the instance's, so the instance is held, and a
+// call that would change it, from destroying the surface to another
+// device's configuration, is refused rather than ending the swapchain
+// the configure is replacing.
+static void TestReconfigure(void)
+{
+    for (int skip = 0; skip <= 1; ++skip)
+    {
+        OpenConfigured();
+        s_skip = skip;
+        s_hook = HeldCalls;
+        mrhiSurfaceConfig config = Config(128);
+        CHECK(mrhiConfigureSurface(s_device, &config) == mrhi_success, "reconfigured");
+        CheckHeld();
+        CHECK(mrhiDestroySurface(s_instance, s_surface) == mrhi_success,
+              "the surface destroyed once the allocator returns");
+        CloseConfigured();
+    }
+}
+
+// Unconfiguring gives the swapchain's records back, the instance held.
+static void TestUnconfigure(void)
+{
+    OpenConfigured();
+    s_hook = HeldCalls;
+    CHECK(mrhiUnconfigureSurface(s_device, s_surface) == mrhi_success, "unconfigured");
+    CheckHeld();
+    CloseConfigured();
+}
+
+// Destroying a surface ends its configuration, which changes the device
+// it is configured on: refused while that device is in its allocator,
+// whatever the call.
+static void TestBusyConfiguredDevice(void)
+{
+    OpenConfigured();
+    s_hook = DestroySurface;
+    mrhiHeapDef def = mrhiDefaultHeapDef();
+    def.entries = 16;
+    mrhiHeapId heap = {0};
+    CHECK(mrhiCreateHeap(s_device, &def, &heap) == mrhi_success, "the heap made");
+    CHECK(s_hook == nullptr && s_answered == 0, "the surface's destruction refused");
+    CHECK(mrhiGetInstanceMisuse(s_instance) == 1, "counted on the instance");
+    CHECK(mrhiUnconfigureSurface(s_device, s_surface) == mrhi_success, "still configured");
+    CloseConfigured();
+}
+
 // The device's driver goes back to the device's allocator as the device
 // is destroyed, and a call then is refused.
 static void TestDestroy(void)
@@ -240,11 +374,30 @@ static void TestDestroy(void)
     ResetAdapter();
 }
 
+// The device's answer, configurations and count are the instance's, so
+// the instance is held while the device's driver goes back to the
+// allocator, after the swapchain's records.
+static void TestDestroyHeld(void)
+{
+    OpenConfigured();
+    s_skip = 1;
+    s_hook = HeldCalls;
+    mrhiDestroyDevice(s_device);
+    CheckHeld();
+    mrhiDestroyDevice(s_second);
+    mrhiDestroyInstance(s_instance);
+    ResetAdapter();
+}
+
 int main(void)
 {
     TestDeviceCreation();
     TestHeap();
     TestShader();
+    TestReconfigure();
+    TestUnconfigure();
+    TestBusyConfiguredDevice();
     TestDestroy();
+    TestDestroyHeld();
     return s_failures == 0 ? 0 : 1;
 }

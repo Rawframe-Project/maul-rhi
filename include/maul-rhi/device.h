@@ -165,8 +165,8 @@ extern "C"
 
     /// Destroys a device in any state, and ends the configurations of the
     /// surfaces it configured. A device still opening answers its request with
-    /// mrhi_errorStale. From inside its allocator it refuses, counting the call
-    /// as misuse and destroying nothing.
+    /// mrhi_errorStale. From inside its allocator, or while its instance is
+    /// busy, it refuses, counting the call as misuse and destroying nothing.
     ///
     /// @param device  The device, or NULL for nothing.
     /// @par Thread safety

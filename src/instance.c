@@ -290,6 +290,18 @@ mrhiResult mrhiInstanceBusy(mrhiInstance* instance)
     return mrhi_errorBusy;
 }
 
+bool mrhiHoldInstance(mrhiInstance* instance)
+{
+    bool held = instance->allocatorGuard.busy;
+    instance->allocatorGuard.busy = true;
+    return held;
+}
+
+void mrhiReleaseInstance(mrhiInstance* instance, bool held)
+{
+    instance->allocatorGuard.busy = held;
+}
+
 mrhiResult mrhiOverLimit(mrhiInstance* instance, mrhiDiagnosticCode code)
 {
     mrhiMisuse(instance, code);

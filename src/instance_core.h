@@ -106,6 +106,14 @@ mrhiResult mrhiOverLimit(mrhiInstance* instance, mrhiDiagnosticCode code);
 // allocator, records it, and returns mrhi_errorBusy.
 mrhiResult mrhiInstanceBusy(mrhiInstance* instance);
 
+// Marks the instance busy while a call of another object that changes
+// it runs host code, as its own allocator would: what the mark was, for
+// mrhiReleaseInstance.
+bool mrhiHoldInstance(mrhiInstance* instance);
+
+// Gives the instance back the mark mrhiHoldInstance returned.
+void mrhiReleaseInstance(mrhiInstance* instance, bool held);
+
 // Appends a record; the caller has made sure there is room.
 void mrhiPushInstanceNotification(mrhiInstance* instance, mrhiInstanceNotification notification);
 

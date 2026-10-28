@@ -528,12 +528,15 @@ void mrhiDestroyDevice(mrhiDevice* device)
     {
         return;
     }
-    if (device->allocatorGuard.busy)
+    mrhiInstance* instance = device->instance;
+    if (device->allocatorGuard.busy || instance->allocatorGuard.busy)
     {
         mrhiDeviceBusy(device);
         return;
     }
-    mrhiInstance* instance = device->instance;
+    // The device's answer, configurations and count are the instance's,
+    // so the instance is held until the device is out of it.
+    instance->allocatorGuard.busy = true;
     if (device->state == mrhi_deviceOpening)
     {
         mrhiAnswerNow(instance, device->request, mrhi_errorStale);
@@ -552,6 +555,7 @@ void mrhiDestroyDevice(mrhiDevice* device)
         device->driver.vtable->destroy(device->driver.self);
     }
     --instance->deviceCount;
+    instance->allocatorGuard.busy = false;
     // The block holds the guard, so it goes back past it.
     mrhiAllocator allocator = device->allocatorGuard.program;
     mrhiRelease(&allocator, device, device->bytes, alignof(mrhiDevice));

@@ -196,6 +196,12 @@ mrhiResult mrhiDestroySurface(mrhiInstance* instance, mrhiSurfaceId surface)
     {
         return mrhi_errorStale;
     }
+    // Ending the surface ends its configuration, which changes the device.
+    const mrhiDevice* device = instance->surfaceSlots[surface.index1 - 1].device;
+    if (device != nullptr && device->allocatorGuard.busy)
+    {
+        return mrhiInstanceBusy(instance);
+    }
     EndSurface(instance, surface.index1);
     return mrhi_success;
 }

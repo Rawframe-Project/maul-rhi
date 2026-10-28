@@ -107,7 +107,7 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
 |---|---|
 | `mrhi_errorInvalid` | An argument the call can never take. It also counts one misuse on the instance or device. |
 | `mrhi_errorLimit` | An argument past a fixed bound of the library, each a named constant: `MRHI_MAX_LABEL_BYTES`, `MRHI_MAX_COLOR_TARGETS`, `MRHI_MAX_INDIRECT_DRAWS`, `MRHI_MAX_NATIVE_PASSES`, `MRHI_MAX_QUERY_SET_QUERIES`. More room would not help. It counts one misuse, as invalid input does. |
-| `mrhi_errorBusy` | A call made from inside the allocator of the instance or device it would change. The allocator may call no function of the library. It counts one misuse, as invalid input does. |
+| `mrhi_errorBusy` | A call made from inside the allocator of the instance or device it would change, or of a device whose call is changing that instance, such as a surface's configuration. The allocator may call no function of the library. It counts one misuse, as invalid input does. |
 | `mrhi_errorFormat` | The data is malformed or does not contain what was asked for: a damaged shader container or pipeline cache, or an entry, constants or pipeline state its reflection refuses. Bad data is not a bug in the program, so it counts no misuse. |
 | `mrhi_errorStale` | An id whose object is gone. |
 | `mrhi_errorCapacity` | A limit is reached: a pool, a frame limit, or one of the device's limits that the adapter's would hold, so a device asking for more would succeed ([past a device limit](devices.md#past-a-device-limit)). |

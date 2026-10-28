@@ -241,7 +241,8 @@ extern "C"
     /// @param surface   The surface.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL instance;
     /// `mrhi_errorStale` for a surface the instance no longer has;
-    /// `mrhi_errorBusy` for a call from inside the instance's allocator.
+    /// `mrhi_errorBusy` for a call from inside the instance's allocator or from
+    /// inside that of the device the surface is configured on.
     /// @par Thread safety
     /// Safe from any thread; the instance and the device that configured the
     /// surface are used by one thread at a time.
@@ -339,7 +340,8 @@ extern "C"
     /// configured on another device; `mrhi_errorCapacity` for a size past the
     /// device's limits within the adapter's, or when the device's surface limit
     /// is reached; `mrhi_errorPlatform` when the driver fails; `mrhi_errorBusy`
-    /// for a call from inside the device's allocator.
+    /// for a call from inside the device's allocator, or while its instance is
+    /// busy.
     /// @par Thread safety
     /// Safe from any thread; the device and its instance are used by one thread
     /// at a time.
@@ -354,7 +356,8 @@ extern "C"
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
     /// `mrhi_errorStale` for a surface the instance no longer has;
     /// `mrhi_errorState` for a surface the device has not configured;
-    /// `mrhi_errorBusy` for a call from inside the device's allocator.
+    /// `mrhi_errorBusy` for a call from inside the device's allocator, or while
+    /// its instance is busy.
     /// @par Thread safety
     /// Safe from any thread; the device and its instance are used by one thread
     /// at a time.
