@@ -343,8 +343,7 @@ mrhiResult mrhiSetRootBlock(mrhiDevice* device, mrhiPassId id, uint32_t offset, 
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticRootBlock);
     }
-    status = mrhiRecordPastLimit(
-        device, MRHI_DEVICE_LIMIT(device, rootBlockBytes, (uint64_t)offset + size));
+    status = MRHI_DEVICE_LIMIT(device, rootBlockBytes, (uint64_t)offset + size);
     if (status != mrhi_success)
     {
         return status;
@@ -376,15 +375,17 @@ static bool IsViewportValid(const mrhiViewport* viewport)
            viewport->minDepth <= viewport->maxDepth;
 }
 
-// Whether a viewport is within WebGPU's ranges for a 2D texture limit:
-// its size within the limit and its edges within twice it.
-static bool FitsViewport(const mrhiViewport* viewport, uint32_t textureDimension2d)
+// The limit a viewport passes, by WebGPU's ranges for a 2D texture limit
+// (its size within the limit, its edges within twice it): the 2D
+// texture dimension, or MRHI_WITHIN_LIMITS.
+static size_t ViewportPast(const mrhiViewport* viewport, uint32_t textureDimension2d)
 {
     float limit = (float)textureDimension2d;
     float range = 2.0f * limit;
-    return viewport->x >= -range && viewport->y >= -range && viewport->width <= limit &&
-           viewport->height <= limit && viewport->x + viewport->width <= range - 1.0f &&
-           viewport->y + viewport->height <= range - 1.0f;
+    bool fits = viewport->x >= -range && viewport->y >= -range && viewport->width <= limit &&
+                viewport->height <= limit && viewport->x + viewport->width <= range - 1.0f &&
+                viewport->y + viewport->height <= range - 1.0f;
+    return fits ? MRHI_WITHIN_LIMITS : offsetof(mrhiLimits, textureDimension2d);
 }
 
 mrhiResult mrhiSetViewport(mrhiDevice* device, mrhiPassId id, const mrhiViewport* viewport)
@@ -407,10 +408,11 @@ mrhiResult mrhiSetViewport(mrhiDevice* device, mrhiPassId id, const mrhiViewport
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticViewport);
     }
-    if (!FitsViewport(viewport, device->limits.textureDimension2d))
+    status = mrhiDevicePastLimit(device, ViewportPast(viewport, device->limits.textureDimension2d),
+                                 ViewportPast(viewport, device->adapterLimits.textureDimension2d));
+    if (status != mrhi_success)
     {
-        bool adapter = FitsViewport(viewport, device->adapterLimits.textureDimension2d);
-        return mrhiRecordPastLimit(device, mrhiPastLimits(adapter));
+        return status;
     }
     mrhiCommand command = {.type = mrhiCommandViewport};
     return Record(device, pass, command, viewport, sizeof(*viewport));

@@ -32,10 +32,16 @@ static size_t TableBytes(uint32_t entries, uint32_t samplers)
     return ((size_t)entries + samplers) * sizeof(mrhiHeapEntrySlot);
 }
 
-// Whether a heap's entries and samplers are within the limits.
-static bool FitsLimits(const mrhiHeapDef* def, const mrhiLimits* limits)
+// The first of the limits a heap's entries and samplers pass, or
+// MRHI_WITHIN_LIMITS.
+static size_t PastLimit(const mrhiHeapDef* def, const mrhiLimits* limits)
 {
-    return def->entries <= limits->heapSize && def->samplers <= limits->samplerHeapSize;
+    if (def->entries > limits->heapSize)
+    {
+        return offsetof(mrhiLimits, heapSize);
+    }
+    return def->samplers <= limits->samplerHeapSize ? MRHI_WITHIN_LIMITS
+                                                    : offsetof(mrhiLimits, samplerHeapSize);
 }
 
 mrhiResult mrhiCreateHeap(mrhiDevice* device, const mrhiHeapDef* def, mrhiHeapId* heapOut)
@@ -65,9 +71,11 @@ mrhiResult mrhiCreateHeap(mrhiDevice* device, const mrhiHeapDef* def, mrhiHeapId
     {
         return mrhi_errorUnsupported;
     }
-    if (!FitsLimits(def, &device->limits))
+    status = mrhiDevicePastLimit(device, PastLimit(def, &device->limits),
+                                 PastLimit(def, &device->adapterLimits));
+    if (status != mrhi_success)
     {
-        return mrhiPastLimits(FitsLimits(def, &device->adapterLimits));
+        return status;
     }
     status = mrhiDeviceUsable(device);
     if (status != mrhi_success)

@@ -17,6 +17,7 @@
 #include "maul-rhi/device.h"
 
 #include <stdatomic.h>
+#include <stddef.h>
 
 // Where a device texture or buffer was imported: the frame's serial and
 // the frame's slot for it.
@@ -610,37 +611,42 @@ mrhiResult mrhiDeviceBadData(mrhiDevice* device, mrhiDiagnosticCode code);
 // returns mrhi_errorCapacity.
 mrhiResult mrhiDeviceFull(mrhiDevice* device, mrhiDiagnosticCode code);
 
-// Checks a value against one of the device's limits: success within the
-// limit it was granted; past it, mrhi_errorCapacity when the adapter's
-// limit holds the value, since a device asking for more would take it,
-// and mrhi_errorUnsupported when not.
-mrhiResult mrhiCheckLimit(uint64_t value, uint64_t granted, uint64_t adapter);
+// A value past one of the device's limits answers by its adapter's:
+// mrhi_errorCapacity when the adapter's limit holds it, since a device
+// asking for more would take it, and mrhi_errorUnsupported when not. Each
+// such refusal is recorded under the code naming the limit
+// (mrhiLimitDiagnostic), the adapter's for unsupported, and counts no
+// misuse. A limit is named by its offset in mrhiLimits.
 
-// Checks an offset against one of the device's alignment limits, where
-// lower is better: success for a multiple of the granted alignment,
-// mrhi_errorCapacity for a multiple of the adapter's only, and
-// mrhi_errorUnsupported for neither.
-mrhiResult mrhiCheckAlignment(uint64_t offset, uint64_t granted, uint64_t adapter);
+// Checks a value against the limit at field: success within the device's,
+// or the refusal, recorded.
+mrhiResult mrhiDeviceLimit(mrhiDevice* device, uint64_t value, uint64_t granted, uint64_t adapter,
+                           size_t field);
 
-// The refusal of a check that the device's limits fail:
-// mrhi_errorCapacity when the adapter's limits pass it, and
-// mrhi_errorUnsupported when not.
-mrhiResult mrhiPastLimits(bool adapterPasses);
+// Checks an offset against the alignment limit at field, where lower is
+// better: success for a multiple of the device's alignment, or the
+// refusal, recorded: capacity for a multiple of the adapter's only.
+mrhiResult mrhiDeviceAlignment(mrhiDevice* device, uint64_t offset, uint64_t granted,
+                               uint64_t adapter, size_t field);
 
-// Checks a value against the device's limit named field (mrhiCheckLimit).
+// The field a check of several limits names when every limit holds.
+#define MRHI_WITHIN_LIMITS SIZE_MAX
+
+// The answer of a check of several limits that names the first it found
+// passed, or MRHI_WITHIN_LIMITS: devicePast against the device's limits,
+// adapterPast against the adapter's. Success, or the refusal, recorded.
+mrhiResult mrhiDevicePastLimit(mrhiDevice* device, size_t devicePast, size_t adapterPast);
+
+// Checks a value against the device's limit named field (mrhiDeviceLimit).
 #define MRHI_DEVICE_LIMIT(device, field, value)                                                    \
-    mrhiCheckLimit((value), (device)->limits.field, (device)->adapterLimits.field)
+    mrhiDeviceLimit((device), (value), (device)->limits.field, (device)->adapterLimits.field,      \
+                    offsetof(mrhiLimits, field))
 
 // Checks an offset against the device's alignment limit named field
-// (mrhiCheckAlignment).
+// (mrhiDeviceAlignment).
 #define MRHI_DEVICE_ALIGNMENT(device, field, offset)                                               \
-    mrhiCheckAlignment((offset), (device)->limits.field, (device)->adapterLimits.field)
-
-// Returns a frame call's status, recording it under
-// mrhi_diagnosticDeviceLimit, counting no misuse, when it is
-// mrhi_errorCapacity: a refusal at one of the device's limits that the
-// adapter's hold.
-mrhiResult mrhiRecordPastLimit(mrhiDevice* device, mrhiResult status);
+    mrhiDeviceAlignment((device), (offset), (device)->limits.field, (device)->adapterLimits.field, \
+                        offsetof(mrhiLimits, field))
 
 // The head every object def opens with.
 typedef struct mrhiDefHead

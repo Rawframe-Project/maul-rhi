@@ -875,9 +875,159 @@
               "doc": "A driver refused a frame for capacity without naming one of the submit codes for the budget that ran out, or named one with another result."
             },
             {
-              "name": "diagnostic_device_limit",
+              "name": "diagnostic_limit_texture_dimension_2d",
               "value": 125,
-              "doc": "A frame call passes a limit the device was granted that its adapter's limit would hold: a device asking for more would take it."
+              "doc": "A value past the device's textureDimension2d limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_texture_dimension_3d",
+              "value": 126,
+              "doc": "A value past the device's textureDimension3d limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_texture_array_layers",
+              "value": 127,
+              "doc": "A value past the device's textureArrayLayers limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_binding_tables",
+              "value": 128,
+              "doc": "A value past the device's bindingTables limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_bindings_per_table",
+              "value": 129,
+              "doc": "A value past the device's bindingsPerTable limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_sampled_textures_per_stage",
+              "value": 130,
+              "doc": "A value past the device's sampledTexturesPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_samplers_per_stage",
+              "value": 131,
+              "doc": "A value past the device's samplersPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_storage_buffers_per_stage",
+              "value": 132,
+              "doc": "A value past the device's storageBuffersPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_storage_textures_per_stage",
+              "value": 133,
+              "doc": "A value past the device's storageTexturesPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_uniform_buffers_per_stage",
+              "value": 134,
+              "doc": "A value past the device's uniformBuffersPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_uniform_binding_bytes",
+              "value": 135,
+              "doc": "A value past the device's uniformBindingBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_storage_binding_bytes",
+              "value": 136,
+              "doc": "A value past the device's storageBindingBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_uniform_offset_alignment",
+              "value": 137,
+              "doc": "An offset off the device's uniformOffsetAlignment: mrhi_errorCapacity on the adapter's, mrhi_errorUnsupported off it too."
+            },
+            {
+              "name": "diagnostic_limit_storage_offset_alignment",
+              "value": 138,
+              "doc": "An offset off the device's storageOffsetAlignment: mrhi_errorCapacity on the adapter's, mrhi_errorUnsupported off it too."
+            },
+            {
+              "name": "diagnostic_limit_vertex_buffers",
+              "value": 139,
+              "doc": "A value past the device's vertexBuffers limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_tables_plus_vertex_buffers",
+              "value": 140,
+              "doc": "A value past the device's tablesPlusVertexBuffers limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_buffer_bytes",
+              "value": 141,
+              "doc": "A value past the device's bufferBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_vertex_attributes",
+              "value": 142,
+              "doc": "A value past the device's vertexAttributes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_vertex_stride",
+              "value": 143,
+              "doc": "A value past the device's vertexStride limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_inter_stage_variables",
+              "value": 144,
+              "doc": "A value past the device's interStageVariables limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_color_bytes_per_sample",
+              "value": 145,
+              "doc": "A value past the device's colorBytesPerSample limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_workgroup_storage_bytes",
+              "value": 146,
+              "doc": "A value past the device's workgroupStorageBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_workgroup_invocations",
+              "value": 147,
+              "doc": "A value past the device's workgroupInvocations limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_workgroup_size_x",
+              "value": 148,
+              "doc": "A value past the device's workgroupSizeX limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_workgroup_size_y",
+              "value": 149,
+              "doc": "A value past the device's workgroupSizeY limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_workgroup_size_z",
+              "value": 150,
+              "doc": "A value past the device's workgroupSizeZ limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_workgroups_per_dimension",
+              "value": 151,
+              "doc": "A value past the device's workgroupsPerDimension limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_root_block_bytes",
+              "value": 152,
+              "doc": "A value past the device's rootBlockBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_heap_size",
+              "value": 153,
+              "doc": "A value past the device's heapSize limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_sampler_heap_size",
+              "value": 154,
+              "doc": "A value past the device's samplerHeapSize limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_multiview_views",
+              "value": 155,
+              "doc": "A value past the device's multiviewViews limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
             }
           ],
           "library": "names the library's own checks"
@@ -6879,7 +7029,7 @@
         {
           "kind": "function",
           "name": "next_device_diagnostic",
-          "doc": "Takes the oldest record from the device's diagnostic queue, which holds a record for each call the device refused as invalid input or bad data, for each frame call refused at one of its limits, and for each submission its driver refused for a budget it names, up to the diagnostics limit; refusals past it are counted but not recorded.",
+          "doc": "Takes the oldest record from the device's diagnostic queue, which holds a record for each call the device refused as invalid input or bad data, for each frame call refused at one of its limits, for each call refused past one of the device's limits (mrhiLimits) under that limit's code, and for each submission its driver refused for a budget it names, up to the diagnostics limit; refusals past it are counted but not recorded.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success` with a record; `mrhi_empty` when the queue is drained or keeps none; `mrhi_errorInvalid` for a NULL argument."

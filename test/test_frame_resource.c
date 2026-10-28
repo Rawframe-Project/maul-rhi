@@ -170,12 +170,27 @@ static void TestLimit(void)
     s_instance = instance;
 }
 
+// The newest diagnostic's code, the queue drained; 0 for none.
+static mrhiDiagnosticCode Refusal(void)
+{
+    mrhiDiagnosticCode code = 0;
+    mrhiDiagnostic record;
+    while (mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success)
+    {
+        code = record.code;
+    }
+    return code;
+}
+
 // A declared size past the device's limits but within the adapter's is
-// capacity, recorded, which a device asking for more would take; past
-// the adapter's it is unsupported.
+// capacity, which a device asking for more would take; past the
+// adapter's it is unsupported. Each is recorded under the limit it
+// passed, so a texture checked against its width and its layers names
+// the one at fault.
 static void TestPastDeviceLimits(void)
 {
     s_adapter.limits.textureDimension2d = 16384;
+    s_adapter.limits.textureArrayLayers = 512;
     s_adapter.limits.bufferBytes = 2 * mrhiDefaultLimits().bufferBytes;
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     deviceDef.deviceLimits.diagnostics = 4;
@@ -184,21 +199,30 @@ static void TestPastDeviceLimits(void)
     mrhiResourceId resource;
     mrhiTextureDef texture = Texture();
     texture.width = 8193;
-    mrhiDiagnostic record = {0};
     CHECK(mrhiDeclareTexture(s_device, &texture, &resource) == mrhi_errorCapacity &&
-              mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success &&
-              record.code == mrhi_diagnosticDeviceLimit,
-          "a texture past the device's 2D limit, recorded");
+              Refusal() == mrhi_diagnosticLimitTextureDimension2d,
+          "a texture past the device's 2D limit, named");
     texture.width = 16385;
-    CHECK(mrhiDeclareTexture(s_device, &texture, &resource) == mrhi_errorUnsupported,
+    CHECK(mrhiDeclareTexture(s_device, &texture, &resource) == mrhi_errorUnsupported &&
+              Refusal() == mrhi_diagnosticLimitTextureDimension2d,
           "past the adapter's");
+    texture = Texture();
+    texture.kind = mrhi_texture2dArray;
+    texture.depthOrLayers = 257;
+    CHECK(mrhiDeclareTexture(s_device, &texture, &resource) == mrhi_errorCapacity &&
+              Refusal() == mrhi_diagnosticLimitTextureArrayLayers,
+          "its layers past the device's, named apart from its width");
+    texture.width = 16385;
+    CHECK(mrhiDeclareTexture(s_device, &texture, &resource) == mrhi_errorUnsupported &&
+              Refusal() == mrhi_diagnosticLimitTextureDimension2d,
+          "its width past the adapter's beside its layers past the device's");
     mrhiBufferDef buffer = Buffer(mrhiDefaultLimits().bufferBytes + 4);
     CHECK(mrhiDeclareBuffer(s_device, &buffer, &resource) == mrhi_errorCapacity &&
-              mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success &&
-              record.code == mrhi_diagnosticDeviceLimit,
-          "a buffer past the device's bytes, recorded");
+              Refusal() == mrhi_diagnosticLimitBufferBytes,
+          "a buffer past the device's bytes, named");
     buffer = Buffer(2 * mrhiDefaultLimits().bufferBytes + 4);
-    CHECK(mrhiDeclareBuffer(s_device, &buffer, &resource) == mrhi_errorUnsupported,
+    CHECK(mrhiDeclareBuffer(s_device, &buffer, &resource) == mrhi_errorUnsupported &&
+              Refusal() == mrhi_diagnosticLimitBufferBytes,
           "past the adapter's");
     CHECK(mrhiGetDeviceMisuse(s_device) == 0, "none is misuse");
     CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");

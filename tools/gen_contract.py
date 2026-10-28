@@ -674,6 +674,8 @@ def emit_capability_checks(contract):
         "",
         '#include "capabilities_core.h"',
         "",
+        "#include <stddef.h>",
+        "",
         "bool mrhiFeaturesWithin(const mrhiFeatures* asked, const mrhiFeatures* granted)",
         "{",
         "    return true",
@@ -696,6 +698,15 @@ def emit_capability_checks(contract):
             lines.append(f"        && limits->{name} != 0"
                          f" && (limits->{name} & (limits->{name} - 1)) == 0")
     lines[-1] += ";"
+    lines += ["}", "", "mrhiDiagnosticCode mrhiLimitDiagnostic(size_t field)", "{",
+              "    switch (field)", "    {"]
+    codes = {value["name"] for value in find_item(contract, "diagnostic_code")["values"]}
+    for member in limits["members"]:
+        code = "diagnostic_limit_" + member["name"]
+        if code in codes:
+            lines += [f"    case offsetof(mrhiLimits, {camel(member['name'])}):",
+                      f"        return {names.value(code)};"]
+    lines += ["    default:", "        return 0;", "    }"]
     lines += ["}", "", "void mrhiMaskFeatures(mrhiFeatures* features, mrhiDriverKind driver)", "{",
               "    switch (driver)", "    {"]
     for api, _ in APIS:

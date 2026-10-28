@@ -942,6 +942,22 @@ static mrhiDiagnosticCode Refusal(void)
     return code;
 }
 
+// Drains the diagnostics into codes, at most capacity of them: how many.
+static size_t Refusals(mrhiDiagnosticCode* codes, size_t capacity)
+{
+    size_t count = 0;
+    mrhiDiagnostic record;
+    while (mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success)
+    {
+        if (count < capacity)
+        {
+            codes[count] = record.code;
+        }
+        ++count;
+    }
+    return count;
+}
+
 // Bindings past the device's limits on an adapter above them: within the
 // adapter's limits capacity, which a device asking for more would take,
 // recorded; past them unsupported. Neither counts misuse.
@@ -960,34 +976,51 @@ static void TestPastDeviceLimits(void)
     Frame();
     mrhiBinding bindings[4];
     Table0(bindings);
+    // Each refusal names its limit: the device's for capacity, the
+    // adapter's for unsupported, and both where a call passes two.
+    const mrhiDiagnosticCode uniformAlignment = mrhi_diagnosticLimitUniformOffsetAlignment;
+    const mrhiDiagnosticCode uniformBytes = mrhi_diagnosticLimitUniformBindingBytes;
+    const mrhiDiagnosticCode storageAlignment = mrhi_diagnosticLimitStorageOffsetAlignment;
+    const mrhiDiagnosticCode storageBytes = mrhi_diagnosticLimitStorageBindingBytes;
     mrhiBinding uniform = bindings[0];
     uniform.offset = 128;
-    CHECK(With0(0, uniform) == mrhi_errorCapacity && Refusal() == mrhi_diagnosticDeviceLimit,
+    CHECK(With0(0, uniform) == mrhi_errorCapacity && Refusal() == uniformAlignment,
           "an offset on the adapter's uniform alignment only");
     uniform.offset = 32;
-    CHECK(With0(0, uniform) == mrhi_errorUnsupported, "off the adapter's");
+    CHECK(With0(0, uniform) == mrhi_errorUnsupported && Refusal() == uniformAlignment,
+          "off the adapter's");
     uniform.offset = 0;
     uniform.size = 65540;
-    CHECK(With0(0, uniform) == mrhi_errorCapacity, "a uniform size past the device's");
+    CHECK(With0(0, uniform) == mrhi_errorCapacity && Refusal() == uniformBytes,
+          "a uniform size past the device's");
     uniform.size = 98308;
-    CHECK(With0(0, uniform) == mrhi_errorUnsupported, "past the adapter's");
+    CHECK(With0(0, uniform) == mrhi_errorUnsupported && Refusal() == uniformBytes,
+          "past the adapter's");
     mrhiBinding read = bindings[2];
     read.offset = 64;
     read.size = 8;
-    CHECK(With0(2, read) == mrhi_errorCapacity, "on the adapter's storage alignment only");
+    CHECK(With0(2, read) == mrhi_errorCapacity && Refusal() == storageAlignment,
+          "on the adapter's storage alignment only");
     read.offset = 4;
-    CHECK(With0(2, read) == mrhi_errorUnsupported, "off the adapter's");
+    CHECK(With0(2, read) == mrhi_errorUnsupported && Refusal() == storageAlignment,
+          "off the adapter's");
     read.offset = 0;
     read.size = (1u << 27) + 4;
-    CHECK(With0(2, read) == mrhi_errorCapacity, "a storage size past the device's");
+    CHECK(With0(2, read) == mrhi_errorCapacity && Refusal() == storageBytes,
+          "a storage size past the device's");
     read.size = (3u << 26) + 4;
-    CHECK(With0(2, read) == mrhi_errorUnsupported, "past the adapter's");
+    CHECK(With0(2, read) == mrhi_errorUnsupported && Refusal() == storageBytes,
+          "past the adapter's");
     read.offset = 64;
-    CHECK(With0(2, read) == mrhi_errorUnsupported, "past the adapter's beside the device's");
+    mrhiDiagnosticCode codes[2] = {0};
+    CHECK(With0(2, read) == mrhi_errorUnsupported && Refusals(codes, 2) == 2 &&
+              codes[0] == storageAlignment && codes[1] == storageBytes,
+          "past the adapter's beside the device's: both named");
     CHECK(mrhiSetBindings(s_device, s_pass, 4, nullptr, 0) == mrhi_errorCapacity &&
-              Refusal() == mrhi_diagnosticDeviceLimit,
+              Refusal() == mrhi_diagnosticLimitBindingTables,
           "a table past the device's");
-    CHECK(mrhiSetBindings(s_device, s_pass, 8, nullptr, 0) == mrhi_errorUnsupported,
+    CHECK(mrhiSetBindings(s_device, s_pass, 8, nullptr, 0) == mrhi_errorUnsupported &&
+              Refusal() == mrhi_diagnosticLimitBindingTables,
           "past the adapter's");
     CHECK(mrhiGetDeviceMisuse(s_device) == 0, "none is misuse");
     Drop();

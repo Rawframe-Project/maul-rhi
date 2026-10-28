@@ -20,6 +20,10 @@ bool mrhiLimitsWithin(const mrhiLimits* asked, const mrhiLimits* granted);
 // of two, as WebGPU requires of an adapter's limits and a device's.
 bool mrhiAlignmentsValid(const mrhiLimits* limits);
 
+// The diagnostic code naming the limit at a field's offset in
+// mrhiLimits (offsetof); 0 for a limit no call is refused at.
+mrhiDiagnosticCode mrhiLimitDiagnostic(size_t field);
+
 // Clears the features a driver's API cannot grant: the rows the
 // contract classes absent-rejected.
 void mrhiMaskFeatures(mrhiFeatures* features, mrhiDriverKind driver);

@@ -1387,6 +1387,18 @@ static mrhiResult WithWorkgroup(mrhiDevice* device, uint32_t x, uint32_t y, uint
 // A container past the device's limits but within the adapter's is
 // capacity, which a device asking for more would take; past one of the
 // adapter's it is unsupported. Neither is misuse.
+// The newest diagnostic of a device's, the queue drained; 0 for none.
+static mrhiDiagnosticCode Refusal(mrhiDevice* device)
+{
+    mrhiDiagnosticCode code = 0;
+    mrhiDiagnostic record;
+    while (mrhiNextDeviceDiagnostic(device, &record) == mrhi_success)
+    {
+        code = record.code;
+    }
+    return code;
+}
+
 static void TestPastDeviceLimits(void)
 {
     mrhiLimits limits = mrhiDefaultLimits();
@@ -1394,24 +1406,35 @@ static void TestPastDeviceLimits(void)
     s_adapter.limits.uniformBindingBytes = 2 * limits.uniformBindingBytes;
     s_adapter.limits.workgroupSizeX = 2 * limits.workgroupSizeX;
     s_adapter.limits.workgroupInvocations = 2 * limits.workgroupInvocations;
-    mrhiDevice* device = Open(4, true);
+    mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.deviceLimits.diagnostics = 4;
+    mrhiDevice* device = OpenWith(def, true);
     Reset();
     Put32(s_sections[META].bytes, limits.rootBlockBytes + 4);
-    CHECK(Made(device) == mrhi_errorCapacity, "a root block past the device's");
+    CHECK(Made(device) == mrhi_errorCapacity &&
+              Refusal(device) == mrhi_diagnosticLimitRootBlockBytes,
+          "a root block past the device's, named");
     Put32(s_sections[META].bytes, 2 * limits.rootBlockBytes + 4);
-    CHECK(Made(device) == mrhi_errorUnsupported, "past the adapter's");
+    CHECK(Made(device) == mrhi_errorUnsupported &&
+              Refusal(device) == mrhi_diagnosticLimitRootBlockBytes,
+          "past the adapter's");
     Reset();
     Put64(Record(BINDINGS, 0, 24) + 16, limits.uniformBindingBytes + 1);
-    CHECK(Made(device) == mrhi_errorCapacity, "a uniform buffer past the device's");
+    CHECK(Made(device) == mrhi_errorCapacity &&
+              Refusal(device) == mrhi_diagnosticLimitUniformBindingBytes,
+          "a uniform buffer past the device's");
     Put64(Record(BINDINGS, 0, 24) + 16, 2 * (uint64_t)limits.uniformBindingBytes + 1);
     CHECK(Made(device) == mrhi_errorUnsupported, "past the adapter's");
-    CHECK(WithWorkgroup(device, limits.workgroupSizeX + 1, 1, 1, 0) == mrhi_errorCapacity,
+    CHECK(WithWorkgroup(device, limits.workgroupSizeX + 1, 1, 1, 0) == mrhi_errorCapacity &&
+              Refusal(device) == mrhi_diagnosticLimitWorkgroupSizeX,
           "a workgroup past the device's x");
-    CHECK(WithWorkgroup(device, 16, 4, 8, 0) == mrhi_errorCapacity,
-          "past its invocations, within the adapter's");
+    CHECK(WithWorkgroup(device, 16, 4, 8, 0) == mrhi_errorCapacity &&
+              Refusal(device) == mrhi_diagnosticLimitWorkgroupInvocations,
+          "past its invocations, within the adapter's, named apart from x");
     CHECK(WithWorkgroup(device, limits.workgroupSizeX + 1, limits.workgroupSizeY + 1, 1, 0) ==
-              mrhi_errorUnsupported,
-          "past the adapter's y beside the device's x");
+                  mrhi_errorUnsupported &&
+              Refusal(device) == mrhi_diagnosticLimitWorkgroupSizeY,
+          "past the adapter's y beside the device's x: y named");
     CHECK(mrhiGetDeviceMisuse(device) == 0, "none is misuse");
     Close(device);
     ResetAdapter();

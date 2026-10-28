@@ -100,7 +100,7 @@ typedef struct Stages
 
 // The vertex buffers: within the limits, strides multiples of 4, and
 // known step modes.
-static mrhiResult CheckBuffers(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def)
+static mrhiResult CheckBuffers(mrhiDevice* device, const mrhiGraphicsPipelineDef* def)
 {
     if (def->vertexBuffers == nullptr && def->vertexBufferCount > 0)
     {
@@ -123,7 +123,7 @@ static mrhiResult CheckBuffers(const mrhiDevice* device, const mrhiGraphicsPipel
 
 // One vertex attribute: in a buffer, of a known format, aligned, within
 // its buffer's stride, and at a location within the limit.
-static mrhiResult CheckAttribute(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
+static mrhiResult CheckAttribute(mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
                                  const mrhiVertexAttribute* attribute)
 {
     mrhiVertexLayout layout = mrhiGetVertexLayout(attribute->format);
@@ -159,8 +159,7 @@ static uint32_t TablesOf(const mrhiReflection* reflection)
 // The vertex state: buffers and attributes, one attribute per location,
 // every vertex input fed by an attribute of its scalar class, and the
 // tables and buffers together within their limit.
-static mrhiResult CheckVertex(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
-                              Stages stages)
+static mrhiResult CheckVertex(mrhiDevice* device, const mrhiGraphicsPipelineDef* def, Stages stages)
 {
     // Buffers past their limit are refused unread, and so is the buffer
     // an attribute names among them.
@@ -206,7 +205,7 @@ static mrhiResult CheckVertex(const mrhiDevice* device, const mrhiGraphicsPipeli
 // The primitive state: known values, a strip index format only for
 // strips, unclipped depth only with its feature, and views past one only
 // with multiview, within its limit.
-static mrhiResult CheckPrimitive(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def)
+static mrhiResult CheckPrimitive(mrhiDevice* device, const mrhiGraphicsPipelineDef* def)
 {
     bool strip =
         def->topology == mrhi_topologyLineStrip || def->topology == mrhi_topologyTriangleStrip;
@@ -360,7 +359,7 @@ static mrhiResult CheckTarget(const mrhiDevice* device, const mrhiColorTargetSta
 // The color targets, at most MRHI_MAX_COLOR_TARGETS: none without a
 // fragment entry, each checked, their bytes per sample within the
 // limit, and some attachment, color or depth.
-static mrhiResult CheckTargets(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
+static mrhiResult CheckTargets(mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
                                Stages stages)
 {
     MRHI_ASSERT(def->colorTargetCount <= MRHI_MAX_COLOR_TARGETS);
@@ -435,7 +434,7 @@ static mrhiResult CheckMultisample(const mrhiDevice* device, const mrhiGraphicsP
 // The inter-stage interface: each fragment input matched by a vertex
 // output of the same location, type and interpolation, and a point list
 // leaving room for its point size among the variables.
-static mrhiResult CheckInterface(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
+static mrhiResult CheckInterface(mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
                                  Stages stages)
 {
     const mrhiShaderVariable* outputs = &stages.reflection->variables[stages.vertex->firstVariable];

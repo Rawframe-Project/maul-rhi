@@ -35,7 +35,7 @@ A call given a value past one of the device's limits answers by what the adapter
 - **Creations:** a buffer's or texture's size, a heap's entries, a shader's root block, bindings, workgroup or interface, a graphics pipeline's vertex buffers, attributes, strides, inter-stage variables, color bytes or views, and a surface's size.
 - **Recording calls:** a table index, a vertex buffer slot, a binding's offset or size, a heap entry's offset, a pass's views, the root block, a viewport, and a dispatch.
 
-Neither counts as misuse. A frame call refused as capacity this way is recorded under `mrhi_diagnosticDeviceLimit`.
+Neither counts as misuse. Each such refusal is recorded in the device's [diagnostics](troubleshooting.md) under the code that names the limit, `mrhi_diagnosticLimit` and the limit's name (`mrhi_diagnosticLimitTextureDimension2d`, `mrhi_diagnosticLimitWorkgroupSizeX`): the device's limit for capacity, the adapter's for unsupported. A call that checks several limits records each it passes, so a program learns which to raise.
 
 A device's own budgets, `mrhiDeviceLimits`, size everything it allocates when it is made: the buffers, textures, views, samplers, shaders, pipelines, query sets and heaps it holds at once, a frame's resources, passes, accesses and barriers, and the bytes for recorded commands (`frameCommandBytes`), uploads (`frameUploadBytes`) and readbacks (`readbackBytes`). A call past one answers `mrhi_errorCapacity`. The limit `framesInFlight` bounds the frames submitted and not yet finished; past it, beginning a frame is refused for capacity rather than blocking.
 

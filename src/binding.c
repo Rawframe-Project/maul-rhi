@@ -127,7 +127,7 @@ static bool IsSampledAs(const mrhiDevice* device, mrhiFormat format, mrhiTexture
 // Checks a buffer binding and records its range: success,
 // mrhi_errorInvalid, or the refusal of an offset or size past the
 // device's limits.
-static mrhiResult CheckBuffer(const mrhiDevice* device, const mrhiShaderBinding* slot,
+static mrhiResult CheckBuffer(mrhiDevice* device, const mrhiShaderBinding* slot,
                               const mrhiBinding* binding, uint64_t total,
                               mrhiCommandBinding* recordedOut)
 {
@@ -225,7 +225,7 @@ static mrhiResult CheckSampler(const mrhiDevice* device, const mrhiShaderBinding
 
 // Checks one binding against its slot and the pass, recording it:
 // success, or the refusal.
-static mrhiResult CheckBinding(const mrhiDevice* device, const mrhiFramePass* pass,
+static mrhiResult CheckBinding(mrhiDevice* device, const mrhiFramePass* pass,
                                const mrhiShaderBinding* slot, const mrhiBinding* binding,
                                mrhiCommandBinding* recordedOut)
 {
@@ -297,8 +297,7 @@ mrhiResult mrhiSetBindings(mrhiDevice* device, mrhiPassId id, uint32_t table,
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticBindingsTable);
     }
-    status =
-        mrhiRecordPastLimit(device, MRHI_DEVICE_LIMIT(device, bindingTables, (uint64_t)table + 1));
+    status = MRHI_DEVICE_LIMIT(device, bindingTables, (uint64_t)table + 1);
     if (status != mrhi_success)
     {
         return status;
@@ -329,7 +328,7 @@ mrhiResult mrhiSetBindings(mrhiDevice* device, mrhiPassId id, uint32_t table,
         {
             return status == mrhi_errorInvalid
                        ? mrhiDeviceMisuse(device, mrhi_diagnosticBindingResource)
-                       : mrhiRecordPastLimit(device, status);
+                       : status;
         }
     }
     mrhiCommand* records = mrhiTakeCommands(device, pass, 1 + count);

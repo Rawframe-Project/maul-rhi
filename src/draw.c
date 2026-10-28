@@ -59,8 +59,7 @@ mrhiResult mrhiSetVertexBuffer(mrhiDevice* device, mrhiPassId id, uint32_t slot,
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticRenderStateOutsideRenderPass);
     }
-    status =
-        mrhiRecordPastLimit(device, MRHI_DEVICE_LIMIT(device, vertexBuffers, (uint64_t)slot + 1));
+    status = MRHI_DEVICE_LIMIT(device, vertexBuffers, (uint64_t)slot + 1);
     if (status != mrhi_success)
     {
         return status;
@@ -339,8 +338,7 @@ mrhiResult mrhiDispatch(mrhiDevice* device, mrhiPassId id, uint32_t x, uint32_t 
         return mrhiDeviceMisuse(device, mrhi_diagnosticComputeOutsideComputePass);
     }
     uint32_t largest = x > y ? (x > z ? x : z) : (y > z ? y : z);
-    status =
-        mrhiRecordPastLimit(device, MRHI_DEVICE_LIMIT(device, workgroupsPerDimension, largest));
+    status = MRHI_DEVICE_LIMIT(device, workgroupsPerDimension, largest);
     if (status != mrhi_success)
     {
         return status;

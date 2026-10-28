@@ -308,9 +308,10 @@ static void TestVertexBuffers(void)
           "the last instance needs its attribute's 8 bytes");
     CHECK(mrhiGetDeviceMisuse(s_device) == 8, "each counted");
     CHECK(mrhiSetVertexBuffer(s_device, s_render, 8, s_v, 0, 12) == mrhi_errorCapacity &&
-              Refusal() == mrhi_diagnosticDeviceLimit,
-          "past the device's vertex buffers, within the adapter's");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 16, s_v, 0, 12) == mrhi_errorUnsupported,
+              Refusal() == mrhi_diagnosticLimitVertexBuffers,
+          "past the device's vertex buffers, within the adapter's, named");
+    CHECK(mrhiSetVertexBuffer(s_device, s_render, 16, s_v, 0, 12) == mrhi_errorUnsupported &&
+              Refusal() == mrhi_diagnosticLimitVertexBuffers,
           "past the adapter's");
     CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 2, 12) == mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticTransferAlignment,
@@ -536,12 +537,13 @@ static void TestDispatch(void)
     CHECK(mrhiDispatch(s_device, s_compute, most + 1, 1, 1) == mrhi_errorCapacity &&
               mrhiDispatch(s_device, s_compute, 1, most + 1, 1) == mrhi_errorCapacity &&
               mrhiDispatch(s_device, s_compute, 1, 1, most + 1) == mrhi_errorCapacity &&
-              Refusal() == mrhi_diagnosticDeviceLimit,
+              Refusal() == mrhi_diagnosticLimitWorkgroupsPerDimension,
           "past the device's limit, within the adapter's");
     CHECK(mrhiDispatch(s_device, s_compute, 2 * most + 1, 1, 1) == mrhi_errorUnsupported &&
               mrhiDispatch(s_device, s_compute, 1, 2 * most + 1, most + 1) ==
                   mrhi_errorUnsupported &&
-              mrhiDispatch(s_device, s_compute, 1, 1, UINT32_MAX) == mrhi_errorUnsupported,
+              mrhiDispatch(s_device, s_compute, 1, 1, UINT32_MAX) == mrhi_errorUnsupported &&
+              Refusal() == mrhi_diagnosticLimitWorkgroupsPerDimension,
           "past the adapter's");
     CHECK(mrhiDispatch(s_device, s_render, 1, 1, 1) == mrhi_errorInvalid &&
               mrhiDispatch(s_device, s_copy, 1, 1, 1) == mrhi_errorInvalid,

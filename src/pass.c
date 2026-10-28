@@ -548,7 +548,7 @@ static mrhiResult CheckDef(mrhiDevice* device, const mrhiPassDef* def)
     {
         return mrhi_errorUnsupported;
     }
-    status = mrhiRecordPastLimit(device, MRHI_DEVICE_LIMIT(device, multiviewViews, ViewsOf(def)));
+    status = MRHI_DEVICE_LIMIT(device, multiviewViews, ViewsOf(def));
     if (status != mrhi_success)
     {
         return status;
