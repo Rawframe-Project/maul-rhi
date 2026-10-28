@@ -27,11 +27,18 @@ static uint8_t* TakeStaging(mrhiDevice* device, mrhiFramePass* pass, uint64_t by
     uint64_t room = device->deviceLimits.frameUploadBytes;
     uint64_t at = atomic_load_explicit(&device->stagingTaken, memory_order_relaxed);
     bool fits = pass->overflow == 0 && bytes <= room && at <= room - bytes;
-    uint64_t rounded = fits ? (bytes + PLACEMENT - 1) / PLACEMENT * PLACEMENT : 0;
-    while (fits &&
-           !atomic_compare_exchange_weak_explicit(&device->stagingTaken, &at, at + rounded,
-                                                  memory_order_relaxed, memory_order_relaxed))
+    uint64_t rounded = 0;
+    while (fits)
     {
+        // Up to the next boundary, or to the region's end where that comes
+        // first, so the staging taken never passes the region.
+        rounded = (bytes + PLACEMENT - 1) / PLACEMENT * PLACEMENT;
+        rounded = rounded < room - at ? rounded : room - at;
+        if (atomic_compare_exchange_weak_explicit(&device->stagingTaken, &at, at + rounded,
+                                                  memory_order_relaxed, memory_order_relaxed))
+        {
+            break;
+        }
         fits = at <= room - bytes;
     }
     if (!fits)
