@@ -63,6 +63,9 @@ extern "C"
         uint64_t stagingBytes;
         // The sum of the bytes its uploads copy from staging.
         uint64_t uploadSum;
+        // The sum of every byte of its staging, the room between and after its
+        // uploads' rows among them.
+        uint64_t stagingSum;
         // The bytes its transients take together.
         uint64_t memoryBytes;
         // The device's objects made with a label, over its life: none in a

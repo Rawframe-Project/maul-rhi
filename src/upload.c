@@ -41,7 +41,11 @@ static uint8_t* TakeStaging(mrhiDevice* device, mrhiFramePass* pass, uint64_t by
         return nullptr;
     }
     *offsetOut = at;
-    return device->frameStaging + (size_t)device->stagingRegion * room + at;
+    uint8_t* staging = device->frameStaging + (size_t)device->stagingRegion * room + at;
+    // Drivers copy the staging whole, so the room up to the next boundary
+    // holds zeros, never what the memory held before.
+    memset(staging + bytes, 0, rounded - bytes);
+    return staging;
 }
 
 mrhiResult mrhiWriteBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId resource,
@@ -103,7 +107,8 @@ mrhiResult mrhiWriteBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId res
     return mrhi_success;
 }
 
-// Copies texels from the program's layout into staging rows of a pitch.
+// Copies texels from the program's layout into staging rows of a pitch,
+// zeros after each row.
 static void Repack(uint8_t* staging, uint64_t pitch, const uint8_t* bytes,
                    const mrhiTexelLayout* layout, uint64_t rows, uint64_t rowBytes, uint32_t layers)
 {
@@ -113,7 +118,9 @@ static void Repack(uint8_t* staging, uint64_t pitch, const uint8_t* bytes,
         {
             const uint8_t* from =
                 bytes + layout->offset + (z * layout->rowsPerImage + y) * layout->bytesPerRow;
-            memcpy(staging + (z * rows + y) * pitch, from, rowBytes);
+            uint8_t* to = staging + (z * rows + y) * pitch;
+            memcpy(to, from, rowBytes);
+            memset(to + rowBytes, 0, pitch - rowBytes);
         }
     }
 }
