@@ -157,9 +157,11 @@ for target in "$out"/check-fuzz/fuzz_*; do
     corpus=$out/corpus/$name
     mkdir -p "$corpus"
     # A target that cannot run here (a Vulkan target without an adapter)
-    # exits 77 before any input.
+    # exits 77 before any input. 77 is also libFuzzer's exit for a crash,
+    # so the probe exits 1 on one, and a target that fails at once is
+    # fuzzed and fails below.
     status=0
-    "$target" -runs=0 "$(mktemp -d)" >/dev/null 2>&1 || status=$?
+    "$target" -runs=0 -error_exitcode=1 "$(mktemp -d)" >/dev/null 2>&1 || status=$?
     if [ "$status" = 77 ]; then
         echo "$name: skipped, it cannot run here"
         continue
