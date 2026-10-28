@@ -22375,6 +22375,11 @@
               "doc": "The sum of every byte of its staging, the room between and after its uploads' rows among them."
             },
             {
+              "name": "record_sum",
+              "type": "uint64",
+              "doc": "The sum of every byte of its command records, payloads among them."
+            },
+            {
               "name": "memory_bytes",
               "type": "uint64",
               "doc": "The bytes its transients take together."
@@ -22526,5 +22531,5 @@
       ]
     }
   ],
-  "contract_version": 21
+  "contract_version": 22
 }

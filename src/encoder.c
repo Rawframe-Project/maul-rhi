@@ -12,6 +12,7 @@
 
 #include <math.h>
 #include <stdatomic.h>
+#include <stddef.h>
 #include <string.h>
 
 mrhiPassWork mrhiWorkOf(const mrhiFramePass* pass)
@@ -151,7 +152,46 @@ mrhiCommand* mrhiTakeCommands(mrhiDevice* device, mrhiFramePass* pass, uint32_t 
     mrhiCommand* records = &chunk->commands[chunk->count];
     chunk->count += count;
     MRHI_ASSERT(chunk->count <= MRHI_CHUNK_COMMANDS);
+    // Drivers read every record, so what a payload leaves of its records
+    // holds zeros, never what the memory held before.
+    memset(records, 0, count * sizeof(mrhiCommand));
     return records;
+}
+
+// Copies one field of a payload struct to its offset in a record.
+#define PUT(record, type, from, field)                                                             \
+    memcpy((uint8_t*)(record) + offsetof(type, field), &(from)->field, sizeof((from)->field))
+
+void mrhiPutBufferSide(mrhiCommand* record, const mrhiCommandBufferSide* side)
+{
+    PUT(record, mrhiCommandBufferSide, side, object);
+    PUT(record, mrhiCommandBufferSide, side, bytesPerRow);
+    PUT(record, mrhiCommandBufferSide, side, offset);
+    PUT(record, mrhiCommandBufferSide, side, rowsPerImage);
+}
+
+void mrhiPutTextureSide(mrhiCommand* record, const mrhiCommandTextureSide* side)
+{
+    PUT(record, mrhiCommandTextureSide, side, object);
+    PUT(record, mrhiCommandTextureSide, side, mip);
+    PUT(record, mrhiCommandTextureSide, side, x);
+    PUT(record, mrhiCommandTextureSide, side, y);
+    PUT(record, mrhiCommandTextureSide, side, z);
+    PUT(record, mrhiCommandTextureSide, side, aspect);
+}
+
+void mrhiPutBinding(mrhiCommand* record, const mrhiCommandBinding* binding)
+{
+    PUT(record, mrhiCommandBinding, binding, slot);
+    PUT(record, mrhiCommandBinding, binding, object);
+    PUT(record, mrhiCommandBinding, binding, offset);
+    PUT(record, mrhiCommandBinding, binding, size);
+    PUT(record, mrhiCommandBinding, binding, viewFormat);
+    PUT(record, mrhiCommandBinding, binding, viewKind);
+    PUT(record, mrhiCommandBinding, binding, aspect);
+    PUT(record, mrhiCommandBinding, binding, baseMip);
+    PUT(record, mrhiCommandBinding, binding, mipCount);
+    PUT(record, mrhiCommandBinding, binding, kind);
 }
 
 // Records a command with bytes of payload after it: success, or

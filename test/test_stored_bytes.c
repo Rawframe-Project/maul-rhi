@@ -3,10 +3,10 @@
 //
 // Bytes the library writes for a program or a driver: a pipeline cache,
 // an adapter's name, a shader's digest, a lost device's message, and the
-// staging a frame's uploads hand the driver. Made over memory that held
-// one byte pattern, then over memory that held a second, each gives the
-// same bytes, and a cache leaves the caller's bytes past its end as they
-// were, so nothing the memory held before reaches them.
+// staging and command records a frame hands the driver. Made over memory
+// that held one byte pattern, then over memory that held a second, each
+// gives the same bytes, and a cache leaves the caller's bytes past its
+// end as they were, so nothing the memory held before reaches them.
 
 #include "test_harness.h"
 
@@ -19,6 +19,7 @@
 #include "maul-rhi/shader.h"
 #include "maul-rhi/test.h"
 #include "shaders/noop_container.h"
+#include "shaders/storage_container.h"
 
 #include <stdalign.h>
 #include <stddef.h>
@@ -64,7 +65,7 @@ typedef struct Written
     mrhiTestFrameLog log;
 } Written;
 
-static Written s_written[2];
+static Written s_written[3];
 
 static const mrhiAllocator kAllocator = {.alloc = Alloc, .free = Free};
 
@@ -127,70 +128,204 @@ static mrhiShaderId Pipeline(mrhiDevice* device)
     return shader;
 }
 
-// A frame that uploads to a buffer, and to a texture whose rows the
-// staging pitches apart.
-static void Upload(mrhiDevice* device)
+// Fills the stack below the caller with the pattern, so that padding of
+// a struct the library builds there holds it. Called through a volatile
+// pointer so that no compiler inlines it away.
+static void FillStack(void)
+{
+    volatile unsigned char stack[16384];
+    for (size_t i = 0; i < sizeof stack; ++i)
+    {
+        stack[i] = (unsigned char)s_pattern;
+    }
+}
+
+static void (*volatile s_fillStack)(void) = FillStack;
+
+// A recording call's result, made over a stack of the pattern.
+#define OVER_PATTERN(call) (s_fillStack(), (call) == mrhi_success)
+
+// A compute pipeline of the storage container, ready.
+static mrhiComputePipelineId Storage(mrhiDevice* device)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_storageContainer;
+    shaderDef.byteCount = sizeof(s_storageContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "the storage shader");
+    mrhiComputePipelineDef def = mrhiDefaultComputePipelineDef();
+    def.shader = shader;
+    def.entry = "cs";
+    def.entryLength = 2;
+    mrhiComputePipelineId pipeline;
+    mrhiRequestId request;
+    mrhiDeviceNotification record;
+    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_success &&
+              mrhiNextDeviceNotification(device, &record) == mrhi_success,
+          "the storage pipeline ready");
+    return pipeline;
+}
+
+// The frame's resources: buffers A and B, textures T and U.
+enum
+{
+    A,
+    B,
+    T,
+    U,
+    RESOURCES,
+};
+
+typedef struct Objects
+{
+    mrhiBufferId buffers[2];
+    mrhiTextureId textures[2];
+} Objects;
+
+static void Make(mrhiDevice* device, Objects* objects)
 {
     mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
-    bufferDef.size = 256;
-    bufferDef.usage = mrhi_bufferCopyDestination;
-    mrhiBufferId buffer;
+    bufferDef.size = 512;
+    bufferDef.usage = mrhi_bufferCopySource | mrhi_bufferCopyDestination | mrhi_bufferStorage;
     mrhiTextureDef textureDef = mrhiDefaultTextureDef();
     textureDef.format = mrhi_formatRgba8Unorm;
     textureDef.width = 3;
     textureDef.height = 3;
-    textureDef.usage = mrhi_textureCopyDestination;
-    mrhiTextureId texture;
-    CHECK(mrhiCreateBuffer(device, &bufferDef, &buffer) == mrhi_success &&
-              mrhiCreateTexture(device, &textureDef, &texture) == mrhi_success,
+    textureDef.usage = mrhi_textureCopySource | mrhi_textureCopyDestination;
+    mrhiTextureDef storageDef = textureDef;
+    storageDef.usage = mrhi_textureCopyDestination | mrhi_textureStorage;
+    CHECK(mrhiCreateBuffer(device, &bufferDef, &objects->buffers[0]) == mrhi_success &&
+              mrhiCreateBuffer(device, &bufferDef, &objects->buffers[1]) == mrhi_success &&
+              mrhiCreateTexture(device, &textureDef, &objects->textures[0]) == mrhi_success &&
+              mrhiCreateTexture(device, &storageDef, &objects->textures[1]) == mrhi_success,
           "the resources");
-    mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    mrhiResourceId resources[2];
-    CHECK(mrhiBeginFrame(device, &frameDef) == mrhi_success &&
-              mrhiImportBuffer(device, buffer, &resources[0]) == mrhi_success &&
-              mrhiImportTexture(device, texture, &resources[1]) == mrhi_success,
-          "the frame");
-    mrhiAccess accesses[2];
-    for (uint32_t i = 0; i < 2; ++i)
-    {
-        accesses[i] = (mrhiAccess){
-            .resource = resources[i],
-            .kind = mrhi_accessCopyDestination,
-            .range = {.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING},
-        };
-    }
+}
+
+static mrhiPassId Pass(mrhiDevice* device, mrhiPassClass passClass, const mrhiAccess* accesses,
+                       uint32_t count)
+{
     mrhiPassDef def = mrhiDefaultPassDef();
-    def.passClass = mrhi_passTransfer;
+    def.passClass = passClass;
     def.neverCull = true;
     def.accesses = accesses;
-    def.accessCount = 2;
+    def.accessCount = count;
     mrhiPassId pass;
-    CHECK(mrhiAddPass(device, &def, &pass) == mrhi_success, "the pass");
+    CHECK(mrhiAddPass(device, &def, &pass) == mrhi_success, "a pass");
+    return pass;
+}
+
+static mrhiAccess Access(mrhiResourceId resource, mrhiAccessKind kind)
+{
+    return (mrhiAccess){
+        .resource = resource,
+        .kind = kind,
+        .range = {.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING},
+    };
+}
+
+// Uploads to A at an offset, and to T, whose rows the staging pitches
+// apart.
+static bool Uploads(mrhiDevice* device, mrhiPassId pass, const mrhiResourceId* r, uint64_t offset)
+{
     static const uint8_t bytes[36] = {1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
                                       13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
                                       25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36};
-    mrhiTextureCopy to = {.resource = resources[1]};
+    mrhiTextureCopy to = {.resource = r[T]};
     mrhiTexelLayout layout = {.bytesPerRow = 12};
     mrhiExtent3d size = {3, 3, 1};
+    return OVER_PATTERN(mrhiBeginPass(device, pass)) &&
+           OVER_PATTERN(mrhiWriteBuffer(device, pass, r[A], offset, bytes, 12)) &&
+           OVER_PATTERN(
+               mrhiWriteTexture(device, pass, &to, bytes, sizeof(bytes), &layout, &size)) &&
+           OVER_PATTERN(mrhiEndPass(device, pass));
+}
+
+// Every copy between A, B, T and U, and a readback of A and of T.
+static bool Copies(mrhiDevice* device, mrhiPassId pass, const mrhiResourceId* r)
+{
+    mrhiBufferCopy fromA = {.resource = r[A]};
+    mrhiBufferCopy toB = {.resource = r[B], .offset = 256};
+    mrhiTextureCopy fromT = {.resource = r[T]};
+    mrhiTextureCopy toU = {.resource = r[U], .x = 1};
+    mrhiExtent3d texel = {1, 1, 1};
+    mrhiExtent3d all = {3, 3, 1};
+    mrhiRequestId read;
+    return OVER_PATTERN(mrhiBeginPass(device, pass)) &&
+           OVER_PATTERN(mrhiCopyBuffer(device, pass, r[A], 0, r[B], 0, 16)) &&
+           OVER_PATTERN(mrhiCopyBufferToTexture(device, pass, &fromA, &toU, &texel)) &&
+           OVER_PATTERN(mrhiCopyTextureToBuffer(device, pass, &fromT, &toB, &texel)) &&
+           OVER_PATTERN(mrhiCopyTexture(device, pass, &fromT, &toU, &texel)) &&
+           OVER_PATTERN(mrhiReadBuffer(device, pass, r[A], 0, 16, &read)) &&
+           OVER_PATTERN(mrhiReadTexture(device, pass, &fromT, &all, &read)) &&
+           OVER_PATTERN(mrhiEndPass(device, pass));
+}
+
+// A dispatch with A, B and U bound to the storage table.
+static bool Dispatch(mrhiDevice* device, mrhiPassId pass, const mrhiResourceId* r,
+                     mrhiComputePipelineId pipeline)
+{
+    const mrhiBinding bindings[3] = {
+        {.slot = 0, .resource = r[A], .size = MRHI_WHOLE_SIZE},
+        {.slot = 1, .resource = r[B], .offset = 256, .size = 64},
+        {.slot = 2,
+         .resource = r[U],
+         .viewKind = mrhi_texture2d,
+         .range = {.mipCount = 1, .layerCount = 1}},
+    };
+    return OVER_PATTERN(mrhiBeginPass(device, pass)) &&
+           OVER_PATTERN(mrhiSetComputePipeline(device, pass, pipeline)) &&
+           OVER_PATTERN(mrhiSetBindings(device, pass, 0, bindings, 3)) &&
+           OVER_PATTERN(mrhiDispatch(device, pass, 1, 1, 1)) &&
+           OVER_PATTERN(mrhiEndPass(device, pass));
+}
+
+// A frame of uploads with A's at an offset, every copy and readback,
+// and a dispatch with a table bound: every payload a record holds.
+static void Frame(mrhiDevice* device, uint64_t offset, mrhiComputePipelineId pipeline)
+{
+    Objects objects;
+    Make(device, &objects);
+    mrhiFrameDef frameDef = mrhiDefaultFrameDef();
+    mrhiResourceId r[RESOURCES];
+    CHECK(mrhiBeginFrame(device, &frameDef) == mrhi_success &&
+              mrhiImportBuffer(device, objects.buffers[0], &r[A]) == mrhi_success &&
+              mrhiImportBuffer(device, objects.buffers[1], &r[B]) == mrhi_success &&
+              mrhiImportTexture(device, objects.textures[0], &r[T]) == mrhi_success &&
+              mrhiImportTexture(device, objects.textures[1], &r[U]) == mrhi_success,
+          "the frame");
+    const mrhiAccess uploads[2] = {Access(r[A], mrhi_accessCopyDestination),
+                                   Access(r[T], mrhi_accessCopyDestination)};
+    const mrhiAccess copies[4] = {
+        Access(r[A], mrhi_accessCopySource), Access(r[T], mrhi_accessCopySource),
+        Access(r[B], mrhi_accessCopyDestination), Access(r[U], mrhi_accessCopyDestination)};
+    const mrhiAccess storage[3] = {Access(r[A], mrhi_accessStorageRead),
+                                   Access(r[B], mrhi_accessStorageReadWrite),
+                                   Access(r[U], mrhi_accessStorageWrite)};
+    mrhiPassId first = Pass(device, mrhi_passTransfer, uploads, 2);
+    mrhiPassId second = Pass(device, mrhi_passTransfer, copies, 4);
+    mrhiPassId third = Pass(device, mrhi_passGraphics, storage, 3);
     mrhiRequestId token;
-    CHECK(mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, pass) == mrhi_success &&
-              mrhiWriteBuffer(device, pass, resources[0], 4, bytes, 12) == mrhi_success &&
-              mrhiWriteTexture(device, pass, &to, bytes, sizeof(bytes), &layout, &size) ==
-                  mrhi_success &&
-              mrhiEndPass(device, pass) == mrhi_success &&
-              mrhiSubmitFrame(device, &token) == mrhi_success,
-          "the uploads submitted");
+    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(Uploads(device, first, r, offset), "the uploads");
+    CHECK(Copies(device, second, r), "the copies");
+    CHECK(Dispatch(device, third, r, pipeline), "the dispatch");
+    CHECK(mrhiSubmitFrame(device, &token) == mrhi_success, "submitted");
     mrhiDeviceNotification record;
-    CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success &&
-              record.kind == mrhi_deviceFrameDone,
-          "done");
-    CHECK(mrhiDestroyTexture(device, texture) == mrhi_success &&
-              mrhiDestroyBuffer(device, buffer) == mrhi_success,
+    bool done = false;
+    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    {
+        done = done || record.kind == mrhi_deviceFrameDone;
+    }
+    CHECK(done, "done");
+    CHECK(mrhiDestroyTexture(device, objects.textures[1]) == mrhi_success &&
+              mrhiDestroyTexture(device, objects.textures[0]) == mrhi_success &&
+              mrhiDestroyBuffer(device, objects.buffers[1]) == mrhi_success &&
+              mrhiDestroyBuffer(device, objects.buffers[0]) == mrhi_success,
           "the resources ended");
 }
 
 // Everything made over memory and buffers of the pattern.
-static void Write(int pattern, Written* written)
+static void Write(int pattern, uint64_t offset, Written* written)
 {
     s_pattern = pattern;
     bool lose = false;
@@ -217,7 +352,7 @@ static void Write(int pattern, Written* written)
     CHECK(mrhiGetPipelineCache(device, written->cache, CACHE_ROOM, &written->cacheSize) ==
               mrhi_success,
           "the cache");
-    Upload(device);
+    Frame(device, offset, Storage(device));
     lose = true;
     mrhiDeviceNotification record;
     while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
@@ -242,8 +377,8 @@ static bool IsPattern(const unsigned char* bytes, size_t count, int pattern)
 
 static void TestSameBytes(void)
 {
-    Write(0xAA, &s_written[0]);
-    Write(0x55, &s_written[1]);
+    Write(0xAA, 4, &s_written[0]);
+    Write(0x55, 4, &s_written[1]);
     const Written* a = &s_written[0];
     const Written* b = &s_written[1];
     CHECK(a->cacheSize == b->cacheSize && memcmp(a->cache, b->cache, a->cacheSize) == 0,
@@ -267,6 +402,12 @@ static void TestSameBytes(void)
     CHECK(a->log.stagingBytes == b->log.stagingBytes && a->log.stagingBytes > 0 &&
               a->log.uploadSum == b->log.uploadSum && a->log.stagingSum == b->log.stagingSum,
           "the same staging bytes handed the driver");
+    CHECK(a->log.recordSum == b->log.recordSum, "the same command records handed the driver");
+    // The sum reads the records' bytes: another offset changes it alone.
+    Write(0xAA, 8, &s_written[2]);
+    CHECK(s_written[2].log.records == a->log.records &&
+              s_written[2].log.recordSum == a->log.recordSum + 4,
+          "an offset 4 bytes on adds 4 to the records' bytes");
     // The buffer's 1 to 12 and the texture's 1 to 36, and zeros around them.
     CHECK(a->log.stagingSum == 78 + 666, "nothing but the uploads and zeros");
 }

@@ -203,8 +203,8 @@ mrhiResult mrhiReadBuffer(mrhiDevice* device, mrhiPassId id, mrhiResourceId reso
         {.object = object, .offset = offset},
         {.offset = RingOffset(device, readback)},
     };
-    memcpy(&records[1], &sides[0], sizeof(sides[0]));
-    memcpy(&records[2], &sides[1], sizeof(sides[1]));
+    mrhiPutBufferSide(&records[1], &sides[0]);
+    mrhiPutBufferSide(&records[2], &sides[1]);
     *requestOut = (mrhiRequestId){readback->request, 1};
     return mrhi_success;
 }
@@ -282,8 +282,8 @@ mrhiResult mrhiReadTexture(mrhiDevice* device, mrhiPassId id, const mrhiTextureC
         .offset = RingOffset(device, readback),
         .rowsPerImage = (uint32_t)rows,
     };
-    memcpy(&records[1], &from, sizeof(from));
-    memcpy(&records[2], &to, sizeof(to));
+    mrhiPutTextureSide(&records[1], &from);
+    mrhiPutBufferSide(&records[2], &to);
     *requestOut = (mrhiRequestId){readback->request, 1};
     return mrhi_success;
 }
