@@ -291,8 +291,7 @@ extern "C"
         mrhi_diagnosticGraphicsPipelineMismatch = 17,
         // A compute pipeline that uses a heap, set in a pass without one.
         mrhi_diagnosticComputePipelineHeap = 18,
-        // Bindings set in a transfer pass, or for a table past the
-        // bindingTables limit.
+        // Bindings set in a transfer pass.
         mrhi_diagnosticBindingsTable = 19,
         // A binding count that is not the number of slots the pipeline's
         // reflection gives the table.
@@ -306,21 +305,16 @@ extern "C"
         // A root block set in a transfer pass, empty, or at an offset or size
         // not a multiple of 4.
         mrhi_diagnosticRootBlock = 23,
-        // A vertex buffer set at a slot past the vertexBuffers limit.
-        mrhi_diagnosticVertexBufferSlot = 24,
         // A draw reading vertices or instances past the end of a vertex buffer
         // it uses.
         mrhi_diagnosticVertexBufferTooSmall = 26,
         // An index buffer set with an unknown format.
         mrhi_diagnosticIndexBufferFormat = 27,
-        // A dispatch of more workgroups in a dimension than the
-        // workgroupsPerDimension limit.
-        mrhi_diagnosticDispatchSize = 29,
         // A counted indirect draw whose maxCount is zero or past
         // MRHI_MAX_INDIRECT_DRAWS.
         mrhi_diagnosticIndirectCountLimit = 31,
-        // A viewport wider or taller than the textureDimension2d limit, outside
-        // twice that range, or with depths outside [0, 1] or in reverse order.
+        // A viewport with an edge or size that is not finite, a negative size,
+        // or depths outside [0, 1] or in reverse order.
         mrhi_diagnosticViewport = 32,
         // A scissor rectangle reaching past the pass's targets.
         mrhi_diagnosticScissor = 33,
@@ -369,8 +363,8 @@ extern "C"
         // A heap entry's view without the usage its kind needs, a storage view
         // of more than one mip, or a sampled view marked writable.
         mrhi_diagnosticHeapView = 56,
-        // A heap entry's buffer without storage usage, or a range misaligned,
-        // empty, not a multiple of 4 or past the buffer.
+        // A heap entry's buffer without storage usage, or a range empty, not a
+        // multiple of 4 or past the buffer.
         mrhi_diagnosticHeapBuffer = 57,
         // A query set def of an unknown type, or of zero or too many queries.
         mrhi_diagnosticQuerySetDef = 58,
@@ -578,6 +572,114 @@ extern "C"
         // submit codes for the budget that ran out, or named one with another
         // result.
         mrhi_diagnosticDriverSubmitBudget = 124,
+        // A value past the device's textureDimension2d limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitTextureDimension2d = 125,
+        // A value past the device's textureDimension3d limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitTextureDimension3d = 126,
+        // A value past the device's textureArrayLayers limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitTextureArrayLayers = 127,
+        // A value past the device's bindingTables limit: mrhi_errorCapacity
+        // within the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitBindingTables = 128,
+        // A value past the device's bindingsPerTable limit: mrhi_errorCapacity
+        // within the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitBindingsPerTable = 129,
+        // A value past the device's sampledTexturesPerStage limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitSampledTexturesPerStage = 130,
+        // A value past the device's samplersPerStage limit: mrhi_errorCapacity
+        // within the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitSamplersPerStage = 131,
+        // A value past the device's storageBuffersPerStage limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitStorageBuffersPerStage = 132,
+        // A value past the device's storageTexturesPerStage limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitStorageTexturesPerStage = 133,
+        // A value past the device's uniformBuffersPerStage limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitUniformBuffersPerStage = 134,
+        // A value past the device's uniformBindingBytes limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitUniformBindingBytes = 135,
+        // A value past the device's storageBindingBytes limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitStorageBindingBytes = 136,
+        // An offset off the device's uniformOffsetAlignment: mrhi_errorCapacity
+        // on the adapter's, mrhi_errorUnsupported off it too.
+        mrhi_diagnosticLimitUniformOffsetAlignment = 137,
+        // An offset off the device's storageOffsetAlignment: mrhi_errorCapacity
+        // on the adapter's, mrhi_errorUnsupported off it too.
+        mrhi_diagnosticLimitStorageOffsetAlignment = 138,
+        // A value past the device's vertexBuffers limit: mrhi_errorCapacity
+        // within the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitVertexBuffers = 139,
+        // A value past the device's tablesPlusVertexBuffers limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitTablesPlusVertexBuffers = 140,
+        // A value past the device's bufferBytes limit: mrhi_errorCapacity
+        // within the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitBufferBytes = 141,
+        // A value past the device's vertexAttributes limit: mrhi_errorCapacity
+        // within the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitVertexAttributes = 142,
+        // A value past the device's vertexStride limit: mrhi_errorCapacity
+        // within the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitVertexStride = 143,
+        // A value past the device's interStageVariables limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitInterStageVariables = 144,
+        // A value past the device's colorBytesPerSample limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitColorBytesPerSample = 145,
+        // A value past the device's workgroupStorageBytes limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitWorkgroupStorageBytes = 146,
+        // A value past the device's workgroupInvocations limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitWorkgroupInvocations = 147,
+        // A value past the device's workgroupSizeX limit: mrhi_errorCapacity
+        // within the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitWorkgroupSizeX = 148,
+        // A value past the device's workgroupSizeY limit: mrhi_errorCapacity
+        // within the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitWorkgroupSizeY = 149,
+        // A value past the device's workgroupSizeZ limit: mrhi_errorCapacity
+        // within the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitWorkgroupSizeZ = 150,
+        // A value past the device's workgroupsPerDimension limit:
+        // mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past
+        // it.
+        mrhi_diagnosticLimitWorkgroupsPerDimension = 151,
+        // A value past the device's rootBlockBytes limit: mrhi_errorCapacity
+        // within the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitRootBlockBytes = 152,
+        // A value past the device's heapSize limit: mrhi_errorCapacity within
+        // the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitHeapSize = 153,
+        // A value past the device's samplerHeapSize limit: mrhi_errorCapacity
+        // within the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitSamplerHeapSize = 154,
+        // A value past the device's multiviewViews limit: mrhi_errorCapacity
+        // within the adapter's, mrhi_errorUnsupported past it.
+        mrhi_diagnosticLimitMultiviewViews = 155,
     };
 
     // A record from an instance's or a device's diagnostic queue.

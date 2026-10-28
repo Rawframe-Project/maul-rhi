@@ -184,11 +184,11 @@ extern "C"
     /// without its cookie, a label that is not UTF-8 without NUL, a usage other
     /// than 0, or a shape mrhiCreateTexture refuses as invalid;
     /// `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES;
-    /// `mrhi_errorUnsupported` for a size past the device's limits, a
+    /// `mrhi_errorUnsupported` for a size past the adapter's limits, a
     /// compressed format without its feature, or a critical extension the
     /// library does not know; `mrhi_errorState` for a device without an open
-    /// frame; `mrhi_errorCapacity` when the device's frameResources limit is
-    /// reached.
+    /// frame; `mrhi_errorCapacity` for a size past the device's limits within
+    /// the adapter's, or when the device's frameResources limit is reached.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDeclareTexture(mrhiDevice* device,
@@ -208,9 +208,10 @@ extern "C"
     /// without its cookie, a label that is not UTF-8 without NUL, a usage other
     /// than 0, or a size that is zero or not a multiple of 4; `mrhi_errorLimit`
     /// for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a
-    /// size past the device's bufferBytes, or a critical extension the library
+    /// size past the adapter's bufferBytes, or a critical extension the library
     /// does not know; `mrhi_errorState` for a device without an open frame;
-    /// `mrhi_errorCapacity` when the device's frameResources limit is reached.
+    /// `mrhi_errorCapacity` for a size past the device's bufferBytes within the
+    /// adapter's, or when the device's frameResources limit is reached.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDeclareBuffer(mrhiDevice* device,
@@ -577,8 +578,9 @@ extern "C"
     /// an imported object destroyed since, or a query set or heap the device no
     /// longer has; `mrhi_errorUnsupported` for a critical extension the library
     /// does not know, or views past one without the multiview feature or past
-    /// its limit; `mrhi_errorState` for a device without an open frame, or a
-    /// frame already compiled; `mrhi_errorCapacity` when the device's
+    /// the adapter's limit; `mrhi_errorState` for a device without an open
+    /// frame, or a frame already compiled; `mrhi_errorCapacity` for views past
+    /// the device's limit within the adapter's, or when the device's
     /// framePasses or frameAccesses limit is reached.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.

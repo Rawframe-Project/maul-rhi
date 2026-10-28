@@ -32,6 +32,18 @@ static size_t TableBytes(uint32_t entries, uint32_t samplers)
     return ((size_t)entries + samplers) * sizeof(mrhiHeapEntrySlot);
 }
 
+// The first of the limits a heap's entries and samplers pass, or
+// MRHI_WITHIN_LIMITS.
+static size_t PastLimit(const mrhiHeapDef* def, const mrhiLimits* limits)
+{
+    if (def->entries > limits->heapSize)
+    {
+        return offsetof(mrhiLimits, heapSize);
+    }
+    return def->samplers <= limits->samplerHeapSize ? MRHI_WITHIN_LIMITS
+                                                    : offsetof(mrhiLimits, samplerHeapSize);
+}
+
 mrhiResult mrhiCreateHeap(mrhiDevice* device, const mrhiHeapDef* def, mrhiHeapId* heapOut)
 {
     if (heapOut != nullptr)
@@ -55,10 +67,15 @@ mrhiResult mrhiCreateHeap(mrhiDevice* device, const mrhiHeapDef* def, mrhiHeapId
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticHeapDef);
     }
-    if (!device->features.bindlessSampling || def->entries > device->limits.heapSize ||
-        def->samplers > device->limits.samplerHeapSize)
+    if (!device->features.bindlessSampling)
     {
         return mrhi_errorUnsupported;
+    }
+    status = mrhiDevicePastLimit(device, PastLimit(def, &device->limits),
+                                 PastLimit(def, &device->adapterLimits));
+    if (status != mrhi_success)
+    {
+        return status;
     }
     status = mrhiDeviceUsable(device);
     if (status != mrhi_success)
@@ -247,11 +264,15 @@ static mrhiResult CheckBuffer(mrhiDevice* device, const mrhiHeapEntry* entry, ui
     uint64_t offset = entry->offset;
     uint64_t size = entry->size == MRHI_WHOLE_SIZE && offset <= buffer->size ? buffer->size - offset
                                                                              : entry->size;
-    if ((buffer->usage & mrhi_bufferStorage) == 0 ||
-        offset % device->limits.storageOffsetAlignment != 0 || size == 0 || size % 4 != 0 ||
+    if ((buffer->usage & mrhi_bufferStorage) == 0 || size == 0 || size % 4 != 0 ||
         offset > buffer->size || size > buffer->size - offset)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticHeapBuffer);
+    }
+    mrhiResult status = MRHI_DEVICE_ALIGNMENT(device, storageOffsetAlignment, offset);
+    if (status != mrhi_success)
+    {
+        return status;
     }
     *sizeOut = size;
     *handleOut = buffer->handle;

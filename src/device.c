@@ -445,6 +445,7 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     device->allocator = def->allocator;
     device->features = def->features;
     device->limits = def->limits;
+    device->adapterLimits = adapter->limits;
     device->deviceLimits = def->deviceLimits;
     device->state = mrhi_deviceOpening;
     device->request = mrhiNextRequest(instance);
@@ -556,6 +557,52 @@ mrhiResult mrhiDeviceFull(mrhiDevice* device, mrhiDiagnosticCode code)
 {
     mrhiRecordDiagnostic(&device->diagnostics, code);
     return mrhi_errorCapacity;
+}
+
+// Records a refusal at the limit at field, and returns it.
+static mrhiResult Refuse(mrhiDevice* device, mrhiResult status, size_t field)
+{
+    mrhiDiagnosticCode code = mrhiLimitDiagnostic(field);
+    MRHI_ASSERT(code != 0);
+    mrhiRecordDiagnostic(&device->diagnostics, code);
+    return status;
+}
+
+mrhiResult mrhiDeviceLimit(mrhiDevice* device, uint64_t value, uint64_t granted, uint64_t adapter,
+                           size_t field)
+{
+    MRHI_ASSERT(granted <= adapter);
+    if (value <= granted)
+    {
+        return mrhi_success;
+    }
+    return Refuse(device, value <= adapter ? mrhi_errorCapacity : mrhi_errorUnsupported, field);
+}
+
+mrhiResult mrhiDeviceAlignment(mrhiDevice* device, uint64_t offset, uint64_t granted,
+                               uint64_t adapter, size_t field)
+{
+    MRHI_ASSERT(adapter != 0 && granted % adapter == 0);
+    if (offset % granted == 0)
+    {
+        return mrhi_success;
+    }
+    return Refuse(device, offset % adapter == 0 ? mrhi_errorCapacity : mrhi_errorUnsupported,
+                  field);
+}
+
+mrhiResult mrhiDevicePastLimit(mrhiDevice* device, size_t devicePast, size_t adapterPast)
+{
+    if (devicePast == MRHI_WITHIN_LIMITS)
+    {
+        MRHI_ASSERT(adapterPast == MRHI_WITHIN_LIMITS);
+        return mrhi_success;
+    }
+    if (adapterPast == MRHI_WITHIN_LIMITS)
+    {
+        return Refuse(device, mrhi_errorCapacity, devicePast);
+    }
+    return Refuse(device, mrhi_errorUnsupported, adapterPast);
 }
 
 mrhiResult mrhiDeviceUsable(const mrhiDevice* device)

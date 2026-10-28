@@ -43,7 +43,7 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticComputePipelineHeap:
         return "A compute pipeline that uses a heap, set in a pass without one.";
     case mrhi_diagnosticBindingsTable:
-        return "Bindings set in a transfer pass, or for a table past the bindingTables limit.";
+        return "Bindings set in a transfer pass.";
     case mrhi_diagnosticBindingsCount:
         return "A binding count that is not the number of slots the pipeline's reflection gives the table.";
     case mrhi_diagnosticBindingsSlot:
@@ -52,18 +52,14 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "A binding whose resource does not fit its slot: its kind, usage, range, format or the access the pass declares.";
     case mrhi_diagnosticRootBlock:
         return "A root block set in a transfer pass, empty, or at an offset or size not a multiple of 4.";
-    case mrhi_diagnosticVertexBufferSlot:
-        return "A vertex buffer set at a slot past the vertexBuffers limit.";
     case mrhi_diagnosticVertexBufferTooSmall:
         return "A draw reading vertices or instances past the end of a vertex buffer it uses.";
     case mrhi_diagnosticIndexBufferFormat:
         return "An index buffer set with an unknown format.";
-    case mrhi_diagnosticDispatchSize:
-        return "A dispatch of more workgroups in a dimension than the workgroupsPerDimension limit.";
     case mrhi_diagnosticIndirectCountLimit:
         return "A counted indirect draw whose maxCount is zero or past MRHI_MAX_INDIRECT_DRAWS.";
     case mrhi_diagnosticViewport:
-        return "A viewport wider or taller than the textureDimension2d limit, outside twice that range, or with depths outside [0, 1] or in reverse order.";
+        return "A viewport with an edge or size that is not finite, a negative size, or depths outside [0, 1] or in reverse order.";
     case mrhi_diagnosticScissor:
         return "A scissor rectangle reaching past the pass's targets.";
     case mrhi_diagnosticBlendConstant:
@@ -99,7 +95,7 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticHeapView:
         return "A heap entry's view without the usage its kind needs, a storage view of more than one mip, or a sampled view marked writable.";
     case mrhi_diagnosticHeapBuffer:
-        return "A heap entry's buffer without storage usage, or a range misaligned, empty, not a multiple of 4 or past the buffer.";
+        return "A heap entry's buffer without storage usage, or a range empty, not a multiple of 4 or past the buffer.";
     case mrhi_diagnosticQuerySetDef:
         return "A query set def of an unknown type, or of zero or too many queries.";
     case mrhi_diagnosticOcclusionQuery:
@@ -230,6 +226,68 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "A driver refused a frame's submission when it could not make, reset, begin or end a command list or buffer for a part of the frame.";
     case mrhi_diagnosticDriverSubmitBudget:
         return "A driver refused a frame for capacity without naming one of the submit codes for the budget that ran out, or named one with another result.";
+    case mrhi_diagnosticLimitTextureDimension2d:
+        return "A value past the device's textureDimension2d limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitTextureDimension3d:
+        return "A value past the device's textureDimension3d limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitTextureArrayLayers:
+        return "A value past the device's textureArrayLayers limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitBindingTables:
+        return "A value past the device's bindingTables limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitBindingsPerTable:
+        return "A value past the device's bindingsPerTable limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitSampledTexturesPerStage:
+        return "A value past the device's sampledTexturesPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitSamplersPerStage:
+        return "A value past the device's samplersPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitStorageBuffersPerStage:
+        return "A value past the device's storageBuffersPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitStorageTexturesPerStage:
+        return "A value past the device's storageTexturesPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitUniformBuffersPerStage:
+        return "A value past the device's uniformBuffersPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitUniformBindingBytes:
+        return "A value past the device's uniformBindingBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitStorageBindingBytes:
+        return "A value past the device's storageBindingBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitUniformOffsetAlignment:
+        return "An offset off the device's uniformOffsetAlignment: mrhi_errorCapacity on the adapter's, mrhi_errorUnsupported off it too.";
+    case mrhi_diagnosticLimitStorageOffsetAlignment:
+        return "An offset off the device's storageOffsetAlignment: mrhi_errorCapacity on the adapter's, mrhi_errorUnsupported off it too.";
+    case mrhi_diagnosticLimitVertexBuffers:
+        return "A value past the device's vertexBuffers limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitTablesPlusVertexBuffers:
+        return "A value past the device's tablesPlusVertexBuffers limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitBufferBytes:
+        return "A value past the device's bufferBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitVertexAttributes:
+        return "A value past the device's vertexAttributes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitVertexStride:
+        return "A value past the device's vertexStride limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitInterStageVariables:
+        return "A value past the device's interStageVariables limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitColorBytesPerSample:
+        return "A value past the device's colorBytesPerSample limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitWorkgroupStorageBytes:
+        return "A value past the device's workgroupStorageBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitWorkgroupInvocations:
+        return "A value past the device's workgroupInvocations limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitWorkgroupSizeX:
+        return "A value past the device's workgroupSizeX limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitWorkgroupSizeY:
+        return "A value past the device's workgroupSizeY limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitWorkgroupSizeZ:
+        return "A value past the device's workgroupSizeZ limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitWorkgroupsPerDimension:
+        return "A value past the device's workgroupsPerDimension limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitRootBlockBytes:
+        return "A value past the device's rootBlockBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitHeapSize:
+        return "A value past the device's heapSize limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitSamplerHeapSize:
+        return "A value past the device's samplerHeapSize limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticLimitMultiviewViews:
+        return "A value past the device's multiviewViews limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
     default:
         return "An unknown diagnostic code.";
     }

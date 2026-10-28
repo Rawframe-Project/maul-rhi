@@ -28,6 +28,15 @@ A pipeline cache is state, not an asset: it is read only under the ABI version t
 
 A device has exactly what it asked for, not what the adapter could give: asking for more than the adapter grants is `mrhi_errorUnsupported`, and a limit below the floor, or an alignment that is not a power of two, is invalid. A program that runs on one adapter therefore runs on any other that grants the same. `mrhiGetDeviceFeatures` and `mrhiGetDeviceLimits` read back what was granted.
 
+### Past a device limit
+
+A call given a value past one of the device's limits answers by what the adapter can do. When the adapter's limit (`mrhiGetAdapterLimits`) holds the value, the call is `mrhi_errorCapacity`: a device asking for more would take it. When the adapter's limit does not hold it either, the call is `mrhi_errorUnsupported`. For an alignment, a value on the adapter's alignment but off the device's is capacity. This holds alike for:
+
+- **Creations:** a buffer's or texture's size, a heap's entries, a shader's root block, bindings, workgroup or interface, a graphics pipeline's vertex buffers, attributes, strides, inter-stage variables, color bytes or views, and a surface's size.
+- **Recording calls:** a table index, a vertex buffer slot, a binding's offset or size, a heap entry's offset, a pass's views, the root block, a viewport, and a dispatch.
+
+Neither counts as misuse. Each such refusal is recorded in the device's [diagnostics](troubleshooting.md) under the code that names the limit, `mrhi_diagnosticLimit` and the limit's name (`mrhi_diagnosticLimitTextureDimension2d`, `mrhi_diagnosticLimitWorkgroupSizeX`): the device's limit for capacity, the adapter's for unsupported. A call that checks several limits records each it passes, so a program learns which to raise.
+
 A device's own budgets, `mrhiDeviceLimits`, size everything it allocates when it is made: the buffers, textures, views, samplers, shaders, pipelines, query sets and heaps it holds at once, a frame's resources, passes, accesses and barriers, and the bytes for recorded commands (`frameCommandBytes`), uploads (`frameUploadBytes`) and readbacks (`readbackBytes`). A call past one answers `mrhi_errorCapacity`. The limit `framesInFlight` bounds the frames submitted and not yet finished; past it, beginning a frame is refused for capacity rather than blocking.
 
 To size a frame's budgets from what frames take, read `mrhiGetFrameUsage` after a frame compiles or is submitted. It holds what the frame begun last took of each frame limit, each member named after the `mrhiDeviceLimits` member it is measured against, so the headroom is the difference. The library's own pass, which zeroes new objects, is left out. After a refusal it holds what the frame took before it, until the next frame begins. With a `diagnostics` capacity, each refusal by a frame's limit also records a code naming the limit, such as `mrhi_diagnosticFramePasses` or `mrhi_diagnosticFrameUploadBytes`; it counts no misuse.

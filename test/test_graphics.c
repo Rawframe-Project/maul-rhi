@@ -464,7 +464,8 @@ static void TestPrimitive(void)
     deviceDef.limits.multiviewViews = 2;
     Reset();
     device = OpenWithShader(deviceDef);
-    CHECK(Made(device, &def) == mrhi_errorUnsupported, "two views in the limit, without multiview");
+    CHECK(Made(device, &def) == mrhi_errorUnsupported && Refusal(device) == 0,
+          "two views in the limit, without multiview, naming no limit");
     Close(device);
     ResetAdapter();
     s_adapter.features.multiview = true;
@@ -475,8 +476,14 @@ static void TestPrimitive(void)
     Reset();
     device = OpenWithShader(deviceDef);
     def.viewCount = 3;
-    CHECK(Made(device, &def) == mrhi_errorUnsupported, "past the device's limit");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "neither is misuse");
+    CHECK(Made(device, &def) == mrhi_errorCapacity &&
+              Refusal(device) == mrhi_diagnosticLimitMultiviewViews,
+          "past the device's limit, within the adapter's, named");
+    def.viewCount = 5;
+    CHECK(Made(device, &def) == mrhi_errorUnsupported &&
+              Refusal(device) == mrhi_diagnosticLimitMultiviewViews,
+          "past the adapter's limit, named");
+    CHECK(mrhiGetDeviceMisuse(device) == 0, "none is misuse");
     Close(device);
 }
 
@@ -821,6 +828,82 @@ static void TestColorBytes(void)
     Close(device);
 }
 
+// A pipeline past the device's limits but within its adapter's, twice
+// the device's: capacity, which a device asking for more would take.
+// Past one of the adapter's it is unsupported, and invalid input still
+// wins. None is misuse.
+static void TestPastDeviceLimits(void)
+{
+    mrhiLimits limits = mrhiDefaultLimits();
+    ResetAdapter();
+    s_adapter.limits.vertexBuffers = 2 * limits.vertexBuffers;
+    s_adapter.limits.vertexStride = 2 * limits.vertexStride;
+    s_adapter.limits.vertexAttributes = 2 * limits.vertexAttributes;
+    s_adapter.limits.colorBytesPerSample = 2 * limits.colorBytesPerSample;
+    mrhiDevice* device = Open();
+    mrhiGraphicsPipelineDef def = Def();
+    s_buffers[0].stride = limits.vertexStride + 4;
+    CHECK(Made(device, &def) == mrhi_errorCapacity, "a stride");
+    s_buffers[0].stride = 2 * limits.vertexStride + 4;
+    CHECK(Made(device, &def) == mrhi_errorUnsupported, "past the adapter's");
+    s_buffers[0].stride = limits.vertexStride + 4;
+    def.colorTargets[0].format = mrhi_formatRg11b10Ufloat;
+    CHECK(Made(device, &def) == mrhi_errorUnsupported, "unsupported outranks capacity");
+    s_attributes[0].buffer = 1;
+    CHECK(Made(device, &def) == mrhi_errorInvalid, "invalid input wins over both");
+    def = Def();
+    s_buffers[0].stride = 0;
+    s_attributes[0].offset = limits.vertexStride - 8;
+    CHECK(Made(device, &def) == mrhi_errorCapacity, "a shared element");
+    def = Def();
+    s_attributes[1] = (mrhiVertexAttribute){
+        .location = limits.vertexAttributes, .format = mrhi_vertexUint8, .offset = 3};
+    def.vertexAttributeCount = 2;
+    CHECK(Made(device, &def) == mrhi_errorCapacity, "a location");
+    def = Def();
+    for (uint32_t i = 1; i <= limits.vertexBuffers; ++i)
+    {
+        s_buffers[i] = (mrhiVertexBufferLayout){.stride = 4};
+    }
+    def.vertexBufferCount = limits.vertexBuffers + 1;
+    CHECK(Made(device, &def) == mrhi_errorCapacity, "a buffer");
+    def = Def();
+    for (uint32_t i = 1; i <= limits.vertexAttributes; ++i)
+    {
+        s_attributes[i] = (mrhiVertexAttribute){.location = i + 3, .format = mrhi_vertexUint8};
+    }
+    def.vertexAttributeCount = limits.vertexAttributes + 1;
+    CHECK(Made(device, &def) == mrhi_errorCapacity, "an attribute");
+    def = Def();
+    def.colorTargets[0].format = mrhi_formatRgba32Float;
+    Targets(&def, (mrhiFormat[]){mrhi_formatRgba32Float, mrhi_formatR8Unorm}, 2);
+    CHECK(Made(device, &def) == mrhi_errorCapacity, "color bytes");
+    Targets(&def,
+            (mrhiFormat[]){mrhi_formatRgba32Float, mrhi_formatRgba32Float, mrhi_formatRgba32Float,
+                           mrhi_formatR8Unorm},
+            4);
+    CHECK(Made(device, &def) == mrhi_errorUnsupported, "past the adapter's");
+    CHECK(mrhiGetDeviceMisuse(device) == 1, "only the invalid def is misuse");
+    Close(device);
+    // Tables and buffers together, on a device of 32 buffers.
+    ResetAdapter();
+    s_adapter.limits.vertexBuffers = 32;
+    s_adapter.limits.tablesPlusVertexBuffers = 48;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.limits.vertexBuffers = 32;
+    Reset();
+    device = OpenWithShader(deviceDef);
+    def = Def();
+    for (uint32_t i = 1; i < 23; ++i)
+    {
+        s_buffers[i] = (mrhiVertexBufferLayout){.stride = 4};
+    }
+    def.vertexBufferCount = 23;
+    CHECK(Made(device, &def) == mrhi_errorCapacity, "tables and buffers");
+    Close(device);
+    ResetAdapter();
+}
+
 // Values past the last of their enum, on the depth test and the front
 // stencil face, which the back face's checks above leave out.
 static void TestUnknownValues(void)
@@ -1025,6 +1108,17 @@ static void TestInterface(void)
     def.topology = mrhi_topologyPointList;
     CHECK(Made(device, &def) == mrhi_success, "points with one variable to spare");
     Close(device);
+    // On an adapter of more variables, every one used is past the
+    // device's limit only.
+    Put16(Record(ENTRIES, 0, 48) + 34, (uint16_t)limit);
+    ResetAdapter();
+    s_adapter.limits.interStageVariables = 2 * limit;
+    device = OpenWithShader(mrhiDefaultDeviceDef());
+    def = Def();
+    def.topology = mrhi_topologyPointList;
+    CHECK(Made(device, &def) == mrhi_errorCapacity, "points with every variable used");
+    Close(device);
+    ResetAdapter();
 }
 
 static void TestHalfFloats(void)
@@ -1148,6 +1242,7 @@ int main(void)
     TestBlend();
     TestDualSource();
     TestColorBytes();
+    TestPastDeviceLimits();
     TestMultisample();
     TestUnknownValues();
     TestCapacity();

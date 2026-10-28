@@ -223,9 +223,40 @@ static void TestRefusalsStateAndLimit(void)
     Close(device);
 }
 
+// Sizes past the device's limits but within the adapter's are capacity,
+// which a device asking for more would take; past the adapter's they
+// are unsupported.
+static void TestPastDeviceLimits(void)
+{
+    s_adapter.limits.textureDimension2d = 16384;
+    s_adapter.limits.textureDimension3d = 4096;
+    s_adapter.limits.textureArrayLayers = 512;
+    mrhiInstance* instance = s_instance;
+    s_device = OpenWith(mrhiDefaultDeviceDef(), true);
+    CHECK(Make(Def(mrhi_texture2d, mrhi_formatRgba8Unorm, 8193, 1, 1, kSampled)) ==
+              mrhi_errorCapacity,
+          "past the device's 2D limit");
+    CHECK(Make(Def(mrhi_texture2dArray, mrhi_formatRgba8Unorm, 4, 4, 257, kSampled)) ==
+              mrhi_errorCapacity,
+          "past its layer limit");
+    CHECK(Make(Def(mrhi_texture3d, mrhi_formatR8Unorm, 4, 4, 2049, kSampled)) == mrhi_errorCapacity,
+          "past its 3D limit");
+    CHECK(Make(Def(mrhi_texture2d, mrhi_formatRgba8Unorm, 16385, 1, 1, kSampled)) ==
+              mrhi_errorUnsupported,
+          "past the adapter's 2D limit");
+    CHECK(Make(Def(mrhi_texture2dArray, mrhi_formatRgba8Unorm, 16385, 4, 257, kSampled)) ==
+              mrhi_errorUnsupported,
+          "past one of the adapter's beside one of the device's");
+    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "none is misuse");
+    Close(s_device);
+    s_instance = instance;
+    ResetAdapter();
+}
+
 int main(void)
 {
     ResetAdapter();
+    TestPastDeviceLimits();
     s_device = OpenWith(mrhiDefaultDeviceDef(), true);
     mrhiInstance* instance = s_instance;
     TestKinds();

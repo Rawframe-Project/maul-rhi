@@ -93,13 +93,11 @@ static bool IsColorTaken(const mrhiSurfaceCaps* caps, const mrhiSurfaceConfig* c
 static bool IsSupported(const mrhiDevice* device, const mrhiSurfaceCaps* caps,
                         const mrhiSurfaceConfig* config)
 {
-    uint32_t most = device->limits.textureDimension2d;
     return caps->presentable && IsColorTaken(caps, config) &&
            (config->usage & ~caps->usages) == 0 &&
            (config->presentMode & caps->presentModes) != 0 &&
            (config->alphaMode & caps->alphaModes) != 0 &&
-           mrhiFormatTakes(device, config->color.format, config->usage) && config->width <= most &&
-           config->height <= most;
+           mrhiFormatTakes(device, config->color.format, config->usage);
 }
 
 // Checks a config's own values and names on a live device: success, or
@@ -159,7 +157,9 @@ static mrhiSurfaceSlot* CheckConfig(mrhiDevice* device, const mrhiSurfaceConfig*
         *statusOut = mrhi_errorUnsupported;
         return nullptr;
     }
-    return slot;
+    uint32_t side = config->width > config->height ? config->width : config->height;
+    *statusOut = MRHI_DEVICE_LIMIT(device, textureDimension2d, side);
+    return *statusOut == mrhi_success ? slot : nullptr;
 }
 
 mrhiResult mrhiConfigureSurface(mrhiDevice* device, const mrhiSurfaceConfig* config)

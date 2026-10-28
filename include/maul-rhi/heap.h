@@ -101,8 +101,10 @@ extern "C"
     /// `mrhi_errorState` for a device that is not ready;
     /// `mrhi_errorUnsupported` for a critical extension the library does not
     /// know, a device without the bindless_sampling feature, or entries or
-    /// samplers past its heapSize or samplerHeapSize; `mrhi_errorCapacity` when
-    /// the device's heaps limit is reached or the allocator fails.
+    /// samplers past the adapter's heapSize or samplerHeapSize;
+    /// `mrhi_errorCapacity` for entries or samplers past the device's heapSize
+    /// or samplerHeapSize within the adapter's, or when the device's heaps
+    /// limit is reached or the allocator fails.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateHeap(mrhiDevice* device, const mrhiHeapDef* def,
@@ -128,11 +130,14 @@ extern "C"
     /// @param entry   What it holds. Only read during the call.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, an
     /// index past the heap's entries, an unknown kind, a view or buffer without
-    /// the usage its kind needs, or a range outside the buffer or off its
-    /// alignment; `mrhi_errorStale` for a heap, view or buffer the device no
-    /// longer has; `mrhi_errorUnsupported` for a storage kind without the
-    /// bindless_heterogeneous feature; `mrhi_errorState` for an entry that is
-    /// not empty, or one cleared before a frame that has not finished.
+    /// the usage its kind needs, or a range outside the buffer;
+    /// `mrhi_errorStale` for a heap, view or buffer the device no longer has;
+    /// `mrhi_errorUnsupported` for a storage kind without the
+    /// bindless_heterogeneous feature, or an offset off the adapter's
+    /// storageOffsetAlignment; `mrhi_errorCapacity` for an offset off the
+    /// device's storageOffsetAlignment and on the adapter's; `mrhi_errorState`
+    /// for an entry that is not empty, or one cleared before a frame that has
+    /// not finished.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiSetHeapEntry(mrhiDevice* device, mrhiHeapId heap,

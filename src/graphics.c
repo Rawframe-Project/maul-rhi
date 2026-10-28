@@ -50,10 +50,10 @@ mrhiGraphicsPipelineDef mrhiDefaultGraphicsPipelineDef(void)
 }
 
 // The worse of two outcomes: invalid input over format over unsupported
-// over success.
+// over a device limit the adapter's would hold (capacity) over success.
 static mrhiResult Worse(mrhiResult a, mrhiResult b)
 {
-    static const mrhiResult ranked[] = {mrhi_errorInvalid, mrhi_errorFormat};
+    static const mrhiResult ranked[] = {mrhi_errorInvalid, mrhi_errorFormat, mrhi_errorUnsupported};
     for (size_t i = 0; i < sizeof(ranked) / sizeof(ranked[0]); ++i)
     {
         if (a == ranked[i] || b == ranked[i])
@@ -100,30 +100,30 @@ typedef struct Stages
 
 // The vertex buffers: within the limits, strides multiples of 4, and
 // known step modes.
-static mrhiResult CheckBuffers(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def)
+static mrhiResult CheckBuffers(mrhiDevice* device, const mrhiGraphicsPipelineDef* def)
 {
     if (def->vertexBuffers == nullptr && def->vertexBufferCount > 0)
     {
         return mrhi_errorInvalid;
     }
-    if (def->vertexBufferCount > device->limits.vertexBuffers)
+    mrhiResult status = MRHI_DEVICE_LIMIT(device, vertexBuffers, def->vertexBufferCount);
+    if (status != mrhi_success)
     {
-        return mrhi_errorUnsupported;
+        return status;
     }
-    mrhiResult status = mrhi_success;
     for (uint32_t i = 0; i < def->vertexBufferCount && status != mrhi_errorInvalid; ++i)
     {
         const mrhiVertexBufferLayout* buffer = &def->vertexBuffers[i];
         status =
             Worse(status, Need(buffer->stride % 4 == 0 && buffer->stepMode <= mrhi_stepInstance));
-        status = Worse(status, Within(buffer->stride <= device->limits.vertexStride));
+        status = Worse(status, MRHI_DEVICE_LIMIT(device, vertexStride, buffer->stride));
     }
     return status;
 }
 
 // One vertex attribute: in a buffer, of a known format, aligned, within
 // its buffer's stride, and at a location within the limit.
-static mrhiResult CheckAttribute(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
+static mrhiResult CheckAttribute(mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
                                  const mrhiVertexAttribute* attribute)
 {
     mrhiVertexLayout layout = mrhiGetVertexLayout(attribute->format);
@@ -135,8 +135,12 @@ static mrhiResult CheckAttribute(const mrhiDevice* device, const mrhiGraphicsPip
     uint64_t end = (uint64_t)attribute->offset + layout.bytes;
     uint32_t stride = def->vertexBuffers[attribute->buffer].stride;
     mrhiResult status = Need(attribute->offset % alignment == 0 && (stride == 0 || end <= stride));
-    return Worse(status, Within((stride != 0 || end <= device->limits.vertexStride) &&
-                                attribute->location < device->limits.vertexAttributes));
+    if (stride == 0)
+    {
+        status = Worse(status, MRHI_DEVICE_LIMIT(device, vertexStride, end));
+    }
+    return Worse(status,
+                 MRHI_DEVICE_LIMIT(device, vertexAttributes, (uint64_t)attribute->location + 1));
 }
 
 // The binding tables the reflection's layout declares: one past the
@@ -155,8 +159,7 @@ static uint32_t TablesOf(const mrhiReflection* reflection)
 // The vertex state: buffers and attributes, one attribute per location,
 // every vertex input fed by an attribute of its scalar class, and the
 // tables and buffers together within their limit.
-static mrhiResult CheckVertex(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
-                              Stages stages)
+static mrhiResult CheckVertex(mrhiDevice* device, const mrhiGraphicsPipelineDef* def, Stages stages)
 {
     // Buffers past their limit are refused unread, and so is the buffer
     // an attribute names among them.
@@ -169,9 +172,10 @@ static mrhiResult CheckVertex(const mrhiDevice* device, const mrhiGraphicsPipeli
     {
         return mrhi_errorInvalid;
     }
-    if (def->vertexAttributeCount > device->limits.vertexAttributes)
+    mrhiResult count = MRHI_DEVICE_LIMIT(device, vertexAttributes, def->vertexAttributeCount);
+    if (count != mrhi_success)
     {
-        return mrhi_errorUnsupported;
+        return Worse(status, count);
     }
     const mrhiVertexAttribute* attributes = def->vertexAttributes;
     for (uint32_t i = 0; i < def->vertexAttributeCount && status != mrhi_errorInvalid; ++i)
@@ -195,13 +199,13 @@ static mrhiResult CheckVertex(const mrhiDevice* device, const mrhiGraphicsPipeli
                                 mrhiGetVertexLayout(attributes[j].format).scalar == input->type));
     }
     uint64_t slots = (uint64_t)TablesOf(stages.reflection) + def->vertexBufferCount;
-    return Worse(status, Within(slots <= device->limits.tablesPlusVertexBuffers));
+    return Worse(status, MRHI_DEVICE_LIMIT(device, tablesPlusVertexBuffers, slots));
 }
 
 // The primitive state: known values, a strip index format only for
 // strips, unclipped depth only with its feature, and views past one only
 // with multiview, within its limit.
-static mrhiResult CheckPrimitive(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def)
+static mrhiResult CheckPrimitive(mrhiDevice* device, const mrhiGraphicsPipelineDef* def)
 {
     bool strip =
         def->topology == mrhi_topologyLineStrip || def->topology == mrhi_topologyTriangleStrip;
@@ -210,9 +214,13 @@ static mrhiResult CheckPrimitive(const mrhiDevice* device, const mrhiGraphicsPip
         (strip || def->stripIndexFormat == mrhi_indexNone) &&
         def->frontFace <= mrhi_frontClockwise && def->cullMode <= mrhi_cullBack);
     status = Worse(status, Within(!def->unclippedDepth || device->features.unclippedDepth));
-    return Worse(status,
-                 Within(def->viewCount <= 1 || (device->features.multiview &&
-                                                def->viewCount <= device->limits.multiviewViews)));
+    if (def->viewCount > 1)
+    {
+        status = Worse(status, device->features.multiview
+                                   ? MRHI_DEVICE_LIMIT(device, multiviewViews, def->viewCount)
+                                   : mrhi_errorUnsupported);
+    }
+    return status;
 }
 
 // Whether a comparison is a test: never through always.
@@ -351,7 +359,7 @@ static mrhiResult CheckTarget(const mrhiDevice* device, const mrhiColorTargetSta
 // The color targets, at most MRHI_MAX_COLOR_TARGETS: none without a
 // fragment entry, each checked, their bytes per sample within the
 // limit, and some attachment, color or depth.
-static mrhiResult CheckTargets(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
+static mrhiResult CheckTargets(mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
                                Stages stages)
 {
     MRHI_ASSERT(def->colorTargetCount <= MRHI_MAX_COLOR_TARGETS);
@@ -391,7 +399,7 @@ static mrhiResult CheckTargets(const mrhiDevice* device, const mrhiGraphicsPipel
     status = Worse(status, Within(!second || (device->features.dualSourceBlending &&
                                               def->colorTargetCount == 1)));
     status = Worse(status, Match(!second || HasSecondSource(stages)));
-    return Worse(status, Within(bytes <= device->limits.colorBytesPerSample));
+    return Worse(status, MRHI_DEVICE_LIMIT(device, colorBytesPerSample, bytes));
 }
 
 // The multisample state: a power of two every target format takes, and
@@ -426,12 +434,14 @@ static mrhiResult CheckMultisample(const mrhiDevice* device, const mrhiGraphicsP
 // The inter-stage interface: each fragment input matched by a vertex
 // output of the same location, type and interpolation, and a point list
 // leaving room for its point size among the variables.
-static mrhiResult CheckInterface(const mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
+static mrhiResult CheckInterface(mrhiDevice* device, const mrhiGraphicsPipelineDef* def,
                                  Stages stages)
 {
     const mrhiShaderVariable* outputs = &stages.reflection->variables[stages.vertex->firstVariable];
-    mrhiResult status = Within(def->topology != mrhi_topologyPointList ||
-                               stages.vertex->variableCount < device->limits.interStageVariables);
+    mrhiResult status = def->topology == mrhi_topologyPointList
+                            ? MRHI_DEVICE_LIMIT(device, interStageVariables,
+                                                (uint64_t)stages.vertex->variableCount + 1)
+                            : mrhi_success;
     for (uint32_t i = 0; stages.fragment != nullptr && i < stages.fragment->variableCount; ++i)
     {
         const mrhiShaderVariable* input =

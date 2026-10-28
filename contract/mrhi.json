@@ -417,7 +417,7 @@
             {
               "name": "diagnostic_bindings_table",
               "value": 19,
-              "doc": "Bindings set in a transfer pass, or for a table past the bindingTables limit."
+              "doc": "Bindings set in a transfer pass."
             },
             {
               "name": "diagnostic_bindings_count",
@@ -440,11 +440,6 @@
               "doc": "A root block set in a transfer pass, empty, or at an offset or size not a multiple of 4."
             },
             {
-              "name": "diagnostic_vertex_buffer_slot",
-              "value": 24,
-              "doc": "A vertex buffer set at a slot past the vertexBuffers limit."
-            },
-            {
               "name": "diagnostic_vertex_buffer_too_small",
               "value": 26,
               "doc": "A draw reading vertices or instances past the end of a vertex buffer it uses."
@@ -455,11 +450,6 @@
               "doc": "An index buffer set with an unknown format."
             },
             {
-              "name": "diagnostic_dispatch_size",
-              "value": 29,
-              "doc": "A dispatch of more workgroups in a dimension than the workgroupsPerDimension limit."
-            },
-            {
               "name": "diagnostic_indirect_count_limit",
               "value": 31,
               "doc": "A counted indirect draw whose maxCount is zero or past MRHI_MAX_INDIRECT_DRAWS."
@@ -467,7 +457,7 @@
             {
               "name": "diagnostic_viewport",
               "value": 32,
-              "doc": "A viewport wider or taller than the textureDimension2d limit, outside twice that range, or with depths outside [0, 1] or in reverse order."
+              "doc": "A viewport with an edge or size that is not finite, a negative size, or depths outside [0, 1] or in reverse order."
             },
             {
               "name": "diagnostic_scissor",
@@ -557,7 +547,7 @@
             {
               "name": "diagnostic_heap_buffer",
               "value": 57,
-              "doc": "A heap entry's buffer without storage usage, or a range misaligned, empty, not a multiple of 4 or past the buffer."
+              "doc": "A heap entry's buffer without storage usage, or a range empty, not a multiple of 4 or past the buffer."
             },
             {
               "name": "diagnostic_query_set_def",
@@ -883,6 +873,161 @@
               "name": "diagnostic_driver_submit_budget",
               "value": 124,
               "doc": "A driver refused a frame for capacity without naming one of the submit codes for the budget that ran out, or named one with another result."
+            },
+            {
+              "name": "diagnostic_limit_texture_dimension_2d",
+              "value": 125,
+              "doc": "A value past the device's textureDimension2d limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_texture_dimension_3d",
+              "value": 126,
+              "doc": "A value past the device's textureDimension3d limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_texture_array_layers",
+              "value": 127,
+              "doc": "A value past the device's textureArrayLayers limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_binding_tables",
+              "value": 128,
+              "doc": "A value past the device's bindingTables limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_bindings_per_table",
+              "value": 129,
+              "doc": "A value past the device's bindingsPerTable limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_sampled_textures_per_stage",
+              "value": 130,
+              "doc": "A value past the device's sampledTexturesPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_samplers_per_stage",
+              "value": 131,
+              "doc": "A value past the device's samplersPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_storage_buffers_per_stage",
+              "value": 132,
+              "doc": "A value past the device's storageBuffersPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_storage_textures_per_stage",
+              "value": 133,
+              "doc": "A value past the device's storageTexturesPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_uniform_buffers_per_stage",
+              "value": 134,
+              "doc": "A value past the device's uniformBuffersPerStage limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_uniform_binding_bytes",
+              "value": 135,
+              "doc": "A value past the device's uniformBindingBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_storage_binding_bytes",
+              "value": 136,
+              "doc": "A value past the device's storageBindingBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_uniform_offset_alignment",
+              "value": 137,
+              "doc": "An offset off the device's uniformOffsetAlignment: mrhi_errorCapacity on the adapter's, mrhi_errorUnsupported off it too."
+            },
+            {
+              "name": "diagnostic_limit_storage_offset_alignment",
+              "value": 138,
+              "doc": "An offset off the device's storageOffsetAlignment: mrhi_errorCapacity on the adapter's, mrhi_errorUnsupported off it too."
+            },
+            {
+              "name": "diagnostic_limit_vertex_buffers",
+              "value": 139,
+              "doc": "A value past the device's vertexBuffers limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_tables_plus_vertex_buffers",
+              "value": 140,
+              "doc": "A value past the device's tablesPlusVertexBuffers limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_buffer_bytes",
+              "value": 141,
+              "doc": "A value past the device's bufferBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_vertex_attributes",
+              "value": 142,
+              "doc": "A value past the device's vertexAttributes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_vertex_stride",
+              "value": 143,
+              "doc": "A value past the device's vertexStride limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_inter_stage_variables",
+              "value": 144,
+              "doc": "A value past the device's interStageVariables limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_color_bytes_per_sample",
+              "value": 145,
+              "doc": "A value past the device's colorBytesPerSample limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_workgroup_storage_bytes",
+              "value": 146,
+              "doc": "A value past the device's workgroupStorageBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_workgroup_invocations",
+              "value": 147,
+              "doc": "A value past the device's workgroupInvocations limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_workgroup_size_x",
+              "value": 148,
+              "doc": "A value past the device's workgroupSizeX limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_workgroup_size_y",
+              "value": 149,
+              "doc": "A value past the device's workgroupSizeY limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_workgroup_size_z",
+              "value": 150,
+              "doc": "A value past the device's workgroupSizeZ limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_workgroups_per_dimension",
+              "value": 151,
+              "doc": "A value past the device's workgroupsPerDimension limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_root_block_bytes",
+              "value": 152,
+              "doc": "A value past the device's rootBlockBytes limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_heap_size",
+              "value": 153,
+              "doc": "A value past the device's heapSize limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_sampler_heap_size",
+              "value": 154,
+              "doc": "A value past the device's samplerHeapSize limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
+            },
+            {
+              "name": "diagnostic_limit_multiview_views",
+              "value": 155,
+              "doc": "A value past the device's multiviewViews limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it."
             }
           ],
           "library": "names the library's own checks"
@@ -6884,7 +7029,7 @@
         {
           "kind": "function",
           "name": "next_device_diagnostic",
-          "doc": "Takes the oldest record from the device's diagnostic queue, which holds a record for each call the device refused as invalid input or bad data, for each frame call refused at one of its limits, and for each submission its driver refused for a budget it names, up to the diagnostics limit; refusals past it are counted but not recorded.",
+          "doc": "Takes the oldest record from the device's diagnostic queue, which holds a record for each call the device refused as invalid input or bad data, for each frame call refused at one of its limits, for each call refused past one of the device's limits (mrhiLimits) under that limit's code, and for each submission its driver refused for a budget it names, up to the diagnostics limit; refusals past it are counted but not recorded.",
           "returns": {
             "type": "result",
             "doc": "`mrhi_success` with a record; `mrhi_empty` when the queue is drained or keeps none; `mrhi_errorInvalid` for a NULL argument."
@@ -8235,7 +8380,7 @@
           "doc": "Makes a buffer on a ready device. It reads as zeros until the frame graph writes it: the first frame that imports it clears it whole, in a pass of the library's own that takes nothing from the frame's budgets, so the program's first use of it sees zeros. Passes that do not use it may run beside that clear.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a size of 0 or not a multiple of 4, or no usage or an unknown one; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size beyond the device's bufferBytes limit or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's buffer limit is reached; `mrhi_errorPlatform` when the driver fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a size of 0 or not a multiple of 4, or no usage or an unknown one; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the adapter's bufferBytes limit or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` for a size past the device's bufferBytes limit within the adapter's, or when the device's buffer limit is reached; `mrhi_errorPlatform` when the driver fails."
           },
           "args": [
             {
@@ -8891,7 +9036,7 @@
           "doc": "Makes a texture on a ready device. It reads as zeros until the frame graph writes it, in every mip, layer and aspect: the first frame that imports it clears it whole, in a pass of the library's own that takes nothing from the frame's budgets, so the program's first use of it sees zeros. Passes that do not use it may run beside that clear. A texture of one mip and layer whose first use is a target that clears it and keeps the result is not cleared before, as that use writes all of it. A transient texture is never cleared, as its contents live only inside a render pass.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, an unknown kind, format, usage or view format, a zero size, a size or layer count that does not fit the kind or the format's block, too many mips, an unusable sample count, or a transient texture that is not only a render target; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the device's limits, a usage or sample count the format cannot take on the device, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's texture limit is reached; `mrhi_errorPlatform` when the driver fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, an unknown kind, format, usage or view format, a zero size, a size or layer count that does not fit the kind or the format's block, too many mips, an unusable sample count, or a transient texture that is not only a render target; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the adapter's limits, a usage or sample count the format cannot take on the device, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` for a size past the device's limits within the adapter's, or when the device's texture limit is reached; `mrhi_errorPlatform` when the driver fails."
           },
           "args": [
             {
@@ -10107,7 +10252,7 @@
           "doc": "Makes a bindless heap on a ready device, every entry empty.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, or 0 entries; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know, a device without the bindless_sampling feature, or entries or samplers past its heapSize or samplerHeapSize; `mrhi_errorCapacity` when the device's heaps limit is reached or the allocator fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, or 0 entries; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know, a device without the bindless_sampling feature, or entries or samplers past the adapter's heapSize or samplerHeapSize; `mrhi_errorCapacity` for entries or samplers past the device's heapSize or samplerHeapSize within the adapter's, or when the device's heaps limit is reached or the allocator fails."
           },
           "args": [
             {
@@ -10202,7 +10347,7 @@
           "doc": "Writes an empty resource entry, which frames submitted later read at its index. Destroying the view or buffer it names empties it.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, an index past the heap's entries, an unknown kind, a view or buffer without the usage its kind needs, or a range outside the buffer or off its alignment; `mrhi_errorStale` for a heap, view or buffer the device no longer has; `mrhi_errorUnsupported` for a storage kind without the bindless_heterogeneous feature; `mrhi_errorState` for an entry that is not empty, or one cleared before a frame that has not finished."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, an index past the heap's entries, an unknown kind, a view or buffer without the usage its kind needs, or a range outside the buffer; `mrhi_errorStale` for a heap, view or buffer the device no longer has; `mrhi_errorUnsupported` for a storage kind without the bindless_heterogeneous feature, or an offset off the adapter's storageOffsetAlignment; `mrhi_errorCapacity` for an offset off the device's storageOffsetAlignment and on the adapter's; `mrhi_errorState` for an entry that is not empty, or one cleared before a frame that has not finished."
           },
           "args": [
             {
@@ -11557,7 +11702,7 @@
           "doc": "Configures a surface on a ready device, or reconfigures one the device holds. A failed reconfiguration leaves the surface unconfigured.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a config without its cookie, an unknown color field or usage, a transient usage, a view format that is not the color format's twin, a zero size, or other than one present mode and one alpha mode; `mrhi_errorStale` for a surface the instance no longer has; `mrhi_errorUnsupported` for a surface the device's adapter cannot present to, a color, usage, present mode or alpha mode it does not report, a usage the format cannot take on the device, a size past the device's limits, view formats the device cannot give the surface's images, or a critical extension the library does not know; `mrhi_errorOutOfDate` for a size the window does not take now, where the window fixes its images' size (Vulkan on Win32, X11 and Android), to be configured again with the window's size; `mrhi_errorState` for a device that is not ready, or a surface configured on another device; `mrhi_errorCapacity` when the device's surface limit is reached; `mrhi_errorPlatform` when the driver fails."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a config without its cookie, an unknown color field or usage, a transient usage, a view format that is not the color format's twin, a zero size, or other than one present mode and one alpha mode; `mrhi_errorStale` for a surface the instance no longer has; `mrhi_errorUnsupported` for a surface the device's adapter cannot present to, a color, usage, present mode or alpha mode it does not report, a usage the format cannot take on the device, a size past the adapter's limits, view formats the device cannot give the surface's images, or a critical extension the library does not know; `mrhi_errorOutOfDate` for a size the window does not take now, where the window fixes its images' size (Vulkan on Win32, X11 and Android), to be configured again with the window's size; `mrhi_errorState` for a device that is not ready, or a surface configured on another device; `mrhi_errorCapacity` for a size past the device's limits within the adapter's, or when the device's surface limit is reached; `mrhi_errorPlatform` when the driver fails."
           },
           "args": [
             {
@@ -11988,7 +12133,7 @@
           "doc": "Declares a texture the open frame's graph makes, aliases and ends with the frame. Its usages are derived from the passes that use it, and checked against its format when the frame is compiled. A pass may read it, or load a target of it, only after an earlier pass wrote it; texels no pass wrote, beside a write to part of it, are undefined and differ by backend.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a usage other than 0, or a shape mrhiCreateTexture refuses as invalid; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the device's limits, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's frameResources limit is reached."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a usage other than 0, or a shape mrhiCreateTexture refuses as invalid; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the adapter's limits, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` for a size past the device's limits within the adapter's, or when the device's frameResources limit is reached."
           },
           "args": [
             {
@@ -12040,7 +12185,7 @@
           "doc": "Declares a buffer the open frame's graph makes, aliases and ends with the frame. Its usages are derived from the passes that use it. A pass may read it only after an earlier pass wrote it; bytes no pass wrote, beside a write to part of it, are undefined and differ by backend.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a usage other than 0, or a size that is zero or not a multiple of 4; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the device's bufferBytes, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` when the device's frameResources limit is reached."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a usage other than 0, or a size that is zero or not a multiple of 4; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the adapter's bufferBytes, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` for a size past the device's bufferBytes within the adapter's, or when the device's frameResources limit is reached."
           },
           "args": [
             {
@@ -13143,7 +13288,7 @@
           "doc": "Declares a pass of the open frame, after the passes declared before it in its class.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an unknown class, kind, aspect or operation, an access or target its resource cannot take (a kind for the other resource type, a range outside the texture, a use an imported object was not made with, a target that does not render or depth-test, a use of a sealed resource other than the reads its sealed state allows), targets of different sizes or sample counts, views past one on a native pass or one without targets, targets without a layer for each view or of a 3D texture with views past one, a resolve that does not match, a subresource written and used otherwise in the pass, an access the class does not allow, a declared resource read before any pass wrote it, an occlusion query set that is not one or is named by a pass without targets, or timestamps of a set that is not a timestamp set, without a set, with neither query, with both the same, or with a query past the set's count or already written in this frame; `mrhi_errorLimit` for more than MRHI_MAX_COLOR_TARGETS color targets, a native pass past MRHI_MAX_NATIVE_PASSES in the frame or a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for a resource of another frame, an imported object destroyed since, or a query set or heap the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know, or views past one without the multiview feature or past its limit; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorCapacity` when the device's framePasses or frameAccesses limit is reached."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, an unknown class, kind, aspect or operation, an access or target its resource cannot take (a kind for the other resource type, a range outside the texture, a use an imported object was not made with, a target that does not render or depth-test, a use of a sealed resource other than the reads its sealed state allows), targets of different sizes or sample counts, views past one on a native pass or one without targets, targets without a layer for each view or of a 3D texture with views past one, a resolve that does not match, a subresource written and used otherwise in the pass, an access the class does not allow, a declared resource read before any pass wrote it, an occlusion query set that is not one or is named by a pass without targets, or timestamps of a set that is not a timestamp set, without a set, with neither query, with both the same, or with a query past the set's count or already written in this frame; `mrhi_errorLimit` for more than MRHI_MAX_COLOR_TARGETS color targets, a native pass past MRHI_MAX_NATIVE_PASSES in the frame or a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for a resource of another frame, an imported object destroyed since, or a query set or heap the device no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know, or views past one without the multiview feature or past the adapter's limit; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorCapacity` for views past the device's limit within the adapter's, or when the device's framePasses or frameAccesses limit is reached."
           },
           "args": [
             {
@@ -15358,7 +15503,7 @@
           "doc": "Loads a shader container on a ready device, checking every byte of it as hostile input.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, or bytes that are not 8-byte aligned; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorFormat` for a container that is malformed, damaged or contradicts itself, or holds a table of more than MRHI_MAX_TABLE_BINDINGS bindings; `mrhi_errorVersion` for a container of another version or holding a section type the library does not know; `mrhi_errorUnsupported` for a root block, bindings, a workgroup or interface variables past the device's limits, 16-bit floats on a device without shaderF16, the primitive index builtin, heap uses on a device without bindless_sampling, or storage ones without bindless_heterogeneous, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's shader limit is reached or its allocator fails; `mrhi_errorPlatform` when the driver refuses the code."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, or bytes that are not 8-byte aligned; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorFormat` for a container that is malformed, damaged or contradicts itself, or holds a table of more than MRHI_MAX_TABLE_BINDINGS bindings; `mrhi_errorVersion` for a container of another version or holding a section type the library does not know; `mrhi_errorUnsupported` for a root block, bindings, a workgroup or interface variables past the adapter's limits, 16-bit floats on a device without shaderF16, the primitive index builtin, heap uses on a device without bindless_sampling, or storage ones without bindless_heterogeneous, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` for a root block, bindings, a workgroup or interface variables past the device's limits within the adapter's, or when the device's shader limit is reached or its allocator fails; `mrhi_errorPlatform` when the driver refuses the code."
           },
           "args": [
             {
@@ -18322,7 +18467,7 @@
           "doc": "Makes a graphics pipeline on a ready device, checked against its shader's reflection and the device as WebGPU checks it. It returns at once with the pipeline pending, and the device's queue answers the request with mrhi_devicePipelineReady; a pipeline is usable once that answer is mrhi_success.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` with the pipeline pending; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, a NULL vertex entry, a NULL fragment entry with a length, constants as for compute pipelines, or state that contradicts itself or WebGPU's rules; `mrhi_errorLimit` for more than MRHI_MAX_COLOR_TARGETS color targets or a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorFormat` for entries the shader has not as vertex and fragment entries, constants as for compute pipelines, or state the reflection refuses: a vertex input without an attribute of its scalar class, a fragment depth without a depth format, a target its fragment output does not fit, blending by an alpha or a second source the output lacks, alpha to coverage with a written sample mask, or a fragment input no vertex output matches; more color targets than the bound are refused first, unread; invalid input outranks format, and format outranks unsupported; `mrhi_errorStale` for a shader the device no longer has; `mrhi_errorUnsupported` for vertex buffers, attributes, strides, inter-stage variables or color bytes past the device's limits, target formats the device cannot render, blend or multisample as asked, unclipped depth without its feature, views past one without multiview or past its limit, a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when the device's pipeline limit is reached or its queue has no room for the answer; `mrhi_errorPlatform` when the driver refuses at once."
+            "doc": "`mrhi_success` with the pipeline pending; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a bad label, a NULL vertex entry, a NULL fragment entry with a length, constants as for compute pipelines, or state that contradicts itself or WebGPU's rules; `mrhi_errorLimit` for more than MRHI_MAX_COLOR_TARGETS color targets or a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorFormat` for entries the shader has not as vertex and fragment entries, constants as for compute pipelines, or state the reflection refuses: a vertex input without an attribute of its scalar class, a fragment depth without a depth format, a target its fragment output does not fit, blending by an alpha or a second source the output lacks, alpha to coverage with a written sample mask, or a fragment input no vertex output matches; more color targets than the bound are refused first, unread; invalid input outranks format, format outranks unsupported, and unsupported outranks capacity; `mrhi_errorStale` for a shader the device no longer has; `mrhi_errorUnsupported` for vertex buffers, attributes, strides, inter-stage variables or color bytes past the adapter's limits, target formats the device cannot render, blend or multisample as asked, unclipped depth without its feature, views past one without multiview or past the adapter's limit, a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` for vertex buffers, attributes, strides, inter-stage variables, color bytes or views past the device's limits within the adapter's, or when the device's pipeline limit is reached or its queue has no room for the answer; `mrhi_errorPlatform` when the driver refuses at once."
           },
           "args": [
             {
@@ -19214,7 +19359,7 @@
           "doc": "Sets every slot of one binding table for later draws or dispatches, checked against the pass's pipeline and its declared accesses.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or bindings with a count, a pass that copies, a table past the device's bindingTables, bindings that are not exactly the table's slots in the shader, a binding its slot's kind does not take (a range out of bounds or unaligned, a view invalid for its texture or of another kind, format or sample type, a sampler of another kind), or a resource the pass declares no covering access of the needed kind for; `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or a resource or sampler that is not live; `mrhi_errorState` for a pass that is not recording or has no pipeline set; `mrhi_errorCapacity` when the frame's commands are full."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or bindings with a count, a pass that copies, bindings that are not exactly the table's slots in the shader, a binding its slot's kind does not take (a range out of bounds, a view invalid for its texture or of another kind, format or sample type, a sampler of another kind), or a resource the pass declares no covering access of the needed kind for; `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or a resource or sampler that is not live; `mrhi_errorState` for a pass that is not recording or has no pipeline set; `mrhi_errorUnsupported` for a table past the adapter's bindingTables, or a range off the adapter's offset alignment or past its binding size; `mrhi_errorCapacity` for a table or a range past the device's limits within the adapter's, or when the frame's commands are full."
           },
           "args": [
             {
@@ -19274,7 +19419,7 @@
           "doc": "Sets the buffer later draws read one of the pipeline's vertex buffers from.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass without targets, a slot past the device's vertexBuffers, a resource that is not a buffer the pass declares with the vertex access, or an offset or size out of range or an offset not a multiple of 4; `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass without targets, a resource that is not a buffer the pass declares with the vertex access, or an offset or size out of range or an offset not a multiple of 4; `mrhi_errorStale` for a pass of another frame, a destroyed pipeline, or a resource that is not live; `mrhi_errorState` for a pass that is not recording; `mrhi_errorUnsupported` for a slot past the adapter's vertexBuffers; `mrhi_errorCapacity` for a slot past the device's vertexBuffers within the adapter's, or when the frame's commands are full."
           },
           "args": [
             {
@@ -19535,7 +19680,7 @@
           "doc": "Dispatches workgroups with the pass's compute pipeline and tables.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, a pass that renders or copies, or a count past the device's workgroupsPerDimension; `mrhi_errorStale` for a pass of another frame or a destroyed pipeline; `mrhi_errorState` for a pass that is not recording, has no pipeline set, or lacks a table the pipeline reads; `mrhi_errorCapacity` when the frame's commands are full."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, or a pass that renders or copies; `mrhi_errorStale` for a pass of another frame or a destroyed pipeline; `mrhi_errorState` for a pass that is not recording, has no pipeline set, or lacks a table the pipeline reads; `mrhi_errorUnsupported` for a count past the adapter's workgroupsPerDimension; `mrhi_errorCapacity` for a count past the device's workgroupsPerDimension within the adapter's, or when the frame's commands are full."
           },
           "args": [
             {
@@ -20791,7 +20936,7 @@
           "doc": "Writes bytes of the root block later draws or dispatches read.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or bytes, a pass that copies, or an unaligned or empty write; `mrhi_errorUnsupported` for a write past the device's root block; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or bytes, a pass that copies, or an unaligned or empty write; `mrhi_errorUnsupported` for a write past the adapter's root block; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` for a write past the device's root block within the adapter's, or when the frame's commands are full."
           },
           "args": [
             {
@@ -20851,7 +20996,7 @@
           "doc": "Sets where later draws land, in a pass with targets.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass without targets, or a viewport out of range; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` when the frame's commands are full."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a pass without targets, or a viewport with an edge or size that is not finite, a negative size, or depths outside [0, 1] or in reverse order; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorUnsupported` for a size past the adapter's textureDimension2d or edges past twice it; `mrhi_errorCapacity` for a size or edges past the device's within the adapter's, or when the frame's commands are full."
           },
           "args": [
             {

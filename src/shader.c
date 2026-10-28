@@ -19,41 +19,59 @@ mrhiShaderDef mrhiDefaultShaderDef(void)
     return def;
 }
 
-// Whether a container's bindings fit the device's limits: slots, binding
-// sizes, and each stage's count of each kind. Tables and color outputs
-// need no check: the floor's four tables and eight color attachments are
-// the container's own bounds.
-static bool AreBindingsWithin(const mrhiLimits* limits, const mrhiContainer* container)
+// The first per-stage count a stage's bindings pass, or
+// MRHI_WITHIN_LIMITS.
+static size_t StagePast(const mrhiLimits* limits, const mrhiContainer* container, uint32_t stage)
+{
+    uint32_t counts[mrhi_bindingStorageTexture + 1] = {0};
+    for (uint32_t i = 0; i < container->bindingCount; ++i)
+    {
+        mrhiShaderBinding binding = mrhiContainerBinding(container, i);
+        counts[binding.kind] += (binding.stages & stage) != 0 ? 1 : 0;
+    }
+    uint32_t storage =
+        counts[mrhi_bindingStorageBuffer] + counts[mrhi_bindingReadOnlyStorageBuffer];
+    return counts[mrhi_bindingUniformBuffer] > limits->uniformBuffersPerStage
+               ? offsetof(mrhiLimits, uniformBuffersPerStage)
+           : storage > limits->storageBuffersPerStage ? offsetof(mrhiLimits, storageBuffersPerStage)
+           : counts[mrhi_bindingSampler] > limits->samplersPerStage
+               ? offsetof(mrhiLimits, samplersPerStage)
+           : counts[mrhi_bindingSampledTexture] > limits->sampledTexturesPerStage
+               ? offsetof(mrhiLimits, sampledTexturesPerStage)
+           : counts[mrhi_bindingStorageTexture] > limits->storageTexturesPerStage
+               ? offsetof(mrhiLimits, storageTexturesPerStage)
+               : MRHI_WITHIN_LIMITS;
+}
+
+// The first limit a container's bindings pass (each stage's count of
+// each kind, a slot, a binding's size), or MRHI_WITHIN_LIMITS. Tables
+// and color outputs need no check: the floor's four tables and eight
+// color attachments are the container's own bounds.
+static size_t BindingsPast(const mrhiLimits* limits, const mrhiContainer* container)
 {
     for (uint32_t stage = mrhi_stageVertex; stage <= mrhi_stageCompute; stage <<= 1)
     {
-        uint32_t counts[mrhi_bindingStorageTexture + 1] = {0};
-        for (uint32_t i = 0; i < container->bindingCount; ++i)
+        size_t past = StagePast(limits, container, stage);
+        if (past != MRHI_WITHIN_LIMITS)
         {
-            mrhiShaderBinding binding = mrhiContainerBinding(container, i);
-            counts[binding.kind] += (binding.stages & stage) != 0 ? 1 : 0;
-        }
-        if (counts[mrhi_bindingUniformBuffer] > limits->uniformBuffersPerStage ||
-            counts[mrhi_bindingStorageBuffer] + counts[mrhi_bindingReadOnlyStorageBuffer] >
-                limits->storageBuffersPerStage ||
-            counts[mrhi_bindingSampler] > limits->samplersPerStage ||
-            counts[mrhi_bindingSampledTexture] > limits->sampledTexturesPerStage ||
-            counts[mrhi_bindingStorageTexture] > limits->storageTexturesPerStage)
-        {
-            return false;
+            return past;
         }
     }
     for (uint32_t i = 0; i < container->bindingCount; ++i)
     {
         mrhiShaderBinding binding = mrhiContainerBinding(container, i);
-        uint64_t bytes = binding.kind == mrhi_bindingUniformBuffer ? limits->uniformBindingBytes
-                                                                   : limits->storageBindingBytes;
-        if (binding.slot >= limits->bindingsPerTable || binding.minSize > bytes)
+        bool uniform = binding.kind == mrhi_bindingUniformBuffer;
+        if (binding.slot >= limits->bindingsPerTable)
         {
-            return false;
+            return offsetof(mrhiLimits, bindingsPerTable);
+        }
+        if (binding.minSize > (uniform ? limits->uniformBindingBytes : limits->storageBindingBytes))
+        {
+            return uniform ? offsetof(mrhiLimits, uniformBindingBytes)
+                           : offsetof(mrhiLimits, storageBindingBytes);
         }
     }
-    return true;
+    return MRHI_WITHIN_LIMITS;
 }
 
 // The fragment builtins an entry reads that count as inter-stage
@@ -70,32 +88,41 @@ static uint32_t StageBuiltins(mrhiShaderBuiltins builtins)
     return count;
 }
 
-// Whether an entry fits the device's limits: a compute entry's
-// workgroup, and the vertex inputs and inter-stage variables of the
-// others, with the fragment builtins that count as variables.
-static bool IsEntryWithin(const mrhiLimits* limits, const mrhiContainer* container,
-                          mrhiShaderEntry entry)
+// The first limit a compute entry's workgroup passes, or
+// MRHI_WITHIN_LIMITS.
+static size_t WorkgroupPast(const mrhiLimits* limits, mrhiShaderEntry entry)
+{
+    uint64_t invocations = (uint64_t)entry.workgroup[0] * entry.workgroup[1] * entry.workgroup[2];
+    return entry.workgroup[0] > limits->workgroupSizeX   ? offsetof(mrhiLimits, workgroupSizeX)
+           : entry.workgroup[1] > limits->workgroupSizeY ? offsetof(mrhiLimits, workgroupSizeY)
+           : entry.workgroup[2] > limits->workgroupSizeZ ? offsetof(mrhiLimits, workgroupSizeZ)
+           : invocations > limits->workgroupInvocations ? offsetof(mrhiLimits, workgroupInvocations)
+           : entry.workgroupStorageBytes > limits->workgroupStorageBytes
+               ? offsetof(mrhiLimits, workgroupStorageBytes)
+               : MRHI_WITHIN_LIMITS;
+}
+
+// The first limit an entry passes (a compute entry's workgroup, the
+// vertex inputs and inter-stage variables of the others, with the
+// fragment builtins that count as variables), or MRHI_WITHIN_LIMITS.
+static size_t EntryPast(const mrhiLimits* limits, const mrhiContainer* container,
+                        mrhiShaderEntry entry)
 {
     if (entry.stage == mrhi_stageCompute)
     {
-        uint64_t invocations = (uint64_t)entry.workgroup[0] * entry.workgroup[1];
-        return entry.workgroup[0] <= limits->workgroupSizeX &&
-               entry.workgroup[1] <= limits->workgroupSizeY &&
-               entry.workgroup[2] <= limits->workgroupSizeZ &&
-               invocations * entry.workgroup[2] <= limits->workgroupInvocations &&
-               entry.workgroupStorageBytes <= limits->workgroupStorageBytes;
+        return WorkgroupPast(limits, entry);
     }
     // Unique input locations below the limit keep their count within it.
     if (entry.variableCount + StageBuiltins(entry.builtins) > limits->interStageVariables)
     {
-        return false;
+        return offsetof(mrhiLimits, interStageVariables);
     }
     for (uint32_t i = 0; i < entry.inputCount; ++i)
     {
         if (mrhiContainerInput(container, entry.firstInput + i).location >=
             limits->vertexAttributes)
         {
-            return false;
+            return offsetof(mrhiLimits, vertexAttributes);
         }
     }
     for (uint32_t i = 0; i < entry.variableCount; ++i)
@@ -103,37 +130,40 @@ static bool IsEntryWithin(const mrhiLimits* limits, const mrhiContainer* contain
         if (mrhiContainerVariable(container, entry.firstVariable + i).location >=
             limits->interStageVariables)
         {
-            return false;
+            return offsetof(mrhiLimits, interStageVariables);
         }
     }
-    return true;
+    return MRHI_WITHIN_LIMITS;
 }
 
-// Whether a container fits the device: its root block, bindings and
-// entries within the limits, and the features its code needs.
-static bool IsWithin(const mrhiDevice* device, const mrhiContainer* container)
+// Whether a device has the features a container's code needs.
+static bool HasFeatures(const mrhiDevice* device, const mrhiContainer* container)
 {
-    if (container->rootBlockBytes > device->limits.rootBlockBytes ||
-        (container->float16 && !device->features.shaderF16) ||
-        (container->subgroups && !device->features.subgroups) ||
-        (container->int64 && !device->features.shaderInt64) ||
-        (container->builtins & mrhi_builtinPrimitiveIndex) != 0 ||
-        (container->heapUses != 0 && !device->features.bindlessSampling) ||
-        ((container->builtins & mrhi_builtinViewIndex) != 0 && !device->features.multiview) ||
-        ((container->heapUses & (mrhi_heapUseStorageTextures | mrhi_heapUseStorageBuffers)) != 0 &&
-         !device->features.bindlessHeterogeneous) ||
-        !AreBindingsWithin(&device->limits, container))
+    const mrhiFeatures* features = &device->features;
+    mrhiShaderHeapUses heterogeneous = mrhi_heapUseStorageTextures | mrhi_heapUseStorageBuffers;
+    return (!container->float16 || features->shaderF16) &&
+           (!container->subgroups || features->subgroups) &&
+           (!container->int64 || features->shaderInt64) &&
+           (container->builtins & mrhi_builtinPrimitiveIndex) == 0 &&
+           (container->heapUses == 0 || features->bindlessSampling) &&
+           ((container->builtins & mrhi_builtinViewIndex) == 0 || features->multiview) &&
+           ((container->heapUses & heterogeneous) == 0 || features->bindlessHeterogeneous);
+}
+
+// The first limit a container passes (its root block, bindings and
+// entries), or MRHI_WITHIN_LIMITS.
+static size_t ContainerPast(const mrhiLimits* limits, const mrhiContainer* container)
+{
+    if (container->rootBlockBytes > limits->rootBlockBytes)
     {
-        return false;
+        return offsetof(mrhiLimits, rootBlockBytes);
     }
-    for (uint32_t i = 0; i < container->entryCount; ++i)
+    size_t past = BindingsPast(limits, container);
+    for (uint32_t i = 0; i < container->entryCount && past == MRHI_WITHIN_LIMITS; ++i)
     {
-        if (!IsEntryWithin(&device->limits, container, mrhiContainerEntry(container, i)))
-        {
-            return false;
-        }
+        past = EntryPast(limits, container, mrhiContainerEntry(container, i));
     }
-    return true;
+    return past;
 }
 
 // Whether each of a container's four tables holds at most
@@ -171,8 +201,16 @@ static mrhiResult CheckShaderDef(mrhiDevice* device, const mrhiShaderDef* def,
     {
         return mrhiDeviceBadData(device, mrhi_diagnosticShaderContainer);
     }
-    return status == mrhi_success && !IsWithin(device, containerOut) ? mrhi_errorUnsupported
-                                                                     : status;
+    if (status != mrhi_success)
+    {
+        return status;
+    }
+    if (!HasFeatures(device, containerOut))
+    {
+        return mrhi_errorUnsupported;
+    }
+    return mrhiDevicePastLimit(device, ContainerPast(&device->limits, containerOut),
+                               ContainerPast(&device->adapterLimits, containerOut));
 }
 
 mrhiResult mrhiCreateShader(mrhiDevice* device, const mrhiShaderDef* def, mrhiShaderId* shaderOut)
