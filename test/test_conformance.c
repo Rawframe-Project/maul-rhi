@@ -445,9 +445,9 @@ static void CheckFrameMemory(mrhiDevice* device)
     mrhiPassId id = {0};
     CHECK(mrhiAddPass(device, &pass, &id) == mrhi_success, "a pass");
     CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
-    uint64_t bytes = 0;
+    mrhiFrameUsage usage = {0};
     // The target is transient, which a tile GPU keeps on chip.
-    CHECK(mrhiGetFrameMemory(device, &bytes) == mrhi_success && bytes >= 2000,
+    CHECK(mrhiGetFrameUsage(device, &usage) == mrhi_success && usage.frameMemoryBytes >= 2000,
           "the transients' memory");
     CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
 }
@@ -2037,13 +2037,13 @@ static uint64_t SlicedBytes(mrhiDevice* device, mrhiTextureKind kind)
     pass.accessCount = 1;
     pass.neverCull = true;
     mrhiPassId id = {0};
-    uint64_t bytes = 0;
+    mrhiFrameUsage usage = {0};
     CHECK(mrhiAddPass(device, &pass, &id) == mrhi_success &&
               mrhiCompileFrame(device) == mrhi_success &&
-              mrhiGetFrameMemory(device, &bytes) == mrhi_success &&
+              mrhiGetFrameUsage(device, &usage) == mrhi_success &&
               mrhiDropFrame(device) == mrhi_success,
           "measured");
-    return bytes;
+    return usage.frameMemoryBytes;
 }
 
 // A volume's mips halve its depth too, an array's keep their layers,

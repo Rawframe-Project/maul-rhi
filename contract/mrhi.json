@@ -14075,37 +14075,9 @@
           "library": "reads the library's plan"
         },
         {
-          "kind": "function",
-          "name": "get_frame_memory",
-          "doc": "Reads the bytes the compiled frame's declared resources take together, aliased by lifetime.",
-          "returns": {
-            "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorState` for a frame not compiled."
-          },
-          "args": [
-            {
-              "name": "device",
-              "type": "opaque.device",
-              "pointer": "mutable",
-              "doc": "The device."
-            },
-            {
-              "name": "bytes_out",
-              "type": "uint64",
-              "pointer": "mutable",
-              "doc": "Receives the bytes."
-            }
-          ],
-          "thread_safety": {
-            "class": "any_exclusive",
-            "object": "the device"
-          },
-          "library": "reads the library's plan"
-        },
-        {
           "kind": "struct",
           "name": "frame_usage",
-          "doc": "What a frame has taken of each limit a frame has, each member named after the mrhiDeviceLimits member it is measured against.",
+          "doc": "What a frame has taken of each limit a frame has, each member named after the mrhiDeviceLimits member it is measured against, and the memory its transient resources take, which no limit bounds.",
           "members": [
             {
               "name": "frame_resources",
@@ -14141,6 +14113,11 @@
               "name": "frame_indirect_draws",
               "type": "uint32",
               "doc": "The maxCounts of its counted multi-draws, in all."
+            },
+            {
+              "name": "frame_memory_bytes",
+              "type": "uint64",
+              "doc": "The bytes its declared resources take together, placed by lifetime so resources whose uses do not overlap share bytes: 0 until its compile succeeds."
             }
           ],
           "library": "a record of the library's own bookkeeping"
