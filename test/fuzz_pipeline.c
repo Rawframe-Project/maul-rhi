@@ -9,7 +9,9 @@
 // whose vertex inputs, color outputs, inter-stage variables, fragment
 // builtins and constants the reflection rules read. Every call must
 // answer a status, count misuse only for invalid input or a bound
-// passed, and name each refusal of the def; a pipeline that is made
+// passed, name each refusal of the def and each device or adapter limit
+// it passes, and answer capacity only past a device limit the adapter's
+// would hold; a pipeline that is made
 // must satisfy WebGPU's rules on the def alone, be answered ready once,
 // and be destroyed.
 // Arrays longer than their limit are given only up to it, as the core
@@ -197,8 +199,9 @@ typedef struct Device
     mrhiShaderId destroyed;
 } Device;
 
-// A device with dual-source blending, unclipped depth and four views,
-// and one with no optional feature.
+// A device with dual-source blending, unclipped depth and four views, on
+// an adapter with more views and vertex state than it asked for, and
+// one with no optional feature.
 static Device s_devices[2];
 
 static mrhiShaderId MakeShader(mrhiDevice* device, const uint8_t* bytes, size_t size)
@@ -209,7 +212,8 @@ static mrhiShaderId MakeShader(mrhiDevice* device, const uint8_t* bytes, size_t 
     mrhiShaderId shader = {0};
     mrhiResult status = mrhiCreateShader(device, &def, &shader);
     Expect(status == mrhi_success || status == mrhi_errorFormat ||
-           status == mrhi_errorUnsupported || status == mrhi_errorVersion);
+           status == mrhi_errorUnsupported || status == mrhi_errorCapacity ||
+           status == mrhi_errorVersion);
     return shader;
 }
 
@@ -228,7 +232,10 @@ static void Open(Device* open, bool featured)
         adapter->features.dualSourceBlending = true;
         adapter->features.unclippedDepth = true;
         adapter->features.multiview = true;
-        adapter->limits.multiviewViews = 4;
+        adapter->limits.multiviewViews = 8;
+        adapter->limits.vertexBuffers = 16;
+        adapter->limits.vertexAttributes = 32;
+        adapter->limits.vertexStride = 4096;
         deviceDef.features = adapter->features;
         deviceDef.limits.multiviewViews = 4;
     }
@@ -595,31 +602,64 @@ static bool KeepsGraphicsRules(const Device* device, const mrhiGraphicsPipelineD
            (!def->alphaToCoverage || (samples > 1 && def->colorTargetCount > 0)) && attached;
 }
 
-// Takes the device's diagnostics: how many it recorded.
-static uint32_t Diagnostics(mrhiDevice* device)
+// Whether a diagnostic code is one a member of mrhiLimits refuses with.
+static bool IsLimitCode(mrhiDiagnosticCode code)
 {
-    uint32_t count = 0;
+    for (size_t field = 0; field < sizeof(mrhiLimits); ++field)
+    {
+        if (mrhiLimitDiagnostic(field) == code)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The device's diagnostics, taken: how many name a limit, and how many
+// name anything else.
+typedef struct Named
+{
+    uint32_t limits;
+    uint32_t others;
+} Named;
+
+static Named Diagnostics(mrhiDevice* device)
+{
+    Named named = {0};
     mrhiDiagnostic record;
     while (mrhiNextDeviceDiagnostic(device, &record) == mrhi_success)
     {
         Expect(record.code != 0);
-        ++count;
+        if (IsLimitCode(record.code))
+        {
+            ++named.limits;
+        }
+        else
+        {
+            ++named.others;
+        }
     }
-    return count;
+    return named;
 }
 
 // Checks what a pipeline creation answered: a status it may give,
-// misuse counted for invalid input or a fixed bound passed alone, and
-// such a def or a bad one named in the diagnostics.
+// misuse counted for invalid input or a fixed bound passed alone, such
+// a def or a bad one named once in the diagnostics, and each device or
+// adapter limit passed named by its own code. Capacity is a device
+// limit passed, so it names one; unsupported may be a missing feature,
+// which names none.
 static void CheckAnswer(mrhiDevice* device, mrhiResult status, uint64_t misuse)
 {
     Expect(status == mrhi_success || status == mrhi_errorInvalid || status == mrhi_errorLimit ||
            status == mrhi_errorFormat || status == mrhi_errorUnsupported ||
-           status == mrhi_errorStale);
+           status == mrhi_errorCapacity || status == mrhi_errorStale);
     bool misused = status == mrhi_errorInvalid || status == mrhi_errorLimit;
     Expect(mrhiGetDeviceMisuse(device) - misuse == (misused ? 1u : 0u));
-    bool named = misused || status == mrhi_errorFormat;
-    Expect(Diagnostics(device) == (named ? 1u : 0u));
+    Named named = Diagnostics(device);
+    Expect(named.others == (misused || status == mrhi_errorFormat ? 1u : 0u));
+    bool refused = status != mrhi_success && status != mrhi_errorStale;
+    Expect(refused || named.limits == 0);
+    Expect(status != mrhi_errorCapacity || named.limits > 0);
 }
 
 // Checks that a made pipeline is answered ready once.

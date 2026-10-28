@@ -464,7 +464,8 @@ static void TestPrimitive(void)
     deviceDef.limits.multiviewViews = 2;
     Reset();
     device = OpenWithShader(deviceDef);
-    CHECK(Made(device, &def) == mrhi_errorUnsupported, "two views in the limit, without multiview");
+    CHECK(Made(device, &def) == mrhi_errorUnsupported && Refusal(device) == 0,
+          "two views in the limit, without multiview, naming no limit");
     Close(device);
     ResetAdapter();
     s_adapter.features.multiview = true;
@@ -475,10 +476,13 @@ static void TestPrimitive(void)
     Reset();
     device = OpenWithShader(deviceDef);
     def.viewCount = 3;
-    CHECK(Made(device, &def) == mrhi_errorCapacity,
-          "past the device's limit, within the adapter's");
+    CHECK(Made(device, &def) == mrhi_errorCapacity &&
+              Refusal(device) == mrhi_diagnosticLimitMultiviewViews,
+          "past the device's limit, within the adapter's, named");
     def.viewCount = 5;
-    CHECK(Made(device, &def) == mrhi_errorUnsupported, "past the adapter's limit");
+    CHECK(Made(device, &def) == mrhi_errorUnsupported &&
+              Refusal(device) == mrhi_diagnosticLimitMultiviewViews,
+          "past the adapter's limit, named");
     CHECK(mrhiGetDeviceMisuse(device) == 0, "none is misuse");
     Close(device);
 }
