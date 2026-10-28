@@ -9,6 +9,7 @@
 #ifndef MAUL_RHI_SRC_INSTANCE_CORE_H
 #define MAUL_RHI_SRC_INSTANCE_CORE_H
 
+#include "allocator.h"
 #include "diagnostics.h"
 #include "driver.h"
 #include "pool.h"
@@ -56,6 +57,9 @@ typedef struct mrhiPending
 
 struct mrhiInstance
 {
+    // The def's allocator behind the instance's guard, which every
+    // allocation of the instance and its driver goes through.
+    mrhiAllocatorGuard allocatorGuard;
     mrhiAllocator allocator;
     mrhiInstanceLimits limits;
     size_t bytes;
@@ -97,6 +101,18 @@ mrhiResult mrhiMisuse(mrhiInstance* instance, mrhiDiagnosticCode code);
 // Counts one misuse refused by a fixed bound of the library, records it,
 // and returns mrhi_errorLimit.
 mrhiResult mrhiOverLimit(mrhiInstance* instance, mrhiDiagnosticCode code);
+
+// Counts one misuse for a call made from inside the instance's
+// allocator, records it, and returns mrhi_errorBusy.
+mrhiResult mrhiInstanceBusy(mrhiInstance* instance);
+
+// Marks the instance busy while a call of another object that changes
+// it runs host code, as its own allocator would: what the mark was, for
+// mrhiReleaseInstance.
+bool mrhiHoldInstance(mrhiInstance* instance);
+
+// Gives the instance back the mark mrhiHoldInstance returned.
+void mrhiReleaseInstance(mrhiInstance* instance, bool held);
 
 // Appends a record; the caller has made sure there is room.
 void mrhiPushInstanceNotification(mrhiInstance* instance, mrhiInstanceNotification notification);

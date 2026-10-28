@@ -168,6 +168,11 @@ mrhiResult mrhiConfigureSurface(mrhiDevice* device, const mrhiSurfaceConfig* con
     {
         return mrhi_errorInvalid;
     }
+    // The call changes the instance's surface slots as well.
+    if (device->allocatorGuard.busy || device->instance->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     if (config == nullptr)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
@@ -187,9 +192,13 @@ mrhiResult mrhiConfigureSurface(mrhiDevice* device, const mrhiSurfaceConfig* con
     mrhiSwapchainSlot* slot = &device->swapchainSlots[index1 - 1];
     uint64_t old = surface->device == nullptr ? 0 : slot->handle;
     uint64_t handle = 0;
+    // The surface's slot is the instance's, so the instance is held while
+    // the driver runs the allocator.
+    bool held = mrhiHoldInstance(device->instance);
     status =
         mrhiDriverStatus(device, device->driver.vtable->configureSurface(
                                      device->driver.self, surface->handle, config, old, &handle));
+    mrhiReleaseInstance(device->instance, held);
     if (status != mrhi_success)
     {
         mrhiPoolRelease(&device->swapchains, index1);
@@ -207,7 +216,9 @@ mrhiResult mrhiConfigureSurface(mrhiDevice* device, const mrhiSurfaceConfig* con
 void mrhiEndConfiguration(mrhiDevice* device, uint32_t swapchain)
 {
     const mrhiSwapchainSlot* slot = &device->swapchainSlots[swapchain - 1];
+    bool held = mrhiHoldInstance(device->instance);
     device->driver.vtable->unconfigureSurface(device->driver.self, slot->handle);
+    mrhiReleaseInstance(device->instance, held);
     mrhiSurfaceSlot* surface = &device->instance->surfaceSlots[slot->surface.index1 - 1];
     surface->device = nullptr;
     surface->swapchain = 0;
@@ -230,6 +241,11 @@ mrhiResult mrhiUnconfigureSurface(mrhiDevice* device, mrhiSurfaceId surface)
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    // The call changes the instance's surface slots as well.
+    if (device->allocatorGuard.busy || device->instance->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
     }
     if (mrhiFindSurface(device->instance, surface) == 0)
     {

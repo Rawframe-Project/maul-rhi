@@ -183,6 +183,10 @@ mrhiResult mrhiRequestAdapters(mrhiInstance* instance, const mrhiAdapterRequestD
     {
         return mrhi_errorInvalid;
     }
+    if (instance->allocatorGuard.busy)
+    {
+        return mrhiInstanceBusy(instance);
+    }
     if (def == nullptr || requestOut == nullptr || def->cookie != ADAPTER_REQUEST_DEF_COOKIE ||
         def->preference > mrhi_powerHigh)
     {

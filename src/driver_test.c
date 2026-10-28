@@ -185,6 +185,14 @@ typedef struct TestView
     uint64_t texture;
 } TestView;
 
+// A swapchain's record, from the device's allocator as a native
+// driver's are.
+typedef struct TestSwapchain
+{
+    uint64_t handle;
+    struct TestSwapchain* next;
+} TestSwapchain;
+
 typedef struct TestDevice
 {
     mrhiAllocator allocator;
@@ -234,8 +242,10 @@ typedef struct TestDevice
     uint64_t pipelinesCached;
     // The last label an object was given, copied as a real driver would.
     char label[MRHI_MAX_LABEL_BYTES + 1];
-    // Configured surfaces; the core ends each before the device.
+    // Configured surfaces, and their records; the core ends each before
+    // the device.
     uint32_t swapchains;
+    TestSwapchain* swapchainRecords;
     // Running frames; held ones finish only through a wait.
     bool holdFrames;
     mrhiResult frameOutcome;
@@ -566,20 +576,53 @@ static void DestroyPipeline(void* self, uint64_t handle)
     --device->pipelines;
 }
 
+// Gives back a configured swapchain's record.
+static void EndSwapchain(TestDevice* device, uint64_t handle)
+{
+    for (TestSwapchain** link = &device->swapchainRecords; *link != nullptr; link = &(*link)->next)
+    {
+        TestSwapchain* record = *link;
+        if (record->handle == handle)
+        {
+            MRHI_ASSERT(device->swapchains > 0);
+            *link = record->next;
+            --device->swapchains;
+            mrhiRelease(&device->allocator, record, sizeof(TestSwapchain), alignof(TestSwapchain));
+            return;
+        }
+    }
+    // The core ends only the swapchains it configured, each once.
+    MRHI_ASSERT(false);
+}
+
 static mrhiResult ConfigureSurface(void* self, uint64_t surface, const mrhiSurfaceConfig* config,
                                    uint64_t oldSwapchain, uint64_t* swapchainOut)
 {
     (void)config;
     TestDevice* device = self;
     MRHI_ASSERT(surface != 0);
+    // As a native driver does, the old swapchain goes before the new one
+    // allocates.
     if (oldSwapchain != 0)
     {
-        MRHI_ASSERT(device->swapchains > 0);
-        --device->swapchains;
+        EndSwapchain(device, oldSwapchain);
+    }
+    TestSwapchain* record =
+        mrhiAllocate(&device->allocator, sizeof(TestSwapchain), alignof(TestSwapchain));
+    if (record == nullptr)
+    {
+        return mrhi_errorCapacity;
     }
     mrhiResult status = MakeObject(device, swapchainOut);
-    device->swapchains += status == mrhi_success ? 1 : 0;
-    return status;
+    if (status != mrhi_success)
+    {
+        mrhiRelease(&device->allocator, record, sizeof(TestSwapchain), alignof(TestSwapchain));
+        return status;
+    }
+    *record = (TestSwapchain){.handle = *swapchainOut, .next = device->swapchainRecords};
+    device->swapchainRecords = record;
+    ++device->swapchains;
+    return mrhi_success;
 }
 
 // Acquires an image as the adapter's test says: a new handle each time,
@@ -614,8 +657,8 @@ static void ReleaseImage(void* self, uint64_t swapchain, uint64_t image)
 static void UnconfigureSurface(void* self, uint64_t swapchain)
 {
     TestDevice* device = self;
-    MRHI_ASSERT(swapchain != 0 && swapchain <= device->nextHandle && device->swapchains > 0);
-    --device->swapchains;
+    MRHI_ASSERT(swapchain != 0 && swapchain <= device->nextHandle);
+    EndSwapchain(device, swapchain);
 }
 
 // A texture's bytes: 4 per texel and sample, doubled for mips; none for

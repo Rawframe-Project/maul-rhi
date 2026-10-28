@@ -104,7 +104,8 @@ extern "C"
     /// samplers past the adapter's heapSize or samplerHeapSize;
     /// `mrhi_errorCapacity` for entries or samplers past the device's heapSize
     /// or samplerHeapSize within the adapter's, or when the device's heaps
-    /// limit is reached or the allocator fails.
+    /// limit is reached or the allocator fails; `mrhi_errorBusy` for a call
+    /// from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateHeap(mrhiDevice* device, const mrhiHeapDef* def,
@@ -116,7 +117,8 @@ extern "C"
     /// @param device  The device.
     /// @param heap    The heap.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
-    /// `mrhi_errorStale` for a heap the device no longer has.
+    /// `mrhi_errorStale` for a heap the device no longer has; `mrhi_errorBusy`
+    /// for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyHeap(mrhiDevice* device, mrhiHeapId heap);
@@ -137,7 +139,8 @@ extern "C"
     /// storageOffsetAlignment; `mrhi_errorCapacity` for an offset off the
     /// device's storageOffsetAlignment and on the adapter's; `mrhi_errorState`
     /// for an entry that is not empty, or one cleared before a frame that has
-    /// not finished.
+    /// not finished; `mrhi_errorBusy` for a call from inside the device's
+    /// allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiSetHeapEntry(mrhiDevice* device, mrhiHeapId heap,
@@ -151,7 +154,8 @@ extern "C"
     /// @param index   The entry.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or an
     /// index past the heap's entries; `mrhi_errorStale` for a heap the device
-    /// no longer has.
+    /// no longer has; `mrhi_errorBusy` for a call from inside the device's
+    /// allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiClearHeapEntry(mrhiDevice* device, mrhiHeapId heap,
@@ -167,7 +171,8 @@ extern "C"
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or an
     /// index past the heap's samplers; `mrhi_errorStale` for a heap or sampler
     /// the device no longer has; `mrhi_errorState` for an entry that is not
-    /// empty, or one cleared before a frame that has not finished.
+    /// empty, or one cleared before a frame that has not finished;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiSetHeapSampler(mrhiDevice* device, mrhiHeapId heap,
@@ -181,7 +186,8 @@ extern "C"
     /// @param index   The sampler entry.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or an
     /// index past the heap's samplers; `mrhi_errorStale` for a heap the device
-    /// no longer has.
+    /// no longer has; `mrhi_errorBusy` for a call from inside the device's
+    /// allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiClearHeapSampler(mrhiDevice* device, mrhiHeapId heap,

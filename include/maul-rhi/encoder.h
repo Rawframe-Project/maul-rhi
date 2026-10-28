@@ -834,7 +834,7 @@ extern "C"
     /// that is not a readback waiting to be taken; `mrhi_errorState` for a
     /// readback not yet answered; `mrhi_errorCapacity` for an array too small,
     /// with the size; the error that ended the readback's frame, which frees
-    /// it.
+    /// it; `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiTakeReadback(mrhiDevice* device, mrhiRequestId request,

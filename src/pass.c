@@ -598,6 +598,23 @@ static void MeasureTargets(const mrhiDevice* device, mrhiFramePass* pass)
     }
 }
 
+// Copies a def's color targets into its pass, each with the format it
+// renders in: drivers never see none.
+static void CopyTargets(const mrhiDevice* device, const mrhiPassDef* def, mrhiFramePass* pass)
+{
+    for (uint32_t i = 0; i < def->colorTargetCount; ++i)
+    {
+        pass->colorTargets[i] = def->colorTargets[i];
+        if (def->colorTargets[i].resource.index1 != 0)
+        {
+            const mrhiTextureDef* texture = mrhiFrameTextureOf(
+                &device->frameResources[def->colorTargets[i].resource.index1 - 1]);
+            pass->colorTargets[i].viewFormat =
+                mrhiViewFormatOf(texture, def->colorTargets[i].viewFormat);
+        }
+    }
+}
+
 mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* passOut)
 {
     if (passOut != nullptr)
@@ -607,6 +624,10 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
     }
     if (def == nullptr || passOut == nullptr)
     {
@@ -663,18 +684,7 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
                def->label, def->labelLength);
     }
     mrhiMarkPassTimestamps(device, def, pass);
-    for (uint32_t i = 0; i < def->colorTargetCount; ++i)
-    {
-        pass->colorTargets[i] = def->colorTargets[i];
-        // Drivers see the format a target renders in, never none.
-        if (def->colorTargets[i].resource.index1 != 0)
-        {
-            const mrhiTextureDef* texture = mrhiFrameTextureOf(
-                &device->frameResources[def->colorTargets[i].resource.index1 - 1]);
-            pass->colorTargets[i].viewFormat =
-                mrhiViewFormatOf(texture, def->colorTargets[i].viewFormat);
-        }
-    }
+    CopyTargets(device, def, pass);
     MeasureTargets(device, pass);
     device->frameUseCount += count;
     *passOut = (mrhiPassId){device->framePassCount, device->frameSerial};

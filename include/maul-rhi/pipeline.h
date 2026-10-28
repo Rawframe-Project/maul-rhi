@@ -501,7 +501,8 @@ extern "C"
     /// for vertex buffers, attributes, strides, inter-stage variables, color
     /// bytes or views past the device's limits within the adapter's, or when
     /// the device's pipeline limit is reached or its queue has no room for the
-    /// answer; `mrhi_errorPlatform` when the driver refuses at once.
+    /// answer; `mrhi_errorPlatform` when the driver refuses at once;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult
@@ -514,7 +515,8 @@ extern "C"
     /// @param device    The device.
     /// @param pipeline  The pipeline.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
-    /// `mrhi_errorStale` for a pipeline the device no longer has.
+    /// `mrhi_errorStale` for a pipeline the device no longer has;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyGraphicsPipeline(mrhiDevice* device,
@@ -584,7 +586,8 @@ extern "C"
     /// extension the library does not know; `mrhi_errorState` for a device that
     /// is not ready; `mrhi_errorCapacity` when the device's pipeline limit is
     /// reached or its queue has no room for the answer; `mrhi_errorPlatform`
-    /// when the driver refuses at once.
+    /// when the driver refuses at once; `mrhi_errorBusy` for a call from inside
+    /// the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateComputePipeline(mrhiDevice* device,
@@ -598,7 +601,8 @@ extern "C"
     /// @param device    The device.
     /// @param pipeline  The pipeline.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
-    /// `mrhi_errorStale` for a pipeline the device no longer has.
+    /// `mrhi_errorStale` for a pipeline the device no longer has;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyComputePipeline(mrhiDevice* device,

@@ -288,6 +288,8 @@ const char* mrhiDiagnosticText(mrhiDiagnosticCode code)
         return "A value past the device's samplerHeapSize limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
     case mrhi_diagnosticLimitMultiviewViews:
         return "A value past the device's multiviewViews limit: mrhi_errorCapacity within the adapter's, mrhi_errorUnsupported past it.";
+    case mrhi_diagnosticAllocatorCall:
+        return "A function that would change the instance or device was called from inside its allocator.";
     default:
         return "An unknown diagnostic code.";
     }

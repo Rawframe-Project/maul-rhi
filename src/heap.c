@@ -54,6 +54,10 @@ mrhiResult mrhiCreateHeap(mrhiDevice* device, const mrhiHeapDef* def, mrhiHeapId
     {
         return mrhi_errorInvalid;
     }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     if (def == nullptr || heapOut == nullptr)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
@@ -175,6 +179,10 @@ mrhiResult mrhiDestroyHeap(mrhiDevice* device, mrhiHeapId heap)
     {
         return mrhi_errorInvalid;
     }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     if (!mrhiPoolIsLive(&device->heaps, heap.index1, heap.generation))
     {
         return mrhi_errorStale;
@@ -286,6 +294,10 @@ mrhiResult mrhiSetHeapEntry(mrhiDevice* device, mrhiHeapId heap, uint32_t index,
     {
         return mrhi_errorInvalid;
     }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     if (entry == nullptr || entry->kind > mrhi_heapStorageBuffer)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticHeapEntry);
@@ -334,6 +346,10 @@ mrhiResult mrhiSetHeapSampler(mrhiDevice* device, mrhiHeapId heap, uint32_t inde
     {
         return mrhi_errorInvalid;
     }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     mrhiResult status = mrhi_success;
     mrhiHeapEntrySlot* slot = FindEntry(device, heap, index, true, &status);
     if (slot == nullptr)
@@ -361,6 +377,10 @@ static mrhiResult Clear(mrhiDevice* device, mrhiHeapId heap, uint32_t index, boo
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
     }
     mrhiResult status = mrhi_success;
     mrhiHeapEntrySlot* slot = FindEntry(device, heap, index, sampler, &status);

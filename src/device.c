@@ -409,6 +409,38 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
     return device;
 }
 
+// Opens the device's driver on the adapter, the instance busy while the
+// driver allocates: success, or the driver's refusal with nothing of it
+// left.
+static mrhiResult OpenDriver(mrhiInstance* instance, const mrhiDriverAdapter* adapter,
+                             const mrhiDeviceDef* def, mrhiDevice* device)
+{
+    // An adapter was found, so the instance has a driver.
+    MRHI_ASSERT(instance->driver.vtable != nullptr);
+    mrhiDeviceDef driverDef = *def;
+    driverDef.allocator = device->allocator;
+    mrhiDropLabel(&driverDef.label, &driverDef.labelLength);
+    // A frame holds the library's passes and their barriers beside the
+    // program's.
+    driverDef.deviceLimits.framePasses += MRHI_LIBRARY_PASSES;
+    driverDef.deviceLimits.frameBarriers += def->deviceLimits.frameResources;
+    instance->allocatorGuard.busy = true;
+    mrhiResult status = instance->driver.vtable->createDevice(
+        instance->driver.self, adapter->handle, &driverDef, device->request, &device->driver);
+    instance->allocatorGuard.busy = false;
+    if (status == mrhi_success)
+    {
+        // The handshake; destroy comes first in every version.
+        status = mrhiCheckDeviceVtable(device->driver.vtable);
+        if (status != mrhi_success && device->driver.vtable != nullptr &&
+            device->driver.vtable->destroy != nullptr)
+        {
+            device->driver.vtable->destroy(device->driver.self);
+        }
+    }
+    return status;
+}
+
 mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
                             mrhiDevice** deviceOut, mrhiRequestId* requestOut)
 {
@@ -424,6 +456,10 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     {
         return mrhi_errorInvalid;
     }
+    if (instance->allocatorGuard.busy)
+    {
+        return mrhiInstanceBusy(instance);
+    }
     if (deviceOut == nullptr || requestOut == nullptr || def == nullptr)
     {
         return mrhiMisuse(instance, mrhi_diagnosticNullArgument);
@@ -434,7 +470,10 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     {
         return status;
     }
+    // The def's allocator serves the instance until the device holds it.
+    instance->allocatorGuard.busy = true;
     mrhiDevice* device = Allocate(def);
+    instance->allocatorGuard.busy = false;
     if (device == nullptr)
     {
         return mrhi_errorCapacity;
@@ -442,7 +481,8 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     device->instance = instance;
     device->adapter = adapter->handle;
     device->adapterInfo = adapter->info;
-    device->allocator = def->allocator;
+    device->allocatorGuard.program = def->allocator;
+    device->allocator = mrhiGuardedAllocator(&device->allocatorGuard);
     device->features = def->features;
     device->limits = def->limits;
     device->adapterLimits = adapter->limits;
@@ -456,29 +496,11 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
                                     ? mrhiAdapterFormatCaps(instance, adapter, format)
                                     : (mrhiFormatCaps){0};
     }
-    // An adapter was found, so the instance has a driver.
-    MRHI_ASSERT(instance->driver.vtable != nullptr);
-    mrhiDeviceDef driverDef = *def;
-    mrhiDropLabel(&driverDef.label, &driverDef.labelLength);
-    // A frame holds the library's passes and their barriers beside the
-    // program's.
-    driverDef.deviceLimits.framePasses += MRHI_LIBRARY_PASSES;
-    driverDef.deviceLimits.frameBarriers += def->deviceLimits.frameResources;
-    status = instance->driver.vtable->createDevice(instance->driver.self, adapter->handle,
-                                                   &driverDef, device->request, &device->driver);
-    if (status == mrhi_success)
-    {
-        // The handshake; destroy comes first in every version.
-        status = mrhiCheckDeviceVtable(device->driver.vtable);
-        if (status != mrhi_success && device->driver.vtable != nullptr &&
-            device->driver.vtable->destroy != nullptr)
-        {
-            device->driver.vtable->destroy(device->driver.self);
-        }
-    }
+    status = OpenDriver(instance, adapter, def, device);
     if (status != mrhi_success)
     {
-        mrhiRelease(&device->allocator, device, device->bytes, alignof(mrhiDevice));
+        mrhiAllocator program = device->allocatorGuard.program;
+        mrhiRelease(&program, device, device->bytes, alignof(mrhiDevice));
         return status;
     }
     device->cacheOutcome =
@@ -507,6 +529,14 @@ void mrhiDestroyDevice(mrhiDevice* device)
         return;
     }
     mrhiInstance* instance = device->instance;
+    if (device->allocatorGuard.busy || instance->allocatorGuard.busy)
+    {
+        mrhiDeviceBusy(device);
+        return;
+    }
+    // The device's answer, configurations and count are the instance's,
+    // so the instance is held until the device is out of it.
+    instance->allocatorGuard.busy = true;
     if (device->state == mrhi_deviceOpening)
     {
         mrhiAnswerNow(instance, device->request, mrhi_errorStale);
@@ -525,7 +555,9 @@ void mrhiDestroyDevice(mrhiDevice* device)
         device->driver.vtable->destroy(device->driver.self);
     }
     --instance->deviceCount;
-    mrhiAllocator allocator = device->allocator;
+    instance->allocatorGuard.busy = false;
+    // The block holds the guard, so it goes back past it.
+    mrhiAllocator allocator = device->allocatorGuard.program;
     mrhiRelease(&allocator, device, device->bytes, alignof(mrhiDevice));
 }
 
@@ -539,6 +571,12 @@ mrhiResult mrhiDeviceMisuse(mrhiDevice* device, mrhiDiagnosticCode code)
     atomic_fetch_add_explicit(&device->misuse, 1, memory_order_relaxed);
     mrhiRecordDiagnostic(&device->diagnostics, code);
     return mrhi_errorInvalid;
+}
+
+mrhiResult mrhiDeviceBusy(mrhiDevice* device)
+{
+    mrhiDeviceMisuse(device, mrhi_diagnosticAllocatorCall);
+    return mrhi_errorBusy;
 }
 
 mrhiResult mrhiDeviceOverLimit(mrhiDevice* device, mrhiDiagnosticCode code)
@@ -692,6 +730,10 @@ mrhiResult mrhiNextDeviceDiagnostic(mrhiDevice* device, mrhiDiagnostic* diagnost
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
     }
     if (diagnosticOut == nullptr)
     {

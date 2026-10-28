@@ -125,6 +125,10 @@ mrhiResult mrhiCreateSurface(mrhiInstance* instance, const mrhiSurfaceDef* def,
     {
         return mrhi_errorInvalid;
     }
+    if (instance->allocatorGuard.busy)
+    {
+        return mrhiInstanceBusy(instance);
+    }
     if (def == nullptr || surfaceOut == nullptr)
     {
         return mrhiMisuse(instance, mrhi_diagnosticNullArgument);
@@ -184,9 +188,19 @@ mrhiResult mrhiDestroySurface(mrhiInstance* instance, mrhiSurfaceId surface)
     {
         return mrhi_errorInvalid;
     }
+    if (instance->allocatorGuard.busy)
+    {
+        return mrhiInstanceBusy(instance);
+    }
     if (mrhiFindSurface(instance, surface) == 0)
     {
         return mrhi_errorStale;
+    }
+    // Ending the surface ends its configuration, which changes the device.
+    const mrhiDevice* device = instance->surfaceSlots[surface.index1 - 1].device;
+    if (device != nullptr && device->allocatorGuard.busy)
+    {
+        return mrhiInstanceBusy(instance);
     }
     EndSurface(instance, surface.index1);
     return mrhi_success;
