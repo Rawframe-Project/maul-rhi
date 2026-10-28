@@ -782,19 +782,9 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiGetPassPlan(mrhiDevice* device, mrhiPassId pass,
                                                        mrhiPassPlan* planOut);
 
-    /// Reads the bytes the compiled frame's declared resources take together,
-    /// aliased by lifetime.
-    ///
-    /// @param device    The device.
-    /// @param bytesOut  Receives the bytes.
-    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
-    /// `mrhi_errorState` for a frame not compiled.
-    /// @par Thread safety
-    /// Safe from any thread; the device is used by one thread at a time.
-    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetFrameMemory(mrhiDevice* device, uint64_t* bytesOut);
-
     // What a frame has taken of each limit a frame has, each member named after
-    // the mrhiDeviceLimits member it is measured against.
+    // the mrhiDeviceLimits member it is measured against, and the memory its
+    // transient resources take, which no limit bounds.
     typedef struct mrhiFrameUsage
     {
         // The resources it declared, imported and acquired.
@@ -818,6 +808,10 @@ extern "C"
         uint32_t frameUploadBytes;
         // The maxCounts of its counted multi-draws, in all.
         uint32_t frameIndirectDraws;
+        // The bytes its declared resources take together, placed by lifetime so
+        // resources whose uses do not overlap share bytes: 0 until its compile
+        // succeeds.
+        uint64_t frameMemoryBytes;
     } mrhiFrameUsage;
 
     /// Reads what the frame begun last has taken of each frame limit: while it

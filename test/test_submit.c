@@ -136,9 +136,9 @@ static void TestView(void)
     bool kept = false;
     CHECK(mrhiIsPassKept(s_device, culled, &kept) == mrhi_success && !kept, "one culled");
     size_t barriers = 0;
-    uint64_t memory = 0;
+    mrhiFrameUsage usage = {0};
     CHECK(mrhiGetFrameBarriers(s_device, nullptr, 0, &barriers) == mrhi_success &&
-              mrhiGetFrameMemory(s_device, &memory) == mrhi_success && memory > 0,
+              mrhiGetFrameUsage(s_device, &usage) == mrhi_success && usage.frameMemoryBytes > 0,
           "the plan");
     uint32_t bytes[4] = {1, 2, 3, 4};
     mrhiClearColor color = {0};
@@ -157,7 +157,8 @@ static void TestView(void)
     CHECK(s_log.frames == 1 && s_log.passes == 5 && s_log.labeled == (MAUL_RHI_LABELS ? 3u : 0u) &&
               s_log.labelBytes == (MAUL_RHI_LABELS ? 10u + 26u : 0u),
           "the kept passes and their labels, which a build without labels drops");
-    CHECK(s_log.barriers == barriers && s_log.memoryBytes == memory, "the plan's barriers");
+    CHECK(s_log.barriers == barriers && s_log.memoryBytes == usage.frameMemoryBytes,
+          "the plan's barriers and memory");
     CHECK(s_log.resources == 4 && s_log.needed == 3 && s_log.transients == 2,
           "four resources, the culled pass's not needed");
     // The clear, an upload, then a marker with two label records (none
