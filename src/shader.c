@@ -266,7 +266,7 @@ mrhiResult mrhiCreateShader(mrhiDevice* device, const mrhiShaderDef* def, mrhiSh
     {
         mrhiReleaseReflection(&device->allocator, slot->reflection);
         *slot = (mrhiShaderSlot){0};
-        mrhiPoolRelease(&device->shaders, index1);
+        mrhiPoolUnacquire(&device->shaders, index1);
         return status;
     }
     *shaderOut = (mrhiShaderId){index1, generation};

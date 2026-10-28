@@ -106,7 +106,7 @@ mrhiResult mrhiCreateHeap(mrhiDevice* device, const mrhiHeapDef* def, mrhiHeapId
     if (status != mrhi_success)
     {
         mrhiRelease(&device->allocator, table, bytes, alignof(mrhiHeapEntrySlot));
-        mrhiPoolRelease(&device->heaps, index1);
+        mrhiPoolUnacquire(&device->heaps, index1);
         return status;
     }
     for (size_t i = 0; i < (size_t)def->entries + def->samplers; ++i)

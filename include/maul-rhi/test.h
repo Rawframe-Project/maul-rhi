@@ -113,6 +113,9 @@ extern "C"
         // Set to lose the adapter's devices at their next poll, submission or
         // acquire, read each time; NULL for never.
         const bool* loseDevice;
+        // Set to refuse every object its devices make with mrhi_errorCapacity,
+        // as a driver out of memory does, read at each; NULL for never.
+        const bool* refuseObjects;
         // The reason a lost device's report gives.
         mrhiDeviceLossReason lossReason;
     } mrhiTestAdapter;

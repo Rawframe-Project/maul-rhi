@@ -9,6 +9,8 @@
 // answers as a clean run does. A call that absorbs the failure answers
 // as a clean run does. A failed reconfiguration leaves the surface
 // unconfigured, as its driver retires the old swapchain whatever happens.
+// A driver refusing an object for memory changes nothing either: the
+// next one made takes the id a clean run gives it.
 
 #include "test_harness.h"
 
@@ -16,6 +18,8 @@
 #include "maul-rhi/frame.h"
 #include "maul-rhi/heap.h"
 #include "maul-rhi/instance.h"
+#include "maul-rhi/pipeline.h"
+#include "maul-rhi/resources.h"
 #include "maul-rhi/shader.h"
 #include "maul-rhi/surface.h"
 #include "maul-rhi/test.h"
@@ -72,6 +76,10 @@ typedef struct World
     // is configured on another device.
     mrhiDevice* probe;
     mrhiSurfaceId surface;
+    mrhiShaderId shader;
+    mrhiTextureId texture;
+    // Set to have the driver refuse every object.
+    bool refuse;
     // What a step made, destroyed with the world.
     mrhiInstance* madeInstance;
     mrhiDevice* madeDevice;
@@ -153,6 +161,7 @@ static void MakeWorld(World* world)
         .limits = mrhiDefaultLimits(),
     };
     world->adapter.features.bindlessSampling = true;
+    world->adapter.refuseObjects = &world->refuse;
     world->adapter.limits.heapSize = 64;
     world->adapter.limits.samplerHeapSize = 16;
 }
@@ -259,7 +268,90 @@ static mrhiResult CreateHeap(World* world)
     def.samplers = 4;
     mrhiHeapId heap = {0};
     mrhiResult result = mrhiCreateHeap(world->device, &def, &heap);
-    world->output = Mix(Mix(world->output, heap.index1), heap.generation);
+    world->output = Mix(Mix(0, heap.index1), heap.generation);
+    return result;
+}
+
+static mrhiResult CreateSampler(World* world)
+{
+    mrhiSamplerDef def = mrhiDefaultSamplerDef();
+    mrhiSamplerId sampler = {0};
+    mrhiResult result = mrhiCreateSampler(world->device, &def, &sampler);
+    world->output = Mix(Mix(0, sampler.index1), sampler.generation);
+    return result;
+}
+
+static mrhiResult CreateBuffer(World* world)
+{
+    mrhiBufferDef def = mrhiDefaultBufferDef();
+    def.size = 256;
+    def.usage = mrhi_bufferStorage;
+    mrhiBufferId buffer = {0};
+    mrhiResult result = mrhiCreateBuffer(world->device, &def, &buffer);
+    world->output = Mix(Mix(0, buffer.index1), buffer.generation);
+    return result;
+}
+
+static mrhiResult CreateTexture(World* world)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = mrhi_formatRgba8Unorm;
+    def.width = 16;
+    def.height = 16;
+    def.usage = mrhi_textureSampled;
+    mrhiTextureId texture = {0};
+    mrhiResult result = mrhiCreateTexture(world->device, &def, &texture);
+    world->output = Mix(Mix(0, texture.index1), texture.generation);
+    return result;
+}
+
+static mrhiResult CreateView(World* world)
+{
+    mrhiViewDef def = mrhiDefaultViewDef();
+    def.texture = world->texture;
+    mrhiViewId view = {0};
+    mrhiResult result = mrhiCreateView(world->device, &def, &view);
+    world->output = Mix(Mix(0, view.index1), view.generation);
+    return result;
+}
+
+static mrhiResult CreateQuerySet(World* world)
+{
+    mrhiQuerySetDef def = mrhiDefaultQuerySetDef();
+    def.count = 4;
+    mrhiQuerySetId set = {0};
+    mrhiResult result = mrhiCreateQuerySet(world->device, &def, &set);
+    world->output = Mix(Mix(0, set.index1), set.generation);
+    return result;
+}
+
+static mrhiResult CreateComputePipeline(World* world)
+{
+    mrhiComputePipelineDef def = mrhiDefaultComputePipelineDef();
+    def.shader = world->shader;
+    def.entry = "cs";
+    def.entryLength = 2;
+    mrhiComputePipelineId pipeline = {0};
+    mrhiRequestId request = {0};
+    mrhiResult result = mrhiCreateComputePipeline(world->device, &def, &pipeline, &request);
+    world->output = MixRequest(Mix(Mix(0, pipeline.index1), pipeline.generation), request);
+    return result;
+}
+
+static mrhiResult CreateGraphicsPipeline(World* world)
+{
+    mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+    def.shader = world->shader;
+    def.vertexEntry = "vs";
+    def.vertexEntryLength = 2;
+    def.fragmentEntry = "fs";
+    def.fragmentEntryLength = 2;
+    def.colorTargets[0].format = mrhi_formatRgba8Unorm;
+    def.colorTargetCount = 1;
+    mrhiGraphicsPipelineId pipeline = {0};
+    mrhiRequestId request = {0};
+    mrhiResult result = mrhiCreateGraphicsPipeline(world->device, &def, &pipeline, &request);
+    world->output = MixRequest(Mix(Mix(0, pipeline.index1), pipeline.generation), request);
     return result;
 }
 
@@ -269,6 +361,42 @@ static mrhiResult Configure(World* world)
     return mrhiConfigureSurface(world->device, &config);
 }
 
+// A surface whose driver fails to make it while the world refuses.
+static mrhiResult CreateSurface(World* world)
+{
+    mrhiSurfaceSourceTest source = {
+        .chain = {.next = nullptr, .type = mrhi_structSurfaceSourceTest},
+        .presentingAdapters = 1,
+        .fail = world->refuse,
+    };
+    mrhiSurfaceDef def = mrhiDefaultSurfaceDef();
+    def.next = &source.chain;
+    mrhiSurfaceId surface = {0};
+    mrhiResult result = mrhiCreateSurface(world->instance, &def, &surface);
+    world->output = Mix(Mix(0, surface.index1), surface.generation);
+    if (result == mrhi_success)
+    {
+        CHECK(mrhiDestroySurface(world->instance, surface) == mrhi_success, "the surface ended");
+    }
+    return result;
+}
+
+// The opened world with a shader of the noop container.
+static void WithShader(World* world)
+{
+    Opened(world);
+    CHECK(CreateShader(world) == mrhi_success, "the shader");
+    world->shader = (mrhiShaderId){(uint32_t)1, (uint32_t)1};
+}
+
+// The opened world with a texture to view.
+static void WithTexture(World* world)
+{
+    Opened(world);
+    CHECK(CreateTexture(world) == mrhi_success, "the texture");
+    world->texture = (mrhiTextureId){(uint32_t)1, (uint32_t)1};
+}
+
 static const Step s_steps[] = {
     {"create instance", nullptr, CreateInstance, false},
     {"create device", MakeInstance, CreateDevice, false},
@@ -276,6 +404,20 @@ static const Step s_steps[] = {
     {"create heap", Opened, CreateHeap, false},
     {"configure surface", WithSurface, Configure, false},
     {"reconfigure surface", Configured, Configure, true},
+};
+
+// Every creation whose driver can refuse it.
+static const Step s_refused[] = {
+    {"create surface", MakeInstance, CreateSurface, false},
+    {"create shader", Opened, CreateShader, false},
+    {"create heap", Opened, CreateHeap, false},
+    {"create sampler", Opened, CreateSampler, false},
+    {"create buffer", Opened, CreateBuffer, false},
+    {"create texture", Opened, CreateTexture, false},
+    {"create view", WithTexture, CreateView, false},
+    {"create query set", Opened, CreateQuerySet, false},
+    {"create compute pipeline", WithShader, CreateComputePipeline, false},
+    {"create graphics pipeline", WithShader, CreateGraphicsPipeline, false},
 };
 
 static uint64_t InstanceDigest(World* world)
@@ -370,7 +512,7 @@ static uint64_t Clean(const Step* step, uint64_t* countOut)
 }
 
 // Runs the step with allocation failAt failing, and every one after it
-// when failFrom.
+// when failFrom; with the driver refusing every object when failAt is 0.
 static bool Fail(const Step* step, uint64_t failAt, bool failFrom, uint64_t done, uint64_t count)
 {
     World world;
@@ -378,18 +520,21 @@ static bool Fail(const Step* step, uint64_t failAt, bool failFrom, uint64_t done
     uint64_t before = Mix(Digest(&world), !step->retires && IsConfigured(&world));
     world.memory.failAt = failAt;
     world.memory.failFrom = failFrom;
+    world.refuse = failAt == 0;
     mrhiResult result = step->run(&world);
     world.memory.failAt = 0;
+    world.refuse = false;
     uint64_t answered = world.output;
     uint64_t after = Mix(Digest(&world), IsConfigured(&world));
-    mrhiResult again = result == mrhi_errorCapacity ? step->run(&world) : result;
-    uint64_t last = result == mrhi_errorCapacity ? Outcome(&world) : Mix(after, answered);
+    mrhiResult again = result != mrhi_success ? step->run(&world) : result;
+    uint64_t last = result != mrhi_success ? Outcome(&world) : Mix(after, answered);
     FreeWorld(&world);
-    // Refused and unchanged, then done as a clean run does it; or the
-    // failure absorbed with the clean run's outcome.
-    bool good = result == mrhi_errorCapacity
-                    ? after == before && again == mrhi_success && last == done
-                    : result == mrhi_success && last == done;
+    // Refused and unchanged, then done as a clean run does it; or an
+    // allocation's failure absorbed with the clean run's outcome. A driver
+    // refuses a surface as the platform, and its objects for memory.
+    bool refused = failAt == 0 ? result != mrhi_success : result == mrhi_errorCapacity;
+    bool good = refused ? after == before && again == mrhi_success && last == done
+                        : failAt != 0 && result == mrhi_success && last == done;
     if (!good || world.memory.live != 0)
     {
         fprintf(stderr, "%s: allocation %u%s of %u failing: %d, %s, then %d, %s, %lld leaked\n",
@@ -420,6 +565,12 @@ int main(void)
     for (size_t i = 0; i < sizeof s_steps / sizeof s_steps[0]; ++i)
     {
         Sweep(&s_steps[i]);
+    }
+    for (size_t i = 0; i < sizeof s_refused / sizeof s_refused[0]; ++i)
+    {
+        uint64_t count = 0;
+        uint64_t done = Clean(&s_refused[i], &count);
+        CHECK(Fail(&s_refused[i], 0, false, done, count), s_refused[i].name);
     }
     return s_failures == 0 ? 0 : 1;
 }

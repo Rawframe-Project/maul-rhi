@@ -94,7 +94,7 @@ mrhiResult mrhiCreateSampler(mrhiDevice* device, const mrhiSamplerDef* def,
         device, device->driver.vtable->createSampler(device->driver.self, &driverDef, &handle));
     if (status != mrhi_success)
     {
-        mrhiPoolRelease(&device->samplers, index1);
+        mrhiPoolUnacquire(&device->samplers, index1);
         return status;
     }
     device->samplerSlots[index1 - 1] = (mrhiSamplerSlot){
@@ -199,7 +199,7 @@ mrhiResult mrhiCreateBuffer(mrhiDevice* device, const mrhiBufferDef* def, mrhiBu
         device, device->driver.vtable->createBuffer(device->driver.self, &driverDef, &handle));
     if (status != mrhi_success)
     {
-        mrhiPoolRelease(&device->buffers, index1);
+        mrhiPoolUnacquire(&device->buffers, index1);
         return status;
     }
     device->bufferSlots[index1 - 1] =

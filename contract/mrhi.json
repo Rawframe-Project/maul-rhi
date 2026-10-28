@@ -22462,6 +22462,12 @@
               "doc": "Set to lose the adapter's devices at their next poll, submission or acquire, read each time; NULL for never."
             },
             {
+              "name": "refuse_objects",
+              "type": "bool",
+              "pointer": "const",
+              "doc": "Set to refuse every object its devices make with mrhi_errorCapacity, as a driver out of memory does, read at each; NULL for never."
+            },
+            {
               "name": "loss_reason",
               "type": "enum.device_loss_reason",
               "doc": "The reason a lost device's report gives."
