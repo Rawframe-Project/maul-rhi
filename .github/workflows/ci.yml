@@ -91,14 +91,15 @@ jobs:
       - name: The contract's headers and sources
         run: python3 tools/gen_contract.py --check
       # A pull request's checkout is its merge into the base, so against the
-      # base contract/mrhi.json changes exactly when its version rises.
+      # base contract/mrhi.json changes exactly when its version must be
+      # above the latest release's, which the v* tags give.
       - name: The contract's version
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           python3 tools/check_contract_version.py --self-test
           if [ -n "$BASE" ]; then
-            git fetch --no-tags --depth=1 origin "$BASE"
+            git fetch --no-tags --depth=1 origin "$BASE" '+refs/tags/v*:refs/tags/v*'
             python3 tools/check_contract_version.py "$BASE"
           fi
       # CI has no shader tools: the committed headers' stamps are checked
