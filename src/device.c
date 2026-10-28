@@ -488,7 +488,8 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
     device->adapterLimits = adapter->limits;
     device->deviceLimits = def->deviceLimits;
     device->state = mrhi_deviceOpening;
-    device->request = mrhiNextRequest(instance);
+    // Taken once the driver opens, so a refused device takes no id.
+    device->request = mrhiPeekRequest(instance);
     for (uint32_t i = 0; i < MRHI_KNOWN_FORMATS; ++i)
     {
         mrhiFormat format = mrhiKnownFormats[i];
@@ -503,6 +504,8 @@ mrhiResult mrhiCreateDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
         mrhiRelease(&program, device, device->bytes, alignof(mrhiDevice));
         return status;
     }
+    [[maybe_unused]] uint32_t request = mrhiNextRequest(instance);
+    MRHI_ASSERT(request == device->request);
     device->cacheOutcome =
         mrhiImportPipelineCache(device, def->pipelineCache, def->pipelineCacheBytes);
     ++instance->deviceCount;
