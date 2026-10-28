@@ -16,8 +16,10 @@
 #include "maul-rhi/frame.h"
 #include "maul-rhi/heap.h"
 #include "maul-rhi/instance.h"
+#include "maul-rhi/shader.h"
 #include "maul-rhi/surface.h"
 #include "maul-rhi/test.h"
+#include "shaders/noop_container.h"
 
 #include <stdalign.h>
 #include <stddef.h>
@@ -237,6 +239,19 @@ static mrhiResult CreateDevice(World* world)
     return result;
 }
 
+static mrhiResult CreateShader(World* world)
+{
+    mrhiShaderDef def = mrhiDefaultShaderDef();
+    def.bytes = s_noopContainer;
+    def.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    mrhiResult result = mrhiCreateShader(world->device, &def, &shader);
+    mrhiShaderInfo info = {0};
+    bool live = mrhiGetShaderInfo(world->device, shader, &info) == mrhi_success;
+    world->output = Mix(Mix(Mix(live, shader.index1), shader.generation), info.entryCount);
+    return result;
+}
+
 static mrhiResult CreateHeap(World* world)
 {
     mrhiHeapDef def = mrhiDefaultHeapDef();
@@ -257,6 +272,7 @@ static mrhiResult Configure(World* world)
 static const Step s_steps[] = {
     {"create instance", nullptr, CreateInstance, false},
     {"create device", MakeInstance, CreateDevice, false},
+    {"create shader", Opened, CreateShader, false},
     {"create heap", Opened, CreateHeap, false},
     {"configure surface", WithSurface, Configure, false},
     {"reconfigure surface", Configured, Configure, true},
