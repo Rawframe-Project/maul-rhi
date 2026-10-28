@@ -361,18 +361,19 @@ mrhiResult mrhiGetFrameUsage(mrhiDevice* device, mrhiFrameUsage* usageOut)
     uint32_t libraryChunks =
         device->frameCompiled ? device->frameChunkLimit - device->frameProgramChunks : 0;
     chunks = chunks < device->frameChunkLimit ? chunks : device->frameChunkLimit;
-    *usageOut = (mrhiFrameUsage){
-        .frameResources = device->frameResourceCount,
-        .framePasses = device->framePassCount - libraryPasses,
-        .frameAccesses = device->frameUseCount,
-        .frameBarriers = device->frameBarrierCount - device->frameLibraryBarriers,
-        .frameCommandBytes = (chunks - libraryChunks) * MRHI_CHUNK_BYTES,
-        .frameUploadBytes =
-            (uint32_t)(staged < limits->frameUploadBytes ? staged : limits->frameUploadBytes),
-        .frameIndirectDraws =
-            (uint32_t)atomic_load_explicit(&device->countedTaken, memory_order_relaxed),
-        .frameMemoryBytes = device->frameCompiled ? device->frameMemory : 0,
-    };
+    // Zeroed first and filled field by field, so the padding before
+    // frameMemoryBytes reads 0 in every build.
+    memset(usageOut, 0, sizeof(*usageOut));
+    usageOut->frameResources = device->frameResourceCount;
+    usageOut->framePasses = device->framePassCount - libraryPasses;
+    usageOut->frameAccesses = device->frameUseCount;
+    usageOut->frameBarriers = device->frameBarrierCount - device->frameLibraryBarriers;
+    usageOut->frameCommandBytes = (chunks - libraryChunks) * MRHI_CHUNK_BYTES;
+    usageOut->frameUploadBytes =
+        (uint32_t)(staged < limits->frameUploadBytes ? staged : limits->frameUploadBytes);
+    usageOut->frameIndirectDraws =
+        (uint32_t)atomic_load_explicit(&device->countedTaken, memory_order_relaxed);
+    usageOut->frameMemoryBytes = device->frameCompiled ? device->frameMemory : 0;
     return mrhi_success;
 }
 
