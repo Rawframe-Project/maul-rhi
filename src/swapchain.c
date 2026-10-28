@@ -168,6 +168,10 @@ mrhiResult mrhiConfigureSurface(mrhiDevice* device, const mrhiSurfaceConfig* con
     {
         return mrhi_errorInvalid;
     }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     if (config == nullptr)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
@@ -230,6 +234,10 @@ mrhiResult mrhiUnconfigureSurface(mrhiDevice* device, mrhiSurfaceId surface)
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
     }
     if (mrhiFindSurface(device->instance, surface) == 0)
     {

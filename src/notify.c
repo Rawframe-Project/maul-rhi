@@ -102,10 +102,17 @@ static void PollDriver(mrhiInstance* instance)
 mrhiResult mrhiNextInstanceNotification(mrhiInstance* instance,
                                         mrhiInstanceNotification* notificationOut)
 {
-    if (instance == nullptr || notificationOut == nullptr)
+    if (instance == nullptr)
     {
-        return instance == nullptr ? mrhi_errorInvalid
-                                   : mrhiMisuse(instance, mrhi_diagnosticNullArgument);
+        return mrhi_errorInvalid;
+    }
+    if (instance->allocatorGuard.busy)
+    {
+        return mrhiInstanceBusy(instance);
+    }
+    if (notificationOut == nullptr)
+    {
+        return mrhiMisuse(instance, mrhi_diagnosticNullArgument);
     }
     if (instance->queueCount == 0)
     {

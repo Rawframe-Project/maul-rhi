@@ -80,7 +80,8 @@ extern "C"
     /// without its cookie; `mrhi_errorUnsupported` for a critical extension the
     /// library does not know; `mrhi_errorState` for a device that is not ready
     /// or has a frame open; `mrhi_errorCapacity` while the device's
-    /// framesInFlight frames are still running, until one finishes.
+    /// framesInFlight frames are still running, until one finishes;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiBeginFrame(mrhiDevice* device, const mrhiFrameDef* def);
@@ -89,7 +90,8 @@ extern "C"
     ///
     /// @param device  The device.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
-    /// `mrhi_errorState` for a device without an open frame.
+    /// `mrhi_errorState` for a device without an open frame; `mrhi_errorBusy`
+    /// for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDropFrame(mrhiDevice* device);
@@ -106,7 +108,8 @@ extern "C"
     /// format cannot take, the frame staying open; `mrhi_errorCapacity` when
     /// the device's queue has no room for the answer, or a pass's commands did
     /// not fit the frame's, the frame staying open to be dropped;
-    /// `mrhi_errorPlatform` when the driver fails, the frame closing.
+    /// `mrhi_errorPlatform` when the driver fails, the frame closing;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiSubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut);
@@ -120,7 +123,8 @@ extern "C"
     /// @param timeoutNs  The longest wait in nanoseconds; 0 only checks.
     /// @return `mrhi_success` once the frame has finished; `mrhi_timeout` when
     /// the deadline passed first; `mrhi_errorInvalid` for a NULL device or a
-    /// token the device never gave.
+    /// token the device never gave; `mrhi_errorBusy` for a call from inside the
+    /// device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiWaitFrame(mrhiDevice* device, mrhiRequestId token,
@@ -133,7 +137,8 @@ extern "C"
     /// @param device           The device.
     /// @param notificationOut  Receives the record.
     /// @return `mrhi_success` with a record; `mrhi_empty` when the queue is
-    /// drained; `mrhi_errorInvalid` for a NULL argument.
+    /// drained; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorBusy` for a
+    /// call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult
@@ -155,7 +160,8 @@ extern "C"
     /// once on the web; `mrhi_empty` at once when the queue is empty and the
     /// device owes no answer, with no pipeline pending and no frame running (a
     /// readback is owed only once its frame is submitted); `mrhi_errorInvalid`
-    /// for a NULL device.
+    /// for a NULL device; `mrhi_errorBusy` for a call from inside the device's
+    /// allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiWaitDeviceNotification(mrhiDevice* device,
@@ -188,7 +194,8 @@ extern "C"
     /// compressed format without its feature, or a critical extension the
     /// library does not know; `mrhi_errorState` for a device without an open
     /// frame; `mrhi_errorCapacity` for a size past the device's limits within
-    /// the adapter's, or when the device's frameResources limit is reached.
+    /// the adapter's, or when the device's frameResources limit is reached;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDeclareTexture(mrhiDevice* device,
@@ -211,7 +218,8 @@ extern "C"
     /// size past the adapter's bufferBytes, or a critical extension the library
     /// does not know; `mrhi_errorState` for a device without an open frame;
     /// `mrhi_errorCapacity` for a size past the device's bufferBytes within the
-    /// adapter's, or when the device's frameResources limit is reached.
+    /// adapter's, or when the device's frameResources limit is reached;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDeclareBuffer(mrhiDevice* device,
@@ -228,7 +236,8 @@ extern "C"
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
     /// `mrhi_errorStale` for a texture the device no longer has;
     /// `mrhi_errorState` for a device without an open frame;
-    /// `mrhi_errorCapacity` when the device's frameResources limit is reached.
+    /// `mrhi_errorCapacity` when the device's frameResources limit is reached;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiImportTexture(mrhiDevice* device, mrhiTextureId texture,
@@ -244,7 +253,8 @@ extern "C"
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
     /// `mrhi_errorStale` for a buffer the device no longer has;
     /// `mrhi_errorState` for a device without an open frame;
-    /// `mrhi_errorCapacity` when the device's frameResources limit is reached.
+    /// `mrhi_errorCapacity` when the device's frameResources limit is reached;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiImportBuffer(mrhiDevice* device, mrhiBufferId buffer,
@@ -267,7 +277,8 @@ extern "C"
     /// `mrhi_errorStale` for a surface the instance no longer has;
     /// `mrhi_errorState` for a device without an open frame, a frame already
     /// compiled, or a surface not configured on the device;
-    /// `mrhi_errorCapacity` when the device's frameResources limit is reached.
+    /// `mrhi_errorCapacity` when the device's frameResources limit is reached;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiAcquireSurfaceImage(mrhiDevice* device,
@@ -291,7 +302,8 @@ extern "C"
     /// sampled usage; `mrhi_errorUnsupported` without the bindless_sampling
     /// feature; `mrhi_errorState` for a device without an open frame or with a
     /// compiled one; `mrhi_errorStale` for a resource not of the open frame, or
-    /// whose object the device no longer has.
+    /// whose object the device no longer has; `mrhi_errorBusy` for a call from
+    /// inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiSealResource(mrhiDevice* device,
@@ -311,7 +323,7 @@ extern "C"
     /// without the bindless_sampling feature; `mrhi_errorState` for a device
     /// without an open frame or with a compiled one; `mrhi_errorStale` for a
     /// resource not of the open frame, or whose object the device no longer
-    /// has.
+    /// has; `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiUnsealResource(mrhiDevice* device,
@@ -581,7 +593,8 @@ extern "C"
     /// the adapter's limit; `mrhi_errorState` for a device without an open
     /// frame, or a frame already compiled; `mrhi_errorCapacity` for views past
     /// the device's limit within the adapter's, or when the device's
-    /// framePasses or frameAccesses limit is reached.
+    /// framePasses or frameAccesses limit is reached; `mrhi_errorBusy` for a
+    /// call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def,
@@ -599,7 +612,8 @@ extern "C"
     /// texture whose format cannot take the usages its kept passes make of it,
     /// the frame staying open; `mrhi_errorCapacity` when the barriers exceed
     /// the device's frameBarriers, the frame staying open; `mrhi_errorState`
-    /// for a device without an open frame, or a frame already compiled.
+    /// for a device without an open frame, or a frame already compiled;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCompileFrame(mrhiDevice* device);

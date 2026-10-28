@@ -7,6 +7,7 @@
 #ifndef MAUL_RHI_SRC_DEVICE_CORE_H
 #define MAUL_RHI_SRC_DEVICE_CORE_H
 
+#include "allocator.h"
 #include "capabilities_core.h"
 #include "command.h"
 #include "diagnostics.h"
@@ -432,6 +433,9 @@ struct mrhiDevice
     mrhiInstance* instance;
     // The driver handle of the adapter it was opened on.
     uint64_t adapter;
+    // The def's allocator behind the device's guard, which every
+    // allocation of the device and its driver goes through.
+    mrhiAllocatorGuard allocatorGuard;
     mrhiAllocator allocator;
     mrhiFeatures features;
     // The limits it was granted, and those of its adapter, which tell a
@@ -598,6 +602,10 @@ const mrhiDriverAdapter* mrhiCheckDeviceDef(mrhiInstance* instance, const mrhiDe
 // Counts one misuse refused by a check on the device, records it, and
 // returns mrhi_errorInvalid.
 mrhiResult mrhiDeviceMisuse(mrhiDevice* device, mrhiDiagnosticCode code);
+
+// Counts one misuse for a call made from inside the device's allocator,
+// records it, and returns mrhi_errorBusy.
+mrhiResult mrhiDeviceBusy(mrhiDevice* device);
 
 // Counts one misuse refused by a fixed bound of the library, records it,
 // and returns mrhi_errorLimit.

@@ -327,6 +327,10 @@ mrhiResult mrhiTakeReadback(mrhiDevice* device, mrhiRequestId request, void* byt
     {
         return mrhi_errorInvalid;
     }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     if (sizeOut == nullptr || (bytes == nullptr && capacity > 0))
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);

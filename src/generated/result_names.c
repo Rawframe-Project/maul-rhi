@@ -40,6 +40,8 @@ const char* mrhiResultName(mrhiResult result)
         return "mrhi_errorFormat";
     case mrhi_errorLimit:
         return "mrhi_errorLimit";
+    case mrhi_errorBusy:
+        return "mrhi_errorBusy";
     case mrhi_errorOutOfDate:
         return "mrhi_errorOutOfDate";
     case mrhi_errorDeviceLost:

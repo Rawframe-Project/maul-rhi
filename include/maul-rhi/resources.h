@@ -129,7 +129,8 @@ extern "C"
     /// order; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES;
     /// `mrhi_errorState` for a device that is not ready;
     /// `mrhi_errorUnsupported` for a critical extension the library does not
-    /// know; `mrhi_errorCapacity` when the device's sampler limit is reached.
+    /// know; `mrhi_errorCapacity` when the device's sampler limit is reached;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateSampler(mrhiDevice* device,
@@ -142,7 +143,8 @@ extern "C"
     /// @param device   The device.
     /// @param sampler  The sampler.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
-    /// `mrhi_errorStale` for a sampler the device no longer has.
+    /// `mrhi_errorStale` for a sampler the device no longer has;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroySampler(mrhiDevice* device,
@@ -221,7 +223,8 @@ extern "C"
     /// library does not know; `mrhi_errorState` for a device that is not ready;
     /// `mrhi_errorCapacity` for a size past the device's bufferBytes limit
     /// within the adapter's, or when the device's buffer limit is reached;
-    /// `mrhi_errorPlatform` when the driver fails.
+    /// `mrhi_errorPlatform` when the driver fails; `mrhi_errorBusy` for a call
+    /// from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateBuffer(mrhiDevice* device,
@@ -234,7 +237,8 @@ extern "C"
     /// @param device  The device.
     /// @param buffer  The buffer.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
-    /// `mrhi_errorStale` for a buffer the device no longer has.
+    /// `mrhi_errorStale` for a buffer the device no longer has;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyBuffer(mrhiDevice* device, mrhiBufferId buffer);
@@ -359,7 +363,7 @@ extern "C"
     /// `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity`
     /// for a size past the device's limits within the adapter's, or when the
     /// device's texture limit is reached; `mrhi_errorPlatform` when the driver
-    /// fails.
+    /// fails; `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateTexture(mrhiDevice* device,
@@ -372,7 +376,8 @@ extern "C"
     /// @param device   The device.
     /// @param texture  The texture.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
-    /// `mrhi_errorStale` for a texture the device no longer has.
+    /// `mrhi_errorStale` for a texture the device no longer has;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyTexture(mrhiDevice* device,
@@ -463,7 +468,8 @@ extern "C"
     /// take on the device, or a critical extension the library does not know;
     /// `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity`
     /// when the device's view limit is reached; `mrhi_errorPlatform` when the
-    /// driver fails.
+    /// driver fails; `mrhi_errorBusy` for a call from inside the device's
+    /// allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateView(mrhiDevice* device, const mrhiViewDef* def,
@@ -476,7 +482,8 @@ extern "C"
     /// @param view    The view.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
     /// `mrhi_errorStale` for a view the device no longer has, its texture's
-    /// destruction included.
+    /// destruction included; `mrhi_errorBusy` for a call from inside the
+    /// device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyView(mrhiDevice* device, mrhiViewId view);
@@ -555,7 +562,8 @@ extern "C"
     /// know, timestamps without the timestamp_query feature, or pipeline
     /// statistics without the pipeline_statistics_query feature;
     /// `mrhi_errorCapacity` when the device's querySets limit is reached or its
-    /// queries limit lacks a run of count queries.
+    /// queries limit lacks a run of count queries; `mrhi_errorBusy` for a call
+    /// from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateQuerySet(mrhiDevice* device,
@@ -568,7 +576,8 @@ extern "C"
     /// @param device  The device.
     /// @param set     The query set.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
-    /// `mrhi_errorStale` for a query set the device no longer has.
+    /// `mrhi_errorStale` for a query set the device no longer has;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyQuerySet(mrhiDevice* device, mrhiQuerySetId set);

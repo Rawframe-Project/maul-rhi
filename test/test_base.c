@@ -34,6 +34,7 @@ static void TestResultNames(void)
         {mrhi_errorVersion, "mrhi_errorVersion"},
         {mrhi_errorFormat, "mrhi_errorFormat"},
         {mrhi_errorLimit, "mrhi_errorLimit"},
+        {mrhi_errorBusy, "mrhi_errorBusy"},
         {mrhi_errorOutOfDate, "mrhi_errorOutOfDate"},
         {mrhi_errorDeviceLost, "mrhi_errorDeviceLost"},
     };
@@ -54,10 +55,10 @@ static void TestResultValues(void)
         mrhiResult result;
         int value;
     } values[] = {
-        {mrhi_errorInvalid, -1},     {mrhi_errorCapacity, -2},    {mrhi_errorStale, -3},
-        {mrhi_errorUnsupported, -4}, {mrhi_errorPlatform, -5},    {mrhi_errorState, -6},
-        {mrhi_errorVersion, -7},     {mrhi_errorFormat, -8},      {mrhi_errorLimit, -9},
-        {mrhi_errorOutOfDate, -32},  {mrhi_errorDeviceLost, -33},
+        {mrhi_errorInvalid, -1},     {mrhi_errorCapacity, -2},   {mrhi_errorStale, -3},
+        {mrhi_errorUnsupported, -4}, {mrhi_errorPlatform, -5},   {mrhi_errorState, -6},
+        {mrhi_errorVersion, -7},     {mrhi_errorFormat, -8},     {mrhi_errorLimit, -9},
+        {mrhi_errorBusy, -10},       {mrhi_errorOutOfDate, -32}, {mrhi_errorDeviceLost, -33},
     };
     for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i)
     {

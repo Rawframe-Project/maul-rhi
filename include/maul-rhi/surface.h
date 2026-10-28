@@ -226,7 +226,8 @@ extern "C"
     /// instance's driver cannot use, an instance without a driver, or a
     /// critical extension the library does not know; `mrhi_errorCapacity` when
     /// the instance's surface limit is reached; `mrhi_errorPlatform` when the
-    /// driver fails.
+    /// driver fails; `mrhi_errorBusy` for a call from inside the instance's
+    /// allocator.
     /// @par Thread safety
     /// Safe from any thread; the instance is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateSurface(mrhiInstance* instance,
@@ -239,7 +240,8 @@ extern "C"
     /// @param instance  The instance.
     /// @param surface   The surface.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL instance;
-    /// `mrhi_errorStale` for a surface the instance no longer has.
+    /// `mrhi_errorStale` for a surface the instance no longer has;
+    /// `mrhi_errorBusy` for a call from inside the instance's allocator.
     /// @par Thread safety
     /// Safe from any thread; the instance and the device that configured the
     /// surface are used by one thread at a time.
@@ -336,7 +338,8 @@ extern "C"
     /// `mrhi_errorState` for a device that is not ready, or a surface
     /// configured on another device; `mrhi_errorCapacity` for a size past the
     /// device's limits within the adapter's, or when the device's surface limit
-    /// is reached; `mrhi_errorPlatform` when the driver fails.
+    /// is reached; `mrhi_errorPlatform` when the driver fails; `mrhi_errorBusy`
+    /// for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device and its instance are used by one thread
     /// at a time.
@@ -350,7 +353,8 @@ extern "C"
     /// @param surface  The surface.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
     /// `mrhi_errorStale` for a surface the instance no longer has;
-    /// `mrhi_errorState` for a surface the device has not configured.
+    /// `mrhi_errorState` for a surface the device has not configured;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device and its instance are used by one thread
     /// at a time.

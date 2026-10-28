@@ -65,6 +65,10 @@ mrhiResult mrhiCreateQuerySet(mrhiDevice* device, const mrhiQuerySetDef* def,
     {
         return mrhi_errorInvalid;
     }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     if (def == nullptr || setOut == nullptr)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
@@ -131,6 +135,10 @@ mrhiResult mrhiDestroyQuerySet(mrhiDevice* device, mrhiQuerySetId set)
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
     }
     if (!mrhiPoolIsLive(&device->querySets, set.index1, set.generation))
     {

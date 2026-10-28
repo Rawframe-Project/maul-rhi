@@ -128,6 +128,10 @@ extern "C"
         // MRHI_MAX_QUERY_SET_QUERIES). More room would not help. It counts one
         // misuse, as invalid input does.
         mrhi_errorLimit = -9,
+        // A call made from inside the allocator of the instance or device it
+        // would change, which may call no function of the library. It counts
+        // one misuse, as invalid input does.
+        mrhi_errorBusy = -10,
         // A surface no longer matches its window: configure it again before
         // acquiring.
         mrhi_errorOutOfDate = -32,
@@ -680,6 +684,9 @@ extern "C"
         // A value past the device's multiviewViews limit: mrhi_errorCapacity
         // within the adapter's, mrhi_errorUnsupported past it.
         mrhi_diagnosticLimitMultiviewViews = 155,
+        // A function that would change the instance or device was called from
+        // inside its allocator.
+        mrhi_diagnosticAllocatorCall = 156,
     };
 
     // A record from an instance's or a device's diagnostic queue.

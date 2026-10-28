@@ -59,6 +59,10 @@ mrhiResult mrhiCreateSampler(mrhiDevice* device, const mrhiSamplerDef* def,
     {
         return mrhi_errorInvalid;
     }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     if (def == nullptr || samplerOut == nullptr)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
@@ -109,6 +113,10 @@ mrhiResult mrhiDestroySampler(mrhiDevice* device, mrhiSamplerId sampler)
     {
         return mrhi_errorInvalid;
     }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     if (!mrhiPoolIsLive(&device->samplers, sampler.index1, sampler.generation))
     {
         return mrhi_errorStale;
@@ -153,6 +161,10 @@ mrhiResult mrhiCreateBuffer(mrhiDevice* device, const mrhiBufferDef* def, mrhiBu
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
     }
     if (def == nullptr || bufferOut == nullptr)
     {
@@ -201,6 +213,10 @@ mrhiResult mrhiDestroyBuffer(mrhiDevice* device, mrhiBufferId buffer)
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
     }
     if (!mrhiPoolIsLive(&device->buffers, buffer.index1, buffer.generation))
     {

@@ -251,6 +251,10 @@ mrhiResult mrhiCreateTexture(mrhiDevice* device, const mrhiTextureDef* def,
     {
         return mrhi_errorInvalid;
     }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     if (def == nullptr || textureOut == nullptr)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
@@ -296,6 +300,10 @@ mrhiResult mrhiDestroyTexture(mrhiDevice* device, mrhiTextureId texture)
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
     }
     if (!mrhiPoolIsLive(&device->textures, texture.index1, texture.generation))
     {

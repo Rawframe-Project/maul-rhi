@@ -125,6 +125,10 @@ mrhiResult mrhiCreateSurface(mrhiInstance* instance, const mrhiSurfaceDef* def,
     {
         return mrhi_errorInvalid;
     }
+    if (instance->allocatorGuard.busy)
+    {
+        return mrhiInstanceBusy(instance);
+    }
     if (def == nullptr || surfaceOut == nullptr)
     {
         return mrhiMisuse(instance, mrhi_diagnosticNullArgument);
@@ -183,6 +187,10 @@ mrhiResult mrhiDestroySurface(mrhiInstance* instance, mrhiSurfaceId surface)
     if (instance == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    if (instance->allocatorGuard.busy)
+    {
+        return mrhiInstanceBusy(instance);
     }
     if (mrhiFindSurface(instance, surface) == 0)
     {

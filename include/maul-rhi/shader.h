@@ -301,7 +301,8 @@ extern "C"
     /// `mrhi_errorCapacity` for a root block, bindings, a workgroup or
     /// interface variables past the device's limits within the adapter's, or
     /// when the device's shader limit is reached or its allocator fails;
-    /// `mrhi_errorPlatform` when the driver refuses the code.
+    /// `mrhi_errorPlatform` when the driver refuses the code; `mrhi_errorBusy`
+    /// for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateShader(mrhiDevice* device,
@@ -313,7 +314,8 @@ extern "C"
     /// @param device  The device.
     /// @param shader  The shader.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device;
-    /// `mrhi_errorStale` for a shader the device no longer has.
+    /// `mrhi_errorStale` for a shader the device no longer has;
+    /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyShader(mrhiDevice* device, mrhiShaderId shader);

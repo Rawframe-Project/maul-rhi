@@ -618,6 +618,10 @@ mrhiResult mrhiCreateGraphicsPipeline(mrhiDevice* device, const mrhiGraphicsPipe
     {
         return mrhi_errorInvalid;
     }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     if (def == nullptr || pipelineOut == nullptr || requestOut == nullptr)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
@@ -676,6 +680,10 @@ mrhiResult mrhiDestroyGraphicsPipeline(mrhiDevice* device, mrhiGraphicsPipelineI
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
     }
     return mrhiDestroyPipeline(device, mrhiPipelineGraphics, pipeline.index1, pipeline.generation);
 }

@@ -223,6 +223,10 @@ mrhiResult mrhiCreateShader(mrhiDevice* device, const mrhiShaderDef* def, mrhiSh
     {
         return mrhi_errorInvalid;
     }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     if (def == nullptr || shaderOut == nullptr)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
@@ -272,6 +276,10 @@ mrhiResult mrhiDestroyShader(mrhiDevice* device, mrhiShaderId shader)
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
     }
     if (!mrhiPoolIsLive(&device->shaders, shader.index1, shader.generation))
     {

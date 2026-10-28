@@ -8,7 +8,7 @@ format_caps: capabilities_core
 chain:
 diagnostics: invariant
 device: allocator capabilities_core chain device_core diagnostics driver heap_core instance_core invariant label pool
-device_core: capabilities_core command diagnostics driver pool reflection
+device_core: allocator capabilities_core command diagnostics driver pool reflection
 driver: command reflection
 driver_test: allocator capabilities_core command driver format_caps frame_walk invariant pipeline_walk
 frame_walk: command driver label
@@ -73,7 +73,7 @@ webgpu_frame: capabilities_core driver invariant web_js webgpu_names
 webgpu_pipeline: container driver invariant reflection web_js webgpu_names
 webgpu_names: capabilities_core invariant
 web_js:
-instance_core: diagnostics driver pool
+instance_core: allocator diagnostics driver pool
 invariant:
 label:
 notify: instance_core invariant

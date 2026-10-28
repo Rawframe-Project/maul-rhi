@@ -213,6 +213,10 @@ mrhiResult mrhiCreateComputePipeline(mrhiDevice* device, const mrhiComputePipeli
     {
         return mrhi_errorInvalid;
     }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     if (def == nullptr || pipelineOut == nullptr || requestOut == nullptr)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
@@ -281,6 +285,10 @@ mrhiResult mrhiDestroyComputePipeline(mrhiDevice* device, mrhiComputePipelineId 
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
+    }
+    if (device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
     }
     return mrhiDestroyPipeline(device, mrhiPipelineCompute, pipeline.index1, pipeline.generation);
 }
