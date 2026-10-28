@@ -429,14 +429,14 @@ extern "C"
 // The color targets one pass writes at most.
 #define MRHI_MAX_COLOR_TARGETS 8
 
-    // A color target's clear value.
-    typedef struct mrhiClearColor
+    // Four color channels: a color target's clear value, or the blend constant.
+    typedef struct mrhiColor
     {
         float red;
         float green;
         float blue;
         float alpha;
-    } mrhiClearColor;
+    } mrhiColor;
 
     // A texture a pass renders colors to.
     typedef struct mrhiColorTarget
@@ -452,7 +452,7 @@ extern "C"
         // What it keeps when the pass ends.
         mrhiStoreOp store;
         // The clear value, for mrhi_loadClear.
-        mrhiClearColor clear;
+        mrhiColor clear;
         // A single-sampled texture of the same format and size the samples
         // resolve to, or a null id.
         mrhiResourceId resolve;

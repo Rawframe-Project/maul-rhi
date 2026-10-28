@@ -141,7 +141,7 @@ static void TestView(void)
               mrhiGetFrameMemory(s_device, &memory) == mrhi_success && memory > 0,
           "the plan");
     uint32_t bytes[4] = {1, 2, 3, 4};
-    mrhiClearColor color = {0};
+    mrhiColor color = {0};
     CHECK(mrhiBeginPass(s_device, upload) == mrhi_success &&
               mrhiWriteBuffer(s_device, upload, buffer, 0, bytes, sizeof(bytes)) == mrhi_success &&
               mrhiInsertDebugMarker(s_device, upload, MARKER, sizeof(MARKER) - 1) == mrhi_success &&
