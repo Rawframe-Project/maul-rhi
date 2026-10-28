@@ -320,6 +320,10 @@ uint64_t mrhiWalkFrame(const mrhiDriverFrame* frame, mrhiHandleCheck isHandle, c
         walk->counts.barriers = (uint32_t)frame->barrierCount;
         walk->counts.resources = frame->resourceCount;
         walk->counts.stagingBytes = frame->stagingBytes;
+        for (uint64_t i = 0; i < frame->stagingBytes; ++i)
+        {
+            walk->counts.stagingSum += frame->staging[i];
+        }
         walk->counts.memoryBytes = frame->memoryBytes;
         *log = walk->counts;
     }
