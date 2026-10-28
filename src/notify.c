@@ -15,12 +15,15 @@ bool mrhiHasRoomForAnswer(const mrhiInstance* instance)
     return instance->queueCount + instance->pendingCount < instance->limits.notifications;
 }
 
+uint32_t mrhiPeekRequest(const mrhiInstance* instance)
+{
+    uint32_t next = instance->nextRequest + 1;
+    return next == 0 ? 1 : next;
+}
+
 uint32_t mrhiNextRequest(mrhiInstance* instance)
 {
-    if (++instance->nextRequest == 0)
-    {
-        ++instance->nextRequest;
-    }
+    instance->nextRequest = mrhiPeekRequest(instance);
     return instance->nextRequest;
 }
 

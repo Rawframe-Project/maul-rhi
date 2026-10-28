@@ -207,6 +207,29 @@ static void TestDestroyWhileOpening(void)
     mrhiDestroyInstance(instance);
 }
 
+// Each device opening takes a request of its own.
+static void TestOwnRequests(void)
+{
+    mrhiAdapterId adapter;
+    mrhiInstance* instance = Create(64, mrhi_success, &adapter);
+    mrhiDeviceDef def = Def(adapter);
+    mrhiDevice* first = nullptr;
+    mrhiDevice* second = nullptr;
+    mrhiRequestId firstRequest;
+    mrhiRequestId secondRequest;
+    CHECK(mrhiCreateDevice(instance, &def, &first, &firstRequest) == mrhi_success &&
+              mrhiCreateDevice(instance, &def, &second, &secondRequest) == mrhi_success,
+          "two devices");
+    CHECK(firstRequest.index1 != secondRequest.index1, "each with its own request");
+    mrhiDestroyDevice(second);
+    mrhiDestroyDevice(first);
+    mrhiInstanceNotification record;
+    while (mrhiNextInstanceNotification(instance, &record) == mrhi_success)
+    {
+    }
+    mrhiDestroyInstance(instance);
+}
+
 static void TestInstanceOutlivesDevices(void)
 {
     mrhiAdapterId adapter;
@@ -365,6 +388,7 @@ int main(void)
     TestGrants();
     TestAlignmentLimits();
     TestDestroyWhileOpening();
+    TestOwnRequests();
     TestInstanceOutlivesDevices();
     TestQueueRoom();
     TestInvalidDefs();

@@ -120,6 +120,9 @@ void mrhiPushInstanceNotification(mrhiInstance* instance, mrhiInstanceNotificati
 // Whether the queue has room for one more answer.
 bool mrhiHasRoomForAnswer(const mrhiInstance* instance);
 
+// The index the next request id takes, never zero, without taking it.
+uint32_t mrhiPeekRequest(const mrhiInstance* instance);
+
 // A new request id's index, never zero.
 uint32_t mrhiNextRequest(mrhiInstance* instance);
 
