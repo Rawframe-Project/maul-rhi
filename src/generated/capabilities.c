@@ -69,6 +69,13 @@ bool mrhiLimitsWithin(const mrhiLimits* asked, const mrhiLimits* granted)
         && asked->multiviewViews <= granted->multiviewViews;
 }
 
+bool mrhiAlignmentsValid(const mrhiLimits* limits)
+{
+    return true
+        && limits->uniformOffsetAlignment != 0 && (limits->uniformOffsetAlignment & (limits->uniformOffsetAlignment - 1)) == 0
+        && limits->storageOffsetAlignment != 0 && (limits->storageOffsetAlignment & (limits->storageOffsetAlignment - 1)) == 0;
+}
+
 void mrhiMaskFeatures(mrhiFeatures* features, mrhiDriverKind driver)
 {
     switch (driver)

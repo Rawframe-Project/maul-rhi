@@ -201,6 +201,29 @@ static void TestTheFloor(void)
     mrhiDestroyInstance(instance);
 }
 
+// An adapter's alignments are powers of two, which the CTS's
+// minUniformBufferOffsetAlignment:validate,powerOf2 and
+// minStorageBufferOffsetAlignment:validate,powerOf2 expect of every
+// adapter: one reporting another is not listed.
+static void TestAlignmentsArePowersOfTwo(void)
+{
+    mrhiInstance* instance = Create(64, 16, true);
+    s_adapters[0].limits.uniformOffsetAlignment = 96;
+    s_adapters[1].limits.storageOffsetAlignment = 0;
+    s_adapters[2].limits.uniformOffsetAlignment = 64;
+    s_adapters[2].limits.storageOffsetAlignment = 128;
+    mrhiInstance* again = nullptr;
+    mrhiInstanceDef def = mrhiDefaultInstanceDef();
+    def.next = &s_driver.chain;
+    CHECK(mrhiCreateInstance(&def, &again) == mrhi_success, "an instance of odd adapters");
+    CHECK(Find(again, mrhi_powerDefault, true) == mrhi_success, "found");
+    char letters[5];
+    Listing(again, letters);
+    CHECK(strcmp(letters, "d") == 0, "only the adapter of powers of two");
+    mrhiDestroyInstance(again);
+    mrhiDestroyInstance(instance);
+}
+
 static void TestFeaturesAreMaskedByTheApi(void)
 {
     mrhiInstance* instance = Create(64, 16, true);
@@ -339,6 +362,7 @@ int main(void)
     TestManyRequestsAtOnce();
     TestLimits();
     TestTheFloor();
+    TestAlignmentsArePowersOfTwo();
     TestFeaturesAreMaskedByTheApi();
     TestDefaultLimits();
     TestWithoutTheTestDriver();
