@@ -114,10 +114,13 @@ jobs:
           python3 tools/gen_kernels.py --self-test
       - name: The documentation site builds
         run: python3 tools/build_docs.py
-      - name: clang-tidy
-        # The native sources against Linux, the web ones against wasm32-wasi;
-        # the D3D12 sources need Windows' headers and build in the Windows
-        # cells.
+      # The native sources against Linux, the web ones against wasm32-wasi;
+      # the D3D12 sources need Windows' headers and build in the Windows
+      # cells. The native ones twice: on the Release preset, where the
+      # assertions compile out and the analyzer follows the paths they
+      # would stop, and with them live, whose branches count toward a
+      # function's complexity. Each hides findings the other shows.
+      - name: clang-tidy, assertions compiled out
         run: |
           cmake --preset linux-clang-20 -B out/tidy -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DMAUL_RHI_LABELS=ON >/dev/null
@@ -126,6 +129,12 @@ jobs:
             xargs -P 4 -n 1 clang-tidy-20 -p out/tidy --quiet --warnings-as-errors='*'
           grep -l '"web_js.h"' src/*.c |
             xargs -P 4 -n 1 clang-tidy-20 -p out/tidy-web --quiet --warnings-as-errors='*'
+      - name: clang-tidy, assertions live
+        run: |
+          cmake --preset linux-clang-20 -B out/tidy-asserts -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DMAUL_RHI_LABELS=ON >/dev/null
+          grep -L '"web_js.h"' src/*.c | grep -v d3d12 |
+            xargs -P 4 -n 1 clang-tidy-20 -p out/tidy-asserts --quiet --warnings-as-errors='*'
       - name: Every test labelled
         run: python3 tools/check_test_hygiene.py --ctest out/tidy --ctest out/tidy-web
 
