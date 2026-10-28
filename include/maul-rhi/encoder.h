@@ -907,7 +907,7 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiSetBlendConstant(mrhiDevice* device, mrhiPassId pass,
-                                                            const mrhiClearColor* color);
+                                                            const mrhiColor* color);
 
     /// Sets the reference stencil tests compare with, in a pass with targets.
     ///

@@ -19,7 +19,7 @@
 #define WIDTH  64
 #define HEIGHT 48
 
-static const mrhiClearColor kColor = {2.0f, 0.5f, 0.25f, 1.0f};
+static const mrhiColor kColor = {2.0f, 0.5f, 0.25f, 1.0f};
 
 // A half float's value; the sample reads only normal numbers.
 static float HalfToFloat(uint16_t half)

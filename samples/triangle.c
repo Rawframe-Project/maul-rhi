@@ -15,7 +15,7 @@
 // The target's width and height.
 #define SIZE 64
 
-static const mrhiClearColor kBackground = {0.2f, 0.4f, 0.6f, 1.0f};
+static const mrhiColor kBackground = {0.2f, 0.4f, 0.6f, 1.0f};
 static const float kTriangle[4] = {1.0f, 0.6f, 0.2f, 1.0f};
 
 static mrhiGraphicsPipelineId MakePipeline(Sample* sample, mrhiShaderId shader)

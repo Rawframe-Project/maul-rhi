@@ -12975,8 +12975,8 @@
         },
         {
           "kind": "struct",
-          "name": "clear_color",
-          "doc": "A color target's clear value.",
+          "name": "color",
+          "doc": "Four color channels: a color target's clear value, or the blend constant.",
           "members": [
             {
               "name": "red",
@@ -13046,7 +13046,7 @@
             },
             {
               "name": "clear",
-              "type": "struct.clear_color",
+              "type": "struct.color",
               "doc": "The clear value, for mrhi_loadClear."
             },
             {
@@ -21122,7 +21122,7 @@
             },
             {
               "name": "color",
-              "type": "struct.clear_color",
+              "type": "struct.color",
               "pointer": "const",
               "doc": "The constant, finite."
             }

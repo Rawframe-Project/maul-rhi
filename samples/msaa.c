@@ -18,7 +18,7 @@
 #define SIZE    64
 #define SAMPLES 4
 
-static const mrhiClearColor kBackground = {0.0f, 0.0f, 0.0f, 1.0f};
+static const mrhiColor kBackground = {0.0f, 0.0f, 0.0f, 1.0f};
 static const float kTriangle[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
 static mrhiGraphicsPipelineId MakePipeline(Sample* sample, mrhiShaderId shader)

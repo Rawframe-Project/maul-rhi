@@ -584,22 +584,22 @@ static void TestScissorAndState(void)
               mrhiSetScissor(nullptr, s_render, &rect) == mrhi_errorInvalid,
           "NULL arguments");
     CHECK(mrhiGetDeviceMisuse(s_device) == 7, "each counted");
-    mrhiClearColor color = {0.25f, 0.5f, 0.75f, 1.0f};
+    mrhiColor color = {0.25f, 0.5f, 0.75f, 1.0f};
     CHECK(mrhiSetBlendConstant(s_device, s_render, &color) == mrhi_success, "a blend constant");
     command = Nth(s_render, 1);
-    const mrhiClearColor* stored = (const mrhiClearColor*)Nth(s_render, 2);
+    const mrhiColor* stored = (const mrhiColor*)Nth(s_render, 2);
     CHECK(command != nullptr && command->type == mrhiCommandBlendConstant &&
               command->payload == 1 && stored != nullptr &&
               memcmp(stored, &color, sizeof(color)) == 0,
           "recorded with the color after it");
-    color = (mrhiClearColor){-2.0f, 3.0f, 0.0f, 0.0f};
+    color = (mrhiColor){-2.0f, 3.0f, 0.0f, 0.0f};
     CHECK(mrhiSetBlendConstant(s_device, s_render, &color) == mrhi_success, "out of 0 to 1");
     float bad[] = {NAN, INFINITY, -INFINITY};
     for (uint32_t i = 0; i < 12; ++i)
     {
         float channels[4] = {0};
         channels[i % 4] = bad[i / 4];
-        color = (mrhiClearColor){channels[0], channels[1], channels[2], channels[3]};
+        color = (mrhiColor){channels[0], channels[1], channels[2], channels[3]};
         CHECK(mrhiSetBlendConstant(s_device, s_render, &color) == mrhi_errorInvalid, "not finite");
     }
     CHECK(mrhiSetBlendConstant(s_device, s_dispatch, &color) == mrhi_errorInvalid &&

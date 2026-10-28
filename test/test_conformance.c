@@ -1240,8 +1240,8 @@ static void CheckAliasing(mrhiDevice* device)
             .resource = targets[i],
             .load = mrhi_loadClear,
             .store = mrhi_storeKeep,
-            .clear = i == 0 ? (mrhiClearColor){1.0f, 0.0f, 0.0f, 1.0f}
-                            : (mrhiClearColor){0.0f, 0.0f, 1.0f, 1.0f},
+            .clear =
+                i == 0 ? (mrhiColor){1.0f, 0.0f, 0.0f, 1.0f} : (mrhiColor){0.0f, 0.0f, 1.0f, 1.0f},
         };
         def.colorTargetCount = 1;
         def.neverCull = true;
@@ -2344,7 +2344,7 @@ static void CheckClear(Scene* scene)
     CHECK(mrhiDeclareTexture(device, &volumeDef, &volume) == mrhi_success, "a volume");
     def.colorTargets[0].resource = volume;
     def.colorTargets[0].layer = 2;
-    def.colorTargets[0].clear = (mrhiClearColor){0.8f, 0.6f, 0.4f, 0.2f};
+    def.colorTargets[0].clear = (mrhiColor){0.8f, 0.6f, 0.4f, 0.2f};
     mrhiPassId slice = {0};
     CHECK(mrhiAddPass(device, &def, &slice) == mrhi_success, "a pass clearing a depth slice");
     mrhiAccess reads[2] = {Whole(scene->t, mrhi_accessCopySource),
@@ -3052,7 +3052,7 @@ static void CheckRenderState(Scene* scene)
           "uploaded");
     DrawPlaced(scene, placed, v, i);
     const float blue[4] = {0.0f, 0.0f, 1.0f, 1.0f};
-    const mrhiClearColor constant = {1.0f, 1.0f, 0.6f, 1.0f};
+    const mrhiColor constant = {1.0f, 1.0f, 0.6f, 1.0f};
     CHECK(mrhiBeginPass(device, tested) == mrhi_success &&
               mrhiSetGraphicsPipeline(device, tested, scene->tested) == mrhi_success,
           "a tested pipeline");

@@ -489,7 +489,7 @@ mrhiResult mrhiSetScissor(mrhiDevice* device, mrhiPassId id, const mrhiScissorRe
     return Record(device, pass, command, nullptr, 0);
 }
 
-mrhiResult mrhiSetBlendConstant(mrhiDevice* device, mrhiPassId id, const mrhiClearColor* color)
+mrhiResult mrhiSetBlendConstant(mrhiDevice* device, mrhiPassId id, const mrhiColor* color)
 {
     if (device == nullptr)
     {
