@@ -64,7 +64,7 @@ typedef struct Written
     mrhiTestFrameLog log;
 } Written;
 
-static Written s_written[2];
+static Written s_written[3];
 
 static const mrhiAllocator kAllocator = {.alloc = Alloc, .free = Free};
 
@@ -127,9 +127,9 @@ static mrhiShaderId Pipeline(mrhiDevice* device)
     return shader;
 }
 
-// A frame that uploads to a buffer, and to a texture whose rows the
-// staging pitches apart.
-static void Upload(mrhiDevice* device)
+// A frame that uploads to a buffer at an offset, and to a texture whose
+// rows the staging pitches apart.
+static void Upload(mrhiDevice* device, uint64_t offset)
 {
     mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
     bufferDef.size = 256;
@@ -174,7 +174,7 @@ static void Upload(mrhiDevice* device)
     mrhiExtent3d size = {3, 3, 1};
     mrhiRequestId token;
     CHECK(mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, pass) == mrhi_success &&
-              mrhiWriteBuffer(device, pass, resources[0], 4, bytes, 12) == mrhi_success &&
+              mrhiWriteBuffer(device, pass, resources[0], offset, bytes, 12) == mrhi_success &&
               mrhiWriteTexture(device, pass, &to, bytes, sizeof(bytes), &layout, &size) ==
                   mrhi_success &&
               mrhiEndPass(device, pass) == mrhi_success &&
@@ -190,7 +190,7 @@ static void Upload(mrhiDevice* device)
 }
 
 // Everything made over memory and buffers of the pattern.
-static void Write(int pattern, Written* written)
+static void Write(int pattern, uint64_t offset, Written* written)
 {
     s_pattern = pattern;
     bool lose = false;
@@ -217,7 +217,7 @@ static void Write(int pattern, Written* written)
     CHECK(mrhiGetPipelineCache(device, written->cache, CACHE_ROOM, &written->cacheSize) ==
               mrhi_success,
           "the cache");
-    Upload(device);
+    Upload(device, offset);
     lose = true;
     mrhiDeviceNotification record;
     while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
@@ -242,8 +242,8 @@ static bool IsPattern(const unsigned char* bytes, size_t count, int pattern)
 
 static void TestSameBytes(void)
 {
-    Write(0xAA, &s_written[0]);
-    Write(0x55, &s_written[1]);
+    Write(0xAA, 4, &s_written[0]);
+    Write(0x55, 4, &s_written[1]);
     const Written* a = &s_written[0];
     const Written* b = &s_written[1];
     CHECK(a->cacheSize == b->cacheSize && memcmp(a->cache, b->cache, a->cacheSize) == 0,
@@ -267,6 +267,12 @@ static void TestSameBytes(void)
     CHECK(a->log.stagingBytes == b->log.stagingBytes && a->log.stagingBytes > 0 &&
               a->log.uploadSum == b->log.uploadSum && a->log.stagingSum == b->log.stagingSum,
           "the same staging bytes handed the driver");
+    CHECK(a->log.recordSum == b->log.recordSum, "the same command records handed the driver");
+    // The sum reads the records' bytes: another offset changes it alone.
+    Write(0xAA, 8, &s_written[2]);
+    CHECK(s_written[2].log.records == a->log.records &&
+              s_written[2].log.recordSum == a->log.recordSum + 4,
+          "an offset 4 bytes on adds 4 to the records' bytes");
     // The buffer's 1 to 12 and the texture's 1 to 36, and zeros around them.
     CHECK(a->log.stagingSum == 78 + 666, "nothing but the uploads and zeros");
 }

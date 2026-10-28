@@ -151,6 +151,9 @@ mrhiCommand* mrhiTakeCommands(mrhiDevice* device, mrhiFramePass* pass, uint32_t 
     mrhiCommand* records = &chunk->commands[chunk->count];
     chunk->count += count;
     MRHI_ASSERT(chunk->count <= MRHI_CHUNK_COMMANDS);
+    // Drivers read every record, so what a payload leaves of its records
+    // holds zeros, never what the memory held before.
+    memset(records, 0, count * sizeof(mrhiCommand));
     return records;
 }
 
