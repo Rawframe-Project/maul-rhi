@@ -156,7 +156,7 @@ static void TestCaps(void)
         .range = mrhi_rangeExtended,
     };
     test.caps.colors[1] = (mrhiSurfaceColor){.format = mrhi_formatBgra8Unorm};
-    test.caps.presentModes = mrhi_presentMailbox;
+    test.caps.presentModes = mrhi_presentMailboxBit;
     test.caps.usages = mrhi_textureCopySource;
     mrhiSurfaceId surface;
     CHECK(Make(instance, &test.chain, &surface) == mrhi_success, "the surface");
@@ -166,8 +166,8 @@ static void TestCaps(void)
     CHECK(caps.colorCount == 2 && caps.colors[0].format == mrhi_formatRgba16Float &&
               caps.colors[0].range == mrhi_rangeExtended,
           "the preferred color first");
-    CHECK(caps.presentModes == (mrhi_presentFifo | mrhi_presentMailbox), "fifo and mailbox");
-    CHECK(caps.alphaModes == mrhi_alphaOpaque, "opaque");
+    CHECK(caps.presentModes == (mrhi_presentFifoBit | mrhi_presentMailboxBit), "fifo and mailbox");
+    CHECK(caps.alphaModes == mrhi_alphaOpaqueBit, "opaque");
     CHECK(caps.usages == (mrhi_textureRenderTarget | mrhi_textureCopySource), "the usages");
     CHECK(mrhiGetSurfaceCaps(instance, surface, adapters[1], &caps) == mrhi_success, "read");
     CHECK(!caps.presentable && caps.colorCount == 0 && caps.presentModes == 0,

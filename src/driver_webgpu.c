@@ -333,8 +333,8 @@ static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
     const mrhiColorPrimaries primaries[2] = {mrhi_primariesBt709, mrhi_primariesDisplayP3};
     *capsOut = (mrhiSurfaceCaps){
         .presentable = true,
-        .presentModes = mrhi_presentFifo,
-        .alphaModes = mrhi_alphaOpaque | mrhi_alphaPremultiplied,
+        .presentModes = mrhi_presentFifoBit,
+        .alphaModes = mrhi_alphaOpaqueBit | mrhi_alphaPremultipliedBit,
         .usages = mrhi_textureRenderTarget | mrhi_textureSampled | mrhi_textureStorage |
                   mrhi_textureCopySource | mrhi_textureCopyDestination,
         // A canvas takes viewFormats, never an sRGB format of its own.

@@ -4122,8 +4122,8 @@ static bool MeetsFloors(const mrhiSurfaceCaps* caps)
              color->range == mrhi_rangeStandard);
     }
     return caps->colorCount >= 1 && caps->colorCount <= MRHI_SURFACE_COLORS && srgb && once &&
-           (caps->presentModes & mrhi_presentFifo) != 0 && (caps->twinViews || caps->twinImages) &&
-           (caps->alphaModes & mrhi_alphaOpaque) != 0 &&
+           (caps->presentModes & mrhi_presentFifoBit) != 0 &&
+           (caps->twinViews || caps->twinImages) && (caps->alphaModes & mrhi_alphaOpaqueBit) != 0 &&
            (caps->usages & mrhi_textureRenderTarget) != 0;
 }
 

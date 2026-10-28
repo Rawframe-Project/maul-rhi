@@ -110,12 +110,10 @@ static void TestInvalid(void)
     bad[count++].viewFormats[3] = mrhi_formatRgba8Unorm;
     bad[count++].width = 0;
     bad[count++].height = 0;
-    bad[count++].presentMode = 0;
-    bad[count++].presentMode = mrhi_presentFifo | mrhi_presentMailbox;
-    bad[count++].presentMode = 8;
-    bad[count++].alphaMode = 0;
-    bad[count++].alphaMode = mrhi_alphaOpaque | mrhi_alphaPremultiplied;
-    bad[count++].alphaMode = 4;
+    bad[count++].presentMode = mrhi_presentImmediate + 1;
+    bad[count++].presentMode = UINT8_MAX;
+    bad[count++].alphaMode = mrhi_alphaPremultiplied + 1;
+    bad[count++].alphaMode = UINT8_MAX;
     for (size_t i = 0; i < count; ++i)
     {
         CHECK(mrhiConfigureSurface(device, &bad[i]) == mrhi_errorInvalid, "invalid");

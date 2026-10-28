@@ -49,7 +49,7 @@ static void TestSizes(void)
 }
 
 static VkSwapchainCreateInfoKHR Shape(const VkSurfaceCapabilitiesKHR* caps,
-                                      mrhiPresentModes presentMode, mrhiAlphaModes alphaMode)
+                                      mrhiPresentMode presentMode, mrhiAlphaMode alphaMode)
 {
     const mrhiSurfaceConfig config = {.presentMode = presentMode, .alphaMode = alphaMode};
     VkSwapchainCreateInfoKHR info = {0};

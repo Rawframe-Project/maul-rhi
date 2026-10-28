@@ -10845,15 +10845,15 @@
           ]
         },
         {
-          "kind": "bitflags",
-          "name": "present_modes",
-          "width": "uint32",
+          "kind": "enum",
+          "name": "present_mode",
+          "width": "uint8",
           "mapped": true,
           "doc": "How presented images reach the display.",
           "values": [
             {
               "name": "present_fifo",
-              "value": 1,
+              "value": 0,
               "doc": "In order, one per refresh, never torn; always offered.",
               "mapping": {
                 "vulkan": {
@@ -10876,7 +10876,7 @@
             },
             {
               "name": "present_mailbox",
-              "value": 2,
+              "value": 1,
               "doc": "The newest image at each refresh, never torn; older ones are dropped.",
               "mapping": {
                 "vulkan": {
@@ -10899,7 +10899,7 @@
             },
             {
               "name": "present_immediate",
-              "value": 4,
+              "value": 2,
               "doc": "At once, and may tear.",
               "mapping": {
                 "vulkan": {
@@ -10924,14 +10924,38 @@
         },
         {
           "kind": "bitflags",
-          "name": "alpha_modes",
+          "name": "present_modes",
           "width": "uint32",
+          "doc": "A set of mrhiPresentMode values, one bit each: the bit of a mode is 1 shifted left by its value.",
+          "library": "a set of the mrhiPresentMode values a surface reports",
+          "values": [
+            {
+              "name": "present_fifo_bit",
+              "value": 1,
+              "doc": "The bit of mrhi_presentFifo."
+            },
+            {
+              "name": "present_mailbox_bit",
+              "value": 2,
+              "doc": "The bit of mrhi_presentMailbox."
+            },
+            {
+              "name": "present_immediate_bit",
+              "value": 4,
+              "doc": "The bit of mrhi_presentImmediate."
+            }
+          ]
+        },
+        {
+          "kind": "enum",
+          "name": "alpha_mode",
+          "width": "uint8",
           "mapped": true,
           "doc": "How a surface's alpha blends with what is behind the window.",
           "values": [
             {
               "name": "alpha_opaque",
-              "value": 1,
+              "value": 0,
               "doc": "Alpha is ignored; always offered.",
               "mapping": {
                 "vulkan": {
@@ -10954,7 +10978,7 @@
             },
             {
               "name": "alpha_premultiplied",
-              "value": 2,
+              "value": 1,
               "doc": "Colors are premultiplied by alpha, and the window shows what is behind it.",
               "mapping": {
                 "vulkan": {
@@ -10974,6 +10998,25 @@
                   "note": "premultiplied"
                 }
               }
+            }
+          ]
+        },
+        {
+          "kind": "bitflags",
+          "name": "alpha_modes",
+          "width": "uint32",
+          "doc": "A set of mrhiAlphaMode values, one bit each: the bit of a mode is 1 shifted left by its value.",
+          "library": "a set of the mrhiAlphaMode values a surface reports",
+          "values": [
+            {
+              "name": "alpha_opaque_bit",
+              "value": 1,
+              "doc": "The bit of mrhi_alphaOpaque."
+            },
+            {
+              "name": "alpha_premultiplied_bit",
+              "value": 2,
+              "doc": "The bit of mrhi_alphaPremultiplied."
             }
           ]
         },
@@ -11007,12 +11050,12 @@
             {
               "name": "present_modes",
               "type": "bitflags.present_modes",
-              "doc": "Its present modes, mrhi_presentFifo among them."
+              "doc": "Its present modes, mrhi_presentFifoBit among them."
             },
             {
               "name": "alpha_modes",
               "type": "bitflags.alpha_modes",
-              "doc": "Its alpha modes, mrhi_alphaOpaque among them."
+              "doc": "Its alpha modes, mrhi_alphaOpaqueBit among them."
             },
             {
               "name": "usages",
@@ -11646,8 +11689,8 @@
             },
             {
               "name": "present_mode",
-              "type": "bitflags.present_modes",
-              "doc": "One present mode the surface reports.",
+              "type": "enum.present_mode",
+              "doc": "A present mode the surface reports.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -11669,8 +11712,8 @@
             },
             {
               "name": "alpha_mode",
-              "type": "bitflags.alpha_modes",
-              "doc": "One alpha mode the surface reports.",
+              "type": "enum.alpha_mode",
+              "doc": "An alpha mode the surface reports.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
