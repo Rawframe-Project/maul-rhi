@@ -21,7 +21,7 @@ The byte layout of a shader container, version 2, for anyone writing a cook of t
 
 Every number is little-endian, and `mrhiCreateShader` reads byte by byte, so a container means the same on every host. The program hands the container over 8-byte aligned, so that its sections are aligned too and drivers can pass SPIR-V words on as they are. Every byte is checked as hostile input before anything is kept: a container that breaks any rule below is `mrhi_errorFormat`, counting no misuse, one of another version or holding a section type the library does not know is `mrhi_errorVersion`, and one that needs what the device lacks is `mrhi_errorUnsupported`.
 
-A container is a header, a table of sections, and the sections. The sections are its fields: each is named by its type, a 32-bit tag, and the format grows by new types, never by longer records, so a record whose meaning changes gets a section of a new type. Array sections are made of fixed-size records, at most 4096 of each, and every record is checked whether or not an entry refers to it. Names live in one strings section and are referred to by offset and length.
+A container is a header, a table of sections, and the sections. The sections are its fields: each is named by its type, a 32-bit tag, and the format grows by new types, never by longer records, so a record whose meaning changes gets a section of a new type. Array sections are made of fixed-size records, at most `MRHI_MAX_CONTAINER_RECORDS` (4096) of each, and every record is checked whether or not an entry refers to it. Names live in one strings section and are referred to by offset and length.
 
 ## Header
 
@@ -33,7 +33,7 @@ The first 64 bytes:
 | 4 | u32 | the format version, 2 |
 | 8 | u64 | the container's size in bytes, which must be the size handed over |
 | 16 | 32 bytes | the SHA-256 digest of every byte from offset 48 to the end |
-| 48 | u32 | the number of sections, at most 64 |
+| 48 | u32 | the number of sections, at most `MRHI_MAX_CONTAINER_SECTIONS` (64) |
 | 52 | 12 bytes | zero |
 
 The digest identifies the container (pipeline caches and a cook's outputs are keyed by it) and catches damage in transit.
@@ -55,7 +55,7 @@ A section holding its default is left out, and a reader gives an absent section 
 
 | Type | Section | Present | Contents |
 |---|---|---|---|
-| 1 | meta | with a root block | 16 bytes: the root block's size (u32, a multiple of 4, 4 to 256), then 12 zero bytes |
+| 1 | meta | with a root block | 16 bytes: the root block's size (u32, a multiple of 4, 4 to `MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES`, 256), then 12 zero bytes |
 | 2 | strings | always | UTF-8 names |
 | 3 | entries | always | 48-byte entry points, at least one |
 | 4 | bindings | when there are any | 24-byte bindings |
@@ -79,7 +79,7 @@ The WGSL section is present exactly when no entry reads a heap or the view index
 |---|---|---|
 | 0 | u32 | the stage, one `mrhiShaderStages` bit |
 | 4 | u32 | the name's offset in the strings |
-| 8 | u32 | the name's length, 1 to 256 bytes of UTF-8 without NUL; names are unique |
+| 8 | u32 | the name's length, 1 to `MRHI_MAX_CONTAINER_NAME_BYTES` (256) bytes of UTF-8 without NUL; names are unique |
 | 12 | 3 × u32 | the workgroup size: each at least 1 for compute, 0 otherwise |
 | 24 | u16, u16 | the first vertex input and the count, 0 unless a vertex entry |
 | 28 | u16, u16 | the first color output and the count, 0 unless a fragment entry |

@@ -149,7 +149,7 @@ static void TestHeader(void)
         CHECK(Parse() == mrhi_errorFormat, "a header zero that is not zero");
     }
     Assemble();
-    Put32(s_container + 48, 65);
+    Put32(s_container + 48, MRHI_MAX_CONTAINER_SECTIONS + 1);
     Seal();
     CHECK(Parse() == mrhi_errorFormat, "too many sections");
     Assemble();
@@ -194,11 +194,11 @@ static void TestSections(void)
     Move(WGSL, OffsetOf(WGSL), 0 - OffsetOf(WGSL));
     CHECK(Parse() == mrhi_errorFormat, "a section whose end wraps to 0");
     Reset();
-    while (s_sectionCount < 65)
+    while (s_sectionCount < MRHI_MAX_CONTAINER_SECTIONS + 1)
     {
         s_sections[s_sectionCount++] = (Section){.type = 100, .size = 8};
     }
-    CHECK(Built() == mrhi_errorFormat, "65 sections, counted before any tag is read");
+    CHECK(Built() == mrhi_errorFormat, "one section too many, counted before any tag is read");
     Reset();
     Assemble();
     uint32_t fit = (uint32_t)((s_size - 64) / 24);
@@ -272,11 +272,11 @@ static void TestMeta(void)
     Put32(s_sections[META].bytes, 18);
     CHECK(Built() == mrhi_errorFormat, "a root block not a multiple of 4");
     Reset();
-    Put32(s_sections[META].bytes, 260);
-    CHECK(Built() == mrhi_errorFormat, "a root block past 256");
+    Put32(s_sections[META].bytes, MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES + 4);
+    CHECK(Built() == mrhi_errorFormat, "a root block past the bound");
     Reset();
-    Put32(s_sections[META].bytes, 256);
-    CHECK(Built() == mrhi_success, "a root block of 256");
+    Put32(s_sections[META].bytes, MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES);
+    CHECK(Built() == mrhi_success, "a root block of the bound");
     Reset();
     s_sections[META].bytes[15] = 1;
     CHECK(Built() == mrhi_errorFormat, "a meta zero that is not zero");
@@ -342,11 +342,12 @@ static void TestEntries(void)
     s_sections[STRINGS].bytes[1] = 0;
     CHECK(Built() == mrhi_errorFormat, "a name with NUL");
     Reset();
-    memset(Record(STRINGS, 0, 263) + 6, 'a', 257);
-    Entry(0, mrhi_stageVertex, 6, 257);
-    CHECK(Built() == mrhi_errorFormat, "a name past 256 bytes");
-    Entry(0, mrhi_stageVertex, 6, 256);
-    CHECK(Built() == mrhi_success, "a name of 256 bytes");
+    memset(Record(STRINGS, 0, 6 + MRHI_MAX_CONTAINER_NAME_BYTES + 1) + 6, 'a',
+           MRHI_MAX_CONTAINER_NAME_BYTES + 1);
+    Entry(0, mrhi_stageVertex, 6, MRHI_MAX_CONTAINER_NAME_BYTES + 1);
+    CHECK(Built() == mrhi_errorFormat, "a name past the bound");
+    Entry(0, mrhi_stageVertex, 6, MRHI_MAX_CONTAINER_NAME_BYTES);
+    CHECK(Built() == mrhi_success, "a name of the bound");
     for (uint32_t axis = 0; axis < 3; ++axis)
     {
         Reset();
@@ -915,10 +916,17 @@ static mrhiResult WithInputs(uint32_t count)
     return Parse();
 }
 
+// The format's bounds, which the published constants name: changing one
+// changes the format, and with it the container's version.
+static_assert(MRHI_MAX_CONTAINER_SECTIONS == 64 && MRHI_MAX_CONTAINER_RECORDS == 4096 &&
+                  MRHI_MAX_CONTAINER_NAME_BYTES == 256 &&
+                  MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES == 256,
+              "the container format's bounds");
+
 static void TestRecordLimit(void)
 {
-    CHECK(WithInputs(4096) == mrhi_success, "4096 records");
-    CHECK(WithInputs(4097) == mrhi_errorFormat, "4097 records");
+    CHECK(WithInputs(MRHI_MAX_CONTAINER_RECORDS) == mrhi_success, "the most records");
+    CHECK(WithInputs(MRHI_MAX_CONTAINER_RECORDS + 1) == mrhi_errorFormat, "one record too many");
 }
 
 // Every single-bit flip of the default container is refused: the digest

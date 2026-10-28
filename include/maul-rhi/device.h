@@ -300,7 +300,7 @@ extern "C"
         // The driver's message: UTF-8 without NUL, messageLength bytes.
         char message[MRHI_LOSS_MESSAGE_BYTES];
         // Its bytes.
-        uint32_t messageLength;
+        size_t messageLength;
     } mrhiDeviceLossReport;
 
     /// Reads what is known about a lost device's loss.

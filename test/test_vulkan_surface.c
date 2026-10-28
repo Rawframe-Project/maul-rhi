@@ -98,9 +98,11 @@ static void TestCaps(void)
     CHECK(caps.presentable && caps.colorCount == 1 &&
               caps.colors[0].format == mrhi_formatBgra8Unorm && caps.twinImages && !caps.twinViews,
           "one color from a format and its sRGB twin, twin images");
-    CHECK(caps.presentModes == (mrhi_presentFifo | mrhi_presentMailbox | mrhi_presentImmediate),
+    CHECK(caps.presentModes ==
+              (mrhi_presentFifoBit | mrhi_presentMailboxBit | mrhi_presentImmediateBit),
           "three present modes, FIFO relaxed not one");
-    CHECK(caps.alphaModes == (mrhi_alphaOpaque | mrhi_alphaPremultiplied), "both alpha modes");
+    CHECK(caps.alphaModes == (mrhi_alphaOpaqueBit | mrhi_alphaPremultipliedBit),
+          "both alpha modes");
     CHECK(caps.usages == (mrhi_textureRenderTarget | mrhi_textureSampled | mrhi_textureStorage |
                           mrhi_textureCopySource | mrhi_textureCopyDestination),
           "every usage");
@@ -111,8 +113,9 @@ static void TestCaps(void)
     facts.alpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
     facts.usages = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     caps = CapsOf(facts);
-    CHECK(caps.presentable && caps.presentModes == (mrhi_presentFifo | mrhi_presentImmediate) &&
-              caps.alphaModes == mrhi_alphaOpaque && caps.usages == mrhi_textureRenderTarget,
+    CHECK(caps.presentable &&
+              caps.presentModes == (mrhi_presentFifoBit | mrhi_presentImmediateBit) &&
+              caps.alphaModes == mrhi_alphaOpaqueBit && caps.usages == mrhi_textureRenderTarget,
           "FIFO and immediate, inherited alpha as opaque, render targets only");
     facts = Full();
     facts.formatCount = 1;

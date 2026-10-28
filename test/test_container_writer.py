@@ -6,7 +6,8 @@
 # is read by test_shader with the same digest and reflection, as are one
 # whose entries use heaps and so has no WGSL, and ones with Metal code,
 # and D3D12 code, whose maps follow the writer's rules; code that
-# disagrees with its reflection is refused; and every minimal fuzz seed
+# disagrees with its reflection is refused; the writer's bounds are the
+# ones include/maul-rhi/shader.h publishes; and every minimal fuzz seed
 # of tools/container_seed.py is read too.
 #
 # usage: test_container_writer.py TEST_SHADER
@@ -17,6 +18,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -186,6 +188,19 @@ def constants(data):
     return [struct.unpack_from("<IB3xIB3x", records, at) for at in range(0, len(records), 16)]
 
 
+def header_bounds():
+    """The container bounds include/maul-rhi/shader.h publishes."""
+    with open(os.path.join(ROOT, "include", "maul-rhi", "shader.h"), encoding="utf-8") as f:
+        return {name: int(value) for name, value in
+                re.findall(r"^#define MRHI_MAX_CONTAINER_(\w+) (\d+)$", f.read(), re.M)}
+
+
+def section_kinds(data):
+    """The kinds of a container's sections, in its table's order."""
+    count = struct.unpack_from("<I", data, 48)[0]
+    return [struct.unpack_from("<I", data, 64 + 24 * i)[0] for i in range(count)]
+
+
 def write(folder, code, text, reflection, options=()):
     """Writes a container; text None passes no WGSL."""
     paths = [os.path.join(folder, n) for n in ("a.spv", "a.wgsl", "a.json", "a.mrsc")]
@@ -313,6 +328,22 @@ def main():
                 if "values" in item]}]}, f)
         check([written(options) for options in variants] == whole,
               "the writer's copy of the contract writes what the whole contract does")
+        # The writer refuses what the library would: its bounds are the
+        # header's. A container with every section it writes holds each
+        # kind once, within the sections the library reads.
+        bounds = header_bounds()
+        check(bounds == {"SECTIONS": 64, "RECORDS": 4096, "NAME_BYTES": 256,
+                         "ROOT_BLOCK_BYTES": 256},
+              f"the header publishes the four bounds: {bounds}")
+        check(mrhi_container.MAX_RECORDS == bounds.get("RECORDS") and
+              mrhi_container.MAX_NAME == bounds.get("NAME_BYTES") and
+              mrhi_container.MAX_ROOT_BLOCK == bounds.get("ROOT_BLOCK_BYTES"),
+              "the writer's records, names and root block are bounded as the library's")
+        every = written(metal_options(folder, msl=MSL, metallib=b"MTLB" + bytes(12)) +
+                        dxil_options(folder, blobs))
+        kinds = section_kinds(every) if every is not None else []
+        check(sorted(kinds) == list(range(1, 16)) and len(kinds) <= bounds.get("SECTIONS", 0),
+              f"every section the writer knows, each once and within the library's: {kinds}")
         status, errors, output = write(folder, code, WGSL, REFLECTION)
         check(status == 0, f"the container is written: {errors}")
         if status == 0:

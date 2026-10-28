@@ -17,10 +17,10 @@
 #define FRAMES 4
 
 // Each window's color in each frame: red and blue, then swapped.
-static mrhiClearColor ColorOf(int window, int frame)
+static mrhiColor ColorOf(int window, int frame)
 {
     bool red = (window + frame) % 2 == 0;
-    return (mrhiClearColor){red ? 1.0f : 0.0f, 0.0f, red ? 0.0f : 1.0f, 1.0f};
+    return (mrhiColor){red ? 1.0f : 0.0f, 0.0f, red ? 0.0f : 1.0f, 1.0f};
 }
 
 // Configures a window's surface in the color its caps list first: the
@@ -49,7 +49,7 @@ static bool Configure(Sample* sample, const SampleWindow* window, mrhiFormat* fo
 
 // Adds a pass clearing an image, and one reading its first pixel back
 // when asked.
-static void AddClear(Sample* sample, mrhiResourceId image, mrhiClearColor color, bool read,
+static void AddClear(Sample* sample, mrhiResourceId image, mrhiColor color, bool read,
                      mrhiPassId* clearOut, mrhiPassId* readOut)
 {
     mrhiPassDef clearDef = mrhiDefaultPassDef();
@@ -82,7 +82,7 @@ static void AddClear(Sample* sample, mrhiResourceId image, mrhiClearColor color,
 
 // Whether a pixel is a color, in an 8-bit format's channel order; other
 // formats are not read.
-static bool IsColor(const uint8_t* pixel, mrhiFormat format, mrhiClearColor color)
+static bool IsColor(const uint8_t* pixel, mrhiFormat format, mrhiColor color)
 {
     uint8_t red = color.red > 0.5f ? 255 : 0;
     uint8_t blue = color.blue > 0.5f ? 255 : 0;
