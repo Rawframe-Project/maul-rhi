@@ -607,17 +607,19 @@ static mrhiResult ConfigureSurface(void* self, uint64_t surface, const mrhiSurfa
     (void)config;
     TestDevice* device = self;
     MRHI_ASSERT(surface != 0);
-    // As a native driver does, the old swapchain goes before the new one
-    // allocates.
-    if (oldSwapchain != 0)
-    {
-        EndSwapchain(device, oldSwapchain);
-    }
+    // A refusal for memory comes before the platform, which keeps the old
+    // swapchain; making the object stands for the platform's call, which
+    // retires it whatever it answers.
     TestSwapchain* record =
         mrhiAllocate(&device->allocator, sizeof(TestSwapchain), alignof(TestSwapchain));
     if (record == nullptr)
     {
+        *swapchainOut = oldSwapchain;
         return mrhi_errorCapacity;
+    }
+    if (oldSwapchain != 0)
+    {
+        EndSwapchain(device, oldSwapchain);
     }
     mrhiResult status = MakeObject(device, swapchainOut);
     if (status != mrhi_success)
