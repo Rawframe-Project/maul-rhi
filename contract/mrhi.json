@@ -22370,6 +22370,11 @@
               "doc": "The sum of the bytes its uploads copy from staging."
             },
             {
+              "name": "staging_sum",
+              "type": "uint64",
+              "doc": "The sum of every byte of its staging, the room between and after its uploads' rows among them."
+            },
+            {
               "name": "memory_bytes",
               "type": "uint64",
               "doc": "The bytes its transients take together."

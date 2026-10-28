@@ -262,6 +262,29 @@ static void TestFull(void)
     CloseDevice();
 }
 
+// Staging whose size is not a multiple of the placement boundary: the
+// last upload's room ends with the staging, and the driver is handed no
+// byte past it.
+static void TestUnevenStaging(void)
+{
+    mrhiTestFrameLog log = {0};
+    s_adapter.frameLog = &log;
+    Open(1000);
+    Frame();
+    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 900) == mrhi_success,
+          "within the staging");
+    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 4) == mrhi_errorCapacity,
+          "nothing past its end");
+    Drop();
+    Frame();
+    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 900) == mrhi_success,
+          "again in the next frame");
+    (void)Submit();
+    CHECK(log.stagingBytes == 1000, "the driver handed the staging and no more");
+    CloseDevice();
+    s_adapter.frameLog = nullptr;
+}
+
 // A frame's staged bytes stay as they were while it runs and the next
 // frame stages its own, as the SPI promises a driver.
 static void TestStagingInFlight(void)
@@ -442,6 +465,7 @@ int main(void)
     TestBuffers();
     TestWholePitch();
     TestFull();
+    TestUnevenStaging();
     TestStagingInFlight();
     TestTextures();
     return s_failures == 0 ? 0 : 1;
