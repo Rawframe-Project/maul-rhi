@@ -14,13 +14,16 @@
 # release-please's markers in base.h, which release-please moves, and the
 # generator keeps it as it finds it.
 #
-# usage: gen_contract.py [--check] [--mappings OUTPUT.md]
+# usage: gen_contract.py [--check] [--mappings OUTPUT.md] | --self-test
 #   --check     writes nothing; fails naming each file that differs from
 #               what the contract generates.
+#   --self-test plants each case of the limits' diagnostic codes in a copy
+#               of the contract and proves the check takes the right ones.
 #   --mappings  also writes the table of how each concept maps onto
 #               Vulkan, D3D12, Metal and WebGPU, for the documentation
 #               site; it is not committed.
 
+import copy
 import json
 import os
 import re
@@ -33,6 +36,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTRACT = os.path.join("contract", "mrhi.json")
 WIDTH = 80
 NAME = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
+# The members of mrhiLimits that need no diagnostic code of their own,
+# each with why: every other member has diagnostic_limit_<member>, which
+# a call refused past it records (mrhiLimitDiagnostic).
+LIMITS_WITHOUT_CODE = {
+    "color_attachments": "the floor's 8 equals MRHI_MAX_COLOR_TARGETS, a fixed bound refused "
+                         "first, so no call is refused at a device's value",
+    "frames_in_flight": "a frame begun past it is a frame budget's refusal, recorded under "
+                        "diagnostic_frames_in_flight",
+}
 KINDS = ("constant", "result", "enum", "bitflags", "opaque", "id", "struct", "function")
 # The kinds a type reference may name, as kind.name.
 REFERABLE = ("enum", "bitflags", "opaque", "id", "struct")
@@ -283,6 +295,29 @@ def check_function(errors, where, item, kind_of):
         errors.append(f"{where}: an exclusive thread safety class names its object")
 
 
+def check_limit_codes(errors, items):
+    """Each limit has its diagnostic code, or a reason not to in
+    LIMITS_WITHOUT_CODE, and each code names a limit."""
+    by_name = {item.get("name"): item for item in items}
+    limits, codes = by_name.get("limits"), by_name.get("diagnostic_code")
+    if limits is None or codes is None:
+        return
+    members = {member.get("name") for member in limits.get("members", [])}
+    prefix = "diagnostic_limit_"
+    coded = {value["name"][len(prefix):] for value in codes.get("values", [])
+             if value.get("name", "").startswith(prefix)}
+    excused = set(LIMITS_WITHOUT_CODE)
+    for name in sorted(members - coded - excused):
+        errors.append(f"struct 'limits': '{name}' has no {prefix}{name} code, nor a reason "
+                      "in LIMITS_WITHOUT_CODE")
+    for name in sorted(coded - members):
+        errors.append(f"enum 'diagnostic_code': '{prefix}{name}' names no member of limits")
+    for name in sorted(coded & excused):
+        errors.append(f"struct 'limits': '{name}' has a code and a reason in LIMITS_WITHOUT_CODE")
+    for name in sorted(excused - members):
+        errors.append(f"LIMITS_WITHOUT_CODE gives a reason for '{name}', which limits lacks")
+
+
 def validate(contract):
     """The contract's structural errors, as messages; empty when valid."""
     errors, kind_of = [], {}
@@ -313,6 +348,7 @@ def validate(contract):
             check_struct(errors, where, item, kind_of)
         elif item["kind"] == "function":
             check_function(errors, where, item, kind_of)
+    check_limit_codes(errors, items)
     return errors
 
 
@@ -916,14 +952,67 @@ def outputs(contract):
     return files
 
 
+def self_test(contract):
+    """Plants each case of the limits' codes in a copy of the contract:
+    whether validate refuses it, naming the member."""
+
+    def planted(change):
+        made = copy.deepcopy(contract)
+        items = {item["name"]: item for header in made["headers"] for item in header["items"]}
+        change(items["limits"], items["diagnostic_code"])
+        return made
+
+    def member(name):
+        return {"name": name, "type": "uint32", "default": 1, "doc": "A limit.",
+                "mapping": copy.deepcopy(find_item(contract, "limits")["members"][0]["mapping"])}
+
+    def code(name, value):
+        return {"name": name, "value": value, "doc": "A limit's refusal."}
+
+    top = max(value["value"] for value in find_item(contract, "diagnostic_code")["values"])
+    cases = [
+        ("as committed", lambda limits, codes: None, None),
+        ("a new limit without a code",
+         lambda limits, codes: limits["members"].append(member("made_up")), "'made_up' has no"),
+        ("a new limit with its code",
+         lambda limits, codes: (limits["members"].append(member("made_up")),
+                                codes["values"].append(code("diagnostic_limit_made_up", top + 1))),
+         None),
+        ("a code for no limit",
+         lambda limits, codes: codes["values"].append(code("diagnostic_limit_made_up", top + 1)),
+         "'diagnostic_limit_made_up' names no member"),
+        ("a code beside a reason",
+         lambda limits, codes: codes["values"].append(
+             code("diagnostic_limit_color_attachments", top + 1)),
+         "'color_attachments' has a code and a reason"),
+        ("a reason for a limit gone",
+         lambda limits, codes: limits["members"].remove(
+             next(m for m in limits["members"] if m["name"] == "frames_in_flight")),
+         "'frames_in_flight', which limits lacks"),
+    ]
+    wrong = 0
+    for name, change, expected in cases:
+        errors = [error for error in validate(planted(change))
+                  if "limits" in error or "diagnostic_limit_" in error]
+        right = not errors if expected is None else any(expected in e for e in errors)
+        if not right:
+            print(f"self-test: {name}: {errors or 'taken'}", file=sys.stderr)
+            wrong += 1
+    print(f"self-test: {len(cases) - wrong} of {len(cases)} cases right")
+    return 1 if wrong else 0
+
+
 def main(argv):
+    if argv == ["--self-test"]:
+        with open(os.path.join(ROOT, CONTRACT), encoding="utf-8") as f:
+            sys.exit(self_test(json.load(f)))
     check = "--check" in argv
     rest = [arg for arg in argv if arg != "--check"]
     mappings = None
     if rest[:1] == ["--mappings"] and len(rest) == 2:
         mappings = rest[1]
     elif rest:
-        raise SystemExit("usage: gen_contract.py [--check] [--mappings OUTPUT.md]")
+        raise SystemExit("usage: gen_contract.py [--check] [--mappings OUTPUT.md] | --self-test")
     with open(os.path.join(ROOT, CONTRACT), encoding="utf-8") as f:
         contract = json.load(f)
     errors = validate(contract)

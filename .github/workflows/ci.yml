@@ -89,7 +89,9 @@ jobs:
           python3 tools/check_test_hygiene.py --self-test
           python3 tools/check_test_hygiene.py
       - name: The contract's headers and sources
-        run: python3 tools/gen_contract.py --check
+        run: |
+          python3 tools/gen_contract.py --self-test
+          python3 tools/gen_contract.py --check
       # A pull request's checkout is its merge into the base, so against the
       # base contract/mrhi.json changes exactly when its version must be
       # above the latest release's, which the v* tags give.

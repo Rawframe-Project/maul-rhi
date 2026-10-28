@@ -81,6 +81,7 @@ source_checks() {
     python3 tools/check_guide.py
     python3 tools/check_test_hygiene.py --self-test
     python3 tools/check_test_hygiene.py
+    python3 tools/gen_contract.py --self-test
     python3 tools/gen_contract.py --check
     python3 tools/check_contract_version.py --self-test
     # The committed shader headers against their inputs and pins, and
