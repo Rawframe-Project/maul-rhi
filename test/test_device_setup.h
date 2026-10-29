@@ -25,7 +25,7 @@ static void ResetAdapter(void)
     };
 }
 
-// Opens a device on s_adapter with the def's device limits and grants;
+// Opens a device on s_adapter with the def's budgets and grants;
 // ready when asked, else still opening.
 static mrhiDevice* OpenWith(mrhiDeviceDef deviceDef, bool ready)
 {

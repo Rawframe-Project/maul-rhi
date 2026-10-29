@@ -1321,7 +1321,7 @@ static void CheckRetirement(mrhiInstance* instance, mrhiAdapterId adapter)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
-    def.deviceLimits.buffers = 1;
+    def.budgets.buffers = 1;
     mrhiDevice* device = nullptr;
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "a device");

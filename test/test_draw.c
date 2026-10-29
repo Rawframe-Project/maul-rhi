@@ -148,7 +148,7 @@ static mrhiDiagnosticCode Refusal(void)
 // indirect arguments; and a target.
 static void OpenLimited(mrhiDeviceDef deviceDef)
 {
-    deviceDef.deviceLimits.diagnostics = 8;
+    deviceDef.budgets.diagnostics = 8;
     s_device = OpenWith(deviceDef, true);
     s_vertices = MakeBuffer(120, mrhi_bufferVertex);
     s_instances = MakeBuffer(40, mrhi_bufferVertex);
@@ -785,7 +785,7 @@ static void TestCountedDraws(void)
     // A frame's counted draws in all stay within frameIndirectDraws, and
     // the next frame starts again.
     s_adapter.features.multiDrawIndirectCount = true;
-    deviceDef.deviceLimits.frameIndirectDraws = 5;
+    deviceDef.budgets.frameIndirectDraws = 5;
     OpenLimited(deviceDef);
     pipeline = MakeGraphics();
     for (int frame = 0; frame < 2; ++frame)
@@ -892,7 +892,7 @@ static void TestSubmitted(void)
 static void TestArena(void)
 {
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    deviceDef.deviceLimits.frameCommandBytes = MRHI_CHUNK_BYTES;
+    deviceDef.budgets.frameCommandBytes = MRHI_CHUNK_BYTES;
     OpenLimited(deviceDef);
     Unbound();
     mrhiGraphicsPipelineId graphics = MakeGraphics();

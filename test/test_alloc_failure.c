@@ -128,7 +128,7 @@ static mrhiDeviceDef DeviceDef(World* world)
     def.features.bindlessSampling = true;
     def.limits.heapSize = 64;
     def.limits.samplerHeapSize = 16;
-    def.deviceLimits.diagnostics = 8;
+    def.budgets.diagnostics = 8;
     return def;
 }
 

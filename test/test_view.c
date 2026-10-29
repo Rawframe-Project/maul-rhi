@@ -204,7 +204,7 @@ static void TestAspects(void)
 static void TestEnds(void)
 {
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    deviceDef.deviceLimits.views = 3;
+    deviceDef.budgets.views = 3;
     mrhiDevice* device = OpenWith(deviceDef, true);
     mrhiTextureId texture =
         MakeTexture(device, mrhi_texture2d, mrhi_formatRgba8Unorm, 1, 1, kSampled);
@@ -282,7 +282,7 @@ static void TestRefusalsAndState(void)
     CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "done");
     s_adapter.objectsBeforeFailure = 1;
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    deviceDef.deviceLimits.views = 1;
+    deviceDef.budgets.views = 1;
     mrhiInstance* instance = s_instance;
     mrhiDevice* device = OpenWith(deviceDef, false);
     def.texture = (mrhiTextureId){1, 1};

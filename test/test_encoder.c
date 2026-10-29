@@ -101,7 +101,7 @@ static void OpenOn(mrhiDeviceDef def)
 static void Open(uint32_t chunks)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.frameCommandBytes = chunks * MRHI_CHUNK_BYTES;
+    def.budgets.frameCommandBytes = chunks * MRHI_CHUNK_BYTES;
     OpenOn(def);
 }
 
@@ -818,8 +818,7 @@ static void TestArena(void)
 
 static void TestLimit(void)
 {
-    CHECK(mrhiDefaultDeviceDef().deviceLimits.frameCommandBytes == 1u << 20,
-          "a megabyte by default");
+    CHECK(mrhiDefaultDeviceDef().budgets.frameCommandBytes == 1u << 20, "a megabyte by default");
     Open(1);
     Frame(false);
     CHECK(mrhiBeginPass(s_device, s_dispatch) == mrhi_success &&

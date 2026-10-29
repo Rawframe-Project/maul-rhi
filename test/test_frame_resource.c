@@ -132,11 +132,11 @@ static void TestImport(void)
     CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
 }
 
-// The frameResources limit, counted afresh each frame.
+// The frameResources budget, counted afresh each frame.
 static void TestLimit(void)
 {
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    deviceDef.deviceLimits.frameResources = 2;
+    deviceDef.budgets.frameResources = 2;
     mrhiInstance* instance = s_instance;
     mrhiDevice* previous = s_device;
     s_device = OpenWith(deviceDef, true);
@@ -193,7 +193,7 @@ static void TestPastDeviceLimits(void)
     s_adapter.limits.textureArrayLayers = 512;
     s_adapter.limits.bufferBytes = 2 * mrhiDefaultLimits().bufferBytes;
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    deviceDef.deviceLimits.diagnostics = 4;
+    deviceDef.budgets.diagnostics = 4;
     s_device = OpenWith(deviceDef, true);
     Begin();
     mrhiResourceId resource;

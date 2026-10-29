@@ -57,10 +57,10 @@ static void Open(uint32_t ringBytes, uint32_t readbacks, uint32_t notifications)
 {
     s_adapter.holdFrames = true;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.readbackBytes = ringBytes;
-    def.deviceLimits.readbacks = readbacks;
+    def.budgets.readbackBytes = ringBytes;
+    def.budgets.readbacks = readbacks;
     // The answers asked for, and the record kept for the loss notice.
-    def.deviceLimits.notifications = notifications + 1;
+    def.budgets.notifications = notifications + 1;
     s_device = OpenWith(def, true);
     mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
     bufferDef.size = 4096;
@@ -535,7 +535,7 @@ static void TestSubmitFailure(void)
 static void TestLimits(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    CHECK(def.deviceLimits.readbackBytes == 1u << 20 && def.deviceLimits.readbacks == 64,
+    CHECK(def.budgets.readbackBytes == 1u << 20 && def.budgets.readbacks == 64,
           "1 MiB and 64 readbacks by default");
 }
 

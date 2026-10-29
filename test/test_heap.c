@@ -25,7 +25,7 @@ static mrhiDevice* Open(uint32_t heaps, bool sampling, bool heterogeneous)
     s_adapter.limits.samplerHeapSize = 64;
     s_adapter.limits.storageOffsetAlignment = 64;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.heaps = heaps;
+    def.budgets.heaps = heaps;
     def.features.bindlessSampling = sampling;
     def.features.bindlessHeterogeneous = heterogeneous;
     def.limits.heapSize = sampling ? 2048 : 0;
@@ -107,7 +107,7 @@ static void TestMakeAndDestroy(void)
     CHECK(mrhiCreateHeap(device, &def, &heap) == mrhi_errorUnsupported, "no bindless feature");
     Close(device);
     device = Open(2, true, false);
-    CHECK(mrhiDefaultDeviceDef().deviceLimits.heaps == 4, "four heaps by default");
+    CHECK(mrhiDefaultDeviceDef().budgets.heaps == 4, "four heaps by default");
     def.entries = 0;
     CHECK(mrhiCreateHeap(device, &def, &heap) == mrhi_errorInvalid, "no entries");
     def = mrhiDefaultHeapDef();
@@ -141,7 +141,7 @@ static void TestMakeAndDestroy(void)
               mrhiCreateHeap(device, &def, &second) == mrhi_success,
           "two full heaps");
     mrhiHeapId third = {0};
-    CHECK(mrhiCreateHeap(device, &def, &third) == mrhi_errorCapacity, "the heaps limit");
+    CHECK(mrhiCreateHeap(device, &def, &third) == mrhi_errorCapacity, "the heaps budget");
     CHECK(mrhiDestroyHeap(device, heap) == mrhi_success, "destroyed");
     CHECK(mrhiDestroyHeap(device, heap) == mrhi_errorStale, "its id has ended");
     CHECK(mrhiDestroyHeap(device, (mrhiHeapId){0}) == mrhi_errorStale, "the null id");

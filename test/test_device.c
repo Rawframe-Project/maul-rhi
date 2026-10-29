@@ -96,17 +96,17 @@ static void TestOpensLater(void)
     mrhiDeviceDef def = Def(adapter);
     def.features.shaderF16 = true;
     def.limits.textureDimension2d = 16384;
-    def.deviceLimits.frameUploadBytes = 3u << 20;
-    def.deviceLimits.diagnostics = 5;
+    def.budgets.frameUploadBytes = 3u << 20;
+    def.budgets.diagnostics = 5;
     mrhiDevice* device = nullptr;
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "made");
     CHECK(device != nullptr && request.index1 != 0, "a device and a request");
     CHECK(mrhiGetDeviceState(device) == mrhi_deviceOpening, "opening until the drain");
-    mrhiDeviceLimits own;
-    CHECK(mrhiGetDeviceOwnLimits(device, &own) == mrhi_success &&
-              memcmp(&own, &def.deviceLimits, sizeof(own)) == 0,
-          "its own limits as asked, while opening");
+    mrhiDeviceBudgets own;
+    CHECK(mrhiGetDeviceBudgets(device, &own) == mrhi_success &&
+              memcmp(&own, &def.budgets, sizeof(own)) == 0,
+          "its budgets as asked, while opening");
     CHECK(Ready(instance, request) == mrhi_success, "ready");
     CHECK(mrhiGetDeviceState(device) == mrhi_deviceReady, "ready after it");
     mrhiFeatures features;
@@ -295,51 +295,51 @@ static void TestInvalidDefs(void)
               mrhiGetInstanceMisuse(instance) == misuse + 1,
           "a label past the bound, counted");
     def = Def(adapter);
-    def.deviceLimits.notifications = 0;
+    def.budgets.notifications = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "zero");
-    def.deviceLimits.notifications = 1;
+    def.budgets.notifications = 1;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
           "only the record kept for the loss notice");
     def = Def(adapter);
-    def.deviceLimits.samplers = 0;
+    def.budgets.samplers = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no samplers");
     def = Def(adapter);
-    def.deviceLimits.buffers = 0;
+    def.budgets.buffers = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no buffers");
     def = Def(adapter);
-    def.deviceLimits.textures = 0;
+    def.budgets.textures = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no textures");
     def = Def(adapter);
-    def.deviceLimits.views = 0;
+    def.budgets.views = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no views");
     def = Def(adapter);
-    def.deviceLimits.surfaces = 0;
+    def.budgets.surfaces = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no surfaces");
     def = Def(adapter);
-    def.deviceLimits.frameResources = 0;
+    def.budgets.frameResources = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
           "no frame resources");
     def = Def(adapter);
-    def.deviceLimits.framePasses = 0;
+    def.budgets.framePasses = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no passes");
     def = Def(adapter);
-    def.deviceLimits.frameAccesses = 0;
+    def.budgets.frameAccesses = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no accesses");
     def = Def(adapter);
-    def.deviceLimits.frameBarriers = 0;
+    def.budgets.frameBarriers = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no barriers");
     def = Def(adapter);
-    def.deviceLimits.shaders = 0;
+    def.budgets.shaders = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no shaders");
     def = Def(adapter);
-    def.deviceLimits.pipelines = 0;
+    def.budgets.pipelines = 0;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid, "no pipelines");
     def = Def(adapter);
-    def.deviceLimits.frameCommandBytes = 4095;
+    def.budgets.frameCommandBytes = 4095;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
           "less than a chunk of commands");
     def = Def(adapter);
-    def.deviceLimits.readbackBytes = 1000;
+    def.budgets.readbackBytes = 1000;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
           "a readback ring off 512 bytes");
     def = Def(adapter);
@@ -370,9 +370,9 @@ static void TestDeviceAllocatorAndMisuse(void)
     CHECK(s_allocations == 2, "the device's own allocator, for the core and the driver");
     CHECK(mrhiGetDeviceFeatures(device, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiGetDeviceLimits(device, nullptr) == mrhi_errorInvalid, "no out");
-    CHECK(mrhiGetDeviceOwnLimits(device, nullptr) == mrhi_errorInvalid, "no out");
-    mrhiDeviceLimits own;
-    CHECK(mrhiGetDeviceOwnLimits(nullptr, &own) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiGetDeviceBudgets(device, nullptr) == mrhi_errorInvalid, "no out");
+    mrhiDeviceBudgets own;
+    CHECK(mrhiGetDeviceBudgets(nullptr, &own) == mrhi_errorInvalid, "no device");
     CHECK(mrhiGetDeviceMisuse(device) == 3 && mrhiGetDeviceMisuse(nullptr) == 0, "counted");
     CHECK(mrhiGetDeviceState(nullptr) == mrhi_deviceFailed, "no device");
     mrhiDestroyDevice(device);

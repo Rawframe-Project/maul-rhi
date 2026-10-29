@@ -17,9 +17,9 @@
 static mrhiDevice* Open(uint32_t pipelines, uint32_t notifications, bool ready)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.pipelines = pipelines;
+    def.budgets.pipelines = pipelines;
     // The answers asked for, and the record kept for the loss notice.
-    def.deviceLimits.notifications = notifications + 1;
+    def.budgets.notifications = notifications + 1;
     return OpenWith(def, ready);
 }
 
