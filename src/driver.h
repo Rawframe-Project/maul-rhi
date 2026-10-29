@@ -21,6 +21,9 @@
 // headers or to a public type they reach, or to what a driver must do or
 // may assume, raises it; 4 is the first installed.
 #define MRHI_SPI_VERSION 11
+// What a driver sees at this version, as tools/check_spi_version.py
+// digests it; --write records it.
+// SPI digest: d610def6b55334525392c1af545a4291f2355121f8f4222dcf9d4572d2930e5b
 
 // The pass classes (mrhiPassClass): graphics, async compute and transfer.
 #define MRHI_PASS_CLASSES 3
