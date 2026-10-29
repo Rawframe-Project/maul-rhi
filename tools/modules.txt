@@ -1,6 +1,6 @@
 # The internal module graph: each module
 # and the modules it may use. tools/check_modules.py enforces it.
-adapter: capabilities_core chain driver instance_core
+adapter: capabilities_core chain driver instance_core outputs
 allocator: invariant
 base:
 capabilities_core:
@@ -89,7 +89,7 @@ heap: allocator device_core heap_core invariant label
 heap_core: device_core
 pass: capabilities_core device_core heap_core label
 compile: capabilities_core device_core encoder_core invariant label
-plan: device_core invariant
+plan: device_core invariant outputs
 memory: device_core invariant
 sha256:
 spirv_caps: bytes
@@ -103,11 +103,12 @@ draw: encoder_core
 copy: copy_core
 upload: copy_core
 query: device_core encoder_core invariant label
-readback: copy_core invariant
+readback: copy_core invariant outputs
 submit: device_core invariant
 copy_core: capabilities_core encoder_core
-cache: bytes device_core sha256
+cache: bytes device_core outputs sha256
 bytes:
+outputs:
 container: bytes capabilities_core container_interface container_table invariant label spirv_caps
 container_table: bytes sha256
 container_interface: bytes

@@ -330,18 +330,19 @@ extern "C"
     /// Lists the adapters the last answered request found, best first by its
     /// preference.
     ///
-    /// @param instance  The instance.
-    /// @param adapters  Receives up to capacity ids. May be NULL when capacity
-    ///                  is 0.
-    /// @param capacity  The ids adapters holds.
-    /// @param countOut  Receives the number of adapters, which may exceed
-    ///                  capacity.
+    /// @param instance     The instance.
+    /// @param adaptersOut  Receives up to capacity ids; zeros, as many as
+    ///                     capacity, on any failure. May be NULL when capacity
+    ///                     is 0.
+    /// @param capacity     The ids adapters holds.
+    /// @param countOut     Receives the number of adapters, which may exceed
+    ///                     capacity; 0 on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL instance or
     /// count, or a NULL array with a capacity.
     /// @par Thread safety
     /// Safe from any thread; the instance is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiInstance_GetAdapters(mrhiInstance* instance,
-                                                                mrhiAdapterId* adapters,
+                                                                mrhiAdapterId* adaptersOut,
                                                                 size_t capacity, size_t* countOut);
 
     /// Reads what an adapter is.

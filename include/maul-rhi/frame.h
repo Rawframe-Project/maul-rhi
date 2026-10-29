@@ -730,18 +730,19 @@ extern "C"
 
     /// Copies the barriers of the compiled frame, in the order they run.
     ///
-    /// @param device    The device.
-    /// @param barriers  Receives up to capacity barriers; NULL when capacity is
-    ///                  0.
-    /// @param capacity  The array's length.
-    /// @param countOut  Receives how many barriers there are.
+    /// @param device       The device.
+    /// @param barriersOut  Receives up to capacity barriers; zeros, as many as
+    ///                     capacity, on any failure. NULL when capacity is 0.
+    /// @param capacity     The array's length.
+    /// @param countOut     Receives how many barriers there are; 0 on any
+    ///                     failure.
     /// @return `mrhi_success` with the total in countOut, which may exceed the
     /// capacity; `mrhi_errorInvalid` for a NULL device or count, or a NULL
     /// array with a capacity; `mrhi_errorState` for a frame not compiled.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDevice_GetFrameBarriers(mrhiDevice* device,
-                                                                   mrhiBarrier* barriers,
+                                                                   mrhiBarrier* barriersOut,
                                                                    size_t capacity,
                                                                    size_t* countOut);
 

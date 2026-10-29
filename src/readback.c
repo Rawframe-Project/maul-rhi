@@ -8,6 +8,7 @@
 
 #include "copy_core.h"
 #include "invariant.h"
+#include "outputs.h"
 
 #include <stdatomic.h>
 #include <stdckdint.h>
@@ -320,8 +321,8 @@ static void Free(mrhiDevice* device, mrhiReadback* readback)
     }
 }
 
-mrhiResult mrhiRequest_TakeReadback(mrhiDevice* device, mrhiRequestId request, void* bytes,
-                                    size_t capacity, size_t* sizeOut)
+static mrhiResult Take(mrhiDevice* device, mrhiRequestId request, void* bytes, size_t capacity,
+                       size_t* sizeOut)
 {
     if (device == nullptr)
     {
@@ -378,4 +379,11 @@ mrhiResult mrhiRequest_TakeReadback(mrhiDevice* device, mrhiRequestId request, v
     }
     Free(device, readback);
     return mrhi_success;
+}
+
+mrhiResult mrhiRequest_TakeReadback(mrhiDevice* device, mrhiRequestId request, void* bytesOut,
+                                    size_t capacity, size_t* sizeOut)
+{
+    return mrhiClearFailed(Take(device, request, bytesOut, capacity, sizeOut), bytesOut, capacity,
+                           sizeOut);
 }

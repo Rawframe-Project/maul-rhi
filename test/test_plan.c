@@ -8,6 +8,8 @@
 
 #include "test_device_setup.h"
 
+#include <string.h>
+
 static mrhiDevice* s_device;
 
 static void Begin(void)
@@ -594,6 +596,34 @@ static void TestRefusals(void)
     CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
+// Whether a failed listing left the barriers' bytes zero and no count.
+static bool Cleared(const mrhiBarrier* barriers, size_t bytes, size_t count)
+{
+    const uint8_t* at = (const uint8_t*)barriers;
+    bool zeros = true;
+    for (size_t i = 0; i < bytes; ++i)
+    {
+        zeros = zeros && at[i] == 0;
+    }
+    return zeros && count == 0;
+}
+
+// A failed listing clears the barriers and the count the caller filled.
+static void TestFailureClears(void)
+{
+    mrhiBarrier barriers[2];
+    size_t count = 99;
+    memset(barriers, 0xA5, sizeof(barriers));
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, barriers, 2, &count) == mrhi_errorState &&
+              Cleared(barriers, sizeof(barriers), count),
+          "no frame");
+    count = 99;
+    memset(barriers, 0xA5, sizeof(barriers));
+    CHECK(mrhiDevice_GetFrameBarriers(nullptr, barriers, 2, &count) == mrhi_errorInvalid &&
+              Cleared(barriers, sizeof(barriers), count),
+          "no device");
+}
+
 // Fewer barriers allowed than a frame plans: the compile refuses, and
 // the frame stays open.
 static void TestBarrierLimit(void)
@@ -633,6 +663,7 @@ int main(void)
     TestTransient();
     TestUnified();
     TestRefusals();
+    TestFailureClears();
     TestBarrierLimit();
     s_instance = instance;
     Close(s_device);
