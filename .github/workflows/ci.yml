@@ -470,6 +470,38 @@ jobs:
       runner: windows-2025
       setup: tools/ci_agility.sh
 
+  # The windows-d3d12 cell's quarantined tests, which the required runs
+  # leave out: a failed one is a known flake and a warning, anything else
+  # fails the step (tools/run_quarantine.sh). ctest runs them by build
+  # directory, so the test preset's environment is set here. Nightly and
+  # by hand only.
+  quarantine-d3d12:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-2025
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      MAUL_RHI_REQUIRE_D3D12: "1"
+      MAUL_RHI_REQUIRE_SURFACE: "1"
+      MAUL_RHI_REQUIRE_BINDLESS: "1"
+      MAUL_RHI_REQUIRE_STATISTICS: "1"
+      MAUL_RHI_REQUIRE_TIMESTAMPS: "1"
+      MAUL_RHI_D3D12_DEBUG: "1"
+      MAUL_RHI_D3D12_GBV_STATES: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup
+        run: tools/ci_agility.sh
+      - name: Build
+        run: |
+          cmake --preset windows-d3d12
+          cmake --build --preset windows-d3d12
+      - name: Quarantined tests
+        run: tools/run_quarantine.sh out/windows-d3d12 -C Debug
+
   # The Vulkan driver on Android in the emulator, Android 15 on x86_64 with
   # KVM, whose SwiftShader offers Vulkan 1.3: every test through adb. Nightly
   # only, as booting the emulator takes minutes.
@@ -590,7 +622,8 @@ jobs:
   required:
     if: always()
     needs: [changes, docs, zizmor, checks, build, msvc-headers, web-emscripten, fuzz, fuzz-targets,
-            fuzz-nightly, windows-d3d12-states, android-emulator, ios-simulator]
+            fuzz-nightly, windows-d3d12-states, quarantine-d3d12, android-emulator,
+            ios-simulator]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     permissions: {}
