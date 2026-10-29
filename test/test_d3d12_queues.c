@@ -383,24 +383,25 @@ static void Dispatch(mrhiDevice* device, mrhiPassId pass, mrhiComputePipelineId 
           "a dispatch");
 }
 
-// Prints why a frame did not finish: whether the queues were held, and
-// each call they took, a wait's or a signal's fence with the value it
-// reached against the one the call named.
+// Prints why a frame did not finish: whether the hooks were in and the
+// queues held, and each call the queues took since the hooks went in, a
+// wait's or a signal's fence with the value it named. It reads no fence:
+// a call noted before the last device went may name a released one, and
+// a wait whose fence and value no signal matches is the one stuck.
 static void PrintCalls(mrhiRequestId token, mrhiResult waited)
 {
     fprintf(stderr, "frame %u.%u not finished within 10 s: %s\n", token.index1, token.generation,
             mrhiGetResultName(waited));
-    fprintf(stderr, "  hold %s, held: copy %d, compute %d, direct %d\n",
-            s_hold == nullptr ? "off" : "on", s_held[D3D12_COMMAND_LIST_TYPE_COPY],
-            s_held[D3D12_COMMAND_LIST_TYPE_COMPUTE], s_held[D3D12_COMMAND_LIST_TYPE_DIRECT]);
+    fprintf(stderr, "  hooks %s, hold %s, held: copy %d, compute %d, direct %d\n",
+            s_queueTable == nullptr ? "off" : "on", s_hold == nullptr ? "off" : "on",
+            s_held[D3D12_COMMAND_LIST_TYPE_COPY], s_held[D3D12_COMMAND_LIST_TYPE_COMPUTE],
+            s_held[D3D12_COMMAND_LIST_TYPE_DIRECT]);
     static const char* const kinds[] = {"execute", "wait", "signal"};
     for (uint32_t i = 0; i < s_callCount; ++i)
     {
         const Call* call = &s_calls[i];
-        uint64_t reached = call->fence == nullptr ? 0 : ID3D12Fence_GetCompletedValue(call->fence);
-        fprintf(stderr, "  %u: %s on queue type %d, fence %p at %llu of %llu\n", i,
-                kinds[call->kind], (int)call->queue, (void*)call->fence,
-                (unsigned long long)reached, (unsigned long long)call->value);
+        fprintf(stderr, "  %u: %s on queue type %d, fence %p, value %llu\n", i, kinds[call->kind],
+                (int)call->queue, (void*)call->fence, (unsigned long long)call->value);
     }
 }
 
