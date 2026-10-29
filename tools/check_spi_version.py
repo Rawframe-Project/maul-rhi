@@ -10,9 +10,10 @@
 # type, a struct's members with their types, offsets, size and alignment
 # (with each function pointer's signature), an enum's values (a sized
 # enum's constants belong to the typedef they follow), the static inline
-# functions of the SPI headers and the macros they define. The core
-# functions the SPI headers declare are not part of the interface and are
-# left out, as are public types no driver reaches.
+# functions of the SPI headers and the macros they define (a function-like
+# one with its parameters and body). The core functions the SPI headers
+# declare are not part of the interface and are left out, as are public
+# types no driver reaches.
 #
 # The digest is recorded in src/driver.h beside MRHI_SPI_VERSION. Against
 # a base, the check refuses a recorded digest that is not the tree's, a
@@ -46,6 +47,9 @@ DIGEST_LINES = ("// What a driver sees at this version, as tools/check_spi_versi
                 "// digests it; --write records it.\n")
 IDENTIFIER = re.compile(r"[A-Za-z_]\w*")
 UNNAMED = re.compile(r"\((anonymous|unnamed)( \w+)? at [^)]*\)")
+# A line of clang -dM: the name, a function-like macro's parameters, the
+# body.
+DEFINE = re.compile(r"#define (\w+)(\([^)]*\))? ?(.*)$")
 
 
 def git(root, *args):
@@ -77,20 +81,21 @@ def layouts(root):
 
 
 def macros(root):
-    """The macros the SPI headers define, with their values, but for the
-    include guards and the version itself."""
+    """The macros the SPI headers define, each with its parameters and
+    body, but for the include guards and the version itself."""
     values = {}
     for line in clang(root, "-E", "-dM").splitlines():
-        parts = line.split(" ", 2)
-        if len(parts) >= 2 and parts[0] == "#define":
-            values[parts[1]] = parts[2] if len(parts) == 3 else ""
+        defined = DEFINE.match(line)
+        if defined is not None:
+            name, parameters, body = defined.groups()
+            values[name] = f"{name}{parameters or ''} {body}".rstrip()
     found = {}
     for header in SPI_HEADERS:
         with open(os.path.join(root, header), encoding="utf-8") as f:
             for name in re.findall(r"^\s*#\s*define\s+(\w+)", f.read(), re.M):
                 guard = name.startswith("MAUL_RHI_SRC_") and name.endswith("_H")
                 if not guard and name != "MRHI_SPI_VERSION":
-                    found[name] = f"#define {name} {values.get(name, '')}".rstrip()
+                    found[name] = f"#define {values.get(name, name)}"
     return found
 
 
@@ -359,6 +364,10 @@ def dump(root, ref):
         print("\n\n".join(seen(work)))
 
 
+# A function-like macro the self-test adds to the SPI headers, which
+# define none of their own.
+SELF_MACRO = "#define MRHI_SELF_TEST_SUM(a, b) ((a) + (b))"
+
 # Each case: its name, the edits made to the tree (file, old, new, or a
 # version edit), and whether the check takes it. The scratch repository
 # holds the headers as a release, v0.9.0, with its digest recorded. Each
@@ -379,6 +388,10 @@ SELF_CASES = [
        "void (*lossReport)(void* self, mrhiDeviceLossReport* reportOut, int extra);")], False),
     ("an SPI macro changed", [("src/container.h", "#define MRHI_METAL_NONE 255",
                                "#define MRHI_METAL_NONE 254")], False),
+    ("an SPI function-like macro's body changed",
+     [("src/command.h", SELF_MACRO, SELF_MACRO.replace("+", "-"))], False),
+    ("an SPI function-like macro given a parameter, its body kept",
+     [("src/command.h", SELF_MACRO, SELF_MACRO.replace("(a, b)", "(a, b, c)", 1))], False),
     ("an SPI inline function changed",
      [("src/driver.h", "MRHI_STATISTICS_COUNTERS : 1u)", "MRHI_STATISTICS_COUNTERS : 2u)")],
      False),
@@ -449,6 +462,8 @@ def self_test():
         os.makedirs(os.path.join(work, "src"))
         for header in SPI_HEADERS:
             shutil.copy(os.path.join(ROOT, header), os.path.join(work, header))
+        edit(work, ("src/command.h", "#define MRHI_RECORD_BYTES 32\n",
+                    f"#define MRHI_RECORD_BYTES 32\n{SELF_MACRO}\n"), None)
         write_quietly(work)
         version, _ = recorded(work)
         run("init", "-q")
