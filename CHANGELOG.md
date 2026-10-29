@@ -5,6 +5,61 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.13.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.12.0...v0.13.0) (2026-10-29)
+
+### Changed
+
+- **Breaking:** the four Take calls, `mrhiInstance_TakeDiagnostic`,
+  `mrhiInstance_TakeNotification`, `mrhiDevice_TakeDiagnostic` and
+  `mrhiDevice_TakeNotification`, leave zeros in their record when they
+  return `mrhi_empty`. Before, the diagnostic takes left the record
+  untouched, and a record kept across an empty take could read as a new
+  one. A program that read the record after an empty take, expecting
+  the one it took before, now reads zeros.
+  ([#239](https://github.com/Rawframe-Project/maul-rhi/pull/239))
+- **Breaking:** `tools/mrhi_dxil.py` cooks DXIL with `-Gis`, so a shader
+  cooked again from the same SPIR-V gives different DXIL. Shader cooks,
+  and every library that cooks through it (maul-vfx, maul-ui),
+  regenerate their containers when they move to this release. A cook's
+  own stamp can record the flags from `mrhi_dxil.DXC_FLAGS`. The cook's
+  interface and the container format are unchanged. On Metal, the
+  driver's own kernel that clamps counted draws' records compiles in the
+  safe math mode, as pipelines already did.
+  ([#249](https://github.com/Rawframe-Project/maul-rhi/pull/249))
+
+  Programs see the first change, and shader cooks the second. Drivers
+  built outside the tree see neither: `MRHI_SPI_VERSION` stays 11.
+
+### Fixed
+
+- 28 calls on an object clear their outputs on any failure, before they
+  check anything: the Take calls, the adapter's and the device's
+  getters, `mrhiSurface_GetCaps`, `mrhiPass_IsKept`,
+  `mrhiResource_GetPlan`, `mrhiPass_GetPlan`, `mrhiShader_GetInfo` and
+  the interop calls of `vulkan.h`, `d3d12.h` and `metal.h`. Before, a
+  failure left the outputs as the caller had them: `mrhiAdapter_GetInfo`
+  with a stale adapter, or `mrhiResource_GetPlan` before a compile, left
+  `*infoOut` and `*planOut` holding a value from before the call. Each
+  out-parameter's doc says what a failure leaves: zeros, `false`, 0 or
+  NULL, or zeros unless a record is taken.
+  ([#239](https://github.com/Rawframe-Project/maul-rhi/pull/239))
+- On D3D12, float math in a shader runs as its source writes it, once
+  the shader is cooked again with this release. Without `-Gis`, DXC
+  marked every float operation fast, then reassociated and folded the
+  math, so a cooked shader computed something other than its source and
+  other than the same shader on Vulkan, Metal and WebGPU. The library's
+  own D3D12 kernels and the containers of its tests and samples are
+  cooked again.
+  ([#249](https://github.com/Rawframe-Project/maul-rhi/pull/249))
+- A graphics pipeline def with several vertex attributes past both the
+  `vertexStride` and `vertexAttributes` limits no longer fills the
+  device's diagnostic queue with that one call's limit records. Each
+  limit is named once per def, so the record of the check that refused
+  the def is kept. Before, the program could get `mrhi_errorInvalid` and
+  a misuse count with no diagnostic naming the check. The status a def
+  gets does not change.
+  ([#256](https://github.com/Rawframe-Project/maul-rhi/pull/256))
+
 ## [0.12.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.11.0...v0.12.0) (2026-10-29)
 
 ### Changed
