@@ -8,6 +8,7 @@
 #include "capabilities_core.h"
 #include "chain.h"
 #include "instance_core.h"
+#include "outputs.h"
 
 #include "generated/out_copies.h"
 
@@ -233,8 +234,8 @@ mrhiResult mrhiInstance_RequestAdapters(mrhiInstance* instance, const mrhiAdapte
     return mrhi_success;
 }
 
-mrhiResult mrhiInstance_GetAdapters(mrhiInstance* instance, mrhiAdapterId* adapters,
-                                    size_t capacity, size_t* countOut)
+static mrhiResult ListAdapters(mrhiInstance* instance, mrhiAdapterId* adapters, size_t capacity,
+                               size_t* countOut)
 {
     if (instance == nullptr || countOut == nullptr || (adapters == nullptr && capacity > 0))
     {
@@ -248,6 +249,13 @@ mrhiResult mrhiInstance_GetAdapters(mrhiInstance* instance, mrhiAdapterId* adapt
     }
     *countOut = instance->listed;
     return mrhi_success;
+}
+
+mrhiResult mrhiInstance_GetAdapters(mrhiInstance* instance, mrhiAdapterId* adaptersOut,
+                                    size_t capacity, size_t* countOut)
+{
+    return mrhiClearFailed(ListAdapters(instance, adaptersOut, capacity, countOut), adaptersOut,
+                           capacity * sizeof(mrhiAdapterId), countOut);
 }
 
 const mrhiDriverAdapter* mrhiFindAdapter(const mrhiInstance* instance, mrhiAdapterId adapter)

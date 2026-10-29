@@ -838,9 +838,11 @@ extern "C"
     ///
     /// @param device    The device.
     /// @param request   The readback's request.
-    /// @param bytes     Where the bytes go, or NULL for the size only.
+    /// @param bytesOut  Where the bytes go, or NULL for the size only; zeros,
+    ///                  as many as capacity, on any failure.
     /// @param capacity  The bytes there.
-    /// @param sizeOut   The readback's bytes.
+    /// @param sizeOut   The readback's bytes; 0 on any failure but
+    ///                  `mrhi_errorCapacity`, which gives them.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or size
     /// out, or an array NULL with a capacity; `mrhi_errorStale` for a request
     /// that is not a readback waiting to be taken; `mrhi_errorState` for a
@@ -850,8 +852,9 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiRequest_TakeReadback(mrhiDevice* device,
-                                                                mrhiRequestId request, void* bytes,
-                                                                size_t capacity, size_t* sizeOut);
+                                                                mrhiRequestId request,
+                                                                void* bytesOut, size_t capacity,
+                                                                size_t* sizeOut);
 
     /// Writes bytes of the root block later draws or dispatches read.
     ///

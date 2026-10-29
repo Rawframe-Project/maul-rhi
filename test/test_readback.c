@@ -440,6 +440,70 @@ static void TestDropAndFailure(void)
     CloseDevice();
 }
 
+// Whether a failed take left zeros in the array's capacity bytes, and
+// the size it should.
+static bool Cleared(const uint8_t* bytes, size_t capacity, size_t size, size_t wanted)
+{
+    bool zeros = true;
+    for (size_t i = 0; i < capacity; ++i)
+    {
+        zeros = zeros && bytes[i] == 0;
+    }
+    return zeros && size == wanted;
+}
+
+// Each failed take leaves zeros in the array and no size, but the size
+// an array too small needed, over bytes and a size the caller filled.
+static void TestFailureClears(void)
+{
+    Open(4096, 4, 16);
+    Frame();
+    mrhiRequestId request = {0};
+    CHECK(Read(0, 16, &request) == mrhi_success, "read");
+    uint8_t bytes[16];
+    size_t size = 99;
+    memset(bytes, 0xA5, sizeof(bytes));
+    CHECK(mrhiRequest_TakeReadback(s_device, request, bytes, sizeof(bytes), &size) ==
+                  mrhi_errorState &&
+              Cleared(bytes, sizeof(bytes), size, 0),
+          "a readback not yet answered");
+    mrhiRequestId token = Submit();
+    CHECK(Finish(token, &request, 1, mrhi_success), "answered");
+    size = 99;
+    memset(bytes, 0xA5, sizeof(bytes));
+    CHECK(mrhiRequest_TakeReadback(s_device, request, bytes, 15, &size) == mrhi_errorCapacity &&
+              Cleared(bytes, 15, size, 16) && bytes[15] == 0xA5,
+          "an array too small, with the size it needed");
+    size = 99;
+    memset(bytes, 0xA5, sizeof(bytes));
+    CHECK(mrhiRequest_TakeReadback(nullptr, request, bytes, sizeof(bytes), &size) ==
+                  mrhi_errorInvalid &&
+              Cleared(bytes, sizeof(bytes), size, 0),
+          "no device");
+    mrhiRequestId none = {0};
+    size = 99;
+    memset(bytes, 0xA5, sizeof(bytes));
+    CHECK(mrhiRequest_TakeReadback(s_device, none, bytes, sizeof(bytes), &size) ==
+                  mrhi_errorStale &&
+              Cleared(bytes, sizeof(bytes), size, 0),
+          "no readback");
+    CloseDevice();
+    s_adapter.frameOutcome = mrhi_errorPlatform;
+    Open(4096, 4, 16);
+    s_adapter.frameOutcome = mrhi_errorPlatform;
+    Frame();
+    CHECK(Read(0, 16, &request) == mrhi_success, "read");
+    token = Submit();
+    CHECK(Finish(token, &request, 1, mrhi_errorPlatform), "answered with the failure");
+    size = 99;
+    memset(bytes, 0xA5, sizeof(bytes));
+    CHECK(mrhiRequest_TakeReadback(s_device, request, bytes, sizeof(bytes), &size) ==
+                  mrhi_errorPlatform &&
+              Cleared(bytes, sizeof(bytes), size, 0),
+          "a readback its frame's failure ended");
+    CloseDevice();
+}
+
 static void TestAnswerRoom(void)
 {
     // Room for four answers: a readback needs one for itself and one for
@@ -558,6 +622,7 @@ int main(void)
     TestTexture();
     TestRing();
     TestDropAndFailure();
+    TestFailureClears();
     TestAnswerRoom();
     TestWrap();
     TestOutOfOrder();

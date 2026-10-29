@@ -339,6 +339,14 @@ static void TestInvalidRequests(void)
     CHECK(mrhiInstance_GetAdapters(instance, nullptr, 1, &count) == mrhi_errorInvalid,
           "a NULL array");
     CHECK(mrhiInstance_GetAdapters(instance, nullptr, 0, nullptr) == mrhi_errorInvalid, "no count");
+    // A failure clears the ids and the count the caller filled.
+    mrhiAdapterId listed[2];
+    memset(listed, 0xA5, sizeof(listed));
+    count = 99;
+    CHECK(mrhiInstance_GetAdapters(nullptr, listed, 2, &count) == mrhi_errorInvalid && count == 0 &&
+              listed[0].index1 == 0 && listed[0].generation == 0 && listed[1].index1 == 0 &&
+              listed[1].generation == 0,
+          "no instance, with the outputs cleared");
     CHECK(mrhiInstance_GetMisuse(instance) == 8, "each invalid call on the instance counted once");
     mrhiAdapterInfo info;
     CHECK(mrhiAdapter_GetInfo(instance, (mrhiAdapterId){3, 9}, &info) == mrhi_errorStale, "stale");

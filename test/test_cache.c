@@ -12,6 +12,7 @@
 #include "maul-rhi/pipeline.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 #define CACHE_ROOM  256
 #define HEADER_ROOM 64
@@ -279,6 +280,50 @@ static void TestMisuse(void)
     Close(device);
 }
 
+// Whether a failed call left zeros in the cache's first capacity bytes,
+// and the size it should.
+static bool Cleared(size_t capacity, size_t size, size_t wanted)
+{
+    bool zeros = true;
+    for (size_t i = 0; i < capacity; ++i)
+    {
+        zeros = zeros && s_cache[i] == 0;
+    }
+    return zeros && size == wanted;
+}
+
+// Each failure leaves zeros in the array and no size, but the size an
+// array too small needed, over bytes and a size the caller filled.
+static void TestFailureClears(void)
+{
+    mrhiDevice* device = OpenCached(nullptr, 0);
+    size_t needed = 0;
+    CHECK(mrhiDevice_GetPipelineCache(device, nullptr, 0, &needed) == mrhi_success, "measured");
+    size_t size = 99;
+    memset(s_cache, 0xA5, sizeof(s_cache));
+    CHECK(mrhiDevice_GetPipelineCache(device, s_cache, needed - 1, &size) == mrhi_errorCapacity &&
+              Cleared(needed - 1, size, needed) && s_cache[needed - 1] == 0xA5,
+          "an array too small, with the size it needed");
+    size = 99;
+    memset(s_cache, 0xA5, sizeof(s_cache));
+    CHECK(mrhiDevice_GetPipelineCache(nullptr, s_cache, sizeof(s_cache), &size) ==
+                  mrhi_errorInvalid &&
+              Cleared(sizeof(s_cache), size, 0),
+          "no device");
+    Close(device);
+    device = OpenWith(mrhiDefaultDeviceDef(), false);
+    size = 99;
+    memset(s_cache, 0xA5, sizeof(s_cache));
+    CHECK(mrhiDevice_GetPipelineCache(device, s_cache, sizeof(s_cache), &size) == mrhi_errorState &&
+              Cleared(sizeof(s_cache), size, 0),
+          "a device not ready");
+    size = 99;
+    CHECK(mrhiDevice_GetPipelineCache(device, nullptr, sizeof(s_cache), &size) == mrhi_errorState &&
+              size == 0,
+          "a device not ready, measured");
+    Close(device);
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -289,5 +334,6 @@ int main(void)
     TestVersion();
     TestIdentity();
     TestMisuse();
+    TestFailureClears();
     return s_failures == 0 ? 0 : 1;
 }

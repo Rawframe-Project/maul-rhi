@@ -1769,10 +1769,10 @@
               "doc": "The instance."
             },
             {
-              "name": "adapters",
+              "name": "adapters_out",
               "type": "id.adapter_id",
               "pointer": "mutable",
-              "doc": "Receives up to capacity ids. May be NULL when capacity is 0."
+              "doc": "Receives up to capacity ids; zeros, as many as capacity, on any failure. May be NULL when capacity is 0."
             },
             {
               "name": "capacity",
@@ -1783,7 +1783,7 @@
               "name": "count_out",
               "type": "size",
               "pointer": "mutable",
-              "doc": "Receives the number of adapters, which may exceed capacity."
+              "doc": "Receives the number of adapters, which may exceed capacity; 0 on any failure."
             }
           ],
           "thread_safety": {
@@ -13993,10 +13993,10 @@
               "doc": "The device."
             },
             {
-              "name": "barriers",
+              "name": "barriers_out",
               "type": "struct.barrier",
               "pointer": "mutable",
-              "doc": "Receives up to capacity barriers; NULL when capacity is 0."
+              "doc": "Receives up to capacity barriers; zeros, as many as capacity, on any failure. NULL when capacity is 0."
             },
             {
               "name": "capacity",
@@ -14007,7 +14007,7 @@
               "name": "count_out",
               "type": "size",
               "pointer": "mutable",
-              "doc": "Receives how many barriers there are."
+              "doc": "Receives how many barriers there are; 0 on any failure."
             }
           ],
           "thread_safety": {
@@ -18848,7 +18848,7 @@
           "doc": "Writes the device's pipeline cache, for a later device's def: the driver's compiled pipelines in a checked envelope.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` with the cache written, or only its size when bytes is NULL; `mrhi_errorInvalid` for a NULL device or sizeOut; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when capacity is less than the size, which sizeOut receives; `mrhi_errorPlatform` when the driver fails to write it."
+            "doc": "`mrhi_success` with the cache written, or only its size when bytesOut is NULL; `mrhi_errorInvalid` for a NULL device or sizeOut; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when capacity is less than the size, which sizeOut receives; `mrhi_errorPlatform` when the driver fails to write it."
           },
           "args": [
             {
@@ -18858,10 +18858,10 @@
               "doc": "The device."
             },
             {
-              "name": "bytes",
+              "name": "bytes_out",
               "type": "void",
               "pointer": "mutable",
-              "doc": "Receives the cache, or NULL to learn its size."
+              "doc": "Receives the cache, or NULL to learn its size; zeros, as many as capacity, on any failure."
             },
             {
               "name": "capacity",
@@ -18872,7 +18872,7 @@
               "name": "size_out",
               "type": "size",
               "pointer": "mutable",
-              "doc": "Receives the cache's size."
+              "doc": "Receives the cache's size; 0 on any failure but `mrhi_errorCapacity`, which gives the size the cache needs."
             }
           ],
           "thread_safety": {
@@ -21034,10 +21034,10 @@
               "doc": "The readback's request."
             },
             {
-              "name": "bytes",
+              "name": "bytes_out",
               "type": "void",
               "pointer": "mutable",
-              "doc": "Where the bytes go, or NULL for the size only."
+              "doc": "Where the bytes go, or NULL for the size only; zeros, as many as capacity, on any failure."
             },
             {
               "name": "capacity",
@@ -21048,7 +21048,7 @@
               "name": "size_out",
               "type": "size",
               "pointer": "mutable",
-              "doc": "The readback's bytes."
+              "doc": "The readback's bytes; 0 on any failure but `mrhi_errorCapacity`, which gives them."
             }
           ],
           "thread_safety": {
