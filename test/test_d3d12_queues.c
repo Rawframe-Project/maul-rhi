@@ -383,14 +383,40 @@ static void Dispatch(mrhiDevice* device, mrhiPassId pass, mrhiComputePipelineId 
           "a dispatch");
 }
 
+// Prints why a frame did not finish: whether the queues were held, and
+// each call they took, a wait's or a signal's fence with the value it
+// reached against the one the call named.
+static void PrintCalls(mrhiRequestId token, mrhiResult waited)
+{
+    fprintf(stderr, "frame %u.%u not finished within 10 s: %s\n", token.index1, token.generation,
+            mrhiGetResultName(waited));
+    fprintf(stderr, "  hold %s, held: copy %d, compute %d, direct %d\n",
+            s_hold == nullptr ? "off" : "on", s_held[D3D12_COMMAND_LIST_TYPE_COPY],
+            s_held[D3D12_COMMAND_LIST_TYPE_COMPUTE], s_held[D3D12_COMMAND_LIST_TYPE_DIRECT]);
+    static const char* const kinds[] = {"execute", "wait", "signal"};
+    for (uint32_t i = 0; i < s_callCount; ++i)
+    {
+        const Call* call = &s_calls[i];
+        uint64_t reached = call->fence == nullptr ? 0 : ID3D12Fence_GetCompletedValue(call->fence);
+        fprintf(stderr, "  %u: %s on queue type %d, fence %p at %llu of %llu\n", i,
+                kinds[call->kind], (int)call->queue, (void*)call->fence,
+                (unsigned long long)reached, (unsigned long long)call->value);
+    }
+}
+
 // Submits the frame and waits for it, draining the device's
 // notifications.
 static void Finish(mrhiDevice* device)
 {
     mrhiRequestId token = {0};
-    CHECK(mrhiDevice_SubmitFrame(device, &token) == mrhi_success &&
-              mrhiRequest_WaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
-          "submitted and finished");
+    bool submitted = mrhiDevice_SubmitFrame(device, &token) == mrhi_success;
+    mrhiResult waited =
+        submitted ? mrhiRequest_WaitFrame(device, token, UINT64_C(10000000000)) : mrhi_errorState;
+    if (submitted && waited != mrhi_success)
+    {
+        PrintCalls(token, waited);
+    }
+    CHECK(submitted && waited == mrhi_success, "submitted and finished");
     mrhiDeviceNotification record;
     while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {

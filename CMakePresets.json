@@ -179,7 +179,8 @@
       "name": "base",
       "hidden": true,
       "output": { "outputOnFailure": true },
-      "execution": { "noTestsAction": "error", "timeout": 300, "jobs": 4 }
+      "execution": { "noTestsAction": "error", "timeout": 300, "jobs": 4 },
+      "filter": { "exclude": { "label": "^quarantine$" } }
     },
     {
       "name": "lavapipe",
@@ -208,13 +209,13 @@
       "name": "linux-seam-x11",
       "inherits": "lavapipe",
       "configurePreset": "linux-seam-x11",
-      "filter": { "include": { "name": "^seam$" } }
+      "filter": { "include": { "name": "^seam$" }, "exclude": { "label": "^quarantine$" } }
     },
     {
       "name": "linux-seam-wayland",
       "inherits": "lavapipe",
       "configurePreset": "linux-seam-wayland",
-      "filter": { "include": { "name": "^seam$" } }
+      "filter": { "include": { "name": "^seam$" }, "exclude": { "label": "^quarantine$" } }
     },
     {
       "name": "android-emulator",
@@ -222,7 +223,7 @@
       "configurePreset": "android-emulator",
       "description": "The three window samples make windows of their own, and the samples know no Android window system.",
       "environment": { "MAUL_RHI_REQUIRE_VULKAN": "1" },
-      "filter": { "exclude": { "name": "^sample_(hdr_surface|two_windows|present_states)$" } }
+      "filter": { "exclude": { "name": "^sample_(hdr_surface|two_windows|present_states)$", "label": "^quarantine$" } }
     },
     {
       "name": "web-emscripten",
@@ -236,7 +237,7 @@
       "configurePreset": "web-wasi",
       "description": "The samples open WebGPU, which Node's WASI lacks.",
       "environment": { "MAUL_RHI_REQUIRE_WEBGPU": "1" },
-      "filter": { "exclude": { "name": "^sample_" } }
+      "filter": { "exclude": { "name": "^sample_", "label": "^quarantine$" } }
     },
     {
       "name": "metal",
@@ -258,7 +259,7 @@
       "configurePreset": "ios-simulator",
       "description": "The simulator's GPU has no cube arrays, below the floor: no adapter is listed, so the guide and the samples have none.",
       "execution": { "timeout": 240 },
-      "filter": { "exclude": { "name": "^(guide|sample_.*)$" } }
+      "filter": { "exclude": { "name": "^(guide|sample_.*)$", "label": "^quarantine$" } }
     },
     {
       "name": "windows-d3d12",
@@ -289,7 +290,7 @@
       "configurePreset": "windows-vulkan",
       "configuration": "Release",
       "description": "The runner has no Vulkan, so the guide and the samples, which open the native driver, have no adapter.",
-      "filter": { "exclude": { "name": "^(guide|sample_.*)$" } }
+      "filter": { "exclude": { "name": "^(guide|sample_.*)$", "label": "^quarantine$" } }
     }
   ]
 }
