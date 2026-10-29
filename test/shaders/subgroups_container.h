@@ -5,12 +5,13 @@
 // from test/shaders/subgroups.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:cd21517f280dae9a76ba7de2757c2abea49b7e1483b97f6c3f49b0f70387e360
+// inputs sha256:b16405ef3faad6501579e81f1b63d2e8c76752aaf2d363bc441315f0564f413f
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0
 // tool dxc linux_dxc_2026_07_29 (v1.9.2607, libdxcompiler 1.9.0.1, 0d3ee6b5)
 // tool dxc sha256:55665c87824051ed4774ff3280a79ccbbb7d39243b9736ca5e98222134112d54
+// tool dxc flags -Gis -Qstrip_reflect -Qstrip_debug
 // bytes sha256:268ebba2973b02f5cd3070577ec14f3a3499de5160895f43b18b8096d18f0fab
 
 #ifndef MAUL_RHI_TEST_SUBGROUPS_CONTAINER_H

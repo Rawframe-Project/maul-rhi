@@ -5,12 +5,13 @@
 // from samples/shaders/triangle.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:2a39c58cd4cf6962db8803997d6100834d7332733998b9596d91373dd0dcb9c5
+// inputs sha256:8675c831fdbf93abdc707d18094c151f5348d259eff570d697501ba03939cef5
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0
 // tool dxc linux_dxc_2026_07_29 (v1.9.2607, libdxcompiler 1.9.0.1, 0d3ee6b5)
 // tool dxc sha256:55665c87824051ed4774ff3280a79ccbbb7d39243b9736ca5e98222134112d54
+// tool dxc flags -Gis -Qstrip_reflect -Qstrip_debug
 // bytes sha256:d9375f218cb11d8fcc15f951c536c803043684426244b4a614f1c2d4054b3cab
 
 #ifndef MAUL_RHI_TEST_TRIANGLE_CONTAINER_H

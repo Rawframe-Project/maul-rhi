@@ -6,7 +6,7 @@ Why the library loads containers made offline instead of compiling shaders, how 
 
 Vulkan takes SPIR-V, D3D12 DXIL, Metal a metallib or MSL it compiles itself, and the WebGPU driver takes WGSL. The library compiles and translates nothing at run time: a shader compiler would dwarf the library, cost the web build its size budget, and put an untrusted-input parser of enormous surface into every program. So a cook makes every form offline, once, and a container carries them side by side. Every build carries every code, which costs size on disk, not time.
 
-The MSL exists beside the metallib because only Apple's toolchain makes a metallib: with MSL, a cook on Linux or Windows can still target Metal, while the library still translates nothing. The driver prefers the metallib when there is one. DXIL is always made offline, since D3D12 has no compiler of its own; SPIRV-Cross writes HLSL from the SPIR-V and DXC compiles it (`tools/mrhi_dxil.py`).
+The MSL exists beside the metallib because only Apple's toolchain makes a metallib: with MSL, a cook on Linux or Windows can still target Metal, while the library still translates nothing. The driver prefers the metallib when there is one. DXIL is always made offline, since D3D12 has no compiler of its own; SPIRV-Cross writes HLSL from the SPIR-V and DXC compiles it (`tools/mrhi_dxil.py`) with `-Gis`, which keeps the float math as the source writes it. Without it DXC marks every float operation fast and reassociates and folds it, so D3D12 would compute something other than the other APIs. The stamp of each committed DXIL header records DXC's flags, and its check refuses DXIL made without `-Gis`.
 
 ## One reflection, in WebGPU's terms
 

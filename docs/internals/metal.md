@@ -28,7 +28,7 @@ Buffers, textures, views, samplers and query sets are Metal objects whose retain
 
 ## Pipelines
 
-A shader holds a library per entry point, made from the container's metallib when it has one and otherwise compiled from each entry's MSL without fast math, and a copy of the Metal map. Each entry is the function of its own name, specialized with the pipeline's constants as function constants of their ids. Pipelines are made at the call and answered at the next poll, and keep what their frames bind, so they outlive their shader.
+A shader holds a library per entry point, made from the container's metallib when it has one and otherwise compiled from each entry's MSL without fast math (the safe math mode), and a copy of the Metal map. The driver's own kernel, which clamps counted draws' records, is compiled with the same options. Each entry is the function of its own name, specialized with the pipeline's constants as function constants of their ids. Pipelines are made at the call and answered at the next poll, and keep what their frames bind, so they outlive their shader.
 
 Vertex attributes take their locations as attribute indices, and vertex buffer n lies at buffer index 30 minus n. Refused as unsupported: a pipeline whose vertex buffers reach a buffer index its container uses; a sample mask that leaves samples out, since Metal has none; a workgroup larger than the pipeline's threads. A buffer of stride 0 takes Metal's constant step function.
 

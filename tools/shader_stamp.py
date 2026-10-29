@@ -10,12 +10,14 @@
 #   // inputs sha256:HEX   every input it was made from: its sources, the
 #                          generator and the writer scripts, each named
 #                          by its path, with CRLF read as LF
-#   // tool NAME VERSION   each pinned tool that made it, a line each
+#   // tool NAME VERSION   each pinned tool that made it, a line each, and
+#                          for DXC the flags it compiled with
 #   // bytes sha256:HEX    the bytes its array holds
 # A check recomputes the inputs' digest from the tree and the bytes'
 # digest from the array, and compares the tools with the generator's
 # pins, so it fails on a changed input, a moved pin or a hand-edited
-# header. The self-test proves each of those fails on a copy of the
+# header. It also refuses DXIL whose DXC flags lack -Gis, which keeps
+# DXC from marking the float math fast, even when the pins agree. The self-test proves each of those fails on a copy of the
 # tree, and that a copy with CRLF line ends passes.
 #
 # Standard library only.
@@ -31,6 +33,8 @@ import sys
 import tempfile
 
 STAMP = re.compile(r"^// (inputs|tool|bytes) (.*)$", re.MULTILINE)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mrhi_dxil import DXC_FLAGS  # noqa: E402
 # The family's DXC, which both generators pin: what dxc --version
 # reports of it, and the stamp's lines naming the release asset of
 # microsoft/DirectXShaderCompiler with its SHA-256.
@@ -38,6 +42,7 @@ DXC_IDENTITY = "libdxcompiler 1.9.0.1, 0d3ee6b5"
 DXC = (
     "dxc linux_dxc_2026_07_29 (v1.9.2607, libdxcompiler 1.9.0.1, 0d3ee6b5)",
     "dxc sha256:55665c87824051ed4774ff3280a79ccbbb7d39243b9736ca5e98222134112d54",
+    "dxc flags " + " ".join(DXC_FLAGS),
 )
 
 
@@ -113,7 +118,7 @@ def array_bytes(text):
 
 def problems(root, units, tools, compare_inputs=True):
     """What is wrong with each unit's header, as (header, kind, detail):
-    kind is "missing", "inputs", "tools" or "bytes". A unit is a header's
+    kind is "missing", "inputs", "tools", "flags" or "bytes". A unit is a header's
     path and its inputs' paths, relative to the root."""
     found = []
     for header, inputs in units:
@@ -135,6 +140,11 @@ def problems(root, units, tools, compare_inputs=True):
         if made_by != list(tools):
             found.append((header, "tools", f"made by {'; '.join(made_by)}, the pins are "
                           f"{'; '.join(tools)}"))
+        flags = [line.split()[2:] for line in made_by if line.startswith("dxc flags")]
+        if any(line.startswith("dxc ") for line in made_by) and not any(
+                "-Gis" in line for line in flags):
+            found.append((header, "flags", "its DXIL was compiled without -Gis, so DXC marked "
+                          "its float math fast"))
         if stamp["bytes"] != f"sha256:{hashlib.sha256(data).hexdigest()}":
             found.append((header, "bytes", "its bytes were edited"))
     return found
@@ -217,11 +227,14 @@ def self_test(root, copied, units_of, tools, compare_inputs=True, cases=()):
                                                               b"// tool moved "), {"tools"})
     expect("an edited header", edited_byte, {"bytes"})
     expect("CRLF line ends", crlf, set())
+    if any(tool.startswith("dxc flags") for tool in tools):
+        expect("DXIL without -Gis",
+               lambda work, header, inputs: edit(work, header, b" -Gis", b""), {"tools", "flags"})
     for what, change, wanted in cases:
         expect(what, lambda work, header, inputs, change=change: change(work), wanted)
     for failure in failures:
         print(f"self-test: {failure}")
     if not failures:
         print("self-test: the check passes as committed and with CRLF, and fails on a changed "
-              "input, pin or header" + "".join(f"; {what}: as wanted" for what, _, _ in cases))
+              "input, pin or header, or DXIL without -Gis" + "".join(f"; {what}: as wanted" for what, _, _ in cases))
     return 1 if failures else 0

@@ -5,12 +5,13 @@
 // from samples/shaders/compute_plan.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:99be1ada53a401d6ae740637c75f2f12397674386ad2dddd013123e896f904cf
+// inputs sha256:52aaee2e00f91fba5c693215d1f7262b4ca1fedf86c2d3974d45858e881db178
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0
 // tool dxc linux_dxc_2026_07_29 (v1.9.2607, libdxcompiler 1.9.0.1, 0d3ee6b5)
 // tool dxc sha256:55665c87824051ed4774ff3280a79ccbbb7d39243b9736ca5e98222134112d54
+// tool dxc flags -Gis -Qstrip_reflect -Qstrip_debug
 // bytes sha256:f6d9d370b4d2880f5ed2b2a2dc1841b8466cc2cba34aa8964cda4e356f02a230
 
 #ifndef MAUL_RHI_TEST_COMPUTE_PLAN_CONTAINER_H

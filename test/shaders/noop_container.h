@@ -5,12 +5,13 @@
 // from test/shaders/noop.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:f7ebc824ebfcb039a3b3ac41b0ee04fa5e646733d89061d6797061c766276298
+// inputs sha256:3bc4571b9669619d65b178dee4ed4ac899cefcc69bed3e063e9150216ac3446a
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0
 // tool dxc linux_dxc_2026_07_29 (v1.9.2607, libdxcompiler 1.9.0.1, 0d3ee6b5)
 // tool dxc sha256:55665c87824051ed4774ff3280a79ccbbb7d39243b9736ca5e98222134112d54
+// tool dxc flags -Gis -Qstrip_reflect -Qstrip_debug
 // bytes sha256:3e90ce8a0362bfe82e39325d952b5099c67a2cc67dcc4857abb8489461bd8531
 
 #ifndef MAUL_RHI_TEST_NOOP_CONTAINER_H

@@ -58,7 +58,7 @@ d3d12_api:
 driver_metal: allocator driver format_caps invariant metal_device metal_frame metal_surface
 metal_device: allocator driver invariant metal_frame metal_lanes metal_native metal_pipeline metal_resource metal_surface
 metal_surface: allocator driver invariant metal_names
-metal_frame: invariant metal_encode metal_lanes metal_resource metal_state metal_surface
+metal_frame: invariant metal_encode metal_lanes metal_pipeline metal_resource metal_state metal_surface
 metal_lanes: driver invariant
 metal_encode: capabilities_core invariant metal_copy metal_names metal_resource metal_state
 metal_copy: capabilities_core invariant metal_resource metal_state
