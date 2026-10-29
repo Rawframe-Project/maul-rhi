@@ -25,8 +25,8 @@
 mrhiResult mrhiInstance_DescribeVulkanDevice(mrhiInstance* instance, const mrhiDeviceDef* def,
                                              void** createInfoOut, void** physicalDeviceOut)
 {
-    mrhiClearOutput(createInfoOut, sizeof(*createInfoOut));
-    mrhiClearOutput(physicalDeviceOut, sizeof(*physicalDeviceOut));
+    mrhiClearHandle(createInfoOut);
+    mrhiClearHandle(physicalDeviceOut);
     if (instance == nullptr)
     {
         return mrhi_errorInvalid;
@@ -67,7 +67,7 @@ mrhiResult mrhiInstance_DescribeVulkanDevice(mrhiInstance* instance, const mrhiD
 mrhiResult mrhiAdapter_GetVulkanPhysicalDevice(mrhiInstance* instance, mrhiAdapterId adapter,
                                                void** physicalDeviceOut)
 {
-    mrhiClearOutput(physicalDeviceOut, sizeof(*physicalDeviceOut));
+    mrhiClearHandle(physicalDeviceOut);
     if (instance == nullptr)
     {
         return mrhi_errorInvalid;
@@ -120,11 +120,11 @@ mrhiResult mrhiDevice_GetVulkanDevice(mrhiDevice* device, void** instanceOut,
                                       void** physicalDeviceOut, void** deviceOut,
                                       void** getInstanceProcAddrOut, void** getDeviceProcAddrOut)
 {
-    mrhiClearOutput(instanceOut, sizeof(*instanceOut));
-    mrhiClearOutput(physicalDeviceOut, sizeof(*physicalDeviceOut));
-    mrhiClearOutput(deviceOut, sizeof(*deviceOut));
-    mrhiClearOutput(getInstanceProcAddrOut, sizeof(*getInstanceProcAddrOut));
-    mrhiClearOutput(getDeviceProcAddrOut, sizeof(*getDeviceProcAddrOut));
+    mrhiClearHandle(instanceOut);
+    mrhiClearHandle(physicalDeviceOut);
+    mrhiClearHandle(deviceOut);
+    mrhiClearHandle(getInstanceProcAddrOut);
+    mrhiClearHandle(getDeviceProcAddrOut);
     if (device == nullptr)
     {
         return mrhi_errorInvalid;

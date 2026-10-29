@@ -18,8 +18,8 @@
 
 mrhiResult mrhiDevice_GetMetalDevice(mrhiDevice* device, void** deviceOut, void** queueOut)
 {
-    mrhiClearOutput(deviceOut, sizeof(*deviceOut));
-    mrhiClearOutput(queueOut, sizeof(*queueOut));
+    mrhiClearHandle(deviceOut);
+    mrhiClearHandle(queueOut);
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
@@ -39,7 +39,7 @@ mrhiResult mrhiDevice_GetMetalDevice(mrhiDevice* device, void** deviceOut, void*
 
 mrhiResult mrhiTexture_GetMetalTexture(mrhiDevice* device, mrhiTextureId texture, void** textureOut)
 {
-    mrhiClearOutput(textureOut, sizeof(*textureOut));
+    mrhiClearHandle(textureOut);
     if (device == nullptr)
     {
         return mrhi_errorInvalid;

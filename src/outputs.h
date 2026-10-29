@@ -24,6 +24,16 @@ static inline void mrhiClearOutput(void* out, size_t bytes)
     }
 }
 
+// Clears a native handle a call writes, unless out is NULL, before the
+// call checks anything.
+static inline void mrhiClearHandle(void** out)
+{
+    if (out != nullptr)
+    {
+        *out = nullptr;
+    }
+}
+
 // Returns status, after clearing the outputs when it is a failure:
 // arrayBytes bytes of arrayOut, and *sizeOut. Either may be NULL.
 static inline mrhiResult mrhiClearFailed(mrhiResult status, void* arrayOut, size_t arrayBytes,
