@@ -904,6 +904,56 @@ static void TestPastDeviceLimits(void)
     ResetAdapter();
 }
 
+// Takes the device's diagnostics, keeping the first capacity codes:
+// how many records there were.
+static uint32_t Records(mrhiDevice* device, mrhiDiagnosticCode* codes, uint32_t capacity)
+{
+    uint32_t count = 0;
+    mrhiDiagnostic record;
+    while (mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success)
+    {
+        if (count < capacity)
+        {
+            codes[count] = record.code;
+        }
+        ++count;
+    }
+    return count;
+}
+
+// Many attributes past both limits in one def: each limit named once, so
+// the device's 8 records keep room for the check that refuses the def.
+static void TestLimitsNamedOnce(void)
+{
+    mrhiLimits limits = mrhiDefaultLimits();
+    ResetAdapter();
+    s_adapter.limits.vertexStride = 2 * limits.vertexStride;
+    s_adapter.limits.vertexAttributes = 2 * limits.vertexAttributes;
+    mrhiDevice* device = Open();
+    mrhiGraphicsPipelineDef def = Def();
+    s_buffers[0].stride = 0;
+    for (uint32_t i = 1; i <= 5; ++i)
+    {
+        s_attributes[i] = (mrhiVertexAttribute){.location = limits.vertexAttributes + i,
+                                                .format = mrhi_vertexUint8,
+                                                .offset = limits.vertexStride + i};
+    }
+    def.vertexAttributeCount = 6;
+    mrhiDiagnosticCode codes[8] = {0};
+    CHECK(Made(device, &def) == mrhi_errorCapacity && Records(device, codes, 8) == 2 &&
+              codes[0] == mrhi_diagnosticLimitVertexStride &&
+              codes[1] == mrhi_diagnosticLimitVertexAttributes,
+          "each limit named once");
+    def.topology = 99;
+    CHECK(Made(device, &def) == mrhi_errorInvalid && Records(device, codes, 8) == 3 &&
+              codes[0] == mrhi_diagnosticLimitVertexStride &&
+              codes[1] == mrhi_diagnosticLimitVertexAttributes &&
+              codes[2] == mrhi_diagnosticGraphicsPrimitive,
+          "the refusal named after them");
+    Close(device);
+    ResetAdapter();
+}
+
 // Values past the last of their enum, on the depth test and the front
 // stencil face, which the back face's checks above leave out.
 static void TestUnknownValues(void)
@@ -1243,6 +1293,7 @@ int main(void)
     TestDualSource();
     TestColorBytes();
     TestPastDeviceLimits();
+    TestLimitsNamedOnce();
     TestMultisample();
     TestUnknownValues();
     TestCapacity();
