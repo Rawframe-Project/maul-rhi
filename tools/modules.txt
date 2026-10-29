@@ -7,7 +7,7 @@ capabilities_core:
 format_caps: capabilities_core
 chain:
 diagnostics: invariant
-device: allocator capabilities_core chain device_core diagnostics driver heap_core instance_core invariant label pool
+device: allocator capabilities_core chain device_core diagnostics driver heap_core instance_core invariant label outputs pool
 device_core: allocator capabilities_core command diagnostics driver pool reflection
 driver: command reflection
 driver_test: allocator capabilities_core command driver format_caps frame_walk invariant pipeline_walk
@@ -33,7 +33,7 @@ vulkan_facts: capabilities_core driver stage_limits vulkan_api
 vulkan_surface: capabilities_core vulkan_adapter vulkan_api
 vulkan_label: invariant vulkan_api
 vulkan_api:
-instance: allocator chain diagnostics driver driver_d3d12 driver_metal driver_test driver_vulkan driver_webgpu instance_core invariant validation
+instance: allocator chain diagnostics driver driver_d3d12 driver_metal driver_test driver_vulkan driver_webgpu instance_core invariant outputs validation
 driver_d3d12: allocator d3d12_api d3d12_device d3d12_surface driver format_caps invariant
 d3d12_device: allocator d3d12_api d3d12_frame d3d12_heap d3d12_names d3d12_pipeline d3d12_resource d3d12_swapchain driver invariant
 d3d12_swapchain: allocator d3d12_api d3d12_names d3d12_slots d3d12_surface driver invariant
@@ -76,21 +76,21 @@ web_js:
 instance_core: allocator diagnostics driver pool
 invariant:
 label:
-notify: instance_core invariant
+notify: instance_core invariant outputs
 pool: invariant
 resources: capabilities_core device_core heap_core label
 texture: capabilities_core chain device_core label
 view: capabilities_core device_core heap_core label
-surface: chain device_core instance_core invariant label
+surface: chain device_core instance_core invariant label outputs
 swapchain: capabilities_core device_core instance_core
-frame: device_core invariant
+frame: device_core invariant outputs
 frame_resource: device_core instance_core
 heap: allocator device_core heap_core invariant label
 heap_core: device_core
 pass: capabilities_core device_core heap_core label
-compile: capabilities_core device_core encoder_core invariant label
+compile: capabilities_core device_core encoder_core invariant label outputs
 plan: device_core invariant outputs
-memory: device_core invariant
+memory: device_core invariant outputs
 sha256:
 spirv_caps: bytes
 stage_limits:
@@ -112,13 +112,13 @@ outputs:
 container: bytes capabilities_core container_interface container_table invariant label spirv_caps
 container_table: bytes sha256
 container_interface: bytes
-shader: container device_core label
+shader: container device_core label outputs
 reflection: allocator container invariant
 pipeline: device_core invariant label pipeline_core
 pipeline_core: device_core
 graphics: capabilities_core invariant label pipeline_core
 vulkan_recipe: allocator chain vulkan_adapter vulkan_api
-vulkan_external: device_core driver_vulkan encoder_core instance_core pool vulkan_device validation
-d3d12_external: d3d12_device device_core encoder_core pool validation
-metal_external: device_core encoder_core metal_native pool validation
+vulkan_external: device_core driver_vulkan encoder_core instance_core outputs pool vulkan_device validation
+d3d12_external: d3d12_device device_core encoder_core outputs pool validation
+metal_external: device_core encoder_core metal_native outputs pool validation
 metal_native: driver
