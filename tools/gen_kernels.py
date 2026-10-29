@@ -79,8 +79,8 @@ def main():
     with tempfile.TemporaryDirectory() as work:
         for source, name, array in KERNELS:
             out = os.path.join(work, name + ".dxil")
-            subprocess.run([dxc, "-T", "cs_6_0", "-E", "main", "-Qstrip_reflect", "-Qstrip_debug",
-                            "-Fo", out, os.path.join(ROOT, "src", source)], check=True)
+            subprocess.run([dxc, "-T", "cs_6_0", "-E", "main", *shader_stamp.DXC_FLAGS, "-Fo",
+                            out, os.path.join(ROOT, "src", source)], check=True)
             with open(out, "rb") as f:
                 code = f.read()
             # DXC leaves the hash zero when it cannot sign.

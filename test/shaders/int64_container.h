@@ -5,12 +5,13 @@
 // from test/shaders/int64.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:b1b6c1002933357fddd12391597e7577d712865a4c56946a72bfa2c2c3ab2c48
+// inputs sha256:f790efa50a3cbb34a4c1eabbccf1d8209cff5a7ef07869a1c068582c3330ac73
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0
 // tool dxc linux_dxc_2026_07_29 (v1.9.2607, libdxcompiler 1.9.0.1, 0d3ee6b5)
 // tool dxc sha256:55665c87824051ed4774ff3280a79ccbbb7d39243b9736ca5e98222134112d54
+// tool dxc flags -Gis -Qstrip_reflect -Qstrip_debug
 // bytes sha256:b70a80efa5bb5bfea77351c83bd036a33488ef37918cda791daa0ccb07d6a909
 
 #ifndef MAUL_RHI_TEST_INT64_CONTAINER_H

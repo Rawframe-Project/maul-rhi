@@ -5,12 +5,13 @@
 // from samples/shaders/compute_square.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:8927aeb2b8a69f44d8181b165b673a95646500aeec0f73cb58f11a26be57512b
+// inputs sha256:0778449178dc25173431c96286ad08ec888bf610d82845ab20746357f57a1f3a
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0
 // tool dxc linux_dxc_2026_07_29 (v1.9.2607, libdxcompiler 1.9.0.1, 0d3ee6b5)
 // tool dxc sha256:55665c87824051ed4774ff3280a79ccbbb7d39243b9736ca5e98222134112d54
+// tool dxc flags -Gis -Qstrip_reflect -Qstrip_debug
 // bytes sha256:95f38b282cb6c5d79e42d04eaac2bdc3c5db5c1a7791d64e9580c12c50e65018
 
 #ifndef MAUL_RHI_TEST_COMPUTE_SQUARE_CONTAINER_H
