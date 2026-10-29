@@ -5,6 +5,99 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.11.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.10.0...v0.11.0) (2026-10-29)
+
+### Added
+
+- `MRHI_MAX_CONTAINER_SECTIONS` (64), `MRHI_MAX_CONTAINER_RECORDS`
+  (4096), `MRHI_MAX_CONTAINER_NAME_BYTES` (256) and
+  `MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES` (256) in `maul-rhi/shader.h`:
+  the shader container format's fixed bounds, for shader cooks that
+  write their own containers. A container past one is still
+  `mrhi_errorFormat`.
+  ([#213](https://github.com/Rawframe-Project/maul-rhi/pull/213))
+- For tests on the test driver: `mrhiTestFrameLog.recordSum`, the sum
+  of every byte of a frame's command records, payloads included.
+  ([#200](https://github.com/Rawframe-Project/maul-rhi/pull/200))
+
+### Changed
+
+- **Breaking:** a device's own sizes are called budgets.
+  `mrhiDeviceLimits` is `mrhiDeviceBudgets`, the device def member
+  `deviceLimits` is `budgets`, `mrhiGetDeviceOwnLimits` is
+  `mrhiGetDeviceBudgets`, and `mrhi_diagnosticDeviceLimits` is
+  `mrhi_diagnosticDeviceBudgets`. The diagnostic texts of the frame
+  refusals name the budget, such as "the device's frameUploadBytes
+  budget". `mrhiLimits` and `mrhiGetDeviceLimits`, WebGPU's capability
+  limits, keep their names.
+  ([#227](https://github.com/Rawframe-Project/maul-rhi/pull/227))
+- **Breaking:** `mrhiSurfaceConfig.presentMode` and `alphaMode` take the
+  enums `mrhiPresentMode` (`mrhi_presentFifo` 0, `mrhi_presentMailbox`
+  1, `mrhi_presentImmediate` 2) and `mrhiAlphaMode` (`mrhi_alphaOpaque`
+  0, `mrhi_alphaPremultiplied` 1), where they took the caps' bit sets
+  and had to set exactly one bit. A zeroed config asks for fifo and
+  opaque. A value past the last mode is `mrhi_errorInvalid`, and a mode
+  the caps lack is `mrhi_errorUnsupported`. `mrhiSurfaceCaps` keeps the
+  sets, with their bits renamed `mrhi_presentFifoBit`,
+  `mrhi_presentMailboxBit`, `mrhi_presentImmediateBit`,
+  `mrhi_alphaOpaqueBit` and `mrhi_alphaPremultipliedBit`, each 1
+  shifted left by its mode.
+  ([#217](https://github.com/Rawframe-Project/maul-rhi/pull/217))
+- **Breaking:** byte lengths in memory are `size_t`:
+  `mrhiAdapterInfo.nameLength`, `mrhiDeviceLossReport.messageLength`
+  and `mrhiSetRootBlock`'s `size`, as every label and name length
+  already was. Array counts in defs stay `uint32_t`.
+  ([#218](https://github.com/Rawframe-Project/maul-rhi/pull/218))
+- **Breaking:** `mrhiClearColor` is `mrhiColor`, with the same members.
+  It is the type of `mrhiColorTarget.clear` and of
+  `mrhiSetBlendConstant`'s color.
+  ([#215](https://github.com/Rawframe-Project/maul-rhi/pull/215))
+- **Breaking for drivers built outside the tree:** `MRHI_SPI_VERSION`
+  is 11, and the mustpass list is `conformance/mustpass/spi-11.txt`,
+  with the same cases. Since 0.10.0, `configureSurface` hands a driver
+  the renumbered present and alpha modes; the adapter record and the
+  loss report a driver fills hold `size_t` lengths; a pass's color
+  targets clear to an `mrhiColor`; and a device def's budgets are its
+  `budgets` member. A driver built against 0.10.0 is refused at the
+  handshake until it is rebuilt against this release.
+
+  Programs and shader cooks see nothing of the version itself;
+  contract_version is 22.
+  ([#230](https://github.com/Rawframe-Project/maul-rhi/pull/230),
+  [#217](https://github.com/Rawframe-Project/maul-rhi/pull/217),
+  [#218](https://github.com/Rawframe-Project/maul-rhi/pull/218),
+  [#215](https://github.com/Rawframe-Project/maul-rhi/pull/215),
+  [#227](https://github.com/Rawframe-Project/maul-rhi/pull/227))
+
+### Fixed
+
+- A call that fills a struct writes every byte of it when it succeeds,
+  its padding as zeros. Before, several getters left in the padding
+  whatever the library's store, its stack or the caller's storage
+  held, so two calls returning the same values could return different
+  bytes. Built with GCC 14, the instance and device notifications, the
+  diagnostics and the resource plan showed it.
+  ([#225](https://github.com/Rawframe-Project/maul-rhi/pull/225))
+- The command records drivers read hold zeros where a payload does not
+  fill them, and in each payload's padding. Before, they held whatever
+  the caller's allocator memory or the stack held, so the same frame
+  recorded over memory that held other bytes handed a driver different
+  records.
+  ([#200](https://github.com/Rawframe-Project/maul-rhi/pull/200))
+
+### Removed
+
+- **Breaking:** `mrhiGetFrameMemory`. A frame's memory is
+  `mrhiFrameUsage.frameMemoryBytes`, read with `mrhiGetFrameUsage`: 0
+  until the frame's compile succeeds, then kept until the next frame
+  begins, after a submission or a drop too. Where `mrhiGetFrameMemory`
+  refused with `mrhi_errorState`, it reads 0.
+  ([#216](https://github.com/Rawframe-Project/maul-rhi/pull/216))
+- **Breaking:** `MRHI_CONTRACT_VERSION`, which only repeated the library
+  version. A program that read it uses `MRHI_VERSION_*` or
+  `mrhiGetVersion`.
+  ([#214](https://github.com/Rawframe-Project/maul-rhi/pull/214))
+
 ## [0.10.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.9.0...v0.10.0) (2026-10-28)
 
 ### Added
