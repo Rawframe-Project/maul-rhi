@@ -14,6 +14,7 @@
 #include "invariant.h"
 #include "label.h"
 
+#include "generated/out_copies.h"
 #include "maul-rhi/vulkan.h"
 
 #include <stdalign.h>
@@ -662,7 +663,7 @@ mrhiResult mrhiGetDeviceFeatures(mrhiDevice* device, mrhiFeatures* featuresOut)
         return device == nullptr ? mrhi_errorInvalid
                                  : mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
-    *featuresOut = device->features;
+    mrhiOutFeatures(featuresOut, &device->features);
     return mrhi_success;
 }
 
@@ -673,7 +674,7 @@ mrhiResult mrhiGetDeviceLimits(mrhiDevice* device, mrhiLimits* limitsOut)
         return device == nullptr ? mrhi_errorInvalid
                                  : mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
-    *limitsOut = device->limits;
+    mrhiOutLimits(limitsOut, &device->limits);
     return mrhi_success;
 }
 
@@ -684,7 +685,7 @@ mrhiResult mrhiGetDeviceBudgets(mrhiDevice* device, mrhiDeviceBudgets* budgetsOu
         return device == nullptr ? mrhi_errorInvalid
                                  : mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
-    *budgetsOut = device->budgets;
+    mrhiOutDeviceBudgets(budgetsOut, &device->budgets);
     return mrhi_success;
 }
 
@@ -719,7 +720,7 @@ mrhiResult mrhiGetDeviceLossReport(mrhiDevice* device, mrhiDeviceLossReport* rep
     {
         return mrhi_errorState;
     }
-    *reportOut = device->lossReport;
+    mrhiOutDeviceLossReport(reportOut, &device->lossReport);
     return mrhi_success;
 }
 

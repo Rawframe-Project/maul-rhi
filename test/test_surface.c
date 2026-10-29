@@ -250,18 +250,20 @@ static void TestInstanceEnds(void)
 // none of the three is unsupported, and caps past their array invalid.
 static void TestSuggestion(void)
 {
-    const mrhiSurfaceColor bgra = {mrhi_formatBgra8Unorm, mrhi_primariesBt709, mrhi_transferSrgb,
-                                   mrhi_rangeStandard};
-    const mrhiSurfaceColor rgba = {mrhi_formatRgba8Unorm, mrhi_primariesBt709, mrhi_transferSrgb,
-                                   mrhi_rangeStandard};
-    const mrhiSurfaceColor hdr = {mrhi_formatRgba16Float, mrhi_primariesBt709, mrhi_transferLinear,
-                                  mrhi_rangeExtended};
-    const mrhiSurfaceColor p3 = {mrhi_formatRgba16Float, mrhi_primariesDisplayP3,
-                                 mrhi_transferLinear, mrhi_rangeExtended};
-    const mrhiSurfaceColor pq = {mrhi_formatRgba16Float, mrhi_primariesBt2020, mrhi_transferPq,
-                                 mrhi_rangeStandard};
-    const mrhiSurfaceColor linear = {mrhi_formatRgba16Float, mrhi_primariesBt709,
-                                     mrhi_transferLinear, mrhi_rangeStandard};
+    // Static, so that their padding is zero as the suggestion's is, and
+    // memcmp compares their colors alone.
+    static const mrhiSurfaceColor bgra = {mrhi_formatBgra8Unorm, mrhi_primariesBt709,
+                                          mrhi_transferSrgb, mrhi_rangeStandard};
+    static const mrhiSurfaceColor rgba = {mrhi_formatRgba8Unorm, mrhi_primariesBt709,
+                                          mrhi_transferSrgb, mrhi_rangeStandard};
+    static const mrhiSurfaceColor hdr = {mrhi_formatRgba16Float, mrhi_primariesBt709,
+                                         mrhi_transferLinear, mrhi_rangeExtended};
+    static const mrhiSurfaceColor p3 = {mrhi_formatRgba16Float, mrhi_primariesDisplayP3,
+                                        mrhi_transferLinear, mrhi_rangeExtended};
+    static const mrhiSurfaceColor pq = {mrhi_formatRgba16Float, mrhi_primariesBt2020,
+                                        mrhi_transferPq, mrhi_rangeStandard};
+    static const mrhiSurfaceColor linear = {mrhi_formatRgba16Float, mrhi_primariesBt709,
+                                            mrhi_transferLinear, mrhi_rangeStandard};
     mrhiSurfaceCaps caps = {.presentable = true, .colorCount = 5};
     caps.colors[0] = p3;
     caps.colors[1] = bgra;

@@ -11,6 +11,8 @@
 #include "invariant.h"
 #include "label.h"
 
+#include "generated/out_copies.h"
+
 #define SURFACE_DEF_COOKIE 0x6D727366u
 
 // The chained structs a surface def accepts: the sources.
@@ -240,7 +242,8 @@ mrhiResult mrhiGetSurfaceCaps(mrhiInstance* instance, mrhiSurfaceId surface, mrh
                  (caps.usages & mrhi_textureRenderTarget) != 0 &&
                  (caps.twinViews || caps.twinImages)));
     // Nothing a driver fills for an adapter that cannot present is passed on.
-    *capsOut = caps.presentable ? caps : (mrhiSurfaceCaps){0};
+    const mrhiSurfaceCaps none = {0};
+    mrhiOutSurfaceCaps(capsOut, caps.presentable ? &caps : &none);
     return mrhi_success;
 }
 
@@ -281,7 +284,7 @@ mrhiResult mrhiSuggestSurfaceColor(const mrhiSurfaceCaps* caps, const mrhiSurfac
                                     : IsSrgb8(color);
             if (fits)
             {
-                *colorOut = *color;
+                mrhiOutSurfaceColor(colorOut, color);
                 return mrhi_success;
             }
         }

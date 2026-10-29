@@ -435,6 +435,11 @@ static void CheckNativePass(mrhiDevice* device, VkDevice made, VkInstance instan
               info.format == VK_FORMAT_R8G8B8A8_UNORM &&
               (info.usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT) != 0,
           "the texture's image");
+    mrhiVulkanTextureInfo again;
+    memset(&again, 0xFF, sizeof(again));
+    CHECK(mrhiGetVulkanTexture(device, texture, &again) == mrhi_success &&
+              memcmp(&again, &info, sizeof(info)) == 0,
+          "the same bytes over a struct that held others, its padding included");
     // The program's command buffer: a clear, in the layout a copy
     // destination is in.
     const VkCommandPoolCreateInfo poolInfo = {

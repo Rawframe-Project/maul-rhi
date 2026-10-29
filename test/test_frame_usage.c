@@ -49,6 +49,18 @@ static mrhiFrameUsage Usage(void)
     return usage;
 }
 
+// Whether two usages hold the same counts. Field by field, because a
+// struct returned by value may carry any bytes in its padding.
+static bool SameUsage(const mrhiFrameUsage* a, const mrhiFrameUsage* b)
+{
+    return a->frameResources == b->frameResources && a->framePasses == b->framePasses &&
+           a->frameAccesses == b->frameAccesses && a->frameBarriers == b->frameBarriers &&
+           a->frameCommandBytes == b->frameCommandBytes &&
+           a->frameUploadBytes == b->frameUploadBytes &&
+           a->frameIndirectDraws == b->frameIndirectDraws &&
+           a->frameMemoryBytes == b->frameMemoryBytes;
+}
+
 // Whether the device's next diagnostic is the code, standing for count
 // refusals, and the last.
 static bool Refused(mrhiDiagnosticCode code, uint32_t count)
@@ -128,7 +140,7 @@ static void TestBeforeFrames(void)
     Open(mrhiDefaultDeviceDef());
     mrhiFrameUsage usage = Usage();
     mrhiFrameUsage zero = {0};
-    CHECK(memcmp(&usage, &zero, sizeof(usage)) == 0, "nothing before the first frame");
+    CHECK(SameUsage(&usage, &zero), "nothing before the first frame");
     CHECK(mrhiGetFrameUsage(nullptr, &usage) == mrhi_errorInvalid, "no device");
     CHECK(mrhiGetFrameUsage(s_device, nullptr) == mrhi_errorInvalid &&
               Refused(mrhi_diagnosticNullArgument, 1) && mrhiGetDeviceMisuse(s_device) == 1,
@@ -180,11 +192,11 @@ static void TestCounts(void)
     mrhiRequestId token;
     CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
     mrhiFrameUsage submitted = Usage();
-    CHECK(memcmp(&submitted, &usage, sizeof(usage)) == 0, "kept once submitted");
+    CHECK(SameUsage(&submitted, &usage), "kept once submitted");
     Begin();
     usage = Usage();
     mrhiFrameUsage zero = {0};
-    CHECK(memcmp(&usage, &zero, sizeof(usage)) == 0, "nothing in the next frame");
+    CHECK(SameUsage(&usage, &zero), "nothing in the next frame");
     Drop();
     CloseDevice();
 }
