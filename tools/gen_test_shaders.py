@@ -26,8 +26,8 @@
 # tells, with no tools, whether every header still matches its inputs,
 # the pins and its stamp; --self-test proves that check on a copy of the
 # tree (--skip-inputs turns off the input comparison, which the
-# self-test must then fail). docs/operations/development.md names where
-# each pinned tool comes from.
+# self-test must then fail; it is refused without --self-test).
+# docs/operations/development.md names where each pinned tool comes from.
 #
 # usage: gen_test_shaders.py [--check | --self-test [--skip-inputs]]
 
@@ -191,22 +191,32 @@ def header(folder, name, data, stamp):
     return "\n".join(lines)
 
 
-def main(argv=None):
+def parse(argv):
+    """The arguments. --skip-inputs is refused without --self-test, where
+    it would quietly turn off the input comparison of --check."""
     parser = argparse.ArgumentParser(prog="gen_test_shaders.py")
     parser.add_argument("--check", action="store_true",
                         help="check every header against its inputs and the pins, with no tools")
     parser.add_argument("--self-test", action="store_true",
                         help="prove the check on a copy of the tree")
     parser.add_argument("--skip-inputs", action="store_true",
-                        help="leave out the input comparison, which the self-test must fail")
+                        help="with --self-test only: leave out the input comparison, which the "
+                        "self-test must fail")
     args = parser.parse_args(argv)
+    if args.skip_inputs and not args.self_test:
+        parser.error("--skip-inputs goes only with --self-test")
+    return args
+
+
+def main(argv=None):
+    args = parse(argv)
     if args.check or args.self_test:
         if args.self_test:
             cases = (("a changed contract value", contract_edit(True), {"inputs"}),
                      ("the contract's prose reworded", contract_edit(False), set()))
             return shader_stamp.self_test(ROOT, ("tools", "test/shaders", "samples/shaders",
                                                  "contract"),
-                                          units, PINS, not args.skip_inputs, cases)
+                                          units, PINS, parse, not args.skip_inputs, cases)
         return shader_stamp.check(ROOT, units(ROOT), PINS, "tools/gen_test_shaders.py",
                                   not args.skip_inputs)
     shader_stamp.refuse_unpinned(tool_identities(), PINNED)
