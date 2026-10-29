@@ -5,6 +5,20 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.13.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.12.0...v0.13.0) (2026-10-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **shader:** tools/mrhi_dxil.py cooks DXIL with -Gis, so a shader cooked again from the same SPIR-V gives different DXIL and different float results on D3D12: the float math DXC used to mark fast, reassociate and fold now runs as the source writes it, matching Vulkan, Metal and WebGPU.
+* **contract:** a call on an object clears its outputs on any failure, to zeros, false, 0 or NULL. The four Take calls (mrhiInstance_TakeDiagnostic, mrhiInstance_TakeNotification, mrhiDevice_TakeDiagnostic and mrhiDevice_TakeNotification) also clear their record when they return mrhi_empty: a program that read the record after an empty take, expecting the one it took before, now reads zeros.
+
+### Fixed
+
+* **contract:** clear the outputs of calls on an object on failure ([#239](https://github.com/Rawframe-Project/maul-rhi/issues/239)) ([0f6a13c](https://github.com/Rawframe-Project/maul-rhi/commit/0f6a13c97d146535a29fcf5ddd96597d5334ca7c)), closes [#236](https://github.com/Rawframe-Project/maul-rhi/issues/236)
+* **pipeline:** name each vertex limit once per graphics def ([#256](https://github.com/Rawframe-Project/maul-rhi/issues/256)) ([4a2dc79](https://github.com/Rawframe-Project/maul-rhi/commit/4a2dc7961a65b4b2f09cde62a587637a8e931e68)), closes [#255](https://github.com/Rawframe-Project/maul-rhi/issues/255)
+* **shader:** cook DXIL with -Gis and build all MSL in safe math ([#249](https://github.com/Rawframe-Project/maul-rhi/issues/249)) ([779bf0d](https://github.com/Rawframe-Project/maul-rhi/commit/779bf0d5fb6cf23b980b3e29cde37e1593f6a879)), closes [#242](https://github.com/Rawframe-Project/maul-rhi/issues/242)
+
 ## [0.12.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.11.0...v0.12.0) (2026-10-29)
 
 ### Changed
