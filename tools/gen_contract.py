@@ -285,6 +285,26 @@ def check_classed(errors, where, item):
         errors.append(f"{where}: needs mapping rows or the library's own reason")
 
 
+# The verbs of a call that makes or ends an object, which the family's
+# rule names PVerbNoun whatever its first id.
+CREATION_VERBS = ("create", "destroy", "declare", "import", "add", "acquire")
+
+
+def object_of(item):
+    """The object a function acts on by the family's rule: the kind of its
+    first id that is not an output, else its root's type; None for a call
+    that takes no root, or makes or ends an object."""
+    args = item.get("args", [])
+    if (not args or not args[0].get("type", "").startswith("opaque.")
+            or item["name"].partition("_")[0] in CREATION_VERBS):
+        return None
+    for arg in args:
+        kind, _, name = arg.get("type", "").partition(".")
+        if kind == "id" and arg.get("pointer") is None:
+            return name.removesuffix("_id")
+    return args[0]["type"].partition(".")[2]
+
+
 def check_function(errors, where, item, kind_of):
     check_signature(errors, where, kind_of, item)
     if item.get("returns") is not None and not item["returns"].get("doc"):
@@ -301,11 +321,12 @@ def check_function(errors, where, item, kind_of):
         errors.append(f"{where}: unknown thread safety class '{safety.get('class')}'")
     elif safety["class"] == "any_exclusive" and not safety.get("object"):
         errors.append(f"{where}: an exclusive thread safety class names its object")
-    on = item.get("object")
-    if on is not None and (kind_of.get(on) != "opaque" and kind_of.get(f"{on}_id") != "id"
-                           or not item["name"].startswith(on + "_")):
-        errors.append(f"{where}: its object '{on}' is not an opaque type or an id that "
-                      "starts its name")
+    on, wanted = item.get("object"), object_of(item)
+    if on != wanted:
+        errors.append(f"{where}: its object '{on}' is not '{wanted}', the kind of its first id "
+                      "or else its root")
+    elif on is not None and not item["name"].startswith(on + "_"):
+        errors.append(f"{where}: its object '{on}' does not start its name")
 
 
 def check_limit_codes(errors, items):
@@ -1040,7 +1061,7 @@ def self_test(contract):
     def planted(change):
         made = copy.deepcopy(contract)
         items = {item["name"]: item for header in made["headers"] for item in header["items"]}
-        change(items["limits"], items["diagnostic_code"], items["pass_begin"])
+        change(items["limits"], items["diagnostic_code"], items)
         return made
 
     def member(name):
@@ -1052,30 +1073,42 @@ def self_test(contract):
 
     top = max(value["value"] for value in find_item(contract, "diagnostic_code")["values"])
     cases = [
-        ("as committed", lambda limits, codes, call: None, None),
+        ("as committed", lambda limits, codes, items: None, None),
         ("a new limit without a code",
-         lambda limits, codes, call: limits["members"].append(member("made_up")), "'made_up' has no"),
+         lambda limits, codes, items: limits["members"].append(member("made_up")), "'made_up' has no"),
         ("a new limit with its code",
-         lambda limits, codes, call: (limits["members"].append(member("made_up")),
+         lambda limits, codes, items: (limits["members"].append(member("made_up")),
                                 codes["values"].append(code("diagnostic_limit_made_up", top + 1))),
          None),
         ("a code for no limit",
-         lambda limits, codes, call: codes["values"].append(code("diagnostic_limit_made_up", top + 1)),
+         lambda limits, codes, items: codes["values"].append(code("diagnostic_limit_made_up", top + 1)),
          "'diagnostic_limit_made_up' names no member"),
         ("a code beside a reason",
-         lambda limits, codes, call: codes["values"].append(
+         lambda limits, codes, items: codes["values"].append(
              code("diagnostic_limit_color_attachments", top + 1)),
          "'color_attachments' has a code and a reason"),
         ("a reason for a limit gone",
-         lambda limits, codes, call: limits["members"].remove(
+         lambda limits, codes, items: limits["members"].remove(
              next(m for m in limits["members"] if m["name"] == "frames_in_flight")),
          "'frames_in_flight', which limits lacks"),
         ("an object of no id or opaque kind",
-         lambda limits, codes, call: call.update(object="draw"), "its object 'draw'"),
-        ("an object that does not start the name",
-         lambda limits, codes, call: call.update(object="device"), "its object 'device'"),
+         lambda limits, codes, items: items["pass_begin"].update(object="draw"),
+         "its object 'draw' is not 'pass'"),
+        ("the root for an object on an id",
+         lambda limits, codes, items: items["pass_begin"].update(object="device"),
+         "its object 'device' is not 'pass'"),
+        ("no object on an id",
+         lambda limits, codes, items: items["pass_begin"].pop("object"),
+         "its object 'None' is not 'pass'"),
+        ("an id for an object on the root",
+         lambda limits, codes, items: items["device_get_state"].update(object="pass"),
+         "its object 'pass' is not 'device'"),
+        ("an object on a creation",
+         lambda limits, codes, items: items["create_buffer"].update(object="device"),
+         "its object 'device' is not 'None'"),
         ("a name that starts with the object's letters only",
-         lambda limits, codes, call: call.update(name="passes_begin"), "its object 'pass'"),
+         lambda limits, codes, items: items["pass_begin"].update(name="passes_begin"),
+         "its object 'pass' does not start"),
     ]
     wrong = 0
     for name, change, expected in cases:

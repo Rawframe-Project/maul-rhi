@@ -43,7 +43,7 @@ Every item has a `kind`, a snake_case `name` and a `doc`. The generator turns na
 | `opaque` | none | a typed opaque pointer, for a root object |
 | `id` | none | a generation-checked id, `{ index1, generation }` |
 | `struct` | `members` (`name`, `type`, optional `doc` and `pointer`); optional `def` or `chained` | a typedef struct; a def opens with `cookie` and `next`, a chained struct with `mrhiChain chain` |
-| `function` | `args`, optional `object`, optional `returns`, `thread_safety`, optional `inline_body` | a documented declaration; one with an `object` acts on that object, which is the kind of its first id or else its root, and is named `mrhiObject_Verb`: `pass_begin` with the object `pass` is `mrhiPass_Begin`; one returning `result` is nodiscard; one with an `inline_body` is a `static inline` function built in the program |
+| `function` | `args`, optional `object`, optional `returns`, `thread_safety`, optional `inline_body` | a documented declaration; one with an `object` acts on that object and is named `mrhiObject_Verb`: `pass_begin` with the object `pass` is `mrhiPass_Begin`. The generator refuses an object that is not the kind of the first id taken by value, or else the root's type, and a function on a root without one, unless its verb makes or ends an object (`create`, `destroy`, `declare`, `import`, `add`, `acquire`); one returning `result` is nodiscard; one with an `inline_body` is a `static inline` function built in the program |
 
 An `inline_body` exists for defaults that must be built in the program rather than the library, such as `mrhiDefaultInstanceDef`, which stamps the headers the program was built with.
 
