@@ -5,6 +5,118 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.12.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.11.0...v0.12.0) (2026-10-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **contract:** mrhiRequest_TakeReadback's and mrhiDevice_GetPipelineCache's bytes is bytesOut, mrhiInstance_GetAdapters's adapters is adaptersOut, and mrhiDevice_GetFrameBarriers's barriers is barriersOut. On any failure, each clears its array's capacity elements and its count or size, except that a too-small array still gets the size it needed.
+* **contract:** the calls on an object are named PObject_Verb, and the two shared names take a verb. Old to new:
+    - mrhiResultName -> mrhiGetResultName
+    - mrhiDiagnosticText -> mrhiGetDiagnosticText
+    - mrhiGetInstanceMisuse -> mrhiInstance_GetMisuse
+    - mrhiNextInstanceDiagnostic -> mrhiInstance_TakeDiagnostic
+    - mrhiGetDriverFaults -> mrhiInstance_GetDriverFaults
+    - mrhiRequestAdapters -> mrhiInstance_RequestAdapters
+    - mrhiNextInstanceNotification -> mrhiInstance_TakeNotification
+    - mrhiGetAdapters -> mrhiInstance_GetAdapters
+    - mrhiGetAdapterInfo -> mrhiAdapter_GetInfo
+    - mrhiGetAdapterFeatures -> mrhiAdapter_GetFeatures
+    - mrhiGetAdapterLimits -> mrhiAdapter_GetLimits
+    - mrhiGetFormatCaps -> mrhiAdapter_GetFormatCaps
+    - mrhiGetDeviceState -> mrhiDevice_GetState
+    - mrhiGetDeviceFeatures -> mrhiDevice_GetFeatures
+    - mrhiGetDeviceLimits -> mrhiDevice_GetLimits
+    - mrhiGetDeviceBudgets -> mrhiDevice_GetBudgets
+    - mrhiGetDeviceTimestampPeriod -> mrhiDevice_GetTimestampPeriod
+    - mrhiGetDeviceMisuse -> mrhiDevice_GetMisuse
+    - mrhiNextDeviceDiagnostic -> mrhiDevice_TakeDiagnostic
+    - mrhiGetDeviceLossReport -> mrhiDevice_GetLossReport
+    - mrhiSimulateDeviceLoss -> mrhiDevice_SimulateLoss
+    - mrhiSetHeapEntry -> mrhiHeap_SetEntry
+    - mrhiClearHeapEntry -> mrhiHeap_ClearEntry
+    - mrhiSetHeapSampler -> mrhiHeap_SetSampler
+    - mrhiClearHeapSampler -> mrhiHeap_ClearSampler
+    - mrhiGetSurfaceCaps -> mrhiSurface_GetCaps
+    - mrhiConfigureSurface -> mrhiDevice_ConfigureSurface
+    - mrhiUnconfigureSurface -> mrhiSurface_Unconfigure
+    - mrhiBeginFrame -> mrhiDevice_BeginFrame
+    - mrhiDropFrame -> mrhiDevice_DropFrame
+    - mrhiSubmitFrame -> mrhiDevice_SubmitFrame
+    - mrhiWaitFrame -> mrhiRequest_WaitFrame
+    - mrhiNextDeviceNotification -> mrhiDevice_TakeNotification
+    - mrhiWaitDeviceNotification -> mrhiDevice_WaitNotification
+    - mrhiSealResource -> mrhiResource_Seal
+    - mrhiUnsealResource -> mrhiResource_Unseal
+    - mrhiCompileFrame -> mrhiDevice_CompileFrame
+    - mrhiIsPassKept -> mrhiPass_IsKept
+    - mrhiGetFrameBarriers -> mrhiDevice_GetFrameBarriers
+    - mrhiGetResourcePlan -> mrhiResource_GetPlan
+    - mrhiGetPassPlan -> mrhiPass_GetPlan
+    - mrhiGetFrameUsage -> mrhiDevice_GetFrameUsage
+    - mrhiGetShaderInfo -> mrhiShader_GetInfo
+    - mrhiGetPipelineCache -> mrhiDevice_GetPipelineCache
+    - mrhiGetPipelineCacheOutcome -> mrhiDevice_GetPipelineCacheOutcome
+    - mrhiBeginPass -> mrhiPass_Begin
+    - mrhiEndPass -> mrhiPass_End
+    - mrhiTakeReadback -> mrhiRequest_TakeReadback
+    - mrhiDescribeVulkanDevice -> mrhiInstance_DescribeVulkanDevice
+    - mrhiGetVulkanPhysicalDevice -> mrhiAdapter_GetVulkanPhysicalDevice
+    - mrhiGetVulkanQueue -> mrhiDevice_GetVulkanQueue
+    - mrhiGetVulkanDevice -> mrhiDevice_GetVulkanDevice
+    - mrhiGetVulkanTexture -> mrhiTexture_GetVulkanTexture
+    - mrhiSetVulkanPassCommands -> mrhiPass_SetVulkanCommands
+    - mrhiGetD3d12Device -> mrhiDevice_GetD3d12Device
+    - mrhiGetD3d12Texture -> mrhiTexture_GetD3d12Texture
+    - mrhiSetD3d12PassCommands -> mrhiPass_SetD3d12Commands
+    - mrhiGetMetalDevice -> mrhiDevice_GetMetalDevice
+    - mrhiGetMetalTexture -> mrhiTexture_GetMetalTexture
+    - mrhiSetMetalPassCommands -> mrhiPass_SetMetalCommands
+    - mrhiSetGraphicsPipeline -> mrhiPass_SetGraphicsPipeline
+    - mrhiSetComputePipeline -> mrhiPass_SetComputePipeline
+    - mrhiSetBindings -> mrhiPass_SetBindings
+    - mrhiSetVertexBuffer -> mrhiPass_SetVertexBuffer
+    - mrhiSetIndexBuffer -> mrhiPass_SetIndexBuffer
+    - mrhiDraw -> mrhiPass_Draw
+    - mrhiDrawIndexed -> mrhiPass_DrawIndexed
+    - mrhiDispatch -> mrhiPass_Dispatch
+    - mrhiDrawIndirect -> mrhiPass_DrawIndirect
+    - mrhiDrawIndexedIndirect -> mrhiPass_DrawIndexedIndirect
+    - mrhiDrawIndirectCount -> mrhiPass_DrawIndirectCount
+    - mrhiDrawIndexedIndirectCount -> mrhiPass_DrawIndexedIndirectCount
+    - mrhiDispatchIndirect -> mrhiPass_DispatchIndirect
+    - mrhiBeginOcclusionQuery -> mrhiPass_BeginOcclusionQuery
+    - mrhiEndOcclusionQuery -> mrhiPass_EndOcclusionQuery
+    - mrhiBeginStatisticsQuery -> mrhiPass_BeginStatisticsQuery
+    - mrhiEndStatisticsQuery -> mrhiPass_EndStatisticsQuery
+    - mrhiResolveQueries -> mrhiPass_ResolveQueries
+    - mrhiCopyBuffer -> mrhiPass_CopyBuffer
+    - mrhiClearBuffer -> mrhiPass_ClearBuffer
+    - mrhiCopyBufferToTexture -> mrhiPass_CopyBufferToTexture
+    - mrhiCopyTextureToBuffer -> mrhiPass_CopyTextureToBuffer
+    - mrhiCopyTexture -> mrhiPass_CopyTexture
+    - mrhiWriteBuffer -> mrhiPass_WriteBuffer
+    - mrhiWriteTexture -> mrhiPass_WriteTexture
+    - mrhiReadBuffer -> mrhiPass_ReadBuffer
+    - mrhiReadTexture -> mrhiPass_ReadTexture
+    - mrhiSetRootBlock -> mrhiPass_SetRootBlock
+    - mrhiSetViewport -> mrhiPass_SetViewport
+    - mrhiSetScissor -> mrhiPass_SetScissor
+    - mrhiSetBlendConstant -> mrhiPass_SetBlendConstant
+    - mrhiSetStencilReference -> mrhiPass_SetStencilReference
+    - mrhiPushDebugGroup -> mrhiPass_PushDebugGroup
+    - mrhiPopDebugGroup -> mrhiPass_PopDebugGroup
+    - mrhiInsertDebugMarker -> mrhiPass_InsertDebugMarker
+
+### Fixed
+
+* **contract:** name four calls' arrays Out and clear them on failure ([#237](https://github.com/Rawframe-Project/maul-rhi/issues/237)) ([7faaf4a](https://github.com/Rawframe-Project/maul-rhi/commit/7faaf4a062b466a94516d49620909aabbe2fe621)), closes [#233](https://github.com/Rawframe-Project/maul-rhi/issues/233)
+
+
+### Changed
+
+* **contract:** name the calls on an object mrhiObject_Verb ([#232](https://github.com/Rawframe-Project/maul-rhi/issues/232)) ([2613c2d](https://github.com/Rawframe-Project/maul-rhi/commit/2613c2d59dba53746bb9e7e6f610882fc6f7336f)), closes [#202](https://github.com/Rawframe-Project/maul-rhi/issues/202)
+
 ## [0.11.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.10.0...v0.11.0) (2026-10-29)
 
 ### Added
