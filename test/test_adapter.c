@@ -56,7 +56,8 @@ static mrhiResult Find(mrhiInstance* instance, mrhiPowerPreference preference, b
     CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success, "an answer");
     CHECK(record.kind == mrhi_instanceAdaptersFound, "an adapters record");
     CHECK(record.request.index1 == request.index1 && request.index1 != 0, "its request");
-    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_empty, "exactly one answer");
+    mrhiInstanceNotification more;
+    CHECK(mrhiInstance_TakeNotification(instance, &more) == mrhi_empty, "exactly one answer");
     return record.outcome;
 }
 
