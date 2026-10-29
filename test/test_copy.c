@@ -74,7 +74,7 @@ static void Open(void)
     s_adapter.features.textureCompressionBc = true;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.features.textureCompressionBc = true;
-    def.deviceLimits.diagnostics = 8;
+    def.budgets.diagnostics = 8;
     s_device = OpenWith(def, true);
     for (uint32_t i = 0; i < 2; ++i)
     {

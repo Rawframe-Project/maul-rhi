@@ -15,7 +15,7 @@
 static mrhiDevice* Open(uint32_t count, bool ready)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.samplers = count;
+    def.budgets.samplers = count;
     return OpenWith(def, ready);
 }
 

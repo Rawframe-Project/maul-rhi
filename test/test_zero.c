@@ -167,9 +167,9 @@ static uint32_t Fill(mrhiDevice* device, mrhiResourceId resource, uint32_t most)
 static void TestBudgets(void)
 {
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    deviceDef.deviceLimits.framePasses = 1;
-    deviceDef.deviceLimits.frameAccesses = 2;
-    deviceDef.deviceLimits.frameCommandBytes = 4096;
+    deviceDef.budgets.framePasses = 1;
+    deviceDef.budgets.frameAccesses = 2;
+    deviceDef.budgets.frameCommandBytes = 4096;
     mrhiDevice* device = Open(deviceDef);
     mrhiBufferId buffer = MakeBuffer(device);
     uint32_t first = Fill(device, Begin(device, buffer), UINT32_MAX);
@@ -212,7 +212,7 @@ static bool CompilesBeside(mrhiDevice* device, mrhiBufferId old, mrhiBufferId fr
 static void TestBarrierBudget(void)
 {
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    deviceDef.deviceLimits.frameBarriers = 1;
+    deviceDef.budgets.frameBarriers = 1;
     mrhiDevice* device = Open(deviceDef);
     mrhiBufferId old = MakeBuffer(device);
     (void)Read(device, Begin(device, old));

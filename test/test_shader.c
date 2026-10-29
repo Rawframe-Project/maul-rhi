@@ -971,7 +971,7 @@ static void Free(void* memory, size_t size, size_t alignment, void* context)
 static mrhiDevice* Open(uint32_t shaders, bool ready)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.shaders = shaders;
+    def.budgets.shaders = shaders;
     def.allocator = (mrhiAllocator){.alloc = Alloc, .free = Free};
     return OpenWith(def, ready);
 }
@@ -1415,7 +1415,7 @@ static void TestPastDeviceLimits(void)
     s_adapter.limits.workgroupSizeX = 2 * limits.workgroupSizeX;
     s_adapter.limits.workgroupInvocations = 2 * limits.workgroupInvocations;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.diagnostics = 4;
+    def.budgets.diagnostics = 4;
     mrhiDevice* device = OpenWith(def, true);
     Reset();
     Put32(s_sections[META].bytes, limits.rootBlockBytes + 4);

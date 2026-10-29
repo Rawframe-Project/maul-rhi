@@ -595,7 +595,7 @@ static void TestRefusals(void)
 static void TestBarrierLimit(void)
 {
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    deviceDef.deviceLimits.frameBarriers = 2;
+    deviceDef.budgets.frameBarriers = 2;
     mrhiInstance* instance = s_instance;
     mrhiDevice* previous = s_device;
     s_device = OpenWith(deviceDef, true);

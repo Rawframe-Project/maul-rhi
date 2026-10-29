@@ -325,7 +325,7 @@ mrhiResult mrhiGetShaderInfo(mrhiDevice* device, mrhiShaderId shader, mrhiShader
 
 void mrhiDestroyShaders(mrhiDevice* device)
 {
-    for (uint32_t i = 0; i < device->deviceLimits.shaders; ++i)
+    for (uint32_t i = 0; i < device->budgets.shaders; ++i)
     {
         mrhiShaderSlot* slot = &device->shaderSlots[i];
         if (slot->reflection != nullptr)

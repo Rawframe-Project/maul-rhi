@@ -205,7 +205,7 @@ static void TestRefusalsStateAndLimit(void)
     CHECK(mrhiDestroyTexture(nullptr, texture) == mrhi_errorInvalid, "no device to destroy on");
     CHECK(mrhiDestroyTexture(s_device, (mrhiTextureId){0, 0}) == mrhi_errorStale, "null");
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    deviceDef.deviceLimits.textures = 1;
+    deviceDef.budgets.textures = 1;
     s_adapter.objectsBeforeFailure = 2;
     mrhiDevice* device = OpenWith(deviceDef, false);
     mrhiTextureId a;

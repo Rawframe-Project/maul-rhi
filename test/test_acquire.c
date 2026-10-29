@@ -233,7 +233,7 @@ static void TestCapacity(void)
     s_outcome = mrhi_success;
     s_adapter.acquireOutcome = &s_outcome;
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    deviceDef.deviceLimits.frameResources = 1;
+    deviceDef.budgets.frameResources = 1;
     s_device = OpenWith(deviceDef, true);
     s_surface = MakeSurface();
     mrhiSurfaceConfig config = Config(s_surface);

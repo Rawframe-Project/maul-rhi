@@ -194,7 +194,7 @@ extern "C"
     /// compressed format without its feature, or a critical extension the
     /// library does not know; `mrhi_errorState` for a device without an open
     /// frame; `mrhi_errorCapacity` for a size past the device's limits within
-    /// the adapter's, or when the device's frameResources limit is reached;
+    /// the adapter's, or when the device's frameResources budget is reached;
     /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
@@ -218,7 +218,7 @@ extern "C"
     /// size past the adapter's bufferBytes, or a critical extension the library
     /// does not know; `mrhi_errorState` for a device without an open frame;
     /// `mrhi_errorCapacity` for a size past the device's bufferBytes within the
-    /// adapter's, or when the device's frameResources limit is reached;
+    /// adapter's, or when the device's frameResources budget is reached;
     /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
@@ -236,7 +236,7 @@ extern "C"
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
     /// `mrhi_errorStale` for a texture the device no longer has;
     /// `mrhi_errorState` for a device without an open frame;
-    /// `mrhi_errorCapacity` when the device's frameResources limit is reached;
+    /// `mrhi_errorCapacity` when the device's frameResources budget is reached;
     /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
@@ -253,7 +253,7 @@ extern "C"
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument;
     /// `mrhi_errorStale` for a buffer the device no longer has;
     /// `mrhi_errorState` for a device without an open frame;
-    /// `mrhi_errorCapacity` when the device's frameResources limit is reached;
+    /// `mrhi_errorCapacity` when the device's frameResources budget is reached;
     /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
@@ -277,7 +277,7 @@ extern "C"
     /// `mrhi_errorStale` for a surface the instance no longer has;
     /// `mrhi_errorState` for a device without an open frame, a frame already
     /// compiled, or a surface not configured on the device;
-    /// `mrhi_errorCapacity` when the device's frameResources limit is reached;
+    /// `mrhi_errorCapacity` when the device's frameResources budget is reached;
     /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
@@ -593,7 +593,7 @@ extern "C"
     /// the adapter's limit; `mrhi_errorState` for a device without an open
     /// frame, or a frame already compiled; `mrhi_errorCapacity` for views past
     /// the device's limit within the adapter's, or when the device's
-    /// framePasses or frameAccesses limit is reached; `mrhi_errorBusy` for a
+    /// framePasses or frameAccesses budget is reached; `mrhi_errorBusy` for a
     /// call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
@@ -782,9 +782,9 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiGetPassPlan(mrhiDevice* device, mrhiPassId pass,
                                                        mrhiPassPlan* planOut);
 
-    // What a frame has taken of each limit a frame has, each member named after
-    // the mrhiDeviceLimits member it is measured against, and the memory its
-    // transient resources take, which no limit bounds.
+    // What a frame has taken of each budget a frame has, each member named
+    // after the mrhiDeviceBudgets member it is measured against, and the memory
+    // its transient resources take, which no budget bounds.
     typedef struct mrhiFrameUsage
     {
         // The resources it declared, imported and acquired.
@@ -814,11 +814,11 @@ extern "C"
         uint64_t frameMemoryBytes;
     } mrhiFrameUsage;
 
-    /// Reads what the frame begun last has taken of each frame limit: while it
-    /// is open, once compiled, after a call its limits refused, and after it is
-    /// submitted or dropped, until the next frame begins. Before the first
-    /// frame, everything is 0. A program compares it with
-    /// mrhiGetDeviceOwnLimits to learn its headroom.
+    /// Reads what the frame begun last has taken of each frame budget: while it
+    /// is open, once compiled, after a call its budgets refused, and after it
+    /// is submitted or dropped, until the next frame begins. Before the first
+    /// frame, everything is 0. A program compares it with mrhiGetDeviceBudgets
+    /// to learn its headroom.
     ///
     /// @param device    The device.
     /// @param usageOut  Receives the usage.

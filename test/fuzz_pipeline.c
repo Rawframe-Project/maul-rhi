@@ -239,7 +239,7 @@ static void Open(Device* open, bool featured)
         deviceDef.features = adapter->features;
         deviceDef.limits.multiviewViews = 4;
     }
-    deviceDef.deviceLimits.diagnostics = 8;
+    deviceDef.budgets.diagnostics = 8;
     drivers[featured] = (mrhiTestDriverDef){
         .chain = {.next = nullptr, .type = mrhi_structTestDriver},
         .adapters = adapter,

@@ -38,7 +38,7 @@ static mrhiShaderId Shader(mrhiDevice* device)
 // test changed them after Reset.
 static mrhiDevice* OpenWithShader(mrhiDeviceDef def)
 {
-    def.deviceLimits.diagnostics = 8;
+    def.budgets.diagnostics = 8;
     mrhiDevice* device = OpenWith(def, true);
     s_shader = Shader(device);
     return device;
@@ -936,7 +936,7 @@ static void TestCapacity(void)
 {
     Reset();
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    deviceDef.deviceLimits.pipelines = 1;
+    deviceDef.budgets.pipelines = 1;
     mrhiDevice* device = OpenWithShader(deviceDef);
     mrhiGraphicsPipelineDef def = Def();
     mrhiGraphicsPipelineId pipeline;

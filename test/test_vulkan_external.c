@@ -652,7 +652,7 @@ static void CheckDeviceAdoption(mrhiInstance* instance, mrhiAdapterId adapter)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
-    def.deviceLimits.diagnostics = 8;
+    def.budgets.diagnostics = 8;
     // Sealing, which adopted images refuse, where the adapter grants it.
     mrhiFeatures granted = {0};
     CHECK(mrhiGetAdapterFeatures(instance, adapter, &granted) == mrhi_success, "the features");

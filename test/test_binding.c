@@ -902,7 +902,7 @@ static void TestSamplers(void)
 static void TestArena(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.frameCommandBytes = MRHI_CHUNK_BYTES;
+    def.budgets.frameCommandBytes = MRHI_CHUNK_BYTES;
     s_device = OpenWith(def, true);
     Reset();
     s_pipeline = MakePipeline();
@@ -969,7 +969,7 @@ static void TestPastDeviceLimits(void)
     s_adapter.limits.uniformBindingBytes = 98304;
     s_adapter.limits.storageBindingBytes = 3u << 26;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.diagnostics = 4;
+    def.budgets.diagnostics = 4;
     OpenOn(def);
     CHECK(mrhiDestroyBuffer(s_device, s_read) == mrhi_success, "the small buffer gone");
     s_read = MakeBuffer(1u << 28);

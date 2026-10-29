@@ -18,7 +18,7 @@ Two limits once rejected the Android emulator and many mobile devices, and the r
 
 ## Memory
 
-Buffers and textures are suballocated with TLSF from device-local blocks ([memory.md](memory.md#gpu-memory-per-driver)). The bookkeeping is sized from the device limits when the device is made, so the driver allocates nothing later either.
+Buffers and textures are suballocated with TLSF from device-local blocks ([memory.md](memory.md#gpu-memory-per-driver)). The bookkeeping is sized from the device's budgets when the device is made, so the driver allocates nothing later either.
 
 ## Pipelines
 

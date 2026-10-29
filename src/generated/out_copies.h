@@ -129,8 +129,8 @@ static inline void mrhiOutFormatCaps(
     out->sampleCounts = from->sampleCounts;
 }
 
-static inline void mrhiOutDeviceLimits(
-    mrhiDeviceLimits* out, const mrhiDeviceLimits* from)
+static inline void mrhiOutDeviceBudgets(
+    mrhiDeviceBudgets* out, const mrhiDeviceBudgets* from)
 {
     memset(out, 0, sizeof(*out));
     out->notifications = from->notifications;

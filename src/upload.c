@@ -24,7 +24,7 @@
 static uint8_t* TakeStaging(mrhiDevice* device, mrhiFramePass* pass, uint64_t bytes,
                             uint64_t* offsetOut)
 {
-    uint64_t room = device->deviceLimits.frameUploadBytes;
+    uint64_t room = device->budgets.frameUploadBytes;
     uint64_t at = atomic_load_explicit(&device->stagingTaken, memory_order_relaxed);
     bool fits = pass->overflow == 0 && bytes <= room && at <= room - bytes;
     uint64_t rounded = 0;

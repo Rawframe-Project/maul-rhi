@@ -20,7 +20,7 @@
 static mrhiDevice* Open(uint32_t diagnostics)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.diagnostics = diagnostics;
+    def.budgets.diagnostics = diagnostics;
     return OpenWith(def, true);
 }
 
@@ -75,7 +75,7 @@ static void TestNoneByDefault(void)
     CHECK(mrhiGetDeviceMisuse(device) == 1 &&
               mrhiNextDeviceDiagnostic(device, &record) == mrhi_empty,
           "counted, not recorded");
-    CHECK(mrhiDefaultDeviceDef().deviceLimits.diagnostics == 0 &&
+    CHECK(mrhiDefaultDeviceDef().budgets.diagnostics == 0 &&
               mrhiDefaultInstanceDef().limits.diagnostics == 0,
           "both queues off by default");
     Close(device);
@@ -139,8 +139,8 @@ static void TestDeviceDef(void)
     cases[0].def.labelLength = 1;
     cases[0].code = mrhi_diagnosticDefHeader;
     cases[0].what = "a label length without a label";
-    cases[1].def.deviceLimits.samplers = 0;
-    cases[1].code = mrhi_diagnosticDeviceLimits;
+    cases[1].def.budgets.samplers = 0;
+    cases[1].code = mrhi_diagnosticDeviceBudgets;
     cases[1].what = "no samplers";
     cases[2].def.limits.textureDimension2d = 1;
     cases[2].code = mrhi_diagnosticLimitsFloor;

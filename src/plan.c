@@ -180,7 +180,7 @@ static void Push(Map* map, mrhiBox box)
 static bool IsProgramBudgetFull(const mrhiDevice* device)
 {
     return device->frameBarrierCount - device->frameLibraryBarriers ==
-           device->deviceLimits.frameBarriers;
+           device->budgets.frameBarriers;
 }
 
 static void Emit(Map* map, uint32_t pass, const mrhiBox* part, mrhiResourceState after)
