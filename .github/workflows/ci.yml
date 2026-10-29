@@ -104,6 +104,18 @@ jobs:
             git fetch --no-tags --depth=1 origin "$BASE" '+refs/tags/v*:refs/tags/v*'
             python3 tools/check_contract_version.py "$BASE"
           fi
+      # What a driver sees, digested from the SPI headers by clang-20,
+      # against the digest src/driver.h records and the latest release's:
+      # a change needs MRHI_SPI_VERSION above the release's.
+      - name: The SPI version
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python3 tools/check_spi_version.py --self-test
+          if [ -n "$BASE" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE" '+refs/tags/v*:refs/tags/v*'
+            python3 tools/check_spi_version.py "$BASE"
+          fi
       # CI has no shader tools: the committed headers' stamps are checked
       # against their inputs and pins, and each check proven on a copy.
       - name: The shader headers' stamps
