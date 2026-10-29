@@ -22,8 +22,10 @@
 #
 # Standard library only.
 
+import contextlib
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import re
@@ -160,14 +162,33 @@ def check(root, units, tools, script, compare_inputs=True):
     return 1 if found else 0
 
 
-def self_test(root, copied, units_of, tools, compare_inputs=True, cases=()):
+def parse_failures(parse):
+    """What is wrong with a script's flags: parse, given its arguments,
+    must refuse --skip-inputs without --self-test, where it would quietly
+    turn off the input comparison of --check, and accept the rest."""
+    def refused(argv):
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                parse(argv)
+        except SystemExit as stop:
+            return stop.code not in (0, None)
+        return False
+
+    wanted = ((["--check", "--skip-inputs"], True), (["--skip-inputs"], True),
+              (["--check"], False), (["--self-test", "--skip-inputs"], False))
+    return [f"{' '.join(argv)}: {'accepted' if want else 'refused'}"
+            for argv, want in wanted if refused(argv) != want]
+
+
+def self_test(root, copied, units_of, tools, parse, compare_inputs=True, cases=()):
     """Proves the check on copies of the tree: it passes as committed and
     with CRLF inputs, and fails on a changed input, a changed pin and an
     edited header, each for its own reason, and as each of the cases says
     (what, a change of a copy's root, the problem kinds wanted). copied
     names the files and folders to copy; units_of answers the units for a
-    root. Answers the exit status."""
-    failures = []
+    root; parse is the script's parser, which parse_failures proves.
+    Answers the exit status."""
+    failures = parse_failures(parse)
 
     def copy():
         work = tempfile.mkdtemp()
@@ -236,5 +257,6 @@ def self_test(root, copied, units_of, tools, compare_inputs=True, cases=()):
         print(f"self-test: {failure}")
     if not failures:
         print("self-test: the check passes as committed and with CRLF, and fails on a changed "
-              "input, pin or header, or DXIL without -Gis" + "".join(f"; {what}: as wanted" for what, _, _ in cases))
+              "input, pin or header, or DXIL without -Gis; --skip-inputs is refused "
+              "without --self-test" + "".join(f"; {what}: as wanted" for what, _, _ in cases))
     return 1 if failures else 0

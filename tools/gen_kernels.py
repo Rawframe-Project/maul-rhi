@@ -13,7 +13,8 @@
 # of its bytes. The script refuses another DXC; --check tells, with no
 # tools, whether every header still matches; --self-test proves that
 # check on a copy of the tree (--skip-inputs turns off the input
-# comparison, which the self-test must then fail).
+# comparison, which the self-test must then fail; it is refused without
+# --self-test).
 #
 # usage: gen_kernels.py [--check | --self-test [--skip-inputs] | path to dxc]
 
@@ -30,6 +31,7 @@ SCRIPTS = ["tools/gen_kernels.py", "tools/shader_stamp.py"]
 # Each kernel: its source in src/, its header's name, and the array the
 # header declares.
 KERNELS = [("d3d12_expand.hlsl", "d3d12_expand.h", "mrhiD3d12ExpandDxil")]
+USAGE = "usage: gen_kernels.py [--check | --self-test [--skip-inputs] | path to dxc]"
 
 
 def units(root):
@@ -60,18 +62,28 @@ def header(source, array, code, stamp):
     return "\n".join(lines) + "\n"
 
 
+def parse(argv):
+    """The flags among argv. --skip-inputs is refused without --self-test,
+    where it would quietly turn off the input comparison of --check."""
+    flags = [arg for arg in argv if arg.startswith("--")]
+    if "--skip-inputs" in flags and "--self-test" not in flags:
+        sys.exit(USAGE)
+    return flags
+
+
 def main():
-    flags = [arg for arg in sys.argv[1:] if arg.startswith("--")]
+    flags = parse(sys.argv[1:])
     compare_inputs = "--skip-inputs" not in flags
     if "--self-test" in flags:
         copied = ["tools"] + [path for header, inputs in units(ROOT) for path in [header] + inputs
                               if not path.startswith("tools/")]
-        return shader_stamp.self_test(ROOT, copied, units, shader_stamp.DXC, compare_inputs)
+        return shader_stamp.self_test(ROOT, copied, units, shader_stamp.DXC, parse,
+                                      compare_inputs)
     if "--check" in flags:
         return shader_stamp.check(ROOT, units(ROOT), shader_stamp.DXC, "tools/gen_kernels.py",
                                   compare_inputs)
     if flags:
-        sys.exit("usage: gen_kernels.py [--check | --self-test [--skip-inputs] | path to dxc]")
+        sys.exit(USAGE)
     dxc = sys.argv[1] if len(sys.argv) > 1 else "dxc"
     shader_stamp.refuse_unpinned({"dxc": shader_stamp.dxc_identity(dxc)},
                                  {"dxc": shader_stamp.DXC_IDENTITY})
