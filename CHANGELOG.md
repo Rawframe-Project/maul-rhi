@@ -5,6 +5,39 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.11.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.10.0...v0.11.0) (2026-10-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **device:** mrhiDeviceLimits is renamed mrhiDeviceBudgets, the device def member deviceLimits budgets, mrhiGetDeviceOwnLimits mrhiGetDeviceBudgets, and mrhi_diagnosticDeviceLimits mrhi_diagnosticDeviceBudgets.
+* **graph:** mrhiGetFrameMemory is removed. Read mrhiFrameUsage.frameMemoryBytes from mrhiGetFrameUsage instead; it reads 0 where mrhiGetFrameMemory refused with mrhi_errorState.
+* **contract:** mrhiAdapterInfo.nameLength and mrhiDeviceLossReport.messageLength are size_t, and mrhiSetRootBlock takes its size as size_t.
+* **surface:** presentMode and alphaMode take mrhiPresentMode and mrhiAlphaMode, and the caps' bits are renamed with a Bit suffix (mrhi_presentFifoBit, mrhi_alphaOpaqueBit and the rest).
+* **graph:** mrhiClearColor is now mrhiColor, with the same members.
+* **contract:** MRHI_CONTRACT_VERSION is no longer defined. A program that read it uses MRHI_VERSION_* or mrhiGetVersion instead.
+
+### Added
+
+* **shader:** publish the shader container's bounds as constants ([#213](https://github.com/Rawframe-Project/maul-rhi/issues/213)) ([b28b184](https://github.com/Rawframe-Project/maul-rhi/commit/b28b184a1e85cb18161a3de1d85272c8dd206a8c)), closes [#211](https://github.com/Rawframe-Project/maul-rhi/issues/211)
+
+
+### Fixed
+
+* **device:** zero the padding of every struct a getter fills ([#225](https://github.com/Rawframe-Project/maul-rhi/issues/225)) ([2da8b7e](https://github.com/Rawframe-Project/maul-rhi/commit/2da8b7e07604bc30f46292b7f159177fff0866aa)), closes [#224](https://github.com/Rawframe-Project/maul-rhi/issues/224)
+* **encoder:** zero a command's records before its payload fills them ([#200](https://github.com/Rawframe-Project/maul-rhi/issues/200)) ([b7db7b4](https://github.com/Rawframe-Project/maul-rhi/commit/b7db7b4f7abfb049f6733821e677a80f572c68c0)), closes [#199](https://github.com/Rawframe-Project/maul-rhi/issues/199)
+* **spi:** raise the SPI version for the driver changes since 0.10.0 ([#230](https://github.com/Rawframe-Project/maul-rhi/issues/230)) ([94aa961](https://github.com/Rawframe-Project/maul-rhi/commit/94aa961234d78b8f9744da16cf0a866b5500436e)), closes [#228](https://github.com/Rawframe-Project/maul-rhi/issues/228)
+
+
+### Changed
+
+* **contract:** drop MRHI_CONTRACT_VERSION from the public headers ([#214](https://github.com/Rawframe-Project/maul-rhi/issues/214)) ([734e334](https://github.com/Rawframe-Project/maul-rhi/commit/734e334f191bcb7e1b80f14f1469dc1cfc4b593f)), closes [#209](https://github.com/Rawframe-Project/maul-rhi/issues/209)
+* **contract:** take byte lengths in memory as size_t ([#218](https://github.com/Rawframe-Project/maul-rhi/issues/218)) ([21bd049](https://github.com/Rawframe-Project/maul-rhi/commit/21bd049334e976924e92eab34b5a9e0eced182db)), closes [#207](https://github.com/Rawframe-Project/maul-rhi/issues/207)
+* **device:** call a device's own limits its budgets ([#227](https://github.com/Rawframe-Project/maul-rhi/issues/227)) ([5e59793](https://github.com/Rawframe-Project/maul-rhi/commit/5e597933970d62d1f2793992ddc9a629da4a9515)), closes [#204](https://github.com/Rawframe-Project/maul-rhi/issues/204)
+* **graph:** read a frame's memory from mrhiFrameUsage ([#216](https://github.com/Rawframe-Project/maul-rhi/issues/216)) ([f798e1a](https://github.com/Rawframe-Project/maul-rhi/commit/f798e1a83cdb3315dc02af13eae87de06d8aab11)), closes [#205](https://github.com/Rawframe-Project/maul-rhi/issues/205)
+* **graph:** rename mrhiClearColor to mrhiColor ([#215](https://github.com/Rawframe-Project/maul-rhi/issues/215)) ([b136fa8](https://github.com/Rawframe-Project/maul-rhi/commit/b136fa80faf696a92a2c4b17920ad33836eaffab)), closes [#203](https://github.com/Rawframe-Project/maul-rhi/issues/203)
+* **surface:** make a config's present and alpha modes enums ([#217](https://github.com/Rawframe-Project/maul-rhi/issues/217)) ([43e19aa](https://github.com/Rawframe-Project/maul-rhi/commit/43e19aa7aa1eee952e6651ec373dfd66ba61fc57)), closes [#206](https://github.com/Rawframe-Project/maul-rhi/issues/206)
+
 ## [0.10.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.9.0...v0.10.0) (2026-10-28)
 
 ### Added
