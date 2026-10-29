@@ -7,6 +7,7 @@
 
 #include "device_core.h"
 #include "encoder_core.h"
+#include "outputs.h"
 #include "validation.h"
 
 #include "maul-rhi/d3d12.h"
@@ -17,6 +18,8 @@
 
 mrhiResult mrhiDevice_GetD3d12Device(mrhiDevice* device, void** deviceOut, void** queueOut)
 {
+    mrhiClearOutput(deviceOut, sizeof(*deviceOut));
+    mrhiClearOutput(queueOut, sizeof(*queueOut));
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
@@ -43,6 +46,7 @@ mrhiResult mrhiDevice_GetD3d12Device(mrhiDevice* device, void** deviceOut, void*
 mrhiResult mrhiTexture_GetD3d12Texture(mrhiDevice* device, mrhiTextureId texture,
                                        void** resourceOut)
 {
+    mrhiClearOutput(resourceOut, sizeof(*resourceOut));
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
