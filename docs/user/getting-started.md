@@ -74,10 +74,10 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
     mrhiInstanceNotification record;
     mrhiAdapterId adapter;
     size_t count = 0;
-    if (mrhiRequestAdapters(instance, &request, &searched) != mrhi_success ||
-        mrhiNextInstanceNotification(instance, &record) != mrhi_success ||
+    if (mrhiInstance_RequestAdapters(instance, &request, &searched) != mrhi_success ||
+        mrhiInstance_TakeNotification(instance, &record) != mrhi_success ||
         record.outcome != mrhi_success ||
-        mrhiGetAdapters(instance, &adapter, 1, &count) != mrhi_success || count == 0)
+        mrhiInstance_GetAdapters(instance, &adapter, 1, &count) != mrhi_success || count == 0)
     {
         return false;
     }
@@ -90,7 +90,7 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
         return false;
     }
     // mrhi_instanceDeviceReady answers the opening.
-    return mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+    return mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
            record.kind == mrhi_instanceDeviceReady && record.outcome == mrhi_success;
 }
 ```
@@ -99,7 +99,7 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
 
 ## The rules every call follows
 
-**Requests and notifications.** Whatever finishes later (an adapter search, a device opening, a pipeline, a frame, a readback) returns a request id at once and is answered by exactly one record in its owner's queue: the instance's (`mrhiNextInstanceNotification`) or the device's (`mrhiNextDeviceNotification`). The library starts no thread and never calls the program. A native driver's answers arrive when the program drains the queue; a browser's come between the page's tasks, so a web program drains again on a later frame instead of waiting. `mrhiWaitDeviceNotification` blocks until the device's queue holds a record, with a timeout, so a native program waiting for a pipeline or a frame need not spin; it returns `mrhi_empty` at once when the device owes no answer, and on the web it never blocks (below).
+**Requests and notifications.** Whatever finishes later (an adapter search, a device opening, a pipeline, a frame, a readback) returns a request id at once and is answered by exactly one record in its owner's queue: the instance's (`mrhiInstance_TakeNotification`) or the device's (`mrhiDevice_TakeNotification`). The library starts no thread and never calls the program. A native driver's answers arrive when the program drains the queue; a browser's come between the page's tasks, so a web program drains again on a later frame instead of waiting. `mrhiDevice_WaitNotification` blocks until the device's queue holds a record, with a timeout, so a native program waiting for a pipeline or a frame need not spin; it returns `mrhi_empty` at once when the device owes no answer, and on the web it never blocks (below).
 
 **Results.** Every fallible function returns an `mrhiResult`. `mrhi_success` is zero. A few positive values are outcomes, not failures: `mrhi_empty` for a drained queue, `mrhi_suboptimal` and `mrhi_occluded` for surfaces, `mrhi_timeout`. The errors:
 
@@ -118,12 +118,12 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
 | `mrhi_errorPlatform` | The platform refused, for a reason the library cannot name. |
 | `mrhi_errorDeviceLost` | The device is lost; see [devices](devices.md#device-loss). |
 
-The values follow the Maul family's numbering, so a raw value logged by a program reads the same in every Maul library: the shared errors are -1 to -10, and Maul RHI's own, `mrhi_errorOutOfDate` and `mrhi_errorDeviceLost`, are -32 and -33. `mrhiResultName` names any value. [Troubleshooting](troubleshooting.md) shows how to learn which check refused a call.
+The values follow the Maul family's numbering, so a raw value logged by a program reads the same in every Maul library: the shared errors are -1 to -10, and Maul RHI's own, `mrhi_errorOutOfDate` and `mrhi_errorDeviceLost`, are -32 and -33. `mrhiGetResultName` names any value. [Troubleshooting](troubleshooting.md) shows how to learn which check refused a call.
 
 **Ids.** The instance and devices are pointers. Everything they own is an id with a generation: an id outlives its object harmlessly, and using it afterwards answers `mrhi_errorStale`. A call that gives a pointer or an id (a creation, a frame's resource or pass, a request) sets it to NULL or the null id first, so after any failure it holds nothing to destroy, wait on or use. A call that fills a struct (adapter info, limits, caps, plans, a notification, a diagnostic) writes every byte of it when it succeeds, its padding as zeros, so equal results compare equal with `memcmp` whatever the struct held before.
 
 **Defs.** Every creation takes a def. Start each from its `mrhiDefault...Def` function and change fields: the default sets a cookie, and a def without it is refused rather than read. `mrhiDefaultInstanceDef` is built into the program from the headers it includes and stamps the def with their ABI version, so an instance refuses a program built against another release with `mrhi_errorVersion` instead of reading a def of another layout. A def's `next` takes chained structs, which add to a call. A chained struct the library does not know is refused with `mrhi_errorUnsupported`, unless bit 31 of its type is set, which marks a hint an older library may skip.
 
-**Memory.** An instance and each device take all their memory when they are made, through the def's allocator, from what the def names: the instance's `mrhiInstanceLimits` and the device's `mrhiDeviceBudgets` (objects, frame resources, passes, accesses, command, upload and readback bytes). A zeroed allocator means the C library's. Past one a call answers `mrhi_errorCapacity`; nothing grows later. A library that is handed a device reads its budgets with `mrhiGetDeviceBudgets`, as it reads the GPU's with `mrhiGetDeviceLimits`.
+**Memory.** An instance and each device take all their memory when they are made, through the def's allocator, from what the def names: the instance's `mrhiInstanceLimits` and the device's `mrhiDeviceBudgets` (objects, frame resources, passes, accesses, command, upload and readback bytes). A zeroed allocator means the C library's. Past one a call answers `mrhi_errorCapacity`; nothing grows later. A library that is handed a device reads its budgets with `mrhiDevice_GetBudgets`, as it reads the GPU's with `mrhiDevice_GetLimits`.
 
 **Threads.** Each function's documentation says which object it uses. An object is used by one thread at a time, except that different passes of a frame may record on different threads at once.

@@ -81,7 +81,7 @@ static mrhiResult Made(mrhiDevice* device, const mrhiGraphicsPipelineDef* def)
     {
         CHECK(mrhiDestroyGraphicsPipeline(device, pipeline) == mrhi_success, "destroyed");
         mrhiDeviceNotification record;
-        CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+        CHECK(mrhiDevice_TakeNotification(device, &record) == mrhi_success &&
                   record.outcome == mrhi_errorStale,
               "answered stale");
     }
@@ -94,7 +94,7 @@ static mrhiDiagnosticCode Refusal(mrhiDevice* device)
 {
     mrhiDiagnosticCode code = 0;
     mrhiDiagnostic record;
-    while (mrhiNextDeviceDiagnostic(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success)
     {
         code = record.code;
     }
@@ -168,7 +168,7 @@ static void TestCreate(void)
     CHECK(mrhiCreateGraphicsPipeline(device, &def, &pipeline, &request) == mrhi_success,
           "a graphics pipeline");
     mrhiDeviceNotification record;
-    CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+    CHECK(mrhiDevice_TakeNotification(device, &record) == mrhi_success &&
               record.kind == mrhi_devicePipelineReady && record.request.index1 == request.index1 &&
               record.outcome == mrhi_success,
           "answered ready");
@@ -193,7 +193,7 @@ static void TestCreate(void)
           "NULL arguments");
     def.cookie = 0;
     CHECK(Made(device, &def) == mrhi_errorInvalid, "no cookie");
-    CHECK(mrhiGetDeviceMisuse(device) == 4, "each counted");
+    CHECK(mrhiDevice_GetMisuse(device) == 4, "each counted");
     def = Def();
     def.shader.generation += 2;
     CHECK(Made(device, &def) == mrhi_errorStale, "a stale shader");
@@ -483,7 +483,7 @@ static void TestPrimitive(void)
     CHECK(Made(device, &def) == mrhi_errorUnsupported &&
               Refusal(device) == mrhi_diagnosticLimitMultiviewViews,
           "past the adapter's limit, named");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "none is misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "none is misuse");
     Close(device);
 }
 
@@ -883,7 +883,7 @@ static void TestPastDeviceLimits(void)
                            mrhi_formatR8Unorm},
             4);
     CHECK(Made(device, &def) == mrhi_errorUnsupported, "past the adapter's");
-    CHECK(mrhiGetDeviceMisuse(device) == 1, "only the invalid def is misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 1, "only the invalid def is misuse");
     Close(device);
     // Tables and buffers together, on a device of 32 buffers.
     ResetAdapter();
@@ -1145,7 +1145,7 @@ static void TestDriverFailure(void)
     mrhiGraphicsPipelineDef def = Def();
     CHECK(Made(device, &def) == mrhi_errorPlatform, "the driver fails at once");
     CHECK(mrhiDestroyShader(device, s_shader) == mrhi_success, "the shader, its last hold");
-    CHECK(mrhiNextDeviceNotification(device, &(mrhiDeviceNotification){0}) == mrhi_empty,
+    CHECK(mrhiDevice_TakeNotification(device, &(mrhiDeviceNotification){0}) == mrhi_empty,
           "nothing to answer");
     Close(device);
     ResetAdapter();
@@ -1167,7 +1167,7 @@ static void TestBadState(void)
     CHECK(Made(device, &def) == mrhi_errorFormat &&
               Refusal(device) == mrhi_diagnosticGraphicsTargets,
           "floats for an unsigned target");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "neither is misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "neither is misuse");
     // The unsupported primitive is checked before the refused target.
     def = Def();
     def.unclippedDepth = true;
@@ -1181,7 +1181,7 @@ static void TestBadState(void)
     CHECK(Made(device, &def) == mrhi_errorInvalid &&
               Refusal(device) == mrhi_diagnosticGraphicsPrimitive,
           "invalid over format");
-    CHECK(mrhiGetDeviceMisuse(device) == 1, "only the invalid one counted");
+    CHECK(mrhiDevice_GetMisuse(device) == 1, "only the invalid one counted");
     Close(device);
     Reset();
     Put32(Record(ENTRIES, 1, 48) + 36, mrhi_builtinFragDepth);
@@ -1189,7 +1189,7 @@ static void TestBadState(void)
     def = Def();
     CHECK(Made(device, &def) == mrhi_errorFormat &&
               Refusal(device) == mrhi_diagnosticGraphicsDepthStencil &&
-              mrhiGetDeviceMisuse(device) == 0,
+              mrhiDevice_GetMisuse(device) == 0,
           "a fragment depth without a depth format");
     Close(device);
 }
@@ -1214,13 +1214,13 @@ static void TestConstantsAndMisuse(void)
     def.label = "\xC3";
     def.labelLength = 1;
     CHECK(Made(device, &def) == mrhi_errorInvalid, "a bad label");
-    uint64_t misuse = mrhiGetDeviceMisuse(device);
+    uint64_t misuse = mrhiDevice_GetMisuse(device);
     def = Def();
     value.value = 7.0;
     def.constants = &value;
     def.constantCount = 1;
     def.unclippedDepth = true;
-    CHECK(Made(device, &def) == mrhi_errorUnsupported && mrhiGetDeviceMisuse(device) == misuse,
+    CHECK(Made(device, &def) == mrhi_errorUnsupported && mrhiDevice_GetMisuse(device) == misuse,
           "unsupported is not misuse");
     CHECK(misuse == 1, "invalid input is, and bad constants are not");
     Close(device);

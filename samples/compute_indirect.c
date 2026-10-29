@@ -61,7 +61,7 @@ static mrhiRequestId Record(Sample* sample, mrhiComputePipelineId plan,
     mrhiResourceId arguments = {0};
     mrhiResourceId values = {0};
     SampleCheck(sample,
-                mrhiBeginFrame(device, &frame) == mrhi_success &&
+                mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
                     mrhiDeclareBuffer(device, &argumentsDef, &arguments) == mrhi_success &&
                     mrhiDeclareBuffer(device, &valuesDef, &values) == mrhi_success,
                 "a frame and its buffers");
@@ -81,7 +81,7 @@ static mrhiRequestId Record(Sample* sample, mrhiComputePipelineId plan,
     mrhiPassId read = {0};
     SampleCheck(sample,
                 mrhiAddPass(device, &readDef, &read) == mrhi_success &&
-                    mrhiCompileFrame(device) == mrhi_success,
+                    mrhiDevice_CompileFrame(device) == mrhi_success,
                 "the frame compiled");
     static uint32_t ones[ELEMENTS];
     memset(ones, 0xFF, sizeof(ones));
@@ -91,32 +91,34 @@ static mrhiRequestId Record(Sample* sample, mrhiComputePipelineId plan,
     const mrhiBinding valuesBinding = {.slot = 0, .resource = values, .size = MRHI_WHOLE_SIZE};
     mrhiRequestId request = {0};
     SampleCheck(sample,
-                mrhiBeginPass(device, filling) == mrhi_success &&
-                    mrhiWriteBuffer(device, filling, values, 0, ones, sizeof(ones)) ==
+                mrhiPass_Begin(device, filling) == mrhi_success &&
+                    mrhiPass_WriteBuffer(device, filling, values, 0, ones, sizeof(ones)) ==
                         mrhi_success &&
-                    mrhiEndPass(device, filling) == mrhi_success,
+                    mrhiPass_End(device, filling) == mrhi_success,
                 "the buffer filled");
+    SampleCheck(
+        sample,
+        mrhiPass_Begin(device, planned) == mrhi_success &&
+            mrhiPass_SetComputePipeline(device, planned, plan) == mrhi_success &&
+            mrhiPass_SetRootBlock(device, planned, 0, &count, sizeof(count)) == mrhi_success &&
+            mrhiPass_SetBindings(device, planned, 0, &argumentsBinding, 1) == mrhi_success &&
+            mrhiPass_Dispatch(device, planned, 1, 1, 1) == mrhi_success &&
+            mrhiPass_End(device, planned) == mrhi_success,
+        "the dispatch planned");
     SampleCheck(sample,
-                mrhiBeginPass(device, planned) == mrhi_success &&
-                    mrhiSetComputePipeline(device, planned, plan) == mrhi_success &&
-                    mrhiSetRootBlock(device, planned, 0, &count, sizeof(count)) == mrhi_success &&
-                    mrhiSetBindings(device, planned, 0, &argumentsBinding, 1) == mrhi_success &&
-                    mrhiDispatch(device, planned, 1, 1, 1) == mrhi_success &&
-                    mrhiEndPass(device, planned) == mrhi_success,
-                "the dispatch planned");
-    SampleCheck(sample,
-                mrhiBeginPass(device, squared) == mrhi_success &&
-                    mrhiSetComputePipeline(device, squared, square) == mrhi_success &&
-                    mrhiSetRootBlock(device, squared, 0, &count, sizeof(count)) == mrhi_success &&
-                    mrhiSetBindings(device, squared, 0, &valuesBinding, 1) == mrhi_success &&
-                    mrhiDispatchIndirect(device, squared, arguments, 0) == mrhi_success &&
-                    mrhiEndPass(device, squared) == mrhi_success,
+                mrhiPass_Begin(device, squared) == mrhi_success &&
+                    mrhiPass_SetComputePipeline(device, squared, square) == mrhi_success &&
+                    mrhiPass_SetRootBlock(device, squared, 0, &count, sizeof(count)) ==
+                        mrhi_success &&
+                    mrhiPass_SetBindings(device, squared, 0, &valuesBinding, 1) == mrhi_success &&
+                    mrhiPass_DispatchIndirect(device, squared, arguments, 0) == mrhi_success &&
+                    mrhiPass_End(device, squared) == mrhi_success,
                 "the elements squared");
     SampleCheck(sample,
-                mrhiBeginPass(device, read) == mrhi_success &&
-                    mrhiReadBuffer(device, read, values, 0, valuesDef.size, &request) ==
+                mrhiPass_Begin(device, read) == mrhi_success &&
+                    mrhiPass_ReadBuffer(device, read, values, 0, valuesDef.size, &request) ==
                         mrhi_success &&
-                    mrhiEndPass(device, read) == mrhi_success,
+                    mrhiPass_End(device, read) == mrhi_success,
                 "the buffer read");
     return request;
 }

@@ -51,7 +51,7 @@ static void CloseDevice(void)
 static mrhiRequestId Submit(void)
 {
     mrhiRequestId token = {0};
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
     return token;
 }
 
@@ -66,7 +66,7 @@ static void TestView(void)
     s_adapter.holdFrames = true;
     Open();
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     mrhiResourceId target = {0};
     mrhiResourceId buffer = {0};
     mrhiResourceId unread = {0};
@@ -132,25 +132,28 @@ static void TestView(void)
     def.accessCount = 1;
     mrhiPassId sampling;
     CHECK(mrhiAddPass(s_device, &def, &sampling) == mrhi_success, "and sampled");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     bool kept = false;
-    CHECK(mrhiIsPassKept(s_device, culled, &kept) == mrhi_success && !kept, "one culled");
+    CHECK(mrhiPass_IsKept(s_device, culled, &kept) == mrhi_success && !kept, "one culled");
     size_t barriers = 0;
     mrhiFrameUsage usage = {0};
-    CHECK(mrhiGetFrameBarriers(s_device, nullptr, 0, &barriers) == mrhi_success &&
-              mrhiGetFrameUsage(s_device, &usage) == mrhi_success && usage.frameMemoryBytes > 0,
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, nullptr, 0, &barriers) == mrhi_success &&
+              mrhiDevice_GetFrameUsage(s_device, &usage) == mrhi_success &&
+              usage.frameMemoryBytes > 0,
           "the plan");
     uint32_t bytes[4] = {1, 2, 3, 4};
     mrhiColor color = {0};
-    CHECK(mrhiBeginPass(s_device, upload) == mrhi_success &&
-              mrhiWriteBuffer(s_device, upload, buffer, 0, bytes, sizeof(bytes)) == mrhi_success &&
-              mrhiInsertDebugMarker(s_device, upload, MARKER, sizeof(MARKER) - 1) == mrhi_success &&
-              mrhiEndPass(s_device, upload) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, upload) == mrhi_success &&
+              mrhiPass_WriteBuffer(s_device, upload, buffer, 0, bytes, sizeof(bytes)) ==
+                  mrhi_success &&
+              mrhiPass_InsertDebugMarker(s_device, upload, MARKER, sizeof(MARKER) - 1) ==
+                  mrhi_success &&
+              mrhiPass_End(s_device, upload) == mrhi_success,
           "the upload recorded");
-    CHECK(mrhiBeginPass(s_device, painting) == mrhi_success &&
-              mrhiSetBlendConstant(s_device, painting, &color) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, painting) == mrhi_success &&
+              mrhiPass_SetBlendConstant(s_device, painting, &color) == mrhi_success,
           "the painting recorded, left open to end");
-    CHECK(mrhiEndPass(s_device, painting) == mrhi_success, "ended");
+    CHECK(mrhiPass_End(s_device, painting) == mrhi_success, "ended");
     mrhiRequestId first = Submit();
     // The library's first pass clears the new imported buffer, under a
     // label of 26 bytes.
@@ -175,7 +178,7 @@ static void TestView(void)
     CHECK(s_log.accesses == 5 && s_log.sealed == 0,
           "each kept pass's one declared resource, and the clear's");
     // The first frame still runs while the next stages its own bytes.
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "another frame");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "another frame");
     CHECK(mrhiImportBuffer(s_device, s_buffer, &buffer) == mrhi_success, "imported");
     access = (mrhiAccess){.resource = buffer, .kind = mrhi_accessCopyDestination};
     def = mrhiDefaultPassDef();
@@ -183,14 +186,15 @@ static void TestView(void)
     def.accessCount = 1;
     uint32_t more[2] = {5, 6};
     CHECK(mrhiAddPass(s_device, &def, &upload) == mrhi_success &&
-              mrhiCompileFrame(s_device) == mrhi_success &&
-              mrhiBeginPass(s_device, upload) == mrhi_success &&
-              mrhiWriteBuffer(s_device, upload, buffer, 0, more, sizeof(more)) == mrhi_success &&
-              mrhiEndPass(s_device, upload) == mrhi_success,
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, upload) == mrhi_success &&
+              mrhiPass_WriteBuffer(s_device, upload, buffer, 0, more, sizeof(more)) ==
+                  mrhi_success &&
+              mrhiPass_End(s_device, upload) == mrhi_success,
           "an upload");
     mrhiRequestId second = Submit();
-    CHECK(mrhiWaitFrame(s_device, first, 1) == mrhi_success &&
-              mrhiWaitFrame(s_device, second, 1) == mrhi_success,
+    CHECK(mrhiRequest_WaitFrame(s_device, first, 1) == mrhi_success &&
+              mrhiRequest_WaitFrame(s_device, second, 1) == mrhi_success,
           "both finished");
     s_adapter.holdFrames = false;
     CHECK(s_log.frames == 2 && s_log.passes == 1 && s_log.commands == 1 &&
@@ -205,7 +209,7 @@ static void TestDestroyedImport(void)
 {
     Open();
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     mrhiResourceId buffer = {0};
     CHECK(mrhiImportBuffer(s_device, s_buffer, &buffer) == mrhi_success, "imported");
     mrhiAccess access = {.resource = buffer, .kind = mrhi_accessCopyDestination};
@@ -222,7 +226,7 @@ static void TestDestroyedImport(void)
     CHECK(mrhiCreateBuffer(s_device, &bufferDef, &next) == mrhi_success &&
               next.index1 == s_buffer.index1,
           "its slot taken again");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     Submit();
     // Beside the library's first pass, which clears the imported buffer.
     CHECK(s_log.frames == 1 && s_log.passes == 2 && s_log.resources == 1,
@@ -235,7 +239,7 @@ static void TestDestroyedTexture(void)
 {
     Open();
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     mrhiResourceId target = {0};
     CHECK(mrhiImportTexture(s_device, s_target, &target) == mrhi_success, "imported");
     mrhiPassDef def = mrhiDefaultPassDef();

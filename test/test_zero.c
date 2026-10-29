@@ -37,7 +37,7 @@ static mrhiResourceId Begin(mrhiDevice* device, mrhiBufferId buffer)
 {
     mrhiFrameDef def = mrhiDefaultFrameDef();
     mrhiResourceId resource = {0};
-    CHECK(mrhiBeginFrame(device, &def) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &def) == mrhi_success &&
               mrhiImportBuffer(device, buffer, &resource) == mrhi_success,
           "a frame with the buffer");
     return resource;
@@ -61,7 +61,7 @@ static void Submit(mrhiDevice* device)
 {
     s_log = (mrhiTestFrameLog){0};
     mrhiRequestId token = {0};
-    CHECK(mrhiSubmitFrame(device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(device, &token) == mrhi_success, "submitted");
 }
 
 // The first frame that imports a buffer runs one more pass, with one
@@ -74,16 +74,16 @@ static void TestFirstFrame(void)
     mrhiBufferId buffer = MakeBuffer(device);
     mrhiResourceId resource = Begin(device, buffer);
     mrhiPassId pass = Read(device, resource);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     mrhiPassId library = {1, pass.generation};
     bool kept = false;
     mrhiPassPlan plan;
-    CHECK(pass.index1 != library.index1 && mrhiBeginPass(device, library) == mrhi_errorStale &&
-              mrhiIsPassKept(device, library, &kept) == mrhi_errorStale &&
-              mrhiGetPassPlan(device, library, &plan) == mrhi_errorStale,
+    CHECK(pass.index1 != library.index1 && mrhiPass_Begin(device, library) == mrhi_errorStale &&
+              mrhiPass_IsKept(device, library, &kept) == mrhi_errorStale &&
+              mrhiPass_GetPlan(device, library, &plan) == mrhi_errorStale,
           "the library's pass refused to the program");
     mrhiResourcePlan used;
-    CHECK(mrhiGetResourcePlan(device, resource, &used) == mrhi_success &&
+    CHECK(mrhiResource_GetPlan(device, resource, &used) == mrhi_success &&
               used.firstPass.index1 == library.index1 && used.lastPass.index1 == pass.index1,
           "the buffer first used by the library's pass");
     Submit(device);
@@ -105,7 +105,7 @@ static void TestDroppedAndUnused(void)
     mrhiDevice* device = Open(mrhiDefaultDeviceDef());
     mrhiBufferId buffer = MakeBuffer(device);
     (void)Begin(device, buffer);
-    CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(device) == mrhi_success, "dropped");
     (void)Begin(device, buffer);
     Submit(device);
     CHECK(s_log.passes == 1 && s_log.commands == 1, "cleared though nothing used it");
@@ -150,14 +150,15 @@ static uint32_t Fill(mrhiDevice* device, mrhiResourceId resource, uint32_t most)
     mrhiPassId more = {0};
     CHECK(mrhiAddPass(device, &def, &pass) == mrhi_success, "the program's one pass");
     CHECK(mrhiAddPass(device, &def, &more) == mrhi_errorCapacity, "and no other");
-    CHECK(mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, pass) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, pass) == mrhi_success,
           "begun");
     uint32_t fitted = 0;
-    while (fitted < most && mrhiClearBuffer(device, pass, resource, 0, 4) == mrhi_success)
+    while (fitted < most && mrhiPass_ClearBuffer(device, pass, resource, 0, 4) == mrhi_success)
     {
         ++fitted;
     }
-    CHECK(mrhiEndPass(device, pass) == mrhi_success, "ended");
+    CHECK(mrhiPass_End(device, pass) == mrhi_success, "ended");
     return fitted;
 }
 
@@ -173,12 +174,13 @@ static void TestBudgets(void)
     mrhiDevice* device = Open(deviceDef);
     mrhiBufferId buffer = MakeBuffer(device);
     uint32_t first = Fill(device, Begin(device, buffer), UINT32_MAX);
-    CHECK(first > 0 && mrhiDropFrame(device) == mrhi_success, "room for clears beside the zeroing");
+    CHECK(first > 0 && mrhiDevice_DropFrame(device) == mrhi_success,
+          "room for clears beside the zeroing");
     CHECK(Fill(device, Begin(device, buffer), first) == first, "all of them again");
     Submit(device);
     CHECK(s_log.passes == 2 && s_log.commands == first + 1, "submitted beside the library's clear");
     uint32_t later = Fill(device, Begin(device, buffer), UINT32_MAX);
-    CHECK(later == first && mrhiDropFrame(device) == mrhi_success,
+    CHECK(later == first && mrhiDevice_DropFrame(device) == mrhi_success,
           "as much room in a frame that clears nothing of its own");
     Close(device);
 }
@@ -189,7 +191,7 @@ static bool CompilesBeside(mrhiDevice* device, mrhiBufferId old, mrhiBufferId fr
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId resources[2] = {{0}, {0}};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportBuffer(device, old, &resources[0]) == mrhi_success &&
               mrhiImportBuffer(device, fresh, &resources[1]) == mrhi_success,
           "a frame with both");
@@ -201,7 +203,7 @@ static bool CompilesBeside(mrhiDevice* device, mrhiBufferId old, mrhiBufferId fr
     mrhiPassId pass = {0};
     CHECK(mrhiAddPass(device, &def, &pass) == mrhi_success, "a pass writing the old buffer");
     (void)Read(device, resources[1]);
-    return mrhiCompileFrame(device) == mrhi_success;
+    return mrhiDevice_CompileFrame(device) == mrhi_success;
 }
 
 // A device whose frames plan one barrier: a frame that spends it on an
@@ -239,8 +241,8 @@ static void TestBarrierBudget(void)
     def.accessCount = 2;
     mrhiPassId pass = {0};
     CHECK(mrhiAddPass(device, &def, &pass) == mrhi_success &&
-              mrhiCompileFrame(device) == mrhi_errorCapacity &&
-              mrhiDropFrame(device) == mrhi_success,
+              mrhiDevice_CompileFrame(device) == mrhi_errorCapacity &&
+              mrhiDevice_DropFrame(device) == mrhi_success,
           "two barriers of the program's own refused");
     Close(device);
 }

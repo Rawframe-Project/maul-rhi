@@ -38,7 +38,7 @@ static void TestMakeAndDestroy(void)
     CHECK(mrhiDestroyBuffer(device, a) == mrhi_errorStale, "its id has ended");
     CHECK(mrhiDestroyBuffer(nullptr, b) == mrhi_errorInvalid, "no device");
     CHECK(mrhiDestroyBuffer(device, b) == mrhi_success, "the other destroyed");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "no misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "no misuse");
     Close(device);
 }
 
@@ -65,14 +65,14 @@ static void TestInvalidDefs(void)
     CHECK(mrhiCreateBuffer(device, nullptr, &buffer) == mrhi_errorInvalid, "no def");
     CHECK(mrhiCreateBuffer(device, &def, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiCreateBuffer(nullptr, &def, &buffer) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetDeviceMisuse(device) == 8, "each counted");
+    CHECK(mrhiDevice_GetMisuse(device) == 8, "each counted");
     def = Def(mrhiDefaultLimits().bufferBytes + 4, mrhi_bufferStorage);
     CHECK(mrhiCreateBuffer(device, &def, &buffer) == mrhi_errorUnsupported, "past the limit");
     def = Def(64, mrhi_bufferIndex);
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def.next = &critical;
     CHECK(mrhiCreateBuffer(device, &def, &buffer) == mrhi_errorUnsupported, "an extension");
-    CHECK(mrhiGetDeviceMisuse(device) == 8, "unsupported asks are not misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 8, "unsupported asks are not misuse");
     Close(device);
 }
 
@@ -85,7 +85,7 @@ static void TestStateLimitAndFailure(void)
     mrhiBufferId c;
     CHECK(mrhiCreateBuffer(device, &def, &a) == mrhi_errorState, "not ready yet");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(s_instance, &record) == mrhi_success, "ready");
+    CHECK(mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success, "ready");
     CHECK(mrhiCreateBuffer(device, &def, &a) == mrhi_success, "one");
     CHECK(mrhiCreateBuffer(device, &def, &b) == mrhi_success, "two");
     CHECK(mrhiCreateBuffer(device, &def, &c) == mrhi_errorCapacity, "the limit");
@@ -115,7 +115,7 @@ static void TestPastDeviceLimit(void)
           "past the device's limit, within the adapter's");
     def = Def(2 * most + 4, mrhi_bufferStorage);
     CHECK(mrhiCreateBuffer(device, &def, &buffer) == mrhi_errorUnsupported, "past the adapter's");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "neither is misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "neither is misuse");
     Close(device);
     ResetAdapter();
 }

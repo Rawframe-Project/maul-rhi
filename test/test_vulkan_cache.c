@@ -64,7 +64,7 @@ static mrhiDevice* Open(const void* bytes, size_t size)
     mrhiRequestId opened = {0};
     mrhiInstanceNotification record;
     bool ready = mrhiCreateDevice(s_instance, &def, &device, &opened) == mrhi_success &&
-                 mrhiNextInstanceNotification(s_instance, &record) == mrhi_success &&
+                 mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success &&
                  record.outcome == mrhi_success;
     CHECK(ready, "a device");
     return ready ? device : nullptr;
@@ -89,7 +89,7 @@ static bool MakePipeline(mrhiDevice* device)
     }
     def.shader = shader;
     return mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_success &&
-           mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+           mrhiDevice_TakeNotification(device, &record) == mrhi_success &&
            record.kind == mrhi_devicePipelineReady && record.outcome == mrhi_success;
 }
 
@@ -142,10 +142,10 @@ static void CheckRefused(const char* what)
         s_failures += 1;
         return;
     }
-    if (mrhiGetPipelineCacheOutcome(device) != mrhi_errorStale)
+    if (mrhiDevice_GetPipelineCacheOutcome(device) != mrhi_errorStale)
     {
         printf("FAIL: %s: answered %d, not stale\n", what,
-               (int)mrhiGetPipelineCacheOutcome(device));
+               (int)mrhiDevice_GetPipelineCacheOutcome(device));
         s_failures += 1;
     }
     if (!MakePipeline(device))
@@ -155,10 +155,11 @@ static void CheckRefused(const char* what)
     }
     size_t size = 0;
     static uint8_t exported[CACHE_ROOM];
-    bool own = mrhiGetPipelineCache(device, exported, sizeof(exported), &size) == mrhi_success &&
-               size >= ENVELOPE_BYTES + HEADER_BYTES &&
-               memcmp(exported + ENVELOPE_BYTES + VENDOR_AT, s_written + ENVELOPE_BYTES + VENDOR_AT,
-                      HEADER_BYTES - VENDOR_AT) == 0;
+    bool own =
+        mrhiDevice_GetPipelineCache(device, exported, sizeof(exported), &size) == mrhi_success &&
+        size >= ENVELOPE_BYTES + HEADER_BYTES &&
+        memcmp(exported + ENVELOPE_BYTES + VENDOR_AT, s_written + ENVELOPE_BYTES + VENDOR_AT,
+               HEADER_BYTES - VENDOR_AT) == 0;
     if (!own)
     {
         printf("FAIL: %s: the device's own cache not exported\n", what);
@@ -175,14 +176,14 @@ static void TestRefusals(void)
         return;
     }
     CHECK(MakePipeline(device), "a pipeline to cache");
-    CHECK(mrhiGetPipelineCache(device, s_written, sizeof(s_written), &s_writtenSize) ==
+    CHECK(mrhiDevice_GetPipelineCache(device, s_written, sizeof(s_written), &s_writtenSize) ==
                   mrhi_success &&
               s_writtenSize >= ENVELOPE_BYTES + HEADER_BYTES && HeaderSize() >= HEADER_BYTES,
           "the cache written, with Vulkan's header");
     mrhiDestroyDevice(device);
     Restore();
     device = Open(s_cache, s_cacheSize);
-    CHECK(device != nullptr && mrhiGetPipelineCacheOutcome(device) == mrhi_success,
+    CHECK(device != nullptr && mrhiDevice_GetPipelineCacheOutcome(device) == mrhi_success,
           "the cache as written taken");
     mrhiDestroyDevice(device);
 
@@ -219,9 +220,10 @@ int main(void)
     mrhiInstanceNotification record;
     size_t count = 0;
     bool found = s_instance != nullptr &&
-                 mrhiRequestAdapters(s_instance, &request, &searched) == mrhi_success &&
-                 mrhiNextInstanceNotification(s_instance, &record) == mrhi_success &&
-                 mrhiGetAdapters(s_instance, &s_adapter, 1, &count) == mrhi_success && count >= 1;
+                 mrhiInstance_RequestAdapters(s_instance, &request, &searched) == mrhi_success &&
+                 mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success &&
+                 mrhiInstance_GetAdapters(s_instance, &s_adapter, 1, &count) == mrhi_success &&
+                 count >= 1;
     if (found)
     {
         TestRefusals();

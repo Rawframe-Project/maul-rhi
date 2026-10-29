@@ -47,7 +47,7 @@ static mrhiResourceId Begin(mrhiDevice* device, mrhiTextureId texture)
 {
     mrhiFrameDef def = mrhiDefaultFrameDef();
     mrhiResourceId resource = {0};
-    CHECK(mrhiBeginFrame(device, &def) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &def) == mrhi_success &&
               mrhiImportTexture(device, texture, &resource) == mrhi_success,
           "a frame with the texture");
     return resource;
@@ -99,10 +99,10 @@ static void Render(mrhiDevice* device, mrhiResourceId resource, bool depth, mrhi
 // Submits the open frame, the log counting it alone.
 static void Submit(mrhiDevice* device)
 {
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     s_log = (mrhiTestFrameLog){0};
     mrhiRequestId token = {0};
-    CHECK(mrhiSubmitFrame(device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(device, &token) == mrhi_success, "submitted");
 }
 
 // The first frame that imports a texture clears it, every mip and layer
@@ -114,10 +114,10 @@ static void TestFirstFrame(void)
     mrhiTextureId texture = MakeTexture(device, mrhi_formatRgba8Unorm, mrhi_texture2dArray, 3, 2);
     mrhiResourceId resource = Begin(device, texture);
     mrhiPassId pass = Use(device, resource, mrhi_accessCopySource);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     mrhiBarrier barriers[4];
     size_t count = 0;
-    CHECK(mrhiGetFrameBarriers(device, barriers, 4, &count) == mrhi_success && count == 2 &&
+    CHECK(mrhiDevice_GetFrameBarriers(device, barriers, 4, &count) == mrhi_success && count == 2 &&
               barriers[0].pass.index1 == 1 && barriers[0].before == mrhi_stateUndefined &&
               barriers[0].after == mrhi_stateCopyDestination && barriers[0].range.mipCount == 3 &&
               barriers[0].range.layerCount == 2 && barriers[1].pass.index1 == pass.index1 &&
@@ -125,7 +125,7 @@ static void TestFirstFrame(void)
           "the whole texture cleared, then read");
     s_log = (mrhiTestFrameLog){0};
     mrhiRequestId token = {0};
-    CHECK(mrhiSubmitFrame(device, &token) == mrhi_success && s_log.passes == 2 &&
+    CHECK(mrhiDevice_SubmitFrame(device, &token) == mrhi_success && s_log.passes == 2 &&
               s_log.commands == 1,
           "one clear in the library's pass");
     resource = Begin(device, texture);
@@ -212,7 +212,7 @@ static void TestTransient(void)
     def.width = 16;
     def.height = 16;
     mrhiResourceId transient = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiDeclareTexture(device, &def, &transient) == mrhi_success,
           "a transient");
     Render(device, transient, false, mrhi_loadDiscard, mrhi_storeKeep, mrhi_loadClear);
@@ -243,13 +243,14 @@ static void TestBarrierBudget(void)
     mrhiTextureId fresh = MakeTexture(device, mrhi_formatRgba8Unorm, mrhi_texture2d, 1, 1);
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId resources[2] = {{0}, {0}};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportTexture(device, old, &resources[0]) == mrhi_success &&
               mrhiImportTexture(device, fresh, &resources[1]) == mrhi_success,
           "a frame with both");
     (void)Use(device, resources[0], mrhi_accessCopyDestination);
     (void)Use(device, resources[1], mrhi_accessCopySource);
-    CHECK(mrhiCompileFrame(device) == mrhi_errorCapacity && mrhiDropFrame(device) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_errorCapacity &&
+              mrhiDevice_DropFrame(device) == mrhi_success,
           "two barriers of the program's own refused");
     Close(device);
 }
@@ -262,7 +263,7 @@ static uint32_t Fill(mrhiDevice* device, mrhiTextureId texture, mrhiBufferId buf
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId t = {0};
     mrhiResourceId b = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportTexture(device, texture, &t) == mrhi_success &&
               mrhiImportBuffer(device, buffer, &b) == mrhi_success,
           "a frame with both");
@@ -270,14 +271,16 @@ static uint32_t Fill(mrhiDevice* device, mrhiTextureId texture, mrhiBufferId buf
     mrhiPassDef def = mrhiDefaultPassDef();
     mrhiPassId more = {0};
     CHECK(mrhiAddPass(device, &def, &more) == mrhi_errorCapacity, "no other pass");
-    CHECK(mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, pass) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, pass) == mrhi_success,
           "begun");
     uint32_t fitted = 0;
-    while (fitted < 100000 && mrhiClearBuffer(device, pass, b, 0, 4) == mrhi_success)
+    while (fitted < 100000 && mrhiPass_ClearBuffer(device, pass, b, 0, 4) == mrhi_success)
     {
         ++fitted;
     }
-    CHECK(mrhiEndPass(device, pass) == mrhi_success && mrhiDropFrame(device) == mrhi_success,
+    CHECK(mrhiPass_End(device, pass) == mrhi_success &&
+              mrhiDevice_DropFrame(device) == mrhi_success,
           "filled and dropped");
     return fitted;
 }
@@ -300,7 +303,7 @@ static void TestBudgets(void)
     CHECK(mrhiCreateBuffer(device, &bufferDef, &buffer) == mrhi_success, "a buffer");
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId resource = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportBuffer(device, buffer, &resource) == mrhi_success,
           "the buffer's own first frame");
     Submit(device);

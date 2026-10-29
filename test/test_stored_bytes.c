@@ -84,8 +84,8 @@ static mrhiInstance* Instance(mrhiTestAdapter* adapter, mrhiTestDriverDef* drive
     mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
     mrhiRequestId request;
     mrhiInstanceNotification record;
-    CHECK(mrhiRequestAdapters(instance, &search, &request) == mrhi_success &&
-              mrhiNextInstanceNotification(instance, &record) == mrhi_success,
+    CHECK(mrhiInstance_RequestAdapters(instance, &search, &request) == mrhi_success &&
+              mrhiInstance_TakeNotification(instance, &record) == mrhi_success,
           "the adapter found");
     return instance;
 }
@@ -94,7 +94,7 @@ static mrhiDevice* Device(mrhiInstance* instance, mrhiAdapterId* adapterOut)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, &def.adapter, 1, &count) == mrhi_success && count == 1,
+    CHECK(mrhiInstance_GetAdapters(instance, &def.adapter, 1, &count) == mrhi_success && count == 1,
           "one adapter");
     *adapterOut = def.adapter;
     def.allocator = kAllocator;
@@ -102,7 +102,7 @@ static mrhiDevice* Device(mrhiInstance* instance, mrhiAdapterId* adapterOut)
     mrhiRequestId request;
     mrhiInstanceNotification record;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success &&
-              mrhiNextInstanceNotification(instance, &record) == mrhi_success,
+              mrhiInstance_TakeNotification(instance, &record) == mrhi_success,
           "the device ready");
     return device;
 }
@@ -123,7 +123,7 @@ static mrhiShaderId Pipeline(mrhiDevice* device)
     mrhiRequestId request;
     mrhiDeviceNotification record;
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_success &&
-              mrhiNextDeviceNotification(device, &record) == mrhi_success,
+              mrhiDevice_TakeNotification(device, &record) == mrhi_success,
           "the pipeline ready");
     return shader;
 }
@@ -161,7 +161,7 @@ static mrhiComputePipelineId Storage(mrhiDevice* device)
     mrhiRequestId request;
     mrhiDeviceNotification record;
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_success &&
-              mrhiNextDeviceNotification(device, &record) == mrhi_success,
+              mrhiDevice_TakeNotification(device, &record) == mrhi_success,
           "the storage pipeline ready");
     return pipeline;
 }
@@ -233,11 +233,11 @@ static bool Uploads(mrhiDevice* device, mrhiPassId pass, const mrhiResourceId* r
     mrhiTextureCopy to = {.resource = r[T]};
     mrhiTexelLayout layout = {.bytesPerRow = 12};
     mrhiExtent3d size = {3, 3, 1};
-    return OVER_PATTERN(mrhiBeginPass(device, pass)) &&
-           OVER_PATTERN(mrhiWriteBuffer(device, pass, r[A], offset, bytes, 12)) &&
+    return OVER_PATTERN(mrhiPass_Begin(device, pass)) &&
+           OVER_PATTERN(mrhiPass_WriteBuffer(device, pass, r[A], offset, bytes, 12)) &&
            OVER_PATTERN(
-               mrhiWriteTexture(device, pass, &to, bytes, sizeof(bytes), &layout, &size)) &&
-           OVER_PATTERN(mrhiEndPass(device, pass));
+               mrhiPass_WriteTexture(device, pass, &to, bytes, sizeof(bytes), &layout, &size)) &&
+           OVER_PATTERN(mrhiPass_End(device, pass));
 }
 
 // Every copy between A, B, T and U, and a readback of A and of T.
@@ -250,14 +250,14 @@ static bool Copies(mrhiDevice* device, mrhiPassId pass, const mrhiResourceId* r)
     mrhiExtent3d texel = {1, 1, 1};
     mrhiExtent3d all = {3, 3, 1};
     mrhiRequestId read;
-    return OVER_PATTERN(mrhiBeginPass(device, pass)) &&
-           OVER_PATTERN(mrhiCopyBuffer(device, pass, r[A], 0, r[B], 0, 16)) &&
-           OVER_PATTERN(mrhiCopyBufferToTexture(device, pass, &fromA, &toU, &texel)) &&
-           OVER_PATTERN(mrhiCopyTextureToBuffer(device, pass, &fromT, &toB, &texel)) &&
-           OVER_PATTERN(mrhiCopyTexture(device, pass, &fromT, &toU, &texel)) &&
-           OVER_PATTERN(mrhiReadBuffer(device, pass, r[A], 0, 16, &read)) &&
-           OVER_PATTERN(mrhiReadTexture(device, pass, &fromT, &all, &read)) &&
-           OVER_PATTERN(mrhiEndPass(device, pass));
+    return OVER_PATTERN(mrhiPass_Begin(device, pass)) &&
+           OVER_PATTERN(mrhiPass_CopyBuffer(device, pass, r[A], 0, r[B], 0, 16)) &&
+           OVER_PATTERN(mrhiPass_CopyBufferToTexture(device, pass, &fromA, &toU, &texel)) &&
+           OVER_PATTERN(mrhiPass_CopyTextureToBuffer(device, pass, &fromT, &toB, &texel)) &&
+           OVER_PATTERN(mrhiPass_CopyTexture(device, pass, &fromT, &toU, &texel)) &&
+           OVER_PATTERN(mrhiPass_ReadBuffer(device, pass, r[A], 0, 16, &read)) &&
+           OVER_PATTERN(mrhiPass_ReadTexture(device, pass, &fromT, &all, &read)) &&
+           OVER_PATTERN(mrhiPass_End(device, pass));
 }
 
 // A dispatch with A, B and U bound to the storage table.
@@ -272,11 +272,11 @@ static bool Dispatch(mrhiDevice* device, mrhiPassId pass, const mrhiResourceId* 
          .viewKind = mrhi_texture2d,
          .range = {.mipCount = 1, .layerCount = 1}},
     };
-    return OVER_PATTERN(mrhiBeginPass(device, pass)) &&
-           OVER_PATTERN(mrhiSetComputePipeline(device, pass, pipeline)) &&
-           OVER_PATTERN(mrhiSetBindings(device, pass, 0, bindings, 3)) &&
-           OVER_PATTERN(mrhiDispatch(device, pass, 1, 1, 1)) &&
-           OVER_PATTERN(mrhiEndPass(device, pass));
+    return OVER_PATTERN(mrhiPass_Begin(device, pass)) &&
+           OVER_PATTERN(mrhiPass_SetComputePipeline(device, pass, pipeline)) &&
+           OVER_PATTERN(mrhiPass_SetBindings(device, pass, 0, bindings, 3)) &&
+           OVER_PATTERN(mrhiPass_Dispatch(device, pass, 1, 1, 1)) &&
+           OVER_PATTERN(mrhiPass_End(device, pass));
 }
 
 // A frame of uploads with A's at an offset, every copy and readback,
@@ -287,7 +287,7 @@ static void Frame(mrhiDevice* device, uint64_t offset, mrhiComputePipelineId pip
     Make(device, &objects);
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
     mrhiResourceId r[RESOURCES];
-    CHECK(mrhiBeginFrame(device, &frameDef) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frameDef) == mrhi_success &&
               mrhiImportBuffer(device, objects.buffers[0], &r[A]) == mrhi_success &&
               mrhiImportBuffer(device, objects.buffers[1], &r[B]) == mrhi_success &&
               mrhiImportTexture(device, objects.textures[0], &r[T]) == mrhi_success &&
@@ -305,14 +305,14 @@ static void Frame(mrhiDevice* device, uint64_t offset, mrhiComputePipelineId pip
     mrhiPassId second = Pass(device, mrhi_passTransfer, copies, 4);
     mrhiPassId third = Pass(device, mrhi_passGraphics, storage, 3);
     mrhiRequestId token;
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     CHECK(Uploads(device, first, r, offset), "the uploads");
     CHECK(Copies(device, second, r), "the copies");
     CHECK(Dispatch(device, third, r, pipeline), "the dispatch");
-    CHECK(mrhiSubmitFrame(device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(device, &token) == mrhi_success, "submitted");
     mrhiDeviceNotification record;
     bool done = false;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
         done = done || record.kind == mrhi_deviceFrameDone;
     }
@@ -343,22 +343,22 @@ static void Write(int pattern, uint64_t offset, Written* written)
     mrhiDevice* device = Device(instance, &id);
     memset(written, pattern, sizeof(*written));
     written->log = (mrhiTestFrameLog){0};
-    CHECK(mrhiGetAdapterInfo(instance, id, &written->adapter) == mrhi_success, "the info");
+    CHECK(mrhiAdapter_GetInfo(instance, id, &written->adapter) == mrhi_success, "the info");
     mrhiShaderId shader = Pipeline(device);
-    CHECK(mrhiGetShaderInfo(device, shader, &written->shader) == mrhi_success, "the shader's");
-    CHECK(mrhiGetPipelineCache(device, nullptr, 0, &written->cacheSize) == mrhi_success &&
+    CHECK(mrhiShader_GetInfo(device, shader, &written->shader) == mrhi_success, "the shader's");
+    CHECK(mrhiDevice_GetPipelineCache(device, nullptr, 0, &written->cacheSize) == mrhi_success &&
               written->cacheSize + TAIL <= CACHE_ROOM,
           "the cache's size");
-    CHECK(mrhiGetPipelineCache(device, written->cache, CACHE_ROOM, &written->cacheSize) ==
+    CHECK(mrhiDevice_GetPipelineCache(device, written->cache, CACHE_ROOM, &written->cacheSize) ==
               mrhi_success,
           "the cache");
     Frame(device, offset, Storage(device));
     lose = true;
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
     }
-    CHECK(mrhiGetDeviceLossReport(device, &written->loss) == mrhi_success, "the loss report");
+    CHECK(mrhiDevice_GetLossReport(device, &written->loss) == mrhi_success, "the loss report");
     mrhiDestroyDevice(device);
     mrhiDestroyInstance(instance);
 }

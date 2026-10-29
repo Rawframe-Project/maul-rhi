@@ -288,7 +288,7 @@ static void TestRefusalsAndState(void)
     def.texture = (mrhiTextureId){1, 1};
     CHECK(mrhiCreateView(device, &def, &view) == mrhi_errorState, "not ready");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(s_instance, &record) == mrhi_success, "ready");
+    CHECK(mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success, "ready");
     def.texture = MakeTexture(device, mrhi_texture2d, mrhi_formatRgba8Unorm, 1, 1, kSampled);
     CHECK(mrhiCreateView(device, &def, &view) == mrhi_errorPlatform, "the driver fails");
     CHECK(mrhiCreateView(device, &def, &view) == mrhi_errorPlatform, "no slot lost");
@@ -311,7 +311,7 @@ int main(void)
     TestManyViews();
     TestRefusalsAndState();
     s_instance = instance;
-    CHECK(mrhiGetDeviceMisuse(s_device) > 0, "the refusals were counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) > 0, "the refusals were counted");
     Close(s_device);
     TestEnds();
     return s_failures == 0 ? 0 : 1;

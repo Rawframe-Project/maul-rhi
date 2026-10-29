@@ -19,7 +19,7 @@ A source the build's driver cannot use is `mrhi_errorUnsupported`. A surface las
 
 ## What an adapter can do with it
 
-`mrhiGetSurfaceCaps` tells, per adapter, whether it presents to the surface at all, and if so:
+`mrhiSurface_GetCaps` tells, per adapter, whether it presents to the surface at all, and if so:
 
 - the colors it offers, preferred first, each a format with its primaries, transfer function and range given separately;
 - the present modes, a set of `mrhiPresentMode` bits (`mrhi_presentFifoBit`, `mrhi_presentMailboxBit`, `mrhi_presentImmediateBit`), each 1 shifted left by its mode;
@@ -33,13 +33,13 @@ Every presenting adapter offers fifo, opaque alpha, the render target usage and 
 
 ## Configuring
 
-`mrhiConfigureSurface` configures a surface on a device with a color the caps report (or its twin, as above), its usages, a nonzero size, one present mode and one alpha mode. Anything the caps do not offer is refused, never quietly replaced.
+`mrhiDevice_ConfigureSurface` configures a surface on a device with a color the caps report (or its twin, as above), its usages, a nonzero size, one present mode and one alpha mode. Anything the caps do not offer is refused, never quietly replaced.
 
 - A surface is configured on one device at a time; another device finds it in `mrhi_errorState`.
 - Configuring again reconfigures. A refused reconfiguration keeps the surface configured as it was. Only a platform call that fails after retiring the old swapchain leaves the surface unconfigured: Vulkan retires it whatever `vkCreateSwapchainKHR` answers, and D3D12 releases it first, as a window holds one swapchain.
 - Where the window fixes its images' size (Vulkan on Win32 and X11), a size other than the window's is `mrhi_errorOutOfDate`: configure again at the window's size. Elsewhere the program's size is kept and the platform scales the images to the window.
 - When the window's pixel size changes, configure again at the new size.
-- `mrhiUnconfigureSurface` ends a configuration. Destroying the surface or the device ends it too.
+- `mrhiSurface_Unconfigure` ends a configuration. Destroying the surface or the device ends it too.
 
 ## Presenting
 

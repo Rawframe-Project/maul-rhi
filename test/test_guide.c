@@ -44,10 +44,10 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
     mrhiInstanceNotification record;
     mrhiAdapterId adapter;
     size_t count = 0;
-    if (mrhiRequestAdapters(instance, &request, &searched) != mrhi_success ||
-        mrhiNextInstanceNotification(instance, &record) != mrhi_success ||
+    if (mrhiInstance_RequestAdapters(instance, &request, &searched) != mrhi_success ||
+        mrhiInstance_TakeNotification(instance, &record) != mrhi_success ||
         record.outcome != mrhi_success ||
-        mrhiGetAdapters(instance, &adapter, 1, &count) != mrhi_success || count == 0)
+        mrhiInstance_GetAdapters(instance, &adapter, 1, &count) != mrhi_success || count == 0)
     {
         return false;
     }
@@ -60,7 +60,7 @@ static bool OpenDevice(mrhiInstance** instanceOut, mrhiDevice** deviceOut)
         return false;
     }
     // mrhi_instanceDeviceReady answers the opening.
-    return mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+    return mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
            record.kind == mrhi_instanceDeviceReady && record.outcome == mrhi_success;
 }
 
@@ -71,7 +71,7 @@ static bool DrawAndRead(mrhiDevice* device, mrhiGraphicsPipelineId pipeline, con
                         mrhiRequestId* pixelsOut, mrhiRequestId* tokenOut)
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    if (mrhiBeginFrame(device, &frame) != mrhi_success)
+    if (mrhiDevice_BeginFrame(device, &frame) != mrhi_success)
     {
         return false;
     }
@@ -100,25 +100,26 @@ static bool DrawAndRead(mrhiDevice* device, mrhiGraphicsPipelineId pipeline, con
     readDef.neverCull = true;
     mrhiPassId reading = {0};
     built = built && mrhiAddPass(device, &readDef, &reading) == mrhi_success &&
-            mrhiCompileFrame(device) == mrhi_success;
+            mrhiDevice_CompileFrame(device) == mrhi_success;
 
     const mrhiTextureCopy source = {.resource = target};
     const mrhiExtent3d extent = {64, 64, 1};
-    bool recorded = built && mrhiBeginPass(device, draw) == mrhi_success &&
-                    mrhiSetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
-                    mrhiSetRootBlock(device, draw, 0, color, 4 * sizeof(float)) == mrhi_success &&
-                    mrhiDraw(device, draw, 3, 1, 0, 0) == mrhi_success &&
-                    mrhiEndPass(device, draw) == mrhi_success &&
-                    mrhiBeginPass(device, reading) == mrhi_success &&
-                    mrhiReadTexture(device, reading, &source, &extent, pixelsOut) == mrhi_success &&
-                    mrhiEndPass(device, reading) == mrhi_success;
+    bool recorded =
+        built && mrhiPass_Begin(device, draw) == mrhi_success &&
+        mrhiPass_SetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
+        mrhiPass_SetRootBlock(device, draw, 0, color, 4 * sizeof(float)) == mrhi_success &&
+        mrhiPass_Draw(device, draw, 3, 1, 0, 0) == mrhi_success &&
+        mrhiPass_End(device, draw) == mrhi_success &&
+        mrhiPass_Begin(device, reading) == mrhi_success &&
+        mrhiPass_ReadTexture(device, reading, &source, &extent, pixelsOut) == mrhi_success &&
+        mrhiPass_End(device, reading) == mrhi_success;
     if (!recorded)
     {
         // Nothing of the frame runs.
-        (void)mrhiDropFrame(device);
+        (void)mrhiDevice_DropFrame(device);
         return false;
     }
-    return mrhiSubmitFrame(device, tokenOut) == mrhi_success;
+    return mrhiDevice_SubmitFrame(device, tokenOut) == mrhi_success;
 }
 
 // The pipeline of the samples' triangle, which draws in its root block's

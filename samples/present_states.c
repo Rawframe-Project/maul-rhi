@@ -30,7 +30,7 @@ static mrhiResult Configure(Sample* sample, const SampleWindow* window, mrhiSurf
     config.color = color;
     config.width = width;
     config.height = height;
-    return mrhiConfigureSurface(sample->device, &config);
+    return mrhiDevice_ConfigureSurface(sample->device, &config);
 }
 
 // Opens a frame and acquires the window's image: the acquire's outcome.
@@ -38,11 +38,12 @@ static mrhiResult Configure(Sample* sample, const SampleWindow* window, mrhiSurf
 static mrhiResult Acquire(Sample* sample, const SampleWindow* window, mrhiResourceId* imageOut)
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    SampleCheck(sample, mrhiBeginFrame(sample->device, &frame) == mrhi_success, "a frame");
+    SampleCheck(sample, mrhiDevice_BeginFrame(sample->device, &frame) == mrhi_success, "a frame");
     mrhiResult acquired = mrhiAcquireSurfaceImage(sample->device, window->surface, imageOut);
     if (acquired != mrhi_success && acquired != mrhi_suboptimal)
     {
-        SampleCheck(sample, mrhiDropFrame(sample->device) == mrhi_success, "the frame dropped");
+        SampleCheck(sample, mrhiDevice_DropFrame(sample->device) == mrhi_success,
+                    "the frame dropped");
     }
     return acquired;
 }
@@ -62,10 +63,10 @@ static mrhiRequestId ClearAndSubmit(Sample* sample, mrhiResourceId image)
     mrhiRequestId token = {0};
     SampleCheck(sample,
                 mrhiAddPass(sample->device, &def, &pass) == mrhi_success &&
-                    mrhiCompileFrame(sample->device) == mrhi_success &&
-                    mrhiBeginPass(sample->device, pass) == mrhi_success &&
-                    mrhiEndPass(sample->device, pass) == mrhi_success &&
-                    mrhiSubmitFrame(sample->device, &token) == mrhi_success,
+                    mrhiDevice_CompileFrame(sample->device) == mrhi_success &&
+                    mrhiPass_Begin(sample->device, pass) == mrhi_success &&
+                    mrhiPass_End(sample->device, pass) == mrhi_success &&
+                    mrhiDevice_SubmitFrame(sample->device, &token) == mrhi_success,
                 "the image cleared and submitted");
     return token;
 }
@@ -104,7 +105,7 @@ static void Resize(Sample* sample, SampleWindow* window, mrhiSurfaceColor color)
         {
             // A suboptimal image may still be presented; this program
             // configures again first.
-            SampleCheck(sample, mrhiDropFrame(sample->device) == mrhi_success,
+            SampleCheck(sample, mrhiDevice_DropFrame(sample->device) == mrhi_success,
                         "the image given back");
         }
         printf("frame %d after the resize: the acquire answered %d\n", frame, (int)acquired);
@@ -135,7 +136,7 @@ int main(void)
     mrhiSurfaceCaps caps;
     mrhiSurfaceColor color = {0};
     SampleCheck(&sample,
-                mrhiGetSurfaceCaps(sample.instance, window.surface, sample.adapter, &caps) ==
+                mrhiSurface_GetCaps(sample.instance, window.surface, sample.adapter, &caps) ==
                         mrhi_success &&
                     mrhiSuggestSurfaceColor(&caps, &caps.colors[0], &color) == mrhi_success,
                 "the preferred color");
@@ -150,11 +151,11 @@ int main(void)
     }
     SampleCheck(&sample,
                 Acquire(&sample, &window, &image) == mrhi_success &&
-                    mrhiDropFrame(sample.device) == mrhi_success,
+                    mrhiDevice_DropFrame(sample.device) == mrhi_success,
                 "an image given back with its frame");
     SampleCheck(&sample, Present(&sample, &window), "the image taken again");
     Resize(&sample, &window, color);
-    SampleCheck(&sample, mrhiUnconfigureSurface(sample.device, window.surface) == mrhi_success,
+    SampleCheck(&sample, mrhiSurface_Unconfigure(sample.device, window.surface) == mrhi_success,
                 "unconfigured");
     SampleCheck(&sample, Acquire(&sample, &window, &image) == mrhi_errorState,
                 "no image once unconfigured");

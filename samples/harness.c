@@ -27,12 +27,12 @@
 
 static mrhiResult NextInstance(mrhiInstance* instance, mrhiInstanceNotification* recordOut)
 {
-    mrhiResult status = mrhiNextInstanceNotification(instance, recordOut);
+    mrhiResult status = mrhiInstance_TakeNotification(instance, recordOut);
 #ifdef __EMSCRIPTEN__
     for (int slept = 0; status == mrhi_empty && slept < WAIT_SLEEPS; ++slept)
     {
         emscripten_sleep(1);
-        status = mrhiNextInstanceNotification(instance, recordOut);
+        status = mrhiInstance_TakeNotification(instance, recordOut);
     }
 #endif
     return status;
@@ -40,12 +40,12 @@ static mrhiResult NextInstance(mrhiInstance* instance, mrhiInstanceNotification*
 
 static mrhiResult NextDevice(mrhiDevice* device, mrhiDeviceNotification* recordOut)
 {
-    mrhiResult status = mrhiNextDeviceNotification(device, recordOut);
+    mrhiResult status = mrhiDevice_TakeNotification(device, recordOut);
 #ifdef __EMSCRIPTEN__
     for (int slept = 0; status == mrhi_empty && slept < WAIT_SLEEPS; ++slept)
     {
         emscripten_sleep(1);
-        status = mrhiNextDeviceNotification(device, recordOut);
+        status = mrhiDevice_TakeNotification(device, recordOut);
     }
 #endif
     return status;
@@ -70,10 +70,11 @@ static bool FindAdapter(Sample* sample)
     mrhiRequestId id = {0};
     mrhiInstanceNotification record;
     size_t count = 0;
-    return mrhiRequestAdapters(sample->instance, &request, &id) == mrhi_success &&
+    return mrhiInstance_RequestAdapters(sample->instance, &request, &id) == mrhi_success &&
            NextInstance(sample->instance, &record) == mrhi_success &&
            record.outcome == mrhi_success &&
-           mrhiGetAdapters(sample->instance, &sample->adapter, 1, &count) == mrhi_success &&
+           mrhiInstance_GetAdapters(sample->instance, &sample->adapter, 1, &count) ==
+               mrhi_success &&
            count > 0;
 }
 
@@ -202,12 +203,12 @@ mrhiComputePipelineId SampleCompute(Sample* sample, const mrhiComputePipelineDef
 // Waits for a frame to finish.
 static mrhiResult WaitFrame(mrhiDevice* device, mrhiRequestId token)
 {
-    mrhiResult status = mrhiWaitFrame(device, token, WAIT_NS);
+    mrhiResult status = mrhiRequest_WaitFrame(device, token, WAIT_NS);
 #ifdef __EMSCRIPTEN__
     for (int slept = 0; status == mrhi_timeout && slept < WAIT_SLEEPS; ++slept)
     {
         emscripten_sleep(1);
-        status = mrhiWaitFrame(device, token, 0);
+        status = mrhiRequest_WaitFrame(device, token, 0);
     }
 #endif
     return status;
@@ -218,7 +219,7 @@ bool SampleWait(Sample* sample, mrhiRequestId token)
     bool ok =
         SampleCheck(sample, WaitFrame(sample->device, token) == mrhi_success, "the frame finished");
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(sample->device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(sample->device, &record) == mrhi_success)
     {
         ok = SampleCheck(sample, record.outcome == mrhi_success, "an answer a success") && ok;
     }
@@ -228,7 +229,7 @@ bool SampleWait(Sample* sample, mrhiRequestId token)
 bool SampleFinish(Sample* sample)
 {
     mrhiRequestId token = {0};
-    return SampleCheck(sample, mrhiSubmitFrame(sample->device, &token) == mrhi_success,
+    return SampleCheck(sample, mrhiDevice_SubmitFrame(sample->device, &token) == mrhi_success,
                        "the frame submitted") &&
            SampleWait(sample, token);
 }
@@ -237,7 +238,7 @@ bool SampleTake(Sample* sample, mrhiRequestId request, void* bytes, size_t size)
 {
     size_t taken = 0;
     return SampleCheck(sample,
-                       mrhiTakeReadback(sample->device, request, bytes, size, &taken) ==
+                       mrhiRequest_TakeReadback(sample->device, request, bytes, size, &taken) ==
                                mrhi_success &&
                            taken == size,
                        "a readback's bytes");

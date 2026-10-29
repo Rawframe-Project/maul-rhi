@@ -38,7 +38,7 @@ static void TestDevice(void)
 {
     mrhiDevice* device = Open(2);
     mrhiDiagnostic record = {0};
-    CHECK(mrhiNextDeviceDiagnostic(device, &record) == mrhi_empty, "none yet");
+    CHECK(mrhiDevice_TakeDiagnostic(device, &record) == mrhi_empty, "none yet");
     Refuse(device, true);
     Refuse(device, true);
     Refuse(device, false);
@@ -47,23 +47,23 @@ static void TestDevice(void)
     mrhiBufferId buffer;
     CHECK(mrhiCreateBuffer(device, nullptr, &buffer) == mrhi_errorInvalid, "a third check");
     Refuse(device, false);
-    CHECK(mrhiGetDeviceMisuse(device) == 5, "every refusal counted");
-    CHECK(mrhiNextDeviceDiagnostic(device, &record) == mrhi_success &&
+    CHECK(mrhiDevice_GetMisuse(device) == 5, "every refusal counted");
+    CHECK(mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success &&
               record.code == mrhi_diagnosticBufferSize && record.count == 2,
           "the first check's two refusals, one record");
-    CHECK(mrhiNextDeviceDiagnostic(device, &record) == mrhi_success &&
+    CHECK(mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success &&
               record.code == mrhi_diagnosticBufferUsage && record.count == 2,
           "the second's");
-    CHECK(mrhiNextDeviceDiagnostic(device, &record) == mrhi_empty, "the third's dropped");
+    CHECK(mrhiDevice_TakeDiagnostic(device, &record) == mrhi_empty, "the third's dropped");
     // Drained, the next refusal takes a record of its own again.
     Refuse(device, false);
-    CHECK(mrhiNextDeviceDiagnostic(device, &record) == mrhi_success && record.count == 1,
+    CHECK(mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success && record.count == 1,
           "a new record after draining");
-    CHECK(mrhiNextDeviceDiagnostic(device, nullptr) == mrhi_errorInvalid &&
-              mrhiNextDeviceDiagnostic(device, &record) == mrhi_success &&
+    CHECK(mrhiDevice_TakeDiagnostic(device, nullptr) == mrhi_errorInvalid &&
+              mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success &&
               record.code == mrhi_diagnosticNullArgument,
           "no record pointer, itself recorded");
-    CHECK(mrhiNextDeviceDiagnostic(nullptr, &record) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiDevice_TakeDiagnostic(nullptr, &record) == mrhi_errorInvalid, "no device");
     Close(device);
 }
 
@@ -72,8 +72,8 @@ static void TestNoneByDefault(void)
     mrhiDevice* device = Open(0);
     Refuse(device, true);
     mrhiDiagnostic record = {0};
-    CHECK(mrhiGetDeviceMisuse(device) == 1 &&
-              mrhiNextDeviceDiagnostic(device, &record) == mrhi_empty,
+    CHECK(mrhiDevice_GetMisuse(device) == 1 &&
+              mrhiDevice_TakeDiagnostic(device, &record) == mrhi_empty,
           "counted, not recorded");
     CHECK(mrhiDefaultDeviceDef().budgets.diagnostics == 0 &&
               mrhiDefaultInstanceDef().limits.diagnostics == 0,
@@ -92,20 +92,21 @@ static void TestInstance(void)
     mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
     search.cookie = 0;
     mrhiRequestId request;
-    CHECK(mrhiRequestAdapters(instance, &search, &request) == mrhi_errorInvalid, "no cookie");
-    CHECK(mrhiGetAdapters(instance, nullptr, 1, nullptr) == mrhi_errorInvalid, "no count");
+    CHECK(mrhiInstance_RequestAdapters(instance, &search, &request) == mrhi_errorInvalid,
+          "no cookie");
+    CHECK(mrhiInstance_GetAdapters(instance, nullptr, 1, nullptr) == mrhi_errorInvalid, "no count");
     mrhiDiagnostic record = {0};
-    CHECK(mrhiNextInstanceDiagnostic(instance, &record) == mrhi_success &&
+    CHECK(mrhiInstance_TakeDiagnostic(instance, &record) == mrhi_success &&
               record.code == mrhi_diagnosticAdapterRequestDef && record.count == 1,
           "the request def's check");
-    CHECK(mrhiNextInstanceDiagnostic(instance, &record) == mrhi_success &&
+    CHECK(mrhiInstance_TakeDiagnostic(instance, &record) == mrhi_success &&
               record.code == mrhi_diagnosticNullArgument,
           "then the missing pointer");
-    CHECK(mrhiNextInstanceDiagnostic(instance, &record) == mrhi_empty, "drained");
-    CHECK(mrhiNextInstanceDiagnostic(instance, nullptr) == mrhi_errorInvalid &&
-              mrhiGetInstanceMisuse(instance) == 3,
+    CHECK(mrhiInstance_TakeDiagnostic(instance, &record) == mrhi_empty, "drained");
+    CHECK(mrhiInstance_TakeDiagnostic(instance, nullptr) == mrhi_errorInvalid &&
+              mrhiInstance_GetMisuse(instance) == 3,
           "no record pointer");
-    CHECK(mrhiNextInstanceDiagnostic(nullptr, &record) == mrhi_errorInvalid, "no instance");
+    CHECK(mrhiInstance_TakeDiagnostic(nullptr, &record) == mrhi_errorInvalid, "no instance");
     mrhiDestroyInstance(instance);
 }
 
@@ -157,7 +158,7 @@ static void TestDeviceDef(void)
         mrhiRequestId request;
         mrhiDiagnostic record = {0};
         CHECK(mrhiCreateDevice(instance, &cases[i].def, &device, &request) == mrhi_errorInvalid &&
-                  mrhiNextInstanceDiagnostic(instance, &record) == mrhi_success &&
+                  mrhiInstance_TakeDiagnostic(instance, &record) == mrhi_success &&
                   record.code == cases[i].code,
               cases[i].what);
     }
@@ -199,7 +200,7 @@ static void TestTextureShape(void)
         mrhiTextureId texture;
         mrhiDiagnostic record = {0};
         CHECK(mrhiCreateTexture(device, &cases[i].def, &texture) == mrhi_errorInvalid &&
-                  mrhiNextDeviceDiagnostic(device, &record) == mrhi_success &&
+                  mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success &&
                   record.code == cases[i].code,
               cases[i].what);
     }
@@ -208,10 +209,10 @@ static void TestTextureShape(void)
 
 static void TestTexts(void)
 {
-    const char* text = mrhiDiagnosticText(mrhi_diagnosticBufferSize);
+    const char* text = mrhiGetDiagnosticText(mrhi_diagnosticBufferSize);
     CHECK(strcmp(text, "A buffer size of zero or not a multiple of 4.") == 0, "a code's text");
-    CHECK(strcmp(mrhiDiagnosticText(0), "An unknown diagnostic code.") == 0, "zero");
-    CHECK(strcmp(mrhiDiagnosticText(0xFFFFu), "An unknown diagnostic code.") == 0, "past them");
+    CHECK(strcmp(mrhiGetDiagnosticText(0), "An unknown diagnostic code.") == 0, "zero");
+    CHECK(strcmp(mrhiGetDiagnosticText(0xFFFFu), "An unknown diagnostic code.") == 0, "past them");
 }
 
 #ifdef TEST_THREADS
@@ -246,11 +247,11 @@ static void TestThreads(void)
     }
     uint64_t total = 0;
     mrhiDiagnostic record;
-    while (mrhiNextDeviceDiagnostic(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success)
     {
         total += record.count;
     }
-    CHECK(total == THREADS * REFUSALS && mrhiGetDeviceMisuse(device) == total,
+    CHECK(total == THREADS * REFUSALS && mrhiDevice_GetMisuse(device) == total,
           "every refusal in a record");
     Close(device);
 }

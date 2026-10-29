@@ -129,7 +129,7 @@ static mrhiResult CopyBuffers(const BufferCopy* c)
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId source = {0};
     mrhiResourceId destination = {0};
-    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
               mrhiImportBuffer(s_device, from, &source) == mrhi_success &&
               (c->same || mrhiImportBuffer(s_device, to, &destination) == mrhi_success),
           "the buffers in a frame");
@@ -145,13 +145,13 @@ static mrhiResult CopyBuffers(const BufferCopy* c)
     mrhiResult status = mrhiAddPass(s_device, &def, &pass);
     if (status == mrhi_success)
     {
-        CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
-                  mrhiBeginPass(s_device, pass) == mrhi_success,
+        CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+                  mrhiPass_Begin(s_device, pass) == mrhi_success,
               "the pass begun");
-        status = mrhiCopyBuffer(s_device, pass, source, c->sourceOffset, destination,
-                                c->destinationOffset, c->size);
+        status = mrhiPass_CopyBuffer(s_device, pass, source, c->sourceOffset, destination,
+                                     c->destinationOffset, c->size);
     }
-    CHECK(mrhiDropFrame(s_device) == mrhi_success &&
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
               mrhiDestroyBuffer(s_device, from) == mrhi_success &&
               (c->same || mrhiDestroyBuffer(s_device, to) == mrhi_success),
           "dropped");
@@ -282,7 +282,7 @@ static mrhiResult CopyTextures(const TextureShape* fromShape, const TextureShape
     mrhiTextureId source = MakeTexture(fromShape);
     mrhiTextureId destination = toShape == nullptr ? source : MakeTexture(toShape);
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
               mrhiImportTexture(s_device, source, &from.resource) == mrhi_success &&
               (toShape == nullptr ||
                mrhiImportTexture(s_device, destination, &to.resource) == mrhi_success),
@@ -306,12 +306,12 @@ static mrhiResult CopyTextures(const TextureShape* fromShape, const TextureShape
     mrhiResult status = mrhiAddPass(s_device, &def, &pass);
     if (status == mrhi_success)
     {
-        CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
-                  mrhiBeginPass(s_device, pass) == mrhi_success,
+        CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+                  mrhiPass_Begin(s_device, pass) == mrhi_success,
               "the pass begun");
-        status = mrhiCopyTexture(s_device, pass, &from, &to, &size);
+        status = mrhiPass_CopyTexture(s_device, pass, &from, &to, &size);
     }
-    CHECK(mrhiDropFrame(s_device) == mrhi_success &&
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
               mrhiDestroyTexture(s_device, source) == mrhi_success &&
               (toShape == nullptr || mrhiDestroyTexture(s_device, destination) == mrhi_success),
           "dropped");
@@ -599,7 +599,7 @@ static mrhiResult RunTransfer(const TransferCase* c)
     mrhiTextureCopy at = c->at;
     mrhiResourceId b = {0};
     CHECK(
-        mrhiBeginFrame(s_device, &frame) == mrhi_success &&
+        mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
             mrhiImportTexture(s_device, texture, &at.resource) == mrhi_success &&
             (c->method == WRITE_TEXTURE || mrhiImportBuffer(s_device, buffer, &b) == mrhi_success),
         "a frame of them");
@@ -616,8 +616,8 @@ static mrhiResult RunTransfer(const TransferCase* c)
     status = mrhiAddPass(s_device, &def, &pass);
     if (status == mrhi_success)
     {
-        CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
-                  mrhiBeginPass(s_device, pass) == mrhi_success,
+        CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+                  mrhiPass_Begin(s_device, pass) == mrhi_success,
               "the pass begun");
         const mrhiBufferCopy side = {.resource = b,
                                      .offset = c->offset,
@@ -628,18 +628,18 @@ static mrhiResult RunTransfer(const TransferCase* c)
         switch (c->method)
         {
         case WRITE_TEXTURE:
-            status = mrhiWriteTexture(s_device, pass, &at, dataSize > 0 ? s_data : nullptr,
-                                      dataSize, &layout, &c->size);
+            status = mrhiPass_WriteTexture(s_device, pass, &at, dataSize > 0 ? s_data : nullptr,
+                                           dataSize, &layout, &c->size);
             break;
         case BUFFER_TO_TEXTURE:
-            status = mrhiCopyBufferToTexture(s_device, pass, &side, &at, &c->size);
+            status = mrhiPass_CopyBufferToTexture(s_device, pass, &side, &at, &c->size);
             break;
         case TEXTURE_TO_BUFFER:
-            status = mrhiCopyTextureToBuffer(s_device, pass, &at, &side, &c->size);
+            status = mrhiPass_CopyTextureToBuffer(s_device, pass, &at, &side, &c->size);
             break;
         }
     }
-    CHECK(mrhiDropFrame(s_device) == mrhi_success &&
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
               mrhiDestroyTexture(s_device, texture) == mrhi_success &&
               (c->method == WRITE_TEXTURE || mrhiDestroyBuffer(s_device, buffer) == mrhi_success),
           "dropped");
@@ -653,7 +653,7 @@ static mrhiResult Clear(uint64_t bufferSize, mrhiBufferUsage usage, uint64_t off
     mrhiBufferId buffer = MakeBuffer(bufferSize, usage);
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId resource = {0};
-    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
               mrhiImportBuffer(s_device, buffer, &resource) == mrhi_success,
           "a frame of the buffer");
     const mrhiAccess access = Whole(resource, mrhi_accessCopyDestination);
@@ -666,12 +666,12 @@ static mrhiResult Clear(uint64_t bufferSize, mrhiBufferUsage usage, uint64_t off
     mrhiResult status = mrhiAddPass(s_device, &def, &pass);
     if (status == mrhi_success)
     {
-        CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
-                  mrhiBeginPass(s_device, pass) == mrhi_success,
+        CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+                  mrhiPass_Begin(s_device, pass) == mrhi_success,
               "the pass begun");
-        status = mrhiClearBuffer(s_device, pass, resource, offset, size);
+        status = mrhiPass_ClearBuffer(s_device, pass, resource, offset, size);
     }
-    CHECK(mrhiDropFrame(s_device) == mrhi_success &&
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
               mrhiDestroyBuffer(s_device, buffer) == mrhi_success,
           "dropped");
     return status;
@@ -1030,7 +1030,7 @@ static mrhiLimits s_limits;
 static void Answered(void)
 {
     mrhiDeviceNotification record;
-    CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_success &&
+    CHECK(mrhiDevice_TakeNotification(s_device, &record) == mrhi_success &&
               record.outcome == mrhi_success,
           "a pipeline ready");
 }
@@ -1069,7 +1069,7 @@ static void MakePipelines(void)
     target.usage = mrhi_textureRenderTarget;
     CHECK(mrhiCreateTexture(s_device, &target, &s_target) == mrhi_success, "the target");
     s_index = MakeBuffer(16, mrhi_bufferIndex);
-    CHECK(mrhiGetDeviceLimits(s_device, &s_limits) == mrhi_success, "the limits");
+    CHECK(mrhiDevice_GetLimits(s_device, &s_limits) == mrhi_success, "the limits");
 }
 
 // A pass of a draw or dispatch case: a frame of the case's buffer,
@@ -1088,7 +1088,7 @@ static mrhiResult BeginCase(mrhiBufferId buffer, mrhiAccessKind kind, bool rende
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId target = {0};
-    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
               mrhiImportBuffer(s_device, buffer, &caseOut->buffer) == mrhi_success &&
               mrhiImportBuffer(s_device, s_index, &caseOut->index) == mrhi_success &&
               mrhiImportTexture(s_device, s_target, &target) == mrhi_success,
@@ -1107,10 +1107,10 @@ static mrhiResult BeginCase(mrhiBufferId buffer, mrhiAccessKind kind, bool rende
     mrhiResult status = mrhiAddPass(s_device, &def, &caseOut->pass);
     if (status == mrhi_success)
     {
-        CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
-                  mrhiBeginPass(s_device, caseOut->pass) == mrhi_success &&
-                  (render ? mrhiSetGraphicsPipeline(s_device, caseOut->pass, s_graphics)
-                          : mrhiSetComputePipeline(s_device, caseOut->pass, s_compute)) ==
+        CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+                  mrhiPass_Begin(s_device, caseOut->pass) == mrhi_success &&
+                  (render ? mrhiPass_SetGraphicsPipeline(s_device, caseOut->pass, s_graphics)
+                          : mrhiPass_SetComputePipeline(s_device, caseOut->pass, s_compute)) ==
                       mrhi_success,
               "the pass begun");
     }
@@ -1119,7 +1119,7 @@ static mrhiResult BeginCase(mrhiBufferId buffer, mrhiAccessKind kind, bool rende
 
 static void EndCase(mrhiBufferId buffer)
 {
-    CHECK(mrhiDropFrame(s_device) == mrhi_success &&
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
               mrhiDestroyBuffer(s_device, buffer) == mrhi_success,
           "dropped");
 }
@@ -1147,14 +1147,14 @@ static mrhiResult DrawIndirect(uint64_t size, mrhiBufferUsage usage, bool indexe
     mrhiResult status = BeginCase(buffer, mrhi_accessIndirect, true, &c);
     if (status == mrhi_success && indexed)
     {
-        CHECK(mrhiSetIndexBuffer(s_device, c.pass, c.index, mrhi_indexUint32, 0, MRHI_WHOLE_SIZE) ==
-                  mrhi_success,
+        CHECK(mrhiPass_SetIndexBuffer(s_device, c.pass, c.index, mrhi_indexUint32, 0,
+                                      MRHI_WHOLE_SIZE) == mrhi_success,
               "the index buffer");
-        status = mrhiDrawIndexedIndirect(s_device, c.pass, c.buffer, offset);
+        status = mrhiPass_DrawIndexedIndirect(s_device, c.pass, c.buffer, offset);
     }
     else if (status == mrhi_success)
     {
-        status = mrhiDrawIndirect(s_device, c.pass, c.buffer, offset);
+        status = mrhiPass_DrawIndirect(s_device, c.pass, c.buffer, offset);
     }
     EndCase(buffer);
     return status;
@@ -1217,8 +1217,8 @@ static mrhiResult Dispatch(bool indirect, mrhiBufferUsage usage, uint64_t size, 
     mrhiResult status = BeginCase(buffer, mrhi_accessIndirect, false, &c);
     if (status == mrhi_success)
     {
-        status = indirect ? mrhiDispatchIndirect(s_device, c.pass, c.buffer, 0)
-                          : mrhiDispatch(s_device, c.pass, x, y, z);
+        status = indirect ? mrhiPass_DispatchIndirect(s_device, c.pass, c.buffer, 0)
+                          : mrhiPass_Dispatch(s_device, c.pass, x, y, z);
     }
     EndCase(buffer);
     return status;
@@ -1275,9 +1275,9 @@ static mrhiResult SetBuffer(bool vertex, uint64_t bytes, uint32_t slot, mrhiInde
     CHECK(BeginCase(buffer, vertex ? mrhi_accessVertex : mrhi_accessIndex, true, &c) ==
               mrhi_success,
           "a render pass");
-    mrhiResult status = vertex
-                            ? mrhiSetVertexBuffer(s_device, c.pass, slot, c.buffer, offset, size)
-                            : mrhiSetIndexBuffer(s_device, c.pass, c.buffer, format, offset, size);
+    mrhiResult status =
+        vertex ? mrhiPass_SetVertexBuffer(s_device, c.pass, slot, c.buffer, offset, size)
+               : mrhiPass_SetIndexBuffer(s_device, c.pass, c.buffer, format, offset, size);
     EndCase(buffer);
     return status;
 }
@@ -1658,7 +1658,7 @@ static mrhiResult RenderPass(const Attachment* colors, const Attachment* resolve
     mrhiTextureId textures[2 * MRHI_MAX_COLOR_TARGETS + 2] = {0};
     uint32_t made = 0;
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success, "a frame");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success, "a frame");
     mrhiPassDef def = mrhiDefaultPassDef();
     def.neverCull = true;
     for (uint32_t i = 0; i < count && i < MRHI_MAX_COLOR_TARGETS; ++i)
@@ -1695,7 +1695,7 @@ static mrhiResult RenderPass(const Attachment* colors, const Attachment* resolve
     }
     mrhiPassId pass = {0};
     mrhiResult status = mrhiAddPass(s_device, &def, &pass);
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     for (uint32_t i = 0; i < made; ++i)
     {
         CHECK(mrhiDestroyTexture(s_device, textures[i]) == mrhi_success, "destroyed");
@@ -1812,7 +1812,7 @@ static mrhiResult Resolve(uint32_t setCount, uint64_t size, mrhiBufferUsage usag
     mrhiBufferId buffer = MakeBuffer(size, usage);
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId destination = {0};
-    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
               mrhiImportBuffer(s_device, buffer, &destination) == mrhi_success,
           "a frame of the buffer");
     const mrhiAccess access = {.resource = destination, .kind = mrhi_accessQueryResolve};
@@ -1824,12 +1824,12 @@ static mrhiResult Resolve(uint32_t setCount, uint64_t size, mrhiBufferUsage usag
     mrhiResult status = mrhiAddPass(s_device, &def, &pass);
     if (status == mrhi_success)
     {
-        CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
-                  mrhiBeginPass(s_device, pass) == mrhi_success,
+        CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+                  mrhiPass_Begin(s_device, pass) == mrhi_success,
               "the pass begun");
-        status = mrhiResolveQueries(s_device, pass, set, first, count, destination, offset);
+        status = mrhiPass_ResolveQueries(s_device, pass, set, first, count, destination, offset);
     }
-    CHECK(mrhiDropFrame(s_device) == mrhi_success &&
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
               mrhiDestroyBuffer(s_device, buffer) == mrhi_success &&
               mrhiDestroyQuerySet(s_device, set) == mrhi_success,
           "dropped");
@@ -1847,7 +1847,7 @@ static mrhiResult Occlusion(uint32_t setCount, const uint32_t* calls, size_t cal
     mrhiQuerySetId set = MakeQuerySet(mrhi_queryOcclusion, setCount);
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId target = {0};
-    CHECK(mrhiBeginFrame(s_device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
               mrhiImportTexture(s_device, s_target, &target) == mrhi_success,
           "a frame of the target");
     mrhiPassDef def = mrhiDefaultPassDef();
@@ -1860,19 +1860,19 @@ static mrhiResult Occlusion(uint32_t setCount, const uint32_t* calls, size_t cal
     {
         CHECK(mrhiAddPass(s_device, &def, &ids[i]) == mrhi_success, "a pass");
     }
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     mrhiResult status = mrhi_success;
     for (uint32_t i = 0; i < passes && status == mrhi_success; ++i)
     {
-        CHECK(mrhiBeginPass(s_device, ids[i]) == mrhi_success, "the pass begun");
+        CHECK(mrhiPass_Begin(s_device, ids[i]) == mrhi_success, "the pass begun");
         for (size_t c = 0; c < callCount && status == mrhi_success; ++c)
         {
-            status = calls[c] == END ? mrhiEndOcclusionQuery(s_device, ids[i])
-                                     : mrhiBeginOcclusionQuery(s_device, ids[i], calls[c]);
+            status = calls[c] == END ? mrhiPass_EndOcclusionQuery(s_device, ids[i])
+                                     : mrhiPass_BeginOcclusionQuery(s_device, ids[i], calls[c]);
         }
-        status = status == mrhi_success ? mrhiEndPass(s_device, ids[i]) : status;
+        status = status == mrhi_success ? mrhiPass_End(s_device, ids[i]) : status;
     }
-    CHECK(mrhiDropFrame(s_device) == mrhi_success &&
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
               mrhiDestroyQuerySet(s_device, set) == mrhi_success,
           "dropped");
     return status;

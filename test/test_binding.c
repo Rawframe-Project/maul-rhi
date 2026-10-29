@@ -58,7 +58,7 @@ static mrhiComputePipelineId MakePipeline(void)
     CHECK(mrhiCreateComputePipeline(s_device, &def, &pipeline, &request) == mrhi_success,
           "a pipeline");
     mrhiDeviceNotification record;
-    CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_success &&
+    CHECK(mrhiDevice_TakeNotification(s_device, &record) == mrhi_success &&
               record.outcome == mrhi_success,
           "ready");
     CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "its shader destroyed");
@@ -170,7 +170,7 @@ static uint32_t DefaultAccesses(mrhiAccess* accesses)
 static void BeginFrame(void)
 {
     mrhiFrameDef def = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &def) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &def) == mrhi_success, "begun");
     s_u = ImportBuffer(s_uniform);
     s_w = ImportBuffer(s_written);
     s_r = ImportBuffer(s_read);
@@ -191,11 +191,12 @@ static void Passes(const mrhiAccess* accesses, uint32_t count)
     def.neverCull = true;
     def.passClass = mrhi_passTransfer;
     CHECK(mrhiAddPass(s_device, &def, &s_copy) == mrhi_success, "a copying pass");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
-    CHECK(mrhiBeginPass(s_device, s_pass) == mrhi_success &&
-              mrhiBeginPass(s_device, s_copy) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_Begin(s_device, s_pass) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_copy) == mrhi_success,
           "begun");
-    CHECK(mrhiSetComputePipeline(s_device, s_pass, s_pipeline) == mrhi_success, "the pipeline");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_pass, s_pipeline) == mrhi_success,
+          "the pipeline");
 }
 
 // A frame whose pass declares the default accesses.
@@ -208,7 +209,7 @@ static void Frame(void)
 
 static void Drop(void)
 {
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 static void CloseDevice(void)
@@ -249,7 +250,7 @@ static mrhiResult With0(uint32_t index, mrhiBinding binding)
     mrhiBinding bindings[4];
     Table0(bindings);
     bindings[index] = binding;
-    return mrhiSetBindings(s_device, s_pass, 0, bindings, 4);
+    return mrhiPass_SetBindings(s_device, s_pass, 0, bindings, 4);
 }
 
 // Sets table 1 with one binding changed: the result.
@@ -258,7 +259,7 @@ static mrhiResult With1(uint32_t index, mrhiBinding binding)
     mrhiBinding bindings[2];
     Table1(bindings);
     bindings[index] = binding;
-    return mrhiSetBindings(s_device, s_pass, 1, bindings, 2);
+    return mrhiPass_SetBindings(s_device, s_pass, 1, bindings, 2);
 }
 
 // The n-th record of the pass, walking its chunks: or NULL past them.
@@ -292,7 +293,7 @@ static void TestTables(void)
     mrhiBinding swapped = bindings[0];
     bindings[0] = bindings[3];
     bindings[3] = swapped;
-    CHECK(mrhiSetBindings(s_device, s_pass, 0, bindings, 4) == mrhi_success,
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 0, bindings, 4) == mrhi_success,
           "table 0, in any order");
     const mrhiCommand* command = Nth(s_pass, 1);
     CHECK(command != nullptr && command->type == mrhiCommandBindings && command->a == 0 &&
@@ -313,7 +314,7 @@ static void TestTables(void)
           "the uniform buffer, last");
     mrhiBinding textures[2];
     Table1(textures);
-    CHECK(mrhiSetBindings(s_device, s_pass, 1, textures, 2) == mrhi_success, "table 1");
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 1, textures, 2) == mrhi_success, "table 1");
     const mrhiCommandBinding* cube = NthBinding(7);
     const mrhiCommandBinding* array = NthBinding(8);
     CHECK(cube->object == s_c.index1 && cube->viewKind == mrhi_textureCube &&
@@ -322,30 +323,32 @@ static void TestTables(void)
           "the cube's view resolved");
     CHECK(array->viewKind == mrhi_texture2dArray && array->mipCount == 1 && array->size == 4,
           "the array's");
-    CHECK(mrhiSetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_success &&
-              mrhiSetBindings(s_device, s_pass, 3, nullptr, 0) == mrhi_success,
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_success &&
+              mrhiPass_SetBindings(s_device, s_pass, 3, nullptr, 0) == mrhi_success,
           "the empty tables");
     CHECK(Nth(s_pass, 10) != nullptr && Nth(s_pass, 11) == nullptr, "one record each");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "no misuse");
-    CHECK(mrhiSetBindings(s_device, s_pass, 4, nullptr, 0) == mrhi_errorUnsupported,
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "no misuse");
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 4, nullptr, 0) == mrhi_errorUnsupported,
           "past the adapter's tables");
-    CHECK(mrhiSetBindings(s_device, s_pass, 0, bindings, 3) == mrhi_errorInvalid &&
-              mrhiSetBindings(s_device, s_pass, 2, bindings, 1) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 0, bindings, 3) == mrhi_errorInvalid &&
+              mrhiPass_SetBindings(s_device, s_pass, 2, bindings, 1) == mrhi_errorInvalid,
           "fewer or more than the table's slots");
     Table0(bindings);
     CHECK(With0(3, bindings[0]) == mrhi_errorInvalid, "a slot twice");
     bindings[3].slot = 9;
     CHECK(With0(3, bindings[3]) == mrhi_errorInvalid, "a slot the table lacks");
-    CHECK(mrhiSetBindings(s_device, s_pass, 0, nullptr, 4) == mrhi_errorInvalid, "no bindings");
-    CHECK(mrhiSetBindings(s_device, s_copy, 2, nullptr, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 0, nullptr, 4) == mrhi_errorInvalid,
+          "no bindings");
+    CHECK(mrhiPass_SetBindings(s_device, s_copy, 2, nullptr, 0) == mrhi_errorInvalid,
           "a pass that copies");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 6, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 6, "each counted");
     CHECK(Nth(s_pass, 11) == nullptr, "nothing recorded");
-    CHECK(mrhiSetBindings(nullptr, s_pass, 2, nullptr, 0) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiEndPass(s_device, s_pass) == mrhi_success, "ended");
-    CHECK(mrhiSetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_errorState, "not recording");
+    CHECK(mrhiPass_SetBindings(nullptr, s_pass, 2, nullptr, 0) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiPass_End(s_device, s_pass) == mrhi_success, "ended");
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_errorState,
+          "not recording");
     Drop();
-    CHECK(mrhiSetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_errorState, "no frame");
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_errorState, "no frame");
     CloseDevice();
 }
 
@@ -359,16 +362,17 @@ static void TestPipeline(void)
     CHECK(mrhiAddPass(s_device, &def, &bare) == mrhi_success, "a pass");
     mrhiAccess accesses[5];
     Passes(accesses, DefaultAccesses(accesses));
-    CHECK(mrhiBeginPass(s_device, bare) == mrhi_success, "begun");
-    CHECK(mrhiSetBindings(s_device, bare, 2, nullptr, 0) == mrhi_errorState, "no pipeline set");
+    CHECK(mrhiPass_Begin(s_device, bare) == mrhi_success, "begun");
+    CHECK(mrhiPass_SetBindings(s_device, bare, 2, nullptr, 0) == mrhi_errorState,
+          "no pipeline set");
     CHECK(mrhiDestroyComputePipeline(s_device, s_pipeline) == mrhi_success, "destroyed");
-    CHECK(mrhiSetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_errorStale,
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_errorStale,
           "a destroyed pipeline");
     s_pipeline = MakePipeline();
-    CHECK(mrhiSetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_errorStale,
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_errorStale,
           "and not its slot's next");
-    CHECK(mrhiSetComputePipeline(s_device, s_pass, s_pipeline) == mrhi_success &&
-              mrhiSetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_success,
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_pass, s_pipeline) == mrhi_success &&
+              mrhiPass_SetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_success,
           "the new one");
     Drop();
     // A render pass and a graphics pipeline.
@@ -397,9 +401,9 @@ static void TestPipeline(void)
     CHECK(mrhiCreateGraphicsPipeline(s_device, &graphicsDef, &graphics, &request) == mrhi_success,
           "a graphics pipeline");
     mrhiDeviceNotification record;
-    CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_success, "ready");
+    CHECK(mrhiDevice_TakeNotification(s_device, &record) == mrhi_success, "ready");
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     mrhiPassDef renderDef = mrhiDefaultPassDef();
     renderDef.colorTargets[0] = (mrhiColorTarget){
         .resource = ImportTexture(target),
@@ -409,11 +413,11 @@ static void TestPipeline(void)
     renderDef.colorTargetCount = 1;
     mrhiPassId render;
     CHECK(mrhiAddPass(s_device, &renderDef, &render) == mrhi_success, "a render pass");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
-    CHECK(mrhiBeginPass(s_device, render) == mrhi_success &&
-              mrhiSetGraphicsPipeline(s_device, render, graphics) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_Begin(s_device, render) == mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(s_device, render, graphics) == mrhi_success,
           "the graphics pipeline set");
-    CHECK(mrhiSetBindings(s_device, render, 2, nullptr, 0) == mrhi_success, "a table set");
+    CHECK(mrhiPass_SetBindings(s_device, render, 2, nullptr, 0) == mrhi_success, "a table set");
     Drop();
     BeginFrame();
     Passes(accesses, DefaultAccesses(accesses));
@@ -422,11 +426,11 @@ static void TestPipeline(void)
     uint8_t* added = Binding(6, 2, 0, mrhi_bindingSampler, mrhi_stageCompute);
     added[8] = mrhi_samplerFiltering;
     mrhiComputePipelineId other = MakePipeline();
-    CHECK(mrhiSetComputePipeline(s_device, s_pass, other) == mrhi_success, "set");
-    CHECK(mrhiSetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_pass, other) == mrhi_success, "set");
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_errorInvalid,
           "its table has a slot");
     mrhiBinding sampler = {.slot = 0, .sampler = s_nearest};
-    CHECK(mrhiSetBindings(s_device, s_pass, 2, &sampler, 1) == mrhi_success, "filled");
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 2, &sampler, 1) == mrhi_success, "filled");
     Drop();
     CloseDevice();
 }
@@ -480,7 +484,7 @@ static void TestBuffers(void)
     CHECK(With0(2, read) == mrhi_success, "a multiple of 4");
     read.offset = 4;
     CHECK(With0(2, read) == mrhi_errorUnsupported, "off the storage alignment");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 7, "each invalid one counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 7, "each invalid one counted");
     Drop();
     CloseDevice();
 }
@@ -505,7 +509,7 @@ static void TestKinds(void)
     mrhiBinding sampler = bindings[3];
     sampler.resource = s_u;
     CHECK(With0(3, sampler) == mrhi_errorInvalid, "a sampler with a resource");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 4, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 4, "each counted");
     mrhiResourceId old = s_u;
     Drop();
     Frame();
@@ -516,7 +520,7 @@ static void TestKinds(void)
     CHECK(With0(0, stale) == mrhi_errorStale, "none");
     CHECK(mrhiDestroySampler(s_device, s_linear) == mrhi_success, "a sampler destroyed");
     CHECK(With0(3, bindings[3]) == mrhi_errorStale, "its id ended");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 4, "not misuse");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 4, "not misuse");
     Drop();
     CloseDevice();
 }
@@ -542,10 +546,10 @@ static mrhiResult Declared(uint32_t index, mrhiAccess access, const mrhiBinding*
         textures[texture->slot] = *texture;
         textures[texture->slot].resource = texture->slot == 0 ? s_c : s_t;
     }
-    mrhiResult status = mrhiSetBindings(s_device, s_pass, 0, bindings, 4);
+    mrhiResult status = mrhiPass_SetBindings(s_device, s_pass, 0, bindings, 4);
     if (status == mrhi_success)
     {
-        status = mrhiSetBindings(s_device, s_pass, 1, textures, 2);
+        status = mrhiPass_SetBindings(s_device, s_pass, 1, textures, 2);
     }
     Drop();
     return status;
@@ -638,7 +642,7 @@ static mrhiResult Sampled(mrhiSampleType type, mrhiTextureKind dimension, bool m
     accesses[count] = Access(sampled, mrhi_accessSampled);
     accesses[count].range.aspect = aspect;
     Passes(accesses, count + 1);
-    CHECK(mrhiSetComputePipeline(s_device, s_pass, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_pass, pipeline) == mrhi_success, "set");
     mrhiBinding binding = {
         .slot = 0,
         .resource = sampled,
@@ -682,7 +686,7 @@ static void TestTextures(void)
     array.viewFormat = mrhi_formatNone;
     array.viewKind = mrhi_texture2d;
     CHECK(With1(1, array) == mrhi_errorInvalid, "of another kind");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 8, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 8, "each counted");
     Drop();
     mrhiTextureId depth =
         MakeTexture(mrhi_texture2d, mrhi_formatDepth32Float, 1, 1, mrhi_textureSampled);
@@ -765,7 +769,7 @@ static mrhiResult DeclaredAs(mrhiTextureId texture, mrhiTextureKind dimension, m
     accesses[count] = Access(resource, kind);
     accesses[count].range.aspect = declared;
     Passes(accesses, count + 1);
-    CHECK(mrhiSetComputePipeline(s_device, s_pass, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_pass, pipeline) == mrhi_success, "set");
     mrhiBinding binding = {
         .slot = 0,
         .resource = resource,
@@ -796,7 +800,7 @@ static mrhiResult Storage(mrhiStorageAccess access, mrhiFormat format, mrhiTextu
     accesses[4] = Access(resource, kind);
     accesses[4].range.mipCount = 1;
     Passes(accesses, count);
-    CHECK(mrhiSetComputePipeline(s_device, s_pass, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_pass, pipeline) == mrhi_success, "set");
     mrhiBinding binding = {
         .slot = 1,
         .resource = resource,
@@ -862,7 +866,7 @@ static mrhiResult Sampler(mrhiSamplerBinding kind, mrhiSamplerId sampler)
     s_sections[BINDINGS].bytes[SAMPLER_SLOT * 24 + 8] = kind;
     mrhiComputePipelineId pipeline = MakePipeline();
     Frame();
-    CHECK(mrhiSetComputePipeline(s_device, s_pass, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_pass, pipeline) == mrhi_success, "set");
     mrhiBinding binding = {.slot = SAMPLER_SLOT, .sampler = sampler};
     mrhiResult status = With0(3, binding);
     Drop();
@@ -919,12 +923,13 @@ static void TestArena(void)
     // The pipeline's record and 25 tables of five fill 126 of 127 records.
     for (uint32_t i = 0; i < 25; ++i)
     {
-        CHECK(mrhiSetBindings(s_device, s_pass, 0, bindings, 4) == mrhi_success, "fits");
+        CHECK(mrhiPass_SetBindings(s_device, s_pass, 0, bindings, 4) == mrhi_success, "fits");
     }
-    CHECK(mrhiSetBindings(s_device, s_pass, 0, bindings, 4) == mrhi_errorCapacity, "full");
-    CHECK(mrhiSetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_errorCapacity, "nothing more");
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 0, bindings, 4) == mrhi_errorCapacity, "full");
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 2, nullptr, 0) == mrhi_errorCapacity,
+          "nothing more");
     bindings[0].slot = 9;
-    CHECK(mrhiSetBindings(s_device, s_pass, 0, bindings, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 0, bindings, 4) == mrhi_errorInvalid,
           "checked before room is sought");
     Drop();
     CloseDevice();
@@ -935,7 +940,7 @@ static mrhiDiagnosticCode Refusal(void)
 {
     mrhiDiagnosticCode code = 0;
     mrhiDiagnostic record;
-    while (mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success)
+    while (mrhiDevice_TakeDiagnostic(s_device, &record) == mrhi_success)
     {
         code = record.code;
     }
@@ -947,7 +952,7 @@ static size_t Refusals(mrhiDiagnosticCode* codes, size_t capacity)
 {
     size_t count = 0;
     mrhiDiagnostic record;
-    while (mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success)
+    while (mrhiDevice_TakeDiagnostic(s_device, &record) == mrhi_success)
     {
         if (count < capacity)
         {
@@ -1016,13 +1021,13 @@ static void TestPastDeviceLimits(void)
     CHECK(With0(2, read) == mrhi_errorUnsupported && Refusals(codes, 2) == 2 &&
               codes[0] == storageAlignment && codes[1] == storageBytes,
           "past the adapter's beside the device's: both named");
-    CHECK(mrhiSetBindings(s_device, s_pass, 4, nullptr, 0) == mrhi_errorCapacity &&
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 4, nullptr, 0) == mrhi_errorCapacity &&
               Refusal() == mrhi_diagnosticLimitBindingTables,
           "a table past the device's");
-    CHECK(mrhiSetBindings(s_device, s_pass, 8, nullptr, 0) == mrhi_errorUnsupported &&
+    CHECK(mrhiPass_SetBindings(s_device, s_pass, 8, nullptr, 0) == mrhi_errorUnsupported &&
               Refusal() == mrhi_diagnosticLimitBindingTables,
           "past the adapter's");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "none is misuse");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "none is misuse");
     Drop();
     CloseDevice();
 }

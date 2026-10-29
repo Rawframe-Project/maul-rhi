@@ -52,12 +52,13 @@ static mrhiDevice* OpenSecond(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     size_t count = 0;
-    CHECK(mrhiGetAdapters(s_instance, &def.adapter, 1, &count) == mrhi_success, "the adapter");
+    CHECK(mrhiInstance_GetAdapters(s_instance, &def.adapter, 1, &count) == mrhi_success,
+          "the adapter");
     mrhiDevice* device = nullptr;
     mrhiRequestId request;
     mrhiInstanceNotification record;
     CHECK(mrhiCreateDevice(s_instance, &def, &device, &request) == mrhi_success, "a second");
-    CHECK(mrhiNextInstanceNotification(s_instance, &record) == mrhi_success, "ready");
+    CHECK(mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success, "ready");
     return device;
 }
 
@@ -66,23 +67,23 @@ static void TestConfigure(void)
     mrhiDevice* device = OpenWith(mrhiDefaultDeviceDef(), true);
     mrhiSurfaceId surface = MakeSurface(1);
     mrhiSurfaceConfig config = Config(surface);
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "configured");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success, "configured");
     config.width = 1920;
     config.height = 1080;
     config.usage |= mrhi_textureCopySource;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "reconfigured");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success, "reconfigured");
     config.color = (mrhiSurfaceColor){
         .format = mrhi_formatRgba16Float,
         .transfer = mrhi_transferLinear,
         .range = mrhi_rangeExtended,
     };
     config.viewFormats[0] = mrhi_formatNone;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "for HDR");
-    CHECK(mrhiUnconfigureSurface(device, surface) == mrhi_success, "unconfigured");
-    CHECK(mrhiUnconfigureSurface(device, surface) == mrhi_errorState, "not configured");
-    CHECK(mrhiUnconfigureSurface(nullptr, surface) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiUnconfigureSurface(device, (mrhiSurfaceId){0, 0}) == mrhi_errorStale, "null");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "no misuse");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success, "for HDR");
+    CHECK(mrhiSurface_Unconfigure(device, surface) == mrhi_success, "unconfigured");
+    CHECK(mrhiSurface_Unconfigure(device, surface) == mrhi_errorState, "not configured");
+    CHECK(mrhiSurface_Unconfigure(nullptr, surface) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiSurface_Unconfigure(device, (mrhiSurfaceId){0, 0}) == mrhi_errorStale, "null");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "no misuse");
     Close(device);
 }
 
@@ -116,11 +117,11 @@ static void TestInvalid(void)
     bad[count++].alphaMode = UINT8_MAX;
     for (size_t i = 0; i < count; ++i)
     {
-        CHECK(mrhiConfigureSurface(device, &bad[i]) == mrhi_errorInvalid, "invalid");
+        CHECK(mrhiDevice_ConfigureSurface(device, &bad[i]) == mrhi_errorInvalid, "invalid");
     }
-    CHECK(mrhiConfigureSurface(device, nullptr) == mrhi_errorInvalid, "no config");
-    CHECK(mrhiConfigureSurface(nullptr, &good) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetDeviceMisuse(device) == count + 1, "each counted");
+    CHECK(mrhiDevice_ConfigureSurface(device, nullptr) == mrhi_errorInvalid, "no config");
+    CHECK(mrhiDevice_ConfigureSurface(nullptr, &good) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiDevice_GetMisuse(device) == count + 1, "each counted");
     Close(device);
 }
 
@@ -132,50 +133,54 @@ static void TestUnsupported(void)
     mrhiSurfaceConfig config = Config(surface);
     config.color.format = mrhi_formatRgba8Unorm;
     config.viewFormats[0] = mrhi_formatRgba8UnormSrgb;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported, "a format not reported");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported,
+          "a format not reported");
     config = Config(surface);
     config.color.range = mrhi_rangeExtended;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported, "a range not reported");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported,
+          "a range not reported");
     config = Config(surface);
     config.color.primaries = mrhi_primariesDisplayP3;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported, "primaries not reported");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported,
+          "primaries not reported");
     config = Config(surface);
     config.color.transfer = mrhi_transferLinear;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported, "linear BGRA8");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported, "linear BGRA8");
     config = Config(surface);
     config.presentMode = mrhi_presentMailbox;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported, "mailbox");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported, "mailbox");
     config = Config(surface);
     config.alphaMode = mrhi_alphaPremultiplied;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported, "premultiplied");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported, "premultiplied");
     config = Config(surface);
     config.usage |= mrhi_textureSampled;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported, "a use not reported");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported,
+          "a use not reported");
     config = Config(surface);
     config.usage |= mrhi_textureStorage;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported,
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported,
           "storage the surface reports but BGRA8 cannot take");
     config = Config(surface);
     config.width = 8193;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported, "too wide");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported, "too wide");
     config = Config(surface);
     config.height = 8193;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported, "too tall");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported, "too tall");
     config = Config(surface);
     config.width = 8192;
     config.height = 8192;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "the largest");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success, "the largest");
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     config.next = &critical;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported,
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported,
           "an unknown critical extension");
     mrhiSurfaceId elsewhere = MakeSurface(2);
     config = Config(elsewhere);
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported,
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported,
           "a surface the adapter does not present to");
     config = Config((mrhiSurfaceId){0, 0});
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorStale, "no surface");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "none counted");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorStale, "no surface");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "none counted");
     Close(device);
 }
 
@@ -189,15 +194,15 @@ static void TestPastDeviceLimit(void)
     mrhiSurfaceId surface = MakeSurface(1);
     mrhiSurfaceConfig config = Config(surface);
     config.width = 8193;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorCapacity,
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorCapacity,
           "wider than the device's limit");
     config = Config(surface);
     config.height = 8193;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorCapacity, "taller");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorCapacity, "taller");
     config.height = 16385;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported,
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported,
           "taller than the adapter's");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "none counted");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "none counted");
     Close(device);
     ResetAdapter();
 }
@@ -233,38 +238,38 @@ static void TestTwins(void)
     mrhiSurfaceId images = MakeTwinSurface(false, true);
     size_t count = 0;
     mrhiAdapterId adapter;
-    CHECK(mrhiGetAdapters(s_instance, &adapter, 1, &count) == mrhi_success, "the adapter");
-    CHECK(mrhiGetSurfaceCaps(s_instance, images, adapter, &caps) == mrhi_success &&
+    CHECK(mrhiInstance_GetAdapters(s_instance, &adapter, 1, &count) == mrhi_success, "the adapter");
+    CHECK(mrhiSurface_GetCaps(s_instance, images, adapter, &caps) == mrhi_success &&
               caps.twinImages && !caps.twinViews,
           "images and no views reported");
     mrhiSurfaceConfig config = Config(images);
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported,
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported,
           "no twin view where only images are");
     config.viewFormats[0] = mrhi_formatNone;
     config.color.format = mrhi_formatBgra8UnormSrgb;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "sRGB images");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success, "sRGB images");
     config.color.format = mrhi_formatRgba8UnormSrgb;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported,
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported,
           "the twin of a format not reported");
     config = Config(images);
     config.viewFormats[0] = mrhi_formatNone;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "unorm images still");
-    CHECK(mrhiUnconfigureSurface(device, images) == mrhi_success, "unconfigured");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success, "unorm images still");
+    CHECK(mrhiSurface_Unconfigure(device, images) == mrhi_success, "unconfigured");
     mrhiSurfaceId views = MakeTwinSurface(false, false);
-    CHECK(mrhiGetSurfaceCaps(s_instance, views, adapter, &caps) == mrhi_success && caps.twinViews &&
-              !caps.twinImages,
+    CHECK(mrhiSurface_GetCaps(s_instance, views, adapter, &caps) == mrhi_success &&
+              caps.twinViews && !caps.twinImages,
           "views at least");
     config = Config(views);
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "a twin view");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success, "a twin view");
     config.viewFormats[0] = mrhi_formatNone;
     config.color.format = mrhi_formatBgra8UnormSrgb;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported,
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported,
           "no sRGB images where only views are");
-    CHECK(mrhiUnconfigureSurface(device, views) == mrhi_success, "unconfigured");
+    CHECK(mrhiSurface_Unconfigure(device, views) == mrhi_success, "unconfigured");
     CHECK(mrhiDestroySurface(s_instance, images) == mrhi_success &&
               mrhiDestroySurface(s_instance, views) == mrhi_success,
           "destroyed");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "none counted");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "none counted");
     Close(device);
 }
 
@@ -276,21 +281,26 @@ static void TestOwnership(void)
     mrhiDevice* device = OpenWith(def, false);
     mrhiSurfaceId surface = MakeSurface(1);
     mrhiSurfaceConfig config = Config(surface);
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorState, "a device still opening");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorState,
+          "a device still opening");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(s_instance, &record) == mrhi_success, "ready");
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "configured");
+    CHECK(mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success, "ready");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success, "configured");
     mrhiSurfaceId other = MakeSurface(1);
     mrhiSurfaceConfig otherConfig = Config(other);
-    CHECK(mrhiConfigureSurface(device, &otherConfig) == mrhi_errorCapacity, "the device's limit");
+    CHECK(mrhiDevice_ConfigureSurface(device, &otherConfig) == mrhi_errorCapacity,
+          "the device's limit");
     mrhiDevice* second = OpenSecond();
-    CHECK(mrhiConfigureSurface(second, &config) == mrhi_errorState, "held by another device");
-    CHECK(mrhiUnconfigureSurface(second, surface) == mrhi_errorState, "not the second's");
-    CHECK(mrhiConfigureSurface(second, &otherConfig) == mrhi_success, "another surface there");
+    CHECK(mrhiDevice_ConfigureSurface(second, &config) == mrhi_errorState,
+          "held by another device");
+    CHECK(mrhiSurface_Unconfigure(second, surface) == mrhi_errorState, "not the second's");
+    CHECK(mrhiDevice_ConfigureSurface(second, &otherConfig) == mrhi_success,
+          "another surface there");
     CHECK(mrhiDestroySurface(s_instance, surface) == mrhi_success, "ended while configured");
-    CHECK(mrhiConfigureSurface(device, &otherConfig) == mrhi_errorState, "still the second's");
+    CHECK(mrhiDevice_ConfigureSurface(device, &otherConfig) == mrhi_errorState,
+          "still the second's");
     mrhiDestroyDevice(second);
-    CHECK(mrhiConfigureSurface(device, &otherConfig) == mrhi_success,
+    CHECK(mrhiDevice_ConfigureSurface(device, &otherConfig) == mrhi_success,
           "free once the second device is gone");
     Close(device);
 }
@@ -305,11 +315,12 @@ static void TestFailures(void)
     mrhiDevice* device = OpenWith(def, true);
     mrhiSurfaceId surface = MakeSurface(1);
     mrhiSurfaceConfig config = Config(surface);
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "the one object");
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorPlatform, "reconfiguring fails");
-    CHECK(mrhiUnconfigureSurface(device, surface) == mrhi_errorState, "left unconfigured");
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorPlatform, "the driver fails");
-    CHECK(mrhiUnconfigureSurface(device, surface) == mrhi_errorState, "still unconfigured");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success, "the one object");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorPlatform,
+          "reconfiguring fails");
+    CHECK(mrhiSurface_Unconfigure(device, surface) == mrhi_errorState, "left unconfigured");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorPlatform, "the driver fails");
+    CHECK(mrhiSurface_Unconfigure(device, surface) == mrhi_errorState, "still unconfigured");
     Close(device);
 }
 
@@ -338,7 +349,7 @@ static bool IsConfigured(mrhiDevice* second, mrhiSurfaceId surface)
 {
     mrhiSurfaceConfig config = Config(surface);
     config.presentMode = mrhi_presentMailbox;
-    return mrhiConfigureSurface(second, &config) == mrhi_errorState;
+    return mrhiDevice_ConfigureSurface(second, &config) == mrhi_errorState;
 }
 
 // A reconfiguration refused before the platform keeps the surface
@@ -356,49 +367,51 @@ static void TestRefusalsKeep(void)
     mrhiDevice* second = OpenSecond();
     mrhiSurfaceId surface = MakeSurface(1);
     mrhiSurfaceConfig config = Config(surface);
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success && IsConfigured(second, surface),
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success &&
+              IsConfigured(second, surface),
           "configured");
     config.cookie = 0;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorInvalid &&
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorInvalid &&
               IsConfigured(second, surface),
           "a malformed config");
     config = Config(surface);
     config.color.format = mrhi_formatRgba8Unorm;
     config.viewFormats[0] = mrhi_formatRgba8UnormSrgb;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported &&
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported &&
               IsConfigured(second, surface),
           "a format the surface does not report");
     config = Config(surface);
     config.width = 16385;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorUnsupported &&
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorUnsupported &&
               IsConfigured(second, surface),
           "past the adapter's size");
     config.width = 8193;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorCapacity &&
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorCapacity &&
               IsConfigured(second, surface),
           "past the device's size");
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
     mrhiResourceId image = {0};
-    CHECK(mrhiBeginFrame(device, &frameDef) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frameDef) == mrhi_success &&
               mrhiAcquireSurfaceImage(device, surface, &image) == mrhi_success,
           "an image held");
     config = Config(surface);
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorState && IsConfigured(second, surface),
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorState &&
+              IsConfigured(second, surface),
           "while the frame holds an image");
-    CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(device) == mrhi_success, "dropped");
     s_outOfMemory = true;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorCapacity &&
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorCapacity &&
               IsConfigured(second, surface),
           "the driver out of memory before the platform");
     s_outOfMemory = false;
-    CHECK(mrhiUnconfigureSurface(device, surface) == mrhi_success, "and the old one works");
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_success, "configured again");
+    CHECK(mrhiSurface_Unconfigure(device, surface) == mrhi_success, "and the old one works");
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success, "configured again");
     refuse = true;
-    CHECK(mrhiConfigureSurface(device, &config) == mrhi_errorCapacity &&
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_errorCapacity &&
               !IsConfigured(second, surface),
           "the platform out of memory retires it");
     refuse = false;
-    CHECK(mrhiGetDeviceMisuse(device) == 1, "the malformed config counted");
+    CHECK(mrhiDevice_GetMisuse(device) == 1, "the malformed config counted");
     mrhiDestroyDevice(second);
     Close(device);
 }

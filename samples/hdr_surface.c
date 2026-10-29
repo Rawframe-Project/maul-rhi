@@ -48,7 +48,7 @@ static mrhiSurfaceColor Configure(Sample* sample, const SampleWindow* window,
     config.usage = mrhi_textureRenderTarget | (caps->usages & mrhi_textureCopySource);
     config.width = WIDTH;
     config.height = HEIGHT;
-    SampleCheck(sample, mrhiConfigureSurface(sample->device, &config) == mrhi_success,
+    SampleCheck(sample, mrhiDevice_ConfigureSurface(sample->device, &config) == mrhi_success,
                 "the surface configured");
     return color;
 }
@@ -61,7 +61,7 @@ static mrhiRequestId Present(Sample* sample, const SampleWindow* window, bool re
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId image = {0};
     SampleCheck(sample,
-                mrhiBeginFrame(device, &frame) == mrhi_success &&
+                mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
                     mrhiAcquireSurfaceImage(device, window->surface, &image) == mrhi_success,
                 "an image acquired");
     mrhiPassDef clearDef = mrhiDefaultPassDef();
@@ -87,9 +87,9 @@ static mrhiRequestId Present(Sample* sample, const SampleWindow* window, bool re
     SampleCheck(sample,
                 mrhiAddPass(device, &clearDef, &clear) == mrhi_success &&
                     (!read || mrhiAddPass(device, &readDef, &reading) == mrhi_success) &&
-                    mrhiCompileFrame(device) == mrhi_success &&
-                    mrhiBeginPass(device, clear) == mrhi_success &&
-                    mrhiEndPass(device, clear) == mrhi_success,
+                    mrhiDevice_CompileFrame(device) == mrhi_success &&
+                    mrhiPass_Begin(device, clear) == mrhi_success &&
+                    mrhiPass_End(device, clear) == mrhi_success,
                 "the image cleared");
     mrhiRequestId pixel = {0};
     if (read)
@@ -97,9 +97,10 @@ static mrhiRequestId Present(Sample* sample, const SampleWindow* window, bool re
         const mrhiTextureCopy source = {.resource = image};
         const mrhiExtent3d one = {1, 1, 1};
         SampleCheck(sample,
-                    mrhiBeginPass(device, reading) == mrhi_success &&
-                        mrhiReadTexture(device, reading, &source, &one, &pixel) == mrhi_success &&
-                        mrhiEndPass(device, reading) == mrhi_success,
+                    mrhiPass_Begin(device, reading) == mrhi_success &&
+                        mrhiPass_ReadTexture(device, reading, &source, &one, &pixel) ==
+                            mrhi_success &&
+                        mrhiPass_End(device, reading) == mrhi_success,
                     "the first pixel read");
     }
     SampleFinish(sample);
@@ -145,7 +146,7 @@ int main(void)
     }
     mrhiSurfaceCaps caps;
     SampleCheck(&sample,
-                mrhiGetSurfaceCaps(sample.instance, window.surface, sample.adapter, &caps) ==
+                mrhiSurface_GetCaps(sample.instance, window.surface, sample.adapter, &caps) ==
                         mrhi_success &&
                     caps.presentable,
                 "the adapter presents there");
@@ -160,7 +161,7 @@ int main(void)
     {
         Present(&sample, &window, false);
     }
-    SampleCheck(&sample, mrhiUnconfigureSurface(sample.device, window.surface) == mrhi_success,
+    SampleCheck(&sample, mrhiSurface_Unconfigure(sample.device, window.surface) == mrhi_success,
                 "the surface unconfigured");
     SampleWindowClose(&sample, &window);
     return SampleClose(&sample);

@@ -148,16 +148,16 @@ static void DrawScene(Sample* sample, const Scene* scene, mrhiPassId pass, mrhiR
         {.slot = 1, .sampler = scene->comparison},
     };
     SampleCheck(sample,
-                mrhiBeginPass(device, pass) == mrhi_success &&
-                    mrhiSetVertexBuffer(device, pass, 0, vertices, 0, sizeof(kVertices)) ==
+                mrhiPass_Begin(device, pass) == mrhi_success &&
+                    mrhiPass_SetVertexBuffer(device, pass, 0, vertices, 0, sizeof(kVertices)) ==
                         mrhi_success &&
-                    mrhiSetGraphicsPipeline(device, pass, scene->solid) == mrhi_success &&
-                    mrhiSetBindings(device, pass, 0, table, 2) == mrhi_success &&
-                    mrhiSetRootBlock(device, pass, 0, kRed, sizeof(kRed)) == mrhi_success &&
-                    mrhiDraw(device, pass, 6, 1, SQUARE, 0) == mrhi_success &&
-                    mrhiSetGraphicsPipeline(device, pass, scene->lit) == mrhi_success &&
-                    mrhiDraw(device, pass, 6, 1, FLOOR, 0) == mrhi_success &&
-                    mrhiEndPass(device, pass) == mrhi_success,
+                    mrhiPass_SetGraphicsPipeline(device, pass, scene->solid) == mrhi_success &&
+                    mrhiPass_SetBindings(device, pass, 0, table, 2) == mrhi_success &&
+                    mrhiPass_SetRootBlock(device, pass, 0, kRed, sizeof(kRed)) == mrhi_success &&
+                    mrhiPass_Draw(device, pass, 6, 1, SQUARE, 0) == mrhi_success &&
+                    mrhiPass_SetGraphicsPipeline(device, pass, scene->lit) == mrhi_success &&
+                    mrhiPass_Draw(device, pass, 6, 1, FLOOR, 0) == mrhi_success &&
+                    mrhiPass_End(device, pass) == mrhi_success,
                 "the scene drawn");
 }
 
@@ -167,7 +167,7 @@ static mrhiRequestId Record(Sample* sample, const Scene* scene)
 {
     mrhiDevice* device = sample->device;
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    SampleCheck(sample, mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    SampleCheck(sample, mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
     bufferDef.size = sizeof(kVertices);
     mrhiResourceId vertices = {0};
@@ -196,30 +196,32 @@ static mrhiRequestId Record(Sample* sample, const Scene* scene)
     mrhiPassId reading = {0};
     SampleCheck(sample,
                 mrhiAddPass(device, &readDef, &reading) == mrhi_success &&
-                    mrhiCompileFrame(device) == mrhi_success,
+                    mrhiDevice_CompileFrame(device) == mrhi_success,
                 "the frame compiled");
     SampleCheck(sample,
-                mrhiBeginPass(device, uploading) == mrhi_success &&
-                    mrhiWriteBuffer(device, uploading, vertices, 0, kVertices, sizeof(kVertices)) ==
-                        mrhi_success &&
-                    mrhiEndPass(device, uploading) == mrhi_success,
+                mrhiPass_Begin(device, uploading) == mrhi_success &&
+                    mrhiPass_WriteBuffer(device, uploading, vertices, 0, kVertices,
+                                         sizeof(kVertices)) == mrhi_success &&
+                    mrhiPass_End(device, uploading) == mrhi_success,
                 "the vertices uploaded");
     SampleCheck(sample,
-                mrhiBeginPass(device, shadow) == mrhi_success &&
-                    mrhiSetGraphicsPipeline(device, shadow, scene->depthOnly) == mrhi_success &&
-                    mrhiSetVertexBuffer(device, shadow, 0, vertices, 0, sizeof(kVertices)) ==
+                mrhiPass_Begin(device, shadow) == mrhi_success &&
+                    mrhiPass_SetGraphicsPipeline(device, shadow, scene->depthOnly) ==
                         mrhi_success &&
-                    mrhiDraw(device, shadow, 12, 1, FLOOR, 0) == mrhi_success &&
-                    mrhiEndPass(device, shadow) == mrhi_success,
+                    mrhiPass_SetVertexBuffer(device, shadow, 0, vertices, 0, sizeof(kVertices)) ==
+                        mrhi_success &&
+                    mrhiPass_Draw(device, shadow, 12, 1, FLOOR, 0) == mrhi_success &&
+                    mrhiPass_End(device, shadow) == mrhi_success,
                 "the shadow map drawn");
     DrawScene(sample, scene, main, vertices, shadowMap);
     const mrhiTextureCopy source = {.resource = color};
     const mrhiExtent3d extent = {SIZE, SIZE, 1};
     mrhiRequestId pixels = {0};
     SampleCheck(sample,
-                mrhiBeginPass(device, reading) == mrhi_success &&
-                    mrhiReadTexture(device, reading, &source, &extent, &pixels) == mrhi_success &&
-                    mrhiEndPass(device, reading) == mrhi_success,
+                mrhiPass_Begin(device, reading) == mrhi_success &&
+                    mrhiPass_ReadTexture(device, reading, &source, &extent, &pixels) ==
+                        mrhi_success &&
+                    mrhiPass_End(device, reading) == mrhi_success,
                 "the scene read");
     return pixels;
 }

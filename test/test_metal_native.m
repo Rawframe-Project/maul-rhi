@@ -75,7 +75,7 @@ static void CheckFrame(mrhiDevice* device, mrhiTextureId texture, id<MTLCommandB
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId resource = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportTexture(device, texture, &resource) == mrhi_success,
           "a frame with the texture");
     mrhiAccess write = Whole(resource, mrhi_accessCopyDestination);
@@ -101,35 +101,36 @@ static void CheckFrame(mrhiDevice* device, mrhiTextureId texture, id<MTLCommandB
     mrhiRequestId bytes = {0};
     mrhiRequestId token = {0};
     void* buffer = (void*)commands;
-    CHECK(mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, upload) == mrhi_success &&
-              mrhiWriteTexture(device, upload, &whole, texels, sizeof(texels), &layout, &extent) ==
-                  mrhi_success &&
-              mrhiEndPass(device, upload) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, upload) == mrhi_success &&
+              mrhiPass_WriteTexture(device, upload, &whole, texels, sizeof(texels), &layout,
+                                    &extent) == mrhi_success &&
+              mrhiPass_End(device, upload) == mrhi_success,
           "uploaded");
-    CHECK(mrhiBeginPass(device, native) == mrhi_success &&
-              mrhiSetMetalPassCommands(device, native, nullptr) == mrhi_errorInvalid &&
-              mrhiSetVulkanPassCommands(device, native, buffer) == mrhi_errorUnsupported &&
-              mrhiSetMetalPassCommands(device, native, buffer) == mrhi_success &&
-              mrhiSetMetalPassCommands(device, native, buffer) == mrhi_errorState &&
-              mrhiEndPass(device, native) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, native) == mrhi_success &&
+              mrhiPass_SetMetalCommands(device, native, nullptr) == mrhi_errorInvalid &&
+              mrhiPass_SetVulkanCommands(device, native, buffer) == mrhi_errorUnsupported &&
+              mrhiPass_SetMetalCommands(device, native, buffer) == mrhi_success &&
+              mrhiPass_SetMetalCommands(device, native, buffer) == mrhi_errorState &&
+              mrhiPass_End(device, native) == mrhi_success,
           "the native pass given its command buffer");
-    CHECK(mrhiBeginPass(device, back) == mrhi_success &&
-              mrhiReadTexture(device, back, &whole, &extent, &bytes) == mrhi_success &&
-              mrhiEndPass(device, back) == mrhi_success &&
-              mrhiSubmitFrame(device, &token) == mrhi_success &&
-              mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, back) == mrhi_success &&
+              mrhiPass_ReadTexture(device, back, &whole, &extent, &bytes) == mrhi_success &&
+              mrhiPass_End(device, back) == mrhi_success &&
+              mrhiDevice_SubmitFrame(device, &token) == mrhi_success &&
+              mrhiRequest_WaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
           "read back and finished");
     CHECK(commands.status == MTLCommandBufferStatusCompleted,
           "the program's command buffer done with the frame");
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
     }
     uint8_t taken[sizeof(texels)] = {0};
     size_t size = 0;
-    bool copied = mrhiTakeReadback(device, bytes, taken, sizeof(taken), &size) == mrhi_success &&
-                  size == sizeof(taken);
+    bool copied =
+        mrhiRequest_TakeReadback(device, bytes, taken, sizeof(taken), &size) == mrhi_success &&
+        size == sizeof(taken);
     for (size_t i = 0; copied && i < sizeof(taken); i += 4)
     {
         copied = taken[i] == 0 && taken[i + 1] == 255 && taken[i + 2] == 0 && taken[i + 3] == 255;
@@ -206,7 +207,7 @@ static void CheckDirty(mrhiDevice* device, id<MTLDevice> native, id<MTLCommandQu
     @autoreleasepool
     {
         CHECK(mrhiCreateTexture(device, &dirty->def, &texture) == mrhi_success &&
-                  mrhiGetMetalTexture(device, texture, &made) == mrhi_success &&
+                  mrhiTexture_GetMetalTexture(device, texture, &made) == mrhi_success &&
                   Dirty(native, queue, (id<MTLTexture>)made, &dirty->def),
               dirty->what);
     }
@@ -283,7 +284,7 @@ static void CheckUsages(mrhiDevice* device)
         mrhiTextureId texture = {0};
         void* made = nullptr;
         bool created = mrhiCreateTexture(device, &def, &texture) == mrhi_success &&
-                       mrhiGetMetalTexture(device, texture, &made) == mrhi_success &&
+                       mrhiTexture_GetMetalTexture(device, texture, &made) == mrhi_success &&
                        made != nullptr;
         MTLTextureUsage usage = created ? ((id<MTLTexture>)made).usage : 0;
         CHECK(created && (usage & cases[i].needed) == cases[i].needed, cases[i].what);
@@ -300,7 +301,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
     deviceDef.adapter = adapter;
     // The compressed formats the adapter has, for the zeroing checks.
     mrhiFeatures granted = {0};
-    CHECK(mrhiGetAdapterFeatures(instance, adapter, &granted) == mrhi_success, "its features");
+    CHECK(mrhiAdapter_GetFeatures(instance, adapter, &granted) == mrhi_success, "its features");
     deviceDef.features.textureCompressionBc = granted.textureCompressionBc;
     deviceDef.features.textureCompressionEtc2 = granted.textureCompressionEtc2;
     deviceDef.features.textureCompressionAstc = granted.textureCompressionAstc;
@@ -308,7 +309,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
     mrhiRequestId opened = {0};
     mrhiInstanceNotification record;
     CHECK(mrhiCreateDevice(instance, &deviceDef, &device, &opened) == mrhi_success &&
-              mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+              mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
               record.outcome == mrhi_success,
           "a device");
     if (device == nullptr)
@@ -319,11 +320,11 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
     void* native = nullptr;
     void* queue = nullptr;
     void* unused[5] = {0};
-    CHECK(mrhiGetMetalDevice(device, &native, &queue) == mrhi_success && native != nullptr &&
+    CHECK(mrhiDevice_GetMetalDevice(device, &native, &queue) == mrhi_success && native != nullptr &&
               queue != nullptr,
           "the device's native objects");
-    CHECK(mrhiGetVulkanDevice(device, &unused[0], &unused[1], &unused[2], &unused[3], &unused[4]) ==
-              mrhi_errorUnsupported,
+    CHECK(mrhiDevice_GetVulkanDevice(device, &unused[0], &unused[1], &unused[2], &unused[3],
+                                     &unused[4]) == mrhi_errorUnsupported,
           "no Vulkan objects");
     mrhiTextureDef textureDef = mrhiDefaultTextureDef();
     textureDef.format = mrhi_formatRgba8Unorm;
@@ -333,7 +334,8 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
     mrhiTextureId texture = {0};
     void* made = nullptr;
     CHECK(mrhiCreateTexture(device, &textureDef, &texture) == mrhi_success &&
-              mrhiGetMetalTexture(device, texture, &made) == mrhi_success && made != nullptr,
+              mrhiTexture_GetMetalTexture(device, texture, &made) == mrhi_success &&
+              made != nullptr,
           "the texture's MTLTexture");
     if (native != nullptr && queue != nullptr && made != nullptr)
     {
@@ -365,9 +367,10 @@ int main(void)
     mrhiAdapterId adapter = {0};
     size_t count = 0;
     bool found = instance != nullptr &&
-                 mrhiRequestAdapters(instance, &request, &searched) == mrhi_success &&
-                 mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
-                 mrhiGetAdapters(instance, &adapter, 1, &count) == mrhi_success && count >= 1;
+                 mrhiInstance_RequestAdapters(instance, &request, &searched) == mrhi_success &&
+                 mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
+                 mrhiInstance_GetAdapters(instance, &adapter, 1, &count) == mrhi_success &&
+                 count >= 1;
     if (found)
     {
         CheckDevice(instance, adapter);

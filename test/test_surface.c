@@ -39,11 +39,12 @@ static mrhiInstance* Create(uint32_t surfaces, mrhiAdapterId* adaptersOut)
     mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
     mrhiRequestId request;
     mrhiInstanceNotification record;
-    CHECK(mrhiRequestAdapters(instance, &search, &request) == mrhi_success, "the search");
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success, "found");
+    CHECK(mrhiInstance_RequestAdapters(instance, &search, &request) == mrhi_success, "the search");
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success, "found");
     size_t count = 0;
     mrhiAdapterId adapters[2];
-    CHECK(mrhiGetAdapters(instance, adapters, 2, &count) == mrhi_success && count == 2, "two");
+    CHECK(mrhiInstance_GetAdapters(instance, adapters, 2, &count) == mrhi_success && count == 2,
+          "two");
     if (adaptersOut != nullptr)
     {
         adaptersOut[0] = adapters[0];
@@ -100,7 +101,7 @@ static void TestSources(void)
         .chain = {.next = nullptr, .type = mrhi_structSurfaceSourceCanvas},
     };
     CHECK(Make(instance, &canvas.chain, &surface) == mrhi_errorUnsupported, "a canvas");
-    CHECK(mrhiGetInstanceMisuse(instance) == 2, "no source and two sources counted");
+    CHECK(mrhiInstance_GetMisuse(instance) == 2, "no source and two sources counted");
     mrhiDestroyInstance(instance);
 }
 
@@ -128,7 +129,7 @@ static void TestRefusals(void)
     def.label = longLabel;
     def.labelLength = MRHI_MAX_LABEL_BYTES + 1;
     CHECK(mrhiCreateSurface(instance, &def, &surface) == mrhi_errorLimit, "a label past the bound");
-    CHECK(mrhiGetInstanceMisuse(instance) == 5, "each counted");
+    CHECK(mrhiInstance_GetMisuse(instance) == 5, "each counted");
     test.fail = true;
     CHECK(Make(instance, &test.chain, &surface) == mrhi_errorPlatform, "the driver fails");
     test.fail = false;
@@ -161,7 +162,7 @@ static void TestCaps(void)
     mrhiSurfaceId surface;
     CHECK(Make(instance, &test.chain, &surface) == mrhi_success, "the surface");
     mrhiSurfaceCaps caps;
-    CHECK(mrhiGetSurfaceCaps(instance, surface, adapters[0], &caps) == mrhi_success, "read");
+    CHECK(mrhiSurface_GetCaps(instance, surface, adapters[0], &caps) == mrhi_success, "read");
     CHECK(caps.presentable, "the discrete adapter presents");
     CHECK(caps.colorCount == 2 && caps.colors[0].format == mrhi_formatRgba16Float &&
               caps.colors[0].range == mrhi_rangeExtended,
@@ -169,19 +170,19 @@ static void TestCaps(void)
     CHECK(caps.presentModes == (mrhi_presentFifoBit | mrhi_presentMailboxBit), "fifo and mailbox");
     CHECK(caps.alphaModes == mrhi_alphaOpaqueBit, "opaque");
     CHECK(caps.usages == (mrhi_textureRenderTarget | mrhi_textureCopySource), "the usages");
-    CHECK(mrhiGetSurfaceCaps(instance, surface, adapters[1], &caps) == mrhi_success, "read");
+    CHECK(mrhiSurface_GetCaps(instance, surface, adapters[1], &caps) == mrhi_success, "read");
     CHECK(!caps.presentable && caps.colorCount == 0 && caps.presentModes == 0,
           "the integrated adapter does not present, and nothing is filled");
-    CHECK(mrhiGetSurfaceCaps(instance, surface, (mrhiAdapterId){0, 0}, &caps) == mrhi_errorStale,
+    CHECK(mrhiSurface_GetCaps(instance, surface, (mrhiAdapterId){0, 0}, &caps) == mrhi_errorStale,
           "no adapter");
-    CHECK(mrhiGetSurfaceCaps(instance, surface, adapters[0], nullptr) == mrhi_errorInvalid,
+    CHECK(mrhiSurface_GetCaps(instance, surface, adapters[0], nullptr) == mrhi_errorInvalid,
           "no out");
-    CHECK(mrhiGetSurfaceCaps(nullptr, surface, adapters[0], &caps) == mrhi_errorInvalid,
+    CHECK(mrhiSurface_GetCaps(nullptr, surface, adapters[0], &caps) == mrhi_errorInvalid,
           "no instance");
     CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "destroyed");
-    CHECK(mrhiGetSurfaceCaps(instance, surface, adapters[0], &caps) == mrhi_errorStale,
+    CHECK(mrhiSurface_GetCaps(instance, surface, adapters[0], &caps) == mrhi_errorStale,
           "a surface that ended");
-    CHECK(mrhiGetInstanceMisuse(instance) == 1, "the missing out counted");
+    CHECK(mrhiInstance_GetMisuse(instance) == 1, "the missing out counted");
     // A surface of the most colors.
     test.caps.colorCount = MRHI_SURFACE_COLORS;
     for (uint32_t i = 0; i < MRHI_SURFACE_COLORS; ++i)
@@ -189,7 +190,7 @@ static void TestCaps(void)
         test.caps.colors[i] = (mrhiSurfaceColor){.format = mrhi_formatBgra8Unorm};
     }
     CHECK(Make(instance, &test.chain, &surface) == mrhi_success &&
-              mrhiGetSurfaceCaps(instance, surface, adapters[0], &caps) == mrhi_success &&
+              mrhiSurface_GetCaps(instance, surface, adapters[0], &caps) == mrhi_success &&
               caps.presentable && caps.colorCount == MRHI_SURFACE_COLORS,
           "the most colors");
     CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "destroyed");
@@ -207,26 +208,26 @@ static void TestCompatibleSurface(void)
     search.compatibleSurface = surface;
     mrhiRequestId request;
     mrhiInstanceNotification record;
-    CHECK(mrhiRequestAdapters(instance, &search, &request) == mrhi_success, "asked");
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+    CHECK(mrhiInstance_RequestAdapters(instance, &search, &request) == mrhi_success, "asked");
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
               record.outcome == mrhi_success,
           "answered");
     mrhiAdapterId adapter;
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, &adapter, 1, &count) == mrhi_success && count == 1,
+    CHECK(mrhiInstance_GetAdapters(instance, &adapter, 1, &count) == mrhi_success && count == 1,
           "only the adapter that presents");
     mrhiAdapterInfo info;
-    CHECK(mrhiGetAdapterInfo(instance, adapter, &info) == mrhi_success &&
+    CHECK(mrhiAdapter_GetInfo(instance, adapter, &info) == mrhi_success &&
               info.kind == mrhi_adapterIntegrated,
           "the integrated one");
-    CHECK(mrhiRequestAdapters(instance, &search, &request) == mrhi_success, "asked again");
+    CHECK(mrhiInstance_RequestAdapters(instance, &search, &request) == mrhi_success, "asked again");
     CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "then the surface ends");
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
               record.outcome == mrhi_errorStale,
           "the answer is stale");
-    CHECK(mrhiGetAdapters(instance, nullptr, 0, &count) == mrhi_success && count == 0,
+    CHECK(mrhiInstance_GetAdapters(instance, nullptr, 0, &count) == mrhi_success && count == 0,
           "no adapter listed");
-    CHECK(mrhiRequestAdapters(instance, &search, &request) == mrhi_errorStale,
+    CHECK(mrhiInstance_RequestAdapters(instance, &search, &request) == mrhi_errorStale,
           "a surface that ended");
     mrhiDestroyInstance(instance);
 }

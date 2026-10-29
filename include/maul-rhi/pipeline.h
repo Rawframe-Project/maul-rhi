@@ -622,8 +622,9 @@ extern "C"
     /// `mrhi_errorPlatform` when the driver fails to write it.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
-    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetPipelineCache(mrhiDevice* device, void* bytes,
-                                                            size_t capacity, size_t* sizeOut);
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDevice_GetPipelineCache(mrhiDevice* device, void* bytes,
+                                                                   size_t capacity,
+                                                                   size_t* sizeOut);
 
     /// Reports what became of the pipeline cache the device's def gave. An
     /// unusable cache never fails a device; it only goes unused.
@@ -637,7 +638,7 @@ extern "C"
     /// device.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
-    MRHI_NODISCARD MRHI_API mrhiResult mrhiGetPipelineCacheOutcome(mrhiDevice* device);
+    MRHI_NODISCARD MRHI_API mrhiResult mrhiDevice_GetPipelineCacheOutcome(mrhiDevice* device);
 
 #ifdef __cplusplus
 }

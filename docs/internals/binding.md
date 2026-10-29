@@ -4,7 +4,7 @@ How shaders reach resources: binding tables and the root block on every API, bin
 
 ## Binding tables
 
-A pipeline's layout comes from its container's reflection: up to four tables (WebGPU's `maxBindGroups`), each a set of slots of fixed kinds. `mrhiSetBindings` sets one whole table: exactly the slots the reflection lists for it, under the pipeline set in the pass, which is looked up by id again on each call. A binding is a buffer range, a texture of the frame seen through an inline view, or a sampler, each checked as WebGPU checks a bind group entry: alignment, size limits and minimum sizes; view kind, format, sample type and multisampling; sampler kind. Each bound resource also needs a declared access of the pass covering it, of the kind the slot needs.
+A pipeline's layout comes from its container's reflection: up to four tables (WebGPU's `maxBindGroups`), each a set of slots of fixed kinds. `mrhiPass_SetBindings` sets one whole table: exactly the slots the reflection lists for it, under the pipeline set in the pass, which is looked up by id again on each call. A binding is a buffer range, a texture of the frame seen through an inline view, or a sampler, each checked as WebGPU checks a bind group entry: alignment, size limits and minimum sizes; view kind, format, sample type and multisampling; sampler kind. Each bound resource also needs a declared access of the pass covering it, of the kind the slot needs.
 
 A table and its command fit one arena chunk, so a table holds at most `MRHI_MAX_TABLE_BINDINGS`. Draws need every table their pipeline reads, set under a container of the same SHA-256 digest: identical containers made apart stay compatible, which matters when two pipelines of one material come from separately loaded files.
 
@@ -12,7 +12,7 @@ On each API a table becomes what it binds cheaply: a Vulkan descriptor set taken
 
 ## The root block
 
-The root block is a few bytes of constants per pass, set with `mrhiSetRootBlock` at 4-byte granularity within `rootBlockBytes`: 64 bytes on the floor, raised where every device of an API allows more (128 on D3D12, inside the root signature's 64 words). It is a Vulkan push constant range for the pipeline's stages, D3D12 root constants, a Metal buffer at the index the container's map gives, and WebGPU immediates. Each pass starts with it zeroed, which each driver ensures; the core does not track what a draw reads of it.
+The root block is a few bytes of constants per pass, set with `mrhiPass_SetRootBlock` at 4-byte granularity within `rootBlockBytes`: 64 bytes on the floor, raised where every device of an API allows more (128 on D3D12, inside the root signature's 64 words). It is a Vulkan push constant range for the pipeline's stages, D3D12 root constants, a Metal buffer at the index the container's map gives, and WebGPU immediates. Each pass starts with it zeroed, which each driver ensures; the core does not track what a draw reads of it.
 
 ## Bindless heaps
 
@@ -29,6 +29,6 @@ How each API provides heaps is on its page: Vulkan through descriptor indexing a
 
 ## Sealing
 
-Streamed assets are written once and read by many passes, and declaring each of them in each pass that might sample it through a heap defeats bindless. Sealing is part of a frame: `mrhiSealResource`, on a texture or buffer the open frame imports, ends it in `mrhi_stateSealed` after the frame's passes, as a surface image ends ready to present, so the frame that uploads a resource is the one that seals it. From the next frame on, any pass may read it through a heap without declaring it, and a frame that imports it may declare only the reads the sealed state allows: a texture sampled; a buffer as uniforms, vertices, indices, indirect arguments or storage read. Those reads leave it sealed, so they need no barrier. `mrhiUnsealResource` returns it to the graph's tracking for the passes after it; whichever of the two calls comes last in a frame decides how it ends.
+Streamed assets are written once and read by many passes, and declaring each of them in each pass that might sample it through a heap defeats bindless. Sealing is part of a frame: `mrhiResource_Seal`, on a texture or buffer the open frame imports, ends it in `mrhi_stateSealed` after the frame's passes, as a surface image ends ready to present, so the frame that uploads a resource is the one that seals it. From the next frame on, any pass may read it through a heap without declaring it, and a frame that imports it may declare only the reads the sealed state allows: a texture sampled; a buffer as uniforms, vertices, indices, indirect arguments or storage read. Those reads leave it sealed, so they need no barrier. `mrhiResource_Unseal` returns it to the graph's tracking for the passes after it; whichever of the two calls comes last in a frame decides how it ends.
 
 On Vulkan the sealed state is `SHADER_READ_ONLY_OPTIMAL` with every shader stage's sampled reads for a texture, and every read for a buffer. On D3D12 a sealed buffer starts each frame in every read state the sealed state allows. Sealing needs `bindlessSampling`.

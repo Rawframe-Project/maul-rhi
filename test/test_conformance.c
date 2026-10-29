@@ -139,13 +139,13 @@ static void ResizeCanvas(int width)
 // loop, so on the web the suite sleeps (JSPI) until one arrives.
 static mrhiResult NextInstance(mrhiInstance* instance, mrhiInstanceNotification* recordOut)
 {
-    mrhiResult status = mrhiNextInstanceNotification(instance, recordOut);
+    mrhiResult status = mrhiInstance_TakeNotification(instance, recordOut);
 #ifdef MRHI_TEST_WEB
     for (int slept = 0; status == mrhi_empty && slept < 10000; ++slept)
     {
         // hygiene: the browser answers only while its event loop runs
         Sleep();
-        status = mrhiNextInstanceNotification(instance, recordOut);
+        status = mrhiInstance_TakeNotification(instance, recordOut);
     }
 #endif
     return status;
@@ -155,13 +155,13 @@ static mrhiResult NextInstance(mrhiInstance* instance, mrhiInstanceNotification*
 // waits.
 static mrhiResult NextDevice(mrhiDevice* device, mrhiDeviceNotification* recordOut)
 {
-    mrhiResult status = mrhiNextDeviceNotification(device, recordOut);
+    mrhiResult status = mrhiDevice_TakeNotification(device, recordOut);
 #ifdef MRHI_TEST_WEB
     for (int slept = 0; status == mrhi_empty && slept < 10000; ++slept)
     {
         // hygiene: the browser answers only while its event loop runs
         Sleep();
-        status = mrhiNextDeviceNotification(device, recordOut);
+        status = mrhiDevice_TakeNotification(device, recordOut);
     }
 #endif
     return status;
@@ -175,27 +175,27 @@ static mrhiResult NextDevice(mrhiDevice* device, mrhiDeviceNotification* recordO
 static void CheckNotificationWait(mrhiDevice* device)
 {
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
     }
-    CHECK(mrhiWaitDeviceNotification(device, UINT64_C(10000000000)) == mrhi_empty,
+    CHECK(mrhiDevice_WaitNotification(device, UINT64_C(10000000000)) == mrhi_empty,
           "nothing owed, at once");
     mrhiFrameDef def = mrhiDefaultFrameDef();
     mrhiRequestId token = {0};
-    CHECK(mrhiBeginFrame(device, &def) == mrhi_success &&
-              mrhiSubmitFrame(device, &token) == mrhi_success,
+    CHECK(mrhiDevice_BeginFrame(device, &def) == mrhi_success &&
+              mrhiDevice_SubmitFrame(device, &token) == mrhi_success,
           "a frame submitted");
-    mrhiResult status = mrhiWaitDeviceNotification(device, UINT64_C(10000000000));
+    mrhiResult status = mrhiDevice_WaitNotification(device, UINT64_C(10000000000));
 #ifdef MRHI_TEST_WEB
     for (int slept = 0; status == mrhi_timeout && slept < 10000; ++slept)
     {
         // hygiene: the browser answers only while its event loop runs
         Sleep();
-        status = mrhiWaitDeviceNotification(device, 0);
+        status = mrhiDevice_WaitNotification(device, 0);
     }
 #endif
     CHECK(status == mrhi_success, "woken by the frame's end");
-    CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+    CHECK(mrhiDevice_TakeNotification(device, &record) == mrhi_success &&
               record.kind == mrhi_deviceFrameDone && record.request.index1 == token.index1 &&
               record.outcome == mrhi_success,
           "the frame's answer");
@@ -205,13 +205,13 @@ static void CheckNotificationWait(mrhiDevice* device)
 // sleeps until it has finished.
 static mrhiResult WaitFor(mrhiDevice* device, mrhiRequestId token)
 {
-    mrhiResult status = mrhiWaitFrame(device, token, UINT64_C(10000000000));
+    mrhiResult status = mrhiRequest_WaitFrame(device, token, UINT64_C(10000000000));
 #ifdef MRHI_TEST_WEB
     for (int slept = 0; status == mrhi_timeout && slept < 10000; ++slept)
     {
         // hygiene: the browser answers only while its event loop runs
         Sleep();
-        status = mrhiWaitFrame(device, token, 0);
+        status = mrhiRequest_WaitFrame(device, token, 0);
     }
 #endif
     return status;
@@ -231,13 +231,14 @@ static size_t Search(mrhiInstance* instance, mrhiAdapterId* ids, size_t capacity
     mrhiAdapterRequestDef request = mrhiDefaultAdapterRequestDef();
     request.allowSoftware = true;
     mrhiRequestId id;
-    CHECK(mrhiRequestAdapters(instance, &request, &id) == mrhi_success, "a search");
+    CHECK(mrhiInstance_RequestAdapters(instance, &request, &id) == mrhi_success, "a search");
     mrhiInstanceNotification record;
     CHECK(NextInstance(instance, &record) == mrhi_success &&
               record.kind == mrhi_instanceAdaptersFound && record.outcome == mrhi_success,
           "answered at the next poll");
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, ids, capacity, &count) == mrhi_success && count <= capacity,
+    CHECK(mrhiInstance_GetAdapters(instance, ids, capacity, &count) == mrhi_success &&
+              count <= capacity,
           "listed");
     return count;
 }
@@ -245,7 +246,7 @@ static size_t Search(mrhiInstance* instance, mrhiAdapterId* ids, size_t capacity
 static void CheckLimits(mrhiInstance* instance, mrhiAdapterId adapter)
 {
     mrhiLimits limits;
-    CHECK(mrhiGetAdapterLimits(instance, adapter, &limits) == mrhi_success, "limits");
+    CHECK(mrhiAdapter_GetLimits(instance, adapter, &limits) == mrhi_success, "limits");
     mrhiLimits floor = mrhiDefaultLimits();
     AT_LEAST(CHECK_AT_LEAST)
     CHECK(limits.uniformOffsetAlignment <= floor.uniformOffsetAlignment &&
@@ -265,12 +266,12 @@ static bool In(mrhiFormat format, mrhiFormat first, mrhiFormat last)
 static void CheckFormats(mrhiInstance* instance, mrhiAdapterId adapter)
 {
     mrhiFeatures features;
-    CHECK(mrhiGetAdapterFeatures(instance, adapter, &features) == mrhi_success, "features");
+    CHECK(mrhiAdapter_GetFeatures(instance, adapter, &features) == mrhi_success, "features");
     for (mrhiFormat format = mrhi_formatRgba8Unorm; format <= mrhi_formatAstc12x12UnormSrgb;
          ++format)
     {
         mrhiFormatCaps caps;
-        CHECK(mrhiGetFormatCaps(instance, adapter, format, &caps) == mrhi_success, "caps");
+        CHECK(mrhiAdapter_GetFormatCaps(instance, adapter, format, &caps) == mrhi_success, "caps");
         CHECK(!caps.filtering || caps.sampling, "filtering samples");
         CHECK(!caps.blending || caps.rendering, "blending renders");
         CHECK(!caps.rendering || (caps.sampleCounts & 1) != 0, "a target has one sample");
@@ -294,10 +295,12 @@ static void CheckFormats(mrhiInstance* instance, mrhiAdapterId adapter)
         CHECK(granted == (caps.sampling && caps.filtering), "a family as granted");
     }
     mrhiFormatCaps caps;
-    CHECK(mrhiGetFormatCaps(instance, adapter, mrhi_formatR32Float, &caps) == mrhi_success &&
+    CHECK(mrhiAdapter_GetFormatCaps(instance, adapter, mrhi_formatR32Float, &caps) ==
+                  mrhi_success &&
               (!features.float32Filterable || caps.filtering),
           "float32Filterable filters");
-    CHECK(mrhiGetFormatCaps(instance, adapter, mrhi_formatRg11b10Ufloat, &caps) == mrhi_success &&
+    CHECK(mrhiAdapter_GetFormatCaps(instance, adapter, mrhi_formatRg11b10Ufloat, &caps) ==
+                  mrhi_success &&
               (!features.rg11b10Renderable || caps.rendering),
           "rg11b10Renderable renders");
 }
@@ -417,7 +420,7 @@ static void CheckObjects(mrhiDevice* device, bool timestamps)
 static void CheckFrameMemory(mrhiDevice* device)
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiTextureDef texture = mrhiDefaultTextureDef();
     texture.format = mrhi_formatRgba8Unorm;
     texture.width = 64;
@@ -444,12 +447,13 @@ static void CheckFrameMemory(mrhiDevice* device)
     pass.neverCull = true;
     mrhiPassId id = {0};
     CHECK(mrhiAddPass(device, &pass, &id) == mrhi_success, "a pass");
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     mrhiFrameUsage usage = {0};
     // The target is transient, which a tile GPU keeps on chip.
-    CHECK(mrhiGetFrameUsage(device, &usage) == mrhi_success && usage.frameMemoryBytes >= 2000,
+    CHECK(mrhiDevice_GetFrameUsage(device, &usage) == mrhi_success &&
+              usage.frameMemoryBytes >= 2000,
           "the transients' memory");
-    CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(device) == mrhi_success, "dropped");
 }
 
 // A target with its twin among its view formats, only ever rendered to:
@@ -459,7 +463,7 @@ static void CheckFrameMemory(mrhiDevice* device)
 static void CheckTransientTwin(mrhiDevice* device)
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiTextureDef texture = mrhiDefaultTextureDef();
     texture.format = mrhi_formatRgba8UnormSrgb;
     texture.viewFormats[0] = mrhi_formatRgba8Unorm;
@@ -474,17 +478,18 @@ static void CheckTransientTwin(mrhiDevice* device)
     pass.neverCull = true;
     mrhiPassId id = {0};
     CHECK(mrhiAddPass(device, &pass, &id) == mrhi_success, "a pass");
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     mrhiResourcePlan plan = {0};
-    CHECK(mrhiGetResourcePlan(device, target, &plan) == mrhi_success && !plan.transient,
+    CHECK(mrhiResource_GetPlan(device, target, &plan) == mrhi_success && !plan.transient,
           "not transient");
-    CHECK(mrhiBeginPass(device, id) == mrhi_success && mrhiEndPass(device, id) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, id) == mrhi_success && mrhiPass_End(device, id) == mrhi_success,
           "recorded");
     mrhiRequestId token = {0};
-    CHECK(mrhiSubmitFrame(device, &token) == mrhi_success && WaitFor(device, token) == mrhi_success,
+    CHECK(mrhiDevice_SubmitFrame(device, &token) == mrhi_success &&
+              WaitFor(device, token) == mrhi_success,
           "finished");
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
         CHECK(record.outcome == mrhi_success, "a success");
     }
@@ -515,12 +520,12 @@ static mrhiAccess Whole(mrhiResourceId resource, mrhiAccessKind kind)
 static void Finish(mrhiDevice* device, uint32_t readbacks)
 {
     mrhiRequestId token = {0};
-    CHECK(mrhiSubmitFrame(device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(device, &token) == mrhi_success, "submitted");
     CHECK(WaitFor(device, token) == mrhi_success, "finished");
     mrhiDeviceNotification record;
     uint32_t done = 0;
     uint32_t answered = 0;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
         CHECK(record.outcome == mrhi_success, "a success");
         done += record.kind == mrhi_deviceFrameDone ? 1 : 0;
@@ -661,7 +666,8 @@ static bool Taken(mrhiDevice* device, mrhiRequestId request, const uint8_t* expe
 {
     static uint8_t bytes[4096];
     size_t taken = 0;
-    return mrhiTakeReadback(device, request, bytes, sizeof(bytes), &taken) == mrhi_success &&
+    return mrhiRequest_TakeReadback(device, request, bytes, sizeof(bytes), &taken) ==
+               mrhi_success &&
            taken == size && (!s_runs || memcmp(bytes, expected, size) == 0);
 }
 
@@ -677,7 +683,7 @@ static bool ReadsAs(mrhiDevice* device, mrhiBufferId buffer, const uint8_t* patt
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId b = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportBuffer(device, buffer, &b) == mrhi_success,
           "a frame with the buffer");
     mrhiAccess write = Whole(b, mrhi_accessCopyDestination);
@@ -685,21 +691,21 @@ static bool ReadsAs(mrhiDevice* device, mrhiBufferId buffer, const uint8_t* patt
     mrhiAccess read = Whole(b, mrhi_accessCopySource);
     mrhiPassId back = CopyPass(device, &read, 1);
     mrhiRequestId request = {0};
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     CHECK(pattern == nullptr ||
-              (mrhiBeginPass(device, upload) == mrhi_success &&
-               mrhiWriteBuffer(device, upload, b, 0, pattern, bytes) == mrhi_success &&
-               mrhiEndPass(device, upload) == mrhi_success),
+              (mrhiPass_Begin(device, upload) == mrhi_success &&
+               mrhiPass_WriteBuffer(device, upload, b, 0, pattern, bytes) == mrhi_success &&
+               mrhiPass_End(device, upload) == mrhi_success),
           "the pattern uploaded");
-    CHECK(mrhiBeginPass(device, back) == mrhi_success &&
-              mrhiReadBuffer(device, back, b, 0, bytes, &request) == mrhi_success &&
-              mrhiEndPass(device, back) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, back) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, back, b, 0, bytes, &request) == mrhi_success &&
+              mrhiPass_End(device, back) == mrhi_success,
           "read back");
     Finish(device, 1);
     static uint8_t taken[4096];
     size_t size = 0;
     return bytes <= sizeof(taken) &&
-           mrhiTakeReadback(device, request, taken, sizeof(taken), &size) == mrhi_success &&
+           mrhiRequest_TakeReadback(device, request, taken, sizeof(taken), &size) == mrhi_success &&
            size == bytes && (!s_runs || memcmp(taken, expected, bytes) == 0);
 }
 
@@ -725,7 +731,7 @@ static void CheckZeroedBuffers(mrhiDevice* device)
     CHECK(mrhiDestroyBuffer(device, first) == mrhi_success, "destroyed");
     // A frame of its own, so that the destroyed buffer's memory is free.
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "an empty frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "an empty frame");
     Finish(device, 0);
     mrhiBufferId again = MakeBuffer(device, BYTES);
     CHECK(ReadsAs(device, again, nullptr, zeros, BYTES),
@@ -783,7 +789,7 @@ static bool ReadsZeros(mrhiDevice* device, mrhiTextureId texture, const ZeroedTe
     uint32_t bytes = block == 1 ? 4 : 8;
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId t = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportTexture(device, texture, &t) == mrhi_success,
           "a frame reading it");
     mrhiAccess whole = {
@@ -792,7 +798,8 @@ static bool ReadsZeros(mrhiDevice* device, mrhiTextureId texture, const ZeroedTe
         .range = {.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING},
     };
     mrhiPassId read = CopyPass(device, &whole, 1);
-    CHECK(mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, read) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success,
           "compiled");
     mrhiRequestId requests[READS];
     size_t sizes[READS];
@@ -803,7 +810,8 @@ static bool ReadsZeros(mrhiDevice* device, mrhiTextureId texture, const ZeroedTe
         const mrhiTextureCopy source = {.resource = t, .y = row * (height - block)};
         const mrhiExtent3d extent = {z->size, block, 1};
         sizes[count] = (size_t)(z->size / block) * bytes;
-        CHECK(mrhiReadTexture(device, read, &source, &extent, &requests[count]) == mrhi_success,
+        CHECK(mrhiPass_ReadTexture(device, read, &source, &extent, &requests[count]) ==
+                  mrhi_success,
               "a row of blocks read");
     }
     for (uint32_t mip = 0; !z->large && mip < z->mips; ++mip)
@@ -821,11 +829,12 @@ static bool ReadsZeros(mrhiDevice* device, mrhiTextureId texture, const ZeroedTe
                 .aspect = depth ? mrhi_aspectDepthOnly : mrhi_aspectAll,
             };
             sizes[count] = (size_t)(size / block) * (size / block) * bytes * extent.depthOrLayers;
-            CHECK(mrhiReadTexture(device, read, &source, &extent, &requests[count]) == mrhi_success,
+            CHECK(mrhiPass_ReadTexture(device, read, &source, &extent, &requests[count]) ==
+                      mrhi_success,
                   "a mip and layer read");
         }
     }
-    CHECK(mrhiEndPass(device, read) == mrhi_success, "read");
+    CHECK(mrhiPass_End(device, read) == mrhi_success, "read");
     Finish(device, count);
     bool zeroed = true;
     for (uint32_t i = 0; i < count; ++i)
@@ -844,7 +853,7 @@ static bool ReadsZerosWhereOnesWere(mrhiDevice* device, const ZeroedTexture* tar
     mrhiTextureId filled = MakeZeroed(device, target);
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId t = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportTexture(device, filled, &t) == mrhi_success,
           "a frame filling a target");
     mrhiPassDef def = mrhiDefaultPassDef();
@@ -869,14 +878,14 @@ static bool ReadsZerosWhereOnesWere(mrhiDevice* device, const ZeroedTexture* tar
     }
     mrhiPassId fill = {0};
     CHECK(mrhiAddPass(device, &def, &fill) == mrhi_success &&
-              mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, fill) == mrhi_success &&
-              mrhiEndPass(device, fill) == mrhi_success,
+              mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, fill) == mrhi_success &&
+              mrhiPass_End(device, fill) == mrhi_success,
           "cleared to ones");
     Finish(device, 0);
     CHECK(mrhiDestroyTexture(device, filled) == mrhi_success, "destroyed");
     // A frame of its own, so that the destroyed texture's memory is free.
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "an empty frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "an empty frame");
     Finish(device, 0);
     mrhiTextureId again = MakeZeroed(device, remade);
     bool zeroed = ReadsZeros(device, again, remade);
@@ -968,7 +977,7 @@ static void CheckRoundTrip(mrhiDevice* device)
     mrhiTextureId array = {0};
     CHECK(mrhiCreateTexture(device, &textureDef, &array) == mrhi_success, "an array");
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiResourceId b = {0};
     mrhiResourceId t = {0};
     mrhiResourceId x = {0};
@@ -992,7 +1001,7 @@ static void CheckRoundTrip(mrhiDevice* device)
     mrhiAccess reads[4] = {Whole(x, mrhi_accessCopySource), Whole(y, mrhi_accessCopySource),
                            Whole(t, mrhi_accessCopySource), Whole(l, mrhi_accessCopySource)};
     mrhiPassId read = CopyPass(device, reads, 4);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     const mrhiTextureCopy texels = {.resource = t};
     const mrhiTexelLayout layout = {.bytesPerRow = 64, .rowsPerImage = 16};
     const mrhiExtent3d extent = {16, 16, 1};
@@ -1005,34 +1014,35 @@ static void CheckRoundTrip(mrhiDevice* device)
     const mrhiTextureCopy corner = {.resource = t, .x = 4, .y = 4};
     const mrhiTextureCopy layer = {.resource = l, .z = 2};
     const mrhiExtent3d square = {4, 4, 1};
-    CHECK(mrhiBeginPass(device, upload) == mrhi_success &&
-              mrhiWriteBuffer(device, upload, b, 0, pattern, sizeof(pattern)) == mrhi_success &&
-              mrhiWriteTexture(device, upload, &texels, pattern, sizeof(pattern), &layout,
-                               &extent) == mrhi_success &&
-              // Empty writes copy nothing, as WebGPU allows.
-              mrhiWriteBuffer(device, upload, b, 0, nullptr, 0) == mrhi_success &&
-              mrhiWriteTexture(device, upload, &texels, nullptr, 0, &layout,
-                               &(mrhiExtent3d){0, 1, 1}) == mrhi_success &&
-              mrhiEndPass(device, upload) == mrhi_success,
-          "uploaded");
-    CHECK(mrhiBeginPass(device, move) == mrhi_success &&
-              mrhiCopyBuffer(device, move, b, 256, x, 0, 256) == mrhi_success &&
-              mrhiCopyBuffer(device, move, b, 768, y, 0, 256) == mrhi_success &&
-              // Zero bytes copy nothing, as WebGPU allows.
-              mrhiCopyBuffer(device, move, b, 0, y, 0, 0) == mrhi_success &&
-              mrhiCopyTexture(device, move, &corner, &layer, &square) == mrhi_success &&
-              mrhiEndPass(device, move) == mrhi_success,
-          "copied");
-    CHECK(mrhiBeginPass(device, read) == mrhi_success &&
-              mrhiReadBuffer(device, read, x, 0, 256, &fromX) == mrhi_success &&
-              mrhiReadBuffer(device, read, y, 0, 256, &fromY) == mrhi_success &&
-              mrhiReadTexture(device, read, &texels, &extent, &fromT) == mrhi_success &&
-              // Empty reads are answered with no bytes.
-              mrhiReadBuffer(device, read, x, 0, 0, &empty) == mrhi_success &&
-              mrhiReadTexture(device, read, &texels, &(mrhiExtent3d){0, 1, 1}, &emptyTexels) ==
+    CHECK(mrhiPass_Begin(device, upload) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, b, 0, pattern, sizeof(pattern)) ==
                   mrhi_success &&
-              mrhiReadTexture(device, read, &layer, &square, &fromL) == mrhi_success &&
-              mrhiEndPass(device, read) == mrhi_success,
+              mrhiPass_WriteTexture(device, upload, &texels, pattern, sizeof(pattern), &layout,
+                                    &extent) == mrhi_success &&
+              // Empty writes copy nothing, as WebGPU allows.
+              mrhiPass_WriteBuffer(device, upload, b, 0, nullptr, 0) == mrhi_success &&
+              mrhiPass_WriteTexture(device, upload, &texels, nullptr, 0, &layout,
+                                    &(mrhiExtent3d){0, 1, 1}) == mrhi_success &&
+              mrhiPass_End(device, upload) == mrhi_success,
+          "uploaded");
+    CHECK(mrhiPass_Begin(device, move) == mrhi_success &&
+              mrhiPass_CopyBuffer(device, move, b, 256, x, 0, 256) == mrhi_success &&
+              mrhiPass_CopyBuffer(device, move, b, 768, y, 0, 256) == mrhi_success &&
+              // Zero bytes copy nothing, as WebGPU allows.
+              mrhiPass_CopyBuffer(device, move, b, 0, y, 0, 0) == mrhi_success &&
+              mrhiPass_CopyTexture(device, move, &corner, &layer, &square) == mrhi_success &&
+              mrhiPass_End(device, move) == mrhi_success,
+          "copied");
+    CHECK(mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, x, 0, 256, &fromX) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, y, 0, 256, &fromY) == mrhi_success &&
+              mrhiPass_ReadTexture(device, read, &texels, &extent, &fromT) == mrhi_success &&
+              // Empty reads are answered with no bytes.
+              mrhiPass_ReadBuffer(device, read, x, 0, 0, &empty) == mrhi_success &&
+              mrhiPass_ReadTexture(device, read, &texels, &(mrhiExtent3d){0, 1, 1}, &emptyTexels) ==
+                  mrhi_success &&
+              mrhiPass_ReadTexture(device, read, &layer, &square, &fromL) == mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
           "read");
     Finish(device, 6);
     CHECK(Taken(device, empty, pattern, 0) && Taken(device, emptyTexels, pattern, 0),
@@ -1047,23 +1057,23 @@ static void CheckRoundTrip(mrhiDevice* device)
     }
     CHECK(Taken(device, fromL, square16, sizeof(square16)),
           "a corner of the texture, copied into an array's third layer");
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "another frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "another frame");
     CHECK(mrhiImportBuffer(device, buffer, &b) == mrhi_success, "imported again");
     // Two ranges cleared first, one to the buffer's end.
     mrhiAccess cleared = Whole(b, mrhi_accessCopyDestination);
     mrhiPassId clear = CopyPass(device, &cleared, 1);
     mrhiAccess again = Whole(b, mrhi_accessCopySource);
     read = CopyPass(device, &again, 1);
-    CHECK(mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, clear) == mrhi_success &&
-              mrhiClearBuffer(device, clear, b, 576, 128) == mrhi_success &&
-              mrhiClearBuffer(device, clear, b, 1008, MRHI_WHOLE_SIZE) == mrhi_success &&
-              mrhiClearBuffer(device, clear, b, 1024, MRHI_WHOLE_SIZE) == mrhi_success &&
-              mrhiEndPass(device, clear) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, clear) == mrhi_success &&
+              mrhiPass_ClearBuffer(device, clear, b, 576, 128) == mrhi_success &&
+              mrhiPass_ClearBuffer(device, clear, b, 1008, MRHI_WHOLE_SIZE) == mrhi_success &&
+              mrhiPass_ClearBuffer(device, clear, b, 1024, MRHI_WHOLE_SIZE) == mrhi_success &&
+              mrhiPass_End(device, clear) == mrhi_success,
           "cleared");
-    CHECK(mrhiBeginPass(device, read) == mrhi_success &&
-              mrhiReadBuffer(device, read, b, 512, 512, &fromX) == mrhi_success &&
-              mrhiEndPass(device, read) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, b, 512, 512, &fromX) == mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
           "read again");
     CHECK(mrhiDestroyBuffer(device, buffer) == mrhi_success, "destroyed while recorded");
     Finish(device, 1);
@@ -1116,7 +1126,7 @@ static void CheckFeatureFormats(mrhiDevice* device, const mrhiFeatures* granted)
         packed = MakeFormatTexture(device, mrhi_formatRg11b10Ufloat, 4, mrhi_textureRenderTarget);
     }
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a feature format frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a feature format frame");
     mrhiResourceId c = {0};
     mrhiResourceId p = {0};
     mrhiPassId upload = {0};
@@ -1145,7 +1155,7 @@ static void CheckFeatureFormats(mrhiDevice* device, const mrhiFeatures* granted)
         reads[readCount++] = Whole(p, mrhi_accessCopySource);
     }
     mrhiPassId read = CopyPass(device, reads, readCount);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "the feature formats compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "the feature formats compiled");
     const mrhiTextureCopy compressedCopy = {.resource = c};
     const mrhiTextureCopy packedCopy = {.resource = p};
     const mrhiTexelLayout layout = {.bytesPerRow = 16, .rowsPerImage = 8};
@@ -1153,27 +1163,28 @@ static void CheckFeatureFormats(mrhiDevice* device, const mrhiFeatures* granted)
     const mrhiExtent3d packedExtent = {4, 4, 1};
     if (granted->textureCompressionBc)
     {
-        CHECK(mrhiBeginPass(device, upload) == mrhi_success &&
-                  mrhiWriteTexture(device, upload, &compressedCopy, blocks, sizeof(blocks), &layout,
-                                   &compressedExtent) == mrhi_success &&
-                  mrhiEndPass(device, upload) == mrhi_success,
+        CHECK(mrhiPass_Begin(device, upload) == mrhi_success &&
+                  mrhiPass_WriteTexture(device, upload, &compressedCopy, blocks, sizeof(blocks),
+                                        &layout, &compressedExtent) == mrhi_success &&
+                  mrhiPass_End(device, upload) == mrhi_success,
               "BC blocks uploaded");
     }
     if (granted->rg11b10Renderable)
     {
-        CHECK(mrhiBeginPass(device, clear) == mrhi_success &&
-                  mrhiEndPass(device, clear) == mrhi_success,
+        CHECK(mrhiPass_Begin(device, clear) == mrhi_success &&
+                  mrhiPass_End(device, clear) == mrhi_success,
               "rg11b10 cleared");
     }
     mrhiRequestId fromC = {0};
     mrhiRequestId fromP = {0};
-    CHECK(mrhiBeginPass(device, read) == mrhi_success &&
+    CHECK(mrhiPass_Begin(device, read) == mrhi_success &&
               (!granted->textureCompressionBc ||
-               mrhiReadTexture(device, read, &compressedCopy, &compressedExtent, &fromC) ==
+               mrhiPass_ReadTexture(device, read, &compressedCopy, &compressedExtent, &fromC) ==
                    mrhi_success) &&
               (!granted->rg11b10Renderable ||
-               mrhiReadTexture(device, read, &packedCopy, &packedExtent, &fromP) == mrhi_success) &&
-              mrhiEndPass(device, read) == mrhi_success,
+               mrhiPass_ReadTexture(device, read, &packedCopy, &packedExtent, &fromP) ==
+                   mrhi_success) &&
+              mrhiPass_End(device, read) == mrhi_success,
           "the feature formats read");
     Finish(device, readCount);
     if (granted->textureCompressionBc)
@@ -1210,7 +1221,7 @@ static void CheckAliasing(mrhiDevice* device)
     }
     mrhiBufferId buffer = MakeBuffer(device, 1024);
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiResourceId out = {0};
     mrhiResourceId buffers[2] = {{0}};
     mrhiResourceId targets[2] = {{0}};
@@ -1252,12 +1263,12 @@ static void CheckAliasing(mrhiDevice* device)
     }
     mrhiAccess read = Whole(out, mrhi_accessCopySource);
     mrhiPassId reading = CopyPass(device, &read, 1);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     mrhiResourcePlan plans[4];
     const mrhiResourceId planned[4] = {buffers[0], buffers[1], targets[0], targets[1]};
     for (int i = 0; i < 4; ++i)
     {
-        CHECK(mrhiGetResourcePlan(device, planned[i], &plans[i]) == mrhi_success, "a plan");
+        CHECK(mrhiResource_GetPlan(device, planned[i], &plans[i]) == mrhi_success, "a plan");
     }
     CHECK(plans[0].memoryBytes > 0 && plans[1].memoryOffset == plans[0].memoryOffset &&
               plans[3].memoryBytes > 0 && plans[3].memoryOffset == plans[2].memoryOffset,
@@ -1265,37 +1276,37 @@ static void CheckAliasing(mrhiDevice* device)
     const mrhiExtent3d row = {4, 1, 1};
     for (int i = 0; i < 2; ++i)
     {
-        CHECK(mrhiBeginPass(device, passes[2 * i]) == mrhi_success &&
-                  mrhiWriteBuffer(device, passes[2 * i], buffers[i], 0, uploads[i],
-                                  sizeof(first)) == mrhi_success &&
-                  mrhiEndPass(device, passes[2 * i]) == mrhi_success &&
-                  mrhiBeginPass(device, passes[2 * i + 1]) == mrhi_success &&
-                  mrhiCopyBuffer(device, passes[2 * i + 1], buffers[i], 0, out,
-                                 (uint64_t)i * sizeof(first), sizeof(first)) == mrhi_success &&
-                  mrhiEndPass(device, passes[2 * i + 1]) == mrhi_success,
+        CHECK(mrhiPass_Begin(device, passes[2 * i]) == mrhi_success &&
+                  mrhiPass_WriteBuffer(device, passes[2 * i], buffers[i], 0, uploads[i],
+                                       sizeof(first)) == mrhi_success &&
+                  mrhiPass_End(device, passes[2 * i]) == mrhi_success &&
+                  mrhiPass_Begin(device, passes[2 * i + 1]) == mrhi_success &&
+                  mrhiPass_CopyBuffer(device, passes[2 * i + 1], buffers[i], 0, out,
+                                      (uint64_t)i * sizeof(first), sizeof(first)) == mrhi_success &&
+                  mrhiPass_End(device, passes[2 * i + 1]) == mrhi_success,
               "a buffer uploaded and copied out");
     }
     for (int i = 0; i < 2; ++i)
     {
         const mrhiTextureCopy texels = {.resource = targets[i]};
         const mrhiBufferCopy bytes = {.resource = out, .offset = 512 + (uint64_t)i * 16};
-        CHECK(mrhiBeginPass(device, passes[4 + 2 * i]) == mrhi_success &&
-                  mrhiEndPass(device, passes[4 + 2 * i]) == mrhi_success &&
-                  mrhiBeginPass(device, passes[5 + 2 * i]) == mrhi_success &&
-                  mrhiCopyTextureToBuffer(device, passes[5 + 2 * i], &texels, &bytes, &row) ==
+        CHECK(mrhiPass_Begin(device, passes[4 + 2 * i]) == mrhi_success &&
+                  mrhiPass_End(device, passes[4 + 2 * i]) == mrhi_success &&
+                  mrhiPass_Begin(device, passes[5 + 2 * i]) == mrhi_success &&
+                  mrhiPass_CopyTextureToBuffer(device, passes[5 + 2 * i], &texels, &bytes, &row) ==
                       mrhi_success &&
-                  mrhiEndPass(device, passes[5 + 2 * i]) == mrhi_success,
+                  mrhiPass_End(device, passes[5 + 2 * i]) == mrhi_success,
               "a target cleared and copied out");
     }
     mrhiRequestId taken = {0};
-    CHECK(mrhiBeginPass(device, reading) == mrhi_success &&
-              mrhiReadBuffer(device, reading, out, 0, 544, &taken) == mrhi_success &&
-              mrhiEndPass(device, reading) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, reading) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, reading, out, 0, 544, &taken) == mrhi_success &&
+              mrhiPass_End(device, reading) == mrhi_success,
           "read");
     Finish(device, 1);
     uint8_t bytes[544];
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, taken, bytes, sizeof(bytes), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, taken, bytes, sizeof(bytes), &size) == mrhi_success &&
               size == sizeof(bytes),
           "the bytes");
     static const uint8_t kRed[4] = {255, 0, 0, 255};
@@ -1332,8 +1343,8 @@ static void CheckRetirement(mrhiInstance* instance, mrhiAdapterId adapter)
         mrhiBufferId buffer = MakeBuffer(device, 256);
         CHECK(mrhiDestroyBuffer(device, buffer) == mrhi_success, "destroyed");
         mrhiFrameDef frame = mrhiDefaultFrameDef();
-        CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
-                  mrhiCompileFrame(device) == mrhi_success,
+        CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
+                  mrhiDevice_CompileFrame(device) == mrhi_success,
               "an empty frame");
         Finish(device, 0);
     }
@@ -1358,7 +1369,7 @@ static void AwaitPipelines(mrhiDevice* device, uint32_t ready, uint32_t stale)
               "a pipeline answered");
         ++counts[record.outcome == mrhi_success ? 0 : 1];
     }
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
         CHECK(record.kind == mrhi_devicePipelineReady &&
                   (record.outcome == mrhi_success || record.outcome == mrhi_errorStale),
@@ -1437,7 +1448,8 @@ static void CheckPipelines(mrhiDevice* device)
     AwaitPipelines(device, 3, 1);
     CHECK(mrhiDestroyShader(device, shader) == mrhi_success, "the shader destroyed");
     CHECK(mrhiDestroyComputePipeline(device, computeId) == mrhi_success, "outlived its shader");
-    CHECK(mrhiGetPipelineCache(device, s_cache, sizeof(s_cache), &s_cacheBytes) == mrhi_success,
+    CHECK(mrhiDevice_GetPipelineCache(device, s_cache, sizeof(s_cache), &s_cacheBytes) ==
+              mrhi_success,
           "the cache exported");
 }
 
@@ -1535,12 +1547,12 @@ static mrhiHeapId MakeHeap(mrhiDevice* device, mrhiTextureId texture, mrhiTextur
         .size = MRHI_WHOLE_SIZE,
         .writable = true,
     };
-    CHECK(mrhiSetHeapEntry(device, heap, HEAP_TEXTURE, &sampled) == mrhi_success &&
-              mrhiSetHeapEntry(device, heap, HEAP_STORAGE, &written) == mrhi_success &&
-              mrhiSetHeapEntry(device, heap, HEAP_BUFFER, &storage) == mrhi_success &&
-              mrhiSetHeapSampler(device, heap, HEAP_SAMPLER, clamping ? clamp : repeat) ==
+    CHECK(mrhiHeap_SetEntry(device, heap, HEAP_TEXTURE, &sampled) == mrhi_success &&
+              mrhiHeap_SetEntry(device, heap, HEAP_STORAGE, &written) == mrhi_success &&
+              mrhiHeap_SetEntry(device, heap, HEAP_BUFFER, &storage) == mrhi_success &&
+              mrhiHeap_SetSampler(device, heap, HEAP_SAMPLER, clamping ? clamp : repeat) ==
                   mrhi_success &&
-              mrhiSetHeapSampler(device, heap, HEAP_OTHER_SAMPLER, clamping ? repeat : clamp) ==
+              mrhiHeap_SetSampler(device, heap, HEAP_OTHER_SAMPLER, clamping ? repeat : clamp) ==
                   mrhi_success,
           "the entries");
     return heap;
@@ -1558,7 +1570,7 @@ static mrhiHeapId MakeHeap(mrhiDevice* device, mrhiTextureId texture, mrhiTextur
 static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool native)
 {
     mrhiFeatures features;
-    CHECK(mrhiGetAdapterFeatures(instance, adapter, &features) == mrhi_success, "features");
+    CHECK(mrhiAdapter_GetFeatures(instance, adapter, &features) == mrhi_success, "features");
     if (!features.bindlessHeterogeneous)
     {
         const char* required = getenv("MAUL_RHI_REQUIRE_BINDLESS");
@@ -1609,7 +1621,7 @@ static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool nativ
                                        10, 20, 30, 255, 255, 51, 153, 255};
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId t = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportTexture(device, texture, &t) == mrhi_success,
           "an upload frame");
     mrhiAccess upload = Whole(t, mrhi_accessCopyDestination);
@@ -1617,16 +1629,17 @@ static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool nativ
     const mrhiTextureCopy texels = {.resource = t};
     const mrhiTexelLayout layout = {.bytesPerRow = 8, .rowsPerImage = 2};
     const mrhiExtent3d extent = {2, 2, 1};
-    CHECK(mrhiSealResource(device, t) == mrhi_success && mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, copy) == mrhi_success &&
-              mrhiWriteTexture(device, copy, &texels, pixels, sizeof(pixels), &layout, &extent) ==
-                  mrhi_success &&
-              mrhiEndPass(device, copy) == mrhi_success,
+    CHECK(mrhiResource_Seal(device, t) == mrhi_success &&
+              mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, copy) == mrhi_success &&
+              mrhiPass_WriteTexture(device, copy, &texels, pixels, sizeof(pixels), &layout,
+                                    &extent) == mrhi_success &&
+              mrhiPass_End(device, copy) == mrhi_success,
           "uploaded and sealed");
     Finish(device, 0);
     mrhiResourceId b[2] = {{0}, {0}};
     mrhiResourceId u = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportBuffer(device, buffers[0], &b[0]) == mrhi_success &&
               mrhiImportBuffer(device, buffers[1], &b[1]) == mrhi_success &&
               mrhiImportBuffer(device, uniform, &u) == mrhi_success,
@@ -1651,27 +1664,27 @@ static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool nativ
     static const uint32_t kWord[4] = {0x5A1234A5u, 0, 0, 0};
     const uint32_t indices[4] = {HEAP_TEXTURE, HEAP_SAMPLER, HEAP_BUFFER, 0};
     const mrhiBinding table = {.slot = 0, .resource = u, .size = MRHI_WHOLE_SIZE};
-    CHECK(mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, fillPass) == mrhi_success &&
-              mrhiWriteBuffer(device, fillPass, u, 0, kWord, sizeof(kWord)) == mrhi_success &&
-              mrhiEndPass(device, fillPass) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, fillPass) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, fillPass, u, 0, kWord, sizeof(kWord)) == mrhi_success &&
+              mrhiPass_End(device, fillPass) == mrhi_success,
           "the uniform buffer filled");
     for (int i = 0; i < 2; ++i)
     {
-        CHECK(mrhiBeginPass(device, dispatches[i]) == mrhi_success &&
-                  mrhiSetComputePipeline(device, dispatches[i], pipeline) == mrhi_success &&
-                  mrhiSetBindings(device, dispatches[i], 0, &table, 1) == mrhi_success &&
-                  mrhiSetRootBlock(device, dispatches[i], 0, indices, sizeof(indices)) ==
+        CHECK(mrhiPass_Begin(device, dispatches[i]) == mrhi_success &&
+                  mrhiPass_SetComputePipeline(device, dispatches[i], pipeline) == mrhi_success &&
+                  mrhiPass_SetBindings(device, dispatches[i], 0, &table, 1) == mrhi_success &&
+                  mrhiPass_SetRootBlock(device, dispatches[i], 0, indices, sizeof(indices)) ==
                       mrhi_success &&
-                  mrhiDispatch(device, dispatches[i], 1, 1, 1) == mrhi_success &&
-                  mrhiEndPass(device, dispatches[i]) == mrhi_success,
+                  mrhiPass_Dispatch(device, dispatches[i], 1, 1, 1) == mrhi_success &&
+                  mrhiPass_End(device, dispatches[i]) == mrhi_success,
               "dispatched through a heap");
     }
     mrhiRequestId written[2] = {{0}, {0}};
-    CHECK(mrhiBeginPass(device, readPass) == mrhi_success &&
-              mrhiReadBuffer(device, readPass, b[0], 0, 12, &written[0]) == mrhi_success &&
-              mrhiReadBuffer(device, readPass, b[1], 0, 12, &written[1]) == mrhi_success &&
-              mrhiEndPass(device, readPass) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, readPass) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, readPass, b[0], 0, 12, &written[0]) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, readPass, b[1], 0, 12, &written[1]) == mrhi_success &&
+              mrhiPass_End(device, readPass) == mrhi_success,
           "read");
     Finish(device, 2);
     // Minified, the nearest texel, and three quarters of the first with
@@ -1681,7 +1694,7 @@ static void CheckHeaps(mrhiInstance* instance, mrhiAdapterId adapter, bool nativ
     for (int i = 0; i < 2; ++i)
     {
         size_t size = 0;
-        CHECK(mrhiTakeReadback(device, written[i], taken[i], sizeof(taken[i]), &size) ==
+        CHECK(mrhiRequest_TakeReadback(device, written[i], taken[i], sizeof(taken[i]), &size) ==
                       mrhi_success &&
                   size == sizeof(taken[i]),
               "the words");
@@ -1801,7 +1814,7 @@ static void BeginScene(Scene* scene)
 {
     mrhiDevice* device = scene->device;
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportBuffer(device, scene->uniform, &scene->u) == mrhi_success &&
               mrhiImportTexture(device, scene->white, &scene->w) == mrhi_success &&
               mrhiImportTexture(device, scene->target, &scene->t) == mrhi_success &&
@@ -1843,14 +1856,14 @@ static void BindScene(const Scene* scene, mrhiPassId pass)
         {.slot = 0, .resource = scene->u, .size = MRHI_WHOLE_SIZE},
         {.slot = 1, .resource = scene->d, .size = MRHI_WHOLE_SIZE},
     };
-    CHECK(mrhiSetBindings(scene->device, pass, 0, table0, 2) == mrhi_success, "table 0");
+    CHECK(mrhiPass_SetBindings(scene->device, pass, 0, table0, 2) == mrhi_success, "table 0");
     const mrhiBinding table1[2] = {
         {.slot = 0,
          .resource = scene->w,
          .range = {.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING}},
         {.slot = 1, .sampler = scene->sampler},
     };
-    CHECK(mrhiSetBindings(scene->device, pass, 1, table1, 2) == mrhi_success, "table 1");
+    CHECK(mrhiPass_SetBindings(scene->device, pass, 1, table1, 2) == mrhi_success, "table 1");
 }
 
 // Reads the target back: its pixels, 4 bytes each, rows of 8.
@@ -1859,7 +1872,7 @@ static mrhiRequestId ReadTarget(const Scene* scene, mrhiPassId pass)
     const mrhiTextureCopy source = {.resource = scene->t};
     const mrhiExtent3d extent = {8, 8, 1};
     mrhiRequestId request = {0};
-    CHECK(mrhiReadTexture(scene->device, pass, &source, &extent, &request) == mrhi_success,
+    CHECK(mrhiPass_ReadTexture(scene->device, pass, &source, &extent, &request) == mrhi_success,
           "a target read");
     return request;
 }
@@ -1932,7 +1945,7 @@ static void CheckDrawFrame(Scene* scene, DrawMode mode)
     mrhiAccess reads[2] = {Whole(scene->t, mrhi_accessCopySource),
                            Whole(scene->d, mrhi_accessCopySource)};
     mrhiPassId read = CopyPass(device, reads, 2);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     const uint8_t white[4] = {255, 255, 255, 255};
     uint32_t values[8] = {1, 2, 3, 4, 5, 6, 7, 8};
     // Three vertices from vertex 2, one instance from instance 0; then
@@ -1941,66 +1954,68 @@ static void CheckDrawFrame(Scene* scene, DrawMode mode)
     const mrhiTextureCopy texel = {.resource = scene->w};
     const mrhiTexelLayout layout = {.bytesPerRow = 4, .rowsPerImage = 1};
     const mrhiExtent3d one = {1, 1, 1};
-    CHECK(
-        mrhiBeginPass(device, upload) == mrhi_success &&
-            mrhiWriteBuffer(device, upload, scene->u, 0, kColor, sizeof(kColor)) == mrhi_success &&
-            mrhiWriteTexture(device, upload, &texel, white, 4, &layout, &one) == mrhi_success &&
-            mrhiWriteBuffer(device, upload, scene->d, 0, values, sizeof(values)) == mrhi_success &&
-            (!indirect ||
-             mrhiWriteBuffer(device, upload, a, 0, arguments, argumentsDef.size) == mrhi_success) &&
-            mrhiEndPass(device, upload) == mrhi_success,
-        "uploaded");
+    CHECK(mrhiPass_Begin(device, upload) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, scene->u, 0, kColor, sizeof(kColor)) ==
+                  mrhi_success &&
+              mrhiPass_WriteTexture(device, upload, &texel, white, 4, &layout, &one) ==
+                  mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, scene->d, 0, values, sizeof(values)) ==
+                  mrhi_success &&
+              (!indirect || mrhiPass_WriteBuffer(device, upload, a, 0, arguments,
+                                                 argumentsDef.size) == mrhi_success) &&
+              mrhiPass_End(device, upload) == mrhi_success,
+          "uploaded");
     const float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-    CHECK(mrhiBeginPass(device, draw) == mrhi_success &&
-              mrhiSetGraphicsPipeline(device, draw, scene->draw) == mrhi_success &&
-              mrhiSetRootBlock(device, draw, 0, tint, sizeof(tint)) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, draw) == mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(device, draw, scene->draw) == mrhi_success &&
+              mrhiPass_SetRootBlock(device, draw, 0, tint, sizeof(tint)) == mrhi_success,
           "a pipeline set");
     BindScene(scene, draw);
     mrhiFeatures features = {0};
-    CHECK(mrhiGetDeviceFeatures(device, &features) == mrhi_success, "the device's features");
+    CHECK(mrhiDevice_GetFeatures(device, &features) == mrhi_success, "the device's features");
     CHECK(mode != DRAW_INDIRECT || features.multiDrawIndirectCount ||
-              mrhiDrawIndirectCount(device, draw, a, 0, a, 0, 1) == mrhi_errorUnsupported,
+              mrhiPass_DrawIndirectCount(device, draw, a, 0, a, 0, 1) == mrhi_errorUnsupported,
           "no counted multi-draw without its feature");
-    CHECK(mrhiPushDebugGroup(device, draw, "half", 4) == mrhi_success &&
-              mrhiInsertDebugMarker(device, draw, "upper left", 10) == mrhi_success,
+    CHECK(mrhiPass_PushDebugGroup(device, draw, "half", 4) == mrhi_success &&
+              mrhiPass_InsertDebugMarker(device, draw, "upper left", 10) == mrhi_success,
           "a debug group");
     bool drawn = false;
     switch (mode)
     {
     case DRAW_DIRECT:
-        drawn = mrhiDraw(device, draw, 3, 1, 2, 0) == mrhi_success;
+        drawn = mrhiPass_Draw(device, draw, 3, 1, 2, 0) == mrhi_success;
         break;
     case DRAW_INDIRECT:
-        drawn = mrhiDrawIndirect(device, draw, a, 0) == mrhi_success;
+        drawn = mrhiPass_DrawIndirect(device, draw, a, 0) == mrhi_success;
         break;
     case DRAW_COUNTED:
-        drawn = mrhiDrawIndirectCount(device, draw, a, 0, a, 32, 1) == mrhi_success &&
-                mrhiDrawIndirectCount(device, draw, a, 0, a, 36, 2) == mrhi_success;
+        drawn = mrhiPass_DrawIndirectCount(device, draw, a, 0, a, 32, 1) == mrhi_success &&
+                mrhiPass_DrawIndirectCount(device, draw, a, 0, a, 36, 2) == mrhi_success;
         break;
     }
-    CHECK(drawn && mrhiPopDebugGroup(device, draw) == mrhi_success &&
-              mrhiEndPass(device, draw) == mrhi_success,
+    CHECK(drawn && mrhiPass_PopDebugGroup(device, draw) == mrhi_success &&
+              mrhiPass_End(device, draw) == mrhi_success,
           "drawn");
-    CHECK(mrhiBeginPass(device, compute) == mrhi_success &&
-              mrhiSetComputePipeline(device, compute, scene->compute) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, compute) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, compute, scene->compute) == mrhi_success,
           "a compute pipeline set");
     BindScene(scene, compute);
-    CHECK(mrhiPushDebugGroup(device, compute, "scale", 5) == mrhi_success &&
-              mrhiDispatch(device, compute, 1, 1, 1) == mrhi_success &&
-              mrhiPopDebugGroup(device, compute) == mrhi_success &&
-              mrhiEndPass(device, compute) == mrhi_success,
+    CHECK(mrhiPass_PushDebugGroup(device, compute, "scale", 5) == mrhi_success &&
+              mrhiPass_Dispatch(device, compute, 1, 1, 1) == mrhi_success &&
+              mrhiPass_PopDebugGroup(device, compute) == mrhi_success &&
+              mrhiPass_End(device, compute) == mrhi_success,
           "dispatched");
     mrhiRequestId pixels = {0};
     mrhiRequestId scaled = {0};
-    CHECK(mrhiBeginPass(device, read) == mrhi_success, "reading");
+    CHECK(mrhiPass_Begin(device, read) == mrhi_success, "reading");
     pixels = ReadTarget(scene, read);
-    CHECK(mrhiReadBuffer(device, read, scene->d, 0, sizeof(values), &scaled) == mrhi_success &&
-              mrhiEndPass(device, read) == mrhi_success,
+    CHECK(mrhiPass_ReadBuffer(device, read, scene->d, 0, sizeof(values), &scaled) == mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
           "read");
     Finish(device, 2);
     uint8_t image[256];
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success &&
               size == sizeof(image),
           "the pixels");
     // Pixel (1, 0) lies above y = x with +Y up, and (6, 7) below it.
@@ -2018,7 +2033,7 @@ static void CheckDrawFrame(Scene* scene, DrawMode mode)
 static uint64_t SlicedBytes(mrhiDevice* device, mrhiTextureKind kind)
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiTextureDef def = mrhiDefaultTextureDef();
     def.kind = kind;
     def.format = mrhi_formatRgba8Unorm;
@@ -2039,9 +2054,9 @@ static uint64_t SlicedBytes(mrhiDevice* device, mrhiTextureKind kind)
     mrhiPassId id = {0};
     mrhiFrameUsage usage = {0};
     CHECK(mrhiAddPass(device, &pass, &id) == mrhi_success &&
-              mrhiCompileFrame(device) == mrhi_success &&
-              mrhiGetFrameUsage(device, &usage) == mrhi_success &&
-              mrhiDropFrame(device) == mrhi_success,
+              mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiDevice_GetFrameUsage(device, &usage) == mrhi_success &&
+              mrhiDevice_DropFrame(device) == mrhi_success,
           "measured");
     return usage.frameMemoryBytes;
 }
@@ -2085,7 +2100,7 @@ static void CheckStorageBindings(mrhiDevice* device, bool readBack)
           "its pipeline");
     AwaitPipelines(device, 1, 0);
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
     bufferDef.size = 16;
     mrhiTextureDef textureDef = mrhiDefaultTextureDef();
@@ -2109,7 +2124,7 @@ static void CheckStorageBindings(mrhiDevice* device, bool readBack)
                            Whole(image, mrhi_accessCopySource),
                            Whole(inputs, mrhi_accessCopySource)};
     mrhiPassId read = CopyPass(device, reads, readBack ? 3 : 2);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     const uint32_t values[4] = {0, 51, 102, 255};
     const mrhiBinding bindings[3] = {
         {.slot = 0, .resource = inputs, .size = MRHI_WHOLE_SIZE},
@@ -2117,22 +2132,23 @@ static void CheckStorageBindings(mrhiDevice* device, bool readBack)
         {.slot = 2, .resource = image, .range = {.mipCount = 1, .layerCount = 1}},
     };
     mrhiRequestId results[3] = {0};
-    CHECK(mrhiBeginPass(device, copy) == mrhi_success &&
-              mrhiWriteBuffer(device, copy, inputs, 0, values, sizeof(values)) == mrhi_success &&
-              mrhiEndPass(device, copy) == mrhi_success &&
-              mrhiBeginPass(device, dispatch) == mrhi_success &&
-              mrhiSetComputePipeline(device, dispatch, pipeline) == mrhi_success &&
-              mrhiSetBindings(device, dispatch, 0, bindings, 3) == mrhi_success &&
-              mrhiDispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
-              mrhiEndPass(device, dispatch) == mrhi_success &&
-              mrhiBeginPass(device, read) == mrhi_success &&
-              mrhiReadBuffer(device, read, outputs, 0, sizeof(values), &results[0]) ==
+    CHECK(mrhiPass_Begin(device, copy) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, copy, inputs, 0, values, sizeof(values)) ==
                   mrhi_success &&
-              mrhiReadTexture(device, read, &(mrhiTextureCopy){.resource = image},
-                              &(mrhiExtent3d){4, 1, 1}, &results[1]) == mrhi_success &&
-              (!readBack || mrhiReadBuffer(device, read, inputs, 0, sizeof(values), &results[2]) ==
-                                mrhi_success) &&
-              mrhiEndPass(device, read) == mrhi_success,
+              mrhiPass_End(device, copy) == mrhi_success &&
+              mrhiPass_Begin(device, dispatch) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, dispatch, pipeline) == mrhi_success &&
+              mrhiPass_SetBindings(device, dispatch, 0, bindings, 3) == mrhi_success &&
+              mrhiPass_Dispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
+              mrhiPass_End(device, dispatch) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, outputs, 0, sizeof(values), &results[0]) ==
+                  mrhi_success &&
+              mrhiPass_ReadTexture(device, read, &(mrhiTextureCopy){.resource = image},
+                                   &(mrhiExtent3d){4, 1, 1}, &results[1]) == mrhi_success &&
+              (!readBack || mrhiPass_ReadBuffer(device, read, inputs, 0, sizeof(values),
+                                                &results[2]) == mrhi_success) &&
+              mrhiPass_End(device, read) == mrhi_success,
           "uploaded, dispatched and read");
     Finish(device, readBack ? 3 : 2);
     const uint32_t doubled[4] = {1, 103, 205, 511};
@@ -2168,7 +2184,7 @@ static void CheckCompute(mrhiDevice* device, const uint8_t* container, size_t by
           "its pipeline");
     AwaitPipelines(device, 1, 0);
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiBufferDef inputDef = mrhiDefaultBufferDef();
     inputDef.size = 4 * sizeof(uint32_t);
     mrhiBufferDef outputDef = mrhiDefaultBufferDef();
@@ -2185,29 +2201,32 @@ static void CheckCompute(mrhiDevice* device, const uint8_t* container, size_t by
     mrhiPassId dispatch = CopyPass(device, uses, 2);
     mrhiAccess back = Whole(outputs, mrhi_accessCopySource);
     mrhiPassId read = CopyPass(device, &back, 1);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     const mrhiBinding bindings[2] = {
         {.slot = 0, .resource = inputs, .size = MRHI_WHOLE_SIZE},
         {.slot = 1, .resource = outputs, .size = MRHI_WHOLE_SIZE},
     };
     mrhiRequestId result = {0};
-    CHECK(mrhiBeginPass(device, copy) == mrhi_success &&
-              mrhiWriteBuffer(device, copy, inputs, 0, values, inputDef.size) == mrhi_success &&
-              mrhiEndPass(device, copy) == mrhi_success &&
-              mrhiBeginPass(device, dispatch) == mrhi_success &&
-              mrhiSetComputePipeline(device, dispatch, pipeline) == mrhi_success &&
-              mrhiSetBindings(device, dispatch, 0, bindings, 2) == mrhi_success &&
-              mrhiDispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
-              mrhiEndPass(device, dispatch) == mrhi_success &&
-              mrhiBeginPass(device, read) == mrhi_success &&
-              mrhiReadBuffer(device, read, outputs, 0, outputDef.size, &result) == mrhi_success &&
-              mrhiEndPass(device, read) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, copy) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, copy, inputs, 0, values, inputDef.size) ==
+                  mrhi_success &&
+              mrhiPass_End(device, copy) == mrhi_success &&
+              mrhiPass_Begin(device, dispatch) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, dispatch, pipeline) == mrhi_success &&
+              mrhiPass_SetBindings(device, dispatch, 0, bindings, 2) == mrhi_success &&
+              mrhiPass_Dispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
+              mrhiPass_End(device, dispatch) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, outputs, 0, outputDef.size, &result) ==
+                  mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
           "uploaded, dispatched and read");
     Finish(device, 1);
     uint32_t got[8] = {0};
     size_t taken = 0;
-    bool whole = mrhiTakeReadback(device, result, got, sizeof(got), &taken) == mrhi_success &&
-                 taken == outputDef.size;
+    bool whole =
+        mrhiRequest_TakeReadback(device, result, got, sizeof(got), &taken) == mrhi_success &&
+        taken == outputDef.size;
     bool same = !s_runs || (whole && memcmp(got, wanted, taken) == 0);
     for (uint32_t i = 0; whole && !same && i < words; ++i)
     {
@@ -2268,25 +2287,26 @@ static void CheckSampledTwin(Scene* scene)
     mrhiPassId draw = DrawPass(scene, draws);
     mrhiAccess reads = Whole(scene->t, mrhi_accessCopySource);
     mrhiPassId read = CopyPass(device, &reads, 1);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     const uint8_t texel[4] = {188, 188, 188, 255};
     const mrhiTexelLayout layout = {.bytesPerRow = 4, .rowsPerImage = 1};
-    CHECK(mrhiBeginPass(device, copy) == mrhi_success &&
-              mrhiWriteBuffer(device, copy, scene->u, 0, kColor, sizeof(kColor)) == mrhi_success &&
-              mrhiWriteTexture(device, copy, &(mrhiTextureCopy){.resource = gray}, texel, 4,
-                               &layout, &(mrhiExtent3d){1, 1, 1}) == mrhi_success &&
-              mrhiEndPass(device, copy) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, copy) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, copy, scene->u, 0, kColor, sizeof(kColor)) ==
+                  mrhi_success &&
+              mrhiPass_WriteTexture(device, copy, &(mrhiTextureCopy){.resource = gray}, texel, 4,
+                                    &layout, &(mrhiExtent3d){1, 1, 1}) == mrhi_success &&
+              mrhiPass_End(device, copy) == mrhi_success,
           "the color and the gray texel uploaded");
     const float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-    CHECK(mrhiBeginPass(device, draw) == mrhi_success &&
-              mrhiSetGraphicsPipeline(device, draw, scene->draw) == mrhi_success &&
-              mrhiSetRootBlock(device, draw, 0, tint, sizeof(tint)) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, draw) == mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(device, draw, scene->draw) == mrhi_success &&
+              mrhiPass_SetRootBlock(device, draw, 0, tint, sizeof(tint)) == mrhi_success,
           "a pipeline set");
     const mrhiBinding buffers[2] = {
         {.slot = 0, .resource = scene->u, .size = MRHI_WHOLE_SIZE},
         {.slot = 1, .resource = scene->d, .size = MRHI_WHOLE_SIZE},
     };
-    CHECK(mrhiSetBindings(device, draw, 0, buffers, 2) == mrhi_success, "table 0");
+    CHECK(mrhiPass_SetBindings(device, draw, 0, buffers, 2) == mrhi_success, "table 0");
     const mrhiBinding twin[2] = {
         {.slot = 0,
          .resource = gray,
@@ -2294,17 +2314,17 @@ static void CheckSampledTwin(Scene* scene)
          .range = {.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING}},
         {.slot = 1, .sampler = scene->sampler},
     };
-    CHECK(mrhiSetBindings(device, draw, 1, twin, 2) == mrhi_success, "the twin bound");
-    CHECK(mrhiDraw(device, draw, 3, 1, 2, 0) == mrhi_success &&
-              mrhiEndPass(device, draw) == mrhi_success &&
-              mrhiBeginPass(device, read) == mrhi_success,
+    CHECK(mrhiPass_SetBindings(device, draw, 1, twin, 2) == mrhi_success, "the twin bound");
+    CHECK(mrhiPass_Draw(device, draw, 3, 1, 2, 0) == mrhi_success &&
+              mrhiPass_End(device, draw) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success,
           "drawn");
     mrhiRequestId pixels = ReadTarget(scene, read);
-    CHECK(mrhiEndPass(device, read) == mrhi_success, "read");
+    CHECK(mrhiPass_End(device, read) == mrhi_success, "read");
     Finish(device, 1);
     uint8_t image[256];
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success,
+    CHECK(mrhiRequest_TakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success,
           "the pixels");
     // The scene's color, 1, 0.2, 0.6 and 1, times the decoded texel.
     static const uint8_t kHalf[4] = {128, 26, 77, 255};
@@ -2350,31 +2370,32 @@ static void CheckClear(Scene* scene)
     mrhiAccess reads[2] = {Whole(scene->t, mrhi_accessCopySource),
                            Whole(volume, mrhi_accessCopySource)};
     mrhiPassId read = CopyPass(device, reads, 2);
-    CHECK(mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, clear) == mrhi_success &&
-              mrhiEndPass(device, clear) == mrhi_success &&
-              mrhiBeginPass(device, slice) == mrhi_success &&
-              mrhiEndPass(device, slice) == mrhi_success &&
-              mrhiBeginPass(device, read) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, clear) == mrhi_success &&
+              mrhiPass_End(device, clear) == mrhi_success &&
+              mrhiPass_Begin(device, slice) == mrhi_success &&
+              mrhiPass_End(device, slice) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success,
           "cleared");
     mrhiRequestId pixels = ReadTarget(scene, read);
     const mrhiTextureCopy sliceAt = {.resource = volume, .z = 2};
     mrhiRequestId slicePixels = {0};
-    CHECK(mrhiReadTexture(device, read, &sliceAt, &(mrhiExtent3d){4, 4, 1}, &slicePixels) ==
+    CHECK(mrhiPass_ReadTexture(device, read, &sliceAt, &(mrhiExtent3d){4, 4, 1}, &slicePixels) ==
               mrhi_success,
           "the slice read");
-    CHECK(mrhiEndPass(device, read) == mrhi_success, "read");
+    CHECK(mrhiPass_End(device, read) == mrhi_success, "read");
     Finish(device, 2);
     uint8_t image[256];
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success &&
               size == sizeof(image),
           "the pixels");
     static const uint8_t kCleared[4] = {51, 102, 153, 204};
     CHECK(!s_runs || (IsNear(&image[0], kCleared) && IsNear(&image[(7 * 8 + 7) * 4], kCleared)),
           "the clear color, channel by channel");
     uint8_t texels[64];
-    CHECK(mrhiTakeReadback(device, slicePixels, texels, sizeof(texels), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, slicePixels, texels, sizeof(texels), &size) ==
+                  mrhi_success &&
               size == sizeof(texels),
           "the slice's texels");
     static const uint8_t kSlice[4] = {204, 153, 102, 51};
@@ -2424,21 +2445,21 @@ static void CheckViewFormat(Scene* scene)
     mrhiAccess reads[2] = {Whole(single, mrhi_accessCopySource),
                            Whole(resolved, mrhi_accessCopySource)};
     mrhiPassId read = CopyPass(device, reads, 2);
-    CHECK(mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, clear) == mrhi_success &&
-              mrhiEndPass(device, clear) == mrhi_success &&
-              mrhiBeginPass(device, resolve) == mrhi_success &&
-              mrhiEndPass(device, resolve) == mrhi_success &&
-              mrhiBeginPass(device, read) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, clear) == mrhi_success &&
+              mrhiPass_End(device, clear) == mrhi_success &&
+              mrhiPass_Begin(device, resolve) == mrhi_success &&
+              mrhiPass_End(device, resolve) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success,
           "cleared in the twin");
     const mrhiExtent3d extent = {4, 4, 1};
     mrhiRequestId requests[2] = {0};
-    CHECK(mrhiReadTexture(device, read, &(mrhiTextureCopy){.resource = single}, &extent,
-                          &requests[0]) == mrhi_success &&
-              mrhiReadTexture(device, read, &(mrhiTextureCopy){.resource = resolved}, &extent,
-                              &requests[1]) == mrhi_success,
+    CHECK(mrhiPass_ReadTexture(device, read, &(mrhiTextureCopy){.resource = single}, &extent,
+                               &requests[0]) == mrhi_success &&
+              mrhiPass_ReadTexture(device, read, &(mrhiTextureCopy){.resource = resolved}, &extent,
+                                   &requests[1]) == mrhi_success,
           "both read");
-    CHECK(mrhiEndPass(device, read) == mrhi_success, "read");
+    CHECK(mrhiPass_End(device, read) == mrhi_success, "read");
     Finish(device, 2);
     // 0.2, 0.4 and 0.6 sRGB-encoded; alpha stays linear.
     static const uint8_t kEncoded[4] = {124, 170, 203, 204};
@@ -2446,7 +2467,7 @@ static void CheckViewFormat(Scene* scene)
     {
         uint8_t texels[64];
         size_t size = 0;
-        CHECK(mrhiTakeReadback(device, requests[i], texels, sizeof(texels), &size) ==
+        CHECK(mrhiRequest_TakeReadback(device, requests[i], texels, sizeof(texels), &size) ==
                       mrhi_success &&
                   size == sizeof(texels),
               "the texels");
@@ -2467,23 +2488,23 @@ static void CheckCulling(Scene* scene)
     mrhiPassId draw = DrawPass(scene, draws);
     mrhiAccess reads = Whole(scene->t, mrhi_accessCopySource);
     mrhiPassId read = CopyPass(device, &reads, 1);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     const float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-    CHECK(mrhiBeginPass(device, draw) == mrhi_success &&
-              mrhiSetGraphicsPipeline(device, draw, scene->culled) == mrhi_success &&
-              mrhiSetRootBlock(device, draw, 0, tint, sizeof(tint)) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, draw) == mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(device, draw, scene->culled) == mrhi_success &&
+              mrhiPass_SetRootBlock(device, draw, 0, tint, sizeof(tint)) == mrhi_success,
           "a pipeline set");
     BindScene(scene, draw);
-    CHECK(mrhiDraw(device, draw, 3, 1, 0, 0) == mrhi_success &&
-              mrhiEndPass(device, draw) == mrhi_success &&
-              mrhiBeginPass(device, read) == mrhi_success,
+    CHECK(mrhiPass_Draw(device, draw, 3, 1, 0, 0) == mrhi_success &&
+              mrhiPass_End(device, draw) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success,
           "drawn");
     mrhiRequestId pixels = ReadTarget(scene, read);
-    CHECK(mrhiEndPass(device, read) == mrhi_success, "read");
+    CHECK(mrhiPass_End(device, read) == mrhi_success, "read");
     Finish(device, 1);
     uint8_t image[256];
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success,
+    CHECK(mrhiRequest_TakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success,
           "the pixels");
     bool black = true;
     for (int i = 0; i < 64; ++i)
@@ -2510,11 +2531,11 @@ static void DrawWith(const Scene* scene, mrhiPassId pass, mrhiGraphicsPipelineId
                      uint32_t firstVertex)
 {
     const float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-    CHECK(mrhiSetGraphicsPipeline(scene->device, pass, pipeline) == mrhi_success &&
-              mrhiSetRootBlock(scene->device, pass, 0, tint, sizeof(tint)) == mrhi_success,
+    CHECK(mrhiPass_SetGraphicsPipeline(scene->device, pass, pipeline) == mrhi_success &&
+              mrhiPass_SetRootBlock(scene->device, pass, 0, tint, sizeof(tint)) == mrhi_success,
           "a pipeline set");
     BindScene(scene, pass);
-    CHECK(mrhiDraw(scene->device, pass, 3, 1, firstVertex, 0) == mrhi_success, "drawn");
+    CHECK(mrhiPass_Draw(scene->device, pass, 3, 1, firstVertex, 0) == mrhi_success, "drawn");
 }
 
 // A frame that writes none of a set's queries resolves them all to 0,
@@ -2531,19 +2552,19 @@ static void CheckUnwritten(Scene* scene, mrhiQuerySetId occlusion, mrhiBufferId 
     mrhiPassId resolve = CopyPass(device, &resolves, 1);
     mrhiAccess reads = Whole(r, mrhi_accessCopySource);
     mrhiPassId read = CopyPass(device, &reads, 1);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     uint8_t ones[24];
     memset(ones, 0xFF, sizeof(ones));
     mrhiRequestId request = {0};
-    CHECK(mrhiBeginPass(device, filled) == mrhi_success &&
-              mrhiWriteBuffer(device, filled, r, 0, ones, sizeof(ones)) == mrhi_success &&
-              mrhiEndPass(device, filled) == mrhi_success &&
-              mrhiBeginPass(device, resolve) == mrhi_success &&
-              mrhiResolveQueries(device, resolve, occlusion, 0, 3, r, 0) == mrhi_success &&
-              mrhiEndPass(device, resolve) == mrhi_success &&
-              mrhiBeginPass(device, read) == mrhi_success &&
-              mrhiReadBuffer(device, read, r, 0, sizeof(ones), &request) == mrhi_success &&
-              mrhiEndPass(device, read) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, filled) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, filled, r, 0, ones, sizeof(ones)) == mrhi_success &&
+              mrhiPass_End(device, filled) == mrhi_success &&
+              mrhiPass_Begin(device, resolve) == mrhi_success &&
+              mrhiPass_ResolveQueries(device, resolve, occlusion, 0, 3, r, 0) == mrhi_success &&
+              mrhiPass_End(device, resolve) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, r, 0, sizeof(ones), &request) == mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
           "resolved");
     Finish(device, 1);
     const uint8_t zeros[24] = {0};
@@ -2591,39 +2612,40 @@ static void CheckQueries(Scene* scene, bool timestamps)
     mrhiPassId resolve = CopyPass(device, &resolves, 1);
     mrhiAccess reads = Whole(r, mrhi_accessCopySource);
     mrhiPassId read = CopyPass(device, &reads, 1);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     uint8_t ones[512];
     memset(ones, 0xFF, sizeof(ones));
-    CHECK(mrhiBeginPass(device, filled) == mrhi_success &&
-              mrhiWriteBuffer(device, filled, r, 0, ones, sizeof(ones)) == mrhi_success &&
-              mrhiEndPass(device, filled) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, filled) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, filled, r, 0, ones, sizeof(ones)) == mrhi_success &&
+              mrhiPass_End(device, filled) == mrhi_success,
           "filled");
-    CHECK(mrhiBeginPass(device, draw) == mrhi_success &&
-              mrhiBeginOcclusionQuery(device, draw, 0) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, draw) == mrhi_success &&
+              mrhiPass_BeginOcclusionQuery(device, draw, 0) == mrhi_success,
           "query 0 begun");
     DrawWith(scene, draw, scene->draw, 2);
-    CHECK(mrhiEndOcclusionQuery(device, draw) == mrhi_success &&
-              mrhiBeginOcclusionQuery(device, draw, 1) == mrhi_success,
+    CHECK(mrhiPass_EndOcclusionQuery(device, draw) == mrhi_success &&
+              mrhiPass_BeginOcclusionQuery(device, draw, 1) == mrhi_success,
           "query 1 begun");
     DrawWith(scene, draw, scene->culled, 0);
-    CHECK(mrhiEndOcclusionQuery(device, draw) == mrhi_success &&
-              mrhiEndPass(device, draw) == mrhi_success,
+    CHECK(mrhiPass_EndOcclusionQuery(device, draw) == mrhi_success &&
+              mrhiPass_End(device, draw) == mrhi_success,
           "queried");
-    CHECK(mrhiBeginPass(device, resolve) == mrhi_success &&
-              mrhiResolveQueries(device, resolve, occlusion, 0, 3, r, 0) == mrhi_success &&
+    CHECK(mrhiPass_Begin(device, resolve) == mrhi_success &&
+              mrhiPass_ResolveQueries(device, resolve, occlusion, 0, 3, r, 0) == mrhi_success &&
               (!timestamps ||
-               mrhiResolveQueries(device, resolve, times, 0, 2, r, 256) == mrhi_success) &&
-              mrhiEndPass(device, resolve) == mrhi_success,
+               mrhiPass_ResolveQueries(device, resolve, times, 0, 2, r, 256) == mrhi_success) &&
+              mrhiPass_End(device, resolve) == mrhi_success,
           "resolved");
     mrhiRequestId request = {0};
-    CHECK(mrhiBeginPass(device, read) == mrhi_success &&
-              mrhiReadBuffer(device, read, r, 0, sizeof(ones), &request) == mrhi_success &&
-              mrhiEndPass(device, read) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, r, 0, sizeof(ones), &request) == mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
           "read");
     Finish(device, 1);
     uint64_t values[64];
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, request, values, sizeof(values), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, request, values, sizeof(values), &size) ==
+                  mrhi_success &&
               size == sizeof(values),
           "the values");
     CHECK(!s_runs || (values[0] != 0 && values[1] == 0 && values[2] == 0),
@@ -2700,22 +2722,23 @@ static void DrawPlaced(const Scene* scene, mrhiPassId pass, mrhiResourceId verti
     const mrhiViewport left = {0.0f, 0.0f, 4.0f, 8.0f, 0.0f, 1.0f};
     const mrhiViewport whole = {0.0f, 0.0f, 8.0f, 8.0f, 0.0f, 1.0f};
     const mrhiScissorRect lowerRight = {4, 4, 4, 4};
-    CHECK(mrhiBeginPass(device, pass) == mrhi_success &&
-              mrhiSetGraphicsPipeline(device, pass, scene->placed) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, pass) == mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(device, pass, scene->placed) == mrhi_success,
           "a placed pipeline");
     BindScene(scene, pass);
-    CHECK(mrhiSetVertexBuffer(device, pass, 0, vertices, 0, sizeof(kPlaced)) == mrhi_success &&
-              mrhiSetIndexBuffer(device, pass, indices, mrhi_indexUint16, 0, 12) == mrhi_success &&
-              mrhiSetViewport(device, pass, &left) == mrhi_success &&
-              mrhiSetStencilReference(device, pass, 1) == mrhi_success &&
-              mrhiSetRootBlock(device, pass, 0, red, sizeof(red)) == mrhi_success &&
-              mrhiDrawIndexed(device, pass, 6, 1, 0, 1, 0) == mrhi_success &&
-              mrhiSetViewport(device, pass, &whole) == mrhi_success &&
-              mrhiSetScissor(device, pass, &lowerRight) == mrhi_success &&
-              mrhiSetStencilReference(device, pass, 2) == mrhi_success &&
-              mrhiSetRootBlock(device, pass, 0, green, sizeof(green)) == mrhi_success &&
-              mrhiDraw(device, pass, 3, 1, 5, 0) == mrhi_success &&
-              mrhiEndPass(device, pass) == mrhi_success,
+    CHECK(mrhiPass_SetVertexBuffer(device, pass, 0, vertices, 0, sizeof(kPlaced)) == mrhi_success &&
+              mrhiPass_SetIndexBuffer(device, pass, indices, mrhi_indexUint16, 0, 12) ==
+                  mrhi_success &&
+              mrhiPass_SetViewport(device, pass, &left) == mrhi_success &&
+              mrhiPass_SetStencilReference(device, pass, 1) == mrhi_success &&
+              mrhiPass_SetRootBlock(device, pass, 0, red, sizeof(red)) == mrhi_success &&
+              mrhiPass_DrawIndexed(device, pass, 6, 1, 0, 1, 0) == mrhi_success &&
+              mrhiPass_SetViewport(device, pass, &whole) == mrhi_success &&
+              mrhiPass_SetScissor(device, pass, &lowerRight) == mrhi_success &&
+              mrhiPass_SetStencilReference(device, pass, 2) == mrhi_success &&
+              mrhiPass_SetRootBlock(device, pass, 0, green, sizeof(green)) == mrhi_success &&
+              mrhiPass_Draw(device, pass, 3, 1, 5, 0) == mrhi_success &&
+              mrhiPass_End(device, pass) == mrhi_success,
           "placed");
 }
 
@@ -2761,33 +2784,35 @@ static void DrawFar(Scene* scene, mrhiGraphicsPipelineId pipeline, uint8_t pixel
     CHECK(mrhiAddPass(device, &def, &draw) == mrhi_success, "a pass");
     mrhiAccess read[2] = {Whole(scene->t, mrhi_accessCopySource), Whole(z, mrhi_accessCopySource)};
     mrhiPassId reading = CopyPass(device, read, 2);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     const float red[4] = {1.0f, 0.0f, 0.0f, 1.0f};
-    CHECK(mrhiBeginPass(device, upload) == mrhi_success &&
-              mrhiWriteBuffer(device, upload, v, 0, kFar, sizeof(kFar)) == mrhi_success &&
-              mrhiEndPass(device, upload) == mrhi_success &&
-              mrhiBeginPass(device, draw) == mrhi_success &&
-              mrhiSetGraphicsPipeline(device, draw, pipeline) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, upload) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, v, 0, kFar, sizeof(kFar)) == mrhi_success &&
+              mrhiPass_End(device, upload) == mrhi_success &&
+              mrhiPass_Begin(device, draw) == mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(device, draw, pipeline) == mrhi_success,
           "a far pipeline");
     BindScene(scene, draw);
-    CHECK(mrhiSetVertexBuffer(device, draw, 0, v, 0, sizeof(kFar)) == mrhi_success &&
-              mrhiSetRootBlock(device, draw, 0, red, sizeof(red)) == mrhi_success &&
-              mrhiDraw(device, draw, 3, 1, 0, 0) == mrhi_success &&
-              mrhiEndPass(device, draw) == mrhi_success &&
-              mrhiBeginPass(device, reading) == mrhi_success,
+    CHECK(mrhiPass_SetVertexBuffer(device, draw, 0, v, 0, sizeof(kFar)) == mrhi_success &&
+              mrhiPass_SetRootBlock(device, draw, 0, red, sizeof(red)) == mrhi_success &&
+              mrhiPass_Draw(device, draw, 3, 1, 0, 0) == mrhi_success &&
+              mrhiPass_End(device, draw) == mrhi_success &&
+              mrhiPass_Begin(device, reading) == mrhi_success,
           "drawn");
     mrhiRequestId color = ReadTarget(scene, reading);
     mrhiRequestId depth = {0};
-    CHECK(mrhiReadTexture(device, reading,
-                          &(mrhiTextureCopy){.resource = z, .aspect = mrhi_aspectDepthOnly},
-                          &(mrhiExtent3d){8, 8, 1}, &depth) == mrhi_success &&
-              mrhiEndPass(device, reading) == mrhi_success,
+    CHECK(mrhiPass_ReadTexture(device, reading,
+                               &(mrhiTextureCopy){.resource = z, .aspect = mrhi_aspectDepthOnly},
+                               &(mrhiExtent3d){8, 8, 1}, &depth) == mrhi_success &&
+              mrhiPass_End(device, reading) == mrhi_success,
           "read");
     Finish(device, 2);
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, color, pixels, 256, &size) == mrhi_success && size == 256,
+    CHECK(mrhiRequest_TakeReadback(device, color, pixels, 256, &size) == mrhi_success &&
+              size == 256,
           "the pixels");
-    CHECK(mrhiTakeReadback(device, depth, depths, 64 * sizeof(float), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, depth, depths, 64 * sizeof(float), &size) ==
+                  mrhi_success &&
               size == 64 * sizeof(float),
           "the depths");
 }
@@ -2914,27 +2939,28 @@ static void CheckIndirectFirstInstance(Scene* scene)
     CHECK(mrhiAddPass(device, &passDef, &draw) == mrhi_success, "a pass");
     mrhiAccess read = Whole(scene->t, mrhi_accessCopySource);
     mrhiPassId reading = CopyPass(device, &read, 1);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
-    CHECK(mrhiBeginPass(device, upload) == mrhi_success &&
-              mrhiWriteBuffer(device, upload, v, 0, kCover, sizeof(kCover)) == mrhi_success &&
-              mrhiWriteBuffer(device, upload, c, 0, kColors, sizeof(kColors)) == mrhi_success &&
-              mrhiWriteBuffer(device, upload, a, 0, kArguments, sizeof(kArguments)) ==
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_Begin(device, upload) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, v, 0, kCover, sizeof(kCover)) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, c, 0, kColors, sizeof(kColors)) ==
                   mrhi_success &&
-              mrhiEndPass(device, upload) == mrhi_success &&
-              mrhiBeginPass(device, draw) == mrhi_success &&
-              mrhiSetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
-              mrhiSetVertexBuffer(device, draw, 0, v, 0, sizeof(kCover)) == mrhi_success &&
-              mrhiSetVertexBuffer(device, draw, 1, c, 0, sizeof(kColors)) == mrhi_success &&
-              mrhiDrawIndirect(device, draw, a, 0) == mrhi_success &&
-              mrhiEndPass(device, draw) == mrhi_success &&
-              mrhiBeginPass(device, reading) == mrhi_success,
+              mrhiPass_WriteBuffer(device, upload, a, 0, kArguments, sizeof(kArguments)) ==
+                  mrhi_success &&
+              mrhiPass_End(device, upload) == mrhi_success &&
+              mrhiPass_Begin(device, draw) == mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
+              mrhiPass_SetVertexBuffer(device, draw, 0, v, 0, sizeof(kCover)) == mrhi_success &&
+              mrhiPass_SetVertexBuffer(device, draw, 1, c, 0, sizeof(kColors)) == mrhi_success &&
+              mrhiPass_DrawIndirect(device, draw, a, 0) == mrhi_success &&
+              mrhiPass_End(device, draw) == mrhi_success &&
+              mrhiPass_Begin(device, reading) == mrhi_success,
           "drawn");
     mrhiRequestId color = ReadTarget(scene, reading);
-    CHECK(mrhiEndPass(device, reading) == mrhi_success, "read");
+    CHECK(mrhiPass_End(device, reading) == mrhi_success, "read");
     Finish(device, 1);
     uint8_t pixels[256];
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, color, pixels, sizeof(pixels), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, color, pixels, sizeof(pixels), &size) == mrhi_success &&
               size == sizeof(pixels),
           "the pixels");
     static const uint8_t kRed[4] = {255, 0, 0, 255};
@@ -2981,18 +3007,19 @@ static void CheckDualSourceBlending(Scene* scene)
     CHECK(mrhiAddPass(device, &passDef, &draw) == mrhi_success, "a pass");
     mrhiAccess read = Whole(scene->t, mrhi_accessCopySource);
     mrhiPassId reading = CopyPass(device, &read, 1);
-    CHECK(mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, draw) == mrhi_success &&
-              mrhiSetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
-              mrhiDraw(device, draw, 3, 1, 0, 0) == mrhi_success &&
-              mrhiEndPass(device, draw) == mrhi_success &&
-              mrhiBeginPass(device, reading) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, draw) == mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
+              mrhiPass_Draw(device, draw, 3, 1, 0, 0) == mrhi_success &&
+              mrhiPass_End(device, draw) == mrhi_success &&
+              mrhiPass_Begin(device, reading) == mrhi_success,
           "drawn");
     mrhiRequestId color = ReadTarget(scene, reading);
-    CHECK(mrhiEndPass(device, reading) == mrhi_success, "read");
+    CHECK(mrhiPass_End(device, reading) == mrhi_success, "read");
     Finish(device, 1);
     uint8_t pixels[256];
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, color, pixels, sizeof(pixels), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, color, pixels, sizeof(pixels), &size) == mrhi_success &&
               size == sizeof(pixels),
           "the pixels");
     static const uint8_t kBlended[4] = {191, 191, 255, 255};
@@ -3043,43 +3070,46 @@ static void CheckRenderState(Scene* scene)
         PlacedPass(scene, z, true, Whole(v, mrhi_accessVertex), Whole(a, mrhi_accessIndirect));
     mrhiAccess read[2] = {Whole(scene->t, mrhi_accessCopySource), Whole(z, mrhi_accessCopySource)};
     mrhiPassId reading = CopyPass(device, read, 2);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
-    CHECK(mrhiBeginPass(device, upload) == mrhi_success &&
-              mrhiWriteBuffer(device, upload, v, 0, kPlaced, sizeof(kPlaced)) == mrhi_success &&
-              mrhiWriteBuffer(device, upload, i, 0, quad, sizeof(quad)) == mrhi_success &&
-              mrhiWriteBuffer(device, upload, a, 0, arguments, sizeof(arguments)) == mrhi_success &&
-              mrhiEndPass(device, upload) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_Begin(device, upload) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, v, 0, kPlaced, sizeof(kPlaced)) ==
+                  mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, i, 0, quad, sizeof(quad)) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, a, 0, arguments, sizeof(arguments)) ==
+                  mrhi_success &&
+              mrhiPass_End(device, upload) == mrhi_success,
           "uploaded");
     DrawPlaced(scene, placed, v, i);
     const float blue[4] = {0.0f, 0.0f, 1.0f, 1.0f};
     const mrhiColor constant = {1.0f, 1.0f, 0.6f, 1.0f};
-    CHECK(mrhiBeginPass(device, tested) == mrhi_success &&
-              mrhiSetGraphicsPipeline(device, tested, scene->tested) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, tested) == mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(device, tested, scene->tested) == mrhi_success,
           "a tested pipeline");
     BindScene(scene, tested);
-    CHECK(mrhiSetVertexBuffer(device, tested, 0, v, 0, sizeof(kPlaced)) == mrhi_success &&
-              mrhiSetStencilReference(device, tested, 2) == mrhi_success &&
-              mrhiSetBlendConstant(device, tested, &constant) == mrhi_success &&
-              mrhiSetRootBlock(device, tested, 0, blue, sizeof(blue)) == mrhi_success &&
-              mrhiDrawIndirect(device, tested, a, 16) == mrhi_success &&
-              mrhiEndPass(device, tested) == mrhi_success,
+    CHECK(mrhiPass_SetVertexBuffer(device, tested, 0, v, 0, sizeof(kPlaced)) == mrhi_success &&
+              mrhiPass_SetStencilReference(device, tested, 2) == mrhi_success &&
+              mrhiPass_SetBlendConstant(device, tested, &constant) == mrhi_success &&
+              mrhiPass_SetRootBlock(device, tested, 0, blue, sizeof(blue)) == mrhi_success &&
+              mrhiPass_DrawIndirect(device, tested, a, 16) == mrhi_success &&
+              mrhiPass_End(device, tested) == mrhi_success,
           "tested");
-    CHECK(mrhiBeginPass(device, reading) == mrhi_success, "reading");
+    CHECK(mrhiPass_Begin(device, reading) == mrhi_success, "reading");
     mrhiRequestId pixels = ReadTarget(scene, reading);
     mrhiRequestId stencil = {0};
-    CHECK(mrhiReadTexture(device, reading,
-                          &(mrhiTextureCopy){.resource = z, .aspect = mrhi_aspectStencilOnly},
-                          &(mrhiExtent3d){8, 8, 1}, &stencil) == mrhi_success,
+    CHECK(mrhiPass_ReadTexture(device, reading,
+                               &(mrhiTextureCopy){.resource = z, .aspect = mrhi_aspectStencilOnly},
+                               &(mrhiExtent3d){8, 8, 1}, &stencil) == mrhi_success,
           "the stencil read");
-    CHECK(mrhiEndPass(device, reading) == mrhi_success, "read");
+    CHECK(mrhiPass_End(device, reading) == mrhi_success, "read");
     Finish(device, 2);
     uint8_t image[256];
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, pixels, image, sizeof(image), &size) == mrhi_success &&
               size == sizeof(image),
           "the pixels");
     uint8_t stencils[64];
-    CHECK(mrhiTakeReadback(device, stencil, stencils, sizeof(stencils), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, stencil, stencils, sizeof(stencils), &size) ==
+                  mrhi_success &&
               size == sizeof(stencils),
           "the stencil values");
     bool cleared = true;
@@ -3145,36 +3175,37 @@ static void CheckComputeSplit(Scene* scene, bool timestamps)
     mrhiAccess reads[3] = {Whole(scene->d, mrhi_accessCopySource), Whole(e, mrhi_accessCopySource),
                            Whole(r, mrhi_accessCopySource)};
     mrhiPassId read = CopyPass(device, reads, 3);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     const uint32_t values[8] = {1, 2, 3, 4, 5, 6, 7, 8};
     const uint32_t marks[4] = {9, 8, 7, 6};
     const float five[4] = {5.0f, 0.0f, 0.0f, 0.0f};
-    CHECK(mrhiBeginPass(device, filled) == mrhi_success &&
-              mrhiWriteBuffer(device, filled, scene->d, 0, values, sizeof(values)) ==
+    CHECK(mrhiPass_Begin(device, filled) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, filled, scene->d, 0, values, sizeof(values)) ==
                   mrhi_success &&
-              mrhiEndPass(device, filled) == mrhi_success &&
-              mrhiBeginPass(device, split) == mrhi_success &&
-              mrhiSetComputePipeline(device, split, scene->adding) == mrhi_success &&
-              mrhiSetRootBlock(device, split, 0, five, sizeof(five)) == mrhi_success,
+              mrhiPass_End(device, filled) == mrhi_success &&
+              mrhiPass_Begin(device, split) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, split, scene->adding) == mrhi_success &&
+              mrhiPass_SetRootBlock(device, split, 0, five, sizeof(five)) == mrhi_success,
           "an adding pipeline set");
     BindScene(scene, split);
-    CHECK(mrhiDispatch(device, split, 1, 1, 1) == mrhi_success &&
-              mrhiWriteBuffer(device, split, e, 0, marks, sizeof(marks)) == mrhi_success &&
-              mrhiDispatch(device, split, 1, 1, 1) == mrhi_success &&
-              mrhiEndPass(device, split) == mrhi_success,
+    CHECK(mrhiPass_Dispatch(device, split, 1, 1, 1) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, split, e, 0, marks, sizeof(marks)) == mrhi_success &&
+              mrhiPass_Dispatch(device, split, 1, 1, 1) == mrhi_success &&
+              mrhiPass_End(device, split) == mrhi_success,
           "dispatched around an upload");
     mrhiRequestId sums = {0};
     mrhiRequestId marked = {0};
     mrhiRequestId stamps = {0};
-    CHECK(mrhiBeginPass(device, resolve) == mrhi_success &&
+    CHECK(mrhiPass_Begin(device, resolve) == mrhi_success &&
               (!timestamps ||
-               mrhiResolveQueries(device, resolve, times, 0, 2, r, 0) == mrhi_success) &&
-              mrhiEndPass(device, resolve) == mrhi_success &&
-              mrhiBeginPass(device, read) == mrhi_success &&
-              mrhiReadBuffer(device, read, scene->d, 0, sizeof(values), &sums) == mrhi_success &&
-              mrhiReadBuffer(device, read, e, 0, sizeof(marks), &marked) == mrhi_success &&
-              mrhiReadBuffer(device, read, r, 0, 16, &stamps) == mrhi_success &&
-              mrhiEndPass(device, read) == mrhi_success,
+               mrhiPass_ResolveQueries(device, resolve, times, 0, 2, r, 0) == mrhi_success) &&
+              mrhiPass_End(device, resolve) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, scene->d, 0, sizeof(values), &sums) ==
+                  mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, e, 0, sizeof(marks), &marked) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, r, 0, 16, &stamps) == mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
           "read");
     Finish(device, 3);
     const uint32_t expected[8] = {11, 12, 13, 14, 15, 16, 17, 18};
@@ -3183,7 +3214,7 @@ static void CheckComputeSplit(Scene* scene, bool timestamps)
     CHECK(Taken(device, marked, (const uint8_t*)marks, sizeof(marks)), "the upload between");
     uint64_t ticks[2] = {0};
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, stamps, ticks, sizeof(ticks), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, stamps, ticks, sizeof(ticks), &size) == mrhi_success &&
               (!s_runs || !timestamps || (ticks[0] != 0 && ticks[1] >= ticks[0])),
           "the pass's timestamps");
     CHECK(!timestamps || mrhiDestroyQuerySet(device, times) == mrhi_success, "destroyed");
@@ -3208,12 +3239,12 @@ static mrhiPassId ClassPass(mrhiDevice* device, mrhiPassClass passClass, const m
 static bool AddIn(const Scene* scene, mrhiPassId pass, float value)
 {
     const float block[4] = {value, 0.0f, 0.0f, 0.0f};
-    bool set = mrhiBeginPass(scene->device, pass) == mrhi_success &&
-               mrhiSetComputePipeline(scene->device, pass, scene->adding) == mrhi_success &&
-               mrhiSetRootBlock(scene->device, pass, 0, block, sizeof(block)) == mrhi_success;
+    bool set = mrhiPass_Begin(scene->device, pass) == mrhi_success &&
+               mrhiPass_SetComputePipeline(scene->device, pass, scene->adding) == mrhi_success &&
+               mrhiPass_SetRootBlock(scene->device, pass, 0, block, sizeof(block)) == mrhi_success;
     BindScene(scene, pass);
-    return set && mrhiDispatch(scene->device, pass, 1, 1, 1) == mrhi_success &&
-           mrhiEndPass(scene->device, pass) == mrhi_success;
+    return set && mrhiPass_Dispatch(scene->device, pass, 1, 1, 1) == mrhi_success &&
+           mrhiPass_End(scene->device, pass) == mrhi_success;
 }
 
 // One buffer passed between the three pass classes: a transfer upload,
@@ -3245,30 +3276,32 @@ static void CheckPassClasses(Scene* scene)
     mrhiPassId one = ClassPass(device, mrhi_passAsyncCompute, uses, 3);
     const mrhiAccess reads[2] = {back, Whole(e, mrhi_accessCopySource)};
     mrhiPassId last = ClassPass(device, mrhi_passTransfer, reads, 2);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     const uint32_t values[8] = {1, 2, 3, 4, 5, 6, 7, 8};
     mrhiRequestId added = {0};
     mrhiRequestId again = {0};
     mrhiRequestId marks = {0};
     const uint32_t words[4] = {9, 8, 7, 6};
-    CHECK(mrhiBeginPass(device, filled) == mrhi_success &&
-              mrhiWriteBuffer(device, filled, scene->d, 0, values, sizeof(values)) ==
+    CHECK(mrhiPass_Begin(device, filled) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, filled, scene->d, 0, values, sizeof(values)) ==
                   mrhi_success &&
-              mrhiEndPass(device, filled) == mrhi_success,
+              mrhiPass_End(device, filled) == mrhi_success,
           "uploaded");
-    CHECK(AddIn(scene, five, 5.0f) && mrhiBeginPass(device, marked) == mrhi_success &&
-              mrhiWriteBuffer(device, marked, e, 0, words, sizeof(words)) == mrhi_success &&
-              mrhiEndPass(device, marked) == mrhi_success && AddIn(scene, seven, 7.0f),
+    CHECK(AddIn(scene, five, 5.0f) && mrhiPass_Begin(device, marked) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, marked, e, 0, words, sizeof(words)) == mrhi_success &&
+              mrhiPass_End(device, marked) == mrhi_success && AddIn(scene, seven, 7.0f),
           "added 5, marked and added 7");
-    CHECK(mrhiBeginPass(device, first) == mrhi_success &&
-              mrhiReadBuffer(device, first, scene->d, 0, sizeof(values), &added) == mrhi_success &&
-              mrhiEndPass(device, first) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, first) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, first, scene->d, 0, sizeof(values), &added) ==
+                  mrhi_success &&
+              mrhiPass_End(device, first) == mrhi_success,
           "read");
     CHECK(AddIn(scene, one, 1.0f), "added 1");
-    CHECK(mrhiBeginPass(device, last) == mrhi_success &&
-              mrhiReadBuffer(device, last, scene->d, 0, sizeof(values), &again) == mrhi_success &&
-              mrhiReadBuffer(device, last, e, 0, sizeof(words), &marks) == mrhi_success &&
-              mrhiEndPass(device, last) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, last) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, last, scene->d, 0, sizeof(values), &again) ==
+                  mrhi_success &&
+              mrhiPass_ReadBuffer(device, last, e, 0, sizeof(words), &marks) == mrhi_success &&
+              mrhiPass_End(device, last) == mrhi_success,
           "read again");
     Finish(device, 3);
     const uint32_t twelve[8] = {13, 14, 15, 16, 17, 18, 19, 20};
@@ -3324,35 +3357,35 @@ static void CheckPassTimestamps(Scene* scene)
     mrhiPassId resolve = CopyPass(device, &resolves, 1);
     mrhiAccess reads[2] = {Whole(e, mrhi_accessCopySource), Whole(r, mrhi_accessCopySource)};
     mrhiPassId read = CopyPass(device, reads, 2);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     const uint32_t marks[4] = {9, 8, 7, 6};
     const float five[4] = {5.0f, 0.0f, 0.0f, 0.0f};
-    CHECK(mrhiBeginPass(device, compute) == mrhi_success &&
-              mrhiSetComputePipeline(device, compute, scene->adding) == mrhi_success &&
-              mrhiSetRootBlock(device, compute, 0, five, sizeof(five)) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, compute) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, compute, scene->adding) == mrhi_success &&
+              mrhiPass_SetRootBlock(device, compute, 0, five, sizeof(five)) == mrhi_success,
           "an adding pipeline set");
     BindScene(scene, compute);
-    CHECK(mrhiDispatch(device, compute, 1, 1, 1) == mrhi_success &&
-              mrhiEndPass(device, compute) == mrhi_success &&
-              mrhiBeginPass(device, transfer) == mrhi_success &&
-              mrhiWriteBuffer(device, transfer, e, 0, marks, sizeof(marks)) == mrhi_success &&
-              mrhiEndPass(device, transfer) == mrhi_success,
+    CHECK(mrhiPass_Dispatch(device, compute, 1, 1, 1) == mrhi_success &&
+              mrhiPass_End(device, compute) == mrhi_success &&
+              mrhiPass_Begin(device, transfer) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, transfer, e, 0, marks, sizeof(marks)) == mrhi_success &&
+              mrhiPass_End(device, transfer) == mrhi_success,
           "dispatched and uploaded");
     mrhiRequestId marked = {0};
     mrhiRequestId stamps = {0};
-    CHECK(mrhiBeginPass(device, resolve) == mrhi_success &&
-              mrhiResolveQueries(device, resolve, times, 0, 4, r, 0) == mrhi_success &&
-              mrhiEndPass(device, resolve) == mrhi_success &&
-              mrhiBeginPass(device, read) == mrhi_success &&
-              mrhiReadBuffer(device, read, e, 0, sizeof(marks), &marked) == mrhi_success &&
-              mrhiReadBuffer(device, read, r, 0, 32, &stamps) == mrhi_success &&
-              mrhiEndPass(device, read) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, resolve) == mrhi_success &&
+              mrhiPass_ResolveQueries(device, resolve, times, 0, 4, r, 0) == mrhi_success &&
+              mrhiPass_End(device, resolve) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, e, 0, sizeof(marks), &marked) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, r, 0, 32, &stamps) == mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
           "read");
     Finish(device, 2);
     CHECK(Taken(device, marked, (const uint8_t*)marks, sizeof(marks)), "the upload");
     uint64_t ticks[4] = {0};
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, stamps, ticks, sizeof(ticks), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, stamps, ticks, sizeof(ticks), &size) == mrhi_success &&
               size == sizeof(ticks),
           "the timestamps");
     CHECK(!s_runs || (ticks[0] != 0 && ticks[1] >= ticks[0]), "the compute pass's timestamps");
@@ -3367,8 +3400,8 @@ static void CheckMultiview(mrhiDevice* device)
 {
     mrhiFeatures features = {0};
     mrhiLimits limits;
-    CHECK(mrhiGetDeviceFeatures(device, &features) == mrhi_success &&
-              mrhiGetDeviceLimits(device, &limits) == mrhi_success,
+    CHECK(mrhiDevice_GetFeatures(device, &features) == mrhi_success &&
+              mrhiDevice_GetLimits(device, &limits) == mrhi_success,
           "the device's features and limits");
     mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
     shaderDef.bytes = s_multiviewContainer;
@@ -3387,7 +3420,7 @@ static void CheckMultiview(mrhiDevice* device)
     CHECK(mrhiCreateTexture(device, &textureDef, &texture) == mrhi_success, "two layers");
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId t = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportTexture(device, texture, &t) == mrhi_success,
           "a frame with them");
     mrhiPassDef drawDef = mrhiDefaultPassDef();
@@ -3411,7 +3444,7 @@ static void CheckMultiview(mrhiDevice* device)
               "the shader destroyed");
         CHECK(mrhiAddPass(device, &drawDef, &draw) == mrhi_errorUnsupported,
               "no two views without multiview");
-        CHECK(mrhiDropFrame(device) == mrhi_success &&
+        CHECK(mrhiDevice_DropFrame(device) == mrhi_success &&
                   mrhiDestroyTexture(device, texture) == mrhi_success,
               "dropped");
         return;
@@ -3432,13 +3465,14 @@ static void CheckMultiview(mrhiDevice* device)
     const mrhiTextureCopy source = {.resource = t};
     const mrhiExtent3d extent = {8, 8, 2};
     mrhiRequestId pixels = {0};
-    CHECK(mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, draw) == mrhi_success &&
-              mrhiSetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
-              mrhiDraw(device, draw, 3, 1, 0, 0) == mrhi_success &&
-              mrhiEndPass(device, draw) == mrhi_success &&
-              mrhiBeginPass(device, reading) == mrhi_success &&
-              mrhiReadTexture(device, reading, &source, &extent, &pixels) == mrhi_success &&
-              mrhiEndPass(device, reading) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, draw) == mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
+              mrhiPass_Draw(device, draw, 3, 1, 0, 0) == mrhi_success &&
+              mrhiPass_End(device, draw) == mrhi_success &&
+              mrhiPass_Begin(device, reading) == mrhi_success &&
+              mrhiPass_ReadTexture(device, reading, &source, &extent, &pixels) == mrhi_success &&
+              mrhiPass_End(device, reading) == mrhi_success,
           "drawn in two views and read");
     Finish(device, 1);
     uint8_t expected[2 * 8 * 8 * 4];
@@ -3487,44 +3521,45 @@ static void CheckStatistics(Scene* scene)
     mrhiPassId resolve = CopyPass(device, &resolves, 1);
     mrhiAccess reads = Whole(r, mrhi_accessCopySource);
     mrhiPassId read = CopyPass(device, &reads, 1);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     uint8_t ones[3 * COUNTERS * sizeof(uint64_t)];
     memset(ones, 0xFF, sizeof(ones));
-    CHECK(mrhiBeginPass(device, filled) == mrhi_success &&
-              mrhiWriteBuffer(device, filled, r, 0, ones, sizeof(ones)) == mrhi_success &&
-              mrhiEndPass(device, filled) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, filled) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, filled, r, 0, ones, sizeof(ones)) == mrhi_success &&
+              mrhiPass_End(device, filled) == mrhi_success,
           "filled");
-    CHECK(mrhiBeginPass(device, draw) == mrhi_success &&
-              mrhiBeginStatisticsQuery(device, draw, set, 0) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, draw) == mrhi_success &&
+              mrhiPass_BeginStatisticsQuery(device, draw, set, 0) == mrhi_success,
           "query 0 begun");
     DrawWith(scene, draw, scene->draw, 2);
-    CHECK(mrhiEndStatisticsQuery(device, draw) == mrhi_success &&
-              mrhiEndPass(device, draw) == mrhi_success,
+    CHECK(mrhiPass_EndStatisticsQuery(device, draw) == mrhi_success &&
+              mrhiPass_End(device, draw) == mrhi_success,
           "drawn");
     const float five[4] = {5.0f, 0.0f, 0.0f, 0.0f};
-    CHECK(mrhiBeginPass(device, dispatch) == mrhi_success &&
-              mrhiBeginStatisticsQuery(device, dispatch, set, 1) == mrhi_success &&
-              mrhiSetComputePipeline(device, dispatch, scene->adding) == mrhi_success &&
-              mrhiSetRootBlock(device, dispatch, 0, five, sizeof(five)) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, dispatch) == mrhi_success &&
+              mrhiPass_BeginStatisticsQuery(device, dispatch, set, 1) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, dispatch, scene->adding) == mrhi_success &&
+              mrhiPass_SetRootBlock(device, dispatch, 0, five, sizeof(five)) == mrhi_success,
           "query 1 begun");
     BindScene(scene, dispatch);
-    CHECK(mrhiDispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
-              mrhiDispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
-              mrhiEndStatisticsQuery(device, dispatch) == mrhi_success &&
-              mrhiEndPass(device, dispatch) == mrhi_success,
+    CHECK(mrhiPass_Dispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
+              mrhiPass_Dispatch(device, dispatch, 1, 1, 1) == mrhi_success &&
+              mrhiPass_EndStatisticsQuery(device, dispatch) == mrhi_success &&
+              mrhiPass_End(device, dispatch) == mrhi_success,
           "dispatched");
     mrhiRequestId request = {0};
-    CHECK(mrhiBeginPass(device, resolve) == mrhi_success &&
-              mrhiResolveQueries(device, resolve, set, 0, 3, r, 0) == mrhi_success &&
-              mrhiEndPass(device, resolve) == mrhi_success &&
-              mrhiBeginPass(device, read) == mrhi_success &&
-              mrhiReadBuffer(device, read, r, 0, sizeof(ones), &request) == mrhi_success &&
-              mrhiEndPass(device, read) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, resolve) == mrhi_success &&
+              mrhiPass_ResolveQueries(device, resolve, set, 0, 3, r, 0) == mrhi_success &&
+              mrhiPass_End(device, resolve) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, r, 0, sizeof(ones), &request) == mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
           "resolved");
     Finish(device, 1);
     uint64_t values[3][COUNTERS];
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, request, values, sizeof(values), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, request, values, sizeof(values), &size) ==
+                  mrhi_success &&
               size == sizeof(values),
           "the counters");
     const uint64_t* drawn = values[0];
@@ -3556,7 +3591,7 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     Scene scene = {.device = device};
     MakeScene(&scene);
     mrhiFeatures features = {0};
-    CHECK(mrhiGetDeviceFeatures(device, &features) == mrhi_success, "its features");
+    CHECK(mrhiDevice_GetFeatures(device, &features) == mrhi_success, "its features");
     RUN("binding.draws", {
         CheckDrawFrame(&scene, DRAW_DIRECT);
         CheckSampledTwin(&scene);
@@ -3650,16 +3685,16 @@ static void RecordStep(Recorder* recorder)
     switch (recorder->step++)
     {
     case 0:
-        recorder->held = mrhiBeginPass(recorder->device, recorder->pass) == mrhi_success;
+        recorder->held = mrhiPass_Begin(recorder->device, recorder->pass) == mrhi_success;
         break;
     case 1:
-        recorder->held =
-            recorder->held && mrhiWriteBuffer(recorder->device, recorder->pass, recorder->buffer, 0,
+        recorder->held = recorder->held &&
+                         mrhiPass_WriteBuffer(recorder->device, recorder->pass, recorder->buffer, 0,
                                               words, sizeof(words)) == mrhi_success;
         break;
     default:
         recorder->held =
-            recorder->held && mrhiEndPass(recorder->device, recorder->pass) == mrhi_success;
+            recorder->held && mrhiPass_End(recorder->device, recorder->pass) == mrhi_success;
         break;
     }
 }
@@ -3729,7 +3764,7 @@ static void RecordBoth(Recorder* first, Recorder* second)
 static void CheckThreads(mrhiDevice* device)
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
     Recorder recorders[2] = {
         {.device = device, .buffer = Declared(device, 256), .value = 0x11111111u},
         {.device = device, .buffer = Declared(device, 256), .value = 0x22222222u},
@@ -3742,16 +3777,16 @@ static void CheckThreads(mrhiDevice* device)
     mrhiAccess reads[2] = {Whole(recorders[0].buffer, mrhi_accessCopySource),
                            Whole(recorders[1].buffer, mrhi_accessCopySource)};
     mrhiPassId read = CopyPass(device, reads, 2);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     RecordBoth(&recorders[0], &recorders[1]);
     CHECK(recorders[0].held && recorders[1].held, "both recorded");
     mrhiRequestId requests[2] = {{0}, {0}};
-    CHECK(mrhiBeginPass(device, read) == mrhi_success &&
-              mrhiReadBuffer(device, read, recorders[0].buffer, 0, 256, &requests[0]) ==
+    CHECK(mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, recorders[0].buffer, 0, 256, &requests[0]) ==
                   mrhi_success &&
-              mrhiReadBuffer(device, read, recorders[1].buffer, 0, 256, &requests[1]) ==
+              mrhiPass_ReadBuffer(device, read, recorders[1].buffer, 0, 256, &requests[1]) ==
                   mrhi_success &&
-              mrhiEndPass(device, read) == mrhi_success,
+              mrhiPass_End(device, read) == mrhi_success,
           "read");
     Finish(device, 2);
     for (int i = 0; i < 2; ++i)
@@ -3766,7 +3801,7 @@ static void CheckThreads(mrhiDevice* device)
     }
 }
 
-// A device lost through mrhiSimulateDeviceLoss with a frame and its
+// A device lost through mrhiDevice_SimulateLoss with a frame and its
 // readback running: the notice, then both answered lost, the report,
 // calls answering lost, a clean destroy, and a new device on the
 // same adapter.
@@ -3781,7 +3816,7 @@ static void CheckLoss(mrhiInstance* instance, mrhiAdapterId adapter)
               NextInstance(instance, &record) == mrhi_success && record.outcome == mrhi_success,
           "a device");
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiResourceId buffer = Declared(device, 256);
     mrhiAccess fill = Whole(buffer, mrhi_accessCopyDestination);
     mrhiPassId filled = CopyPass(device, &fill, 1);
@@ -3790,41 +3825,43 @@ static void CheckLoss(mrhiInstance* instance, mrhiAdapterId adapter)
     const uint32_t words[4] = {1, 2, 3, 4};
     mrhiRequestId readback = {0};
     mrhiRequestId token = {0};
-    CHECK(mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, filled) == mrhi_success &&
-              mrhiWriteBuffer(device, filled, buffer, 0, words, sizeof(words)) == mrhi_success &&
-              mrhiEndPass(device, filled) == mrhi_success &&
-              mrhiBeginPass(device, read) == mrhi_success &&
-              mrhiReadBuffer(device, read, buffer, 0, sizeof(words), &readback) == mrhi_success &&
-              mrhiEndPass(device, read) == mrhi_success &&
-              mrhiSubmitFrame(device, &token) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, filled) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, filled, buffer, 0, words, sizeof(words)) ==
+                  mrhi_success &&
+              mrhiPass_End(device, filled) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, buffer, 0, sizeof(words), &readback) ==
+                  mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success &&
+              mrhiDevice_SubmitFrame(device, &token) == mrhi_success,
           "a frame running");
-    CHECK(mrhiSimulateDeviceLoss(device) == mrhi_success &&
-              mrhiGetDeviceState(device) == mrhi_deviceLost,
+    CHECK(mrhiDevice_SimulateLoss(device) == mrhi_success &&
+              mrhiDevice_GetState(device) == mrhi_deviceLost,
           "lost at once");
     mrhiDeviceNotification notice;
-    CHECK(mrhiNextDeviceNotification(device, &notice) == mrhi_success &&
+    CHECK(mrhiDevice_TakeNotification(device, &notice) == mrhi_success &&
               notice.kind == mrhi_deviceLostNotice,
           "the notice first");
-    CHECK(mrhiNextDeviceNotification(device, &notice) == mrhi_success &&
+    CHECK(mrhiDevice_TakeNotification(device, &notice) == mrhi_success &&
               notice.kind == mrhi_deviceFrameDone && notice.request.index1 == token.index1 &&
               notice.outcome == mrhi_errorDeviceLost,
           "the frame answered lost");
-    CHECK(mrhiNextDeviceNotification(device, &notice) == mrhi_success &&
+    CHECK(mrhiDevice_TakeNotification(device, &notice) == mrhi_success &&
               notice.kind == mrhi_deviceReadbackReady && notice.request.index1 == readback.index1 &&
               notice.outcome == mrhi_errorDeviceLost,
           "its readback answered lost");
     mrhiDeviceLossReport report;
-    CHECK(mrhiGetDeviceLossReport(device, &report) == mrhi_success &&
+    CHECK(mrhiDevice_GetLossReport(device, &report) == mrhi_success &&
               report.reason == mrhi_lossSimulated && report.lastSubmitted.index1 == token.index1,
           "the report");
-    CHECK(mrhiSimulateDeviceLoss(device) == mrhi_errorDeviceLost &&
-              mrhiBeginFrame(device, &frame) == mrhi_errorDeviceLost,
+    CHECK(mrhiDevice_SimulateLoss(device) == mrhi_errorDeviceLost &&
+              mrhiDevice_BeginFrame(device, &frame) == mrhi_errorDeviceLost,
           "lost from then on");
     mrhiDestroyDevice(device);
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success &&
               NextInstance(instance, &record) == mrhi_success && record.outcome == mrhi_success &&
-              mrhiGetDeviceState(device) == mrhi_deviceReady,
+              mrhiDevice_GetState(device) == mrhi_deviceReady,
           "a new device on the adapter");
     mrhiDestroyDevice(device);
 }
@@ -3861,7 +3898,8 @@ static void ExportCache(mrhiInstance* instance, mrhiAdapterId adapter)
     CHECK(mrhiCreateComputePipeline(device, &compute, &pipeline, &request) == mrhi_success,
           "a compute pipeline to cache");
     AwaitPipelines(device, 1, 0);
-    CHECK(mrhiGetPipelineCache(device, s_cache, sizeof(s_cache), &s_cacheBytes) == mrhi_success,
+    CHECK(mrhiDevice_GetPipelineCache(device, s_cache, sizeof(s_cache), &s_cacheBytes) ==
+              mrhi_success,
           "the cache exported");
     mrhiDestroyDevice(device);
 }
@@ -3879,7 +3917,7 @@ static void CheckCacheImport(mrhiInstance* instance, mrhiAdapterId adapter)
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "a device");
     mrhiInstanceNotification record;
     CHECK(NextInstance(instance, &record) == mrhi_success, "ready");
-    CHECK(mrhiGetPipelineCacheOutcome(device) == mrhi_success, "its own cache taken");
+    CHECK(mrhiDevice_GetPipelineCacheOutcome(device) == mrhi_success, "its own cache taken");
     mrhiDestroyDevice(device);
 }
 
@@ -3890,11 +3928,11 @@ static void CheckCacheImport(mrhiInstance* instance, mrhiAdapterId adapter)
 static void CheckOpened(mrhiDevice* device, const mrhiFeatures* asked)
 {
     mrhiFeatures granted;
-    CHECK(mrhiGetDeviceFeatures(device, &granted) == mrhi_success &&
+    CHECK(mrhiDevice_GetFeatures(device, &granted) == mrhi_success &&
               memcmp(&granted, asked, sizeof(granted)) == 0,
           "granted as asked");
     double period = 0.0;
-    mrhiResult status = mrhiGetDeviceTimestampPeriod(device, &period);
+    mrhiResult status = mrhiDevice_GetTimestampPeriod(device, &period);
     CHECK(asked->timestampQuery ? status == mrhi_success && period > 0.0
                                 : status == mrhi_errorUnsupported,
           "a timestamp period with timestamps");
@@ -3907,7 +3945,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     def.features = *asked;
     // Multiview asked for with the adapter's views.
     mrhiLimits limits;
-    CHECK(mrhiGetAdapterLimits(instance, adapter, &limits) == mrhi_success, "limits");
+    CHECK(mrhiAdapter_GetLimits(instance, adapter, &limits) == mrhi_success, "limits");
     def.limits.multiviewViews = asked->multiview ? limits.multiviewViews : 1;
     LABEL(def, "conformance");
     mrhiDevice* device = nullptr;
@@ -3917,14 +3955,14 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     CHECK(NextInstance(instance, &record) == mrhi_success &&
               record.kind == mrhi_instanceDeviceReady && record.outcome == mrhi_success,
           "ready at the next poll");
-    CHECK(mrhiGetDeviceState(device) == mrhi_deviceReady, "ready");
+    CHECK(mrhiDevice_GetState(device) == mrhi_deviceReady, "ready");
     RUN("api.devices", CheckOpened(device, asked));
     RUN("api.notification_wait", CheckNotificationWait(device));
     RUN("api.objects", CheckObjects(device, asked->timestampQuery));
     RUN("hazards.frame_memory", {
         CheckFrameMemory(device);
         mrhiAdapterInfo info = {0};
-        CHECK(mrhiGetAdapterInfo(instance, adapter, &info) == mrhi_success, "its driver");
+        CHECK(mrhiAdapter_GetInfo(instance, adapter, &info) == mrhi_success, "its driver");
         CheckSlicedMemory(device, info.driver == mrhi_driverWebGpu);
     });
     RUN("hazards.transient_twin", CheckTransientTwin(device));
@@ -3976,7 +4014,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
 static void CheckInfo(mrhiInstance* instance, mrhiAdapterId adapter, mrhiDriverKind driver)
 {
     mrhiAdapterInfo info;
-    CHECK(mrhiGetAdapterInfo(instance, adapter, &info) == mrhi_success, "info");
+    CHECK(mrhiAdapter_GetInfo(instance, adapter, &info) == mrhi_success, "info");
     CHECK(info.driver == driver, "the driver's adapter");
     CHECK(info.kind <= mrhi_adapterSoftware, "a kind");
     CHECK(info.vendorId != 0x1414 || info.deviceId != 0x8C || info.kind == mrhi_adapterSoftware,
@@ -4012,7 +4050,7 @@ static size_t CheckDriver(mrhiInstance* instance, mrhiDriverKind driver)
         mrhiFeatures none = {0};
         CheckDevice(instance, ids[i], &none);
         mrhiFeatures all;
-        CHECK(mrhiGetAdapterFeatures(instance, ids[i], &all) == mrhi_success, "features");
+        CHECK(mrhiAdapter_GetFeatures(instance, ids[i], &all) == mrhi_success, "features");
         RUN("capabilities.required", CheckRequired(&all));
         s_full = true;
         CheckDevice(instance, ids[i], &all);
@@ -4051,7 +4089,7 @@ static void TestTestDriver(void)
         return;
     }
     CHECK(CheckDriver(instance, mrhi_driverTest) == 1, "the test adapter");
-    s_driverFaults += mrhiGetDriverFaults(instance);
+    s_driverFaults += mrhiInstance_GetDriverFaults(instance);
     mrhiDestroyInstance(instance);
 }
 
@@ -4166,7 +4204,7 @@ static mrhiResult Configure(mrhiDevice* device, mrhiSurfaceId surface, const mrh
     config.usage = mrhi_textureRenderTarget | (caps->usages & mrhi_textureCopySource);
     config.width = width;
     config.height = height;
-    return mrhiConfigureSurface(device, &config);
+    return mrhiDevice_ConfigureSurface(device, &config);
 }
 
 // Whether an acquire gave an image.
@@ -4185,7 +4223,7 @@ static mrhiResult RecordRed(mrhiDevice* device, mrhiSurfaceId surface, bool read
     mrhiResult acquired = mrhiAcquireSurfaceImage(device, surface, &image);
     if (!IsAcquired(acquired))
     {
-        CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
+        CHECK(mrhiDevice_DropFrame(device) == mrhi_success, "dropped");
         return acquired;
     }
     mrhiPassDef def = mrhiDefaultPassDef();
@@ -4200,17 +4238,17 @@ static mrhiResult RecordRed(mrhiDevice* device, mrhiSurfaceId surface, bool read
     CHECK(mrhiAddPass(device, &def, &clear) == mrhi_success, "a clearing pass");
     mrhiAccess reads = Whole(image, mrhi_accessCopySource);
     mrhiPassId copy = read ? CopyPass(device, &reads, 1) : (mrhiPassId){0};
-    CHECK(mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, clear) == mrhi_success &&
-              mrhiEndPass(device, clear) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, clear) == mrhi_success &&
+              mrhiPass_End(device, clear) == mrhi_success,
           "cleared");
     if (read)
     {
         const mrhiTextureCopy source = {.resource = image};
         const mrhiExtent3d one = {1, 1, 1};
-        CHECK(mrhiBeginPass(device, copy) == mrhi_success &&
-                  mrhiReadTexture(device, copy, &source, &one, requestOut) == mrhi_success &&
-                  mrhiEndPass(device, copy) == mrhi_success,
+        CHECK(mrhiPass_Begin(device, copy) == mrhi_success &&
+                  mrhiPass_ReadTexture(device, copy, &source, &one, requestOut) == mrhi_success &&
+                  mrhiPass_End(device, copy) == mrhi_success,
               "read");
     }
     return acquired;
@@ -4222,7 +4260,7 @@ static mrhiResult PresentRed(mrhiDevice* device, mrhiSurfaceId surface, bool rea
                              uint8_t pixelOut[4])
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success, "a frame");
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiRequestId request = {0};
     mrhiResult acquired = RecordRed(device, surface, read, &request);
     if (!IsAcquired(acquired))
@@ -4231,8 +4269,8 @@ static mrhiResult PresentRed(mrhiDevice* device, mrhiSurfaceId surface, bool rea
     }
     Finish(device, read ? 1 : 0);
     size_t size = 0;
-    CHECK(!read ||
-              (mrhiTakeReadback(device, request, pixelOut, 4, &size) == mrhi_success && size == 4),
+    CHECK(!read || (mrhiRequest_TakeReadback(device, request, pixelOut, 4, &size) == mrhi_success &&
+                    size == 4),
           "a pixel");
     return acquired;
 }
@@ -4248,15 +4286,15 @@ static void CheckFramesInFlight(mrhiDevice* device, mrhiSurfaceId surface)
     for (int i = 0; i < 12; ++i)
     {
         mrhiFrameDef frame = mrhiDefaultFrameDef();
-        mrhiResult begun = mrhiBeginFrame(device, &frame);
+        mrhiResult begun = mrhiDevice_BeginFrame(device, &frame);
         while (begun == mrhi_errorCapacity && waited < submitted)
         {
             CHECK(WaitFor(device, tokens[waited++ % 16]) == mrhi_success, "a frame finished");
-            begun = mrhiBeginFrame(device, &frame);
+            begun = mrhiDevice_BeginFrame(device, &frame);
         }
         mrhiRequestId request = {0};
         CHECK(begun == mrhi_success && IsAcquired(RecordRed(device, surface, false, &request)) &&
-                  mrhiSubmitFrame(device, &tokens[submitted++ % 16]) == mrhi_success,
+                  mrhiDevice_SubmitFrame(device, &tokens[submitted++ % 16]) == mrhi_success,
               "a frame in flight");
     }
     while (waited < submitted)
@@ -4264,7 +4302,7 @@ static void CheckFramesInFlight(mrhiDevice* device, mrhiSurfaceId surface)
         CHECK(WaitFor(device, tokens[waited++ % 16]) == mrhi_success, "a frame finished");
     }
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
         CHECK(record.outcome == mrhi_success, "a frame done");
     }
@@ -4276,15 +4314,15 @@ static void CheckUnwrittenImages(mrhiDevice* device, mrhiSurfaceId surface)
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId image = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               IsAcquired(mrhiAcquireSurfaceImage(device, surface, &image)) &&
-              mrhiDropFrame(device) == mrhi_success,
+              mrhiDevice_DropFrame(device) == mrhi_success,
           "an image given back");
     uint8_t pixel[4];
     CHECK(IsAcquired(PresentRed(device, surface, false, pixel)), "the image taken again");
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               IsAcquired(mrhiAcquireSurfaceImage(device, surface, &image)) &&
-              mrhiCompileFrame(device) == mrhi_success,
+              mrhiDevice_CompileFrame(device) == mrhi_success,
           "an image no pass writes");
     Finish(device, 0);
 }
@@ -4302,7 +4340,7 @@ static void CheckEveryColor(mrhiDevice* device, mrhiSurfaceId surface, const mrh
         config.width = 64;
         config.height = 48;
         uint8_t pixel[4];
-        CHECK(mrhiConfigureSurface(device, &config) == mrhi_success &&
+        CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success &&
                   IsAcquired(PresentRed(device, surface, false, pixel)),
               "every color listed presents");
     }
@@ -4360,7 +4398,7 @@ static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiS
     CHECK(Configure(device, surface, caps, 64, 48) == mrhi_success &&
               IsAcquired(PresentRed(device, surface, false, pixel)),
           "configured again");
-    CHECK(mrhiUnconfigureSurface(device, surface) == mrhi_success, "unconfigured");
+    CHECK(mrhiSurface_Unconfigure(device, surface) == mrhi_success, "unconfigured");
     mrhiDestroyDevice(device);
 }
 
@@ -4405,7 +4443,7 @@ static void CheckXcbSurface(mrhiInstance* instance, const mrhiAdapterId* ids, si
     for (size_t i = 0; i < count; ++i)
     {
         mrhiSurfaceCaps caps;
-        CHECK(mrhiGetSurfaceCaps(instance, surface, ids[i], &caps) == mrhi_success, "caps");
+        CHECK(mrhiSurface_GetCaps(instance, surface, ids[i], &caps) == mrhi_success, "caps");
         CHECK(!caps.presentable || MeetsFloors(&caps), "the floors where it presents");
         if (caps.presentable)
         {
@@ -4437,7 +4475,7 @@ static void CheckAndroidSurface(mrhiInstance* instance, const mrhiAdapterId* ids
     for (size_t i = 0; i < count; ++i)
     {
         mrhiSurfaceCaps caps;
-        CHECK(mrhiGetSurfaceCaps(instance, surface, ids[i], &caps) == mrhi_success &&
+        CHECK(mrhiSurface_GetCaps(instance, surface, ids[i], &caps) == mrhi_success &&
                   caps.presentable && MeetsFloors(&caps),
               "presentable, with the floors");
         if (caps.presentable)
@@ -4481,7 +4519,7 @@ static void CheckWin32Surface(mrhiInstance* instance, const mrhiAdapterId* ids, 
     for (size_t i = 0; i < count; ++i)
     {
         mrhiSurfaceCaps caps;
-        CHECK(mrhiGetSurfaceCaps(instance, surface, ids[i], &caps) == mrhi_success, "caps");
+        CHECK(mrhiSurface_GetCaps(instance, surface, ids[i], &caps) == mrhi_success, "caps");
         CHECK(!caps.presentable || MeetsFloors(&caps), "the floors where it presents");
         if (caps.presentable)
         {
@@ -4512,7 +4550,7 @@ static void CheckCanvasSurface(mrhiInstance* instance, const mrhiAdapterId* ids,
     for (size_t i = 0; i < count; ++i)
     {
         mrhiSurfaceCaps caps;
-        CHECK(mrhiGetSurfaceCaps(instance, surface, ids[i], &caps) == mrhi_success &&
+        CHECK(mrhiSurface_GetCaps(instance, surface, ids[i], &caps) == mrhi_success &&
                   caps.presentable && MeetsFloors(&caps),
               "presentable, with the floors");
         CheckPresenting(instance, ids[i], surface, &caps, false);
@@ -4556,7 +4594,7 @@ static void CheckMetalSurface(mrhiInstance* instance, const mrhiAdapterId* ids, 
     for (size_t i = 0; i < count; ++i)
     {
         mrhiSurfaceCaps caps;
-        CHECK(mrhiGetSurfaceCaps(instance, surface, ids[i], &caps) == mrhi_success &&
+        CHECK(mrhiSurface_GetCaps(instance, surface, ids[i], &caps) == mrhi_success &&
                   caps.presentable && MeetsFloors(&caps),
               "presentable, with the floors");
         CheckPresenting(instance, ids[i], surface, &caps, false);
@@ -4603,7 +4641,7 @@ static void CheckOutsideSurface(mrhiInstance* instance, const mrhiAdapterId* ids
     for (size_t i = 0; i < count; ++i)
     {
         mrhiSurfaceCaps caps;
-        CHECK(mrhiGetSurfaceCaps(instance, surface, ids[i], &caps) == mrhi_success, "caps");
+        CHECK(mrhiSurface_GetCaps(instance, surface, ids[i], &caps) == mrhi_success, "caps");
         CHECK(!caps.presentable || MeetsFloors(&caps), "the floors where it presents");
         if (caps.presentable)
         {
@@ -4703,7 +4741,7 @@ static void TestNativeDriver(void)
     {
         CheckSurfaces(instance);
     }
-    s_driverFaults += mrhiGetDriverFaults(instance);
+    s_driverFaults += mrhiInstance_GetDriverFaults(instance);
     mrhiDestroyInstance(instance);
 }
 

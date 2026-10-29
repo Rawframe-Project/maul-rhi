@@ -82,7 +82,7 @@ static void RoundTrip(Sample* sample, mrhiBufferId bufferId, mrhiTextureId textu
     imageDef.width = SIZE;
     imageDef.height = SIZE;
     SampleCheck(sample,
-                mrhiBeginFrame(device, &frame) == mrhi_success &&
+                mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
                     mrhiImportBuffer(device, bufferId, &buffer) == mrhi_success &&
                     mrhiImportTexture(device, textureId, &texture) == mrhi_success &&
                     mrhiDeclareBuffer(device, &copyDef, &bufferCopy) == mrhi_success &&
@@ -99,7 +99,7 @@ static void RoundTrip(Sample* sample, mrhiBufferId bufferId, mrhiTextureId textu
     const mrhiAccess reads[2] = {Whole(bufferCopy, mrhi_accessCopySource),
                                  Whole(textureCopy, mrhi_accessCopySource)};
     mrhiPassId read = CopyPass(sample, reads, 2);
-    SampleCheck(sample, mrhiCompileFrame(device) == mrhi_success, "the frame compiled");
+    SampleCheck(sample, mrhiDevice_CompileFrame(device) == mrhi_success, "the frame compiled");
     const mrhiTexelLayout layout = {.bytesPerRow = ROW, .rowsPerImage = SIZE};
     const mrhiExtent3d extent = {SIZE, SIZE, 1};
     const mrhiTextureCopy whole = {.resource = texture};
@@ -108,20 +108,21 @@ static void RoundTrip(Sample* sample, mrhiBufferId bufferId, mrhiTextureId textu
     mrhiRequestId texelsBack = {0};
     SampleCheck(
         sample,
-        mrhiBeginPass(device, upload) == mrhi_success &&
-            mrhiWriteBuffer(device, upload, buffer, 0, bytes, sizeof(bytes)) == mrhi_success &&
-            mrhiWriteTexture(device, upload, &whole, texels, sizeof(texels), &layout, &extent) ==
+        mrhiPass_Begin(device, upload) == mrhi_success &&
+            mrhiPass_WriteBuffer(device, upload, buffer, 0, bytes, sizeof(bytes)) == mrhi_success &&
+            mrhiPass_WriteTexture(device, upload, &whole, texels, sizeof(texels), &layout,
+                                  &extent) == mrhi_success &&
+            mrhiPass_End(device, upload) == mrhi_success &&
+            mrhiPass_Begin(device, move) == mrhi_success &&
+            mrhiPass_CopyBuffer(device, move, buffer, 0, bufferCopy, 0, sizeof(bytes)) ==
                 mrhi_success &&
-            mrhiEndPass(device, upload) == mrhi_success &&
-            mrhiBeginPass(device, move) == mrhi_success &&
-            mrhiCopyBuffer(device, move, buffer, 0, bufferCopy, 0, sizeof(bytes)) == mrhi_success &&
-            mrhiCopyTexture(device, move, &whole, &wholeCopy, &extent) == mrhi_success &&
-            mrhiEndPass(device, move) == mrhi_success &&
-            mrhiBeginPass(device, read) == mrhi_success &&
-            mrhiReadBuffer(device, read, bufferCopy, 0, sizeof(bytes), &bytesBack) ==
+            mrhiPass_CopyTexture(device, move, &whole, &wholeCopy, &extent) == mrhi_success &&
+            mrhiPass_End(device, move) == mrhi_success &&
+            mrhiPass_Begin(device, read) == mrhi_success &&
+            mrhiPass_ReadBuffer(device, read, bufferCopy, 0, sizeof(bytes), &bytesBack) ==
                 mrhi_success &&
-            mrhiReadTexture(device, read, &wholeCopy, &extent, &texelsBack) == mrhi_success &&
-            mrhiEndPass(device, read) == mrhi_success,
+            mrhiPass_ReadTexture(device, read, &wholeCopy, &extent, &texelsBack) == mrhi_success &&
+            mrhiPass_End(device, read) == mrhi_success,
         "uploaded, copied and read");
     uint8_t back[sizeof(texels)];
     bool finished = SampleFinish(sample);
@@ -143,7 +144,7 @@ static mrhiRequestId WriteAndRead(Sample* sample, mrhiBufferId bufferId, uint32_
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId buffer = {0};
     SampleCheck(sample,
-                mrhiBeginFrame(device, &frame) == mrhi_success &&
+                mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
                     mrhiImportBuffer(device, bufferId, &buffer) == mrhi_success,
                 "a frame");
     const mrhiAccess write = Whole(buffer, mrhi_accessCopyDestination);
@@ -152,16 +153,18 @@ static mrhiRequestId WriteAndRead(Sample* sample, mrhiBufferId bufferId, uint32_
     mrhiPassId reading = CopyPass(sample, &read, 1);
     const uint32_t values[4] = {value, value + 1, value + 2, value + 3};
     mrhiRequestId request = {0};
-    SampleCheck(
-        sample,
-        mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, upload) == mrhi_success &&
-            mrhiWriteBuffer(device, upload, buffer, 0, values, sizeof(values)) == mrhi_success &&
-            mrhiEndPass(device, upload) == mrhi_success &&
-            mrhiBeginPass(device, reading) == mrhi_success &&
-            mrhiReadBuffer(device, reading, buffer, 0, sizeof(values), &request) == mrhi_success &&
-            mrhiEndPass(device, reading) == mrhi_success &&
-            mrhiSubmitFrame(device, tokenOut) == mrhi_success,
-        "written, read and submitted");
+    SampleCheck(sample,
+                mrhiDevice_CompileFrame(device) == mrhi_success &&
+                    mrhiPass_Begin(device, upload) == mrhi_success &&
+                    mrhiPass_WriteBuffer(device, upload, buffer, 0, values, sizeof(values)) ==
+                        mrhi_success &&
+                    mrhiPass_End(device, upload) == mrhi_success &&
+                    mrhiPass_Begin(device, reading) == mrhi_success &&
+                    mrhiPass_ReadBuffer(device, reading, buffer, 0, sizeof(values), &request) ==
+                        mrhi_success &&
+                    mrhiPass_End(device, reading) == mrhi_success &&
+                    mrhiDevice_SubmitFrame(device, tokenOut) == mrhi_success,
+                "written, read and submitted");
     return request;
 }
 

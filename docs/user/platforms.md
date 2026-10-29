@@ -34,7 +34,7 @@ The toolchain file defaults to x86_64 and Android 11 (API 30); `ANDROID_ABI` and
 
 ## The web
 
-The WebGPU driver calls the browser's WebGPU through JavaScript compiled into the library, and needs a browser whose WebGPU has immediates, which carry the root block. Every request is answered by a promise the browser settles between the page's tasks, so a web program returns to the page's event loop and drains its queues on a later frame; `mrhiWaitFrame` and `mrhiWaitDeviceNotification` never block there. `mrhiWaitDeviceNotification` returns `mrhi_success` if the browser has already settled an answer, and otherwise `mrhi_timeout` at once, whatever its timeout: a pipeline's promise or a frame's completion settles only once the page yields, so waiting in place could never see it.
+The WebGPU driver calls the browser's WebGPU through JavaScript compiled into the library, and needs a browser whose WebGPU has immediates, which carry the root block. Every request is answered by a promise the browser settles between the page's tasks, so a web program returns to the page's event loop and drains its queues on a later frame; `mrhiRequest_WaitFrame` and `mrhiDevice_WaitNotification` never block there. `mrhiDevice_WaitNotification` returns `mrhi_success` if the browser has already settled an answer, and otherwise `mrhi_timeout` at once, whatever its timeout: a pipeline's promise or a frame's completion settles only once the page yields, so waiting in place could never see it.
 
 **With Emscripten,** link the library as any other: the JavaScript comes along in its objects.
 

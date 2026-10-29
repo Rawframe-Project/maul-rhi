@@ -10,7 +10,7 @@ A surface lasts one generation of the window's drawable. When the platform repla
 
 ## Capabilities and their floors
 
-Formats, present modes and alpha modes differ by platform and by adapter, so they are reported per adapter (`mrhiGetSurfaceCaps`) and the program picks among what the platform reports rather than trusting one format. Every presenting adapter offers at least fifo, opaque alpha, the render target usage, 8-bit sRGB in Rec. 709, and one way to that format's twin.
+Formats, present modes and alpha modes differ by platform and by adapter, so they are reported per adapter (`mrhiSurface_GetCaps`) and the program picks among what the platform reports rather than trusting one format. Every presenting adapter offers at least fifo, opaque alpha, the render target usage, 8-bit sRGB in Rec. 709, and one way to that format's twin.
 
 Colors are reported with primaries, transfer function and range as separate fields, because the APIs name color spaces as combinations (DXGI's scRGB, Vulkan's color space and format pairs, Metal's color space names) that do not line up one to one.
 

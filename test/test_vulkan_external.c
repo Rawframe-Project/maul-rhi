@@ -88,9 +88,9 @@ static bool FirstAdapter(mrhiInstance* instance, mrhiAdapterId* adapterOut)
     mrhiRequestId id;
     mrhiInstanceNotification record;
     size_t count = 0;
-    return mrhiRequestAdapters(instance, &request, &id) == mrhi_success &&
-           mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
-           mrhiGetAdapters(instance, adapterOut, 1, &count) == mrhi_success && count >= 1;
+    return mrhiInstance_RequestAdapters(instance, &request, &id) == mrhi_success &&
+           mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
+           mrhiInstance_GetAdapters(instance, adapterOut, 1, &count) == mrhi_success && count >= 1;
 }
 
 // Opens a device for a def and takes its readiness.
@@ -102,7 +102,7 @@ static mrhiDevice* Open(mrhiInstance* instance, const mrhiDeviceDef* def, mrhiRe
     mrhiInstanceNotification record;
     if (device != nullptr)
     {
-        CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+        CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
                   record.kind == mrhi_instanceDeviceReady && record.outcome == mrhi_success,
               "the device ready");
     }
@@ -130,7 +130,7 @@ static void CheckRuns(mrhiDevice* device)
     mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
     bufferDef.size = sizeof(pattern);
     mrhiResourceId buffer = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiDeclareBuffer(device, &bufferDef, &buffer) == mrhi_success,
           "a frame and a buffer");
     mrhiPassDef passDef = mrhiDefaultPassDef();
@@ -146,23 +146,25 @@ static void CheckRuns(mrhiDevice* device)
     CHECK(mrhiAddPass(device, &passDef, &back) == mrhi_success, "the readback");
     mrhiRequestId bytes = {0};
     mrhiRequestId token = {0};
-    CHECK(
-        mrhiCompileFrame(device) == mrhi_success && mrhiBeginPass(device, upload) == mrhi_success &&
-            mrhiWriteBuffer(device, upload, buffer, 0, pattern, sizeof(pattern)) == mrhi_success &&
-            mrhiEndPass(device, upload) == mrhi_success &&
-            mrhiBeginPass(device, back) == mrhi_success &&
-            mrhiReadBuffer(device, back, buffer, 0, sizeof(pattern), &bytes) == mrhi_success &&
-            mrhiEndPass(device, back) == mrhi_success &&
-            mrhiSubmitFrame(device, &token) == mrhi_success &&
-            mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
-        "recorded and finished");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, upload) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, buffer, 0, pattern, sizeof(pattern)) ==
+                  mrhi_success &&
+              mrhiPass_End(device, upload) == mrhi_success &&
+              mrhiPass_Begin(device, back) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, back, buffer, 0, sizeof(pattern), &bytes) ==
+                  mrhi_success &&
+              mrhiPass_End(device, back) == mrhi_success &&
+              mrhiDevice_SubmitFrame(device, &token) == mrhi_success &&
+              mrhiRequest_WaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
+          "recorded and finished");
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
     }
     uint8_t taken[sizeof(pattern)] = {0};
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, bytes, taken, sizeof(taken), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, bytes, taken, sizeof(taken), &size) == mrhi_success &&
               size == sizeof(pattern) && memcmp(taken, pattern, size) == 0,
           "the bytes back");
 }
@@ -295,7 +297,7 @@ static void ClearAndRead(mrhiDevice* device, mrhiTextureId texture, float green)
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId target = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportTexture(device, texture, &target) == mrhi_success,
           "a frame with the image");
     mrhiPassDef clearDef = mrhiDefaultPassDef();
@@ -319,23 +321,24 @@ static void ClearAndRead(mrhiDevice* device, mrhiTextureId texture, float green)
     mrhiRequestId token = {0};
     CHECK(mrhiAddPass(device, &clearDef, &clear) == mrhi_success &&
               mrhiAddPass(device, &readDef, &back) == mrhi_success &&
-              mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, clear) == mrhi_success &&
-              mrhiEndPass(device, clear) == mrhi_success &&
-              mrhiBeginPass(device, back) == mrhi_success &&
-              mrhiReadTexture(device, back, &whole, &extent, &texels) == mrhi_success &&
-              mrhiEndPass(device, back) == mrhi_success &&
-              mrhiSubmitFrame(device, &token) == mrhi_success &&
-              mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
+              mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, clear) == mrhi_success &&
+              mrhiPass_End(device, clear) == mrhi_success &&
+              mrhiPass_Begin(device, back) == mrhi_success &&
+              mrhiPass_ReadTexture(device, back, &whole, &extent, &texels) == mrhi_success &&
+              mrhiPass_End(device, back) == mrhi_success &&
+              mrhiDevice_SubmitFrame(device, &token) == mrhi_success &&
+              mrhiRequest_WaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
           "cleared and read");
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
     }
     uint8_t taken[16 * 16 * 4] = {0};
     size_t size = 0;
-    bool same = mrhiTakeReadback(device, texels, taken, sizeof(taken), &size) == mrhi_success &&
-                size == sizeof(taken);
+    bool same =
+        mrhiRequest_TakeReadback(device, texels, taken, sizeof(taken), &size) == mrhi_success &&
+        size == sizeof(taken);
     uint8_t expected = green > 0.5f ? 255 : 0;
     for (size_t i = 0; same && i < sizeof(taken); i += 4)
     {
@@ -379,15 +382,15 @@ static void CheckImageAdoption(mrhiDevice* device, VkDevice made, VkPhysicalDevi
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId resource = {0};
     mrhiRequestId token = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportTexture(device, texture, &resource) == mrhi_success,
           "a frame importing it");
-    CHECK(mrhiSealResource(device, resource) ==
+    CHECK(mrhiResource_Seal(device, resource) ==
               (sealing ? mrhi_errorInvalid : mrhi_errorUnsupported),
           "never sealed");
-    CHECK(mrhiCompileFrame(device) == mrhi_success &&
-              mrhiSubmitFrame(device, &token) == mrhi_success &&
-              mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiDevice_SubmitFrame(device, &token) == mrhi_success &&
+              mrhiRequest_WaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
           "an empty frame");
     ClearAndRead(device, texture, 1.0f);
     // The frame ended it a color target, as the runtime takes it back:
@@ -412,8 +415,8 @@ static void CheckNativePass(mrhiDevice* device, VkDevice made, VkInstance instan
                             VkPhysicalDevice physical, uint32_t family)
 {
     void* natives[5] = {0};
-    CHECK(mrhiGetVulkanDevice(device, &natives[0], &natives[1], &natives[2], &natives[3],
-                              &natives[4]) == mrhi_success &&
+    CHECK(mrhiDevice_GetVulkanDevice(device, &natives[0], &natives[1], &natives[2], &natives[3],
+                                     &natives[4]) == mrhi_success &&
               natives[0] == (void*)instance && natives[1] == (void*)physical &&
               natives[2] == (void*)made && natives[3] != nullptr && natives[4] != nullptr,
           "the device's native objects");
@@ -430,14 +433,14 @@ static void CheckNativePass(mrhiDevice* device, VkDevice made, VkInstance instan
     mrhiTextureId texture = {0};
     mrhiVulkanTextureInfo info = {0};
     CHECK(mrhiCreateTexture(device, &def, &texture) == mrhi_success &&
-              mrhiGetVulkanTexture(device, texture, &info) == mrhi_success &&
+              mrhiTexture_GetVulkanTexture(device, texture, &info) == mrhi_success &&
               info.image != nullptr && info.memory != nullptr &&
               info.format == VK_FORMAT_R8G8B8A8_UNORM &&
               (info.usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT) != 0,
           "the texture's image");
     mrhiVulkanTextureInfo again;
     memset(&again, 0xFF, sizeof(again));
-    CHECK(mrhiGetVulkanTexture(device, texture, &again) == mrhi_success &&
+    CHECK(mrhiTexture_GetVulkanTexture(device, texture, &again) == mrhi_success &&
               memcmp(&again, &info, sizeof(info)) == 0,
           "the same bytes over a struct that held others, its padding included");
     // The program's command buffer: a clear, in the layout a copy
@@ -475,7 +478,7 @@ static void CheckNativePass(mrhiDevice* device, VkDevice made, VkInstance instan
     mrhiResourceId declared = {0};
     mrhiBufferDef declaredDef = mrhiDefaultBufferDef();
     declaredDef.size = 256;
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportTexture(device, texture, &resource) == mrhi_success &&
               mrhiDeclareBuffer(device, &declaredDef, &declared) == mrhi_success,
           "a frame with the texture");
@@ -512,37 +515,38 @@ static void CheckNativePass(mrhiDevice* device, VkDevice made, VkInstance instan
     const mrhiExtent3d extent = {16, 16, 1};
     mrhiRequestId bytes = {0};
     mrhiRequestId token = {0};
-    CHECK(mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, upload) == mrhi_success &&
-              mrhiWriteTexture(device, upload, &whole, texels, sizeof(texels), &layout, &extent) ==
-                  mrhi_success &&
-              mrhiEndPass(device, upload) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, upload) == mrhi_success &&
+              mrhiPass_WriteTexture(device, upload, &whole, texels, sizeof(texels), &layout,
+                                    &extent) == mrhi_success &&
+              mrhiPass_End(device, upload) == mrhi_success,
           "uploaded");
-    CHECK(mrhiSetVulkanPassCommands(device, native, commands) == mrhi_errorState,
+    CHECK(mrhiPass_SetVulkanCommands(device, native, commands) == mrhi_errorState,
           "no command buffer before the pass begins");
-    CHECK(mrhiBeginPass(device, native) == mrhi_success &&
-              mrhiWriteTexture(device, native, &whole, texels, sizeof(texels), &layout, &extent) ==
-                  mrhi_errorInvalid &&
-              mrhiSetVulkanPassCommands(device, native, nullptr) == mrhi_errorInvalid &&
-              mrhiSetVulkanPassCommands(device, native, commands) == mrhi_success &&
-              mrhiSetVulkanPassCommands(device, native, commands) == mrhi_errorState &&
-              mrhiEndPass(device, native) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, native) == mrhi_success &&
+              mrhiPass_WriteTexture(device, native, &whole, texels, sizeof(texels), &layout,
+                                    &extent) == mrhi_errorInvalid &&
+              mrhiPass_SetVulkanCommands(device, native, nullptr) == mrhi_errorInvalid &&
+              mrhiPass_SetVulkanCommands(device, native, commands) == mrhi_success &&
+              mrhiPass_SetVulkanCommands(device, native, commands) == mrhi_errorState &&
+              mrhiPass_End(device, native) == mrhi_success,
           "the native pass given its commands, and no encoder call");
-    CHECK(mrhiBeginPass(device, back) == mrhi_success &&
-              mrhiSetVulkanPassCommands(device, back, commands) == mrhi_errorInvalid &&
-              mrhiReadTexture(device, back, &whole, &extent, &bytes) == mrhi_success &&
-              mrhiEndPass(device, back) == mrhi_success &&
-              mrhiSubmitFrame(device, &token) == mrhi_success &&
-              mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, back) == mrhi_success &&
+              mrhiPass_SetVulkanCommands(device, back, commands) == mrhi_errorInvalid &&
+              mrhiPass_ReadTexture(device, back, &whole, &extent, &bytes) == mrhi_success &&
+              mrhiPass_End(device, back) == mrhi_success &&
+              mrhiDevice_SubmitFrame(device, &token) == mrhi_success &&
+              mrhiRequest_WaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
           "read back and finished");
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
     }
     uint8_t taken[sizeof(texels)] = {0};
     size_t size = 0;
-    bool cleared = mrhiTakeReadback(device, bytes, taken, sizeof(taken), &size) == mrhi_success &&
-                   size == sizeof(taken);
+    bool cleared =
+        mrhiRequest_TakeReadback(device, bytes, taken, sizeof(taken), &size) == mrhi_success &&
+        size == sizeof(taken);
     for (size_t i = 0; cleared && i < sizeof(taken); i += 4)
     {
         cleared = taken[i] == 0 && taken[i + 1] == 255 && taken[i + 2] == 0 && taken[i + 3] == 255;
@@ -556,17 +560,17 @@ static void CheckNativePass(mrhiDevice* device, VkDevice made, VkInstance instan
     // A frame holds MRHI_MAX_NATIVE_PASSES of them.
     mrhiPassDef nativeDef = mrhiDefaultPassDef();
     nativeDef.native = true;
-    bool added = mrhiBeginFrame(device, &frame) == mrhi_success;
+    bool added = mrhiDevice_BeginFrame(device, &frame) == mrhi_success;
     for (uint32_t i = 0; i < MRHI_MAX_NATIVE_PASSES && added; ++i)
     {
         added = mrhiAddPass(device, &nativeDef, &refused) == mrhi_success;
     }
     CHECK(added && mrhiAddPass(device, &nativeDef, &refused) == mrhi_errorLimit &&
-              mrhiDropFrame(device) == mrhi_success,
+              mrhiDevice_DropFrame(device) == mrhi_success,
           "native passes up to their limit");
     mrhiDiagnostic diagnostic = {0};
     mrhiDiagnosticCode last = 0;
-    while (mrhiNextDeviceDiagnostic(device, &diagnostic) == mrhi_success)
+    while (mrhiDevice_TakeDiagnostic(device, &diagnostic) == mrhi_success)
     {
         last = diagnostic.code;
     }
@@ -655,7 +659,7 @@ static void CheckDeviceAdoption(mrhiInstance* instance, mrhiAdapterId adapter)
     def.budgets.diagnostics = 8;
     // Sealing, which adopted images refuse, where the adapter grants it.
     mrhiFeatures granted = {0};
-    CHECK(mrhiGetAdapterFeatures(instance, adapter, &granted) == mrhi_success, "the features");
+    CHECK(mrhiAdapter_GetFeatures(instance, adapter, &granted) == mrhi_success, "the features");
     def.features.bindlessSampling = granted.bindlessSampling;
     mrhiDeviceVulkanAdopt adopt = {.chain = {.type = mrhi_structDeviceVulkanAdopt}};
     mrhiDeviceDef adopting = def;
@@ -666,11 +670,11 @@ static void CheckDeviceAdoption(mrhiInstance* instance, mrhiAdapterId adapter)
           "no device adopted before a description");
     void* info = nullptr;
     void* physical = nullptr;
-    CHECK(mrhiDescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_success &&
+    CHECK(mrhiInstance_DescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_success &&
               info != nullptr && physical != nullptr,
           "a description");
     void* listed = nullptr;
-    CHECK(mrhiGetVulkanPhysicalDevice(instance, adapter, &listed) == mrhi_success &&
+    CHECK(mrhiAdapter_GetVulkanPhysicalDevice(instance, adapter, &listed) == mrhi_success &&
               listed == physical,
           "the adapter's physical device");
     const VkDeviceCreateInfo* created = info;
@@ -704,7 +708,7 @@ static void CheckDeviceAdoption(mrhiInstance* instance, mrhiAdapterId adapter)
     }
     uint32_t family = UINT32_MAX;
     uint32_t index = UINT32_MAX;
-    CHECK(mrhiGetVulkanQueue(device, &family, &index) == mrhi_success &&
+    CHECK(mrhiDevice_GetVulkanQueue(device, &family, &index) == mrhi_success &&
               family == created->pQueueCreateInfos[0].queueFamilyIndex && index == 0,
           "the queue the session binds");
     CheckRuns(device);
@@ -717,23 +721,24 @@ static void CheckDeviceAdoption(mrhiInstance* instance, mrhiAdapterId adapter)
     CHECK(s_device.vkDeviceWaitIdle(made) == VK_SUCCESS, "the adopted device still alive");
     s_device.vkDestroyDevice(made, nullptr);
     // A later description replaces the earlier one.
-    CHECK(mrhiDescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_success,
+    CHECK(mrhiInstance_DescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_success,
           "described again");
     mrhiDeviceDef changed = def;
     changed.next = &extensions.chain;
     extensions.chain.next = nullptr;
-    CHECK(mrhiDescribeVulkanDevice(instance, &changed, &info, &physical) == mrhi_success,
+    CHECK(mrhiInstance_DescribeVulkanDevice(instance, &changed, &info, &physical) == mrhi_success,
           "described with an extension");
     adopt.device = (void*)(uintptr_t)1;
     CHECK(Open(instance, &adopting, &status) == nullptr && status == mrhi_errorInvalid,
           "the earlier description gone");
     // A refused description ends the earlier one too.
-    CHECK(mrhiDescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_success,
+    CHECK(mrhiInstance_DescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_success,
           "described once more");
     static const char unended[] = {'a'};
     extensions.extensions = unended;
     extensions.extensionsLength = sizeof(unended);
-    CHECK(mrhiDescribeVulkanDevice(instance, &changed, &info, &physical) == mrhi_errorInvalid,
+    CHECK(mrhiInstance_DescribeVulkanDevice(instance, &changed, &info, &physical) ==
+              mrhi_errorInvalid,
           "a description refused");
     CHECK(Open(instance, &adopting, &status) == nullptr && status == mrhi_errorInvalid,
           "the earlier description gone with the refusal");
@@ -769,7 +774,7 @@ static void CheckDeviceExtensions(mrhiInstance* instance, mrhiAdapterId adapter)
     def.allocator = (mrhiAllocator){CountingAlloc, CountingFree, nullptr};
     void* info = nullptr;
     void* physical = nullptr;
-    CHECK(mrhiDescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_success,
+    CHECK(mrhiInstance_DescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_success,
           "described with extensions");
     CHECK(Features(info, &wanted12), "the features merged into the library's");
     memset(names, 'x', sizeof(names) - 1);
@@ -793,7 +798,8 @@ static void CheckDeviceExtensions(mrhiInstance* instance, mrhiAdapterId adapter)
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT,
     };
     extensions.features = &unknown;
-    CHECK(mrhiDescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_errorUnsupported &&
+    CHECK(mrhiInstance_DescribeVulkanDevice(instance, &def, &info, &physical) ==
+                  mrhi_errorUnsupported &&
               Open(instance, &def, &status) == nullptr && status == mrhi_errorUnsupported,
           "an unknown feature struct refused");
     extensions.features = nullptr;
@@ -809,7 +815,7 @@ static void CheckDeviceExtensions(mrhiInstance* instance, mrhiAdapterId adapter)
           "an empty name refused");
     extensions.extensions = nullptr;
     extensions.extensionsLength = 1;
-    CHECK(mrhiDescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_errorInvalid,
+    CHECK(mrhiInstance_DescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_errorInvalid,
           "no names with bytes refused");
 }
 
@@ -852,7 +858,7 @@ static void CheckInstanceAdoption(void)
         def.adapter = adapter;
         void* info = nullptr;
         void* physical = nullptr;
-        CHECK(mrhiDescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_success &&
+        CHECK(mrhiInstance_DescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_success &&
                   Named(info, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0,
               "no swapchain without surfaces");
         mrhiDestroyInstance(instance);
@@ -925,10 +931,12 @@ static void CheckOtherDriver(void)
     def.adapter = adapter;
     void* info = nullptr;
     void* physical = nullptr;
-    CHECK(mrhiDescribeVulkanDevice(instance, &def, &info, &physical) == mrhi_errorUnsupported &&
+    CHECK(mrhiInstance_DescribeVulkanDevice(instance, &def, &info, &physical) ==
+                  mrhi_errorUnsupported &&
               info == nullptr && physical == nullptr,
           "no description");
-    CHECK(mrhiGetVulkanPhysicalDevice(instance, adapter, &physical) == mrhi_errorUnsupported,
+    CHECK(mrhiAdapter_GetVulkanPhysicalDevice(instance, adapter, &physical) ==
+              mrhi_errorUnsupported,
           "no physical device");
     mrhiDeviceVulkanAdopt adopt = {.chain = {.type = mrhi_structDeviceVulkanAdopt},
                                    .device = (void*)(uintptr_t)1};
@@ -939,7 +947,8 @@ static void CheckOtherDriver(void)
     mrhiDevice* device = Open(instance, &def, &status);
     uint32_t family = 0;
     uint32_t index = 0;
-    CHECK(device != nullptr && mrhiGetVulkanQueue(device, &family, &index) == mrhi_errorUnsupported,
+    CHECK(device != nullptr &&
+              mrhiDevice_GetVulkanQueue(device, &family, &index) == mrhi_errorUnsupported,
           "no queue");
     mrhiTextureVulkanAdopt image = {.chain = {.type = mrhi_structTextureVulkanAdopt},
                                     .image = (void*)(uintptr_t)1};
@@ -959,11 +968,11 @@ static void CheckOtherDriver(void)
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
     mrhiPassId pass = {0};
     CHECK(device != nullptr &&
-              mrhiGetVulkanDevice(device, &natives[0], &natives[1], &natives[2], &natives[3],
-                                  &natives[4]) == mrhi_errorUnsupported &&
-              mrhiBeginFrame(device, &frameDef) == mrhi_success &&
+              mrhiDevice_GetVulkanDevice(device, &natives[0], &natives[1], &natives[2], &natives[3],
+                                         &natives[4]) == mrhi_errorUnsupported &&
+              mrhiDevice_BeginFrame(device, &frameDef) == mrhi_success &&
               mrhiAddPass(device, &nativeDef, &pass) == mrhi_errorUnsupported &&
-              mrhiDropFrame(device) == mrhi_success,
+              mrhiDevice_DropFrame(device) == mrhi_success,
           "no native objects or passes");
     mrhiDestroyDevice(device);
     mrhiDestroyInstance(instance);

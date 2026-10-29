@@ -13,12 +13,12 @@ static mrhiDevice* s_device;
 static void Begin(void)
 {
     mrhiFrameDef def = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &def) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &def) == mrhi_success, "begun");
 }
 
 static void Drop(void)
 {
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 static mrhiResourceId Declare(mrhiFormat format, uint32_t width, uint32_t samples)
@@ -103,7 +103,7 @@ static mrhiResult Add(mrhiPassDef def)
 static bool Kept(mrhiPassId pass)
 {
     bool kept = false;
-    CHECK(mrhiIsPassKept(s_device, pass, &kept) == mrhi_success, "read");
+    CHECK(mrhiPass_IsKept(s_device, pass, &kept) == mrhi_success, "read");
     return kept;
 }
 
@@ -146,11 +146,11 @@ static void TestCulling(void)
     def.neverCull = true;
     CHECK(mrhiAddPass(s_device, &def, &side) == mrhi_success, "never culled");
     bool kept;
-    CHECK(mrhiIsPassKept(s_device, draw, &kept) == mrhi_errorState, "not compiled");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_IsKept(s_device, draw, &kept) == mrhi_errorState, "not compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(Kept(draw) && Kept(compose) && Kept(side), "what the output needs, and the side pass");
     CHECK(!Kept(dead) && !Kept(feeds) && !Kept(fed), "what nothing kept needs");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_errorState, "compiled once");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_errorState, "compiled once");
     CHECK(Add(Pass(Color(scene, mrhi_loadClear), nullptr, 0)) == mrhi_errorState,
           "no pass after the compile");
     mrhiTextureDef late = mrhiDefaultTextureDef();
@@ -160,28 +160,28 @@ static void TestCulling(void)
     mrhiResourceId resource;
     CHECK(mrhiDeclareTexture(s_device, &late, &resource) == mrhi_errorState,
           "no resource after the compile");
-    CHECK(mrhiIsPassKept(s_device, (mrhiPassId){0, 0}, &kept) == mrhi_errorStale, "no pass");
-    CHECK(mrhiIsPassKept(s_device, (mrhiPassId){side.index1 + 1, draw.generation}, &kept) ==
+    CHECK(mrhiPass_IsKept(s_device, (mrhiPassId){0, 0}, &kept) == mrhi_errorStale, "no pass");
+    CHECK(mrhiPass_IsKept(s_device, (mrhiPassId){side.index1 + 1, draw.generation}, &kept) ==
               mrhi_errorStale,
           "past the passes");
-    CHECK(mrhiIsPassKept(s_device, draw, nullptr) == mrhi_errorInvalid, "no out");
-    CHECK(mrhiIsPassKept(nullptr, draw, &kept) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiCompileFrame(nullptr) == mrhi_errorInvalid, "no device to compile");
+    CHECK(mrhiPass_IsKept(s_device, draw, nullptr) == mrhi_errorInvalid, "no out");
+    CHECK(mrhiPass_IsKept(nullptr, draw, &kept) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiDevice_CompileFrame(nullptr) == mrhi_errorInvalid, "no device to compile");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
-    CHECK(mrhiIsPassKept(s_device, draw, &kept) == mrhi_errorState, "the frame closed");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_errorState, "nothing to compile");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiPass_IsKept(s_device, draw, &kept) == mrhi_errorState, "the frame closed");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_errorState, "nothing to compile");
     Begin();
-    CHECK(mrhiIsPassKept(s_device, draw, &kept) == mrhi_errorState, "not compiled yet");
+    CHECK(mrhiPass_IsKept(s_device, draw, &kept) == mrhi_errorState, "not compiled yet");
     // The last frame's scene slot, needed there, is only written here.
     mrhiResourceId reused = Declare(mrhi_formatRgba16Float, 64, 1);
     CHECK(reused.index1 == scene.index1, "the scene's slot");
     mrhiPassId lone;
     def = Pass(Color(reused, mrhi_loadClear), nullptr, 0);
     CHECK(mrhiAddPass(s_device, &def, &lone) == mrhi_success, "a pass nothing reads");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(!Kept(lone), "culled, whatever the last frame needed");
-    CHECK(mrhiIsPassKept(s_device, draw, &kept) == mrhi_errorStale, "a pass of the last frame");
+    CHECK(mrhiPass_IsKept(s_device, draw, &kept) == mrhi_errorStale, "a pass of the last frame");
     Drop();
     Begin();
     mrhiResourceId overwritten = Declare(mrhi_formatRgba16Float, 64, 1);
@@ -193,7 +193,7 @@ static void TestCulling(void)
     def.colorTargets[1] = Color(window, mrhi_loadClear);
     def.colorTargetCount = 2;
     CHECK(mrhiAddPass(s_device, &def, &second) == mrhi_success, "written again, not read");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(!Kept(first) && Kept(second), "a write nobody reads before the next write");
     Drop();
     CHECK(mrhiDestroyTexture(s_device, output) == mrhi_success, "done");
@@ -209,14 +209,16 @@ static void TestDerivedUsages(void)
     def.neverCull = true;
     CHECK(Add(def) == mrhi_success, "sRGB written as storage");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorUnsupported, "sRGB has no storage");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_errorUnsupported, "still open, and still refused");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorUnsupported, "sRGB has no storage");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_errorUnsupported,
+          "still open, and still refused");
     Drop();
     Begin();
     srgb = Declare(mrhi_formatRgba8UnormSrgb, 64, 1);
     write = Access(srgb, mrhi_accessStorageWrite);
     CHECK(Add(Pass((mrhiColorTarget){0}, &write, 1)) == mrhi_success, "culled");
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "a culled pass derives nothing");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success,
+          "a culled pass derives nothing");
     Begin();
     mrhiResourceId samples = Declare(mrhi_formatRgba8Unorm, 64, 4);
     CHECK(Add(Pass(Color(samples, mrhi_loadClear), nullptr, 0)) == mrhi_success, "drawn");
@@ -224,7 +226,7 @@ static void TestDerivedUsages(void)
     def = Pass((mrhiColorTarget){0}, &read, 1);
     def.neverCull = true;
     CHECK(Add(def) == mrhi_success, "then sampled");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "a target also sampled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "a target also sampled");
     Drop();
     Begin();
     samples = Declare(mrhi_formatRgba8Unorm, 64, 4);
@@ -232,7 +234,8 @@ static void TestDerivedUsages(void)
     def = Pass((mrhiColorTarget){0}, &copy, 1);
     def.neverCull = true;
     CHECK(Add(def) == mrhi_success, "samples only copied to");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_errorInvalid, "several samples not as a target");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_errorInvalid,
+          "several samples not as a target");
     Drop();
 }
 
@@ -243,7 +246,7 @@ static mrhiDiagnosticCode Refusal(void)
 {
     mrhiDiagnosticCode code = 0;
     mrhiDiagnostic record;
-    while (mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success)
+    while (mrhiDevice_TakeDiagnostic(s_device, &record) == mrhi_success)
     {
         code = record.code;
     }
@@ -630,7 +633,7 @@ static void TestImports(void)
     CHECK(Add(def) == mrhi_success, "a sampled texture sampled");
     one = Access(t, mrhi_accessStorageRead);
     CHECK(Add(def) == mrhi_errorInvalid, "storage of a texture made without it");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(!Kept(read), "a read only pass is culled");
     CHECK(Kept(written) && Kept(copied), "writes to imported buffers are kept");
     Drop();
@@ -804,7 +807,7 @@ int main(void)
     TestViews();
     TestRefusals();
     s_instance = instance;
-    CHECK(mrhiGetDeviceMisuse(s_device) > 30, "the refusals were counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) > 30, "the refusals were counted");
     Close(s_device);
     return s_failures == 0 ? 0 : 1;
 }

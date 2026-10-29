@@ -13,12 +13,12 @@ static mrhiDevice* s_device;
 static void Begin(void)
 {
     mrhiFrameDef def = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &def) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &def) == mrhi_success, "begun");
 }
 
 static void Drop(void)
 {
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 static mrhiResourceId Declare(mrhiFormat format, uint32_t samples)
@@ -74,21 +74,21 @@ static mrhiPassId Draw(mrhiResourceId target, mrhiStoreOp store, const mrhiAcces
 static mrhiResourcePlan Plan(mrhiResourceId resource)
 {
     mrhiResourcePlan plan = {0};
-    CHECK(mrhiGetResourcePlan(s_device, resource, &plan) == mrhi_success, "a plan");
+    CHECK(mrhiResource_GetPlan(s_device, resource, &plan) == mrhi_success, "a plan");
     return plan;
 }
 
 static mrhiPassPlan PassPlan(mrhiPassId pass)
 {
     mrhiPassPlan plan = {0};
-    CHECK(mrhiGetPassPlan(s_device, pass, &plan) == mrhi_success, "a pass plan");
+    CHECK(mrhiPass_GetPlan(s_device, pass, &plan) == mrhi_success, "a pass plan");
     return plan;
 }
 
 static uint64_t Memory(void)
 {
     mrhiFrameUsage usage = {0};
-    CHECK(mrhiGetFrameUsage(s_device, &usage) == mrhi_success, "the usage");
+    CHECK(mrhiDevice_GetFrameUsage(s_device, &usage) == mrhi_success, "the usage");
     return usage.frameMemoryBytes;
 }
 
@@ -112,7 +112,7 @@ static void TestChain(mrhiTextureId windowTexture)
     Draw(c, mrhi_storeKeep, &readB, 1);
     mrhiAccess readC = Access(c, mrhi_accessSampled);
     Draw(window, mrhi_storeKeep, &readC, 1);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     mrhiResourcePlan plan = Plan(a);
     CHECK(plan.memoryOffset == 0 && plan.memoryBytes == kTexture, "the first at the start");
     plan = Plan(b);
@@ -141,7 +141,7 @@ static void TestBuffers(void)
     mrhiAccess second[2] = {Access(y, mrhi_accessStorageRead), Access(z, mrhi_accessStorageWrite)};
     def.accesses = second;
     AddPass(def);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(Plan(x).memoryOffset == 0 && Plan(x).memoryBytes == 256, "x at the start");
     CHECK(Plan(y).memoryOffset == 256 && Plan(y).memoryBytes == 1024, "y after it");
     CHECK(Plan(z).memoryOffset == 1280 && Plan(z).memoryBytes == 512,
@@ -160,7 +160,7 @@ static void TestBuffers(void)
     second[1] = Access(z, mrhi_accessStorageWrite);
     def.accesses = second;
     AddPass(def);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(Plan(z).memoryOffset == 0, "a buffer that fits in x's place");
     CHECK(Memory() == 1280, "no more than two at once");
     Drop();
@@ -171,7 +171,8 @@ static uint32_t BarriersOf(mrhiResourceId resource, mrhiBarrier* found, uint32_t
 {
     mrhiBarrier barriers[32];
     size_t count = 0;
-    CHECK(mrhiGetFrameBarriers(s_device, barriers, 32, &count) == mrhi_success, "the barriers");
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, barriers, 32, &count) == mrhi_success,
+          "the barriers");
     uint32_t matched = 0;
     for (size_t i = 0; i < count && matched < capacity; ++i)
     {
@@ -212,7 +213,7 @@ static void TestAliasing(void)
     def.accesses = &third;
     def.accessCount = 1;
     mrhiPassId thirdPass = AddPass(def);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(Plan(z).memoryOffset == 0 && Plan(t).memoryOffset == 0, "z and t where x was");
     mrhiBarrier found[4];
     CHECK(BarriersOf(x, found, 4) == 0, "x on fresh memory");
@@ -252,7 +253,7 @@ static void TestOrder(void)
     def.accesses = third;
     def.accessCount = 3;
     AddPass(def);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(Plan(a).memoryOffset == 0 && Plan(b).memoryOffset == 1024, "a, then b");
     CHECK(Plan(c).memoryOffset == 0, "c where a was");
     CHECK(Plan(d).memoryOffset == 2048, "d past both c and b");
@@ -271,7 +272,7 @@ static void TestOrder(void)
     def.accesses = both;
     def.accessCount = 2;
     AddPass(def);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(Plan(texture).memoryBytes == 400, "the texture's bytes");
     CHECK(Plan(buffer).memoryOffset == 512, "the buffer aligned past it");
     Drop();
@@ -298,7 +299,7 @@ static void TestTransient(void)
     use.accessCount = 1;
     use.neverCull = true;
     AddPass(use);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(Plan(samples).memoryBytes == 0, "the samples on chip");
     CHECK(Plan(resolved).memoryOffset == 0 && Plan(resolved).memoryBytes == kTexture,
           "what they resolve to in memory");
@@ -340,7 +341,7 @@ static void TestStores(mrhiTextureId windowTexture)
     later.neverCull = true;
     AddPass(later);
     mrhiPassId culled = Draw(unread, mrhi_storeKeep, nullptr, 0);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     mrhiPassPlan plan = PassPlan(first);
     CHECK(plan.kept, "kept");
     CHECK(plan.colorStores[0] == mrhi_storeKeep, "read later, kept");
@@ -370,7 +371,7 @@ static void TestStores(mrhiTextureId windowTexture)
     mrhiPassId again = AddPass(def);
     mrhiAccess lateRead = Access(kept, mrhi_accessSampled);
     Draw(unreadOut, mrhi_storeKeep, &lateRead, 1);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     plan = PassPlan(writer);
     CHECK(plan.colorStores[0] == mrhi_storeKeep, "kept for the next pass's load");
     CHECK(plan.colorStores[1] == mrhi_storeDiscard, "overwritten next without a read");
@@ -408,7 +409,7 @@ static void TestStores(mrhiTextureId windowTexture)
         reader.accessCount = 1;
         reader.neverCull = true;
         AddPass(reader);
-        CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+        CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
         CHECK(PassPlan(firstPart).colorStores[0] == mrhi_storeDiscard,
               layers ? "the next layer read, not the first" : "the next mip read, not the first");
         Drop();
@@ -421,20 +422,20 @@ static void TestRefusals(void)
     Begin();
     mrhiResourceId target = Declare(mrhi_formatRgba8Unorm, 1);
     mrhiPassId pass = Draw(target, mrhi_storeKeep, nullptr, 0);
-    CHECK(mrhiGetPassPlan(s_device, pass, &plan) == mrhi_errorState, "not compiled");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_GetPlan(s_device, pass, &plan) == mrhi_errorState, "not compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(Memory() == 0, "a culled frame takes nothing");
-    CHECK(mrhiGetPassPlan(s_device, pass, nullptr) == mrhi_errorInvalid, "no out");
-    CHECK(mrhiGetPassPlan(nullptr, pass, &plan) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetPassPlan(s_device, (mrhiPassId){0, 0}, &plan) == mrhi_errorStale, "no pass");
-    CHECK(mrhiGetPassPlan(s_device, (mrhiPassId){pass.index1 + 1, pass.generation}, &plan) ==
+    CHECK(mrhiPass_GetPlan(s_device, pass, nullptr) == mrhi_errorInvalid, "no out");
+    CHECK(mrhiPass_GetPlan(nullptr, pass, &plan) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiPass_GetPlan(s_device, (mrhiPassId){0, 0}, &plan) == mrhi_errorStale, "no pass");
+    CHECK(mrhiPass_GetPlan(s_device, (mrhiPassId){pass.index1 + 1, pass.generation}, &plan) ==
               mrhi_errorStale,
           "past the passes");
     Drop();
     Begin();
     Draw(Declare(mrhi_formatRgba8Unorm, 1), mrhi_storeKeep, nullptr, 0);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
-    CHECK(mrhiGetPassPlan(s_device, pass, &plan) == mrhi_errorStale, "the last frame's");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_GetPlan(s_device, pass, &plan) == mrhi_errorStale, "the last frame's");
     Drop();
 }
 

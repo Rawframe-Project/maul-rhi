@@ -62,13 +62,13 @@ static void Open(void)
 static void Begin(void)
 {
     mrhiFrameDef def = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &def) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &def) == mrhi_success, "begun");
 }
 
 static void Submit(void)
 {
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
 }
 
 // Whether a pass was handed the driver following exactly the given pass of
@@ -315,9 +315,9 @@ static void TestAliasing(void)
     mrhiPassId graphics = Pass(mrhi_passGraphics, Access(late, mrhi_accessStorageRead, 0), true);
     mrhiResourcePlan earlyPlan;
     mrhiResourcePlan latePlan;
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
-              mrhiGetResourcePlan(s_device, early, &earlyPlan) == mrhi_success &&
-              mrhiGetResourcePlan(s_device, late, &latePlan) == mrhi_success &&
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiResource_GetPlan(s_device, early, &earlyPlan) == mrhi_success &&
+              mrhiResource_GetPlan(s_device, late, &latePlan) == mrhi_success &&
               latePlan.memoryOffset == earlyPlan.memoryOffset,
           "the later buffer takes the earlier one's memory");
     Submit();

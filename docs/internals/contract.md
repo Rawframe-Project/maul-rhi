@@ -43,7 +43,7 @@ Every item has a `kind`, a snake_case `name` and a `doc`. The generator turns na
 | `opaque` | none | a typed opaque pointer, for a root object |
 | `id` | none | a generation-checked id, `{ index1, generation }` |
 | `struct` | `members` (`name`, `type`, optional `doc` and `pointer`); optional `def` or `chained` | a typedef struct; a def opens with `cookie` and `next`, a chained struct with `mrhiChain chain` |
-| `function` | `args`, optional `returns`, `thread_safety`, optional `inline_body` | a documented declaration; one returning `result` is nodiscard; one with an `inline_body` is a `static inline` function built in the program |
+| `function` | `args`, optional `object`, optional `returns`, `thread_safety`, optional `inline_body` | a documented declaration; one with an `object` acts on that object, which is the kind of its first id or else its root, and is named `mrhiObject_Verb`: `pass_begin` with the object `pass` is `mrhiPass_Begin`; one returning `result` is nodiscard; one with an `inline_body` is a `static inline` function built in the program |
 
 An `inline_body` exists for defaults that must be built in the program rather than the library, such as `mrhiDefaultInstanceDef`, which stamps the headers the program was built with.
 
@@ -74,7 +74,7 @@ A mapping has a row for each of `vulkan`, `d3d12`, `metal` and `web_gpu`: a `cla
 
 - A struct with `defaults` gives each member a `default`, from which its `Default` function in `src/generated/defaults.c` is made. A limit member may add `better: lower`, as alignments do; every other limit is better higher, which is how the core compares a request against an adapter. A limit that is better lower must also be a power of two, on an adapter and in a device def.
 - The `format` enum's texture formats carry, beside their mapping, the capabilities every adapter has (`floor`), their block size, the feature a compressed format needs (`family`), their sRGB or linear twin (`srgb_pair`) and their depth and stencil `aspects`. They make `src/generated/capabilities.c`: the known formats, the floor, the twins and the aspect checks.
-- Diagnostic codes are an enum like any other; their docs become the texts `mrhiDiagnosticText` returns, in `src/generated/diagnostic_texts.c`.
+- Diagnostic codes are an enum like any other; their docs become the texts `mrhiGetDiagnosticText` returns, in `src/generated/diagnostic_texts.c`.
 
 ## Thread safety
 

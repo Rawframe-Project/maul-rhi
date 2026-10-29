@@ -159,7 +159,7 @@ static bool ReadsZerosFirst(mrhiDevice* device, mrhiTextureId texture, const mrh
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId resource = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportTexture(device, texture, &resource) == mrhi_success,
           "the texture's first frame");
     mrhiAccess read = {
@@ -174,8 +174,8 @@ static bool ReadsZerosFirst(mrhiDevice* device, mrhiTextureId texture, const mrh
     pass.neverCull = true;
     mrhiPassId back = {0};
     CHECK(mrhiAddPass(device, &pass, &back) == mrhi_success &&
-              mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, back) == mrhi_success,
+              mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, back) == mrhi_success,
           "a pass reading it");
     DirtyRegion regions[DIRTY_REGIONS];
     uint32_t count = DirtyRegions(def, regions);
@@ -201,16 +201,16 @@ static bool ReadsZerosFirst(mrhiDevice* device, mrhiTextureId texture, const mrh
         };
         const mrhiExtent3d extent = {across * block, down * block, 1};
         sizes[i] = (size_t)across * down * blockBytes;
-        CHECK(mrhiReadTexture(device, back, &source, &extent, &requests[i]) == mrhi_success,
+        CHECK(mrhiPass_ReadTexture(device, back, &source, &extent, &requests[i]) == mrhi_success,
               "a part read");
     }
     mrhiRequestId token = {0};
-    CHECK(mrhiEndPass(device, back) == mrhi_success &&
-              mrhiSubmitFrame(device, &token) == mrhi_success &&
-              mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
+    CHECK(mrhiPass_End(device, back) == mrhi_success &&
+              mrhiDevice_SubmitFrame(device, &token) == mrhi_success &&
+              mrhiRequest_WaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
           "read back and finished");
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
     }
     static const uint8_t zeros[4096];
@@ -219,9 +219,9 @@ static bool ReadsZerosFirst(mrhiDevice* device, mrhiTextureId texture, const mrh
     for (uint32_t i = 0; i < count; ++i)
     {
         size_t size = 0;
-        zeroed =
-            mrhiTakeReadback(device, requests[i], taken, sizeof(taken), &size) == mrhi_success &&
-            size == sizes[i] && memcmp(taken, zeros, size) == 0 && zeroed;
+        zeroed = mrhiRequest_TakeReadback(device, requests[i], taken, sizeof(taken), &size) ==
+                     mrhi_success &&
+                 size == sizes[i] && memcmp(taken, zeros, size) == 0 && zeroed;
     }
     return zeroed;
 }

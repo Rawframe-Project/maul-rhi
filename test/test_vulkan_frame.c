@@ -197,10 +197,10 @@ static mrhiDevice* OpenDevice(mrhiInstance* instance, bool* timestampsOut)
     mrhiAdapterId adapter = {0};
     size_t count = 0;
     mrhiFeatures features = {0};
-    if (mrhiRequestAdapters(instance, &request, &id) != mrhi_success ||
-        mrhiNextInstanceNotification(instance, &record) != mrhi_success ||
-        mrhiGetAdapters(instance, &adapter, 1, &count) != mrhi_success || count == 0 ||
-        mrhiGetAdapterFeatures(instance, adapter, &features) != mrhi_success)
+    if (mrhiInstance_RequestAdapters(instance, &request, &id) != mrhi_success ||
+        mrhiInstance_TakeNotification(instance, &record) != mrhi_success ||
+        mrhiInstance_GetAdapters(instance, &adapter, 1, &count) != mrhi_success || count == 0 ||
+        mrhiAdapter_GetFeatures(instance, adapter, &features) != mrhi_success)
     {
         return nullptr;
     }
@@ -212,7 +212,7 @@ static mrhiDevice* OpenDevice(mrhiInstance* instance, bool* timestampsOut)
     mrhiDevice* device = nullptr;
     mrhiRequestId ready;
     if (mrhiCreateDevice(instance, &def, &device, &ready) != mrhi_success ||
-        mrhiNextInstanceNotification(instance, &record) != mrhi_success ||
+        mrhiInstance_TakeNotification(instance, &record) != mrhi_success ||
         record.outcome != mrhi_success)
     {
         return nullptr;
@@ -263,7 +263,7 @@ static mrhiResult SubmitFrame(mrhiDevice* device, mrhiQuerySetId times)
     mrhiBufferDef def = mrhiDefaultBufferDef();
     def.size = sizeof(words);
     mrhiResourceId buffer = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiDeclareBuffer(device, &def, &buffer) == mrhi_success,
           "a frame and a buffer");
     mrhiAccess write = Whole(buffer, mrhi_accessCopyDestination);
@@ -273,32 +273,34 @@ static mrhiResult SubmitFrame(mrhiDevice* device, mrhiQuerySetId times)
     mrhiPassId native = AddPass(device, mrhi_passGraphics, nullptr, (mrhiQuerySetId){0});
     mrhiPassId graphics = AddPass(device, mrhi_passGraphics, &back, times);
     mrhiRequestId bytes = {0};
-    CHECK(mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, upload) == mrhi_success &&
-              mrhiWriteBuffer(device, upload, buffer, 0, words, sizeof(words)) == mrhi_success &&
-              mrhiEndPass(device, upload) == mrhi_success &&
-              mrhiBeginPass(device, compute) == mrhi_success &&
-              mrhiEndPass(device, compute) == mrhi_success &&
-              mrhiBeginPass(device, native) == mrhi_success &&
-              mrhiEndPass(device, native) == mrhi_success &&
-              mrhiBeginPass(device, graphics) == mrhi_success &&
-              mrhiReadBuffer(device, graphics, buffer, 0, sizeof(words), &bytes) == mrhi_success &&
-              mrhiEndPass(device, graphics) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, upload) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, buffer, 0, words, sizeof(words)) ==
+                  mrhi_success &&
+              mrhiPass_End(device, upload) == mrhi_success &&
+              mrhiPass_Begin(device, compute) == mrhi_success &&
+              mrhiPass_End(device, compute) == mrhi_success &&
+              mrhiPass_Begin(device, native) == mrhi_success &&
+              mrhiPass_End(device, native) == mrhi_success &&
+              mrhiPass_Begin(device, graphics) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, graphics, buffer, 0, sizeof(words), &bytes) ==
+                  mrhi_success &&
+              mrhiPass_End(device, graphics) == mrhi_success,
           "recorded");
     mrhiRequestId token = {0};
-    mrhiResult status = mrhiSubmitFrame(device, &token);
+    mrhiResult status = mrhiDevice_SubmitFrame(device, &token);
     if (status != mrhi_success)
     {
         return status;
     }
-    CHECK(mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success, "finished");
+    CHECK(mrhiRequest_WaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success, "finished");
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
     }
     uint32_t taken[4] = {0};
     size_t size = 0;
-    CHECK(mrhiTakeReadback(device, bytes, taken, sizeof(taken), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(device, bytes, taken, sizeof(taken), &size) == mrhi_success &&
               size == sizeof(words) && memcmp(taken, words, size) == 0,
           "the words back");
     return status;
@@ -309,7 +311,7 @@ static mrhiDiagnosticCode LastDiagnostic(mrhiDevice* device)
 {
     mrhiDiagnosticCode code = 0;
     mrhiDiagnostic record;
-    while (mrhiNextDeviceDiagnostic(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success)
     {
         code = record.code;
     }

@@ -183,8 +183,8 @@ static bool Dirty(const Functions* functions, VkDevice device, uint32_t family, 
 static void CheckDirtyTextures(mrhiDevice* device)
 {
     void* natives[5] = {0};
-    CHECK(mrhiGetVulkanDevice(device, &natives[0], &natives[1], &natives[2], &natives[3],
-                              &natives[4]) == mrhi_success,
+    CHECK(mrhiDevice_GetVulkanDevice(device, &natives[0], &natives[1], &natives[2], &natives[3],
+                                     &natives[4]) == mrhi_success,
           "the device's native objects");
     PFN_vkGetInstanceProcAddr getInstance = nullptr;
     PFN_vkGetDeviceProcAddr get = nullptr;
@@ -207,7 +207,7 @@ static void CheckDirtyTextures(mrhiDevice* device)
         mrhiVulkanTextureInfo info = {0};
         bool depth = textures[i].def.format == mrhi_formatDepth32Float;
         CHECK(mrhiCreateTexture(device, &textures[i].def, &texture) == mrhi_success &&
-                  mrhiGetVulkanTexture(device, texture, &info) == mrhi_success &&
+                  mrhiTexture_GetVulkanTexture(device, texture, &info) == mrhi_success &&
                   Dirty(&functions, native, family, (VkImage)info.image, depth),
               textures[i].what);
         CHECK(ReadsZerosFirst(device, texture, &textures[i].def), textures[i].what);
@@ -227,9 +227,10 @@ int main(void)
     mrhiAdapterId adapter = {0};
     size_t count = 0;
     bool found = instance != nullptr &&
-                 mrhiRequestAdapters(instance, &request, &searched) == mrhi_success &&
-                 mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
-                 mrhiGetAdapters(instance, &adapter, 1, &count) == mrhi_success && count >= 1;
+                 mrhiInstance_RequestAdapters(instance, &request, &searched) == mrhi_success &&
+                 mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
+                 mrhiInstance_GetAdapters(instance, &adapter, 1, &count) == mrhi_success &&
+                 count >= 1;
     mrhiDevice* device = nullptr;
     if (found)
     {
@@ -237,7 +238,7 @@ int main(void)
         deviceDef.adapter = adapter;
         mrhiRequestId opened = {0};
         CHECK(mrhiCreateDevice(instance, &deviceDef, &device, &opened) == mrhi_success &&
-                  mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+                  mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
                   record.outcome == mrhi_success,
               "a device");
     }

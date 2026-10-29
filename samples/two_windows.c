@@ -29,7 +29,7 @@ static bool Configure(Sample* sample, const SampleWindow* window, mrhiFormat* fo
 {
     mrhiSurfaceCaps caps;
     SampleCheck(sample,
-                mrhiGetSurfaceCaps(sample->instance, window->surface, sample->adapter, &caps) ==
+                mrhiSurface_GetCaps(sample->instance, window->surface, sample->adapter, &caps) ==
                         mrhi_success &&
                     caps.presentable,
                 "the adapter presents to each window");
@@ -41,7 +41,7 @@ static bool Configure(Sample* sample, const SampleWindow* window, mrhiFormat* fo
     config.usage = mrhi_textureRenderTarget | (caps.usages & mrhi_textureCopySource);
     config.width = WIDTH;
     config.height = HEIGHT;
-    SampleCheck(sample, mrhiConfigureSurface(sample->device, &config) == mrhi_success,
+    SampleCheck(sample, mrhiDevice_ConfigureSurface(sample->device, &config) == mrhi_success,
                 "each surface configured");
     *formatOut = config.color.format;
     return (caps.usages & mrhi_textureCopySource) != 0;
@@ -127,7 +127,7 @@ int main(void)
     for (int frame = 0; frame < FRAMES; ++frame)
     {
         mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-        SampleCheck(&sample, mrhiBeginFrame(device, &frameDef) == mrhi_success, "a frame");
+        SampleCheck(&sample, mrhiDevice_BeginFrame(device, &frameDef) == mrhi_success, "a frame");
         mrhiResourceId images[2] = {{0}};
         mrhiPassId clears[2] = {{0}};
         mrhiPassId reads[2] = {{0}};
@@ -139,19 +139,19 @@ int main(void)
                         "both images acquired");
             AddClear(&sample, images[i], ColorOf(i, frame), read[i], &clears[i], &reads[i]);
         }
-        SampleCheck(&sample, mrhiCompileFrame(device) == mrhi_success, "the frame compiled");
+        SampleCheck(&sample, mrhiDevice_CompileFrame(device) == mrhi_success, "the frame compiled");
         mrhiRequestId pixels[2] = {{0}};
         for (int i = 0; i < 2; ++i)
         {
             mrhiTextureCopy source = none;
             source.resource = images[i];
             SampleCheck(&sample,
-                        mrhiBeginPass(device, clears[i]) == mrhi_success &&
-                            mrhiEndPass(device, clears[i]) == mrhi_success &&
-                            (!read[i] || (mrhiBeginPass(device, reads[i]) == mrhi_success &&
-                                          mrhiReadTexture(device, reads[i], &source, &one,
-                                                          &pixels[i]) == mrhi_success &&
-                                          mrhiEndPass(device, reads[i]) == mrhi_success)),
+                        mrhiPass_Begin(device, clears[i]) == mrhi_success &&
+                            mrhiPass_End(device, clears[i]) == mrhi_success &&
+                            (!read[i] || (mrhiPass_Begin(device, reads[i]) == mrhi_success &&
+                                          mrhiPass_ReadTexture(device, reads[i], &source, &one,
+                                                               &pixels[i]) == mrhi_success &&
+                                          mrhiPass_End(device, reads[i]) == mrhi_success)),
                         "each image cleared");
         }
         SampleFinish(&sample);
@@ -168,7 +168,7 @@ int main(void)
     }
     for (int i = 0; i < 2; ++i)
     {
-        SampleCheck(&sample, mrhiUnconfigureSurface(device, windows[i].surface) == mrhi_success,
+        SampleCheck(&sample, mrhiSurface_Unconfigure(device, windows[i].surface) == mrhi_success,
                     "each surface unconfigured");
         SampleWindowClose(&sample, &windows[i]);
     }

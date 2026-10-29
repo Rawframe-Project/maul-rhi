@@ -231,7 +231,7 @@ static bool EnsureSurface(Program* program, mwinContext* context)
     mrhiSurfaceCaps caps;
     return SampleCheck(
         sample,
-        mrhiGetSurfaceCaps(sample->instance, program->surface, sample->adapter, &caps) ==
+        mrhiSurface_GetCaps(sample->instance, program->surface, sample->adapter, &caps) ==
                 mrhi_success &&
             mrhiSuggestSurfaceColor(&caps, &caps.colors[0], &program->color) == mrhi_success,
         "the surface's preferred color");
@@ -252,7 +252,8 @@ static bool Configure(Program* program, mwinPixelSize size)
         program->resizedFrom = program->submitted;
     }
     return SampleCheck(program->sample,
-                       mrhiConfigureSurface(program->sample->device, &config) == mrhi_success,
+                       mrhiDevice_ConfigureSurface(program->sample->device, &config) ==
+                           mrhi_success,
                        "configured at the window's pixel size");
 }
 
@@ -260,7 +261,7 @@ static bool Configure(Program* program, mwinPixelSize size)
 static void TakeAnswers(Program* program)
 {
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(program->sample->device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(program->sample->device, &record) == mrhi_success)
     {
         program->finished +=
             SampleCheck(program->sample, record.outcome == mrhi_success, "a frame finished");
@@ -281,7 +282,7 @@ static void Present(Program* program, mwinContext* context)
         return;
     }
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    mrhiResult begun = mrhiBeginFrame(sample->device, &frame);
+    mrhiResult begun = mrhiDevice_BeginFrame(sample->device, &frame);
     if (begun == mrhi_errorCapacity)
     {
         return;
@@ -291,7 +292,8 @@ static void Present(Program* program, mwinContext* context)
     mrhiResult acquired = mrhiAcquireSurfaceImage(sample->device, program->surface, &image);
     if (acquired != mrhi_success)
     {
-        SampleCheck(sample, mrhiDropFrame(sample->device) == mrhi_success, "the frame dropped");
+        SampleCheck(sample, mrhiDevice_DropFrame(sample->device) == mrhi_success,
+                    "the frame dropped");
         // Out of date or suboptimal: configure again at the next frame.
         program->configured = (mwinPixelSize){0};
         return;
@@ -306,13 +308,14 @@ static void Present(Program* program, mwinContext* context)
     def.colorTargetCount = 1;
     mrhiPassId pass = {0};
     mrhiRequestId token = {0};
-    program->submitted += SampleCheck(sample,
-                                      mrhiAddPass(sample->device, &def, &pass) == mrhi_success &&
-                                          mrhiCompileFrame(sample->device) == mrhi_success &&
-                                          mrhiBeginPass(sample->device, pass) == mrhi_success &&
-                                          mrhiEndPass(sample->device, pass) == mrhi_success &&
-                                          mrhiSubmitFrame(sample->device, &token) == mrhi_success,
-                                      "the image cleared and submitted");
+    program->submitted +=
+        SampleCheck(sample,
+                    mrhiAddPass(sample->device, &def, &pass) == mrhi_success &&
+                        mrhiDevice_CompileFrame(sample->device) == mrhi_success &&
+                        mrhiPass_Begin(sample->device, pass) == mrhi_success &&
+                        mrhiPass_End(sample->device, pass) == mrhi_success &&
+                        mrhiDevice_SubmitFrame(sample->device, &token) == mrhi_success,
+                    "the image cleared and submitted");
 }
 
 static void Collect(Program* program, mwinContext* context)

@@ -108,8 +108,8 @@ static mrhiInstance* Instance(mrhiTestAdapter* adapter, mrhiTestDriverDef* drive
     CHECK(mrhiCreateInstance(&def, &instance) == mrhi_success, "the instance");
     mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
     mrhiRequestId request;
-    CHECK(mrhiRequestAdapters(instance, &search, &request) == mrhi_success &&
-              OVER_PATTERN(mrhiNextInstanceNotification(instance, &filled->found)),
+    CHECK(mrhiInstance_RequestAdapters(instance, &search, &request) == mrhi_success &&
+              OVER_PATTERN(mrhiInstance_TakeNotification(instance, &filled->found)),
           "the adapter found");
     return instance;
 }
@@ -117,11 +117,11 @@ static mrhiInstance* Instance(mrhiTestAdapter* adapter, mrhiTestDriverDef* drive
 // The adapter's facts, a surface's caps, and an instance diagnostic.
 static void Adapter(mrhiInstance* instance, mrhiAdapterId adapter, Filled* filled)
 {
-    CHECK(OVER_PATTERN(mrhiGetAdapterInfo(instance, adapter, &filled->adapterInfo)) &&
-              OVER_PATTERN(mrhiGetAdapterFeatures(instance, adapter, &filled->adapterFeatures)) &&
-              OVER_PATTERN(mrhiGetAdapterLimits(instance, adapter, &filled->adapterLimits)) &&
-              OVER_PATTERN(
-                  mrhiGetFormatCaps(instance, adapter, mrhi_formatRgba8Unorm, &filled->formatCaps)),
+    CHECK(OVER_PATTERN(mrhiAdapter_GetInfo(instance, adapter, &filled->adapterInfo)) &&
+              OVER_PATTERN(mrhiAdapter_GetFeatures(instance, adapter, &filled->adapterFeatures)) &&
+              OVER_PATTERN(mrhiAdapter_GetLimits(instance, adapter, &filled->adapterLimits)) &&
+              OVER_PATTERN(mrhiAdapter_GetFormatCaps(instance, adapter, mrhi_formatRgba8Unorm,
+                                                     &filled->formatCaps)),
           "the adapter's facts");
     mrhiSurfaceSourceTest source = {
         .chain = {.next = nullptr, .type = mrhi_structSurfaceSourceTest},
@@ -131,12 +131,12 @@ static void Adapter(mrhiInstance* instance, mrhiAdapterId adapter, Filled* fille
     surfaceDef.next = &source.chain;
     mrhiSurfaceId surface;
     CHECK(mrhiCreateSurface(instance, &surfaceDef, &surface) == mrhi_success &&
-              OVER_PATTERN(mrhiGetSurfaceCaps(instance, surface, adapter, &filled->surfaceCaps)) &&
+              OVER_PATTERN(mrhiSurface_GetCaps(instance, surface, adapter, &filled->surfaceCaps)) &&
               OVER_PATTERN(mrhiSuggestSurfaceColor(
                   &filled->surfaceCaps, &filled->surfaceCaps.colors[0], &filled->suggested)),
           "the surface's caps and a color");
-    CHECK(mrhiGetAdapters(instance, nullptr, 1, nullptr) == mrhi_errorInvalid &&
-              OVER_PATTERN(mrhiNextInstanceDiagnostic(instance, &filled->instanceDiagnostic)),
+    CHECK(mrhiInstance_GetAdapters(instance, nullptr, 1, nullptr) == mrhi_errorInvalid &&
+              OVER_PATTERN(mrhiInstance_TakeDiagnostic(instance, &filled->instanceDiagnostic)),
           "a misuse recorded");
 }
 
@@ -149,21 +149,21 @@ static mrhiDevice* Device(mrhiInstance* instance, mrhiAdapterId adapter, Filled*
     mrhiDevice* device = nullptr;
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success &&
-              OVER_PATTERN(mrhiNextInstanceNotification(instance, &filled->ready)),
+              OVER_PATTERN(mrhiInstance_TakeNotification(instance, &filled->ready)),
           "the device ready");
-    CHECK(OVER_PATTERN(mrhiGetDeviceFeatures(device, &filled->deviceFeatures)) &&
-              OVER_PATTERN(mrhiGetDeviceLimits(device, &filled->deviceLimits)) &&
-              OVER_PATTERN(mrhiGetDeviceBudgets(device, &filled->budgets)),
+    CHECK(OVER_PATTERN(mrhiDevice_GetFeatures(device, &filled->deviceFeatures)) &&
+              OVER_PATTERN(mrhiDevice_GetLimits(device, &filled->deviceLimits)) &&
+              OVER_PATTERN(mrhiDevice_GetBudgets(device, &filled->budgets)),
           "the device's facts");
-    CHECK(mrhiGetDeviceFeatures(device, nullptr) == mrhi_errorInvalid &&
-              OVER_PATTERN(mrhiNextDeviceDiagnostic(device, &filled->deviceDiagnostic)),
+    CHECK(mrhiDevice_GetFeatures(device, nullptr) == mrhi_errorInvalid &&
+              OVER_PATTERN(mrhiDevice_TakeDiagnostic(device, &filled->deviceDiagnostic)),
           "a misuse recorded");
     mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
     shaderDef.bytes = s_noopContainer;
     shaderDef.byteCount = sizeof(s_noopContainer);
     mrhiShaderId shader = {0};
     CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success &&
-              OVER_PATTERN(mrhiGetShaderInfo(device, shader, &filled->shader)),
+              OVER_PATTERN(mrhiShader_GetInfo(device, shader, &filled->shader)),
           "the shader's info");
     return device;
 }
@@ -188,32 +188,33 @@ static void Frame(mrhiDevice* device, Filled* filled)
     mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
     bufferDef.size = 256;
     mrhiResourceId buffer = {0};
-    CHECK(mrhiBeginFrame(device, &frameDef) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frameDef) == mrhi_success &&
               mrhiDeclareBuffer(device, &bufferDef, &buffer) == mrhi_success,
           "the frame");
     const mrhiAccess write = {.resource = buffer, .kind = mrhi_accessCopyDestination};
     const mrhiAccess read = {.resource = buffer, .kind = mrhi_accessCopySource};
     mrhiPassId writes = Pass(device, &write);
     mrhiPassId reads = Pass(device, &read);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
     filled->barrierCount = 0;
-    CHECK(OVER_PATTERN(mrhiGetFrameBarriers(device, filled->barriers, 4, &filled->barrierCount)) &&
+    CHECK(OVER_PATTERN(
+              mrhiDevice_GetFrameBarriers(device, filled->barriers, 4, &filled->barrierCount)) &&
               filled->barrierCount > 0 && filled->barrierCount <= 4,
           "the barriers");
-    CHECK(OVER_PATTERN(mrhiGetResourcePlan(device, buffer, &filled->resourcePlan)) &&
-              OVER_PATTERN(mrhiGetPassPlan(device, writes, &filled->passPlan)),
+    CHECK(OVER_PATTERN(mrhiResource_GetPlan(device, buffer, &filled->resourcePlan)) &&
+              OVER_PATTERN(mrhiPass_GetPlan(device, writes, &filled->passPlan)),
           "the plans");
-    CHECK(mrhiBeginPass(device, writes) == mrhi_success &&
-              mrhiEndPass(device, writes) == mrhi_success &&
-              mrhiBeginPass(device, reads) == mrhi_success &&
-              mrhiEndPass(device, reads) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, writes) == mrhi_success &&
+              mrhiPass_End(device, writes) == mrhi_success &&
+              mrhiPass_Begin(device, reads) == mrhi_success &&
+              mrhiPass_End(device, reads) == mrhi_success,
           "the passes recorded");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(device, &token) == mrhi_success &&
-              OVER_PATTERN(mrhiGetFrameUsage(device, &filled->usage)),
+    CHECK(mrhiDevice_SubmitFrame(device, &token) == mrhi_success &&
+              OVER_PATTERN(mrhiDevice_GetFrameUsage(device, &filled->usage)),
           "submitted");
     bool done = false;
-    while (!done && OVER_PATTERN(mrhiNextDeviceNotification(device, &filled->frameDone)))
+    while (!done && OVER_PATTERN(mrhiDevice_TakeNotification(device, &filled->frameDone)))
     {
         done = filled->frameDone.kind == mrhi_deviceFrameDone;
     }
@@ -237,16 +238,17 @@ static void Fill(int pattern, Filled* filled)
     mrhiInstance* instance = Instance(&adapter, &driver, filled);
     mrhiAdapterId id;
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, &id, 1, &count) == mrhi_success && count == 1, "one adapter");
+    CHECK(mrhiInstance_GetAdapters(instance, &id, 1, &count) == mrhi_success && count == 1,
+          "one adapter");
     Adapter(instance, id, filled);
     mrhiDevice* device = Device(instance, id, filled);
     Frame(device, filled);
     lose = true;
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
     }
-    CHECK(OVER_PATTERN(mrhiGetDeviceLossReport(device, &filled->loss)), "the loss report");
+    CHECK(OVER_PATTERN(mrhiDevice_GetLossReport(device, &filled->loss)), "the loss report");
     mrhiDestroyDevice(device);
     mrhiDestroyInstance(instance);
 }

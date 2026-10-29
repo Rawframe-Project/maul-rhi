@@ -92,14 +92,14 @@ static void TestInvalidDefs(void)
     CHECK(mrhiCreateSampler(device, nullptr, &sampler) == mrhi_errorInvalid, "no def");
     CHECK(mrhiCreateSampler(device, &def, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiCreateSampler(nullptr, &def, &sampler) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetDeviceMisuse(device) == 13, "each counted on the device");
+    CHECK(mrhiDevice_GetMisuse(device) == 13, "each counted on the device");
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def.next = &critical;
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorUnsupported, "an extension");
     mrhiChain untyped = {.next = nullptr, .type = mrhi_structNone};
     def.next = &untyped;
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorInvalid, "an untyped node");
-    CHECK(mrhiGetDeviceMisuse(device) == 14, "the untyped node counted");
+    CHECK(mrhiDevice_GetMisuse(device) == 14, "the untyped node counted");
     Close(device);
 }
 
@@ -112,14 +112,14 @@ static void TestStateAndLimit(void)
     mrhiSamplerId c;
     CHECK(mrhiCreateSampler(device, &def, &a) == mrhi_errorState, "not ready yet");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(s_instance, &record) == mrhi_success, "ready");
+    CHECK(mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success, "ready");
     CHECK(mrhiCreateSampler(device, &def, &a) == mrhi_success, "one");
     CHECK(mrhiCreateSampler(device, &def, &b) == mrhi_success, "two");
     CHECK(mrhiCreateSampler(device, &def, &c) == mrhi_errorCapacity, "the limit");
     CHECK(mrhiDestroySampler(device, a) == mrhi_success, "one gone");
     CHECK(mrhiCreateSampler(device, &def, &c) == mrhi_success, "room again");
     CHECK(c.index1 == a.index1 && c.generation != a.generation, "the slot, newer");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "no misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "no misuse");
     Close(device);
 }
 

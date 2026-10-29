@@ -996,7 +996,7 @@ static void TestCreate(void)
     CHECK(mrhiCreateShader(device, &def, &a) == mrhi_success && a.index1 != 0, "a shader");
     memset(s_container, 0, s_size);
     mrhiShaderInfo info = {0};
-    CHECK(mrhiGetShaderInfo(device, a, &info) == mrhi_success, "its info");
+    CHECK(mrhiShader_GetInfo(device, a, &info) == mrhi_success, "its info");
     Reset();
     Assemble();
     CHECK(memcmp(info.digest, s_container + 16, MRHI_DIGEST_BYTES) == 0 && info.entryCount == 3 &&
@@ -1008,11 +1008,11 @@ static void TestCreate(void)
     CHECK(mrhiCreateShader(device, &def, &c) == mrhi_errorCapacity, "the limit");
     CHECK(mrhiDestroyShader(device, a) == mrhi_success, "destroyed");
     CHECK(mrhiDestroyShader(device, a) == mrhi_errorStale, "its id has ended");
-    CHECK(mrhiGetShaderInfo(device, a, &info) == mrhi_errorStale, "no info for it");
+    CHECK(mrhiShader_GetInfo(device, a, &info) == mrhi_errorStale, "no info for it");
     CHECK(mrhiCreateShader(device, &def, &c) == mrhi_success, "room again");
     CHECK(mrhiDestroyShader(nullptr, b) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetShaderInfo(nullptr, b, &info) == mrhi_errorInvalid, "no device for info");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "no misuse");
+    CHECK(mrhiShader_GetInfo(nullptr, b, &info) == mrhi_errorInvalid, "no device for info");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "no misuse");
     // b and c are still live: the device frees them.
     Close(device);
 }
@@ -1027,7 +1027,7 @@ static void TestRefusals(void)
     CHECK(mrhiCreateShader(nullptr, &def, &shader) == mrhi_errorInvalid, "no device");
     CHECK(mrhiCreateShader(device, nullptr, &shader) == mrhi_errorInvalid, "no def");
     CHECK(mrhiCreateShader(device, &def, nullptr) == mrhi_errorInvalid, "no out");
-    CHECK(mrhiGetShaderInfo(device, shader, nullptr) == mrhi_errorInvalid, "no info out");
+    CHECK(mrhiShader_GetInfo(device, shader, nullptr) == mrhi_errorInvalid, "no info out");
     def.cookie = 0;
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorInvalid, "no cookie");
     def = Def();
@@ -1041,7 +1041,7 @@ static void TestRefusals(void)
     memmove(s_container + 4, s_container, s_size);
     def.bytes = s_container + 4;
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorInvalid, "misaligned bytes");
-    CHECK(mrhiGetDeviceMisuse(device) == 7, "each counted");
+    CHECK(mrhiDevice_GetMisuse(device) == 7, "each counted");
     Assemble();
     s_container[s_size - 1] ^= 1;
     def = Def();
@@ -1058,7 +1058,7 @@ static void TestRefusals(void)
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def.next = &critical;
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported, "an extension");
-    CHECK(mrhiGetDeviceMisuse(device) == 7, "other refusals are not misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 7, "other refusals are not misuse");
     def.next = nullptr;
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "the device's root block");
     Close(device);
@@ -1084,7 +1084,7 @@ static void TestFeatures(void)
     Put32(Record(ENTRIES, 1, 48) + 36, mrhi_builtinPrimitiveIndex);
     Assemble();
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported, "the primitive index");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "neither is misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "neither is misuse");
     Close(device);
     // The view index needs multiview.
     Reset();
@@ -1240,7 +1240,7 @@ static void TestHeapFeatures(void)
     device = OpenBindless(false);
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "with it");
     mrhiShaderInfo info;
-    CHECK(mrhiGetShaderInfo(device, shader, &info) == mrhi_success &&
+    CHECK(mrhiShader_GetInfo(device, shader, &info) == mrhi_success &&
               info.heapUses == (mrhi_heapUseSampledTextures | mrhi_heapUseSamplers),
           "its heap uses told");
     SetHeapUses(2, mrhi_heapUseStorageTextures);
@@ -1251,7 +1251,7 @@ static void TestHeapFeatures(void)
     Assemble();
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_errorUnsupported,
           "storage buffers without them");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "neither is misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "neither is misuse");
     Close(device);
     device = OpenBindless(true);
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "storage buffers with them");
@@ -1375,7 +1375,7 @@ static void TestLimits(void)
     CHECK(Made(device) == mrhi_success, "a storage buffer as large as the limit");
     Put64(Record(BINDINGS, 1, 24) + 16, limits.storageBindingBytes + 1);
     CHECK(Made(device) == mrhi_errorUnsupported, "a storage buffer past the limit");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "limits are not misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "limits are not misuse");
     Close(device);
 }
 
@@ -1400,7 +1400,7 @@ static mrhiDiagnosticCode Refusal(mrhiDevice* device)
 {
     mrhiDiagnosticCode code = 0;
     mrhiDiagnostic record;
-    while (mrhiNextDeviceDiagnostic(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success)
     {
         code = record.code;
     }
@@ -1443,7 +1443,7 @@ static void TestPastDeviceLimits(void)
                   mrhi_errorUnsupported &&
               Refusal(device) == mrhi_diagnosticLimitWorkgroupSizeY,
           "past the adapter's y beside the device's x: y named");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "none is misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "none is misuse");
     Close(device);
     ResetAdapter();
 }
@@ -1522,7 +1522,7 @@ static void TestEntryLimits(void)
              mrhi_samplingCenter);
     Put16(vertex + 34, (uint16_t)(count + 1));
     CHECK(Made(device) == mrhi_errorUnsupported, "vertex outputs past the limit");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "limits are not misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "limits are not misuse");
     Close(device);
     // With more invocations than any one size, each size is checked.
     s_adapter.limits.workgroupInvocations = 1024;
@@ -1547,7 +1547,7 @@ static void TestStateAndFailure(void)
     mrhiShaderId b;
     CHECK(mrhiCreateShader(device, &def, &a) == mrhi_errorState, "not ready yet");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(s_instance, &record) == mrhi_success, "ready");
+    CHECK(mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success, "ready");
     s_failAllocations = true;
     CHECK(mrhiCreateShader(device, &def, &a) == mrhi_errorCapacity, "the allocator fails");
     s_failAllocations = false;
@@ -1615,7 +1615,7 @@ static int CheckFile(char** args, bool all)
     mrhiShaderId shader;
     mrhiShaderInfo info = {0};
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "the library reads it");
-    CHECK(mrhiGetShaderInfo(device, shader, &info) == mrhi_success, "its info");
+    CHECK(mrhiShader_GetInfo(device, shader, &info) == mrhi_success, "its info");
     CHECK(memcmp(info.digest, digest, MRHI_DIGEST_BYTES) == 0, "the same digest");
     CHECK(info.entryCount == (uint32_t)atoi(args[2]) &&
               info.bindingCount == (uint32_t)atoi(args[3]) &&

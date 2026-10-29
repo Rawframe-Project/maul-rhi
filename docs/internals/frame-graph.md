@@ -8,7 +8,7 @@ Production frame graphs (Frostbite, Unreal, Granite, Filament) run a setup callb
 
 ## Declaring
 
-`mrhiBeginFrame` opens the device's one frame. Its resources are frame-local, generation-checked ids for three kinds of thing:
+`mrhiDevice_BeginFrame` opens the device's one frame. Its resources are frame-local, generation-checked ids for three kinds of thing:
 
 - **transients** the frame makes, places and may alias (`mrhiDeclareBuffer`, `mrhiDeclareTexture`);
 - **imported** device objects (`mrhiImportBuffer`, `mrhiImportTexture`), tracked and never aliased, each carrying one state between frames;
@@ -26,11 +26,11 @@ An object is fresh from `mrhiCreateBuffer` or `mrhiCreateTexture` until a frame 
 
 A texture of one mip and one layer, not a volume, whose first use in the frame is a color target that clears and keeps it, or a depth target, not read-only, that clears and keeps depth and any stencil, is left out of the clear when the frame compiles: that use writes all of it. No other use counts, since a draw or a copy covers only what it reaches. The texture still stops being fresh when the frame is submitted.
 
-The program's passes take ids from 2. `mrhiBeginPass`, `mrhiIsPassKept` and `mrhiGetPassPlan` answer `mrhi_errorStale` for the library's pass, which barriers, waits and resource plans may still name. Every driver buffer is made with the copy destination usage the clear needs; how each driver clears a texture, and what usage that adds, is on its page.
+The program's passes take ids from 2. `mrhiPass_Begin`, `mrhiPass_IsKept` and `mrhiPass_GetPlan` answer `mrhi_errorStale` for the library's pass, which barriers, waits and resource plans may still name. Every driver buffer is made with the copy destination usage the clear needs; how each driver clears a texture, and what usage that adds, is on its page.
 
 ## Compiling
 
-`mrhiCompileFrame` does four things, in `src/compile.c` and `src/plan.c`:
+`mrhiDevice_CompileFrame` does four things, in `src/compile.c` and `src/plan.c`:
 
 1. **Culling**, from the last pass back, at the granularity of whole resources: a pass is kept when it sets `neverCull`, or writes an imported resource, a surface image or a resource a kept later pass reads. Culled passes are never recorded and write no timestamps.
 2. **Stores.** A target's store is kept only when a later kept pass reads it or the texture outlives the frame; otherwise it is discarded, which lets tile GPUs keep it on chip.
@@ -60,11 +60,11 @@ When the first use of a transient lands on memory that resources used earlier in
 
 ## The readable plan
 
-After the compile, `mrhiIsPassKept`, `mrhiGetPassPlan`, `mrhiGetResourcePlan` and `mrhiGetFrameBarriers` expose the plan, and `mrhiGetFrameUsage` its memory. They exist for conformance tests and graph tools, and they are why the hazards and aliasing cases of the conformance suite can be checked exactly on any driver.
+After the compile, `mrhiPass_IsKept`, `mrhiPass_GetPlan`, `mrhiResource_GetPlan` and `mrhiDevice_GetFrameBarriers` expose the plan, and `mrhiDevice_GetFrameUsage` its memory. They exist for conformance tests and graph tools, and they are why the hazards and aliasing cases of the conformance suite can be checked exactly on any driver.
 
 ## Submission
 
-`mrhiSubmitFrame` hands the driver one read-only view, built in tables the device allocated with itself (`mrhiDriverFrame` in `src/driver.h`):
+`mrhiDevice_SubmitFrame` hands the driver one read-only view, built in tables the device allocated with itself (`mrhiDriverFrame` in `src/driver.h`):
 
 - the frame's resources by slot: device objects by driver handle, transients by def with the usages their passes derive and their place in frame memory, and whether a kept pass uses each;
 - the kept passes in the order they run, with their class, label, targets and stores, render area, query sets, the resources they declare with the states they leave, their first command chunk, and the latest pass of each other class they must follow;

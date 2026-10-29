@@ -30,7 +30,7 @@ The web runner (`test/web_runner.cjs`) prints the page's console and fails on an
 
 ## A frame that looks wrong
 
-`mrhiIsPassKept`, `mrhiGetPassPlan`, `mrhiGetResourcePlan`, `mrhiGetFrameBarriers` and `mrhiGetFrameUsage` show what the compile decided: which passes were culled, which stores were kept, every barrier with its states, where each transient was placed and the memory they take. On the test driver, `mrhiTestAdapter.frameLog` counts what the frame walk found in each submitted frame.
+`mrhiPass_IsKept`, `mrhiPass_GetPlan`, `mrhiResource_GetPlan`, `mrhiDevice_GetFrameBarriers` and `mrhiDevice_GetFrameUsage` show what the compile decided: which passes were culled, which stores were kept, every barrier with its states, where each transient was placed and the memory they take. On the test driver, `mrhiTestAdapter.frameLog` counts what the frame walk found in each submitted frame.
 
 ## Fuzzing
 

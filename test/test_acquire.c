@@ -57,7 +57,7 @@ static void Open(void)
     s_device = OpenWith(mrhiDefaultDeviceDef(), true);
     s_surface = MakeSurface();
     mrhiSurfaceConfig config = Config(s_surface);
-    CHECK(mrhiConfigureSurface(s_device, &config) == mrhi_success, "configured");
+    CHECK(mrhiDevice_ConfigureSurface(s_device, &config) == mrhi_success, "configured");
 }
 
 static void CloseDevice(void)
@@ -71,7 +71,7 @@ static void CloseDevice(void)
 static void BeginFrame(void)
 {
     mrhiFrameDef def = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &def) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &def) == mrhi_success, "begun");
 }
 
 // A pass drawing into an image, kept only for it.
@@ -96,7 +96,7 @@ static void TestAcquire(void)
     CHECK(mrhiAcquireSurfaceImage(s_device, (mrhiSurfaceId){0}, &image) == mrhi_errorStale,
           "no surface");
     CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, nullptr) == mrhi_errorInvalid &&
-              mrhiGetDeviceMisuse(s_device) == 1,
+              mrhiDevice_GetMisuse(s_device) == 1,
           "no out, counted");
     CHECK(mrhiAcquireSurfaceImage(nullptr, s_surface, &image) == mrhi_errorInvalid, "no device");
     CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, &image) == mrhi_success && image.index1 != 0,
@@ -106,8 +106,8 @@ static void TestAcquire(void)
               again.index1 == image.index1 && again.generation == image.generation,
           "the same image again");
     mrhiSurfaceConfig config = Config(s_surface);
-    CHECK(mrhiConfigureSurface(s_device, &config) == mrhi_errorState &&
-              mrhiUnconfigureSurface(s_device, s_surface) == mrhi_errorState,
+    CHECK(mrhiDevice_ConfigureSurface(s_device, &config) == mrhi_errorState &&
+              mrhiSurface_Unconfigure(s_device, s_surface) == mrhi_errorState,
           "no reconfiguring while the frame holds its image");
     mrhiAccess read = {
         .resource = image,
@@ -128,41 +128,42 @@ static void TestAcquire(void)
     def.accesses = &stored;
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a usage not configured");
     mrhiPassId draw = Draw(image);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     bool kept = false;
-    CHECK(mrhiIsPassKept(s_device, draw, &kept) == mrhi_success && kept, "kept for the image");
+    CHECK(mrhiPass_IsKept(s_device, draw, &kept) == mrhi_success && kept, "kept for the image");
     mrhiPassPlan passPlan;
-    CHECK(mrhiGetPassPlan(s_device, draw, &passPlan) == mrhi_success &&
+    CHECK(mrhiPass_GetPlan(s_device, draw, &passPlan) == mrhi_success &&
               passPlan.colorStores[0] == mrhi_storeKeep,
           "what it draws kept for presenting");
     CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, &again) == mrhi_errorState,
           "no acquiring once compiled");
     mrhiBarrier barriers[8];
     size_t count = 0;
-    CHECK(mrhiGetFrameBarriers(s_device, barriers, 8, &count) == mrhi_success && count == 2 &&
-              barriers[0].pass.index1 == draw.index1 && barriers[0].before == mrhi_stateUndefined &&
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, barriers, 8, &count) == mrhi_success &&
+              count == 2 && barriers[0].pass.index1 == draw.index1 &&
+              barriers[0].before == mrhi_stateUndefined &&
               barriers[0].after == mrhi_stateColorTarget,
           "undefined before its pass");
     CHECK(barriers[1].pass.index1 == 0 && barriers[1].resource.index1 == image.index1 &&
               barriers[1].before == mrhi_stateColorTarget && barriers[1].after == mrhi_statePresent,
           "ready to present at the frame's end");
     mrhiResourcePlan plan;
-    CHECK(mrhiGetResourcePlan(s_device, image, &plan) == mrhi_success && !plan.transient &&
+    CHECK(mrhiResource_GetPlan(s_device, image, &plan) == mrhi_success && !plan.transient &&
               plan.memoryBytes == 0,
           "never placed in the frame's memory");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
     CHECK(s_log.frames == 1 && s_log.presented == 1 && s_log.passes == 1, "presented");
-    CHECK(mrhiConfigureSurface(s_device, &config) == mrhi_success, "reconfigured after");
+    CHECK(mrhiDevice_ConfigureSurface(s_device, &config) == mrhi_success, "reconfigured after");
     BeginFrame();
     mrhiResourceId next = {0};
     CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, &next) == mrhi_success && next.index1 != 0,
           "the next image");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped, the image given back");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped, the image given back");
     BeginFrame();
     CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, &next) == mrhi_success, "one more");
     Draw(next);
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success && s_log.presented == 1,
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success && s_log.presented == 1,
           "presented, the dropped one not");
     CHECK(mrhiDestroySurface(s_instance, other) == mrhi_success, "the other destroyed");
     CloseDevice();
@@ -181,7 +182,7 @@ static void TestOutcomes(void)
     s_outcome = mrhi_success;
     CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, &image) == mrhi_suboptimal,
           "the same answer again");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     BeginFrame();
     s_outcome = mrhi_occluded;
     image = (mrhiResourceId){7, 7};
@@ -193,25 +194,26 @@ static void TestOutcomes(void)
               image.index1 == 0 && image.generation == 0,
           "again, no image");
     mrhiSurfaceConfig config = Config(s_surface);
-    CHECK(mrhiConfigureSurface(s_device, &config) == mrhi_success, "reconfigured, no image held");
+    CHECK(mrhiDevice_ConfigureSurface(s_device, &config) == mrhi_success,
+          "reconfigured, no image held");
     s_outcome = mrhi_success;
     CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, &image) == mrhi_success && image.index1 != 0,
           "an image of the new configuration");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     BeginFrame();
     s_outcome = mrhi_errorOutOfDate;
     CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, &image) == mrhi_errorOutOfDate &&
               image.index1 == 0,
           "out of date");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success && s_log.presented == 0,
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success && s_log.presented == 0,
           "a frame without its image still submitted");
     BeginFrame();
     s_outcome = mrhi_errorDeviceLost;
     CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, &image) == mrhi_errorDeviceLost,
           "the device lost");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "no misuse");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "no misuse");
     CloseDevice();
 }
 
@@ -237,7 +239,7 @@ static void TestCapacity(void)
     s_device = OpenWith(deviceDef, true);
     s_surface = MakeSurface();
     mrhiSurfaceConfig config = Config(s_surface);
-    CHECK(mrhiConfigureSurface(s_device, &config) == mrhi_success, "configured");
+    CHECK(mrhiDevice_ConfigureSurface(s_device, &config) == mrhi_success, "configured");
     BeginFrame();
     mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
     bufferDef.size = 4;
@@ -247,7 +249,7 @@ static void TestCapacity(void)
     CHECK(mrhiAcquireSurfaceImage(s_device, s_surface, &image) == mrhi_errorCapacity &&
               image.index1 == 0,
           "no room");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CloseDevice();
 }
 
