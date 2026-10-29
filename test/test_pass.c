@@ -639,7 +639,7 @@ static void TestImports(void)
     CHECK(mrhiDestroyTexture(s_device, sampled) == mrhi_success, "done");
 }
 
-// Ids of other frames, destroyed imports and the frame's limits.
+// Ids of other frames, destroyed imports and the frame's budgets.
 static void TestStaleAndLimits(void)
 {
     mrhiTextureId gone = MakeTexture(mrhi_textureSampled | mrhi_textureRenderTarget);
@@ -670,8 +670,8 @@ static void TestStaleAndLimits(void)
     CHECK(Add(def) == mrhi_errorStale, "depth of the last frame");
     Drop();
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    deviceDef.deviceLimits.framePasses = 1;
-    deviceDef.deviceLimits.frameAccesses = 4;
+    deviceDef.budgets.framePasses = 1;
+    deviceDef.budgets.frameAccesses = 4;
     mrhiInstance* instance = s_instance;
     mrhiDevice* previous = s_device;
     s_device = OpenWith(deviceDef, true);
@@ -790,7 +790,7 @@ int main(void)
 {
     ResetAdapter();
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    deviceDef.deviceLimits.diagnostics = 8;
+    deviceDef.budgets.diagnostics = 8;
     s_device = OpenWith(deviceDef, true);
     mrhiInstance* instance = s_instance;
     TestCulling();

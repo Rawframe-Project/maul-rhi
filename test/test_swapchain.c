@@ -272,7 +272,7 @@ static void TestTwins(void)
 static void TestOwnership(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.surfaces = 1;
+    def.budgets.surfaces = 1;
     mrhiDevice* device = OpenWith(def, false);
     mrhiSurfaceId surface = MakeSurface(1);
     mrhiSurfaceConfig config = Config(surface);
@@ -300,7 +300,7 @@ static void TestOwnership(void)
 static void TestFailures(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.surfaces = 1;
+    def.budgets.surfaces = 1;
     s_adapter.objectsBeforeFailure = 1;
     mrhiDevice* device = OpenWith(def, true);
     mrhiSurfaceId surface = MakeSurface(1);

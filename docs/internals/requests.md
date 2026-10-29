@@ -15,7 +15,7 @@ Taking from a queue first polls the driver for what it finished, a small batch a
 
 ## Never losing an answer
 
-Each queue is a fixed ring sized by its owner's `notifications` limit. A request is accepted only when the ring has room for its answer beside every answer already owed (`mrhiHasRoomForAnswer`): a search, an opening, a pipeline, a submission or a readback that would overfill it is refused with `mrhi_errorCapacity` at the call. An accepted request therefore always finds room. A readback reserves room for its own record and its frame's. A device also keeps one record free from its creation for the loss notice, so every device holds at least two notifications.
+Each queue is a fixed ring sized by its owner's `notifications` count. A request is accepted only when the ring has room for its answer beside every answer already owed (`mrhiHasRoomForAnswer`): a search, an opening, a pipeline, a submission or a readback that would overfill it is refused with `mrhi_errorCapacity` at the call. An accepted request therefore always finds room. A readback reserves room for its own record and its frame's. A device also keeps one record free from its creation for the loss notice, so every device holds at least two notifications.
 
 Request ids come from one counter per owner, skipping zero, so every answer's id is unique on its owner and a null id never names a request. Frames' tokens, pipelines and readbacks share the device's counter.
 

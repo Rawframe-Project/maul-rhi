@@ -79,7 +79,7 @@ typedef struct Filled
     mrhiSurfaceColor suggested;
     mrhiFeatures deviceFeatures;
     mrhiLimits deviceLimits;
-    mrhiDeviceLimits ownLimits;
+    mrhiDeviceBudgets budgets;
     mrhiDiagnostic deviceDiagnostic;
     mrhiShaderInfo shader;
     mrhiBarrier barriers[4];
@@ -145,7 +145,7 @@ static mrhiDevice* Device(mrhiInstance* instance, mrhiAdapterId adapter, Filled*
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
     def.allocator = kAllocator;
-    def.deviceLimits.diagnostics = 4;
+    def.budgets.diagnostics = 4;
     mrhiDevice* device = nullptr;
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success &&
@@ -153,7 +153,7 @@ static mrhiDevice* Device(mrhiInstance* instance, mrhiAdapterId adapter, Filled*
           "the device ready");
     CHECK(OVER_PATTERN(mrhiGetDeviceFeatures(device, &filled->deviceFeatures)) &&
               OVER_PATTERN(mrhiGetDeviceLimits(device, &filled->deviceLimits)) &&
-              OVER_PATTERN(mrhiGetDeviceOwnLimits(device, &filled->ownLimits)),
+              OVER_PATTERN(mrhiGetDeviceBudgets(device, &filled->budgets)),
           "the device's facts");
     CHECK(mrhiGetDeviceFeatures(device, nullptr) == mrhi_errorInvalid &&
               OVER_PATTERN(mrhiNextDeviceDiagnostic(device, &filled->deviceDiagnostic)),
@@ -264,7 +264,7 @@ static void TestSameBytes(void)
     CHECK(SAME(instanceDiagnostic) && SAME(deviceDiagnostic), "the diagnostics");
     CHECK(SAME(adapterInfo), "the adapter's info");
     CHECK(SAME(adapterFeatures) && SAME(deviceFeatures), "the features");
-    CHECK(SAME(adapterLimits) && SAME(deviceLimits) && SAME(ownLimits), "the limits");
+    CHECK(SAME(adapterLimits) && SAME(deviceLimits) && SAME(budgets), "the limits and budgets");
     CHECK(SAME(formatCaps), "a format's caps");
     CHECK(SAME(surfaceCaps) && SAME(suggested), "the surface's caps and its suggested color");
     CHECK(SAME(shader), "the shader's info");

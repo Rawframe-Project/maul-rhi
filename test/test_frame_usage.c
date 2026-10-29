@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// A frame's usage of the device's frame limits on test driver devices:
+// A frame's usage of the device's frame budgets on test driver devices:
 // what the frame begun last took, the library's own pass left out, kept
 // after a refusal and a submission until the next frame begins; and the
-// limit each capacity refusal names in the device's diagnostics, counted
+// budget each capacity refusal names in the device's diagnostics, counted
 // as no misuse, a driver's budgets at the submission among them.
 
 #include "test_device_setup.h"
@@ -24,7 +24,7 @@ static uint8_t s_bytes[2048];
 static void Open(mrhiDeviceDef def)
 {
     s_adapter.holdFrames = true;
-    def.deviceLimits.diagnostics = 8;
+    def.budgets.diagnostics = 8;
     s_device = OpenWith(def, true);
 }
 
@@ -222,7 +222,7 @@ static void TestLibraryLeftOut(void)
 static void TestResources(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.frameResources = 2;
+    def.budgets.frameResources = 2;
     Open(def);
     mrhiBufferId buffer = MakeBuffer(1024);
     Begin();
@@ -242,8 +242,8 @@ static void TestResources(void)
 static void TestPasses(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.framePasses = 2;
-    def.deviceLimits.frameAccesses = 4;
+    def.budgets.framePasses = 2;
+    def.budgets.frameAccesses = 4;
     Open(def);
     Begin();
     mrhiAccess accesses[3] = {
@@ -333,7 +333,7 @@ static void CheckBarriers(void (*declare)(void), bool aliasing)
     Drop();
     CloseDevice();
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.frameBarriers = planned - 1;
+    def.budgets.frameBarriers = planned - 1;
     Open(def);
     Begin();
     declare();
@@ -360,7 +360,7 @@ static void TestBarriers(void)
 static void TestCommands(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.frameCommandBytes = CHUNK_BYTES;
+    def.budgets.frameCommandBytes = CHUNK_BYTES;
     Open(def);
     Begin();
     mrhiResourceId buffer = DeclareBuffer(4);
@@ -395,7 +395,7 @@ static void TestCommands(void)
 static void TestUploads(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.frameUploadBytes = 2052;
+    def.budgets.frameUploadBytes = 2052;
     Open(def);
     Begin();
     mrhiResourceId first = DeclareBuffer(2048);
@@ -437,8 +437,8 @@ static void TestUploads(void)
 static void TestReadbacks(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.readbacks = 1;
-    def.deviceLimits.readbackBytes = 512;
+    def.budgets.readbacks = 1;
+    def.budgets.readbackBytes = 512;
     Open(def);
     mrhiBufferId buffer = MakeBuffer(1024);
     Begin();
@@ -479,7 +479,7 @@ static void TestNotifications(void)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     // Two answers, and the record kept for the loss notice.
-    def.deviceLimits.notifications = 3;
+    def.budgets.notifications = 3;
     Open(def);
     mrhiBufferId buffer = MakeBuffer(1024);
     mrhiRequestId token;

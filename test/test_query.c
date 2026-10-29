@@ -18,8 +18,8 @@ static mrhiDevice* Open(uint32_t sets, uint32_t queries, bool timestamps, bool r
 {
     s_adapter.features.timestampQuery = timestamps;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.querySets = sets;
-    def.deviceLimits.queries = queries;
+    def.budgets.querySets = sets;
+    def.budgets.queries = queries;
     def.features.timestampQuery = timestamps;
     return OpenWith(def, ready);
 }
@@ -38,7 +38,7 @@ static void TestMakeAndDestroy(void)
     mrhiQuerySetDef def = mrhiDefaultQuerySetDef();
     CHECK(def.type == mrhi_queryOcclusion && def.count == 1, "one occlusion query");
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
-    CHECK(deviceDef.deviceLimits.querySets == 16 && deviceDef.deviceLimits.queries == 4096,
+    CHECK(deviceDef.budgets.querySets == 16 && deviceDef.budgets.queries == 4096,
           "the device's defaults");
     mrhiQuerySetId a = {0};
     mrhiQuerySetId b = {0};
@@ -207,7 +207,7 @@ static void OpenFrames(uint32_t commandBytes)
     def.features.pipelineStatisticsQuery = true;
     def.features.multiview = true;
     def.limits.multiviewViews = 2;
-    def.deviceLimits.frameCommandBytes = commandBytes;
+    def.budgets.frameCommandBytes = commandBytes;
     s_device = OpenWith(def, true);
     mrhiTextureDef textureDef = mrhiDefaultTextureDef();
     textureDef.format = mrhi_formatRgba8Unorm;

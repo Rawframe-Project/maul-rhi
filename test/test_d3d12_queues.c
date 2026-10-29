@@ -1057,7 +1057,7 @@ static void CheckClears(mrhiInstance* instance, mrhiAdapterId adapter)
     };
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
-    def.deviceLimits.frameResources = 1;
+    def.budgets.frameResources = 1;
     mrhiDevice* device = nullptr;
     mrhiRequestId opened = {0};
     mrhiInstanceNotification record;

@@ -207,7 +207,7 @@ static mrhiDevice* OpenDevice(mrhiInstance* instance, bool* timestampsOut)
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = adapter;
     def.features.timestampQuery = features.timestampQuery;
-    def.deviceLimits.diagnostics = 8;
+    def.budgets.diagnostics = 8;
     *timestampsOut = features.timestampQuery;
     mrhiDevice* device = nullptr;
     mrhiRequestId ready;

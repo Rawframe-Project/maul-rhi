@@ -13,7 +13,7 @@
 static mrhiDevice* Open(uint32_t count, bool ready)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
-    def.deviceLimits.buffers = count;
+    def.budgets.buffers = count;
     return OpenWith(def, ready);
 }
 

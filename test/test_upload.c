@@ -67,7 +67,7 @@ static void Open(uint32_t uploadBytes)
     s_adapter.holdFrames = true;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.features.textureCompressionBc = true;
-    def.deviceLimits.frameUploadBytes = uploadBytes;
+    def.budgets.frameUploadBytes = uploadBytes;
     s_device = OpenWith(def, true);
     mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
     bufferDef.size = 1024;
@@ -153,7 +153,7 @@ static const mrhiCommand* Nth(uint32_t n)
 static const uint8_t* Staged(uint64_t offset)
 {
     return s_device->frameStaging +
-           (size_t)s_device->stagingRegion * s_device->deviceLimits.frameUploadBytes + offset;
+           (size_t)s_device->stagingRegion * s_device->budgets.frameUploadBytes + offset;
 }
 
 static void TestBuffers(void)
