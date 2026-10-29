@@ -57,20 +57,20 @@ static void Open(void)
     mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
     mrhiRequestId request;
     mrhiInstanceNotification record;
-    Expect(mrhiRequestAdapters(s_instance, &search, &request) == mrhi_success &&
-           mrhiNextInstanceNotification(s_instance, &record) == mrhi_success);
+    Expect(mrhiInstance_RequestAdapters(s_instance, &search, &request) == mrhi_success &&
+           mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success);
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     size_t count = 0;
-    Expect(mrhiGetAdapters(s_instance, &deviceDef.adapter, 1, &count) == mrhi_success &&
+    Expect(mrhiInstance_GetAdapters(s_instance, &deviceDef.adapter, 1, &count) == mrhi_success &&
            count == 1);
     Expect(mrhiCreateDevice(s_instance, &deviceDef, &s_device, &request) == mrhi_success &&
-           mrhiNextInstanceNotification(s_instance, &record) == mrhi_success);
+           mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success);
     size_t size = 0;
-    Expect(mrhiGetPipelineCache(s_device, nullptr, 0, &size) == mrhi_success &&
+    Expect(mrhiDevice_GetPipelineCache(s_device, nullptr, 0, &size) == mrhi_success &&
            size >= HEADER_BYTES);
     uint8_t* envelope = malloc(size);
     Expect(envelope != nullptr &&
-           mrhiGetPipelineCache(s_device, envelope, size, &size) == mrhi_success);
+           mrhiDevice_GetPipelineCache(s_device, envelope, size, &size) == mrhi_success);
     memcpy(s_header, envelope, HEADER_BYTES);
     free(envelope);
 }

@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Device loss and recovery. The program loses its device on purpose
-// with mrhiSimulateDeviceLoss while a frame with a readback is running,
+// with mrhiDevice_SimulateLoss while a frame with a readback is running,
 // as a GPU hang or reset would lose it: the notice comes first, then the
 // frame and its readback answered lost; the report says why; calls that
 // need the GPU answer lost, while destroying still works. The program
@@ -34,7 +34,7 @@ static mrhiRequestId Record(Sample* sample, mrhiBufferId bufferId, const uint8_t
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId buffer = {0};
     SampleCheck(sample,
-                mrhiBeginFrame(device, &frame) == mrhi_success &&
+                mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
                     mrhiImportBuffer(device, bufferId, &buffer) == mrhi_success,
                 "a frame");
     const mrhiAccess write = {.resource = buffer, .kind = mrhi_accessCopyDestination};
@@ -51,13 +51,14 @@ static mrhiRequestId Record(Sample* sample, mrhiBufferId bufferId, const uint8_t
     mrhiRequestId request = {0};
     SampleCheck(sample,
                 mrhiAddPass(device, &def, &reading) == mrhi_success &&
-                    mrhiCompileFrame(device) == mrhi_success &&
-                    mrhiBeginPass(device, upload) == mrhi_success &&
-                    mrhiWriteBuffer(device, upload, buffer, 0, bytes, size) == mrhi_success &&
-                    mrhiEndPass(device, upload) == mrhi_success &&
-                    mrhiBeginPass(device, reading) == mrhi_success &&
-                    mrhiReadBuffer(device, reading, buffer, 0, size, &request) == mrhi_success &&
-                    mrhiEndPass(device, reading) == mrhi_success,
+                    mrhiDevice_CompileFrame(device) == mrhi_success &&
+                    mrhiPass_Begin(device, upload) == mrhi_success &&
+                    mrhiPass_WriteBuffer(device, upload, buffer, 0, bytes, size) == mrhi_success &&
+                    mrhiPass_End(device, upload) == mrhi_success &&
+                    mrhiPass_Begin(device, reading) == mrhi_success &&
+                    mrhiPass_ReadBuffer(device, reading, buffer, 0, size, &request) ==
+                        mrhi_success &&
+                    mrhiPass_End(device, reading) == mrhi_success,
                 "written and read");
     return request;
 }
@@ -69,28 +70,28 @@ static void Lose(Sample* sample, mrhiBufferId buffer)
     const uint8_t bytes[16] = {1, 2, 3, 4};
     mrhiRequestId readback = Record(sample, buffer, bytes, sizeof(bytes));
     mrhiRequestId token = {0};
-    SampleCheck(sample, mrhiSubmitFrame(device, &token) == mrhi_success, "a frame running");
+    SampleCheck(sample, mrhiDevice_SubmitFrame(device, &token) == mrhi_success, "a frame running");
     SampleCheck(sample,
-                mrhiSimulateDeviceLoss(device) == mrhi_success &&
-                    mrhiGetDeviceState(device) == mrhi_deviceLost,
+                mrhiDevice_SimulateLoss(device) == mrhi_success &&
+                    mrhiDevice_GetState(device) == mrhi_deviceLost,
                 "the device lost");
     mrhiDeviceNotification record;
     SampleCheck(sample,
-                mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+                mrhiDevice_TakeNotification(device, &record) == mrhi_success &&
                     record.kind == mrhi_deviceLostNotice && record.outcome == mrhi_errorDeviceLost,
                 "the notice first");
     SampleCheck(sample,
-                mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+                mrhiDevice_TakeNotification(device, &record) == mrhi_success &&
                     record.kind == mrhi_deviceFrameDone && record.request.index1 == token.index1 &&
                     record.outcome == mrhi_errorDeviceLost &&
-                    mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+                    mrhiDevice_TakeNotification(device, &record) == mrhi_success &&
                     record.kind == mrhi_deviceReadbackReady &&
                     record.request.index1 == readback.index1 &&
                     record.outcome == mrhi_errorDeviceLost,
                 "the frame and its readback answered lost");
     mrhiDeviceLossReport report;
     SampleCheck(sample,
-                mrhiGetDeviceLossReport(device, &report) == mrhi_success &&
+                mrhiDevice_GetLossReport(device, &report) == mrhi_success &&
                     report.reason == mrhi_lossSimulated &&
                     report.lastSubmitted.index1 == token.index1,
                 "a report of a simulated loss");
@@ -102,8 +103,9 @@ static void Lose(Sample* sample, mrhiBufferId buffer)
     def.size = 16;
     def.usage = mrhi_bufferCopyDestination;
     SampleCheck(sample,
-                mrhiTakeReadback(device, readback, nullptr, 0, &size) == mrhi_errorDeviceLost &&
-                    mrhiBeginFrame(device, &frame) == mrhi_errorDeviceLost &&
+                mrhiRequest_TakeReadback(device, readback, nullptr, 0, &size) ==
+                        mrhi_errorDeviceLost &&
+                    mrhiDevice_BeginFrame(device, &frame) == mrhi_errorDeviceLost &&
                     mrhiCreateBuffer(device, &def, &another) == mrhi_errorDeviceLost,
                 "the GPU's work refused");
     SampleCheck(sample, mrhiDestroyBuffer(device, buffer) == mrhi_success,

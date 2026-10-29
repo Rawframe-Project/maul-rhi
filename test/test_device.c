@@ -64,10 +64,11 @@ static mrhiInstance* Create(uint32_t notifications, mrhiResult openOutcome,
     mrhiAdapterRequestDef request = mrhiDefaultAdapterRequestDef();
     mrhiRequestId id;
     mrhiInstanceNotification record;
-    CHECK(mrhiRequestAdapters(instance, &request, &id) == mrhi_success, "the search");
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success, "its answer");
+    CHECK(mrhiInstance_RequestAdapters(instance, &request, &id) == mrhi_success, "the search");
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success, "its answer");
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, adapterOut, 1, &count) == mrhi_success && count == 1, "one");
+    CHECK(mrhiInstance_GetAdapters(instance, adapterOut, 1, &count) == mrhi_success && count == 1,
+          "one");
     return instance;
 }
 
@@ -82,10 +83,10 @@ static mrhiDeviceDef Def(mrhiAdapterId adapter)
 static mrhiResult Ready(mrhiInstance* instance, mrhiRequestId request)
 {
     mrhiInstanceNotification record = {0};
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success, "a record");
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success, "a record");
     CHECK(record.kind == mrhi_instanceDeviceReady, "a device ready record");
     CHECK(record.request.index1 == request.index1, "its request");
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_empty, "exactly one");
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_empty, "exactly one");
     return record.outcome;
 }
 
@@ -102,18 +103,18 @@ static void TestOpensLater(void)
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "made");
     CHECK(device != nullptr && request.index1 != 0, "a device and a request");
-    CHECK(mrhiGetDeviceState(device) == mrhi_deviceOpening, "opening until the drain");
+    CHECK(mrhiDevice_GetState(device) == mrhi_deviceOpening, "opening until the drain");
     mrhiDeviceBudgets own;
-    CHECK(mrhiGetDeviceBudgets(device, &own) == mrhi_success &&
+    CHECK(mrhiDevice_GetBudgets(device, &own) == mrhi_success &&
               memcmp(&own, &def.budgets, sizeof(own)) == 0,
           "its budgets as asked, while opening");
     CHECK(Ready(instance, request) == mrhi_success, "ready");
-    CHECK(mrhiGetDeviceState(device) == mrhi_deviceReady, "ready after it");
+    CHECK(mrhiDevice_GetState(device) == mrhi_deviceReady, "ready after it");
     mrhiFeatures features;
     mrhiLimits limits;
-    CHECK(mrhiGetDeviceFeatures(device, &features) == mrhi_success && features.shaderF16,
+    CHECK(mrhiDevice_GetFeatures(device, &features) == mrhi_success && features.shaderF16,
           "the features granted");
-    CHECK(mrhiGetDeviceLimits(device, &limits) == mrhi_success &&
+    CHECK(mrhiDevice_GetLimits(device, &limits) == mrhi_success &&
               limits.textureDimension2d == 16384,
           "the limits granted");
     mrhiDestroyDevice(device);
@@ -129,7 +130,7 @@ static void TestFailedOpening(void)
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "made");
     CHECK(Ready(instance, request) == mrhi_errorPlatform, "the driver's failure");
-    CHECK(mrhiGetDeviceState(device) == mrhi_deviceFailed, "failed");
+    CHECK(mrhiDevice_GetState(device) == mrhi_deviceFailed, "failed");
     mrhiDestroyDevice(device);
     mrhiDestroyInstance(instance);
 }
@@ -153,7 +154,7 @@ static void TestGrants(void)
     def.limits.uniformOffsetAlignment = 32;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorUnsupported,
           "an alignment finer than the adapter's");
-    CHECK(mrhiGetInstanceMisuse(instance) == 0, "unsupported asks are not misuse");
+    CHECK(mrhiInstance_GetMisuse(instance) == 0, "unsupported asks are not misuse");
     def = Def(adapter);
     def.limits.textureDimension2d = 4096;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
@@ -161,9 +162,9 @@ static void TestGrants(void)
     def = Def((mrhiAdapterId){adapter.index1, adapter.generation + 1});
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorStale,
           "a stale adapter");
-    CHECK(mrhiGetInstanceMisuse(instance) == 1, "only the invalid ask is misuse");
+    CHECK(mrhiInstance_GetMisuse(instance) == 1, "only the invalid ask is misuse");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_empty, "refusals queue nothing");
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_empty, "refusals queue nothing");
     mrhiDestroyInstance(instance);
 }
 
@@ -184,7 +185,7 @@ static void TestAlignmentLimits(void)
     def.limits.storageOffsetAlignment = 192;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
           "a storage alignment that is not a power of two");
-    CHECK(mrhiGetInstanceMisuse(instance) == 2, "each is misuse");
+    CHECK(mrhiInstance_GetMisuse(instance) == 2, "each is misuse");
     def = Def(adapter);
     def.limits.uniformOffsetAlignment = 64;
     def.limits.storageOffsetAlignment = 128;
@@ -224,7 +225,7 @@ static void TestOwnRequests(void)
     mrhiDestroyDevice(second);
     mrhiDestroyDevice(first);
     mrhiInstanceNotification record;
-    while (mrhiNextInstanceNotification(instance, &record) == mrhi_success)
+    while (mrhiInstance_TakeNotification(instance, &record) == mrhi_success)
     {
     }
     mrhiDestroyInstance(instance);
@@ -242,8 +243,8 @@ static void TestInstanceOutlivesDevices(void)
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "made");
     CHECK(Ready(instance, request) == mrhi_success, "ready");
     mrhiDestroyInstance(instance);
-    CHECK(mrhiGetInstanceMisuse(instance) == 1, "refused while a device exists");
-    CHECK(mrhiGetDeviceState(device) == mrhi_deviceReady, "the device is untouched");
+    CHECK(mrhiInstance_GetMisuse(instance) == 1, "refused while a device exists");
+    CHECK(mrhiDevice_GetState(device) == mrhi_deviceReady, "the device is untouched");
     mrhiDestroyDevice(device);
     mrhiDestroyInstance(instance);
     CHECK(s_allocations == 0, "the instance is destroyed once its devices are");
@@ -263,7 +264,7 @@ static void TestQueueRoom(void)
     CHECK(second == nullptr, "no second device");
     mrhiDestroyDevice(first);
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success, "the stale answer");
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success, "the stale answer");
     mrhiDestroyInstance(instance);
 }
 
@@ -290,9 +291,9 @@ static void TestInvalidDefs(void)
     memset(longLabel, 'd', sizeof(longLabel));
     def.label = longLabel;
     def.labelLength = MRHI_MAX_LABEL_BYTES + 1;
-    uint64_t misuse = mrhiGetInstanceMisuse(instance);
+    uint64_t misuse = mrhiInstance_GetMisuse(instance);
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorLimit &&
-              mrhiGetInstanceMisuse(instance) == misuse + 1,
+              mrhiInstance_GetMisuse(instance) == misuse + 1,
           "a label past the bound, counted");
     def = Def(adapter);
     def.budgets.notifications = 0;
@@ -354,7 +355,7 @@ static void TestInvalidDefs(void)
     def.allocator.free = CountingFree;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_errorInvalid,
           "an allocator with one function");
-    CHECK(mrhiGetInstanceMisuse(instance) == 23, "each invalid or limit call counted");
+    CHECK(mrhiInstance_GetMisuse(instance) == 23, "each invalid or limit call counted");
     mrhiDestroyInstance(instance);
 }
 
@@ -368,13 +369,13 @@ static void TestDeviceAllocatorAndMisuse(void)
     mrhiRequestId request;
     CHECK(mrhiCreateDevice(instance, &def, &device, &request) == mrhi_success, "made");
     CHECK(s_allocations == 2, "the device's own allocator, for the core and the driver");
-    CHECK(mrhiGetDeviceFeatures(device, nullptr) == mrhi_errorInvalid, "no out");
-    CHECK(mrhiGetDeviceLimits(device, nullptr) == mrhi_errorInvalid, "no out");
-    CHECK(mrhiGetDeviceBudgets(device, nullptr) == mrhi_errorInvalid, "no out");
+    CHECK(mrhiDevice_GetFeatures(device, nullptr) == mrhi_errorInvalid, "no out");
+    CHECK(mrhiDevice_GetLimits(device, nullptr) == mrhi_errorInvalid, "no out");
+    CHECK(mrhiDevice_GetBudgets(device, nullptr) == mrhi_errorInvalid, "no out");
     mrhiDeviceBudgets own;
-    CHECK(mrhiGetDeviceBudgets(nullptr, &own) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetDeviceMisuse(device) == 3 && mrhiGetDeviceMisuse(nullptr) == 0, "counted");
-    CHECK(mrhiGetDeviceState(nullptr) == mrhi_deviceFailed, "no device");
+    CHECK(mrhiDevice_GetBudgets(nullptr, &own) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiDevice_GetMisuse(device) == 3 && mrhiDevice_GetMisuse(nullptr) == 0, "counted");
+    CHECK(mrhiDevice_GetState(nullptr) == mrhi_deviceFailed, "no device");
     mrhiDestroyDevice(device);
     CHECK(s_allocations == 0, "returned");
     mrhiDestroyDevice(nullptr);

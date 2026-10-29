@@ -68,7 +68,8 @@ mrhiResult mrhiImportPipelineCache(mrhiDevice* device, const void* bytes, size_t
     return taken ? mrhi_success : mrhi_errorStale;
 }
 
-mrhiResult mrhiGetPipelineCache(mrhiDevice* device, void* bytes, size_t capacity, size_t* sizeOut)
+mrhiResult mrhiDevice_GetPipelineCache(mrhiDevice* device, void* bytes, size_t capacity,
+                                       size_t* sizeOut)
 {
     if (device == nullptr)
     {
@@ -115,7 +116,7 @@ mrhiResult mrhiGetPipelineCache(mrhiDevice* device, void* bytes, size_t capacity
     return mrhi_success;
 }
 
-mrhiResult mrhiGetPipelineCacheOutcome(mrhiDevice* device)
+mrhiResult mrhiDevice_GetPipelineCacheOutcome(mrhiDevice* device)
 {
     return device == nullptr ? mrhi_errorInvalid : device->cacheOutcome;
 }

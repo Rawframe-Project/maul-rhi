@@ -122,7 +122,8 @@ static mrhiDeviceDef DeviceDef(World* world)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     size_t count = 0;
-    CHECK(mrhiGetAdapters(world->instance, &def.adapter, 1, &count) == mrhi_success && count == 1,
+    CHECK(mrhiInstance_GetAdapters(world->instance, &def.adapter, 1, &count) == mrhi_success &&
+              count == 1,
           "the adapter");
     def.allocator = AllocatorOf(world);
     def.features.bindlessSampling = true;
@@ -136,7 +137,7 @@ static mrhiDeviceDef DeviceDef(World* world)
 static void Answer(World* world)
 {
     mrhiInstanceNotification notification;
-    while (mrhiNextInstanceNotification(world->instance, &notification) == mrhi_success)
+    while (mrhiInstance_TakeNotification(world->instance, &notification) == mrhi_success)
     {
     }
 }
@@ -149,7 +150,8 @@ static void MakeInstance(World* world)
     CHECK(mrhiCreateInstance(&def, &world->instance) == mrhi_success, "the instance");
     mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
     mrhiRequestId request;
-    CHECK(mrhiRequestAdapters(world->instance, &search, &request) == mrhi_success, "the search");
+    CHECK(mrhiInstance_RequestAdapters(world->instance, &search, &request) == mrhi_success,
+          "the search");
     Answer(world);
 }
 
@@ -218,7 +220,7 @@ static void Configured(World* world)
 {
     WithSurface(world);
     mrhiSurfaceConfig config = Config(world, 64);
-    CHECK(mrhiConfigureSurface(world->device, &config) == mrhi_success, "configured");
+    CHECK(mrhiDevice_ConfigureSurface(world->device, &config) == mrhi_success, "configured");
 }
 
 typedef struct Step
@@ -256,7 +258,7 @@ static mrhiResult CreateShader(World* world)
     mrhiShaderId shader = {0};
     mrhiResult result = mrhiCreateShader(world->device, &def, &shader);
     mrhiShaderInfo info = {0};
-    bool live = mrhiGetShaderInfo(world->device, shader, &info) == mrhi_success;
+    bool live = mrhiShader_GetInfo(world->device, shader, &info) == mrhi_success;
     world->output = Mix(Mix(Mix(live, shader.index1), shader.generation), info.entryCount);
     return result;
 }
@@ -358,7 +360,7 @@ static mrhiResult CreateGraphicsPipeline(World* world)
 static mrhiResult Configure(World* world)
 {
     mrhiSurfaceConfig config = Config(world, 128);
-    return mrhiConfigureSurface(world->device, &config);
+    return mrhiDevice_ConfigureSurface(world->device, &config);
 }
 
 // A surface whose driver fails to make it while the world refuses.
@@ -424,15 +426,15 @@ static const Step s_refused[] = {
 
 static uint64_t InstanceDigest(World* world)
 {
-    uint64_t hash = Mix(14695981039346656037u, mrhiGetInstanceMisuse(world->instance));
+    uint64_t hash = Mix(14695981039346656037u, mrhiInstance_GetMisuse(world->instance));
     mrhiInstanceNotification notification;
-    while (mrhiNextInstanceNotification(world->instance, &notification) == mrhi_success)
+    while (mrhiInstance_TakeNotification(world->instance, &notification) == mrhi_success)
     {
         hash = Mix(MixRequest(Mix(hash, notification.kind), notification.request),
                    (uint64_t)notification.outcome);
     }
     mrhiDiagnostic diagnostic;
-    while (mrhiNextInstanceDiagnostic(world->instance, &diagnostic) == mrhi_success)
+    while (mrhiInstance_TakeDiagnostic(world->instance, &diagnostic) == mrhi_success)
     {
         hash = Mix(Mix(hash, diagnostic.code), diagnostic.count);
     }
@@ -441,15 +443,15 @@ static uint64_t InstanceDigest(World* world)
 
 static uint64_t DeviceDigest(mrhiDevice* device, uint64_t hash)
 {
-    hash = Mix(Mix(hash, mrhiGetDeviceMisuse(device)), mrhiGetDeviceState(device));
+    hash = Mix(Mix(hash, mrhiDevice_GetMisuse(device)), mrhiDevice_GetState(device));
     mrhiDeviceNotification notification;
-    while (mrhiNextDeviceNotification(device, &notification) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &notification) == mrhi_success)
     {
         hash = Mix(MixRequest(Mix(hash, notification.kind), notification.request),
                    (uint64_t)notification.outcome);
     }
     mrhiDiagnostic diagnostic;
-    while (mrhiNextDeviceDiagnostic(device, &diagnostic) == mrhi_success)
+    while (mrhiDevice_TakeDiagnostic(device, &diagnostic) == mrhi_success)
     {
         hash = Mix(Mix(hash, diagnostic.code), diagnostic.count);
     }
@@ -478,7 +480,7 @@ static bool IsConfigured(World* world)
     }
     mrhiSurfaceConfig config = Config(world, 64);
     config.presentMode = mrhi_presentMailbox;
-    return mrhiConfigureSurface(world->probe, &config) == mrhi_errorState;
+    return mrhiDevice_ConfigureSurface(world->probe, &config) == mrhi_errorState;
 }
 
 // What the step changed and answered.

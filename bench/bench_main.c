@@ -110,7 +110,7 @@ static void DrawFrame(Sample* sample, mrhiGraphicsPipelineId pipeline, double* d
     mrhiResourceId target = {0};
     mrhiPassDef drawDef = mrhiDefaultPassDef();
     mrhiPassId draw = {0};
-    bool ready = mrhiBeginFrame(device, &frame) == mrhi_success &&
+    bool ready = mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
                  mrhiDeclareTexture(device, &targetDef, &target) == mrhi_success;
     drawDef.colorTargets[0] = (mrhiColorTarget){
         .resource = target,
@@ -120,20 +120,20 @@ static void DrawFrame(Sample* sample, mrhiGraphicsPipelineId pipeline, double* d
     drawDef.colorTargetCount = 1;
     drawDef.neverCull = true;
     ready = ready && mrhiAddPass(device, &drawDef, &draw) == mrhi_success &&
-            mrhiCompileFrame(device) == mrhi_success &&
-            mrhiBeginPass(device, draw) == mrhi_success &&
-            mrhiSetGraphicsPipeline(device, draw, pipeline) == mrhi_success;
+            mrhiDevice_CompileFrame(device) == mrhi_success &&
+            mrhiPass_Begin(device, draw) == mrhi_success &&
+            mrhiPass_SetGraphicsPipeline(device, draw, pipeline) == mrhi_success;
     double drawing = Seconds();
     for (uint32_t i = 0; i < DRAWS && ready; ++i)
     {
         const float color[4] = {(float)(i % 7) / 7.0f, 0.5f, 0.25f, 1.0f};
-        ready = mrhiSetRootBlock(device, draw, 0, color, sizeof(color)) == mrhi_success &&
-                mrhiDraw(device, draw, 3, 1, 0, 0) == mrhi_success;
+        ready = mrhiPass_SetRootBlock(device, draw, 0, color, sizeof(color)) == mrhi_success &&
+                mrhiPass_Draw(device, draw, 3, 1, 0, 0) == mrhi_success;
     }
     double drawn = Seconds();
     mrhiRequestId token = {0};
-    ready = ready && mrhiEndPass(device, draw) == mrhi_success &&
-            mrhiSubmitFrame(device, &token) == mrhi_success;
+    ready = ready && mrhiPass_End(device, draw) == mrhi_success &&
+            mrhiDevice_SubmitFrame(device, &token) == mrhi_success;
     double submitted = Seconds();
     SampleCheck(sample, ready && SampleWait(sample, token), "the draw frame");
     *drawsOut = drawn - drawing;
@@ -152,7 +152,7 @@ static void PassFrame(Sample* sample, double* passesOut, double* compileOut)
     bufferDef.size = 256;
     static mrhiResourceId buffers[PASSES];
     static mrhiPassId passes[PASSES];
-    bool ready = mrhiBeginFrame(device, &frame) == mrhi_success;
+    bool ready = mrhiDevice_BeginFrame(device, &frame) == mrhi_success;
     for (uint32_t i = 0; i < PASSES && ready; ++i)
     {
         ready = mrhiDeclareBuffer(device, &bufferDef, &buffers[i]) == mrhi_success;
@@ -171,19 +171,20 @@ static void PassFrame(Sample* sample, double* passesOut, double* compileOut)
         ready = mrhiAddPass(device, &def, &passes[i]) == mrhi_success;
     }
     double compiling = Seconds();
-    ready = ready && mrhiCompileFrame(device) == mrhi_success;
+    ready = ready && mrhiDevice_CompileFrame(device) == mrhi_success;
     double compiled = Seconds();
     static const uint8_t bytes[16] = {1, 2, 3, 4};
     for (uint32_t i = 0; i < PASSES && ready; ++i)
     {
-        ready = mrhiBeginPass(device, passes[i]) == mrhi_success &&
-                (i == 0 ? mrhiWriteBuffer(device, passes[i], buffers[0], 0, bytes, sizeof(bytes))
-                        : mrhiCopyBuffer(device, passes[i], buffers[i - 1], 0, buffers[i], 0,
-                                         sizeof(bytes))) == mrhi_success &&
-                mrhiEndPass(device, passes[i]) == mrhi_success;
+        ready =
+            mrhiPass_Begin(device, passes[i]) == mrhi_success &&
+            (i == 0 ? mrhiPass_WriteBuffer(device, passes[i], buffers[0], 0, bytes, sizeof(bytes))
+                    : mrhiPass_CopyBuffer(device, passes[i], buffers[i - 1], 0, buffers[i], 0,
+                                          sizeof(bytes))) == mrhi_success &&
+            mrhiPass_End(device, passes[i]) == mrhi_success;
     }
     mrhiRequestId token = {0};
-    ready = ready && mrhiSubmitFrame(device, &token) == mrhi_success;
+    ready = ready && mrhiDevice_SubmitFrame(device, &token) == mrhi_success;
     double submitted = Seconds();
     SampleCheck(sample, ready && SampleWait(sample, token), "the pass frame");
     *passesOut = submitted - start;
@@ -211,10 +212,10 @@ static bool ZeroFrame(Sample* sample, uint64_t bytes, double* zeroOut)
         mrhiFrameDef frame = mrhiDefaultFrameDef();
         mrhiResourceId resource = {0};
         mrhiRequestId token = {0};
-        bool ready = mrhiBeginFrame(device, &frame) == mrhi_success &&
+        bool ready = mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
                      mrhiImportBuffer(device, buffer, &resource) == mrhi_success;
         double start = Seconds();
-        ready = ready && mrhiSubmitFrame(device, &token) == mrhi_success;
+        ready = ready && mrhiDevice_SubmitFrame(device, &token) == mrhi_success;
         SampleCheck(sample, ready && SampleWait(sample, token), "the zeroing frame");
         took[i] = Seconds() - start;
     }
@@ -235,9 +236,9 @@ static void ZeroTimes(Sample* sample)
     mrhiRequestId opened = {0};
     mrhiInstanceNotification record;
     bool open =
-        mrhiGetAdapterLimits(sample->instance, sample->adapter, &def.limits) == mrhi_success &&
+        mrhiAdapter_GetLimits(sample->instance, sample->adapter, &def.limits) == mrhi_success &&
         mrhiCreateDevice(sample->instance, &def, &sample->device, &opened) == mrhi_success &&
-        mrhiNextInstanceNotification(sample->instance, &record) == mrhi_success &&
+        mrhiInstance_TakeNotification(sample->instance, &record) == mrhi_success &&
         record.outcome == mrhi_success;
     if (!SampleCheck(sample, open, "a device with the adapter's limits"))
     {
@@ -324,16 +325,17 @@ static bool Footprint(size_t* instanceOut, size_t* deviceOut)
     mrhiInstanceNotification record;
     mrhiAdapterId adapter = {0};
     size_t count = 0;
-    bool found = mrhiRequestAdapters(instance, &request, &searched) == mrhi_success &&
-                 mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
-                 mrhiGetAdapters(instance, &adapter, 1, &count) == mrhi_success && count >= 1;
+    bool found = mrhiInstance_RequestAdapters(instance, &request, &searched) == mrhi_success &&
+                 mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
+                 mrhiInstance_GetAdapters(instance, &adapter, 1, &count) == mrhi_success &&
+                 count >= 1;
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     deviceDef.adapter = adapter;
     deviceDef.allocator = (mrhiAllocator){CountedAlloc, CountedFree, &deviceBytes};
     mrhiDevice* device = nullptr;
     mrhiRequestId opened = {0};
     found = found && mrhiCreateDevice(instance, &deviceDef, &device, &opened) == mrhi_success &&
-            mrhiNextInstanceNotification(instance, &record) == mrhi_success;
+            mrhiInstance_TakeNotification(instance, &record) == mrhi_success;
     *instanceOut = instanceBytes.live;
     *deviceOut = deviceBytes.live;
     mrhiDestroyDevice(device);
@@ -361,7 +363,7 @@ int main(int argc, char** argv)
         return opened == SAMPLE_SKIPPED ? 0 : opened;
     }
     mrhiAdapterInfo info;
-    if (mrhiGetAdapterInfo(sample.instance, sample.adapter, &info) == mrhi_success)
+    if (mrhiAdapter_GetInfo(sample.instance, sample.adapter, &info) == mrhi_success)
     {
         printf("# %.*s, best of %d runs\n", (int)info.nameLength, info.name, RUNS);
     }

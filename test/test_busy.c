@@ -77,9 +77,9 @@ static void InstanceCalls(void)
     mrhiInstanceNotification notification;
     mrhiDiagnostic diagnostic;
     mrhiDevice* device = nullptr;
-    Busy(mrhiRequestAdapters(s_instance, nullptr, &request));
-    Busy(mrhiNextInstanceNotification(s_instance, &notification));
-    Busy(mrhiNextInstanceDiagnostic(s_instance, &diagnostic));
+    Busy(mrhiInstance_RequestAdapters(s_instance, nullptr, &request));
+    Busy(mrhiInstance_TakeNotification(s_instance, &notification));
+    Busy(mrhiInstance_TakeDiagnostic(s_instance, &diagnostic));
     Busy(mrhiCreateDevice(s_instance, nullptr, &device, &request));
     mrhiSurfaceId surface = {0};
     Busy(mrhiCreateSurface(s_instance, nullptr, &surface));
@@ -97,8 +97,8 @@ static void DeviceCalls(void)
     mrhiDiagnostic diagnostic;
     mrhiDeviceNotification notification;
     size_t size = 0;
-    Busy(mrhiSimulateDeviceLoss(d));
-    Busy(mrhiNextDeviceDiagnostic(d, &diagnostic));
+    Busy(mrhiDevice_SimulateLoss(d));
+    Busy(mrhiDevice_TakeDiagnostic(d, &diagnostic));
     Busy(mrhiCreateSampler(d, nullptr, nullptr));
     Busy(mrhiDestroySampler(d, (mrhiSamplerId){0}));
     Busy(mrhiCreateBuffer(d, nullptr, nullptr));
@@ -111,41 +111,41 @@ static void DeviceCalls(void)
     Busy(mrhiDestroyQuerySet(d, (mrhiQuerySetId){0}));
     Busy(mrhiCreateHeap(d, nullptr, nullptr));
     Busy(mrhiDestroyHeap(d, (mrhiHeapId){0}));
-    Busy(mrhiSetHeapEntry(d, (mrhiHeapId){0}, 0, nullptr));
-    Busy(mrhiClearHeapEntry(d, (mrhiHeapId){0}, 0));
-    Busy(mrhiSetHeapSampler(d, (mrhiHeapId){0}, 0, (mrhiSamplerId){0}));
-    Busy(mrhiClearHeapSampler(d, (mrhiHeapId){0}, 0));
-    Busy(mrhiConfigureSurface(d, nullptr));
-    Busy(mrhiUnconfigureSurface(d, (mrhiSurfaceId){0}));
-    Busy(mrhiBeginFrame(d, nullptr));
-    Busy(mrhiDropFrame(d));
-    Busy(mrhiSubmitFrame(d, &request));
-    Busy(mrhiWaitFrame(d, request, 0));
-    Busy(mrhiNextDeviceNotification(d, &notification));
-    Busy(mrhiWaitDeviceNotification(d, 0));
+    Busy(mrhiHeap_SetEntry(d, (mrhiHeapId){0}, 0, nullptr));
+    Busy(mrhiHeap_ClearEntry(d, (mrhiHeapId){0}, 0));
+    Busy(mrhiHeap_SetSampler(d, (mrhiHeapId){0}, 0, (mrhiSamplerId){0}));
+    Busy(mrhiHeap_ClearSampler(d, (mrhiHeapId){0}, 0));
+    Busy(mrhiDevice_ConfigureSurface(d, nullptr));
+    Busy(mrhiSurface_Unconfigure(d, (mrhiSurfaceId){0}));
+    Busy(mrhiDevice_BeginFrame(d, nullptr));
+    Busy(mrhiDevice_DropFrame(d));
+    Busy(mrhiDevice_SubmitFrame(d, &request));
+    Busy(mrhiRequest_WaitFrame(d, request, 0));
+    Busy(mrhiDevice_TakeNotification(d, &notification));
+    Busy(mrhiDevice_WaitNotification(d, 0));
     Busy(mrhiDeclareTexture(d, nullptr, &resource));
     Busy(mrhiDeclareBuffer(d, nullptr, &resource));
     Busy(mrhiImportTexture(d, (mrhiTextureId){0}, &resource));
     Busy(mrhiImportBuffer(d, (mrhiBufferId){0}, &resource));
     Busy(mrhiAcquireSurfaceImage(d, (mrhiSurfaceId){0}, &resource));
-    Busy(mrhiSealResource(d, resource));
-    Busy(mrhiUnsealResource(d, resource));
+    Busy(mrhiResource_Seal(d, resource));
+    Busy(mrhiResource_Unseal(d, resource));
     Busy(mrhiAddPass(d, nullptr, nullptr));
-    Busy(mrhiCompileFrame(d));
+    Busy(mrhiDevice_CompileFrame(d));
     Busy(mrhiCreateShader(d, nullptr, nullptr));
     Busy(mrhiDestroyShader(d, (mrhiShaderId){0}));
     Busy(mrhiCreateGraphicsPipeline(d, nullptr, nullptr, nullptr));
     Busy(mrhiDestroyGraphicsPipeline(d, (mrhiGraphicsPipelineId){0}));
     Busy(mrhiCreateComputePipeline(d, nullptr, nullptr, nullptr));
     Busy(mrhiDestroyComputePipeline(d, (mrhiComputePipelineId){0}));
-    Busy(mrhiTakeReadback(d, request, nullptr, 0, &size));
+    Busy(mrhiRequest_TakeReadback(d, request, nullptr, 0, &size));
     mrhiDestroyDevice(d);
 }
 
 static void BeginFrame(void)
 {
     mrhiFrameDef def = mrhiDefaultFrameDef();
-    Busy(mrhiBeginFrame(s_device, &def));
+    Busy(mrhiDevice_BeginFrame(s_device, &def));
 }
 
 static void CreateBuffer(void)
@@ -183,10 +183,10 @@ static void TestDeviceCreation(void)
         s_hook = InstanceCalls;
         s_device = Open();
         CHECK(s_hook == nullptr && s_answered == 0, "every instance call refused as busy");
-        CHECK(mrhiGetInstanceMisuse(s_instance) == INSTANCE_CALLS, "each counted");
+        CHECK(mrhiInstance_GetMisuse(s_instance) == INSTANCE_CALLS, "each counted");
         mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
         mrhiRequestId request;
-        CHECK(mrhiRequestAdapters(s_instance, &search, &request) == mrhi_success,
+        CHECK(mrhiInstance_RequestAdapters(s_instance, &search, &request) == mrhi_success,
               "taken again once the allocator returns");
         Close(s_device);
     }
@@ -204,7 +204,7 @@ static void TestHeap(void)
     mrhiHeapId heap = {0};
     CHECK(mrhiCreateHeap(s_device, &def, &heap) == mrhi_success, "the heap made");
     CHECK(s_hook == nullptr && s_answered == 0, "every device call refused as busy");
-    CHECK(mrhiGetDeviceMisuse(s_device) == DEVICE_CALLS, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == DEVICE_CALLS, "each counted");
     s_hook = CreateBuffer;
     CHECK(mrhiDestroyHeap(s_device, heap) == mrhi_success, "the heap destroyed");
     CHECK(s_hook == nullptr && s_answered == 0, "a call while its table goes back refused");
@@ -225,7 +225,7 @@ static void TestShader(void)
     mrhiShaderId shader = {0};
     CHECK(mrhiCreateShader(s_device, &def, &shader) == mrhi_success, "the shader made");
     CHECK(s_hook == nullptr && s_answered == 0, "a frame begun from inside refused");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 1, "counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 1, "counted");
     Close(s_device);
 }
 
@@ -262,8 +262,8 @@ static mrhiSurfaceConfig Config(uint32_t width)
 static void SecondCalls(void)
 {
     mrhiSurfaceConfig config = Config(64);
-    Busy(mrhiConfigureSurface(s_second, &config));
-    Busy(mrhiUnconfigureSurface(s_second, s_surface));
+    Busy(mrhiDevice_ConfigureSurface(s_second, &config));
+    Busy(mrhiSurface_Unconfigure(s_second, s_surface));
     mrhiDestroyDevice(s_second);
 }
 
@@ -285,11 +285,11 @@ static void OpenConfigured(void)
     s_device = Open();
     s_surface = MakeSurface();
     mrhiSurfaceConfig config = Config(64);
-    CHECK(mrhiConfigureSurface(s_device, &config) == mrhi_success, "configured");
+    CHECK(mrhiDevice_ConfigureSurface(s_device, &config) == mrhi_success, "configured");
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     size_t count = 0;
     mrhiRequestId request;
-    CHECK(mrhiGetAdapters(s_instance, &def.adapter, 1, &count) == mrhi_success &&
+    CHECK(mrhiInstance_GetAdapters(s_instance, &def.adapter, 1, &count) == mrhi_success &&
               mrhiCreateDevice(s_instance, &def, &s_second, &request) == mrhi_success,
           "a second device");
     s_answered = 0;
@@ -299,8 +299,8 @@ static void OpenConfigured(void)
 static void CheckHeld(void)
 {
     CHECK(s_hook == nullptr && s_answered == 0, "every call refused as busy");
-    CHECK(mrhiGetInstanceMisuse(s_instance) == INSTANCE_CALLS, "each instance call counted");
-    CHECK(mrhiGetDeviceMisuse(s_second) == SECOND_CALLS, "each second device call counted");
+    CHECK(mrhiInstance_GetMisuse(s_instance) == INSTANCE_CALLS, "each instance call counted");
+    CHECK(mrhiDevice_GetMisuse(s_second) == SECOND_CALLS, "each second device call counted");
 }
 
 static void CloseConfigured(void)
@@ -325,7 +325,7 @@ static void TestReconfigure(void)
         s_skip = skip;
         s_hook = HeldCalls;
         mrhiSurfaceConfig config = Config(128);
-        CHECK(mrhiConfigureSurface(s_device, &config) == mrhi_success, "reconfigured");
+        CHECK(mrhiDevice_ConfigureSurface(s_device, &config) == mrhi_success, "reconfigured");
         CheckHeld();
         CHECK(mrhiDestroySurface(s_instance, s_surface) == mrhi_success,
               "the surface destroyed once the allocator returns");
@@ -338,7 +338,7 @@ static void TestUnconfigure(void)
 {
     OpenConfigured();
     s_hook = HeldCalls;
-    CHECK(mrhiUnconfigureSurface(s_device, s_surface) == mrhi_success, "unconfigured");
+    CHECK(mrhiSurface_Unconfigure(s_device, s_surface) == mrhi_success, "unconfigured");
     CheckHeld();
     CloseConfigured();
 }
@@ -355,8 +355,8 @@ static void TestBusyConfiguredDevice(void)
     mrhiHeapId heap = {0};
     CHECK(mrhiCreateHeap(s_device, &def, &heap) == mrhi_success, "the heap made");
     CHECK(s_hook == nullptr && s_answered == 0, "the surface's destruction refused");
-    CHECK(mrhiGetInstanceMisuse(s_instance) == 1, "counted on the instance");
-    CHECK(mrhiUnconfigureSurface(s_device, s_surface) == mrhi_success, "still configured");
+    CHECK(mrhiInstance_GetMisuse(s_instance) == 1, "counted on the instance");
+    CHECK(mrhiSurface_Unconfigure(s_device, s_surface) == mrhi_success, "still configured");
     CloseConfigured();
 }
 

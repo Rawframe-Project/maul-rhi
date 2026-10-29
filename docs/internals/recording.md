@@ -8,7 +8,7 @@ Vulkan and D3D12 record command buffers on any thread; Metal makes encoders from
 
 ## Claiming a pass
 
-Passes record between `mrhiCompileFrame` and `mrhiSubmitFrame`. `mrhiBeginPass` claims a kept pass with an atomic exchange, so a pass is begun once, by one thread; a culled pass, a pass of another frame and a pass already begun are refused, and submission is refused while any pass still records. Different passes record on different threads at once. A kept pass that is never begun records nothing but still loads and stores its targets.
+Passes record between `mrhiDevice_CompileFrame` and `mrhiDevice_SubmitFrame`. `mrhiPass_Begin` claims a kept pass with an atomic exchange, so a pass is begun once, by one thread; a culled pass, a pass of another frame and a pass already begun are refused, and submission is refused while any pass still records. Different passes record on different threads at once. A kept pass that is never begun records nothing but still loads and stores its targets.
 
 ## The arena
 
@@ -32,8 +32,8 @@ An empty copy, write or read records nothing: WebGPU allows them, while Vulkan r
 
 ## Uploads and readbacks
 
-- **Uploads** (`mrhiWriteBuffer`, `mrhiWriteTexture`) copy the program's bytes at the call into the frame's staging region, the device's `frameUploadBytes` for each frame in flight, and record a copy from it. Every upload starts at a 512-byte boundary and a texture's rows at a 256-byte pitch, the strictest of the four APIs, so no driver repacks. Each running frame keeps its own region, chosen free when the frame begins, whatever order frames finish in. A full staging marks the pass as a full arena does.
-- **Readbacks** (`mrhiReadBuffer`, `mrhiReadTexture`) copy into the device's readback ring, `readbackBytes` at the same alignments, and each takes one of `readbacks` records and a request. A readback wraps to the ring's start rather than split (the bytes an empty ring skips are free at once, so an empty ring always holds a readback of its whole size), and is refused for capacity when the ring, the records or the answer room for it and its frame run out. The frame's finish queues `mrhi_deviceReadbackReady` for each, after the driver filled the ring. `mrhiTakeReadback` copies the bytes out with rows packed tightly, and taking frees the ring in order from the oldest, so a readback left untaken holds the ring.
+- **Uploads** (`mrhiPass_WriteBuffer`, `mrhiPass_WriteTexture`) copy the program's bytes at the call into the frame's staging region, the device's `frameUploadBytes` for each frame in flight, and record a copy from it. Every upload starts at a 512-byte boundary and a texture's rows at a 256-byte pitch, the strictest of the four APIs, so no driver repacks. Each running frame keeps its own region, chosen free when the frame begins, whatever order frames finish in. A full staging marks the pass as a full arena does.
+- **Readbacks** (`mrhiPass_ReadBuffer`, `mrhiPass_ReadTexture`) copy into the device's readback ring, `readbackBytes` at the same alignments, and each takes one of `readbacks` records and a request. A readback wraps to the ring's start rather than split (the bytes an empty ring skips are free at once, so an empty ring always holds a readback of its whole size), and is refused for capacity when the ring, the records or the answer room for it and its frame run out. The frame's finish queues `mrhi_deviceReadbackReady` for each, after the driver filled the ring. `mrhiRequest_TakeReadback` copies the bytes out with rows packed tightly, and taking frees the ring in order from the oldest, so a readback left untaken holds the ring.
 - Readbacks are taken and recorded under a lock, the one lock the encoders hold, since passes record in parallel and records must stay in order. A dropped frame or a failed submission gives back its records and ring bytes.
 
 ## Queries

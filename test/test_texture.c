@@ -212,7 +212,7 @@ static void TestRefusalsStateAndLimit(void)
     mrhiTextureId b;
     CHECK(mrhiCreateTexture(device, &def, &a) == mrhi_errorState, "not ready");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(s_instance, &record) == mrhi_success, "ready");
+    CHECK(mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success, "ready");
     CHECK(mrhiCreateTexture(device, &def, &a) == mrhi_success, "one");
     CHECK(mrhiCreateTexture(device, &def, &b) == mrhi_errorCapacity, "the limit");
     CHECK(mrhiDestroyTexture(device, a) == mrhi_success, "freed");
@@ -247,7 +247,7 @@ static void TestPastDeviceLimits(void)
     CHECK(Make(Def(mrhi_texture2dArray, mrhi_formatRgba8Unorm, 16385, 4, 257, kSampled)) ==
               mrhi_errorUnsupported,
           "past one of the adapter's beside one of the device's");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "none is misuse");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "none is misuse");
     Close(s_device);
     s_instance = instance;
     ResetAdapter();
@@ -265,7 +265,7 @@ int main(void)
     TestFormats();
     TestRefusalsStateAndLimit();
     s_instance = instance;
-    CHECK(mrhiGetDeviceMisuse(s_device) > 0, "the refusals were counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) > 0, "the refusals were counted");
     Close(s_device);
     TestCompressedWithTheFeature();
     return s_failures == 0 ? 0 : 1;

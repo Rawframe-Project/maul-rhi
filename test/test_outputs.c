@@ -60,10 +60,11 @@ static void TestRequestAdapters(void)
     mrhiAdapterRequestDef def = mrhiDefaultAdapterRequestDef();
     mrhiRequestId request;
     SPOIL(request);
-    CHECK(mrhiRequestAdapters(nullptr, &def, &request) == mrhi_errorInvalid && CLEARED(request),
+    CHECK(mrhiInstance_RequestAdapters(nullptr, &def, &request) == mrhi_errorInvalid &&
+              CLEARED(request),
           "a search without an instance: the null id");
     SPOIL(request);
-    CHECK(mrhiRequestAdapters(s_instance, nullptr, &request) == mrhi_errorInvalid &&
+    CHECK(mrhiInstance_RequestAdapters(s_instance, nullptr, &request) == mrhi_errorInvalid &&
               CLEARED(request),
           "a search without a def: the null id");
 }
@@ -295,12 +296,12 @@ static void TestReadBuffer(void)
 {
     mrhiRequestId request;
     SPOIL(request);
-    CHECK(mrhiReadBuffer(nullptr, (mrhiPassId){0}, (mrhiResourceId){0}, 0, 4, &request) ==
+    CHECK(mrhiPass_ReadBuffer(nullptr, (mrhiPassId){0}, (mrhiResourceId){0}, 0, 4, &request) ==
                   mrhi_errorInvalid &&
               CLEARED(request),
           "a buffer read without a device: the null id");
     SPOIL(request);
-    CHECK(mrhiReadBuffer(s_device, (mrhiPassId){0}, (mrhiResourceId){0}, 0, 4, &request) !=
+    CHECK(mrhiPass_ReadBuffer(s_device, (mrhiPassId){0}, (mrhiResourceId){0}, 0, 4, &request) !=
                   mrhi_success &&
               CLEARED(request),
           "a buffer read outside a pass: the null id");
@@ -312,12 +313,12 @@ static void TestReadTexture(void)
     mrhiExtent3d size = {1, 1, 1};
     mrhiRequestId request;
     SPOIL(request);
-    CHECK(mrhiReadTexture(nullptr, (mrhiPassId){0}, &source, &size, &request) ==
+    CHECK(mrhiPass_ReadTexture(nullptr, (mrhiPassId){0}, &source, &size, &request) ==
                   mrhi_errorInvalid &&
               CLEARED(request),
           "a texture read without a device: the null id");
     SPOIL(request);
-    CHECK(mrhiReadTexture(s_device, (mrhiPassId){0}, nullptr, &size, &request) ==
+    CHECK(mrhiPass_ReadTexture(s_device, (mrhiPassId){0}, nullptr, &size, &request) ==
                   mrhi_errorInvalid &&
               CLEARED(request),
           "a texture read without a source: the null id");
@@ -327,10 +328,10 @@ static void TestSubmitFrame(void)
 {
     mrhiRequestId token;
     SPOIL(token);
-    CHECK(mrhiSubmitFrame(nullptr, &token) == mrhi_errorInvalid && CLEARED(token),
+    CHECK(mrhiDevice_SubmitFrame(nullptr, &token) == mrhi_errorInvalid && CLEARED(token),
           "a submit without a device: the null id");
     SPOIL(token);
-    CHECK(mrhiSubmitFrame(s_device, &token) != mrhi_success && CLEARED(token),
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) != mrhi_success && CLEARED(token),
           "a submit without a frame: the null id");
 }
 

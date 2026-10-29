@@ -13,13 +13,13 @@ static mrhiDevice* s_device;
 static void Begin(void)
 {
     mrhiFrameDef def = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &def) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &def) == mrhi_success, "begun");
 }
 
 static void Submit(void)
 {
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
 }
 
 static mrhiResourceId Declare(mrhiFormat format, uint32_t mips, uint32_t samples)
@@ -91,13 +91,13 @@ static size_t s_count;
 
 static void ReadBarriers(void)
 {
-    CHECK(mrhiGetFrameBarriers(s_device, s_barriers, 32, &s_count) == mrhi_success, "read");
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, s_barriers, 32, &s_count) == mrhi_success, "read");
     CHECK(s_count <= 32, "room for them");
     // Room for one more: nothing is written past the count.
     static mrhiBarrier more[33];
     size_t count = 0;
     more[s_count].resource.index1 = 0xBEEF;
-    CHECK(mrhiGetFrameBarriers(s_device, more, s_count + 1, &count) == mrhi_success &&
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, more, s_count + 1, &count) == mrhi_success &&
               count == s_count && more[s_count].resource.index1 == 0xBEEF,
           "nothing past the count");
 }
@@ -117,7 +117,7 @@ static bool Is(size_t i, mrhiPassId pass, mrhiResourceId resource, uint32_t base
 static mrhiResourcePlan Plan(mrhiResourceId resource)
 {
     mrhiResourcePlan plan = {0};
-    CHECK(mrhiGetResourcePlan(s_device, resource, &plan) == mrhi_success, "a plan");
+    CHECK(mrhiResource_GetPlan(s_device, resource, &plan) == mrhi_success, "a plan");
     return plan;
 }
 
@@ -143,7 +143,7 @@ static void TestRenderThenSample(void)
     mrhiPassId draw = Target(scene, mrhi_loadClear, nullptr, 0);
     mrhiAccess sample = Access(scene, mrhi_accessSampled, 0, 1);
     mrhiPassId compose = Target(window, mrhi_loadClear, &sample, 1);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 3, "three barriers");
     CHECK(Is(0, draw, scene, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateColorTarget),
@@ -164,7 +164,7 @@ static void TestRenderThenSample(void)
     CHECK(mrhiImportTexture(s_device, windowTexture, &window) == mrhi_success, "again");
     sample = Access(window, mrhi_accessSampled, 0, 1);
     mrhiPassId read = Compute(&sample, 1, true);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 1 && Is(0, read, window, 0, 1, kAll, mrhi_stateColorTarget, mrhi_stateSampled),
           "from the state the last frame left");
@@ -172,21 +172,21 @@ static void TestRenderThenSample(void)
     Begin();
     CHECK(mrhiImportTexture(s_device, windowTexture, &window) == mrhi_success, "a third time");
     mrhiPassId again = Target(window, mrhi_loadKeep, nullptr, 0);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 1 &&
               Is(0, again, window, 0, 1, kAll, mrhi_stateSampled, mrhi_stateColorTarget),
           "sampled last frame");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Begin();
     CHECK(mrhiImportTexture(s_device, windowTexture, &window) == mrhi_success, "after a drop");
     again = Target(window, mrhi_loadKeep, nullptr, 0);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 1 &&
               Is(0, again, window, 0, 1, kAll, mrhi_stateSampled, mrhi_stateColorTarget),
           "a dropped frame leaves no state");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CHECK(mrhiDestroyTexture(s_device, windowTexture) == mrhi_success, "done");
 }
 
@@ -205,7 +205,7 @@ static void TestMipChain(void)
     mrhiPassId p3 = Compute(third, 2, false);
     mrhiAccess all = Access(mips, mrhi_accessSampled, 0, MRHI_REMAINING);
     mrhiPassId p4 = Compute(&all, 1, true);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     const mrhiResourceState undefined = mrhi_stateUndefined;
     const mrhiResourceState write = mrhi_stateStorageWrite;
@@ -217,7 +217,7 @@ static void TestMipChain(void)
     CHECK(Is(3, p3, mips, 1, 1, kAll, write, sampled), "mip 1 read");
     CHECK(Is(4, p3, mips, 2, 1, kAll, undefined, write), "mip 2 written");
     CHECK(Is(5, p4, mips, 2, 1, kAll, write, sampled), "only mip 2 changes for the last read");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 // Buffers: no barrier before a first use or between reads in one state,
@@ -240,7 +240,7 @@ static void TestBuffers(void)
     Compute(&read, 1, true);
     mrhiAccess vertices = Access(buffer, mrhi_accessVertex, 0, 1);
     mrhiPassId vertex = Compute(&vertices, 1, true);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 2 &&
               Is(0, compute, buffer, 0, 1, kAll, mrhi_stateCopyDestination, mrhi_stateStorageRead),
@@ -250,7 +250,7 @@ static void TestBuffers(void)
     mrhiResourcePlan plan = Plan(buffer);
     CHECK(plan.usage == (mrhi_bufferCopyDestination | mrhi_bufferStorage | mrhi_bufferVertex),
           "its usages");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 // Writes after writes of the same kind, and writes after reads.
@@ -307,7 +307,7 @@ static void TestWritesAfter(void)
     copy.accessCount = 1;
     copy.neverCull = true;
     mrhiPassId last = AddPass(copy);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 13, "thirteen barriers");
     CHECK(Is(3, passes[1], storage, 0, 1, kAll, mrhi_stateStorageWrite, mrhi_stateStorageWrite),
@@ -328,7 +328,7 @@ static void TestWritesAfter(void)
           "a write after a read");
     CHECK(!Plan(storage).transient, "storage alone is not transient");
     CHECK(!Plan(resolved).transient, "a resolve alone is not transient");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 // Layers of an array and slices of a volume.
@@ -364,7 +364,7 @@ static void TestLayers(void)
     CHECK(mrhiImportTexture(s_device, volume, &slices) == mrhi_success, "the volume");
     mrhiAccess whole = Access(slices, mrhi_accessStorageWrite, 0, 1);
     mrhiPassId fill = Compute(&whole, 1, false);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 8, "eight barriers");
     CHECK(
@@ -392,7 +392,7 @@ static void TestLayers(void)
     CHECK(Is(7, fill, slices, 0, 1, kAll, mrhi_stateCopyDestination, mrhi_stateStorageWrite) &&
               s_barriers[7].range.layerCount == 1,
           "a volume is one layer, with nothing left at the end");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CHECK(mrhiDestroyTexture(s_device, volume) == mrhi_success, "done");
 }
 
@@ -414,12 +414,12 @@ static void TestBufferCarried(void)
     CHECK(mrhiImportBuffer(s_device, buffer, &imported) == mrhi_success, "again");
     mrhiAccess read = Access(imported, mrhi_accessStorageRead, 0, 1);
     mrhiPassId pass = Compute(&read, 1, true);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 1 &&
               Is(0, pass, imported, 0, 1, kAll, mrhi_stateStorageWrite, mrhi_stateStorageRead),
           "after the last frame's write");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CHECK(mrhiDestroyBuffer(s_device, buffer) == mrhi_success, "done");
 }
 
@@ -442,7 +442,7 @@ static void TestPlanes(void)
     def.depthTarget = (mrhiDepthTarget){.resource = depth, .readOnly = true};
     def.neverCull = true;
     mrhiPassId test = AddPass(def);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 4, "four barriers");
     CHECK(Is(0, write, depth, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateDepthTarget),
@@ -454,7 +454,7 @@ static void TestPlanes(void)
           "stencil to read-only");
     CHECK(Is(3, test, depth, 0, 1, mrhi_aspectDepthOnly, mrhi_stateSampled, mrhi_stateDepthRead),
           "depth to read-only");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 // Targets that live only inside their passes are transient.
@@ -474,13 +474,13 @@ static void TestTransient(void)
     AddPass(def);
     mrhiAccess read = Access(resolved, mrhi_accessSampled, 0, 1);
     Compute(&read, 1, true);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     mrhiResourcePlan plan = Plan(samples);
     CHECK(plan.transient && plan.usage == (mrhi_textureRenderTarget | mrhi_textureTransient),
           "the samples live in the pass");
     plan = Plan(resolved);
     CHECK(!plan.transient, "what they resolve to is read later");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     // WebGPU's transient attachments take no view formats.
     Begin();
     mrhiTextureDef twinDef = mrhiDefaultTextureDef();
@@ -498,9 +498,9 @@ static void TestTransient(void)
     };
     def.neverCull = true;
     AddPass(def);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(!Plan(twin).transient, "a target listing view formats is never transient");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Begin();
     samples = Declare(mrhi_formatRgba8Unorm, 1, 1);
     def = mrhiDefaultPassDef();
@@ -511,13 +511,13 @@ static void TestTransient(void)
     def.neverCull = true;
     AddPass(def);
     mrhiResourceId unused = Declare(mrhi_formatRgba8Unorm, 1, 1);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(!Plan(samples).transient, "contents kept between passes");
     plan = Plan(unused);
     CHECK(!plan.transient && plan.usage == 0 && plan.firstPass.index1 == 0 &&
               plan.lastPass.generation == 0,
           "an unused resource");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 // An import whose parts end in different states is unified at the end.
@@ -529,7 +529,7 @@ static void TestUnified(void)
     CHECK(mrhiImportTexture(s_device, texture, &imported) == mrhi_success, "imported");
     mrhiAccess write = Access(imported, mrhi_accessStorageWrite, 0, 1);
     mrhiPassId pass = Compute(&write, 1, false);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 3, "three barriers");
     CHECK(
@@ -544,7 +544,7 @@ static void TestUnified(void)
     CHECK(mrhiImportTexture(s_device, texture, &imported) == mrhi_success, "again");
     mrhiAccess read = Access(imported, mrhi_accessSampled, 1, 1);
     pass = Compute(&read, 1, true);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     ReadBarriers();
     CHECK(s_count == 3, "three barriers");
     CHECK(Is(0, pass, imported, 1, 1, kAll, mrhi_stateStorageWrite, mrhi_stateSampled),
@@ -553,7 +553,7 @@ static void TestUnified(void)
           "mip 0 follows");
     CHECK(Is(2, kEnd, imported, 2, 1, kAll, mrhi_stateStorageWrite, mrhi_stateSampled),
           "and mip 2");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "done");
 }
 
@@ -562,32 +562,36 @@ static void TestRefusals(void)
     mrhiBarrier barrier;
     size_t count = 0;
     mrhiResourcePlan plan;
-    CHECK(mrhiGetFrameBarriers(s_device, &barrier, 1, &count) == mrhi_errorState, "no frame");
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, &barrier, 1, &count) == mrhi_errorState,
+          "no frame");
     Begin();
     mrhiResourceId scene = Declare(mrhi_formatRgba8Unorm, 1, 1);
     Target(scene, mrhi_loadClear, nullptr, 0);
-    CHECK(mrhiGetFrameBarriers(s_device, &barrier, 1, &count) == mrhi_errorState, "not compiled");
-    CHECK(mrhiGetResourcePlan(s_device, scene, &plan) == mrhi_errorState, "no plan yet");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
-    CHECK(mrhiGetFrameBarriers(s_device, nullptr, 0, &count) == mrhi_success && count == 0,
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, &barrier, 1, &count) == mrhi_errorState,
+          "not compiled");
+    CHECK(mrhiResource_GetPlan(s_device, scene, &plan) == mrhi_errorState, "no plan yet");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, nullptr, 0, &count) == mrhi_success && count == 0,
           "a culled pass makes no barrier");
-    CHECK(mrhiGetFrameBarriers(s_device, nullptr, 1, &count) == mrhi_errorInvalid,
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, nullptr, 1, &count) == mrhi_errorInvalid,
           "a capacity without an array");
-    CHECK(mrhiGetFrameBarriers(s_device, &barrier, 1, nullptr) == mrhi_errorInvalid, "no count");
-    CHECK(mrhiGetFrameBarriers(nullptr, &barrier, 1, &count) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetResourcePlan(s_device, scene, nullptr) == mrhi_errorInvalid, "no out");
-    CHECK(mrhiGetResourcePlan(nullptr, scene, &plan) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetResourcePlan(s_device, (mrhiResourceId){0, 0}, &plan) == mrhi_errorStale,
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, &barrier, 1, nullptr) == mrhi_errorInvalid,
+          "no count");
+    CHECK(mrhiDevice_GetFrameBarriers(nullptr, &barrier, 1, &count) == mrhi_errorInvalid,
+          "no device");
+    CHECK(mrhiResource_GetPlan(s_device, scene, nullptr) == mrhi_errorInvalid, "no out");
+    CHECK(mrhiResource_GetPlan(nullptr, scene, &plan) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiResource_GetPlan(s_device, (mrhiResourceId){0, 0}, &plan) == mrhi_errorStale,
           "no resource");
-    CHECK(mrhiGetResourcePlan(s_device, (mrhiResourceId){2, scene.generation}, &plan) ==
+    CHECK(mrhiResource_GetPlan(s_device, (mrhiResourceId){2, scene.generation}, &plan) ==
               mrhi_errorStale,
           "past the resources");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Begin();
     Declare(mrhi_formatRgba8Unorm, 1, 1);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
-    CHECK(mrhiGetResourcePlan(s_device, scene, &plan) == mrhi_errorStale, "the last frame's");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiResource_GetPlan(s_device, scene, &plan) == mrhi_errorStale, "the last frame's");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 // Fewer barriers allowed than a frame plans: the compile refuses, and
@@ -605,10 +609,10 @@ static void TestBarrierLimit(void)
     Compute(&first, 1, false);
     mrhiAccess all = Access(mips, mrhi_accessSampled, 0, MRHI_REMAINING);
     Compute(&all, 1, true);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_errorCapacity, "three barriers for two");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_errorCapacity, "three barriers for two");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorCapacity, "not submitted either");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "still open");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorCapacity, "not submitted either");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "still open");
     Close(s_device);
     s_device = previous;
     s_instance = instance;

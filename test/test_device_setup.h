@@ -40,15 +40,17 @@ static mrhiDevice* OpenWith(mrhiDeviceDef deviceDef, bool ready)
     mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
     mrhiRequestId request;
     mrhiInstanceNotification record;
-    CHECK(mrhiRequestAdapters(s_instance, &search, &request) == mrhi_success, "the search");
-    CHECK(mrhiNextInstanceNotification(s_instance, &record) == mrhi_success, "found");
+    CHECK(mrhiInstance_RequestAdapters(s_instance, &search, &request) == mrhi_success,
+          "the search");
+    CHECK(mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success, "found");
     size_t count = 0;
-    CHECK(mrhiGetAdapters(s_instance, &deviceDef.adapter, 1, &count) == mrhi_success, "one");
+    CHECK(mrhiInstance_GetAdapters(s_instance, &deviceDef.adapter, 1, &count) == mrhi_success,
+          "one");
     mrhiDevice* device = nullptr;
     CHECK(mrhiCreateDevice(s_instance, &deviceDef, &device, &request) == mrhi_success, "made");
     if (ready)
     {
-        CHECK(mrhiNextInstanceNotification(s_instance, &record) == mrhi_success, "ready");
+        CHECK(mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success, "ready");
     }
     return device;
 }

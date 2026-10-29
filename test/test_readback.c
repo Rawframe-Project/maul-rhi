@@ -86,7 +86,7 @@ static void CloseDevice(void)
 static void Frame(void)
 {
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     CHECK(mrhiImportBuffer(s_device, s_buffer, &s_r[BUFFER]) == mrhi_success, "imported");
     for (uint32_t i = ARRAY; i < RESOURCES; ++i)
     {
@@ -111,20 +111,20 @@ static void Frame(void)
     def.colorTargets[0] = (mrhiColorTarget){.resource = s_r[TARGET], .load = mrhi_loadClear};
     def.colorTargetCount = 1;
     CHECK(mrhiAddPass(s_device, &def, &s_render) == mrhi_success, "a render pass");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
-    CHECK(mrhiBeginPass(s_device, s_pass) == mrhi_success &&
-              mrhiBeginPass(s_device, s_render) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_Begin(s_device, s_pass) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_render) == mrhi_success,
           "begun");
 }
 
 // Ends both passes and submits: the token.
 static mrhiRequestId Submit(void)
 {
-    CHECK(mrhiEndPass(s_device, s_pass) == mrhi_success &&
-              mrhiEndPass(s_device, s_render) == mrhi_success,
+    CHECK(mrhiPass_End(s_device, s_pass) == mrhi_success &&
+              mrhiPass_End(s_device, s_render) == mrhi_success,
           "ended");
     mrhiRequestId token = {0};
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
     return token;
 }
 
@@ -133,17 +133,17 @@ static mrhiRequestId Submit(void)
 static bool Finish(mrhiRequestId token, const mrhiRequestId* readbacks, uint32_t count,
                    mrhiResult outcome)
 {
-    CHECK(mrhiWaitFrame(s_device, token, 1) == mrhi_success, "finished");
+    CHECK(mrhiRequest_WaitFrame(s_device, token, 1) == mrhi_success, "finished");
     mrhiDeviceNotification record;
-    bool answered = mrhiNextDeviceNotification(s_device, &record) == mrhi_success &&
+    bool answered = mrhiDevice_TakeNotification(s_device, &record) == mrhi_success &&
                     record.kind == mrhi_deviceFrameDone && record.request.index1 == token.index1;
     for (uint32_t i = 0; i < count; ++i)
     {
-        answered = answered && mrhiNextDeviceNotification(s_device, &record) == mrhi_success &&
+        answered = answered && mrhiDevice_TakeNotification(s_device, &record) == mrhi_success &&
                    record.kind == mrhi_deviceReadbackReady &&
                    record.request.index1 == readbacks[i].index1 && record.outcome == outcome;
     }
-    return answered && mrhiNextDeviceNotification(s_device, &record) == mrhi_empty;
+    return answered && mrhiDevice_TakeNotification(s_device, &record) == mrhi_empty;
 }
 
 static const mrhiCommand* Nth(uint32_t n)
@@ -164,7 +164,7 @@ static void Fill(uint64_t offset, uint64_t bytes, uint8_t seed)
 
 static mrhiResult Read(uint64_t offset, uint64_t size, mrhiRequestId* requestOut)
 {
-    return mrhiReadBuffer(s_device, s_pass, s_r[BUFFER], offset, size, requestOut);
+    return mrhiPass_ReadBuffer(s_device, s_pass, s_r[BUFFER], offset, size, requestOut);
 }
 
 static void TestBuffer(void)
@@ -181,26 +181,30 @@ static void TestBuffer(void)
               to->offset == 0,
           "recorded as a copy into the ring");
     size_t size = 0;
-    CHECK(mrhiTakeReadback(s_device, request, nullptr, 0, &size) == mrhi_errorState,
+    CHECK(mrhiRequest_TakeReadback(s_device, request, nullptr, 0, &size) == mrhi_errorState,
           "not answered while recording");
-    CHECK(mrhiWaitDeviceNotification(s_device, UINT64_C(1000000000)) == mrhi_empty,
+    CHECK(mrhiDevice_WaitNotification(s_device, UINT64_C(1000000000)) == mrhi_empty,
           "a wait owes it nothing before its frame is submitted");
     mrhiRequestId token = Submit();
-    CHECK(mrhiWaitDeviceNotification(s_device, 0) == mrhi_timeout, "then its held frame is owed");
+    CHECK(mrhiDevice_WaitNotification(s_device, 0) == mrhi_timeout, "then its held frame is owed");
     CHECK(token.index1 == request.index1 + 1, "requests share one counter");
-    CHECK(mrhiTakeReadback(s_device, request, nullptr, 0, &size) == mrhi_errorState,
+    CHECK(mrhiRequest_TakeReadback(s_device, request, nullptr, 0, &size) == mrhi_errorState,
           "nor while its frame runs");
     CHECK(Finish(token, &request, 1, mrhi_success), "answered after its frame");
-    CHECK(mrhiTakeReadback(s_device, request, nullptr, 0, &size) == mrhi_success && size == 16,
+    CHECK(mrhiRequest_TakeReadback(s_device, request, nullptr, 0, &size) == mrhi_success &&
+              size == 16,
           "its size");
     uint8_t bytes[32] = {0};
-    CHECK(mrhiTakeReadback(s_device, request, bytes, 15, &size) == mrhi_errorCapacity && size == 16,
+    CHECK(mrhiRequest_TakeReadback(s_device, request, bytes, 15, &size) == mrhi_errorCapacity &&
+              size == 16,
           "too little room, with the size");
     Fill(0, 16, 9);
-    CHECK(mrhiTakeReadback(s_device, request, bytes, sizeof(bytes), &size) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(s_device, request, bytes, sizeof(bytes), &size) ==
+                  mrhi_success &&
               size == 16 && bytes[0] == 9 && bytes[15] == (uint8_t)(9 + 45) && bytes[16] == 0,
           "taken");
-    CHECK(mrhiTakeReadback(s_device, request, bytes, sizeof(bytes), &size) == mrhi_errorStale,
+    CHECK(mrhiRequest_TakeReadback(s_device, request, bytes, sizeof(bytes), &size) ==
+              mrhi_errorStale,
           "once");
     Frame();
     mrhiRequestId second = {0};
@@ -208,15 +212,16 @@ static void TestBuffer(void)
     token = Submit();
     CHECK(Finish(token, &second, 1, mrhi_success), "answered from its own record");
     mrhiRequestId other = {second.index1, 2};
-    CHECK(mrhiTakeReadback(s_device, other, nullptr, 0, &size) == mrhi_errorStale,
+    CHECK(mrhiRequest_TakeReadback(s_device, other, nullptr, 0, &size) == mrhi_errorStale,
           "another generation");
-    CHECK(mrhiTakeReadback(s_device, token, bytes, sizeof(bytes), &size) == mrhi_errorStale,
+    CHECK(mrhiRequest_TakeReadback(s_device, token, bytes, sizeof(bytes), &size) == mrhi_errorStale,
           "a frame's token is no readback");
-    CHECK(mrhiTakeReadback(s_device, request, bytes, 4, nullptr) == mrhi_errorInvalid &&
-              mrhiTakeReadback(s_device, request, nullptr, 4, &size) == mrhi_errorInvalid,
+    CHECK(mrhiRequest_TakeReadback(s_device, request, bytes, 4, nullptr) == mrhi_errorInvalid &&
+              mrhiRequest_TakeReadback(s_device, request, nullptr, 4, &size) == mrhi_errorInvalid,
           "no size out, or no array with room");
-    CHECK(mrhiTakeReadback(nullptr, request, bytes, 4, &size) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 2, "each counted");
+    CHECK(mrhiRequest_TakeReadback(nullptr, request, bytes, 4, &size) == mrhi_errorInvalid,
+          "no device");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 2, "each counted");
     CloseDevice();
 }
 
@@ -231,23 +236,23 @@ static void TestRefusals(void)
               Read(4100, 0, &request) == mrhi_errorInvalid,
           "past the buffer");
     CHECK(Read(0, 4, nullptr) == mrhi_errorInvalid, "no request out");
-    CHECK(mrhiReadBuffer(s_device, s_pass, s_r[ARRAY], 0, 4, &request) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ReadBuffer(s_device, s_pass, s_r[ARRAY], 0, 4, &request) == mrhi_errorInvalid,
           "a texture");
-    CHECK(mrhiReadBuffer(s_device, s_render, s_r[BUFFER], 0, 4, &request) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ReadBuffer(s_device, s_render, s_r[BUFFER], 0, 4, &request) == mrhi_errorInvalid,
           "a pass with targets");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 7, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 7, "each counted");
     mrhiResourceId none = {0};
-    CHECK(mrhiReadBuffer(s_device, s_pass, none, 0, 4, &request) == mrhi_errorStale, "none");
-    CHECK(mrhiReadBuffer(nullptr, s_pass, s_r[BUFFER], 0, 4, &request) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ReadBuffer(s_device, s_pass, none, 0, 4, &request) == mrhi_errorStale, "none");
+    CHECK(mrhiPass_ReadBuffer(nullptr, s_pass, s_r[BUFFER], 0, 4, &request) == mrhi_errorInvalid,
           "no device");
-    CHECK(mrhiEndPass(s_device, s_pass) == mrhi_success && Read(0, 4, &request) == mrhi_errorState,
+    CHECK(mrhiPass_End(s_device, s_pass) == mrhi_success && Read(0, 4, &request) == mrhi_errorState,
           "not recording");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CloseDevice();
     // A pass declaring the buffer a copy destination.
     Open(4096, 8, 16);
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     CHECK(mrhiImportBuffer(s_device, s_buffer, &s_r[BUFFER]) == mrhi_success, "imported");
     mrhiAccess access = {.resource = s_r[BUFFER], .kind = mrhi_accessCopyDestination};
     mrhiPassDef def = mrhiDefaultPassDef();
@@ -256,11 +261,11 @@ static void TestRefusals(void)
     def.accesses = &access;
     def.accessCount = 1;
     CHECK(mrhiAddPass(s_device, &def, &s_pass) == mrhi_success &&
-              mrhiCompileFrame(s_device) == mrhi_success &&
-              mrhiBeginPass(s_device, s_pass) == mrhi_success,
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_pass) == mrhi_success,
           "a pass");
     CHECK(Read(0, 4, &request) == mrhi_errorInvalid, "a buffer declared a copy destination");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CloseDevice();
 }
 
@@ -274,7 +279,8 @@ static void TestTexture(void)
     mrhiRequestId layer = {0};
     mrhiRequestId request = {0};
     CHECK(Read(0, 4, &buffer) == mrhi_success, "a buffer first");
-    CHECK(mrhiReadTexture(s_device, s_pass, &source, &size, &layer) == mrhi_success, "a layer");
+    CHECK(mrhiPass_ReadTexture(s_device, s_pass, &source, &size, &layer) == mrhi_success,
+          "a layer");
     const mrhiCommand* command = Nth(3);
     const mrhiCommandTextureSide* from = (const mrhiCommandTextureSide*)Nth(4);
     const mrhiCommandBufferSide* to = (const mrhiCommandBufferSide*)Nth(5);
@@ -285,34 +291,35 @@ static void TestTexture(void)
           "recorded into the ring at 512, rows at a pitch of 256");
     mrhiTextureCopy depth = {.resource = s_r[DEPTH]};
     mrhiRequestId depthRequest = {0};
-    CHECK(mrhiReadTexture(s_device, s_pass, &depth, &(mrhiExtent3d){16, 8, 1}, &depthRequest) ==
-              mrhi_success,
+    CHECK(mrhiPass_ReadTexture(s_device, s_pass, &depth, &(mrhiExtent3d){16, 8, 1},
+                               &depthRequest) == mrhi_success,
           "depth32float's depth");
     mrhiTextureCopy stencil = {.resource = s_r[STENCIL], .aspect = mrhi_aspectDepthOnly};
-    CHECK(mrhiReadTexture(s_device, s_pass, &stencil, &(mrhiExtent3d){16, 8, 1}, &request) ==
+    CHECK(mrhiPass_ReadTexture(s_device, s_pass, &stencil, &(mrhiExtent3d){16, 8, 1}, &request) ==
               mrhi_errorInvalid,
           "not the combined format's depth");
     mrhiTextureCopy multi = {.resource = s_r[MULTI]};
-    CHECK(mrhiReadTexture(s_device, s_pass, &multi, &(mrhiExtent3d){16, 8, 1}, &request) ==
+    CHECK(mrhiPass_ReadTexture(s_device, s_pass, &multi, &(mrhiExtent3d){16, 8, 1}, &request) ==
               mrhi_errorInvalid,
           "not a multisampled texture");
     mrhiTextureCopy outside = {.resource = s_r[OUTSIDE]};
-    CHECK(mrhiReadTexture(s_device, s_pass, &outside, &(mrhiExtent3d){16, 8, 1}, &request) ==
+    CHECK(mrhiPass_ReadTexture(s_device, s_pass, &outside, &(mrhiExtent3d){16, 8, 1}, &request) ==
               mrhi_errorInvalid,
           "not a texture the pass does not declare");
-    CHECK(mrhiReadTexture(s_device, s_pass, nullptr, &size, &request) == mrhi_errorInvalid &&
-              mrhiReadTexture(s_device, s_pass, &source, nullptr, &request) == mrhi_errorInvalid &&
-              mrhiReadTexture(s_device, s_pass, &source, &size, nullptr) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ReadTexture(s_device, s_pass, nullptr, &size, &request) == mrhi_errorInvalid &&
+              mrhiPass_ReadTexture(s_device, s_pass, &source, nullptr, &request) ==
+                  mrhi_errorInvalid &&
+              mrhiPass_ReadTexture(s_device, s_pass, &source, &size, nullptr) == mrhi_errorInvalid,
           "NULL arguments");
-    CHECK(mrhiReadTexture(s_device, s_render, &source, &size, &request) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ReadTexture(s_device, s_render, &source, &size, &request) == mrhi_errorInvalid,
           "a pass with targets");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 7, "each counted");
-    CHECK(mrhiReadTexture(nullptr, s_pass, &source, &size, &request) == mrhi_errorInvalid,
+    CHECK(mrhiDevice_GetMisuse(s_device) == 7, "each counted");
+    CHECK(mrhiPass_ReadTexture(nullptr, s_pass, &source, &size, &request) == mrhi_errorInvalid,
           "no device");
     mrhiTextureCopy stencilOnly = {.resource = s_r[STENCIL], .aspect = mrhi_aspectStencilOnly};
     mrhiRequestId stencilRequest = {0};
-    CHECK(mrhiReadTexture(s_device, s_pass, &stencilOnly, &(mrhiExtent3d){16, 8, 1},
-                          &stencilRequest) == mrhi_success,
+    CHECK(mrhiPass_ReadTexture(s_device, s_pass, &stencilOnly, &(mrhiExtent3d){16, 8, 1},
+                               &stencilRequest) == mrhi_success,
           "the combined format's stencil");
     mrhiRequestId token = Submit();
     mrhiRequestId answers[] = {
@@ -323,7 +330,7 @@ static void TestTexture(void)
     };
     CHECK(Finish(token, answers, 4, mrhi_success), "all four answered in order");
     size_t taken = 0;
-    CHECK(mrhiTakeReadback(s_device, stencilRequest, nullptr, 0, &taken) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(s_device, stencilRequest, nullptr, 0, &taken) == mrhi_success &&
               taken == 128,
           "the stencil a byte a texel");
     for (uint32_t y = 0; y < 8; ++y)
@@ -331,7 +338,7 @@ static void TestTexture(void)
         Fill(512 + y * 256, 32, (uint8_t)(y * 16));
     }
     uint8_t bytes[512];
-    CHECK(mrhiTakeReadback(s_device, layer, bytes, sizeof(bytes), &taken) == mrhi_success &&
+    CHECK(mrhiRequest_TakeReadback(s_device, layer, bytes, sizeof(bytes), &taken) == mrhi_success &&
               taken == 256,
           "taken tightly: 8 rows of 32 bytes");
     bool packed = true;
@@ -357,20 +364,20 @@ static void TestRing(void)
     CHECK(Read(0, 512, &c) == mrhi_success, "512 bytes more");
     mrhiRequestId d = {0};
     CHECK(Read(0, 0, &d) == mrhi_errorCapacity, "not a fourth record");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "not misuse");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "not misuse");
     mrhiRequestId token = Submit();
     mrhiRequestId answers[] = {a, b, c};
     CHECK(Finish(token, answers, 3, mrhi_success), "answered");
     size_t size = 0;
     uint8_t bytes[2048];
-    CHECK(mrhiTakeReadback(s_device, b, bytes, sizeof(bytes), &size) == mrhi_success,
+    CHECK(mrhiRequest_TakeReadback(s_device, b, bytes, sizeof(bytes), &size) == mrhi_success,
           "the second taken first");
-    CHECK(mrhiTakeReadback(s_device, b, bytes, sizeof(bytes), &size) == mrhi_errorStale,
+    CHECK(mrhiRequest_TakeReadback(s_device, b, bytes, sizeof(bytes), &size) == mrhi_errorStale,
           "once, though its room is held");
     Frame();
     CHECK(Read(0, 512, &d) == mrhi_errorCapacity, "its room held behind the first");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
-    CHECK(mrhiTakeReadback(s_device, a, bytes, sizeof(bytes), &size) == mrhi_success,
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiRequest_TakeReadback(s_device, a, bytes, sizeof(bytes), &size) == mrhi_success,
           "the first taken");
     Frame();
     CHECK(Read(0, 2048, &d) == mrhi_success, "both freed");
@@ -381,13 +388,14 @@ static void TestRing(void)
     token = Submit();
     mrhiRequestId more[] = {d, e};
     CHECK(Finish(token, more, 2, mrhi_success), "answered");
-    CHECK(mrhiTakeReadback(s_device, c, bytes, sizeof(bytes), &size) == mrhi_success &&
-              mrhiTakeReadback(s_device, d, bytes, sizeof(bytes), &size) == mrhi_success &&
-              mrhiTakeReadback(s_device, e, bytes, sizeof(bytes), &size) == mrhi_success,
+    CHECK(mrhiRequest_TakeReadback(s_device, c, bytes, sizeof(bytes), &size) == mrhi_success &&
+              mrhiRequest_TakeReadback(s_device, d, bytes, sizeof(bytes), &size) == mrhi_success &&
+              mrhiRequest_TakeReadback(s_device, e, bytes, sizeof(bytes), &size) == mrhi_success,
           "all taken");
     Frame();
     CHECK(Read(0, 4096, &a) == mrhi_success, "the whole ring free again");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped, though its read wrapped the ring");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success,
+          "dropped, though its read wrapped the ring");
     // The dropped wrap leaves the ring empty where the drop found it, so
     // readbacks of every size go on.
     Frame();
@@ -405,9 +413,9 @@ static void TestDropAndFailure(void)
     Frame();
     mrhiRequestId dropped = {0};
     CHECK(Read(0, 4096, &dropped) == mrhi_success, "the whole ring");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     size_t size = 0;
-    CHECK(mrhiTakeReadback(s_device, dropped, nullptr, 0, &size) == mrhi_errorStale,
+    CHECK(mrhiRequest_TakeReadback(s_device, dropped, nullptr, 0, &size) == mrhi_errorStale,
           "its readback gone");
     Frame();
     mrhiRequestId request = {0};
@@ -423,9 +431,11 @@ static void TestDropAndFailure(void)
     token = Submit();
     CHECK(Finish(token, &request, 1, mrhi_errorPlatform), "answered with the failure");
     uint8_t bytes[16];
-    CHECK(mrhiTakeReadback(s_device, request, bytes, sizeof(bytes), &size) == mrhi_errorPlatform,
+    CHECK(mrhiRequest_TakeReadback(s_device, request, bytes, sizeof(bytes), &size) ==
+              mrhi_errorPlatform,
           "taken as the failure");
-    CHECK(mrhiTakeReadback(s_device, request, bytes, sizeof(bytes), &size) == mrhi_errorStale,
+    CHECK(mrhiRequest_TakeReadback(s_device, request, bytes, sizeof(bytes), &size) ==
+              mrhi_errorStale,
           "and freed");
     CloseDevice();
 }
@@ -447,19 +457,19 @@ static void TestAnswerRoom(void)
     CHECK(Read(0, 4, &requests[0]) == mrhi_success && Read(0, 4, &requests[1]) == mrhi_success &&
               Read(0, 4, &requests[2]) == mrhi_success,
           "the room back once they are answered");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CloseDevice();
     Open(0, 0, 16);
     Frame();
     mrhiRequestId request = {0};
     CHECK(Read(0, 4, &request) == mrhi_errorCapacity, "no readbacks on a device without them");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CloseDevice();
     Open(0, 4, 16);
     Frame();
     CHECK(Read(0, 0, &request) == mrhi_success, "no bytes without a ring");
     CHECK(Read(0, 4, &request) == mrhi_errorCapacity, "but no more");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CloseDevice();
 }
 
@@ -474,12 +484,13 @@ static void TestWrap(void)
     CHECK(Finish(token, &first, 1, mrhi_success), "answered");
     uint8_t bytes[4096];
     size_t size = 0;
-    CHECK(mrhiTakeReadback(s_device, first, bytes, sizeof(bytes), &size) == mrhi_success, "taken");
+    CHECK(mrhiRequest_TakeReadback(s_device, first, bytes, sizeof(bytes), &size) == mrhi_success,
+          "taken");
     Frame();
     mrhiRequestId second = {0};
     CHECK(Read(0, 1024, &second) == mrhi_success, "a kilobyte past what is left");
     CHECK(((const mrhiCommandBufferSide*)Nth(2))->offset == 0, "placed at the ring's start");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CloseDevice();
 }
 
@@ -521,13 +532,13 @@ static void TestSubmitFailure(void)
     Frame();
     mrhiRequestId request = {0};
     CHECK(Read(0, 4096, &request) == mrhi_success, "the whole ring");
-    CHECK(mrhiEndPass(s_device, s_pass) == mrhi_success &&
-              mrhiEndPass(s_device, s_render) == mrhi_success,
+    CHECK(mrhiPass_End(s_device, s_pass) == mrhi_success &&
+              mrhiPass_End(s_device, s_render) == mrhi_success,
           "ended");
     mrhiRequestId token = {0};
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorPlatform, "refused by the driver");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorPlatform, "refused by the driver");
     size_t size = 0;
-    CHECK(mrhiTakeReadback(s_device, request, nullptr, 0, &size) == mrhi_errorStale,
+    CHECK(mrhiRequest_TakeReadback(s_device, request, nullptr, 0, &size) == mrhi_errorStale,
           "its readback dropped");
     CloseDevice();
 }

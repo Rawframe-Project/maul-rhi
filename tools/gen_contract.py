@@ -6,9 +6,10 @@
 # contract/mrhi.json, which is their source of truth
 # (docs/internals/contract.md describes it). The contract's names are
 # snake_case; this generator turns them into the family's C names: get_version
-# becomes mrhiGetVersion, error_invalid mrhi_errorInvalid, view_count
-# viewCount. Headers go through the pinned clang-format, so the format,
-# documentation and source checks apply to them as to hand-written code.
+# becomes mrhiGetVersion, pass_begin on the object pass mrhiPass_Begin,
+# error_invalid mrhi_errorInvalid, view_count viewCount. Headers go through
+# the pinned clang-format, so the format, documentation and source checks
+# apply to them as to hand-written code.
 #
 # The library version is not in the contract: it lives between
 # release-please's markers in base.h, which release-please moves, and the
@@ -17,8 +18,9 @@
 # usage: gen_contract.py [--check] [--mappings OUTPUT.md] | --self-test
 #   --check     writes nothing; fails naming each file that differs from
 #               what the contract generates.
-#   --self-test plants each case of the limits' diagnostic codes in a copy
-#               of the contract and proves the check takes the right ones.
+#   --self-test plants each case of the limits' diagnostic codes, and of a
+#               function's object, in a copy of the contract and proves the
+#               check takes the right ones.
 #   --mappings  also writes the table of how each concept maps onto
 #               Vulkan, D3D12, Metal and WebGPU, for the documentation
 #               site; it is not committed.
@@ -110,8 +112,14 @@ class Names:
     def type(self, name):
         return self.prefix + pascal(name)
 
-    def function(self, name):
-        return self.prefix + pascal(name)
+    def function(self, name, on=None):
+        if on is None:
+            return self.prefix + pascal(name)
+        return self.prefix + pascal(on) + "_" + pascal(name[len(on) + 1:])
+
+    def call(self, item):
+        """A function item's name, PObject_Verb when it names an object."""
+        return self.function(item["name"], item.get("object"))
 
     def value(self, name):
         return self.prefix + "_" + camel(name)
@@ -293,6 +301,11 @@ def check_function(errors, where, item, kind_of):
         errors.append(f"{where}: unknown thread safety class '{safety.get('class')}'")
     elif safety["class"] == "any_exclusive" and not safety.get("object"):
         errors.append(f"{where}: an exclusive thread safety class names its object")
+    on = item.get("object")
+    if on is not None and (kind_of.get(on) != "opaque" and kind_of.get(f"{on}_id") != "id"
+                           or not item["name"].startswith(on + "_")):
+        errors.append(f"{where}: its object '{on}' is not an opaque type or an id that "
+                      "starts its name")
 
 
 def check_limit_codes(errors, items):
@@ -563,11 +576,11 @@ def emit_function(names, item):
         # Built by the program from its own headers, so that a default
         # stamps the version the program was built with.
         return lines + [f"    static inline {result} "
-                        f"{names.function(item['name'])}({c_signature(names, item)})", "    {"] + [
+                        f"{names.call(item)}({c_signature(names, item)})", "    {"] + [
             "        " + line for line in item["inline_body"]] + ["    }"]
     nodiscard = f"{names.macro}_NODISCARD " if returns and returns["type"] == "result" else ""
     return lines + [f"    {nodiscard}{names.macro}_API {result} "
-                    f"{names.function(item['name'])}({c_signature(names, item)});"]
+                    f"{names.call(item)}({c_signature(names, item)});"]
 
 
 EMITTERS = {
@@ -633,7 +646,7 @@ def emit_mappings(contract):
             lines.append("| Concept | " + " | ".join(title for _, title in APIS) + " |")
             lines.append("| --- " * (len(APIS) + 1) + "|")
             for item in whole:
-                label = names.function(item["name"]) if item["kind"] == "function" \
+                label = names.call(item) if item["kind"] == "function" \
                     else names.type(item["name"])
                 cells = [cell(item["mapping"][api]) for api, _ in APIS]
                 lines.append(f"| `{label}` | " + " | ".join(cells) + " |")
@@ -641,7 +654,7 @@ def emit_mappings(contract):
             lines += ["", f"## {header['name']}: the library's own", ""]
             lines += ["| Concept | Why no API maps it |", "| --- | --- |"]
             for item in own:
-                label = names.function(item["name"]) if item["kind"] == "function" \
+                label = names.call(item) if item["kind"] == "function" \
                     else names.type(item["name"])
                 lines.append(f"| `{label}` | {item['library']} |")
     return "\n".join(lines) + "\n"
@@ -933,11 +946,11 @@ def format_checks(contract):
 
 
 def emit_result_names(contract):
-    """The source of the ResultName function, one case per result value."""
+    """The source of the GetResultName function, one case per result value."""
     names = Names(contract)
     result = next(item for header in contract["headers"] for item in header["items"]
                   if item["kind"] == "result")
-    function = names.function(result["name"] + "_name")
+    function = names.function("get_" + result["name"] + "_name")
     lines = [
         "// SPDX-License-Identifier: MIT",
         "// Copyright (c) 2026 Sirac Ozmen",
@@ -962,11 +975,11 @@ def emit_result_names(contract):
 
 
 def emit_diagnostic_texts(contract):
-    """The source of the DiagnosticText function: each diagnostic code's
+    """The source of the GetDiagnosticText function: each diagnostic code's
     doc, which is its text."""
     names = Names(contract)
     codes = find_item(contract, "diagnostic_code")
-    function = names.function("diagnostic_text")
+    function = names.function("get_diagnostic_text")
     lines = [
         "// SPDX-License-Identifier: MIT",
         "// Copyright (c) 2026 Sirac Ozmen",
@@ -1020,13 +1033,14 @@ def outputs(contract):
 
 
 def self_test(contract):
-    """Plants each case of the limits' codes in a copy of the contract:
-    whether validate refuses it, naming the member."""
+    """Plants each case of the limits' codes, and of a function's object,
+    in a copy of the contract: whether validate refuses it, naming the
+    member or the object."""
 
     def planted(change):
         made = copy.deepcopy(contract)
         items = {item["name"]: item for header in made["headers"] for item in header["items"]}
-        change(items["limits"], items["diagnostic_code"])
+        change(items["limits"], items["diagnostic_code"], items["pass_begin"])
         return made
 
     def member(name):
@@ -1038,29 +1052,35 @@ def self_test(contract):
 
     top = max(value["value"] for value in find_item(contract, "diagnostic_code")["values"])
     cases = [
-        ("as committed", lambda limits, codes: None, None),
+        ("as committed", lambda limits, codes, call: None, None),
         ("a new limit without a code",
-         lambda limits, codes: limits["members"].append(member("made_up")), "'made_up' has no"),
+         lambda limits, codes, call: limits["members"].append(member("made_up")), "'made_up' has no"),
         ("a new limit with its code",
-         lambda limits, codes: (limits["members"].append(member("made_up")),
+         lambda limits, codes, call: (limits["members"].append(member("made_up")),
                                 codes["values"].append(code("diagnostic_limit_made_up", top + 1))),
          None),
         ("a code for no limit",
-         lambda limits, codes: codes["values"].append(code("diagnostic_limit_made_up", top + 1)),
+         lambda limits, codes, call: codes["values"].append(code("diagnostic_limit_made_up", top + 1)),
          "'diagnostic_limit_made_up' names no member"),
         ("a code beside a reason",
-         lambda limits, codes: codes["values"].append(
+         lambda limits, codes, call: codes["values"].append(
              code("diagnostic_limit_color_attachments", top + 1)),
          "'color_attachments' has a code and a reason"),
         ("a reason for a limit gone",
-         lambda limits, codes: limits["members"].remove(
+         lambda limits, codes, call: limits["members"].remove(
              next(m for m in limits["members"] if m["name"] == "frames_in_flight")),
          "'frames_in_flight', which limits lacks"),
+        ("an object of no id or opaque kind",
+         lambda limits, codes, call: call.update(object="draw"), "its object 'draw'"),
+        ("an object that does not start the name",
+         lambda limits, codes, call: call.update(object="device"), "its object 'device'"),
+        ("a name that starts with the object's letters only",
+         lambda limits, codes, call: call.update(name="passes_begin"), "its object 'pass'"),
     ]
     wrong = 0
     for name, change, expected in cases:
         errors = [error for error in validate(planted(change))
-                  if "limits" in error or "diagnostic_limit_" in error]
+                  if "limits" in error or "diagnostic_limit_" in error or "its object" in error]
         right = not errors if expected is None else any(expected in e for e in errors)
         if not right:
             print(f"self-test: {name}: {errors or 'taken'}", file=sys.stderr)

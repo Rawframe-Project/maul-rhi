@@ -50,7 +50,7 @@ static void TestMakeAndDestroy(void)
     CHECK(mrhiDestroyQuerySet(device, (mrhiQuerySetId){0, 0}) == mrhi_errorStale, "the null id");
     CHECK(mrhiDestroyQuerySet(nullptr, b) == mrhi_errorInvalid, "no device");
     CHECK(mrhiDestroyQuerySet(device, b) == mrhi_success, "b destroyed");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "no misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "no misuse");
     Close(device);
 }
 
@@ -76,7 +76,7 @@ static void TestInvalidDefs(void)
     CHECK(mrhiCreateQuerySet(device, nullptr, &set) == mrhi_errorInvalid, "no def");
     CHECK(mrhiCreateQuerySet(device, &def, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiCreateQuerySet(nullptr, &def, &set) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetDeviceMisuse(device) == 7, "each counted on the device");
+    CHECK(mrhiDevice_GetMisuse(device) == 7, "each counted on the device");
     def = Def(mrhi_queryTimestamp, 1);
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorUnsupported,
           "timestamps without the feature");
@@ -91,7 +91,7 @@ static void TestInvalidDefs(void)
     def.labelLength = 9;
     def.next = nullptr;
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_success, "a labeled set");
-    CHECK(mrhiGetDeviceMisuse(device) == 7, "neither counted");
+    CHECK(mrhiDevice_GetMisuse(device) == 7, "neither counted");
     Close(device);
 }
 
@@ -104,7 +104,7 @@ static void TestStateAndLimits(void)
     mrhiQuerySetId c;
     CHECK(mrhiCreateQuerySet(device, &three, &a) == mrhi_errorState, "not ready yet");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(s_instance, &record) == mrhi_success, "ready");
+    CHECK(mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success, "ready");
     mrhiQuerySetDef nine = Def(mrhi_queryOcclusion, 9);
     CHECK(mrhiCreateQuerySet(device, &nine, &a) == mrhi_errorCapacity, "more than the device");
     CHECK(mrhiCreateQuerySet(device, &three, &a) == mrhi_success, "queries 0 to 2");
@@ -125,7 +125,7 @@ static void TestStateAndLimits(void)
     CHECK(mrhiCreateQuerySet(device, &eight, &a) == mrhi_success, "all eight");
     mrhiQuerySetDef one = mrhiDefaultQuerySetDef();
     CHECK(mrhiCreateQuerySet(device, &one, &b) == mrhi_errorCapacity, "none left");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "no misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "no misuse");
     Close(device);
 }
 
@@ -243,7 +243,7 @@ static mrhiPassDef RenderDef(mrhiResourceId target, mrhiQuerySetId set)
 static mrhiResourceId BeginFrame(void)
 {
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     mrhiResourceId target = {0};
     CHECK(mrhiImportTexture(s_device, s_target, &target) == mrhi_success &&
               mrhiImportBuffer(s_device, s_results, &s_r) == mrhi_success,
@@ -262,15 +262,15 @@ static void Frame(mrhiQuerySetId set)
     def.accesses = &results;
     def.accessCount = 1;
     CHECK(mrhiAddPass(s_device, &def, &s_compute) == mrhi_success, "the compute pass");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
-    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
-              mrhiBeginPass(s_device, s_compute) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_Begin(s_device, s_render) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_compute) == mrhi_success,
           "begun");
 }
 
 static void Drop(void)
 {
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 // The n-th record of a pass, walking its chunks: or NULL past them.
@@ -305,14 +305,14 @@ static void TestPassSets(void)
     def.neverCull = true;
     def.occlusionQuerySet = occlusion;
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a pass without targets");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 2, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 2, "each counted");
     def = RenderDef(target, gone);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorStale, "a destroyed set");
     def.depthTarget.resource = target;
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorStale, "stale before the targets");
     def = RenderDef(target, occlusion);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "an occlusion set");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 2, "the stale ones not counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 2, "the stale ones not counted");
     Drop();
     Close(s_device);
 }
@@ -322,43 +322,43 @@ static void TestOcclusion(void)
     OpenFrames(1u << 20);
     mrhiQuerySetId set = MakeSet(mrhi_queryOcclusion, 4);
     Frame(set);
-    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 2) == mrhi_success, "begun");
+    CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_render, 2) == mrhi_success, "begun");
     const mrhiCommand* command = Nth(s_render, 0);
     CHECK(command != nullptr && command->type == mrhiCommandBeginOcclusionQuery &&
               command->b == s_device->querySetSlots[set.index1 - 1].handle && command->a == 2,
           "recorded with the set's handle");
-    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 3) == mrhi_errorInvalid, "one open");
-    CHECK(mrhiEndPass(s_device, s_render) == mrhi_errorInvalid, "no end while open");
-    CHECK(mrhiEndOcclusionQuery(s_device, s_render) == mrhi_success, "ended");
+    CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_render, 3) == mrhi_errorInvalid, "one open");
+    CHECK(mrhiPass_End(s_device, s_render) == mrhi_errorInvalid, "no end while open");
+    CHECK(mrhiPass_EndOcclusionQuery(s_device, s_render) == mrhi_success, "ended");
     command = Nth(s_render, 1);
     CHECK(command != nullptr && command->type == mrhiCommandEndOcclusionQuery, "recorded");
-    CHECK(mrhiEndOcclusionQuery(s_device, s_render) == mrhi_errorInvalid, "none open");
-    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 2) == mrhi_errorInvalid,
+    CHECK(mrhiPass_EndOcclusionQuery(s_device, s_render) == mrhi_errorInvalid, "none open");
+    CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_render, 2) == mrhi_errorInvalid,
           "written this frame");
-    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 4) == mrhi_errorInvalid, "past the set");
-    CHECK(mrhiBeginOcclusionQuery(s_device, s_compute, 0) == mrhi_errorInvalid &&
-              mrhiEndOcclusionQuery(s_device, s_compute) == mrhi_errorInvalid,
+    CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_render, 4) == mrhi_errorInvalid, "past the set");
+    CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_compute, 0) == mrhi_errorInvalid &&
+              mrhiPass_EndOcclusionQuery(s_device, s_compute) == mrhi_errorInvalid,
           "a pass without a set");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 7, "each counted");
-    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 3) == mrhi_success &&
-              mrhiEndOcclusionQuery(s_device, s_render) == mrhi_success,
+    CHECK(mrhiDevice_GetMisuse(s_device) == 7, "each counted");
+    CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_render, 3) == mrhi_success &&
+              mrhiPass_EndOcclusionQuery(s_device, s_render) == mrhi_success,
           "another query");
     CHECK(Nth(s_render, 4) == nullptr, "the refused ones recorded nothing");
-    CHECK(mrhiBeginOcclusionQuery(nullptr, s_render, 0) == mrhi_errorInvalid &&
-              mrhiEndOcclusionQuery(nullptr, s_render) == mrhi_errorInvalid,
+    CHECK(mrhiPass_BeginOcclusionQuery(nullptr, s_render, 0) == mrhi_errorInvalid &&
+              mrhiPass_EndOcclusionQuery(nullptr, s_render) == mrhi_errorInvalid,
           "no device");
-    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success, "the pass ended");
-    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 0) == mrhi_errorState &&
-              mrhiEndOcclusionQuery(s_device, s_render) == mrhi_errorState,
+    CHECK(mrhiPass_End(s_device, s_render) == mrhi_success, "the pass ended");
+    CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_render, 0) == mrhi_errorState &&
+              mrhiPass_EndOcclusionQuery(s_device, s_render) == mrhi_errorState,
           "not recording");
     Drop();
     Frame(set);
-    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 2) == mrhi_success &&
-              mrhiEndOcclusionQuery(s_device, s_render) == mrhi_success,
+    CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_render, 2) == mrhi_success &&
+              mrhiPass_EndOcclusionQuery(s_device, s_render) == mrhi_success,
           "written again in the next frame");
     CHECK(mrhiDestroyQuerySet(s_device, set) == mrhi_success, "destroyed while recording");
-    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 0) == mrhi_errorStale, "stale");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 7, "neither counted");
+    CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_render, 0) == mrhi_errorStale, "stale");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 7, "neither counted");
     Drop();
     Close(s_device);
 }
@@ -377,15 +377,15 @@ static void TestSetsApart(void)
     CHECK(mrhiAddPass(s_device, &def, &a) == mrhi_success, "a pass on the first set");
     def.occlusionQuerySet = second;
     CHECK(mrhiAddPass(s_device, &def, &b) == mrhi_success, "one on the second");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
-              mrhiBeginPass(s_device, a) == mrhi_success &&
-              mrhiBeginPass(s_device, b) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, a) == mrhi_success &&
+              mrhiPass_Begin(s_device, b) == mrhi_success,
           "begun");
-    CHECK(mrhiBeginOcclusionQuery(s_device, b, 0) == mrhi_success &&
-              mrhiBeginOcclusionQuery(s_device, a, 0) == mrhi_success,
+    CHECK(mrhiPass_BeginOcclusionQuery(s_device, b, 0) == mrhi_success &&
+              mrhiPass_BeginOcclusionQuery(s_device, a, 0) == mrhi_success,
           "query 0 of each");
-    CHECK(mrhiEndOcclusionQuery(s_device, a) == mrhi_success &&
-              mrhiEndOcclusionQuery(s_device, b) == mrhi_success,
+    CHECK(mrhiPass_EndOcclusionQuery(s_device, a) == mrhi_success &&
+              mrhiPass_EndOcclusionQuery(s_device, b) == mrhi_success,
           "ended");
     Drop();
     Close(s_device);
@@ -462,13 +462,13 @@ static void TestTimestamps(void)
     def.occlusionQuerySet = occlusion;
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "an occlusion set refused");
     misuse += 2;
-    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == misuse, "each counted");
     def = TimedDef(gone, 5, 6);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorStale, "a destroyed set");
     def = TimedDef(set, 6, 7);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success,
           "queries a refused pass named, unwritten");
-    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "the stale one not counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == misuse, "the stale one not counted");
     Drop();
     BeginFrame();
     def = TimedDef(set, 0, 1);
@@ -482,24 +482,24 @@ static void TestPeriod(void)
     s_adapter.timestampPeriod = 83.333;
     OpenFrames(1u << 20);
     double period = 0.0;
-    CHECK(mrhiGetDeviceTimestampPeriod(s_device, &period) == mrhi_success && period == 83.333,
+    CHECK(mrhiDevice_GetTimestampPeriod(s_device, &period) == mrhi_success && period == 83.333,
           "the driver's period");
-    CHECK(mrhiGetDeviceTimestampPeriod(s_device, nullptr) == mrhi_errorInvalid &&
-              mrhiGetDeviceMisuse(s_device) == 1,
+    CHECK(mrhiDevice_GetTimestampPeriod(s_device, nullptr) == mrhi_errorInvalid &&
+              mrhiDevice_GetMisuse(s_device) == 1,
           "no out, counted");
-    CHECK(mrhiGetDeviceTimestampPeriod(nullptr, &period) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiDevice_GetTimestampPeriod(nullptr, &period) == mrhi_errorInvalid, "no device");
     Close(s_device);
     s_adapter.timestampPeriod = 0.0;
     OpenFrames(1u << 20);
-    CHECK(mrhiGetDeviceTimestampPeriod(s_device, &period) == mrhi_success && period == 1.0,
+    CHECK(mrhiDevice_GetTimestampPeriod(s_device, &period) == mrhi_success && period == 1.0,
           "nanoseconds when the driver says none");
     Close(s_device);
     mrhiDevice* device = Open(1, 1, false, true);
-    CHECK(mrhiGetDeviceTimestampPeriod(device, &period) == mrhi_errorUnsupported,
+    CHECK(mrhiDevice_GetTimestampPeriod(device, &period) == mrhi_errorUnsupported,
           "a device without timestamps");
     Close(device);
     device = Open(1, 1, true, false);
-    CHECK(mrhiGetDeviceTimestampPeriod(device, &period) == mrhi_errorState, "not ready yet");
+    CHECK(mrhiDevice_GetTimestampPeriod(device, &period) == mrhi_errorState, "not ready yet");
     Close(device);
 }
 
@@ -550,15 +550,15 @@ static void TestResolveAccess(void)
     access.kind = 11;
     access.resource = declared;
     CHECK(mrhiAddPass(s_device, &def, &refused) == mrhi_errorInvalid, "a kind past it");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 6, "each counted");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 6, "each counted");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     mrhiResourcePlan plan;
-    CHECK(mrhiGetResourcePlan(s_device, declared, &plan) == mrhi_success &&
+    CHECK(mrhiResource_GetPlan(s_device, declared, &plan) == mrhi_success &&
               plan.usage == (mrhi_bufferQueryResolve | mrhi_bufferCopySource),
           "the transient's usage");
     mrhiBarrier barriers[8];
     size_t count = 0;
-    CHECK(mrhiGetFrameBarriers(s_device, barriers, 8, &count) == mrhi_success, "barriers");
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, barriers, 8, &count) == mrhi_success, "barriers");
     bool found = false;
     for (size_t i = 0; i < count; ++i)
     {
@@ -577,52 +577,53 @@ static void TestResolve(void)
     mrhiQuerySetId other = MakeSet(mrhi_queryOcclusion, 8);
     mrhiQuerySetId set = MakeSet(mrhi_queryOcclusion, 64);
     Frame(set);
-    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 64, s_r, 0) == mrhi_success,
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, set, 0, 64, s_r, 0) == mrhi_success,
           "every query");
     const mrhiCommand* command = Nth(s_compute, 0);
     CHECK(command != nullptr && command->type == mrhiCommandResolveQueries &&
               command->b == s_device->querySetSlots[set.index1 - 1].handle &&
               command->c == 0 + (64ull << 32) && command->a == s_r.index1 && command->d == 0,
           "recorded");
-    CHECK(mrhiResolveQueries(s_device, s_compute, set, 63, 1, s_r, 768) == mrhi_success,
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, set, 63, 1, s_r, 768) == mrhi_success,
           "the last into the last 256 bytes");
     command = Nth(s_compute, 1);
     CHECK(command != nullptr && command->c == 63 + (1ull << 32) && command->d == 768,
           "recorded with its first query and offset");
-    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 32, s_r, 768) == mrhi_success &&
-              mrhiResolveQueries(s_device, s_compute, set, 0, 0, s_r, 1024) == mrhi_success,
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, set, 0, 32, s_r, 768) == mrhi_success &&
+              mrhiPass_ResolveQueries(s_device, s_compute, set, 0, 0, s_r, 1024) == mrhi_success,
           "the buffer's end");
-    CHECK(mrhiResolveQueries(s_device, s_compute, other, 0, 8, s_r, 0) == mrhi_success,
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, other, 0, 8, s_r, 0) == mrhi_success,
           "another set");
     uint32_t misuse = 0;
-    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 33, s_r, 768) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, set, 0, 33, s_r, 768) == mrhi_errorInvalid,
           "a value past the buffer");
-    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 0, s_r, 1280) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, set, 0, 0, s_r, 1280) == mrhi_errorInvalid,
           "an offset past it");
-    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 1, s_r, 128) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, set, 0, 1, s_r, 128) == mrhi_errorInvalid,
           "an offset off 256");
-    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 65, s_r, 0) == mrhi_errorInvalid &&
-              mrhiResolveQueries(s_device, s_compute, set, 60, 5, s_r, 0) == mrhi_errorInvalid &&
-              mrhiResolveQueries(s_device, s_compute, set, 1, UINT32_MAX, s_r, 0) ==
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, set, 0, 65, s_r, 0) == mrhi_errorInvalid &&
+              mrhiPass_ResolveQueries(s_device, s_compute, set, 60, 5, s_r, 0) ==
+                  mrhi_errorInvalid &&
+              mrhiPass_ResolveQueries(s_device, s_compute, set, 1, UINT32_MAX, s_r, 0) ==
                   mrhi_errorInvalid,
           "queries past the set");
-    CHECK(mrhiResolveQueries(s_device, s_compute, set, 64, 0, s_r, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, set, 64, 0, s_r, 0) == mrhi_errorInvalid,
           "a first query at its end");
-    CHECK(mrhiResolveQueries(s_device, s_render, set, 0, 1, s_r, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ResolveQueries(s_device, s_render, set, 0, 1, s_r, 0) == mrhi_errorInvalid,
           "a pass with targets");
     misuse += 8;
-    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == misuse, "each counted");
     CHECK(mrhiDestroyQuerySet(s_device, other) == mrhi_success &&
-              mrhiResolveQueries(s_device, s_compute, other, 0, 1, s_r, 0) == mrhi_errorStale,
+              mrhiPass_ResolveQueries(s_device, s_compute, other, 0, 1, s_r, 0) == mrhi_errorStale,
           "a destroyed set");
     mrhiResourceId none = {0};
-    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 1, none, 0) == mrhi_errorStale,
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, set, 0, 1, none, 0) == mrhi_errorStale,
           "no resource");
-    CHECK(mrhiResolveQueries(nullptr, s_compute, set, 0, 1, s_r, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ResolveQueries(nullptr, s_compute, set, 0, 1, s_r, 0) == mrhi_errorInvalid,
           "no device");
-    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "none counted");
-    CHECK(mrhiEndPass(s_device, s_compute) == mrhi_success &&
-              mrhiResolveQueries(s_device, s_compute, set, 0, 1, s_r, 0) == mrhi_errorState,
+    CHECK(mrhiDevice_GetMisuse(s_device) == misuse, "none counted");
+    CHECK(mrhiPass_End(s_device, s_compute) == mrhi_success &&
+              mrhiPass_ResolveQueries(s_device, s_compute, set, 0, 1, s_r, 0) == mrhi_errorState,
           "not recording");
     Drop();
     // A pass that does not declare the buffer, one of async compute, and
@@ -647,20 +648,20 @@ static void TestResolve(void)
     def.accessCount = 0;
     mrhiPassId async;
     CHECK(mrhiAddPass(s_device, &def, &async) == mrhi_success, "an async compute pass");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
-              mrhiBeginPass(s_device, bare) == mrhi_success &&
-              mrhiBeginPass(s_device, drawing) == mrhi_success &&
-              mrhiBeginPass(s_device, copying) == mrhi_success &&
-              mrhiBeginPass(s_device, async) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, bare) == mrhi_success &&
+              mrhiPass_Begin(s_device, drawing) == mrhi_success &&
+              mrhiPass_Begin(s_device, copying) == mrhi_success &&
+              mrhiPass_Begin(s_device, async) == mrhi_success,
           "begun");
-    CHECK(mrhiResolveQueries(s_device, bare, set, 0, 0, s_r, 0) == mrhi_errorInvalid &&
-              mrhiResolveQueries(s_device, copying, set, 0, 1, s_r, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ResolveQueries(s_device, bare, set, 0, 0, s_r, 0) == mrhi_errorInvalid &&
+              mrhiPass_ResolveQueries(s_device, copying, set, 0, 1, s_r, 0) == mrhi_errorInvalid,
           "not declared for resolves");
-    CHECK(mrhiResolveQueries(s_device, async, set, 0, 1, s_r, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ResolveQueries(s_device, async, set, 0, 1, s_r, 0) == mrhi_errorInvalid,
           "async compute");
-    CHECK(mrhiResolveQueries(s_device, drawing, set, 0, 0, s_r, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ResolveQueries(s_device, drawing, set, 0, 0, s_r, 0) == mrhi_errorInvalid,
           "a render pass declaring it");
-    CHECK(mrhiGetDeviceMisuse(s_device) == misuse + 4, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == misuse + 4, "each counted");
     Drop();
     Close(s_device);
 }
@@ -673,19 +674,19 @@ static void TestOcclusionCapacity(void)
     Frame(set);
     for (uint32_t i = 0; i < 63; ++i)
     {
-        CHECK(mrhiBeginOcclusionQuery(s_device, s_render, i) == mrhi_success &&
-                  mrhiEndOcclusionQuery(s_device, s_render) == mrhi_success,
+        CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_render, i) == mrhi_success &&
+                  mrhiPass_EndOcclusionQuery(s_device, s_render) == mrhi_success,
               "fits");
     }
-    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 63) == mrhi_success, "the last record");
-    CHECK(mrhiEndOcclusionQuery(s_device, s_render) == mrhi_errorCapacity, "full");
-    CHECK(mrhiBeginOcclusionQuery(s_device, s_render, 64) == mrhi_errorCapacity &&
-              mrhiEndOcclusionQuery(s_device, s_render) == mrhi_errorCapacity,
+    CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_render, 63) == mrhi_success, "the last record");
+    CHECK(mrhiPass_EndOcclusionQuery(s_device, s_render) == mrhi_errorCapacity, "full");
+    CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_render, 64) == mrhi_errorCapacity &&
+              mrhiPass_EndOcclusionQuery(s_device, s_render) == mrhi_errorCapacity,
           "still full");
-    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success, "the pass ends");
-    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 1, s_r, 0) == mrhi_errorCapacity,
+    CHECK(mrhiPass_End(s_device, s_render) == mrhi_success, "the pass ends");
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, set, 0, 1, s_r, 0) == mrhi_errorCapacity,
           "a resolve too");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "no misuse");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "no misuse");
     Drop();
     Close(s_device);
 }
@@ -700,60 +701,61 @@ static void TestStatistics(void)
     mrhiQuerySetId set = MakeSet(mrhi_queryPipelineStatistics, 4);
     uint64_t handle = s_device->querySetSlots[set.index1 - 1].handle;
     Frame(occlusion);
-    CHECK(mrhiBeginStatisticsQuery(s_device, s_render, set, 1) == mrhi_success &&
-              mrhiBeginOcclusionQuery(s_device, s_render, 0) == mrhi_success,
+    CHECK(mrhiPass_BeginStatisticsQuery(s_device, s_render, set, 1) == mrhi_success &&
+              mrhiPass_BeginOcclusionQuery(s_device, s_render, 0) == mrhi_success,
           "begun beside an occlusion query");
     const mrhiCommand* command = Nth(s_render, 0);
     CHECK(command != nullptr && command->type == mrhiCommandBeginStatisticsQuery &&
               command->a == 1 && command->b == handle,
           "recorded with the set's handle");
     uint32_t misuse = 0;
-    CHECK(mrhiBeginStatisticsQuery(s_device, s_render, set, 2) == mrhi_errorInvalid, "one open");
-    CHECK(mrhiEndOcclusionQuery(s_device, s_render) == mrhi_success &&
-              mrhiEndPass(s_device, s_render) == mrhi_errorInvalid,
+    CHECK(mrhiPass_BeginStatisticsQuery(s_device, s_render, set, 2) == mrhi_errorInvalid,
+          "one open");
+    CHECK(mrhiPass_EndOcclusionQuery(s_device, s_render) == mrhi_success &&
+              mrhiPass_End(s_device, s_render) == mrhi_errorInvalid,
           "no end while open");
     misuse += 2;
-    CHECK(mrhiEndStatisticsQuery(s_device, s_render) == mrhi_success, "ended");
+    CHECK(mrhiPass_EndStatisticsQuery(s_device, s_render) == mrhi_success, "ended");
     command = Nth(s_render, 3);
     CHECK(command != nullptr && command->type == mrhiCommandEndStatisticsQuery && command->a == 1 &&
               command->b == handle,
           "recorded with its query");
-    CHECK(mrhiEndStatisticsQuery(s_device, s_render) == mrhi_errorInvalid, "none open");
-    CHECK(mrhiBeginStatisticsQuery(s_device, s_compute, set, 1) == mrhi_errorInvalid,
+    CHECK(mrhiPass_EndStatisticsQuery(s_device, s_render) == mrhi_errorInvalid, "none open");
+    CHECK(mrhiPass_BeginStatisticsQuery(s_device, s_compute, set, 1) == mrhi_errorInvalid,
           "written this frame");
-    CHECK(mrhiBeginStatisticsQuery(s_device, s_compute, set, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_BeginStatisticsQuery(s_device, s_compute, set, 4) == mrhi_errorInvalid,
           "past the set");
-    CHECK(mrhiBeginStatisticsQuery(s_device, s_compute, occlusion, 3) == mrhi_errorInvalid,
+    CHECK(mrhiPass_BeginStatisticsQuery(s_device, s_compute, occlusion, 3) == mrhi_errorInvalid,
           "an occlusion set");
     misuse += 4;
-    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == misuse, "each counted");
     CHECK(Nth(s_render, 4) == nullptr, "the refused ones recorded nothing");
-    CHECK(mrhiBeginStatisticsQuery(s_device, s_compute, set, 0) == mrhi_success &&
-              mrhiEndStatisticsQuery(s_device, s_compute) == mrhi_success,
+    CHECK(mrhiPass_BeginStatisticsQuery(s_device, s_compute, set, 0) == mrhi_success &&
+              mrhiPass_EndStatisticsQuery(s_device, s_compute) == mrhi_success,
           "in a pass without targets");
-    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success, "the render pass ended");
-    CHECK(mrhiBeginStatisticsQuery(s_device, s_render, set, 2) == mrhi_errorState &&
-              mrhiEndStatisticsQuery(s_device, s_render) == mrhi_errorState,
+    CHECK(mrhiPass_End(s_device, s_render) == mrhi_success, "the render pass ended");
+    CHECK(mrhiPass_BeginStatisticsQuery(s_device, s_render, set, 2) == mrhi_errorState &&
+              mrhiPass_EndStatisticsQuery(s_device, s_render) == mrhi_errorState,
           "not recording");
-    CHECK(mrhiBeginStatisticsQuery(nullptr, s_compute, set, 2) == mrhi_errorInvalid &&
-              mrhiEndStatisticsQuery(nullptr, s_compute) == mrhi_errorInvalid,
+    CHECK(mrhiPass_BeginStatisticsQuery(nullptr, s_compute, set, 2) == mrhi_errorInvalid &&
+              mrhiPass_EndStatisticsQuery(nullptr, s_compute) == mrhi_errorInvalid,
           "no device");
-    CHECK(mrhiResolveQueries(s_device, s_compute, set, 0, 4, s_r, 0) == mrhi_success &&
-              mrhiResolveQueries(s_device, s_compute, set, 2, 2, s_r, 768) == mrhi_success,
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, set, 0, 4, s_r, 0) == mrhi_success &&
+              mrhiPass_ResolveQueries(s_device, s_compute, set, 2, 2, s_r, 768) == mrhi_success,
           "88 bytes a query");
-    CHECK(mrhiResolveQueries(s_device, s_compute, set, 1, 3, s_r, 768) == mrhi_errorInvalid,
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, set, 1, 3, s_r, 768) == mrhi_errorInvalid,
           "not three in the last 256 bytes");
     misuse += 1;
-    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == misuse, "counted");
     Drop();
     Frame(occlusion);
-    CHECK(mrhiBeginStatisticsQuery(s_device, s_render, set, 1) == mrhi_success &&
-              mrhiEndStatisticsQuery(s_device, s_render) == mrhi_success,
+    CHECK(mrhiPass_BeginStatisticsQuery(s_device, s_render, set, 1) == mrhi_success &&
+              mrhiPass_EndStatisticsQuery(s_device, s_render) == mrhi_success,
           "written again in the next frame");
     CHECK(mrhiDestroyQuerySet(s_device, set) == mrhi_success &&
-              mrhiBeginStatisticsQuery(s_device, s_compute, set, 0) == mrhi_errorStale,
+              mrhiPass_BeginStatisticsQuery(s_device, s_compute, set, 0) == mrhi_errorStale,
           "a destroyed set");
-    CHECK(mrhiGetDeviceMisuse(s_device) == misuse, "not counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == misuse, "not counted");
     Drop();
     Close(s_device);
 }
@@ -783,14 +785,14 @@ static void TestStatisticsPasses(void)
     CHECK(mrhiAddPass(s_device, &def, &passes[1]) == mrhi_success, "async compute");
     def.passClass = mrhi_passTransfer;
     CHECK(mrhiAddPass(s_device, &def, &passes[2]) == mrhi_success, "transfers");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     for (uint32_t i = 0; i < 3; ++i)
     {
-        CHECK(mrhiBeginPass(s_device, passes[i]) == mrhi_success &&
-                  mrhiBeginStatisticsQuery(s_device, passes[i], set, i) == mrhi_errorInvalid,
+        CHECK(mrhiPass_Begin(s_device, passes[i]) == mrhi_success &&
+                  mrhiPass_BeginStatisticsQuery(s_device, passes[i], set, i) == mrhi_errorInvalid,
               "refused");
     }
-    CHECK(mrhiGetDeviceMisuse(s_device) == 3, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 3, "each counted");
     Drop();
     Close(s_device);
 }

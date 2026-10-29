@@ -60,9 +60,9 @@ static mrhiAdapterId FindAdapter(mrhiInstance* instance)
     mrhiInstanceNotification record;
     mrhiAdapterId adapter = {0};
     size_t count = 0;
-    CHECK(mrhiRequestAdapters(instance, &search, &request) == mrhi_success &&
-              mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
-              mrhiGetAdapters(instance, &adapter, 1, &count) == mrhi_success && count == 1,
+    CHECK(mrhiInstance_RequestAdapters(instance, &search, &request) == mrhi_success &&
+              mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
+              mrhiInstance_GetAdapters(instance, &adapter, 1, &count) == mrhi_success && count == 1,
           "one adapter");
     return adapter;
 }
@@ -74,7 +74,7 @@ static void TestAccepted(void)
     CHECK(Create(&external, &instance) == mrhi_success, "taken");
     mrhiAdapterId adapter = FindAdapter(instance);
     mrhiAdapterInfo info;
-    CHECK(mrhiGetAdapterInfo(instance, adapter, &info) == mrhi_success &&
+    CHECK(mrhiAdapter_GetInfo(instance, adapter, &info) == mrhi_success &&
               info.driver == mrhi_driverExternal && info.kind == mrhi_adapterDiscrete,
           "reported as external");
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
@@ -83,7 +83,7 @@ static void TestAccepted(void)
     mrhiRequestId request;
     mrhiInstanceNotification record;
     CHECK(mrhiCreateDevice(instance, &deviceDef, &device, &request) == mrhi_success &&
-              mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+              mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
               record.outcome == mrhi_success,
           "a device on it");
     mrhiDestroyDevice(device);
@@ -157,7 +157,7 @@ static void TestDeviceHandshake(void)
               "refused");
     }
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_empty,
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_empty,
           "the refused devices' answers dropped");
     mrhiDestroyInstance(instance);
 }
@@ -210,13 +210,14 @@ static void TestOwnSources(void)
     mrhiSurfaceId surface = {0};
     CHECK(MakeSurface(instance, &own.chain, &surface) == mrhi_success, "its own source");
     mrhiSurfaceCaps caps;
-    CHECK(mrhiGetSurfaceCaps(instance, surface, adapter, &caps) == mrhi_success && caps.presentable,
+    CHECK(mrhiSurface_GetCaps(instance, surface, adapter, &caps) == mrhi_success &&
+              caps.presentable,
           "presenting there");
     CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "destroyed");
     own.chain.type = MRHI_STRUCT_DRIVER_DEFINED | 2u;
     CHECK(MakeSurface(instance, &own.chain, &surface) == mrhi_errorUnsupported,
           "one the driver cannot use");
-    uint64_t misuse = mrhiGetInstanceMisuse(instance);
+    uint64_t misuse = mrhiInstance_GetMisuse(instance);
     own.chain.type = OWN_SOURCE | 0x80000000u;
     CHECK(MakeSurface(instance, &own.chain, &surface) == mrhi_errorInvalid,
           "a hint, skipped: no source");
@@ -224,7 +225,7 @@ static void TestOwnSources(void)
     OwnSource second = {.chain = {.next = nullptr, .type = OWN_SOURCE | 2u}};
     own.chain.next = &second.chain;
     CHECK(MakeSurface(instance, &own.chain, &surface) == mrhi_errorInvalid, "two sources");
-    CHECK(mrhiGetInstanceMisuse(instance) == misuse + 2, "both counted");
+    CHECK(mrhiInstance_GetMisuse(instance) == misuse + 2, "both counted");
     mrhiDestroyInstance(instance);
     // The test driver's own instance knows no driver-defined struct.
     mrhiTestDriverDef test = {

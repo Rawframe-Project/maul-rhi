@@ -30,13 +30,13 @@ static void Open(bool sampling)
 static void Begin(void)
 {
     mrhiFrameDef def = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &def) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &def) == mrhi_success, "begun");
 }
 
 static void Submit(void)
 {
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
 }
 
 static mrhiTextureId MakeTexture(mrhiTextureUsage usage)
@@ -100,8 +100,9 @@ static size_t s_count;
 
 static void Compile(void)
 {
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
-    CHECK(mrhiGetFrameBarriers(s_device, s_barriers, 16, &s_count) == mrhi_success && s_count <= 16,
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, s_barriers, 16, &s_count) == mrhi_success &&
+              s_count <= 16,
           "barriers read");
 }
 
@@ -127,24 +128,24 @@ static void TestRefusals(void)
     mrhiTextureId texture = MakeTexture(mrhi_textureSampled);
     Begin();
     mrhiResourceId imported = ImportTexture(texture);
-    CHECK(mrhiSealResource(s_device, imported) == mrhi_errorUnsupported &&
-              mrhiUnsealResource(s_device, imported) == mrhi_errorUnsupported,
+    CHECK(mrhiResource_Seal(s_device, imported) == mrhi_errorUnsupported &&
+              mrhiResource_Unseal(s_device, imported) == mrhi_errorUnsupported,
           "not without bindless sampling");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Close(s_device);
 
     Open(true);
     texture = MakeTexture(mrhi_textureSampled);
     mrhiTextureId unsampled = MakeTexture(mrhi_textureCopyDestination);
-    CHECK(mrhiSealResource(nullptr, imported) == mrhi_errorInvalid &&
-              mrhiUnsealResource(nullptr, imported) == mrhi_errorInvalid,
+    CHECK(mrhiResource_Seal(nullptr, imported) == mrhi_errorInvalid &&
+              mrhiResource_Unseal(nullptr, imported) == mrhi_errorInvalid,
           "no device");
-    CHECK(mrhiSealResource(s_device, imported) == mrhi_errorState &&
-              mrhiUnsealResource(s_device, imported) == mrhi_errorState,
+    CHECK(mrhiResource_Seal(s_device, imported) == mrhi_errorState &&
+              mrhiResource_Unseal(s_device, imported) == mrhi_errorState,
           "no frame open");
     Begin();
-    CHECK(mrhiSealResource(s_device, imported) == mrhi_errorStale &&
-              mrhiUnsealResource(s_device, imported) == mrhi_errorStale,
+    CHECK(mrhiResource_Seal(s_device, imported) == mrhi_errorStale &&
+              mrhiResource_Unseal(s_device, imported) == mrhi_errorStale,
           "a resource of another frame");
     mrhiTextureDef def = mrhiDefaultTextureDef();
     def.format = mrhi_formatRgba8Unorm;
@@ -152,25 +153,25 @@ static void TestRefusals(void)
     def.height = 4;
     mrhiResourceId declared = {0};
     CHECK(mrhiDeclareTexture(s_device, &def, &declared) == mrhi_success, "declared");
-    CHECK(mrhiSealResource(s_device, declared) == mrhi_errorInvalid &&
-              mrhiUnsealResource(s_device, declared) == mrhi_errorInvalid,
+    CHECK(mrhiResource_Seal(s_device, declared) == mrhi_errorInvalid &&
+              mrhiResource_Unseal(s_device, declared) == mrhi_errorInvalid,
           "not what the frame made");
     mrhiResourceId plain = ImportTexture(unsampled);
-    CHECK(mrhiSealResource(s_device, plain) == mrhi_errorInvalid, "a texture sealed is sampled");
-    CHECK(mrhiUnsealResource(s_device, plain) == mrhi_success, "unsealing an unsealed one");
+    CHECK(mrhiResource_Seal(s_device, plain) == mrhi_errorInvalid, "a texture sealed is sampled");
+    CHECK(mrhiResource_Unseal(s_device, plain) == mrhi_success, "unsealing an unsealed one");
     mrhiTextureId doomed = MakeTexture(mrhi_textureSampled);
     mrhiResourceId gone = ImportTexture(doomed);
     CHECK(mrhiDestroyTexture(s_device, doomed) == mrhi_success, "its texture destroyed");
-    CHECK(mrhiSealResource(s_device, gone) == mrhi_errorStale &&
-              mrhiUnsealResource(s_device, gone) == mrhi_errorStale,
+    CHECK(mrhiResource_Seal(s_device, gone) == mrhi_errorStale &&
+              mrhiResource_Unseal(s_device, gone) == mrhi_errorStale,
           "its object gone");
     imported = ImportTexture(texture);
-    CHECK(mrhiSealResource(s_device, imported) == mrhi_success, "sealed");
+    CHECK(mrhiResource_Seal(s_device, imported) == mrhi_success, "sealed");
     Compile();
-    CHECK(mrhiSealResource(s_device, imported) == mrhi_errorState &&
-              mrhiUnsealResource(s_device, imported) == mrhi_errorState,
+    CHECK(mrhiResource_Seal(s_device, imported) == mrhi_errorState &&
+              mrhiResource_Unseal(s_device, imported) == mrhi_errorState,
           "not once compiled");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Close(s_device);
 }
 
@@ -184,8 +185,8 @@ static void TestSealedTexture(void)
     Begin();
     mrhiResourceId resource = ImportTexture(texture);
     CHECK(Use(resource, mrhi_accessCopyDestination, mrhi_passTransfer) == mrhi_success, "uploaded");
-    CHECK(mrhiSealResource(s_device, resource) == mrhi_success &&
-              mrhiSealResource(s_device, resource) == mrhi_success,
+    CHECK(mrhiResource_Seal(s_device, resource) == mrhi_success &&
+              mrhiResource_Seal(s_device, resource) == mrhi_success,
           "sealed, twice");
     CHECK(Use(resource, mrhi_accessCopySource, mrhi_passTransfer) == mrhi_success,
           "a later pass of the sealing frame takes any use");
@@ -227,7 +228,7 @@ static void TestSealedBuffer(void)
         MakeBuffer(mrhi_bufferUniform | mrhi_bufferStorage | mrhi_bufferVertex | mrhi_bufferIndex |
                    mrhi_bufferIndirect | mrhi_bufferCopySource | mrhi_bufferCopyDestination);
     Begin();
-    CHECK(mrhiSealResource(s_device, ImportBuffer(buffer)) == mrhi_success, "sealed");
+    CHECK(mrhiResource_Seal(s_device, ImportBuffer(buffer)) == mrhi_success, "sealed");
     Compile();
     // The new buffer is cleared first, so a heap reading it sealed reads
     // zeros; a buffer's first use takes no barrier.
@@ -263,14 +264,14 @@ static void TestUnseal(void)
     Open(true);
     mrhiTextureId texture = MakeTexture(mrhi_textureSampled | mrhi_textureCopyDestination);
     Begin();
-    CHECK(mrhiSealResource(s_device, ImportTexture(texture)) == mrhi_success, "sealed");
+    CHECK(mrhiResource_Seal(s_device, ImportTexture(texture)) == mrhi_success, "sealed");
     Compile();
     Submit();
 
     Begin();
     mrhiResourceId resource = ImportTexture(texture);
     CHECK(Use(resource, mrhi_accessSampled, mrhi_passGraphics) == mrhi_success, "read sealed");
-    CHECK(mrhiUnsealResource(s_device, resource) == mrhi_success &&
+    CHECK(mrhiResource_Unseal(s_device, resource) == mrhi_success &&
               Use(resource, mrhi_accessCopyDestination, mrhi_passTransfer) == mrhi_success,
           "written once unsealed");
     Compile();
@@ -282,8 +283,8 @@ static void TestUnseal(void)
     resource = ImportTexture(texture);
     CHECK(Use(resource, mrhi_accessCopyDestination, mrhi_passTransfer) == mrhi_success,
           "tracked again");
-    CHECK(mrhiSealResource(s_device, resource) == mrhi_success &&
-              mrhiUnsealResource(s_device, resource) == mrhi_success,
+    CHECK(mrhiResource_Seal(s_device, resource) == mrhi_success &&
+              mrhiResource_Unseal(s_device, resource) == mrhi_success,
           "sealed, then unsealed");
     Compile();
     CHECK(s_count == 1 && Moves(0, 2, mrhi_stateCopyDestination, mrhi_stateCopyDestination),
@@ -292,13 +293,13 @@ static void TestUnseal(void)
 
     Begin();
     resource = ImportTexture(texture);
-    CHECK(mrhiSealResource(s_device, resource) == mrhi_success, "sealed");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "then dropped");
+    CHECK(mrhiResource_Seal(s_device, resource) == mrhi_success, "sealed");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "then dropped");
     Begin();
     resource = ImportTexture(texture);
     CHECK(Use(resource, mrhi_accessCopyDestination, mrhi_passTransfer) == mrhi_success,
           "a dropped frame seals nothing");
-    CHECK(mrhiSealResource(s_device, resource) == mrhi_success, "sealed");
+    CHECK(mrhiResource_Seal(s_device, resource) == mrhi_success, "sealed");
     Compile();
     CHECK(s_count == 2 && Moves(0, 2, mrhi_stateCopyDestination, mrhi_stateCopyDestination) &&
               Moves(1, END, mrhi_stateCopyDestination, mrhi_stateSealed),
@@ -307,8 +308,8 @@ static void TestUnseal(void)
 
     Begin();
     resource = ImportTexture(texture);
-    CHECK(mrhiUnsealResource(s_device, resource) == mrhi_success &&
-              mrhiSealResource(s_device, resource) == mrhi_success,
+    CHECK(mrhiResource_Unseal(s_device, resource) == mrhi_success &&
+              mrhiResource_Seal(s_device, resource) == mrhi_success,
           "unsealed, then sealed");
     CHECK(Use(resource, mrhi_accessCopyDestination, mrhi_passTransfer) == mrhi_success,
           "written while tracked");

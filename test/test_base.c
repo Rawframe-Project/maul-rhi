@@ -40,9 +40,9 @@ static void TestResultNames(void)
     };
     for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i)
     {
-        CHECK(strcmp(mrhiResultName(names[i].result), names[i].name) == 0, names[i].name);
+        CHECK(strcmp(mrhiGetResultName(names[i].result), names[i].name) == 0, names[i].name);
     }
-    CHECK(strcmp(mrhiResultName(12345), "unknown result") == 0, "unknown name");
+    CHECK(strcmp(mrhiGetResultName(12345), "unknown result") == 0, "unknown name");
 }
 
 // The family's numbering: the shared errors at their values, so a raw
@@ -62,7 +62,7 @@ static void TestResultValues(void)
     };
     for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i)
     {
-        CHECK(values[i].result == values[i].value, mrhiResultName(values[i].result));
+        CHECK(values[i].result == values[i].value, mrhiGetResultName(values[i].result));
     }
 }
 

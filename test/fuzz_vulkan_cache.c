@@ -82,7 +82,7 @@ static void MakePipeline(void)
     mrhiRequestId request = {0};
     mrhiDeviceNotification record;
     Expect(mrhiCreateComputePipeline(s_device, &def, &pipeline, &request) == mrhi_success &&
-           mrhiNextDeviceNotification(s_device, &record) == mrhi_success &&
+           mrhiDevice_TakeNotification(s_device, &record) == mrhi_success &&
            record.outcome == mrhi_success);
 }
 
@@ -96,23 +96,25 @@ static void Open(void)
     mrhiInstanceNotification record;
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     size_t count = 0;
-    if (mrhiRequestAdapters(s_instance, &search, &request) != mrhi_success ||
-        mrhiNextInstanceNotification(s_instance, &record) != mrhi_success ||
-        mrhiGetAdapters(s_instance, &deviceDef.adapter, 1, &count) != mrhi_success || count == 0)
+    if (mrhiInstance_RequestAdapters(s_instance, &search, &request) != mrhi_success ||
+        mrhiInstance_TakeNotification(s_instance, &record) != mrhi_success ||
+        mrhiInstance_GetAdapters(s_instance, &deviceDef.adapter, 1, &count) != mrhi_success ||
+        count == 0)
     {
         fputs("fuzz_vulkan_cache: no Vulkan adapter, so nothing to fuzz here\n", stderr);
         // hygiene: no adapter is exit 77, which CI fails and check.sh skips
         exit(77);
     }
     Expect(mrhiCreateDevice(s_instance, &deviceDef, &s_device, &request) == mrhi_success &&
-           mrhiNextInstanceNotification(s_instance, &record) == mrhi_success &&
+           mrhiInstance_TakeNotification(s_instance, &record) == mrhi_success &&
            record.outcome == mrhi_success);
     MakePipeline();
     size_t size = 0;
-    Expect(mrhiGetPipelineCache(s_device, nullptr, 0, &size) == mrhi_success &&
+    Expect(mrhiDevice_GetPipelineCache(s_device, nullptr, 0, &size) == mrhi_success &&
            size >= ENVELOPE_BYTES + HEADER_BYTES);
     uint8_t* cache = malloc(size);
-    Expect(cache != nullptr && mrhiGetPipelineCache(s_device, cache, size, &size) == mrhi_success);
+    Expect(cache != nullptr &&
+           mrhiDevice_GetPipelineCache(s_device, cache, size, &size) == mrhi_success);
     memcpy(s_envelope, cache, ENVELOPE_BYTES);
     memcpy(s_header, cache + ENVELOPE_BYTES, HEADER_BYTES);
     s_payloadSize = size - ENVELOPE_BYTES;
@@ -203,7 +205,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     if (status == mrhi_success)
     {
         size_t exported = 0;
-        Expect(mrhiGetPipelineCache(s_device, nullptr, 0, &exported) == mrhi_success &&
+        Expect(mrhiDevice_GetPipelineCache(s_device, nullptr, 0, &exported) == mrhi_success &&
                exported >= ENVELOPE_BYTES + HEADER_BYTES);
     }
     free(bytes);

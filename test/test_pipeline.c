@@ -65,7 +65,7 @@ static mrhiComputePipelineDef Def(mrhiShaderId shader, const char* entry)
 static mrhiDeviceNotification Next(mrhiDevice* device)
 {
     mrhiDeviceNotification record = {0};
-    CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_success, "a record");
+    CHECK(mrhiDevice_TakeNotification(device, &record) == mrhi_success, "a record");
     return record;
 }
 
@@ -86,7 +86,7 @@ static void TestCreate(void)
     CHECK(record.kind == mrhi_devicePipelineReady && record.request.index1 == request.index1 &&
               record.request.generation == request.generation && record.outcome == mrhi_success,
           "answered ready");
-    CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_empty, "once");
+    CHECK(mrhiDevice_TakeNotification(device, &record) == mrhi_empty, "once");
     mrhiComputePipelineId second = {0};
     mrhiRequestId next = {0};
     CHECK(mrhiCreateComputePipeline(device, &def, &second, &next) == mrhi_success &&
@@ -97,7 +97,7 @@ static void TestCreate(void)
     CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success, "destroyed");
     CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_errorStale, "its id has ended");
     CHECK(mrhiDestroyComputePipeline(nullptr, second) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "no misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "no misuse");
     // The second is still live: the device destroys it, and the
     // reflection with it.
     Close(device);
@@ -113,20 +113,20 @@ static void TestWait(void)
     Reset();
     mrhiShaderId shader = Shader(device);
     mrhiComputePipelineDef def = Def(shader, "cs");
-    CHECK(mrhiWaitDeviceNotification(device, 0) == mrhi_empty, "nothing owed");
+    CHECK(mrhiDevice_WaitNotification(device, 0) == mrhi_empty, "nothing owed");
     mrhiComputePipelineId pipeline = {0};
     mrhiRequestId request = {0};
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_success,
           "a pipeline, pending");
-    CHECK(mrhiWaitDeviceNotification(device, UINT64_MAX) == mrhi_success, "woken by its answer");
-    CHECK(mrhiWaitDeviceNotification(device, 0) == mrhi_success, "still there, not taken");
+    CHECK(mrhiDevice_WaitNotification(device, UINT64_MAX) == mrhi_success, "woken by its answer");
+    CHECK(mrhiDevice_WaitNotification(device, 0) == mrhi_success, "still there, not taken");
     mrhiDeviceNotification record = Next(device);
     CHECK(record.kind == mrhi_devicePipelineReady && record.request.index1 == request.index1,
           "the pipeline's answer");
-    CHECK(mrhiWaitDeviceNotification(device, UINT64_MAX) == mrhi_empty,
+    CHECK(mrhiDevice_WaitNotification(device, UINT64_MAX) == mrhi_empty,
           "nothing owed again, at once");
-    CHECK(mrhiWaitDeviceNotification(nullptr, 0) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "no misuse");
+    CHECK(mrhiDevice_WaitNotification(nullptr, 0) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "no misuse");
     CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
               mrhiDestroyShader(device, shader) == mrhi_success,
           "destroyed");
@@ -140,8 +140,8 @@ static void TestRequestsShared(void)
     mrhiShaderId shader = Shader(device);
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
     mrhiRequestId token = {0};
-    CHECK(mrhiBeginFrame(device, &frameDef) == mrhi_success &&
-              mrhiSubmitFrame(device, &token) == mrhi_success,
+    CHECK(mrhiDevice_BeginFrame(device, &frameDef) == mrhi_success &&
+              mrhiDevice_SubmitFrame(device, &token) == mrhi_success,
           "a frame");
     mrhiComputePipelineDef def = Def(shader, "cs");
     mrhiComputePipelineId pipeline;
@@ -149,13 +149,14 @@ static void TestRequestsShared(void)
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_success &&
               request.index1 == token.index1 + 1,
           "the pipeline's request follows the frame's token");
-    CHECK(mrhiBeginFrame(device, &frameDef) == mrhi_success &&
-              mrhiSubmitFrame(device, &token) == mrhi_success && token.index1 == request.index1 + 1,
+    CHECK(mrhiDevice_BeginFrame(device, &frameDef) == mrhi_success &&
+              mrhiDevice_SubmitFrame(device, &token) == mrhi_success &&
+              token.index1 == request.index1 + 1,
           "and the next frame's token follows it");
     uint32_t pipelines = 0;
     uint32_t frames = 0;
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
         pipelines += record.kind == mrhi_devicePipelineReady ? 1 : 0;
         frames += record.kind == mrhi_deviceFrameDone ? 1 : 0;
@@ -194,7 +195,7 @@ static void TestInvalid(void)
     def.entryLength = 2;
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorInvalid,
           "no name with a length");
-    CHECK(mrhiGetDeviceMisuse(device) == 7, "each counted");
+    CHECK(mrhiDevice_GetMisuse(device) == 7, "each counted");
     // An entry the shader lacks is bad data, which a correct program can
     // meet in a shader from content.
     const char* entries[] = {"vs", "fs", "c", "css", ""};
@@ -221,8 +222,8 @@ static void TestInvalid(void)
           "no shader");
     CHECK(mrhiDestroyComputePipeline(device, (mrhiComputePipelineId){1, 1}) == mrhi_errorStale,
           "a pipeline never made");
-    CHECK(mrhiGetDeviceMisuse(device) == 7, "other refusals are not misuse");
-    CHECK(mrhiNextDeviceNotification(device, &(mrhiDeviceNotification){0}) == mrhi_empty,
+    CHECK(mrhiDevice_GetMisuse(device) == 7, "other refusals are not misuse");
+    CHECK(mrhiDevice_TakeNotification(device, &(mrhiDeviceNotification){0}) == mrhi_empty,
           "nothing started");
     Close(device);
 }
@@ -310,7 +311,7 @@ static void TestPendingAndOutcome(void)
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_success, "made");
     CHECK(Next(device).outcome == mrhi_errorPlatform, "failed in the driver");
     CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success, "a failed one destroyed");
-    CHECK(mrhiNextDeviceNotification(device, &(mrhiDeviceNotification){0}) == mrhi_empty,
+    CHECK(mrhiDevice_TakeNotification(device, &(mrhiDeviceNotification){0}) == mrhi_empty,
           "without a second answer");
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_success, "again");
     CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success, "destroyed pending");
@@ -318,7 +319,7 @@ static void TestPendingAndOutcome(void)
     CHECK(record.kind == mrhi_devicePipelineReady && record.request.index1 == request.index1 &&
               record.outcome == mrhi_errorStale,
           "answered stale at once");
-    CHECK(mrhiNextDeviceNotification(device, &record) == mrhi_empty, "and never by the driver");
+    CHECK(mrhiDevice_TakeNotification(device, &record) == mrhi_empty, "and never by the driver");
     Close(device);
     s_adapter.pipelineOutcome = mrhi_success;
     device = Open(4, 1, true);
@@ -350,10 +351,10 @@ static void TestRoomAndLimits(void)
           "a third has no room");
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
     mrhiRequestId token;
-    CHECK(mrhiBeginFrame(device, &frameDef) == mrhi_success &&
-              mrhiSubmitFrame(device, &token) == mrhi_errorCapacity,
+    CHECK(mrhiDevice_BeginFrame(device, &frameDef) == mrhi_success &&
+              mrhiDevice_SubmitFrame(device, &token) == mrhi_errorCapacity,
           "nor a frame");
-    CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(device) == mrhi_success, "dropped");
     // Beginning the frame took both answers in, so the queue is full.
     CHECK(mrhiDestroyComputePipeline(device, pipelines[0]) == mrhi_success,
           "a ready one destroyed, answering nothing");
@@ -393,7 +394,7 @@ static void TestStateAndFailure(void)
     def = Def(Shader(device), "cs");
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorPlatform,
           "the driver fails at once");
-    CHECK(mrhiNextDeviceNotification(device, &(mrhiDeviceNotification){0}) == mrhi_empty,
+    CHECK(mrhiDevice_TakeNotification(device, &(mrhiDeviceNotification){0}) == mrhi_empty,
           "nothing to answer");
     s_adapter.objectsBeforeFailure = 0;
     Close(device);
@@ -451,7 +452,7 @@ static void TestBadData(void)
     def.constantCount = sizeof(s_oversized) / sizeof(s_oversized[0]);
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorFormat,
           "an oversized list, by its length");
-    CHECK(mrhiGetDeviceMisuse(device) == 0, "none is misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "none is misuse");
     Close(device);
 }
 

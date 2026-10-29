@@ -121,7 +121,7 @@ static mrhiAccess Access(uint32_t resource, mrhiAccessKind kind)
 static void BeginFrame(void)
 {
     mrhiFrameDef def = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &def) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &def) == mrhi_success, "begun");
     for (uint32_t i = 0; i < RESOURCES; ++i)
     {
         mrhiResult status = i < 2 ? mrhiImportBuffer(s_device, s_buffers[i], &s_r[i])
@@ -144,15 +144,15 @@ static void Passes(const mrhiAccess* accesses, uint32_t count)
     def.colorTargets[0] = (mrhiColorTarget){.resource = s_r[TARGET], .load = mrhi_loadClear};
     def.colorTargetCount = 1;
     CHECK(mrhiAddPass(s_device, &def, &s_render) == mrhi_success, "a render pass");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
-    CHECK(mrhiBeginPass(s_device, s_pass) == mrhi_success &&
-              mrhiBeginPass(s_device, s_render) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_Begin(s_device, s_pass) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_render) == mrhi_success,
           "begun");
 }
 
 static void Drop(void)
 {
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 // The n-th record of the pass: or NULL past its records.
@@ -186,7 +186,7 @@ static mrhiDiagnosticCode Refusal(void)
 {
     mrhiDiagnosticCode code = 0;
     mrhiDiagnostic record;
-    while (mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success)
+    while (mrhiDevice_TakeDiagnostic(s_device, &record) == mrhi_success)
     {
         code = record.code;
     }
@@ -204,8 +204,8 @@ static void TestClears(void)
     Passes(accesses, 2);
     mrhiResourceId from = s_r[SOURCE];
     mrhiResourceId to = s_r[DESTINATION];
-    CHECK(mrhiClearBuffer(s_device, s_pass, to, 8, 16) == mrhi_success &&
-              mrhiClearBuffer(s_device, s_pass, to, 4000, MRHI_WHOLE_SIZE) == mrhi_success,
+    CHECK(mrhiPass_ClearBuffer(s_device, s_pass, to, 8, 16) == mrhi_success &&
+              mrhiPass_ClearBuffer(s_device, s_pass, to, 4000, MRHI_WHOLE_SIZE) == mrhi_success,
           "cleared");
     const mrhiCommand* first = Nth(0);
     const mrhiCommand* second = Nth(1);
@@ -213,33 +213,34 @@ static void TestClears(void)
               first->a == to.index1 && first->c == 8 && first->d == 16,
           "recorded");
     CHECK(second != nullptr && second->c == 4000 && second->d == 96, "the rest resolved");
-    CHECK(mrhiClearBuffer(s_device, s_pass, to, 4096, MRHI_WHOLE_SIZE) == mrhi_success &&
-              mrhiClearBuffer(s_device, s_pass, to, 0, 0) == mrhi_success && Nth(2) == nullptr,
+    CHECK(mrhiPass_ClearBuffer(s_device, s_pass, to, 4096, MRHI_WHOLE_SIZE) == mrhi_success &&
+              mrhiPass_ClearBuffer(s_device, s_pass, to, 0, 0) == mrhi_success && Nth(2) == nullptr,
           "nothing recorded for an empty clear");
-    CHECK(mrhiClearBuffer(s_device, s_pass, to, 2, 4) == mrhi_errorInvalid &&
-              mrhiClearBuffer(s_device, s_pass, to, 0, 6) == mrhi_errorInvalid &&
+    CHECK(mrhiPass_ClearBuffer(s_device, s_pass, to, 2, 4) == mrhi_errorInvalid &&
+              mrhiPass_ClearBuffer(s_device, s_pass, to, 0, 6) == mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticTransferAlignment,
           "an offset or size not a multiple of 4");
-    CHECK(mrhiClearBuffer(s_device, s_pass, to, 8, 4092) == mrhi_errorInvalid &&
-              mrhiClearBuffer(s_device, s_pass, to, 4100, MRHI_WHOLE_SIZE) == mrhi_errorInvalid &&
-              mrhiClearBuffer(s_device, s_pass, to, UINT64_MAX - 3, 8) == mrhi_errorInvalid &&
+    CHECK(mrhiPass_ClearBuffer(s_device, s_pass, to, 8, 4092) == mrhi_errorInvalid &&
+              mrhiPass_ClearBuffer(s_device, s_pass, to, 4100, MRHI_WHOLE_SIZE) ==
+                  mrhi_errorInvalid &&
+              mrhiPass_ClearBuffer(s_device, s_pass, to, UINT64_MAX - 3, 8) == mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticTransferRange,
           "past the end");
-    CHECK(mrhiClearBuffer(s_device, s_pass, from, 0, 4) == mrhi_errorInvalid &&
+    CHECK(mrhiPass_ClearBuffer(s_device, s_pass, from, 0, 4) == mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticUndeclaredAccess,
           "a buffer declared only as a copy source");
-    CHECK(mrhiClearBuffer(s_device, s_pass, s_r[ARRAY], 0, 4) == mrhi_errorInvalid &&
+    CHECK(mrhiPass_ClearBuffer(s_device, s_pass, s_r[ARRAY], 0, 4) == mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticResourceKind,
           "a texture");
-    CHECK(mrhiClearBuffer(s_device, s_render, to, 0, 4) == mrhi_errorInvalid &&
+    CHECK(mrhiPass_ClearBuffer(s_device, s_render, to, 0, 4) == mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticTransferInRenderPass,
           "a pass with targets");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 8, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 8, "each counted");
     mrhiResourceId none = {0};
-    CHECK(mrhiClearBuffer(s_device, s_pass, none, 0, 4) == mrhi_errorStale, "none");
-    CHECK(mrhiClearBuffer(nullptr, s_pass, to, 0, 4) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiEndPass(s_device, s_pass) == mrhi_success &&
-              mrhiClearBuffer(s_device, s_pass, to, 0, 4) == mrhi_errorState,
+    CHECK(mrhiPass_ClearBuffer(s_device, s_pass, none, 0, 4) == mrhi_errorStale, "none");
+    CHECK(mrhiPass_ClearBuffer(nullptr, s_pass, to, 0, 4) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiPass_End(s_device, s_pass) == mrhi_success &&
+              mrhiPass_ClearBuffer(s_device, s_pass, to, 0, 4) == mrhi_errorState,
           "not recording");
     Drop();
     CloseDevice();
@@ -256,7 +257,7 @@ static void TestBuffers(void)
     Passes(accesses, 2);
     mrhiResourceId from = s_r[SOURCE];
     mrhiResourceId to = s_r[DESTINATION];
-    CHECK(mrhiCopyBuffer(s_device, s_pass, from, 4, to, 8, 4088) == mrhi_success, "copied");
+    CHECK(mrhiPass_CopyBuffer(s_device, s_pass, from, 4, to, 8, 4088) == mrhi_success, "copied");
     const mrhiCommand* command = Nth(0);
     const mrhiCommandBufferSide* source = (const mrhiCommandBufferSide*)Nth(1);
     const mrhiCommandBufferSide* destination = (const mrhiCommandBufferSide*)Nth(2);
@@ -264,39 +265,41 @@ static void TestBuffers(void)
               command->b == 4088 && source->object == from.index1 && source->offset == 4 &&
               destination->object == to.index1 && destination->offset == 8,
           "recorded with both sides");
-    CHECK(mrhiCopyBuffer(s_device, s_pass, from, 0, to, 0, 0) == mrhi_success, "nothing");
-    CHECK(mrhiCopyBuffer(s_device, s_pass, from, 0, to, 0, 6) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyBuffer(s_device, s_pass, from, 0, to, 0, 0) == mrhi_success, "nothing");
+    CHECK(mrhiPass_CopyBuffer(s_device, s_pass, from, 0, to, 0, 6) == mrhi_errorInvalid,
           "a size not a multiple of 4");
-    CHECK(mrhiCopyBuffer(s_device, s_pass, from, 2, to, 0, 4) == mrhi_errorInvalid &&
-              mrhiCopyBuffer(s_device, s_pass, from, 0, to, 2, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyBuffer(s_device, s_pass, from, 2, to, 0, 4) == mrhi_errorInvalid &&
+              mrhiPass_CopyBuffer(s_device, s_pass, from, 0, to, 2, 4) == mrhi_errorInvalid,
           "an offset not a multiple of 4");
-    CHECK(mrhiCopyBuffer(s_device, s_pass, from, 8, to, 0, 4092) == mrhi_errorInvalid &&
-              mrhiCopyBuffer(s_device, s_pass, from, 0, to, 8, 4092) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyBuffer(s_device, s_pass, from, 8, to, 0, 4092) == mrhi_errorInvalid &&
+              mrhiPass_CopyBuffer(s_device, s_pass, from, 0, to, 8, 4092) == mrhi_errorInvalid,
           "past either end");
-    CHECK(mrhiCopyBuffer(s_device, s_pass, from, 4100, to, 0, 0) == mrhi_errorInvalid &&
-              mrhiCopyBuffer(s_device, s_pass, from, 0, to, 4100, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyBuffer(s_device, s_pass, from, 4100, to, 0, 0) == mrhi_errorInvalid &&
+              mrhiPass_CopyBuffer(s_device, s_pass, from, 0, to, 4100, 0) == mrhi_errorInvalid,
           "starting past either");
-    CHECK(mrhiCopyBuffer(s_device, s_pass, from, UINT64_MAX - 3, to, 0, 8) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyBuffer(s_device, s_pass, from, UINT64_MAX - 3, to, 0, 8) ==
+              mrhi_errorInvalid,
           "wrapping");
-    CHECK(mrhiCopyBuffer(s_device, s_pass, to, 0, from, 0, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyBuffer(s_device, s_pass, to, 0, from, 0, 4) == mrhi_errorInvalid,
           "each the other way than declared");
-    CHECK(mrhiCopyBuffer(s_device, s_pass, from, 0, from, 0, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyBuffer(s_device, s_pass, from, 0, from, 0, 4) == mrhi_errorInvalid,
           "one buffer as both");
-    CHECK(mrhiCopyBuffer(s_device, s_pass, to, 0, to, 0, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyBuffer(s_device, s_pass, to, 0, to, 0, 4) == mrhi_errorInvalid,
           "a buffer not declared as a source");
-    CHECK(mrhiCopyBuffer(s_device, s_pass, s_r[ARRAY], 0, to, 0, 4) == mrhi_errorInvalid &&
-              mrhiCopyBuffer(s_device, s_pass, from, 0, s_r[ARRAY], 0, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyBuffer(s_device, s_pass, s_r[ARRAY], 0, to, 0, 4) == mrhi_errorInvalid &&
+              mrhiPass_CopyBuffer(s_device, s_pass, from, 0, s_r[ARRAY], 0, 4) == mrhi_errorInvalid,
           "a texture");
-    CHECK(mrhiCopyBuffer(s_device, s_render, from, 0, to, 0, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyBuffer(s_device, s_render, from, 0, to, 0, 4) == mrhi_errorInvalid,
           "a pass with targets");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 14, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 14, "each counted");
     mrhiResourceId none = {0};
-    CHECK(mrhiCopyBuffer(s_device, s_pass, none, 0, to, 0, 4) == mrhi_errorStale &&
-              mrhiCopyBuffer(s_device, s_pass, from, 0, none, 0, 4) == mrhi_errorStale,
+    CHECK(mrhiPass_CopyBuffer(s_device, s_pass, none, 0, to, 0, 4) == mrhi_errorStale &&
+              mrhiPass_CopyBuffer(s_device, s_pass, from, 0, none, 0, 4) == mrhi_errorStale,
           "none");
-    CHECK(mrhiCopyBuffer(nullptr, s_pass, from, 0, to, 0, 4) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiEndPass(s_device, s_pass) == mrhi_success &&
-              mrhiCopyBuffer(s_device, s_pass, from, 0, to, 0, 4) == mrhi_errorState,
+    CHECK(mrhiPass_CopyBuffer(nullptr, s_pass, from, 0, to, 0, 4) == mrhi_errorInvalid,
+          "no device");
+    CHECK(mrhiPass_End(s_device, s_pass) == mrhi_success &&
+              mrhiPass_CopyBuffer(s_device, s_pass, from, 0, to, 0, 4) == mrhi_errorState,
           "not recording");
     Drop();
     // A texture declared as a copy source, whose slot a buffer's shares.
@@ -306,7 +309,7 @@ static void TestBuffers(void)
         Access(DESTINATION, mrhi_accessCopyDestination),
     };
     Passes(texture, 2);
-    CHECK(mrhiCopyBuffer(s_device, s_pass, s_r[ARRAY], 0, s_r[DESTINATION], 0, 4) ==
+    CHECK(mrhiPass_CopyBuffer(s_device, s_pass, s_r[ARRAY], 0, s_r[DESTINATION], 0, 4) ==
               mrhi_errorInvalid,
           "a texture as a buffer");
     Drop();
@@ -317,12 +320,12 @@ static void TestBuffers(void)
 // the layout: the result.
 static mrhiResult Upload(mrhiBufferCopy buffer, mrhiTextureCopy texture, mrhiExtent3d size)
 {
-    return mrhiCopyBufferToTexture(s_device, s_pass, &buffer, &texture, &size);
+    return mrhiPass_CopyBufferToTexture(s_device, s_pass, &buffer, &texture, &size);
 }
 
 static mrhiResult Download(mrhiTextureCopy texture, mrhiBufferCopy buffer, mrhiExtent3d size)
 {
-    return mrhiCopyTextureToBuffer(s_device, s_pass, &texture, &buffer, &size);
+    return mrhiPass_CopyTextureToBuffer(s_device, s_pass, &texture, &buffer, &size);
 }
 
 // A pass declaring the buffers as source and destination, and a texture
@@ -389,7 +392,7 @@ static void TestLayouts(void)
     CHECK(Upload(Buffer(SOURCE, 4, 256, 0), Texture(ARRAY, 0, 1), one) == mrhi_success, "on them");
     // The fifth copy: four of three records before it, then its command.
     CHECK(((const mrhiCommandBufferSide*)Nth(4 * 3 + 1))->offset == 4, "recorded at them");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 10, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 10, "each counted");
     Drop();
     Declare(WIDE, mrhi_accessCopyDestination, ALL);
     mrhiExtent3d wide = {128, 2, 1};
@@ -443,7 +446,7 @@ static void TestRegions(void)
     CHECK(Download(Texture(ARRAY, 0, 1), Buffer(DESTINATION, 0, 256, 0),
                    (mrhiExtent3d){16, 8, 1}) == mrhi_errorInvalid,
           "a texture declared as a destination copied from");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 10, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 10, "each counted");
     Drop();
     Declare(ARRAY, mrhi_accessCopySource, ALL);
     CHECK(Download(Texture(ARRAY, 1, 2), Buffer(DESTINATION, 256, 256, 0),
@@ -540,18 +543,20 @@ static void TestDepth(void)
               mrhi_errorInvalid,
           "nor without its layer");
     mrhiBufferCopy buffer = Buffer(DESTINATION, 0, 256, 0);
-    CHECK(mrhiCopyTextureToBuffer(s_device, s_pass, nullptr, &buffer, &whole) ==
+    CHECK(mrhiPass_CopyTextureToBuffer(s_device, s_pass, nullptr, &buffer, &whole) ==
                   mrhi_errorInvalid &&
-              mrhiCopyTextureToBuffer(s_device, s_pass, &depth, nullptr, &whole) ==
+              mrhiPass_CopyTextureToBuffer(s_device, s_pass, &depth, nullptr, &whole) ==
                   mrhi_errorInvalid &&
-              mrhiCopyTextureToBuffer(s_device, s_pass, &depth, &buffer, nullptr) ==
+              mrhiPass_CopyTextureToBuffer(s_device, s_pass, &depth, &buffer, nullptr) ==
                   mrhi_errorInvalid &&
-              mrhiCopyBufferToTexture(s_device, s_pass, &buffer, &depth, nullptr) ==
+              mrhiPass_CopyBufferToTexture(s_device, s_pass, &buffer, &depth, nullptr) ==
                   mrhi_errorInvalid,
           "NULL arguments");
-    CHECK(mrhiCopyTextureToBuffer(nullptr, s_pass, &depth, &buffer, &whole) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyTextureToBuffer(nullptr, s_pass, &depth, &buffer, &whole) ==
+              mrhi_errorInvalid,
           "no device");
-    CHECK(mrhiCopyTextureToBuffer(s_device, s_render, &depth, &buffer, &whole) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyTextureToBuffer(s_device, s_render, &depth, &buffer, &whole) ==
+              mrhi_errorInvalid,
           "a pass with targets");
     Drop();
     Declare(DEPTH, mrhi_accessCopyDestination, ALL);
@@ -606,7 +611,7 @@ static mrhiResult Between(uint32_t from, mrhiTextureAspect fromAspect, uint32_t 
     source.aspect = fromAspect;
     mrhiTextureCopy destination = Texture(to, 0, 0);
     destination.aspect = toAspect;
-    mrhiResult status = mrhiCopyTexture(s_device, s_pass, &source, &destination, &size);
+    mrhiResult status = mrhiPass_CopyTexture(s_device, s_pass, &source, &destination, &size);
     Drop();
     return status;
 }
@@ -628,7 +633,7 @@ static void TestTextures(void)
     source.x = 4;
     mrhiTextureCopy destination = Texture(ARRAY, 0, 2);
     mrhiExtent3d size = {12, 8, 1};
-    CHECK(mrhiCopyTexture(s_device, s_pass, &source, &destination, &size) == mrhi_success,
+    CHECK(mrhiPass_CopyTexture(s_device, s_pass, &source, &destination, &size) == mrhi_success,
           "one layer to another");
     const mrhiCommand* command = Nth(0);
     const mrhiCommandTextureSide* from = (const mrhiCommandTextureSide*)Nth(1);
@@ -638,35 +643,39 @@ static void TestTextures(void)
               to->object == s_r[ARRAY].index1,
           "recorded");
     size.width = 13;
-    CHECK(mrhiCopyTexture(s_device, s_pass, &source, &destination, &size) == mrhi_errorInvalid &&
+    CHECK(mrhiPass_CopyTexture(s_device, s_pass, &source, &destination, &size) ==
+                  mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticTextureRegion,
           "past the source");
     size.width = 12;
-    CHECK(mrhiCopyTexture(s_device, s_pass, &destination, &source, &size) == mrhi_errorInvalid &&
+    CHECK(mrhiPass_CopyTexture(s_device, s_pass, &destination, &source, &size) ==
+                  mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticUndeclaredAccess,
           "the other way than declared");
     mrhiTextureCopy layer1 = Texture(ARRAY, 0, 1);
-    CHECK(mrhiCopyTexture(s_device, s_pass, &layer1, &destination, &size) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyTexture(s_device, s_pass, &layer1, &destination, &size) == mrhi_errorInvalid,
           "from a layer declared as a destination");
     mrhiTextureCopy layer0 = Texture(ARRAY, 0, 0);
-    CHECK(mrhiCopyTexture(s_device, s_pass, &source, &layer0, &size) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyTexture(s_device, s_pass, &source, &layer0, &size) == mrhi_errorInvalid,
           "to a layer declared as a source");
-    CHECK(mrhiCopyTexture(s_device, s_pass, nullptr, &destination, &size) == mrhi_errorInvalid &&
-              mrhiCopyTexture(s_device, s_pass, &source, nullptr, &size) == mrhi_errorInvalid &&
-              mrhiCopyTexture(s_device, s_pass, &source, &destination, nullptr) ==
-                  mrhi_errorInvalid,
-          "NULL arguments");
-    CHECK(mrhiCopyTexture(s_device, s_render, &source, &destination, &size) == mrhi_errorInvalid,
+    CHECK(
+        mrhiPass_CopyTexture(s_device, s_pass, nullptr, &destination, &size) == mrhi_errorInvalid &&
+            mrhiPass_CopyTexture(s_device, s_pass, &source, nullptr, &size) == mrhi_errorInvalid &&
+            mrhiPass_CopyTexture(s_device, s_pass, &source, &destination, nullptr) ==
+                mrhi_errorInvalid,
+        "NULL arguments");
+    CHECK(mrhiPass_CopyTexture(s_device, s_render, &source, &destination, &size) ==
+              mrhi_errorInvalid,
           "a pass with targets");
     mrhiTextureCopy buffer = Texture(SOURCE, 0, 0);
-    CHECK(mrhiCopyTexture(s_device, s_pass, &buffer, &destination, &size) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyTexture(s_device, s_pass, &buffer, &destination, &size) == mrhi_errorInvalid,
           "a buffer");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 9, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 9, "each counted");
     mrhiTextureCopy none = {0};
-    CHECK(mrhiCopyTexture(s_device, s_pass, &none, &destination, &size) == mrhi_errorStale &&
-              mrhiCopyTexture(s_device, s_pass, &source, &none, &size) == mrhi_errorStale,
+    CHECK(mrhiPass_CopyTexture(s_device, s_pass, &none, &destination, &size) == mrhi_errorStale &&
+              mrhiPass_CopyTexture(s_device, s_pass, &source, &none, &size) == mrhi_errorStale,
           "none");
-    CHECK(mrhiCopyTexture(nullptr, s_pass, &source, &destination, &size) == mrhi_errorInvalid,
+    CHECK(mrhiPass_CopyTexture(nullptr, s_pass, &source, &destination, &size) == mrhi_errorInvalid,
           "no device");
     Drop();
     mrhiTextureAspect all = mrhi_aspectAll;
@@ -715,10 +724,10 @@ static void TestNeighbourDeclares(void)
     CHECK(mrhiAddPass(s_device, &def, &first) == mrhi_success, "a pass reading the source");
     def.accesses = &destination;
     CHECK(mrhiAddPass(s_device, &def, &second) == mrhi_success, "the next writing the destination");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
-              mrhiBeginPass(s_device, first) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, first) == mrhi_success,
           "compiled and begun");
-    CHECK(mrhiCopyBuffer(s_device, first, s_r[SOURCE], 0, s_r[DESTINATION], 0, 4) ==
+    CHECK(mrhiPass_CopyBuffer(s_device, first, s_r[SOURCE], 0, s_r[DESTINATION], 0, 4) ==
                   mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticUndeclaredAccess,
           "the destination undeclared in the first pass");
@@ -734,7 +743,7 @@ static void TestImportOrder(void)
     for (int backward = 0; backward < 2; ++backward)
     {
         mrhiFrameDef def = mrhiDefaultFrameDef();
-        CHECK(mrhiBeginFrame(s_device, &def) == mrhi_success, "begun");
+        CHECK(mrhiDevice_BeginFrame(s_device, &def) == mrhi_success, "begun");
         mrhiResourceId ids[RESOURCES] = {0};
         for (uint32_t n = 2; n < RESOURCES; ++n)
         {

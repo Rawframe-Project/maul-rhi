@@ -26,8 +26,8 @@ static mrhiInstance* Create(void)
     mrhiAdapterRequestDef request = mrhiDefaultAdapterRequestDef();
     mrhiRequestId id;
     mrhiInstanceNotification record;
-    CHECK(mrhiRequestAdapters(instance, &request, &id) == mrhi_success, "the search");
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success, "its answer");
+    CHECK(mrhiInstance_RequestAdapters(instance, &request, &id) == mrhi_success, "the search");
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success, "its answer");
     return instance;
 }
 
@@ -43,7 +43,7 @@ static mrhiTestAdapter Adapter(mrhiFeatures features)
 static mrhiFormatCaps Caps(mrhiInstance* instance, mrhiAdapterId adapter, mrhiFormat format)
 {
     mrhiFormatCaps caps = {0};
-    CHECK(mrhiGetFormatCaps(instance, adapter, format, &caps) == mrhi_success, "the caps");
+    CHECK(mrhiAdapter_GetFormatCaps(instance, adapter, format, &caps) == mrhi_success, "the caps");
     return caps;
 }
 
@@ -54,7 +54,8 @@ static void TestTheFloor(void)
     mrhiInstance* instance = Create();
     mrhiAdapterId adapter;
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, &adapter, 1, &count) == mrhi_success && count == 2, "two");
+    CHECK(mrhiInstance_GetAdapters(instance, &adapter, 1, &count) == mrhi_success && count == 2,
+          "two");
     mrhiFormatCaps rgba8 = Caps(instance, adapter, mrhi_formatRgba8Unorm);
     CHECK(rgba8.sampling && rgba8.filtering && rgba8.rendering && rgba8.blending && rgba8.storage &&
               rgba8.sampleCounts == 5,
@@ -84,7 +85,7 @@ static void TestFeaturesAdd(void)
     mrhiInstance* instance = Create();
     mrhiAdapterId adapter;
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, &adapter, 1, &count) == mrhi_success, "listed");
+    CHECK(mrhiInstance_GetAdapters(instance, &adapter, 1, &count) == mrhi_success, "listed");
     CHECK(Caps(instance, adapter, mrhi_formatR32Float).filtering &&
               Caps(instance, adapter, mrhi_formatRg32Float).filtering &&
               Caps(instance, adapter, mrhi_formatRgba32Float).filtering,
@@ -108,7 +109,7 @@ static bool ListedWith(mrhiFormat format, mrhiFormatCaps caps)
     mrhiInstance* instance = Create();
     mrhiAdapterId ids[2];
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, ids, 2, &count) == mrhi_success, "the listing");
+    CHECK(mrhiInstance_GetAdapters(instance, ids, 2, &count) == mrhi_success, "the listing");
     mrhiDestroyInstance(instance);
     return count == 2;
 }
@@ -144,18 +145,21 @@ static void TestRefusals(void)
     mrhiInstance* instance = Create();
     mrhiAdapterId adapter;
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, &adapter, 1, &count) == mrhi_success, "listed");
+    CHECK(mrhiInstance_GetAdapters(instance, &adapter, 1, &count) == mrhi_success, "listed");
     mrhiFormatCaps caps;
-    CHECK(mrhiGetFormatCaps(instance, adapter, mrhi_formatNone, &caps) == mrhi_errorInvalid,
+    CHECK(mrhiAdapter_GetFormatCaps(instance, adapter, mrhi_formatNone, &caps) == mrhi_errorInvalid,
           "no format");
-    CHECK(mrhiGetFormatCaps(instance, adapter, 999, &caps) == mrhi_errorInvalid, "unlisted");
-    CHECK(mrhiGetFormatCaps(instance, adapter, mrhi_formatR8Unorm, nullptr) == mrhi_errorInvalid,
+    CHECK(mrhiAdapter_GetFormatCaps(instance, adapter, 999, &caps) == mrhi_errorInvalid,
+          "unlisted");
+    CHECK(mrhiAdapter_GetFormatCaps(instance, adapter, mrhi_formatR8Unorm, nullptr) ==
+              mrhi_errorInvalid,
           "no out");
-    CHECK(mrhiGetInstanceMisuse(instance) == 3, "counted");
-    CHECK(mrhiGetFormatCaps(instance, (mrhiAdapterId){0, 0}, mrhi_formatR8Unorm, &caps) ==
+    CHECK(mrhiInstance_GetMisuse(instance) == 3, "counted");
+    CHECK(mrhiAdapter_GetFormatCaps(instance, (mrhiAdapterId){0, 0}, mrhi_formatR8Unorm, &caps) ==
               mrhi_errorStale,
           "a stale adapter");
-    CHECK(mrhiGetFormatCaps(nullptr, adapter, mrhi_formatR8Unorm, &caps) == mrhi_errorInvalid,
+    CHECK(mrhiAdapter_GetFormatCaps(nullptr, adapter, mrhi_formatR8Unorm, &caps) ==
+              mrhi_errorInvalid,
           "no instance");
     mrhiDestroyInstance(instance);
 }

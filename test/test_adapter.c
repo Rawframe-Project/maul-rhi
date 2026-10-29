@@ -51,12 +51,12 @@ static mrhiResult Find(mrhiInstance* instance, mrhiPowerPreference preference, b
     def.preference = preference;
     def.allowSoftware = software;
     mrhiRequestId request = {0};
-    CHECK(mrhiRequestAdapters(instance, &def, &request) == mrhi_success, "the request");
+    CHECK(mrhiInstance_RequestAdapters(instance, &def, &request) == mrhi_success, "the request");
     mrhiInstanceNotification record = {0};
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success, "an answer");
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success, "an answer");
     CHECK(record.kind == mrhi_instanceAdaptersFound, "an adapters record");
     CHECK(record.request.index1 == request.index1 && request.index1 != 0, "its request");
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_empty, "exactly one answer");
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_empty, "exactly one answer");
     return record.outcome;
 }
 
@@ -65,11 +65,11 @@ static void Listing(mrhiInstance* instance, char* letters)
 {
     mrhiAdapterId ids[4];
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, ids, 4, &count) == mrhi_success, "the listing");
+    CHECK(mrhiInstance_GetAdapters(instance, ids, 4, &count) == mrhi_success, "the listing");
     for (size_t i = 0; i < count && i < 4; ++i)
     {
         mrhiAdapterInfo info;
-        CHECK(mrhiGetAdapterInfo(instance, ids[i], &info) == mrhi_success, "an adapter's facts");
+        CHECK(mrhiAdapter_GetInfo(instance, ids[i], &info) == mrhi_success, "an adapter's facts");
         letters[i] = info.name[0];
     }
     letters[count < 4 ? count : 4] = '\0';
@@ -100,27 +100,30 @@ static void TestIdsStayAndGoStale(void)
     CHECK(Find(instance, mrhi_powerDefault, true) == mrhi_success, "the first search");
     mrhiAdapterId first[3];
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, first, 3, &count) == mrhi_success && count == 3, "three");
+    CHECK(mrhiInstance_GetAdapters(instance, first, 3, &count) == mrhi_success && count == 3,
+          "three");
     CHECK(Find(instance, mrhi_powerHigh, false) == mrhi_success, "the second search");
     mrhiAdapterId second[3];
-    CHECK(mrhiGetAdapters(instance, second, 3, &count) == mrhi_success && count == 2, "two");
+    CHECK(mrhiInstance_GetAdapters(instance, second, 3, &count) == mrhi_success && count == 2,
+          "two");
     CHECK(memcmp(&second[0], &first[2], sizeof(mrhiAdapterId)) == 0, "the discrete id stays");
     CHECK(memcmp(&second[1], &first[1], sizeof(mrhiAdapterId)) == 0, "the integrated id stays");
     mrhiAdapterInfo info;
-    CHECK(mrhiGetAdapterInfo(instance, first[0], &info) == mrhi_errorStale, "software is stale");
+    CHECK(mrhiAdapter_GetInfo(instance, first[0], &info) == mrhi_errorStale, "software is stale");
     CHECK(Find(instance, mrhi_powerDefault, true) == mrhi_success, "the third search");
     mrhiAdapterId third[3];
-    CHECK(mrhiGetAdapters(instance, third, 3, &count) == mrhi_success && count == 3, "three");
+    CHECK(mrhiInstance_GetAdapters(instance, third, 3, &count) == mrhi_success && count == 3,
+          "three");
     CHECK(third[0].index1 == first[0].index1 && third[0].generation != first[0].generation,
           "a found-again adapter is a new generation");
-    CHECK(mrhiGetAdapterInfo(instance, first[0], &info) == mrhi_errorStale,
+    CHECK(mrhiAdapter_GetInfo(instance, first[0], &info) == mrhi_errorStale,
           "its old id stays stale once the slot is back in use");
-    CHECK(mrhiGetAdapterInfo(instance, (mrhiAdapterId){0, 1}, &info) == mrhi_errorStale, "null");
-    CHECK(mrhiGetAdapterInfo(instance, (mrhiAdapterId){17, 1}, &info) == mrhi_errorStale,
+    CHECK(mrhiAdapter_GetInfo(instance, (mrhiAdapterId){0, 1}, &info) == mrhi_errorStale, "null");
+    CHECK(mrhiAdapter_GetInfo(instance, (mrhiAdapterId){17, 1}, &info) == mrhi_errorStale,
           "past the table");
-    CHECK(mrhiGetAdapterInfo(instance, (mrhiAdapterId){UINT32_MAX, 1}, &info) == mrhi_errorStale,
+    CHECK(mrhiAdapter_GetInfo(instance, (mrhiAdapterId){UINT32_MAX, 1}, &info) == mrhi_errorStale,
           "far past the table");
-    CHECK(mrhiGetAdapterInfo(instance, (mrhiAdapterId){16, 1}, &info) == mrhi_errorStale,
+    CHECK(mrhiAdapter_GetInfo(instance, (mrhiAdapterId){16, 1}, &info) == mrhi_errorStale,
           "a slot never used");
     mrhiDestroyInstance(instance);
 }
@@ -132,25 +135,25 @@ static void TestAnswerComesAtTheDrain(void)
     mrhiRequestId a = {0};
     mrhiRequestId b = {0};
     mrhiRequestId c = {0};
-    CHECK(mrhiRequestAdapters(instance, &def, &a) == mrhi_success, "a");
-    CHECK(mrhiRequestAdapters(instance, &def, &b) == mrhi_success, "b");
-    CHECK(mrhiRequestAdapters(instance, &def, &c) == mrhi_success, "c");
+    CHECK(mrhiInstance_RequestAdapters(instance, &def, &a) == mrhi_success, "a");
+    CHECK(mrhiInstance_RequestAdapters(instance, &def, &b) == mrhi_success, "b");
+    CHECK(mrhiInstance_RequestAdapters(instance, &def, &c) == mrhi_success, "c");
     CHECK(a.index1 != b.index1 && b.index1 != c.index1, "requests have their own ids");
     size_t count = 1;
-    CHECK(mrhiGetAdapters(instance, nullptr, 0, &count) == mrhi_success && count == 0,
+    CHECK(mrhiInstance_GetAdapters(instance, nullptr, 0, &count) == mrhi_success && count == 0,
           "nothing listed before the answer");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
               record.request.index1 == a.index1,
           "a answers first");
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
               record.request.index1 == b.index1,
           "then b");
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
               record.request.index1 == c.index1,
           "then c");
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_empty, "then nothing");
-    CHECK(mrhiGetAdapters(instance, nullptr, 0, &count) == mrhi_success && count == 3,
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_empty, "then nothing");
+    CHECK(mrhiInstance_GetAdapters(instance, nullptr, 0, &count) == mrhi_success && count == 3,
           "the count without an array");
     mrhiDestroyInstance(instance);
 }
@@ -162,11 +165,11 @@ static void TestManyRequestsAtOnce(void)
     mrhiRequestId request;
     for (int i = 0; i < 20; ++i)
     {
-        CHECK(mrhiRequestAdapters(instance, &def, &request) == mrhi_success, "a request");
+        CHECK(mrhiInstance_RequestAdapters(instance, &def, &request) == mrhi_success, "a request");
     }
     mrhiInstanceNotification record;
     int answers = 0;
-    while (mrhiNextInstanceNotification(instance, &record) == mrhi_success)
+    while (mrhiInstance_TakeNotification(instance, &record) == mrhi_success)
     {
         CHECK(record.request.index1 == (uint32_t)answers + 1, "in order");
         ++answers;
@@ -193,8 +196,8 @@ static void TestTheFloor(void)
     mrhiAdapterId id;
     size_t count = 0;
     mrhiLimits limits;
-    CHECK(mrhiGetAdapters(again, &id, 1, &count) == mrhi_success && count == 1, "one");
-    CHECK(mrhiGetAdapterLimits(again, id, &limits) == mrhi_success &&
+    CHECK(mrhiInstance_GetAdapters(again, &id, 1, &count) == mrhi_success && count == 1, "one");
+    CHECK(mrhiAdapter_GetLimits(again, id, &limits) == mrhi_success &&
               limits.textureDimension2d == 16384 && limits.uniformOffsetAlignment == 64,
           "its own limits");
     mrhiDestroyInstance(again);
@@ -238,22 +241,22 @@ static void TestFeaturesAreMaskedByTheApi(void)
     CHECK(Find(instance, mrhi_powerHigh, false) == mrhi_success, "found");
     mrhiAdapterId ids[2];
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, ids, 2, &count) == mrhi_success && count == 2, "two");
+    CHECK(mrhiInstance_GetAdapters(instance, ids, 2, &count) == mrhi_success && count == 2, "two");
     mrhiFeatures features;
-    CHECK(mrhiGetAdapterFeatures(instance, ids[0], &features) == mrhi_success, "web features");
+    CHECK(mrhiAdapter_GetFeatures(instance, ids[0], &features) == mrhi_success, "web features");
     CHECK(!features.shaderInt64 && features.timestampQuery, "no 64-bit integers in WGSL");
-    CHECK(mrhiGetAdapterFeatures(instance, ids[1], &features) == mrhi_success, "d3d12 features");
+    CHECK(mrhiAdapter_GetFeatures(instance, ids[1], &features) == mrhi_success, "d3d12 features");
     CHECK(!features.textureCompressionAstc && features.multiview, "no ASTC on D3D12");
-    CHECK(mrhiGetAdapterFeatures(instance, (mrhiAdapterId){0, 0}, &features) == mrhi_errorStale,
+    CHECK(mrhiAdapter_GetFeatures(instance, (mrhiAdapterId){0, 0}, &features) == mrhi_errorStale,
           "a null id");
-    uint64_t misuse = mrhiGetInstanceMisuse(instance);
-    CHECK(mrhiGetAdapterFeatures(instance, ids[0], nullptr) == mrhi_errorInvalid &&
-              mrhiGetInstanceMisuse(instance) == misuse + 1,
+    uint64_t misuse = mrhiInstance_GetMisuse(instance);
+    CHECK(mrhiAdapter_GetFeatures(instance, ids[0], nullptr) == mrhi_errorInvalid &&
+              mrhiInstance_GetMisuse(instance) == misuse + 1,
           "no out, counted as misuse");
     mrhiLimits limits;
-    CHECK(mrhiGetAdapterLimits(instance, (mrhiAdapterId){0, 0}, &limits) == mrhi_errorStale,
+    CHECK(mrhiAdapter_GetLimits(instance, (mrhiAdapterId){0, 0}, &limits) == mrhi_errorStale,
           "a null id's limits");
-    CHECK(mrhiGetAdapterLimits(nullptr, ids[0], &limits) == mrhi_errorInvalid, "no instance");
+    CHECK(mrhiAdapter_GetLimits(nullptr, ids[0], &limits) == mrhi_errorInvalid, "no instance");
     mrhiDestroyInstance(instance);
 }
 
@@ -271,16 +274,17 @@ static void TestLimits(void)
     mrhiInstance* instance = Create(2, 2, true);
     CHECK(Find(instance, mrhi_powerHigh, true) == mrhi_errorCapacity, "three adapters, room for 2");
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, nullptr, 0, &count) == mrhi_success && count == 2, "two kept");
+    CHECK(mrhiInstance_GetAdapters(instance, nullptr, 0, &count) == mrhi_success && count == 2,
+          "two kept");
     mrhiAdapterRequestDef def = mrhiDefaultAdapterRequestDef();
     mrhiRequestId request;
-    CHECK(mrhiRequestAdapters(instance, &def, &request) == mrhi_success, "one");
-    CHECK(mrhiRequestAdapters(instance, &def, &request) == mrhi_success, "two");
-    CHECK(mrhiRequestAdapters(instance, &def, &request) == mrhi_errorCapacity,
+    CHECK(mrhiInstance_RequestAdapters(instance, &def, &request) == mrhi_success, "one");
+    CHECK(mrhiInstance_RequestAdapters(instance, &def, &request) == mrhi_success, "two");
+    CHECK(mrhiInstance_RequestAdapters(instance, &def, &request) == mrhi_errorCapacity,
           "no room for a third answer");
     mrhiInstanceNotification record;
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_success, "a drain");
-    CHECK(mrhiRequestAdapters(instance, &def, &request) == mrhi_success, "room again");
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_success, "a drain");
+    CHECK(mrhiInstance_RequestAdapters(instance, &def, &request) == mrhi_success, "room again");
     mrhiDestroyInstance(instance);
 }
 
@@ -292,11 +296,12 @@ static void TestWithoutTheTestDriver(void)
     CHECK(Find(instance, mrhi_powerDefault, true) == mrhi_success, "answered");
     mrhiAdapterId ids[16];
     size_t count = 0;
-    CHECK(mrhiGetAdapters(instance, ids, 16, &count) == mrhi_success && count <= 16, "listed");
+    CHECK(mrhiInstance_GetAdapters(instance, ids, 16, &count) == mrhi_success && count <= 16,
+          "listed");
     for (size_t i = 0; i < count; ++i)
     {
         mrhiAdapterInfo info;
-        CHECK(mrhiGetAdapterInfo(instance, ids[i], &info) == mrhi_success &&
+        CHECK(mrhiAdapter_GetInfo(instance, ids[i], &info) == mrhi_success &&
                   info.driver != mrhi_driverTest,
               "a native adapter");
     }
@@ -310,33 +315,37 @@ static void TestInvalidRequests(void)
     mrhiRequestId request;
     mrhiInstanceNotification record;
     size_t count;
-    CHECK(mrhiRequestAdapters(nullptr, &def, &request) == mrhi_errorInvalid, "no instance");
-    CHECK(mrhiRequestAdapters(instance, nullptr, &request) == mrhi_errorInvalid, "no def");
-    CHECK(mrhiRequestAdapters(instance, &def, nullptr) == mrhi_errorInvalid, "no out");
+    CHECK(mrhiInstance_RequestAdapters(nullptr, &def, &request) == mrhi_errorInvalid,
+          "no instance");
+    CHECK(mrhiInstance_RequestAdapters(instance, nullptr, &request) == mrhi_errorInvalid, "no def");
+    CHECK(mrhiInstance_RequestAdapters(instance, &def, nullptr) == mrhi_errorInvalid, "no out");
     def.preference = 3;
-    CHECK(mrhiRequestAdapters(instance, &def, &request) == mrhi_errorInvalid, "a bad preference");
+    CHECK(mrhiInstance_RequestAdapters(instance, &def, &request) == mrhi_errorInvalid,
+          "a bad preference");
     def = mrhiDefaultAdapterRequestDef();
     def.cookie = 0;
-    CHECK(mrhiRequestAdapters(instance, &def, &request) == mrhi_errorInvalid, "no cookie");
+    CHECK(mrhiInstance_RequestAdapters(instance, &def, &request) == mrhi_errorInvalid, "no cookie");
     def = mrhiDefaultAdapterRequestDef();
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def.next = &critical;
-    CHECK(mrhiRequestAdapters(instance, &def, &request) == mrhi_errorUnsupported,
+    CHECK(mrhiInstance_RequestAdapters(instance, &def, &request) == mrhi_errorUnsupported,
           "an unknown critical extension");
     mrhiChain untyped = {.next = nullptr, .type = mrhi_structNone};
     def.next = &untyped;
-    CHECK(mrhiRequestAdapters(instance, &def, &request) == mrhi_errorInvalid, "an untyped node");
-    CHECK(mrhiNextInstanceNotification(instance, nullptr) == mrhi_errorInvalid, "no record");
-    CHECK(mrhiNextInstanceNotification(instance, &record) == mrhi_empty, "refusals queue nothing");
-    CHECK(mrhiGetAdapters(instance, nullptr, 1, &count) == mrhi_errorInvalid, "a NULL array");
-    CHECK(mrhiGetAdapters(instance, nullptr, 0, nullptr) == mrhi_errorInvalid, "no count");
-    CHECK(mrhiGetInstanceMisuse(instance) == 8, "each invalid call on the instance counted once");
+    CHECK(mrhiInstance_RequestAdapters(instance, &def, &request) == mrhi_errorInvalid,
+          "an untyped node");
+    CHECK(mrhiInstance_TakeNotification(instance, nullptr) == mrhi_errorInvalid, "no record");
+    CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_empty, "refusals queue nothing");
+    CHECK(mrhiInstance_GetAdapters(instance, nullptr, 1, &count) == mrhi_errorInvalid,
+          "a NULL array");
+    CHECK(mrhiInstance_GetAdapters(instance, nullptr, 0, nullptr) == mrhi_errorInvalid, "no count");
+    CHECK(mrhiInstance_GetMisuse(instance) == 8, "each invalid call on the instance counted once");
     mrhiAdapterInfo info;
-    CHECK(mrhiGetAdapterInfo(instance, (mrhiAdapterId){3, 9}, &info) == mrhi_errorStale, "stale");
-    CHECK(mrhiGetAdapterInfo(instance, (mrhiAdapterId){3, 9}, nullptr) == mrhi_errorInvalid,
+    CHECK(mrhiAdapter_GetInfo(instance, (mrhiAdapterId){3, 9}, &info) == mrhi_errorStale, "stale");
+    CHECK(mrhiAdapter_GetInfo(instance, (mrhiAdapterId){3, 9}, nullptr) == mrhi_errorInvalid,
           "no out");
-    CHECK(mrhiGetInstanceMisuse(instance) == 9, "stale ids and unknown extensions are not misuse");
-    CHECK(mrhiGetInstanceMisuse(nullptr) == 0, "no instance");
+    CHECK(mrhiInstance_GetMisuse(instance) == 9, "stale ids and unknown extensions are not misuse");
+    CHECK(mrhiInstance_GetMisuse(nullptr) == 0, "no instance");
     mrhiDestroyInstance(instance);
 }
 

@@ -155,12 +155,12 @@ int main(void)
     mrhiInstanceNotification record;
     mrhiAdapterId adapter = {0};
     size_t count = 0;
-    Check(mrhiRequestAdapters(instance, &search, &request) == mrhi_success &&
-              mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
-              mrhiGetAdapters(instance, &adapter, 1, &count) == mrhi_success && count == 1,
+    Check(mrhiInstance_RequestAdapters(instance, &search, &request) == mrhi_success &&
+              mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
+              mrhiInstance_GetAdapters(instance, &adapter, 1, &count) == mrhi_success && count == 1,
           "its adapter");
     mrhiAdapterInfo info;
-    Check(mrhiGetAdapterInfo(instance, adapter, &info) == mrhi_success &&
+    Check(mrhiAdapter_GetInfo(instance, adapter, &info) == mrhi_success &&
               info.driver == mrhi_driverExternal && info.nameLength == 7 &&
               memcmp(info.name, "outside", 7) == 0,
           "reported as external, by its name");

@@ -12,7 +12,7 @@ static mrhiDevice* s_device;
 static void Begin(void)
 {
     mrhiFrameDef def = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &def) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &def) == mrhi_success, "begun");
 }
 
 static mrhiTextureDef Texture(void)
@@ -75,7 +75,7 @@ static void TestDeclare(void)
     CHECK(mrhiDeclareBuffer(nullptr, &buffer, &b) == mrhi_errorInvalid, "no device");
     CHECK(mrhiDeclareBuffer(s_device, nullptr, &b) == mrhi_errorInvalid, "no def");
     CHECK(mrhiDeclareBuffer(s_device, &buffer, nullptr) == mrhi_errorInvalid, "no out");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     texture = Texture();
     CHECK(mrhiDeclareTexture(s_device, &texture, &a) == mrhi_errorState, "no frame");
     buffer = Buffer(64);
@@ -106,7 +106,7 @@ static void TestImport(void)
               again.index1 == bufferFirst.index1,
           "the buffer's same id");
     CHECK(bufferFirst.index1 != first.index1, "another resource");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Begin();
     CHECK(mrhiImportTexture(s_device, texture, &again) == mrhi_success, "the next frame");
     CHECK(again.generation != first.generation && again.index1 == 1, "a new id there");
@@ -119,7 +119,7 @@ static void TestImport(void)
     CHECK(mrhiImportTexture(s_device, texture, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiImportBuffer(nullptr, buffer, &again) == mrhi_errorInvalid, "no device");
     CHECK(mrhiImportBuffer(s_device, buffer, nullptr) == mrhi_errorInvalid, "no out");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CHECK(mrhiImportTexture(s_device, texture, &again) == mrhi_errorState,
           "imported in a frame that closed");
     CHECK(mrhiImportBuffer(s_device, buffer, &again) == mrhi_errorState,
@@ -129,7 +129,7 @@ static void TestImport(void)
     Begin();
     CHECK(mrhiImportTexture(s_device, texture, &again) == mrhi_errorStale, "a destroyed texture");
     CHECK(mrhiImportBuffer(s_device, buffer, &again) == mrhi_errorStale, "a destroyed buffer");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 // The frameResources budget, counted afresh each frame.
@@ -163,7 +163,7 @@ static void TestLimit(void)
               "full for an import");
         CHECK(mrhiImportTexture(s_device, texture, &resource) == mrhi_success,
               "an import made already");
-        CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+        CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     }
     Close(s_device);
     s_device = previous;
@@ -175,7 +175,7 @@ static mrhiDiagnosticCode Refusal(void)
 {
     mrhiDiagnosticCode code = 0;
     mrhiDiagnostic record;
-    while (mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success)
+    while (mrhiDevice_TakeDiagnostic(s_device, &record) == mrhi_success)
     {
         code = record.code;
     }
@@ -224,8 +224,8 @@ static void TestPastDeviceLimits(void)
     CHECK(mrhiDeclareBuffer(s_device, &buffer, &resource) == mrhi_errorUnsupported &&
               Refusal() == mrhi_diagnosticLimitBufferBytes,
           "past the adapter's");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "none is misuse");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "none is misuse");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Close(s_device);
     ResetAdapter();
 }
@@ -240,7 +240,7 @@ int main(void)
     TestImport();
     TestLimit();
     s_instance = instance;
-    CHECK(mrhiGetDeviceMisuse(s_device) == 12, "each invalid call counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 12, "each invalid call counted");
     Close(s_device);
     return s_failures == 0 ? 0 : 1;
 }

@@ -62,7 +62,7 @@ static mrhiGraphicsPipelineId Graphics(const mrhiGraphicsPipelineDef* def)
     CHECK(mrhiCreateGraphicsPipeline(s_device, def, &pipeline, &request) == mrhi_success,
           "a graphics pipeline");
     mrhiDeviceNotification record;
-    CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_success, "answered");
+    CHECK(mrhiDevice_TakeNotification(s_device, &record) == mrhi_success, "answered");
     return pipeline;
 }
 
@@ -87,7 +87,7 @@ static void OpenOn(mrhiDeviceDef def)
     CHECK(mrhiCreateComputePipeline(s_device, &computeDef, &s_compute, &request) == mrhi_success,
           "a compute pipeline");
     mrhiDeviceNotification record;
-    CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_success, "answered");
+    CHECK(mrhiDevice_TakeNotification(s_device, &record) == mrhi_success, "answered");
     mrhiTextureDef textureDef = mrhiDefaultTextureDef();
     textureDef.format = mrhi_formatDepthStencil;
     textureDef.width = 16;
@@ -133,7 +133,7 @@ static mrhiHeapId s_frameHeap;
 static void Frame(bool readOnly)
 {
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     mrhiPassDef def = mrhiDefaultPassDef();
     def.neverCull = true;
     def.colorTargets[0] = (mrhiColorTarget){
@@ -164,7 +164,7 @@ static void Frame(bool readOnly)
     s_copy = Add(def);
     def = mrhiDefaultPassDef();
     s_culled = Add(def);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
 }
 
 // The command the n-th record of a pass holds, walking its chunks: or
@@ -195,44 +195,44 @@ static void TestPhases(void)
 {
     Open(4);
     mrhiPassId early = {1, 1};
-    CHECK(mrhiBeginPass(s_device, early) == mrhi_errorState, "no frame open");
+    CHECK(mrhiPass_Begin(s_device, early) == mrhi_errorState, "no frame open");
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     mrhiPassDef def = mrhiDefaultPassDef();
     def.neverCull = true;
     mrhiPassId pass = Add(def);
-    CHECK(mrhiBeginPass(s_device, pass) == mrhi_errorState, "not compiled");
+    CHECK(mrhiPass_Begin(s_device, pass) == mrhi_errorState, "not compiled");
     mrhiPassId past = {pass.index1 + 5, pass.generation};
-    CHECK(mrhiBeginPass(s_device, past) == mrhi_errorState, "the phase checked before the id");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiPass_Begin(s_device, past) == mrhi_errorState, "the phase checked before the id");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Frame(false);
-    CHECK(mrhiEndPass(s_device, s_dispatch) == mrhi_errorState, "not begun");
-    CHECK(mrhiBeginPass(s_device, s_culled) == mrhi_errorState, "culled");
-    CHECK(mrhiBeginPass(s_device, s_dispatch) == mrhi_success, "begun");
-    CHECK(mrhiBeginPass(s_device, s_dispatch) == mrhi_errorState, "begun once");
+    CHECK(mrhiPass_End(s_device, s_dispatch) == mrhi_errorState, "not begun");
+    CHECK(mrhiPass_Begin(s_device, s_culled) == mrhi_errorState, "culled");
+    CHECK(mrhiPass_Begin(s_device, s_dispatch) == mrhi_success, "begun");
+    CHECK(mrhiPass_Begin(s_device, s_dispatch) == mrhi_errorState, "begun once");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorState, "a pass still recording");
-    CHECK(mrhiEndPass(s_device, s_dispatch) == mrhi_success, "ended");
-    CHECK(mrhiEndPass(s_device, s_dispatch) == mrhi_errorState, "ended once");
-    CHECK(mrhiBeginPass(s_device, s_dispatch) == mrhi_errorState, "never begun again");
-    CHECK(mrhiSetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_errorState,
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorState, "a pass still recording");
+    CHECK(mrhiPass_End(s_device, s_dispatch) == mrhi_success, "ended");
+    CHECK(mrhiPass_End(s_device, s_dispatch) == mrhi_errorState, "ended once");
+    CHECK(mrhiPass_Begin(s_device, s_dispatch) == mrhi_errorState, "never begun again");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_errorState,
           "no command after its end");
     mrhiPassId stale = {s_dispatch.index1, s_dispatch.generation + 1};
-    CHECK(mrhiBeginPass(s_device, stale) == mrhi_errorStale, "another frame's pass");
+    CHECK(mrhiPass_Begin(s_device, stale) == mrhi_errorStale, "another frame's pass");
     stale = (mrhiPassId){0, s_dispatch.generation};
-    CHECK(mrhiBeginPass(s_device, stale) == mrhi_errorStale, "a null pass");
+    CHECK(mrhiPass_Begin(s_device, stale) == mrhi_errorStale, "a null pass");
     stale = (mrhiPassId){s_culled.index1 + 1, s_dispatch.generation};
-    CHECK(mrhiBeginPass(s_device, stale) == mrhi_errorStale, "past the passes");
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
-    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_errorState, "the frame is gone");
+    CHECK(mrhiPass_Begin(s_device, stale) == mrhi_errorStale, "past the passes");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiPass_Begin(s_device, s_render) == mrhi_errorState, "the frame is gone");
     Frame(false);
-    CHECK(mrhiBeginPass(s_device, s_dispatch) == mrhi_success, "begun in the next frame");
+    CHECK(mrhiPass_Begin(s_device, s_dispatch) == mrhi_success, "begun in the next frame");
     CHECK(Nth(s_dispatch, 0) == nullptr, "recording nothing yet");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped while recording");
-    CHECK(mrhiBeginPass(nullptr, s_dispatch) == mrhi_errorInvalid &&
-              mrhiEndPass(nullptr, s_dispatch) == mrhi_errorInvalid,
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped while recording");
+    CHECK(mrhiPass_Begin(nullptr, s_dispatch) == mrhi_errorInvalid &&
+              mrhiPass_End(nullptr, s_dispatch) == mrhi_errorInvalid,
           "no device");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "none of it misuse");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "none of it misuse");
     Close2();
 }
 
@@ -240,52 +240,53 @@ static void TestPipelines(void)
 {
     Open(4);
     Frame(false);
-    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
-              mrhiBeginPass(s_device, s_dispatch) == mrhi_success &&
-              mrhiBeginPass(s_device, s_copy) == mrhi_success &&
-              mrhiBeginPass(s_device, s_depth) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, s_render) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_dispatch) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_copy) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_depth) == mrhi_success,
           "four passes begun");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, s_graphics) == mrhi_success,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, s_graphics) == mrhi_success,
           "a graphics pipeline for its targets");
     const mrhiCommand* command = Nth(s_render, 0);
     CHECK(command != nullptr && command->type == mrhiCommandGraphicsPipeline &&
               command->b == s_device->pipelineSlots[s_graphics.index1 - 1].handle &&
               command->payload == 0,
           "recorded");
-    CHECK(mrhiSetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_success,
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_success,
           "a compute pipeline");
     command = Nth(s_dispatch, 0);
     CHECK(command != nullptr && command->type == mrhiCommandComputePipeline &&
               command->b == s_device->pipelineSlots[s_compute.index1 - 1].handle,
           "recorded");
-    CHECK(mrhiSetComputePipeline(s_device, s_render, s_compute) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_render, s_compute) == mrhi_errorInvalid,
           "no dispatch in a render pass");
     mrhiGraphicsPipelineId unknown = {0};
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_dispatch, s_graphics) == mrhi_errorInvalid &&
-              mrhiSetGraphicsPipeline(s_device, s_dispatch, unknown) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_dispatch, s_graphics) == mrhi_errorInvalid &&
+              mrhiPass_SetGraphicsPipeline(s_device, s_dispatch, unknown) == mrhi_errorInvalid,
           "no draw without targets, whatever the pipeline");
-    CHECK(mrhiSetComputePipeline(s_device, s_copy, s_compute) == mrhi_errorInvalid &&
-              mrhiSetGraphicsPipeline(s_device, s_copy, s_graphics) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_copy, s_compute) == mrhi_errorInvalid &&
+              mrhiPass_SetGraphicsPipeline(s_device, s_copy, s_graphics) == mrhi_errorInvalid,
           "neither in a transfer pass");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_depth, s_graphics) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_depth, s_graphics) == mrhi_errorInvalid,
           "another pass's targets");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 6, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 6, "each counted");
     mrhiGraphicsPipelineId wrongKind = {s_compute.index1, s_compute.generation};
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, wrongKind) == mrhi_errorStale,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, wrongKind) == mrhi_errorStale,
           "a compute pipeline's id");
     mrhiComputePipelineId dead = {s_compute.index1, s_compute.generation + 2};
-    CHECK(mrhiSetComputePipeline(s_device, s_dispatch, dead) == mrhi_errorStale, "a dead id");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_dispatch, dead) == mrhi_errorStale, "a dead id");
     mrhiComputePipelineId none = {0};
-    CHECK(mrhiSetComputePipeline(s_device, s_dispatch, none) == mrhi_errorStale, "a null id");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_dispatch, none) == mrhi_errorStale, "a null id");
     mrhiGraphicsPipelineDef def = GraphicsDef();
     mrhiGraphicsPipelineId pending;
     mrhiRequestId request;
     CHECK(mrhiCreateGraphicsPipeline(s_device, &def, &pending, &request) == mrhi_success,
           "a pipeline still compiling");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pending) == mrhi_errorState, "not ready");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pending) == mrhi_errorState,
+          "not ready");
     mrhiDeviceNotification record;
-    CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_success, "answered");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pending) == mrhi_success, "ready now");
+    CHECK(mrhiDevice_TakeNotification(s_device, &record) == mrhi_success, "answered");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pending) == mrhi_success, "ready now");
     CHECK(Nth(s_render, 1) != nullptr && Nth(s_render, 2) == nullptr, "two records");
     // The stream keeps the handle: a slot freed and taken again while the
     // frame records names another pipeline.
@@ -296,16 +297,16 @@ static void TestPipelines(void)
     CHECK(pending.index1 != 0 && s_device->pipelineSlots[pending.index1 - 1].handle != handle &&
               Nth(s_render, 1)->b == handle,
           "the recorded handle unchanged");
-    CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_success, "answered");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 6, "none of that misuse");
-    CHECK(mrhiSetGraphicsPipeline(nullptr, s_render, s_graphics) == mrhi_errorInvalid &&
-              mrhiSetComputePipeline(nullptr, s_dispatch, s_compute) == mrhi_errorInvalid,
+    CHECK(mrhiDevice_TakeNotification(s_device, &record) == mrhi_success, "answered");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 6, "none of that misuse");
+    CHECK(mrhiPass_SetGraphicsPipeline(nullptr, s_render, s_graphics) == mrhi_errorInvalid &&
+              mrhiPass_SetComputePipeline(nullptr, s_dispatch, s_compute) == mrhi_errorInvalid,
           "no device");
-    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success, "ended");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, s_graphics) == mrhi_errorState &&
-              mrhiSetComputePipeline(s_device, s_render, s_compute) == mrhi_errorState,
+    CHECK(mrhiPass_End(s_device, s_render) == mrhi_success, "ended");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, s_graphics) == mrhi_errorState &&
+              mrhiPass_SetComputePipeline(s_device, s_render, s_compute) == mrhi_errorState,
           "not recording");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Close2();
 }
 
@@ -315,9 +316,9 @@ static mrhiResult InDepthPass(const mrhiGraphicsPipelineDef* def, bool readOnly)
 {
     mrhiGraphicsPipelineId pipeline = Graphics(def);
     Frame(readOnly);
-    CHECK(mrhiBeginPass(s_device, s_depth) == mrhi_success, "begun");
-    mrhiResult status = mrhiSetGraphicsPipeline(s_device, s_depth, pipeline);
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiPass_Begin(s_device, s_depth) == mrhi_success, "begun");
+    mrhiResult status = mrhiPass_SetGraphicsPipeline(s_device, s_depth, pipeline);
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CHECK(mrhiDestroyGraphicsPipeline(s_device, pipeline) == mrhi_success, "destroyed");
     return status;
 }
@@ -372,16 +373,16 @@ static void TestTargets(void)
     def.depthCompare = mrhi_compareLess;
     CHECK(InDepthPass(&def, false) == mrhi_errorInvalid, "a color target the pass lacks");
     Frame(false);
-    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success, "the render pass");
+    CHECK(mrhiPass_Begin(s_device, s_render) == mrhi_success, "the render pass");
     mrhiGraphicsPipelineId pipeline = Graphics(&def);
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_errorInvalid,
           "a depth target the pass lacks");
     def = GraphicsDef();
     def.colorTargets[0].format = mrhi_formatRg8Unorm;
     pipeline = Graphics(&def);
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_errorInvalid,
           "another color format");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Close2();
 }
 
@@ -396,7 +397,7 @@ static void TestViewFormats(void)
     def.colorTargets[0].format = mrhi_formatRgba8UnormSrgb;
     mrhiGraphicsPipelineId twin = Graphics(&def);
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     mrhiTextureDef textureDef = mrhiDefaultTextureDef();
     textureDef.format = mrhi_formatRgba8Unorm;
     textureDef.width = 64;
@@ -413,12 +414,12 @@ static void TestViewFormats(void)
     };
     passDef.colorTargetCount = 1;
     mrhiPassId pass = Add(passDef);
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
-    CHECK(mrhiBeginPass(s_device, pass) == mrhi_success, "begun");
-    CHECK(mrhiSetGraphicsPipeline(s_device, pass, own) == mrhi_errorInvalid,
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_Begin(s_device, pass) == mrhi_success, "begun");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, pass, own) == mrhi_errorInvalid,
           "not the texture's own format");
-    CHECK(mrhiSetGraphicsPipeline(s_device, pass, twin) == mrhi_success, "its view format");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, pass, twin) == mrhi_success, "its view format");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CHECK(mrhiDestroyGraphicsPipeline(s_device, own) == mrhi_success, "destroyed");
     CHECK(mrhiDestroyGraphicsPipeline(s_device, twin) == mrhi_success, "destroyed");
     Close2();
@@ -444,7 +445,7 @@ static void TestViews(void)
     textureDef.height = 16;
     textureDef.depthOrLayers = 2;
     mrhiResourceId layers = {0};
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success &&
               mrhiDeclareTexture(s_device, &textureDef, &layers) == mrhi_success,
           "two layers");
     mrhiPassDef passDef = mrhiDefaultPassDef();
@@ -454,13 +455,13 @@ static void TestViews(void)
     passDef.viewCount = 2;
     mrhiPassId pass = {0};
     CHECK(mrhiAddPass(s_device, &passDef, &pass) == mrhi_success &&
-              mrhiCompileFrame(s_device) == mrhi_success &&
-              mrhiBeginPass(s_device, pass) == mrhi_success,
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, pass) == mrhi_success,
           "a pass of two views");
-    CHECK(mrhiSetGraphicsPipeline(s_device, pass, s_graphics) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, pass, s_graphics) == mrhi_errorInvalid,
           "a pipeline of one view");
-    CHECK(mrhiSetGraphicsPipeline(s_device, pass, two) == mrhi_success, "one of two");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, pass, two) == mrhi_success, "one of two");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Close2();
 }
 
@@ -470,11 +471,11 @@ static void TestViewport(void)
     s_adapter.limits.textureDimension2d = 16384;
     Open(4);
     Frame(false);
-    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
-              mrhiBeginPass(s_device, s_dispatch) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, s_render) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_dispatch) == mrhi_success,
           "begun");
     mrhiViewport viewport = {.width = 64, .height = 32, .maxDepth = 1};
-    CHECK(mrhiSetViewport(s_device, s_render, &viewport) == mrhi_success, "the targets");
+    CHECK(mrhiPass_SetViewport(s_device, s_render, &viewport) == mrhi_success, "the targets");
     const mrhiCommand* command = Nth(s_render, 0);
     const mrhiViewport* stored = (const mrhiViewport*)Nth(s_render, 1);
     CHECK(command != nullptr && command->type == mrhiCommandViewport && command->payload == 1 &&
@@ -489,7 +490,7 @@ static void TestViewport(void)
     };
     for (size_t i = 0; i < sizeof(edges) / sizeof(edges[0]); ++i)
     {
-        CHECK(mrhiSetViewport(s_device, s_render, &edges[i]) == mrhi_success, "at an edge");
+        CHECK(mrhiPass_SetViewport(s_device, s_render, &edges[i]) == mrhi_success, "at an edge");
     }
     // Past the device's ranges, within the adapter's: a device asking for
     // more would take them.
@@ -503,7 +504,7 @@ static void TestViewport(void)
     };
     for (size_t i = 0; i < sizeof(past) / sizeof(past[0]); ++i)
     {
-        CHECK(mrhiSetViewport(s_device, s_render, &past[i]) == mrhi_errorCapacity,
+        CHECK(mrhiPass_SetViewport(s_device, s_render, &past[i]) == mrhi_errorCapacity,
               "past a device range");
     }
     mrhiViewport beyond[] = {
@@ -513,10 +514,10 @@ static void TestViewport(void)
     };
     for (size_t i = 0; i < sizeof(beyond) / sizeof(beyond[0]); ++i)
     {
-        CHECK(mrhiSetViewport(s_device, s_render, &beyond[i]) == mrhi_errorUnsupported,
+        CHECK(mrhiPass_SetViewport(s_device, s_render, &beyond[i]) == mrhi_errorUnsupported,
               "past an adapter range");
     }
-    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "neither is misuse");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "neither is misuse");
     mrhiViewport invalid[] = {
         {.width = -1, .height = 1, .maxDepth = 1},
         {.width = 1, .height = -1, .maxDepth = 1},
@@ -535,17 +536,17 @@ static void TestViewport(void)
     uint32_t count = (uint32_t)(sizeof(invalid) / sizeof(invalid[0]));
     for (uint32_t i = 0; i < count; ++i)
     {
-        CHECK(mrhiSetViewport(s_device, s_render, &invalid[i]) == mrhi_errorInvalid,
+        CHECK(mrhiPass_SetViewport(s_device, s_render, &invalid[i]) == mrhi_errorInvalid,
               "not well formed");
     }
-    CHECK(mrhiGetDeviceMisuse(s_device) == count, "each counted");
-    CHECK(mrhiSetViewport(s_device, s_dispatch, &viewport) == mrhi_errorInvalid,
+    CHECK(mrhiDevice_GetMisuse(s_device) == count, "each counted");
+    CHECK(mrhiPass_SetViewport(s_device, s_dispatch, &viewport) == mrhi_errorInvalid,
           "no viewport without targets");
-    CHECK(mrhiSetViewport(s_device, s_render, nullptr) == mrhi_errorInvalid &&
-              mrhiSetViewport(nullptr, s_render, &viewport) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetViewport(s_device, s_render, nullptr) == mrhi_errorInvalid &&
+              mrhiPass_SetViewport(nullptr, s_render, &viewport) == mrhi_errorInvalid,
           "NULL arguments");
-    CHECK(mrhiSetViewport(s_device, s_copy, &viewport) == mrhi_errorState, "not begun");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiPass_SetViewport(s_device, s_copy, &viewport) == mrhi_errorState, "not begun");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Close2();
 }
 
@@ -553,39 +554,40 @@ static void TestScissorAndState(void)
 {
     Open(4);
     Frame(false);
-    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
-              mrhiBeginPass(s_device, s_depth) == mrhi_success &&
-              mrhiBeginPass(s_device, s_dispatch) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, s_render) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_depth) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_dispatch) == mrhi_success,
           "begun");
     mrhiScissorRect rect = {.x = 60, .y = 30, .width = 4, .height = 2};
-    CHECK(mrhiSetScissor(s_device, s_render, &rect) == mrhi_success, "the mip's corner");
+    CHECK(mrhiPass_SetScissor(s_device, s_render, &rect) == mrhi_success, "the mip's corner");
     const mrhiCommand* command = Nth(s_render, 0);
     CHECK(command != nullptr && command->type == mrhiCommandScissor && command->a == 60 &&
               command->b == 30 && command->c == 4 && command->d == 2 && command->payload == 0,
           "recorded");
     rect.width = 5;
-    CHECK(mrhiSetScissor(s_device, s_render, &rect) == mrhi_errorInvalid, "past its width");
+    CHECK(mrhiPass_SetScissor(s_device, s_render, &rect) == mrhi_errorInvalid, "past its width");
     rect.width = 4;
     rect.height = 3;
-    CHECK(mrhiSetScissor(s_device, s_render, &rect) == mrhi_errorInvalid, "past its height");
+    CHECK(mrhiPass_SetScissor(s_device, s_render, &rect) == mrhi_errorInvalid, "past its height");
     rect = (mrhiScissorRect){.x = UINT32_MAX, .width = 2, .height = 1};
-    CHECK(mrhiSetScissor(s_device, s_render, &rect) == mrhi_errorInvalid, "wrapping across");
+    CHECK(mrhiPass_SetScissor(s_device, s_render, &rect) == mrhi_errorInvalid, "wrapping across");
     rect = (mrhiScissorRect){.y = UINT32_MAX, .width = 1, .height = 2};
-    CHECK(mrhiSetScissor(s_device, s_render, &rect) == mrhi_errorInvalid, "wrapping down");
+    CHECK(mrhiPass_SetScissor(s_device, s_render, &rect) == mrhi_errorInvalid, "wrapping down");
     rect = (mrhiScissorRect){.width = 16, .height = 8};
-    CHECK(mrhiSetScissor(s_device, s_depth, &rect) == mrhi_success, "a depth target's size");
+    CHECK(mrhiPass_SetScissor(s_device, s_depth, &rect) == mrhi_success, "a depth target's size");
     rect.width = 17;
-    CHECK(mrhiSetScissor(s_device, s_depth, &rect) == mrhi_errorInvalid, "past it");
+    CHECK(mrhiPass_SetScissor(s_device, s_depth, &rect) == mrhi_errorInvalid, "past it");
     rect = (mrhiScissorRect){0};
-    CHECK(mrhiSetScissor(s_device, s_depth, &rect) == mrhi_success, "empty");
-    CHECK(mrhiSetScissor(s_device, s_dispatch, &rect) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetScissor(s_device, s_depth, &rect) == mrhi_success, "empty");
+    CHECK(mrhiPass_SetScissor(s_device, s_dispatch, &rect) == mrhi_errorInvalid,
           "no scissor without targets");
-    CHECK(mrhiSetScissor(s_device, s_render, nullptr) == mrhi_errorInvalid &&
-              mrhiSetScissor(nullptr, s_render, &rect) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetScissor(s_device, s_render, nullptr) == mrhi_errorInvalid &&
+              mrhiPass_SetScissor(nullptr, s_render, &rect) == mrhi_errorInvalid,
           "NULL arguments");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 7, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 7, "each counted");
     mrhiColor color = {0.25f, 0.5f, 0.75f, 1.0f};
-    CHECK(mrhiSetBlendConstant(s_device, s_render, &color) == mrhi_success, "a blend constant");
+    CHECK(mrhiPass_SetBlendConstant(s_device, s_render, &color) == mrhi_success,
+          "a blend constant");
     command = Nth(s_render, 1);
     const mrhiColor* stored = (const mrhiColor*)Nth(s_render, 2);
     CHECK(command != nullptr && command->type == mrhiCommandBlendConstant &&
@@ -593,29 +595,30 @@ static void TestScissorAndState(void)
               memcmp(stored, &color, sizeof(color)) == 0,
           "recorded with the color after it");
     color = (mrhiColor){-2.0f, 3.0f, 0.0f, 0.0f};
-    CHECK(mrhiSetBlendConstant(s_device, s_render, &color) == mrhi_success, "out of 0 to 1");
+    CHECK(mrhiPass_SetBlendConstant(s_device, s_render, &color) == mrhi_success, "out of 0 to 1");
     float bad[] = {NAN, INFINITY, -INFINITY};
     for (uint32_t i = 0; i < 12; ++i)
     {
         float channels[4] = {0};
         channels[i % 4] = bad[i / 4];
         color = (mrhiColor){channels[0], channels[1], channels[2], channels[3]};
-        CHECK(mrhiSetBlendConstant(s_device, s_render, &color) == mrhi_errorInvalid, "not finite");
+        CHECK(mrhiPass_SetBlendConstant(s_device, s_render, &color) == mrhi_errorInvalid,
+              "not finite");
     }
-    CHECK(mrhiSetBlendConstant(s_device, s_dispatch, &color) == mrhi_errorInvalid &&
-              mrhiSetBlendConstant(s_device, s_render, nullptr) == mrhi_errorInvalid &&
-              mrhiSetBlendConstant(nullptr, s_render, &color) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetBlendConstant(s_device, s_dispatch, &color) == mrhi_errorInvalid &&
+              mrhiPass_SetBlendConstant(s_device, s_render, nullptr) == mrhi_errorInvalid &&
+              mrhiPass_SetBlendConstant(nullptr, s_render, &color) == mrhi_errorInvalid,
           "no targets, no color, no device");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 7 + 12 + 2, "each counted");
-    CHECK(mrhiSetStencilReference(s_device, s_depth, 0xAB) == mrhi_success, "a reference");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 7 + 12 + 2, "each counted");
+    CHECK(mrhiPass_SetStencilReference(s_device, s_depth, 0xAB) == mrhi_success, "a reference");
     command = Nth(s_depth, 2);
     CHECK(command != nullptr && command->type == mrhiCommandStencilReference && command->a == 0xAB,
           "recorded");
-    CHECK(mrhiSetStencilReference(s_device, s_dispatch, 1) == mrhi_errorInvalid &&
-              mrhiSetStencilReference(nullptr, s_depth, 1) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetStencilReference(s_device, s_dispatch, 1) == mrhi_errorInvalid &&
+              mrhiPass_SetStencilReference(nullptr, s_depth, 1) == mrhi_errorInvalid,
           "no targets, no device");
-    CHECK(mrhiSetStencilReference(s_device, s_copy, 1) == mrhi_errorState, "not begun");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiPass_SetStencilReference(s_device, s_copy, 1) == mrhi_errorState, "not begun");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Close2();
 }
 
@@ -625,53 +628,55 @@ static void TestRootBlock(void)
     s_adapter.limits.rootBlockBytes = 128;
     Open(4);
     Frame(false);
-    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
-              mrhiBeginPass(s_device, s_dispatch) == mrhi_success &&
-              mrhiBeginPass(s_device, s_copy) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, s_render) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_dispatch) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_copy) == mrhi_success,
           "begun");
     uint8_t bytes[256];
     for (uint32_t i = 0; i < sizeof(bytes); ++i)
     {
         bytes[i] = (uint8_t)i;
     }
-    CHECK(mrhiSetRootBlock(s_device, s_dispatch, 0, bytes, 64) == mrhi_success, "all of it");
+    CHECK(mrhiPass_SetRootBlock(s_device, s_dispatch, 0, bytes, 64) == mrhi_success, "all of it");
     const mrhiCommand* command = Nth(s_dispatch, 0);
     CHECK(command != nullptr && command->type == mrhiCommandRootBlock && command->a == 0 &&
               command->b == 64 && command->payload == 2 &&
               memcmp(Nth(s_dispatch, 1), bytes, 32) == 0 &&
               memcmp(Nth(s_dispatch, 2), bytes + 32, 32) == 0,
           "recorded with its bytes after it");
-    CHECK(mrhiSetRootBlock(s_device, s_render, 60, bytes, 4) == mrhi_success, "its last word");
+    CHECK(mrhiPass_SetRootBlock(s_device, s_render, 60, bytes, 4) == mrhi_success, "its last word");
     command = Nth(s_render, 0);
     CHECK(command != nullptr && command->a == 60 && command->b == 4 && command->payload == 1 &&
               memcmp(Nth(s_render, 1), bytes, 4) == 0,
           "in one payload record");
-    CHECK(mrhiSetRootBlock(s_device, s_render, 60, bytes, 8) == mrhi_errorCapacity,
+    CHECK(mrhiPass_SetRootBlock(s_device, s_render, 60, bytes, 8) == mrhi_errorCapacity,
           "past the device's limit, within the adapter's");
-    CHECK(mrhiSetRootBlock(s_device, s_render, 0, bytes, 128) == mrhi_errorCapacity,
+    CHECK(mrhiPass_SetRootBlock(s_device, s_render, 0, bytes, 128) == mrhi_errorCapacity,
           "up to the adapter's");
-    CHECK(mrhiSetRootBlock(s_device, s_render, 0, bytes, 132) == mrhi_errorUnsupported,
+    CHECK(mrhiPass_SetRootBlock(s_device, s_render, 0, bytes, 132) == mrhi_errorUnsupported,
           "past the adapter's limit");
-    CHECK(mrhiSetRootBlock(s_device, s_render, UINT32_MAX - 3, bytes, 4) == mrhi_errorUnsupported,
+    CHECK(mrhiPass_SetRootBlock(s_device, s_render, UINT32_MAX - 3, bytes, 4) ==
+              mrhi_errorUnsupported,
           "wrapping past it");
-    CHECK(mrhiSetRootBlock(s_device, s_render, 4, bytes, SIZE_MAX - 3) == mrhi_errorUnsupported,
+    CHECK(mrhiPass_SetRootBlock(s_device, s_render, 4, bytes, SIZE_MAX - 3) ==
+              mrhi_errorUnsupported,
           "a size wrapping its end past 64 bits");
     // Where size_t is wider, a size whose low 32 bits alone would fit.
     CHECK(SIZE_MAX == UINT32_MAX ||
-              mrhiSetRootBlock(s_device, s_render, 0, bytes, (size_t)UINT32_MAX + 5) ==
+              mrhiPass_SetRootBlock(s_device, s_render, 0, bytes, (size_t)UINT32_MAX + 5) ==
                   mrhi_errorUnsupported,
           "a size past 32 bits");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "not misuse");
-    CHECK(mrhiSetRootBlock(s_device, s_render, 2, bytes, 4) == mrhi_errorInvalid &&
-              mrhiSetRootBlock(s_device, s_render, 0, bytes, 6) == mrhi_errorInvalid &&
-              mrhiSetRootBlock(s_device, s_render, 0, bytes, 0) == mrhi_errorInvalid &&
-              mrhiSetRootBlock(s_device, s_copy, 0, bytes, 4) == mrhi_errorInvalid &&
-              mrhiSetRootBlock(s_device, s_render, 0, nullptr, 4) == mrhi_errorInvalid,
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "not misuse");
+    CHECK(mrhiPass_SetRootBlock(s_device, s_render, 2, bytes, 4) == mrhi_errorInvalid &&
+              mrhiPass_SetRootBlock(s_device, s_render, 0, bytes, 6) == mrhi_errorInvalid &&
+              mrhiPass_SetRootBlock(s_device, s_render, 0, bytes, 0) == mrhi_errorInvalid &&
+              mrhiPass_SetRootBlock(s_device, s_copy, 0, bytes, 4) == mrhi_errorInvalid &&
+              mrhiPass_SetRootBlock(s_device, s_render, 0, nullptr, 4) == mrhi_errorInvalid,
           "unaligned, empty, in a transfer pass, or without bytes");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 5, "each counted");
-    CHECK(mrhiSetRootBlock(nullptr, s_render, 0, bytes, 4) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiSetRootBlock(s_device, s_depth, 0, bytes, 4) == mrhi_errorState, "not begun");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 5, "each counted");
+    CHECK(mrhiPass_SetRootBlock(nullptr, s_render, 0, bytes, 4) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiPass_SetRootBlock(s_device, s_depth, 0, bytes, 4) == mrhi_errorState, "not begun");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Close2();
 }
 
@@ -679,12 +684,12 @@ static void TestDebugGroups(void)
 {
     Open(4);
     Frame(false);
-    CHECK(mrhiBeginPass(s_device, s_copy) == mrhi_success, "begun");
-    CHECK(mrhiPopDebugGroup(s_device, s_copy) == mrhi_errorInvalid, "no group open");
-    CHECK(mrhiPushDebugGroup(s_device, s_copy, "copies", 6) == mrhi_success &&
-              mrhiPushDebugGroup(s_device, s_copy, "inner", 5) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, s_copy) == mrhi_success, "begun");
+    CHECK(mrhiPass_PopDebugGroup(s_device, s_copy) == mrhi_errorInvalid, "no group open");
+    CHECK(mrhiPass_PushDebugGroup(s_device, s_copy, "copies", 6) == mrhi_success &&
+              mrhiPass_PushDebugGroup(s_device, s_copy, "inner", 5) == mrhi_success,
           "two groups in a transfer pass");
-    CHECK(mrhiInsertDebugMarker(s_device, s_copy, "here", 4) == mrhi_success, "a marker");
+    CHECK(mrhiPass_InsertDebugMarker(s_device, s_copy, "here", 4) == mrhi_success, "a marker");
 #if MAUL_RHI_LABELS
     const mrhiCommand* command = Nth(s_copy, 0);
     CHECK(command != nullptr && command->type == mrhiCommandPushDebugGroup && command->b == 6 &&
@@ -697,10 +702,10 @@ static void TestDebugGroups(void)
 #else
     CHECK(Nth(s_copy, 0) == nullptr, "nothing recorded in a build without labels");
 #endif
-    CHECK(mrhiEndPass(s_device, s_copy) == mrhi_errorInvalid, "groups still open");
-    CHECK(mrhiPopDebugGroup(s_device, s_copy) == mrhi_success, "one closed");
-    CHECK(mrhiEndPass(s_device, s_copy) == mrhi_errorInvalid, "one still open");
-    CHECK(mrhiPopDebugGroup(s_device, s_copy) == mrhi_success, "both closed");
+    CHECK(mrhiPass_End(s_device, s_copy) == mrhi_errorInvalid, "groups still open");
+    CHECK(mrhiPass_PopDebugGroup(s_device, s_copy) == mrhi_success, "one closed");
+    CHECK(mrhiPass_End(s_device, s_copy) == mrhi_errorInvalid, "one still open");
+    CHECK(mrhiPass_PopDebugGroup(s_device, s_copy) == mrhi_success, "both closed");
 #if MAUL_RHI_LABELS
     command = Nth(s_copy, 7);
     CHECK(command != nullptr && command->type == mrhiCommandPopDebugGroup &&
@@ -709,33 +714,33 @@ static void TestDebugGroups(void)
 #else
     CHECK(Nth(s_copy, 0) == nullptr, "the pops recorded nothing either");
 #endif
-    CHECK(mrhiEndPass(s_device, s_copy) == mrhi_success, "ended");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 3, "each refusal counted");
-    CHECK(mrhiBeginPass(s_device, s_dispatch) == mrhi_success, "another pass");
+    CHECK(mrhiPass_End(s_device, s_copy) == mrhi_success, "ended");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 3, "each refusal counted");
+    CHECK(mrhiPass_Begin(s_device, s_dispatch) == mrhi_success, "another pass");
     char label[257];
     memset(label, 'a', sizeof(label));
-    CHECK(mrhiInsertDebugMarker(s_device, s_dispatch, label, 256) == mrhi_success,
+    CHECK(mrhiPass_InsertDebugMarker(s_device, s_dispatch, label, 256) == mrhi_success,
           "the longest label");
 #if MAUL_RHI_LABELS
     const mrhiCommand* longest = Nth(s_dispatch, 0);
     CHECK(longest != nullptr && longest->payload == 8, "in eight payload records");
 #endif
-    CHECK(mrhiInsertDebugMarker(s_device, s_dispatch, label, 257) == mrhi_errorLimit &&
-              mrhiPushDebugGroup(s_device, s_dispatch, label, 0) == mrhi_errorInvalid &&
-              mrhiPushDebugGroup(s_device, s_dispatch, nullptr, 4) == mrhi_errorInvalid &&
-              mrhiInsertDebugMarker(s_device, s_dispatch, "\xFF", 1) == mrhi_errorInvalid,
+    CHECK(mrhiPass_InsertDebugMarker(s_device, s_dispatch, label, 257) == mrhi_errorLimit &&
+              mrhiPass_PushDebugGroup(s_device, s_dispatch, label, 0) == mrhi_errorInvalid &&
+              mrhiPass_PushDebugGroup(s_device, s_dispatch, nullptr, 4) == mrhi_errorInvalid &&
+              mrhiPass_InsertDebugMarker(s_device, s_dispatch, "\xFF", 1) == mrhi_errorInvalid,
           "too long, empty, missing or not text");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 7, "each counted");
-    CHECK(mrhiPushDebugGroup(nullptr, s_dispatch, "a", 1) == mrhi_errorInvalid &&
-              mrhiInsertDebugMarker(nullptr, s_dispatch, "a", 1) == mrhi_errorInvalid &&
-              mrhiPopDebugGroup(nullptr, s_dispatch) == mrhi_errorInvalid,
+    CHECK(mrhiDevice_GetMisuse(s_device) == 7, "each counted");
+    CHECK(mrhiPass_PushDebugGroup(nullptr, s_dispatch, "a", 1) == mrhi_errorInvalid &&
+              mrhiPass_InsertDebugMarker(nullptr, s_dispatch, "a", 1) == mrhi_errorInvalid &&
+              mrhiPass_PopDebugGroup(nullptr, s_dispatch) == mrhi_errorInvalid,
           "no device");
-    CHECK(mrhiPushDebugGroup(s_device, s_copy, "a", 1) == mrhi_errorState &&
-              mrhiPopDebugGroup(s_device, s_copy) == mrhi_errorState,
+    CHECK(mrhiPass_PushDebugGroup(s_device, s_copy, "a", 1) == mrhi_errorState &&
+              mrhiPass_PopDebugGroup(s_device, s_copy) == mrhi_errorState,
           "the pass ended");
-    CHECK(mrhiEndPass(s_device, s_dispatch) == mrhi_success, "ended");
+    CHECK(mrhiPass_End(s_device, s_dispatch) == mrhi_success, "ended");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
     Close2();
 }
 
@@ -743,76 +748,76 @@ static void TestArena(void)
 {
     Open(2);
     Frame(false);
-    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
-              mrhiBeginPass(s_device, s_dispatch) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, s_render) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_dispatch) == mrhi_success,
           "begun");
     // The render pass takes the first chunk, the dispatch pass the second.
     uint32_t perChunk = (uint32_t)MRHI_CHUNK_COMMANDS;
     for (uint32_t i = 0; i < perChunk - 2; ++i)
     {
-        CHECK(mrhiSetStencilReference(s_device, s_render, i) == mrhi_success, "fills");
+        CHECK(mrhiPass_SetStencilReference(s_device, s_render, i) == mrhi_success, "fills");
     }
-    CHECK(mrhiSetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_success, "a chunk");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_success, "a chunk");
     CHECK(Nth(s_render, perChunk - 3)->a == perChunk - 3, "the render pass's last record");
     uint8_t bytes[64] = {0};
-    CHECK(mrhiSetRootBlock(s_device, s_render, 0, bytes, 64) == mrhi_errorCapacity,
+    CHECK(mrhiPass_SetRootBlock(s_device, s_render, 0, bytes, 64) == mrhi_errorCapacity,
           "three records past its chunk, and no third chunk");
-    CHECK(mrhiSetStencilReference(s_device, s_render, 0) == mrhi_errorCapacity,
+    CHECK(mrhiPass_SetStencilReference(s_device, s_render, 0) == mrhi_errorCapacity,
           "nothing after, though a record would fit");
     CHECK(Nth(s_render, perChunk - 2) == nullptr, "nothing recorded");
     // The dispatch pass's chunk holds a record: 63 more root blocks of a
     // record each and their payload fill it.
     for (uint32_t i = 0; i < (perChunk - 1) / 2; ++i)
     {
-        CHECK(mrhiSetRootBlock(s_device, s_dispatch, 0, bytes, 4) == mrhi_success,
+        CHECK(mrhiPass_SetRootBlock(s_device, s_dispatch, 0, bytes, 4) == mrhi_success,
               "the other pass fills its chunk");
     }
-    CHECK(mrhiSetRootBlock(s_device, s_dispatch, 0, bytes, 4) == mrhi_errorCapacity,
+    CHECK(mrhiPass_SetRootBlock(s_device, s_dispatch, 0, bytes, 4) == mrhi_errorCapacity,
           "and finds the arena full");
-    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success &&
-              mrhiEndPass(s_device, s_dispatch) == mrhi_success,
+    CHECK(mrhiPass_End(s_device, s_render) == mrhi_success &&
+              mrhiPass_End(s_device, s_dispatch) == mrhi_success,
           "ended");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorCapacity, "refused");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "not misuse");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorCapacity, "refused");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "not misuse");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Frame(false);
 #if MAUL_RHI_LABELS
-    CHECK(mrhiBeginPass(s_device, s_copy) == mrhi_success, "the arena again");
+    CHECK(mrhiPass_Begin(s_device, s_copy) == mrhi_success, "the arena again");
     // Markers of two records: 63 to a chunk, the last record of each
     // left unused rather than splitting one.
     uint32_t markers = 2 * (perChunk / 2);
     for (uint32_t i = 0; i < markers; ++i)
     {
-        CHECK(mrhiInsertDebugMarker(s_device, s_copy, "m", 1) == mrhi_success, "fills it");
+        CHECK(mrhiPass_InsertDebugMarker(s_device, s_copy, "m", 1) == mrhi_success, "fills it");
     }
     CHECK(Nth(s_copy, 2 * markers - 1) != nullptr && Nth(s_copy, 2 * markers) == nullptr,
           "every record kept, across chunks");
-    CHECK(mrhiInsertDebugMarker(s_device, s_copy, "m", 1) == mrhi_errorCapacity, "full");
-    CHECK(mrhiPushDebugGroup(s_device, s_copy, "g", 1) == mrhi_errorCapacity,
+    CHECK(mrhiPass_InsertDebugMarker(s_device, s_copy, "m", 1) == mrhi_errorCapacity, "full");
+    CHECK(mrhiPass_PushDebugGroup(s_device, s_copy, "g", 1) == mrhi_errorCapacity,
           "a group without room");
-    CHECK(mrhiEndPass(s_device, s_copy) == mrhi_errorInvalid, "still counted open");
-    CHECK(mrhiPopDebugGroup(s_device, s_copy) == mrhi_errorCapacity, "closed without room");
-    CHECK(mrhiEndPass(s_device, s_copy) == mrhi_success, "ended");
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorCapacity, "refused once more");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiPass_End(s_device, s_copy) == mrhi_errorInvalid, "still counted open");
+    CHECK(mrhiPass_PopDebugGroup(s_device, s_copy) == mrhi_errorCapacity, "closed without room");
+    CHECK(mrhiPass_End(s_device, s_copy) == mrhi_success, "ended");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorCapacity, "refused once more");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Frame(false);
-    CHECK(mrhiBeginPass(s_device, s_copy) == mrhi_success &&
-              mrhiInsertDebugMarker(s_device, s_copy, "m", 1) == mrhi_success &&
-              mrhiEndPass(s_device, s_copy) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, s_copy) == mrhi_success &&
+              mrhiPass_InsertDebugMarker(s_device, s_copy, "m", 1) == mrhi_success &&
+              mrhiPass_End(s_device, s_copy) == mrhi_success,
           "each frame takes the arena afresh");
     CHECK(Nth(s_copy, 2) == nullptr, "holding only the new frame's records");
 #else
     // Without labels a marker records nothing, so markers never fill it.
-    bool taken = mrhiBeginPass(s_device, s_copy) == mrhi_success;
+    bool taken = mrhiPass_Begin(s_device, s_copy) == mrhi_success;
     for (uint32_t i = 0; i < 4 * perChunk; ++i)
     {
-        taken = taken && mrhiInsertDebugMarker(s_device, s_copy, "m", 1) == mrhi_success;
+        taken = taken && mrhiPass_InsertDebugMarker(s_device, s_copy, "m", 1) == mrhi_success;
     }
-    CHECK(taken && mrhiEndPass(s_device, s_copy) == mrhi_success && Nth(s_copy, 0) == nullptr,
+    CHECK(taken && mrhiPass_End(s_device, s_copy) == mrhi_success && Nth(s_copy, 0) == nullptr,
           "markers take no room in a build without labels");
 #endif
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
     Close2();
 }
 
@@ -821,12 +826,12 @@ static void TestLimit(void)
     CHECK(mrhiDefaultDeviceDef().budgets.frameCommandBytes == 1u << 20, "a megabyte by default");
     Open(1);
     Frame(false);
-    CHECK(mrhiBeginPass(s_device, s_dispatch) == mrhi_success &&
-              mrhiSetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_success &&
-              mrhiEndPass(s_device, s_dispatch) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, s_dispatch) == mrhi_success &&
+              mrhiPass_SetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_success &&
+              mrhiPass_End(s_device, s_dispatch) == mrhi_success,
           "one chunk records");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
     Close2();
 }
 
@@ -836,13 +841,13 @@ static void TestFailed(void)
     s_adapter.pipelineOutcome = mrhi_errorPlatform;
     Open(1);
     Frame(false);
-    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
-              mrhiBeginPass(s_device, s_dispatch) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, s_render) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_dispatch) == mrhi_success,
           "begun");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, s_graphics) == mrhi_errorState &&
-              mrhiSetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_errorState,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, s_graphics) == mrhi_errorState &&
+              mrhiPass_SetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_errorState,
           "failed");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Close2();
 }
 
@@ -898,36 +903,36 @@ static void TestHeaps(void)
     CHECK(mrhiCreateComputePipeline(s_device, &computeDef, &compute, &request) == mrhi_success,
           "a compute pipeline reading a heap");
     mrhiDeviceNotification record;
-    CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_success, "answered");
+    CHECK(mrhiDevice_TakeNotification(s_device, &record) == mrhi_success, "answered");
     mrhiHeapDef heapDef = mrhiDefaultHeapDef();
     heapDef.entries = 4;
     heapDef.samplers = 2;
     mrhiHeapId heap = {0};
     CHECK(mrhiCreateHeap(s_device, &heapDef, &heap) == mrhi_success, "a heap");
     Frame(false);
-    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
-              mrhiBeginPass(s_device, s_dispatch) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, s_render) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_dispatch) == mrhi_success,
           "begun without a heap");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, vertex) == mrhi_errorInvalid &&
-              mrhiSetGraphicsPipeline(s_device, s_render, fragment) == mrhi_errorInvalid &&
-              mrhiSetComputePipeline(s_device, s_dispatch, compute) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, vertex) == mrhi_errorInvalid &&
+              mrhiPass_SetGraphicsPipeline(s_device, s_render, fragment) == mrhi_errorInvalid &&
+              mrhiPass_SetComputePipeline(s_device, s_dispatch, compute) == mrhi_errorInvalid,
           "no pipeline reading a heap");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 3, "each misuse");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, s_graphics) == mrhi_success &&
-              mrhiSetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_success,
+    CHECK(mrhiDevice_GetMisuse(s_device) == 3, "each misuse");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, s_graphics) == mrhi_success &&
+              mrhiPass_SetComputePipeline(s_device, s_dispatch, s_compute) == mrhi_success,
           "others");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     s_frameHeap = heap;
     Frame(false);
-    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
-              mrhiBeginPass(s_device, s_dispatch) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, s_render) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_dispatch) == mrhi_success,
           "begun with the heap");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, vertex) == mrhi_success &&
-              mrhiSetGraphicsPipeline(s_device, s_render, fragment) == mrhi_success &&
-              mrhiSetGraphicsPipeline(s_device, s_render, s_graphics) == mrhi_success &&
-              mrhiSetComputePipeline(s_device, s_dispatch, compute) == mrhi_success,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, vertex) == mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(s_device, s_render, fragment) == mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(s_device, s_render, s_graphics) == mrhi_success &&
+              mrhiPass_SetComputePipeline(s_device, s_dispatch, compute) == mrhi_success,
           "any pipeline");
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     s_frameHeap = (mrhiHeapId){0};
     Close2();
     ResetAdapter();

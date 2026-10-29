@@ -112,7 +112,7 @@ static void Upload(Sample* sample, const Scene* scene)
     mrhiResourceId u = {0};
     mrhiResourceId t = {0};
     SampleCheck(sample,
-                mrhiBeginFrame(device, &frame) == mrhi_success &&
+                mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
                     mrhiImportBuffer(device, scene->vertices, &v) == mrhi_success &&
                     mrhiImportBuffer(device, scene->indices, &i) == mrhi_success &&
                     mrhiImportBuffer(device, scene->transform, &u) == mrhi_success &&
@@ -130,18 +130,20 @@ static void Upload(Sample* sample, const Scene* scene)
     const mrhiTextureCopy texels = {.resource = t};
     const mrhiTexelLayout layout = {.bytesPerRow = 8, .rowsPerImage = 2};
     const mrhiExtent3d extent = {2, 2, 1};
-    SampleCheck(
-        sample,
-        mrhiAddPass(device, &def, &pass) == mrhi_success &&
-            mrhiCompileFrame(device) == mrhi_success &&
-            mrhiBeginPass(device, pass) == mrhi_success &&
-            mrhiWriteBuffer(device, pass, v, 0, kVertices, sizeof(kVertices)) == mrhi_success &&
-            mrhiWriteBuffer(device, pass, i, 0, kIndices, sizeof(kIndices)) == mrhi_success &&
-            mrhiWriteBuffer(device, pass, u, 0, kTransform, sizeof(kTransform)) == mrhi_success &&
-            mrhiWriteTexture(device, pass, &texels, kTexels, sizeof(kTexels), &layout, &extent) ==
-                mrhi_success &&
-            mrhiEndPass(device, pass) == mrhi_success,
-        "uploaded");
+    SampleCheck(sample,
+                mrhiAddPass(device, &def, &pass) == mrhi_success &&
+                    mrhiDevice_CompileFrame(device) == mrhi_success &&
+                    mrhiPass_Begin(device, pass) == mrhi_success &&
+                    mrhiPass_WriteBuffer(device, pass, v, 0, kVertices, sizeof(kVertices)) ==
+                        mrhi_success &&
+                    mrhiPass_WriteBuffer(device, pass, i, 0, kIndices, sizeof(kIndices)) ==
+                        mrhi_success &&
+                    mrhiPass_WriteBuffer(device, pass, u, 0, kTransform, sizeof(kTransform)) ==
+                        mrhi_success &&
+                    mrhiPass_WriteTexture(device, pass, &texels, kTexels, sizeof(kTexels), &layout,
+                                          &extent) == mrhi_success &&
+                    mrhiPass_End(device, pass) == mrhi_success,
+                "uploaded");
     SampleFinish(sample);
 }
 
@@ -155,17 +157,18 @@ static void DrawQuad(Sample* sample, const Scene* scene, mrhiPassId pass, mrhiRe
         {.slot = 0, .resource = t, .range = {.mipCount = 1, .layerCount = 1}},
         {.slot = 1, .sampler = scene->sampler},
     };
-    SampleCheck(sample,
-                mrhiBeginPass(device, pass) == mrhi_success &&
-                    mrhiSetGraphicsPipeline(device, pass, scene->pipeline) == mrhi_success &&
-                    mrhiSetBindings(device, pass, 0, table0, 1) == mrhi_success &&
-                    mrhiSetBindings(device, pass, 1, table1, 2) == mrhi_success &&
-                    mrhiSetVertexBuffer(device, pass, 0, v, 0, sizeof(kVertices)) == mrhi_success &&
-                    mrhiSetIndexBuffer(device, pass, i, mrhi_indexUint16, 0, sizeof(kIndices)) ==
-                        mrhi_success &&
-                    mrhiDrawIndexed(device, pass, 6, 1, 0, 0, 0) == mrhi_success &&
-                    mrhiEndPass(device, pass) == mrhi_success,
-                "the quad drawn");
+    SampleCheck(
+        sample,
+        mrhiPass_Begin(device, pass) == mrhi_success &&
+            mrhiPass_SetGraphicsPipeline(device, pass, scene->pipeline) == mrhi_success &&
+            mrhiPass_SetBindings(device, pass, 0, table0, 1) == mrhi_success &&
+            mrhiPass_SetBindings(device, pass, 1, table1, 2) == mrhi_success &&
+            mrhiPass_SetVertexBuffer(device, pass, 0, v, 0, sizeof(kVertices)) == mrhi_success &&
+            mrhiPass_SetIndexBuffer(device, pass, i, mrhi_indexUint16, 0, sizeof(kIndices)) ==
+                mrhi_success &&
+            mrhiPass_DrawIndexed(device, pass, 6, 1, 0, 0, 0) == mrhi_success &&
+            mrhiPass_End(device, pass) == mrhi_success,
+        "the quad drawn");
 }
 
 // The second frame: the quad drawn into a declared target, read back.
@@ -183,7 +186,7 @@ static mrhiRequestId Draw(Sample* sample, const Scene* scene)
     targetDef.width = SIZE;
     targetDef.height = SIZE;
     SampleCheck(sample,
-                mrhiBeginFrame(device, &frame) == mrhi_success &&
+                mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
                     mrhiImportBuffer(device, scene->vertices, &v) == mrhi_success &&
                     mrhiImportBuffer(device, scene->indices, &i) == mrhi_success &&
                     mrhiImportBuffer(device, scene->transform, &u) == mrhi_success &&
@@ -213,16 +216,17 @@ static mrhiRequestId Draw(Sample* sample, const Scene* scene)
     SampleCheck(sample,
                 mrhiAddPass(device, &drawDef, &draw) == mrhi_success &&
                     mrhiAddPass(device, &readDef, &reading) == mrhi_success &&
-                    mrhiCompileFrame(device) == mrhi_success,
+                    mrhiDevice_CompileFrame(device) == mrhi_success,
                 "the frame compiled");
     DrawQuad(sample, scene, draw, v, i, u, t);
     const mrhiTextureCopy source = {.resource = target};
     const mrhiExtent3d extent = {SIZE, SIZE, 1};
     mrhiRequestId pixels = {0};
     SampleCheck(sample,
-                mrhiBeginPass(device, reading) == mrhi_success &&
-                    mrhiReadTexture(device, reading, &source, &extent, &pixels) == mrhi_success &&
-                    mrhiEndPass(device, reading) == mrhi_success,
+                mrhiPass_Begin(device, reading) == mrhi_success &&
+                    mrhiPass_ReadTexture(device, reading, &source, &extent, &pixels) ==
+                        mrhi_success &&
+                    mrhiPass_End(device, reading) == mrhi_success,
                 "the target read");
     return pixels;
 }

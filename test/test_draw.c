@@ -55,7 +55,7 @@ static void Unbound(void)
 static void Answered(void)
 {
     mrhiDeviceNotification record;
-    CHECK(mrhiNextDeviceNotification(s_device, &record) == mrhi_success &&
+    CHECK(mrhiDevice_TakeNotification(s_device, &record) == mrhi_success &&
               record.outcome == mrhi_success,
           "ready");
 }
@@ -137,7 +137,7 @@ static mrhiDiagnosticCode Refusal(void)
 {
     mrhiDiagnosticCode code = 0;
     mrhiDiagnostic record;
-    while (mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success)
+    while (mrhiDevice_TakeDiagnostic(s_device, &record) == mrhi_success)
     {
         code = record.code;
     }
@@ -184,7 +184,7 @@ static mrhiAccess Access(mrhiResourceId resource, mrhiAccessKind kind)
 static void Frame(void)
 {
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     s_v = Import(s_vertices);
     s_i = Import(s_instances);
     s_x = Import(s_indices);
@@ -214,16 +214,16 @@ static void Frame(void)
     def.accessCount = 0;
     def.passClass = mrhi_passTransfer;
     CHECK(mrhiAddPass(s_device, &def, &s_copy) == mrhi_success, "the copying pass");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
-    CHECK(mrhiBeginPass(s_device, s_render) == mrhi_success &&
-              mrhiBeginPass(s_device, s_compute) == mrhi_success &&
-              mrhiBeginPass(s_device, s_copy) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_Begin(s_device, s_render) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_compute) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_copy) == mrhi_success,
           "begun");
 }
 
 static void Drop(void)
 {
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 static void CloseDevice(void)
@@ -252,8 +252,10 @@ static const mrhiCommand* Nth(mrhiPassId id, uint32_t n)
 // Sets both vertex buffers whole in the render pass.
 static void SetVertices(void)
 {
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 0, MRHI_WHOLE_SIZE) == mrhi_success &&
-              mrhiSetVertexBuffer(s_device, s_render, 1, s_i, 0, MRHI_WHOLE_SIZE) == mrhi_success,
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 0, s_v, 0, MRHI_WHOLE_SIZE) ==
+                  mrhi_success &&
+              mrhiPass_SetVertexBuffer(s_device, s_render, 1, s_i, 0, MRHI_WHOLE_SIZE) ==
+                  mrhi_success,
           "the vertex buffers");
 }
 
@@ -265,87 +267,90 @@ static void TestVertexBuffers(void)
     Unbound();
     mrhiGraphicsPipelineId pipeline = MakeGraphics();
     Frame();
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 0, MRHI_WHOLE_SIZE) == mrhi_success,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 0, s_v, 0, MRHI_WHOLE_SIZE) == mrhi_success,
           "buffer 0");
     const mrhiCommand* command = Nth(s_render, 1);
     CHECK(command != nullptr && command->type == mrhiCommandVertexBuffer && command->a == 0 &&
               command->b == s_v.index1 && command->c == 0 && command->d == 120,
           "recorded whole");
-    CHECK(mrhiDraw(s_device, s_render, 3, 1, 0, 0) == mrhi_errorState, "buffer 1 not set");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 1, s_i, 0, 40) == mrhi_success, "buffer 1");
+    CHECK(mrhiPass_Draw(s_device, s_render, 3, 1, 0, 0) == mrhi_errorState, "buffer 1 not set");
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 1, s_i, 0, 40) == mrhi_success, "buffer 1");
     command = Nth(s_render, 2);
     CHECK(command != nullptr && command->a == 1 && command->b == s_i.index1 && command->d == 40,
           "recorded in its slot");
-    CHECK(mrhiDraw(s_device, s_render, 10, 3, 0, 0) == mrhi_success, "every vertex and instance");
+    CHECK(mrhiPass_Draw(s_device, s_render, 10, 3, 0, 0) == mrhi_success,
+          "every vertex and instance");
     command = Nth(s_render, 3);
     CHECK(command != nullptr && command->type == mrhiCommandDraw && command->a == 10 &&
               command->b == 3 && command->c == 0 && command->d == 0,
           "recorded");
-    CHECK(mrhiDraw(s_device, s_render, 5, 1, 5, 2) == mrhi_success, "the last of each");
+    CHECK(mrhiPass_Draw(s_device, s_render, 5, 1, 5, 2) == mrhi_success, "the last of each");
     CHECK(Nth(s_render, 4)->c == 5 && Nth(s_render, 4)->d == 2, "recorded from them");
-    CHECK(mrhiDraw(s_device, s_render, 0, 0, 0, 0) == mrhi_success, "none");
-    CHECK(mrhiDraw(s_device, s_render, 0, 0, 10, 3) == mrhi_success, "none, from the end");
-    CHECK(mrhiDraw(s_device, s_render, 11, 1, 0, 0) == mrhi_errorInvalid &&
-              mrhiDraw(s_device, s_render, 5, 1, 6, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_Draw(s_device, s_render, 0, 0, 0, 0) == mrhi_success, "none");
+    CHECK(mrhiPass_Draw(s_device, s_render, 0, 0, 10, 3) == mrhi_success, "none, from the end");
+    CHECK(mrhiPass_Draw(s_device, s_render, 11, 1, 0, 0) == mrhi_errorInvalid &&
+              mrhiPass_Draw(s_device, s_render, 5, 1, 6, 0) == mrhi_errorInvalid,
           "a vertex past the buffer");
-    CHECK(mrhiDraw(s_device, s_render, 1, 4, 0, 0) == mrhi_errorInvalid &&
-              mrhiDraw(s_device, s_render, 1, 1, 0, 3) == mrhi_errorInvalid &&
-              mrhiDraw(s_device, s_render, 0, 0, 0, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_Draw(s_device, s_render, 1, 4, 0, 0) == mrhi_errorInvalid &&
+              mrhiPass_Draw(s_device, s_render, 1, 1, 0, 3) == mrhi_errorInvalid &&
+              mrhiPass_Draw(s_device, s_render, 0, 0, 0, 4) == mrhi_errorInvalid,
           "an instance past it");
-    CHECK(mrhiDraw(s_device, s_render, 1, 1, UINT32_MAX, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_Draw(s_device, s_render, 1, 1, UINT32_MAX, 0) == mrhi_errorInvalid,
           "counted in 64 bits");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 6, "each counted");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 12, MRHI_WHOLE_SIZE) == mrhi_success,
+    CHECK(mrhiDevice_GetMisuse(s_device) == 6, "each counted");
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 0, s_v, 12, MRHI_WHOLE_SIZE) == mrhi_success,
           "from the second vertex");
     CHECK(Nth(s_render, 7)->c == 12 && Nth(s_render, 7)->d == 108, "recorded from its offset");
-    CHECK(mrhiDraw(s_device, s_render, 9, 1, 0, 0) == mrhi_success &&
-              mrhiDraw(s_device, s_render, 10, 1, 0, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_Draw(s_device, s_render, 9, 1, 0, 0) == mrhi_success &&
+              mrhiPass_Draw(s_device, s_render, 10, 1, 0, 0) == mrhi_errorInvalid,
           "nine left");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 1, s_i, 0, 39) == mrhi_success, "39 bytes");
-    CHECK(mrhiDraw(s_device, s_render, 1, 2, 0, 0) == mrhi_success &&
-              mrhiDraw(s_device, s_render, 1, 3, 0, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 1, s_i, 0, 39) == mrhi_success, "39 bytes");
+    CHECK(mrhiPass_Draw(s_device, s_render, 1, 2, 0, 0) == mrhi_success &&
+              mrhiPass_Draw(s_device, s_render, 1, 3, 0, 0) == mrhi_errorInvalid,
           "the last instance needs its attribute's 8 bytes");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 8, "each counted");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 8, s_v, 0, 12) == mrhi_errorCapacity &&
+    CHECK(mrhiDevice_GetMisuse(s_device) == 8, "each counted");
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 8, s_v, 0, 12) == mrhi_errorCapacity &&
               Refusal() == mrhi_diagnosticLimitVertexBuffers,
           "past the device's vertex buffers, within the adapter's, named");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 16, s_v, 0, 12) == mrhi_errorUnsupported &&
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 16, s_v, 0, 12) == mrhi_errorUnsupported &&
               Refusal() == mrhi_diagnosticLimitVertexBuffers,
           "past the adapter's");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 2, 12) == mrhi_errorInvalid &&
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 0, s_v, 2, 12) == mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticTransferAlignment,
           "an offset not a multiple of 4");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 124, MRHI_WHOLE_SIZE) ==
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 0, s_v, 124, MRHI_WHOLE_SIZE) ==
               mrhi_errorInvalid,
           "an offset past it");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 120, MRHI_WHOLE_SIZE) == mrhi_success,
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 0, s_v, 120, MRHI_WHOLE_SIZE) ==
+              mrhi_success,
           "nothing, at its end");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 4, 120) == mrhi_errorInvalid &&
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 0, s_v, 4, 120) == mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticTransferRange,
           "a size past it");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_x, 0, 12) == mrhi_errorInvalid &&
-              mrhiSetVertexBuffer(s_device, s_render, 0, s_x, 0, 0) == mrhi_errorInvalid &&
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 0, s_x, 0, 12) == mrhi_errorInvalid &&
+              mrhiPass_SetVertexBuffer(s_device, s_render, 0, s_x, 0, 0) == mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticUndeclaredAccess,
           "a buffer declared for indices");
-    CHECK(mrhiSetVertexBuffer(s_device, s_compute, 0, s_v, 0, 12) == mrhi_errorInvalid &&
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_compute, 0, s_v, 0, 12) == mrhi_errorInvalid &&
               Refusal() == mrhi_diagnosticRenderStateOutsideRenderPass,
           "a pass without targets");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 14, "each invalid one counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 14, "each invalid one counted");
     mrhiResourceId none = {0};
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, none, 0, 12) == mrhi_errorStale, "none");
-    CHECK(mrhiSetVertexBuffer(nullptr, s_render, 0, s_v, 0, 12) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success, "ended");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 0, 12) == mrhi_errorState &&
-              mrhiDraw(s_device, s_render, 0, 0, 0, 0) == mrhi_errorState,
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 0, none, 0, 12) == mrhi_errorStale, "none");
+    CHECK(mrhiPass_SetVertexBuffer(nullptr, s_render, 0, s_v, 0, 12) == mrhi_errorInvalid,
+          "no device");
+    CHECK(mrhiPass_End(s_device, s_render) == mrhi_success, "ended");
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 0, s_v, 0, 12) == mrhi_errorState &&
+              mrhiPass_Draw(s_device, s_render, 0, 0, 0, 0) == mrhi_errorState,
           "not recording");
     Drop();
     Frame();
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set again");
-    CHECK(mrhiDraw(s_device, s_render, 0, 0, 0, 0) == mrhi_errorState,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set again");
+    CHECK(mrhiPass_Draw(s_device, s_render, 0, 0, 0, 0) == mrhi_errorState,
           "each pass starts without buffers");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 1, s_i, 0, 8) == mrhi_success &&
-              mrhiDraw(s_device, s_render, 1, 3, 0, 0) == mrhi_errorState,
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 1, s_i, 0, 8) == mrhi_success &&
+              mrhiPass_Draw(s_device, s_render, 1, 3, 0, 0) == mrhi_errorState,
           "a buffer not set before one too small");
     Drop();
     CloseDevice();
@@ -367,10 +372,11 @@ static void TestAttributeReach(void)
     def.vertexAttributeCount = 3;
     mrhiGraphicsPipelineId pipeline = Graphics(&def);
     Frame();
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
     SetVertices();
-    CHECK(mrhiDraw(s_device, s_render, 1, 2, 0, 0) == mrhi_success, "two instances in 40 bytes");
-    CHECK(mrhiDraw(s_device, s_render, 1, 3, 0, 0) == mrhi_errorInvalid, "not three");
+    CHECK(mrhiPass_Draw(s_device, s_render, 1, 2, 0, 0) == mrhi_success,
+          "two instances in 40 bytes");
+    CHECK(mrhiPass_Draw(s_device, s_render, 1, 3, 0, 0) == mrhi_errorInvalid, "not three");
     Drop();
     CloseDevice();
 }
@@ -381,69 +387,80 @@ static void TestIndices(void)
     Unbound();
     mrhiGraphicsPipelineId pipeline = MakeGraphics();
     Frame();
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
     SetVertices();
-    CHECK(mrhiDrawIndexed(s_device, s_render, 1, 1, 0, 0, 0) == mrhi_errorState, "no indices");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+    CHECK(mrhiPass_DrawIndexed(s_device, s_render, 1, 1, 0, 0, 0) == mrhi_errorState, "no indices");
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
               mrhi_success,
           "32 indices");
     const mrhiCommand* command = Nth(s_render, 3);
     CHECK(command != nullptr && command->type == mrhiCommandIndexBuffer &&
               command->a == mrhi_indexUint16 && command->b == s_x.index1 && command->d == 64,
           "recorded");
-    CHECK(mrhiDrawIndexed(s_device, s_render, 32, 3, 0, -5, 0) == mrhi_success, "all of them");
+    CHECK(mrhiPass_DrawIndexed(s_device, s_render, 32, 3, 0, -5, 0) == mrhi_success, "all of them");
     command = Nth(s_render, 4);
     CHECK(command != nullptr && command->type == mrhiCommandDrawIndexed && command->a == 32 &&
               command->b == 3 && command->c == (0xFFFFFFFBull << 32) && command->d == 0,
           "recorded with the base vertex");
-    CHECK(mrhiDrawIndexed(s_device, s_render, 16, 1, 16, 0, 2) == mrhi_success, "the last half");
-    CHECK(mrhiDrawIndexed(s_device, s_render, 33, 1, 0, 0, 0) == mrhi_errorInvalid &&
-              mrhiDrawIndexed(s_device, s_render, 16, 1, 17, 0, 0) == mrhi_errorInvalid &&
-              mrhiDrawIndexed(s_device, s_render, 1, 1, UINT32_MAX, 0, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DrawIndexed(s_device, s_render, 16, 1, 16, 0, 2) == mrhi_success,
+          "the last half");
+    CHECK(mrhiPass_DrawIndexed(s_device, s_render, 33, 1, 0, 0, 0) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndexed(s_device, s_render, 16, 1, 17, 0, 0) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndexed(s_device, s_render, 1, 1, UINT32_MAX, 0, 0) == mrhi_errorInvalid,
           "an index past them");
-    CHECK(mrhiDrawIndexed(s_device, s_render, 1, 4, 0, 0, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DrawIndexed(s_device, s_render, 1, 4, 0, 0, 0) == mrhi_errorInvalid,
           "an instance past its buffer");
-    CHECK(mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 0, 0) == mrhi_success, "no vertices");
-    CHECK(mrhiDrawIndexed(s_device, s_render, 32, 1, 0, 0, 0) == mrhi_success,
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 0, s_v, 0, 0) == mrhi_success,
+          "no vertices");
+    CHECK(mrhiPass_DrawIndexed(s_device, s_render, 32, 1, 0, 0, 0) == mrhi_success,
           "vertices are not counted for indices");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint32, 4, MRHI_WHOLE_SIZE) ==
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint32, 4, MRHI_WHOLE_SIZE) ==
               mrhi_success,
           "15 wider indices");
-    CHECK(mrhiDrawIndexed(s_device, s_render, 15, 1, 0, 0, 0) == mrhi_success &&
-              mrhiDrawIndexed(s_device, s_render, 16, 1, 0, 0, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DrawIndexed(s_device, s_render, 15, 1, 0, 0, 0) == mrhi_success &&
+              mrhiPass_DrawIndexed(s_device, s_render, 16, 1, 0, 0, 0) == mrhi_errorInvalid,
           "and not 16");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 5, "each counted");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 2, 2) == mrhi_success,
+    CHECK(mrhiDevice_GetMisuse(s_device) == 5, "each counted");
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 2, 2) == mrhi_success,
           "an offset and size of the narrow width");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 1, 2) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 1, 2) ==
+              mrhi_errorInvalid,
           "an offset off the width");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint32, 2, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint32, 2, 4) ==
+              mrhi_errorInvalid,
           "off the wider width");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, 3) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, 3) ==
+              mrhi_errorInvalid,
           "a size off it");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint32, 0, 6) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint32, 0, 6) ==
+              mrhi_errorInvalid,
           "off the wider width");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexNone, 0, 4) == mrhi_errorInvalid &&
-              mrhiSetIndexBuffer(s_device, s_render, s_x, 3, 0, 4) == mrhi_errorInvalid,
-          "no width");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 66, MRHI_WHOLE_SIZE) ==
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexNone, 0, 4) ==
                   mrhi_errorInvalid &&
-              mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 2, 64) ==
+              mrhiPass_SetIndexBuffer(s_device, s_render, s_x, 3, 0, 4) == mrhi_errorInvalid,
+          "no width");
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 66, MRHI_WHOLE_SIZE) ==
+                  mrhi_errorInvalid &&
+              mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 2, 64) ==
                   mrhi_errorInvalid,
           "past it");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_v, mrhi_indexUint16, 0, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_v, mrhi_indexUint16, 0, 4) ==
+              mrhi_errorInvalid,
           "a buffer declared for vertices");
-    CHECK(mrhiSetIndexBuffer(s_device, s_compute, s_x, mrhi_indexUint16, 0, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_compute, s_x, mrhi_indexUint16, 0, 4) ==
+              mrhi_errorInvalid,
           "a pass without targets");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 15, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 15, "each counted");
     mrhiResourceId none = {0};
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, none, mrhi_indexUint16, 0, 4) == mrhi_errorStale,
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, none, mrhi_indexUint16, 0, 4) ==
+              mrhi_errorStale,
           "none");
-    CHECK(mrhiSetIndexBuffer(nullptr, s_render, s_x, mrhi_indexUint16, 0, 4) == mrhi_errorInvalid &&
-              mrhiDrawIndexed(nullptr, s_render, 0, 0, 0, 0, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_SetIndexBuffer(nullptr, s_render, s_x, mrhi_indexUint16, 0, 4) ==
+                  mrhi_errorInvalid &&
+              mrhiPass_DrawIndexed(nullptr, s_render, 0, 0, 0, 0, 0) == mrhi_errorInvalid,
           "no device");
-    CHECK(mrhiEndPass(s_device, s_copy) == mrhi_success, "the copying pass ended");
-    CHECK(mrhiSetIndexBuffer(s_device, s_copy, s_x, mrhi_indexUint16, 0, 4) == mrhi_errorState,
+    CHECK(mrhiPass_End(s_device, s_copy) == mrhi_success, "the copying pass ended");
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_copy, s_x, mrhi_indexUint16, 0, 4) == mrhi_errorState,
           "not recording");
     Drop();
     // A strip with a strip index format takes indices of that width.
@@ -452,20 +469,20 @@ static void TestIndices(void)
     def.stripIndexFormat = mrhi_indexUint32;
     mrhiGraphicsPipelineId strip = Graphics(&def);
     Frame();
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, strip) == mrhi_success, "a strip");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, strip) == mrhi_success, "a strip");
     SetVertices();
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
               mrhi_success,
           "narrow indices");
-    CHECK(mrhiDrawIndexed(s_device, s_render, 3, 1, 0, 0, 0) == mrhi_errorState,
+    CHECK(mrhiPass_DrawIndexed(s_device, s_render, 3, 1, 0, 0, 0) == mrhi_errorState,
           "not the strip's width");
-    CHECK(mrhiDraw(s_device, s_render, 3, 1, 0, 0) == mrhi_success, "drawn without them");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint32, 0, MRHI_WHOLE_SIZE) ==
+    CHECK(mrhiPass_Draw(s_device, s_render, 3, 1, 0, 0) == mrhi_success, "drawn without them");
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint32, 0, MRHI_WHOLE_SIZE) ==
                   mrhi_success &&
-              mrhiDrawIndexed(s_device, s_render, 3, 1, 0, 0, 0) == mrhi_success,
+              mrhiPass_DrawIndexed(s_device, s_render, 3, 1, 0, 0, 0) == mrhi_success,
           "its width");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success &&
-              mrhiDrawIndexed(s_device, s_render, 3, 1, 0, 0, 0) == mrhi_success,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success &&
+              mrhiPass_DrawIndexed(s_device, s_render, 3, 1, 0, 0, 0) == mrhi_success,
           "any width for a list");
     Drop();
     CloseDevice();
@@ -482,33 +499,33 @@ static void TestTables(void)
     Put64(s_sections[BINDINGS].bytes + 16, 16);
     mrhiGraphicsPipelineId other = MakeGraphics();
     Frame();
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
     SetVertices();
-    CHECK(mrhiDraw(s_device, s_render, 1, 1, 0, 0) == mrhi_errorState, "its table not set");
+    CHECK(mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == mrhi_errorState, "its table not set");
     mrhiBinding binding = {.slot = 0, .resource = s_u, .size = 256};
-    CHECK(mrhiSetBindings(s_device, s_render, 2, &binding, 1) == mrhi_success, "set");
-    CHECK(mrhiDraw(s_device, s_render, 1, 1, 0, 0) == mrhi_success, "drawn");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, same) == mrhi_success &&
-              mrhiDraw(s_device, s_render, 1, 1, 0, 0) == mrhi_success,
+    CHECK(mrhiPass_SetBindings(s_device, s_render, 2, &binding, 1) == mrhi_success, "set");
+    CHECK(mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == mrhi_success, "drawn");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, same) == mrhi_success &&
+              mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == mrhi_success,
           "by a pipeline of the same container");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, other) == mrhi_success &&
-              mrhiDraw(s_device, s_render, 1, 1, 0, 0) == mrhi_errorState,
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, other) == mrhi_success &&
+              mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == mrhi_errorState,
           "not by one of another");
-    CHECK(mrhiSetBindings(s_device, s_render, 2, &binding, 1) == mrhi_success &&
-              mrhiDraw(s_device, s_render, 1, 1, 0, 0) == mrhi_success,
+    CHECK(mrhiPass_SetBindings(s_device, s_render, 2, &binding, 1) == mrhi_success &&
+              mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == mrhi_success,
           "until set under it");
     CHECK(mrhiDestroyGraphicsPipeline(s_device, other) == mrhi_success, "destroyed");
-    CHECK(mrhiDraw(s_device, s_render, 1, 1, 0, 0) == mrhi_errorStale &&
-              mrhiDrawIndexed(s_device, s_render, 1, 1, 0, 0, 0) == mrhi_errorStale,
+    CHECK(mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == mrhi_errorStale &&
+              mrhiPass_DrawIndexed(s_device, s_render, 1, 1, 0, 0, 0) == mrhi_errorStale,
           "a destroyed pipeline");
-    CHECK(mrhiDraw(s_device, s_compute, 1, 1, 0, 0) == mrhi_errorInvalid &&
-              mrhiDrawIndexed(s_device, s_compute, 1, 1, 0, 0, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_Draw(s_device, s_compute, 1, 1, 0, 0) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndexed(s_device, s_compute, 1, 1, 0, 0, 0) == mrhi_errorInvalid,
           "a pass without targets");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 2, "counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 2, "counted");
     Drop();
     Frame();
-    CHECK(mrhiDraw(s_device, s_render, 1, 1, 0, 0) == mrhi_errorState &&
-              mrhiDrawIndexed(s_device, s_render, 1, 1, 0, 0, 0) == mrhi_errorState,
+    CHECK(mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == mrhi_errorState &&
+              mrhiPass_DrawIndexed(s_device, s_render, 1, 1, 0, 0, 0) == mrhi_errorState,
           "no pipeline set");
     Drop();
     CloseDevice();
@@ -524,40 +541,40 @@ static void TestDispatch(void)
     Binding(0, 3, 0, mrhi_bindingUniformBuffer, mrhi_stageCompute);
     mrhiComputePipelineId bound = MakeCompute();
     Frame();
-    CHECK(mrhiDispatch(s_device, s_compute, 1, 1, 1) == mrhi_errorState, "no pipeline set");
-    CHECK(mrhiSetComputePipeline(s_device, s_compute, pipeline) == mrhi_success, "set");
-    CHECK(mrhiDispatch(s_device, s_compute, 4, 2, 1) == mrhi_success, "dispatched");
+    CHECK(mrhiPass_Dispatch(s_device, s_compute, 1, 1, 1) == mrhi_errorState, "no pipeline set");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_compute, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_Dispatch(s_device, s_compute, 4, 2, 1) == mrhi_success, "dispatched");
     const mrhiCommand* command = Nth(s_compute, 1);
     CHECK(command != nullptr && command->type == mrhiCommandDispatch && command->a == 4 &&
               command->b == 2 && command->c == 1,
           "recorded");
     uint32_t most = mrhiDefaultLimits().workgroupsPerDimension;
-    CHECK(mrhiDispatch(s_device, s_compute, most, most, most) == mrhi_success, "at the limit");
-    CHECK(mrhiDispatch(s_device, s_compute, 0, 0, 0) == mrhi_success, "nothing");
-    CHECK(mrhiDispatch(s_device, s_compute, most + 1, 1, 1) == mrhi_errorCapacity &&
-              mrhiDispatch(s_device, s_compute, 1, most + 1, 1) == mrhi_errorCapacity &&
-              mrhiDispatch(s_device, s_compute, 1, 1, most + 1) == mrhi_errorCapacity &&
+    CHECK(mrhiPass_Dispatch(s_device, s_compute, most, most, most) == mrhi_success, "at the limit");
+    CHECK(mrhiPass_Dispatch(s_device, s_compute, 0, 0, 0) == mrhi_success, "nothing");
+    CHECK(mrhiPass_Dispatch(s_device, s_compute, most + 1, 1, 1) == mrhi_errorCapacity &&
+              mrhiPass_Dispatch(s_device, s_compute, 1, most + 1, 1) == mrhi_errorCapacity &&
+              mrhiPass_Dispatch(s_device, s_compute, 1, 1, most + 1) == mrhi_errorCapacity &&
               Refusal() == mrhi_diagnosticLimitWorkgroupsPerDimension,
           "past the device's limit, within the adapter's");
-    CHECK(mrhiDispatch(s_device, s_compute, 2 * most + 1, 1, 1) == mrhi_errorUnsupported &&
-              mrhiDispatch(s_device, s_compute, 1, 2 * most + 1, most + 1) ==
+    CHECK(mrhiPass_Dispatch(s_device, s_compute, 2 * most + 1, 1, 1) == mrhi_errorUnsupported &&
+              mrhiPass_Dispatch(s_device, s_compute, 1, 2 * most + 1, most + 1) ==
                   mrhi_errorUnsupported &&
-              mrhiDispatch(s_device, s_compute, 1, 1, UINT32_MAX) == mrhi_errorUnsupported &&
+              mrhiPass_Dispatch(s_device, s_compute, 1, 1, UINT32_MAX) == mrhi_errorUnsupported &&
               Refusal() == mrhi_diagnosticLimitWorkgroupsPerDimension,
           "past the adapter's");
-    CHECK(mrhiDispatch(s_device, s_render, 1, 1, 1) == mrhi_errorInvalid &&
-              mrhiDispatch(s_device, s_copy, 1, 1, 1) == mrhi_errorInvalid,
+    CHECK(mrhiPass_Dispatch(s_device, s_render, 1, 1, 1) == mrhi_errorInvalid &&
+              mrhiPass_Dispatch(s_device, s_copy, 1, 1, 1) == mrhi_errorInvalid,
           "a pass with targets or copying");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 2, "each invalid one counted");
-    CHECK(mrhiSetComputePipeline(s_device, s_compute, bound) == mrhi_success &&
-              mrhiDispatch(s_device, s_compute, 1, 1, 1) == mrhi_errorState,
+    CHECK(mrhiDevice_GetMisuse(s_device) == 2, "each invalid one counted");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_compute, bound) == mrhi_success &&
+              mrhiPass_Dispatch(s_device, s_compute, 1, 1, 1) == mrhi_errorState,
           "its table not set");
     CHECK(mrhiDestroyComputePipeline(s_device, bound) == mrhi_success &&
-              mrhiDispatch(s_device, s_compute, 1, 1, 1) == mrhi_errorStale,
+              mrhiPass_Dispatch(s_device, s_compute, 1, 1, 1) == mrhi_errorStale,
           "destroyed");
-    CHECK(mrhiDispatch(nullptr, s_compute, 1, 1, 1) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiEndPass(s_device, s_compute) == mrhi_success &&
-              mrhiDispatch(s_device, s_compute, 1, 1, 1) == mrhi_errorState,
+    CHECK(mrhiPass_Dispatch(nullptr, s_compute, 1, 1, 1) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiPass_End(s_device, s_compute) == mrhi_success &&
+              mrhiPass_Dispatch(s_device, s_compute, 1, 1, 1) == mrhi_errorState,
           "not recording");
     Drop();
     CloseDevice();
@@ -569,54 +586,56 @@ static void TestIndirectDraws(void)
     Unbound();
     mrhiGraphicsPipelineId pipeline = MakeGraphics();
     Frame();
-    CHECK(mrhiDrawIndirect(s_device, s_render, s_a, 0) == mrhi_errorState &&
-              mrhiDrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorState,
+    CHECK(mrhiPass_DrawIndirect(s_device, s_render, s_a, 0) == mrhi_errorState &&
+              mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorState,
           "no pipeline set");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
-    CHECK(mrhiDrawIndirect(s_device, s_render, s_a, 0) == mrhi_errorState, "no vertex buffers");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_DrawIndirect(s_device, s_render, s_a, 0) == mrhi_errorState,
+          "no vertex buffers");
     SetVertices();
-    CHECK(mrhiDrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorState, "no indices");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+    CHECK(mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorState,
+          "no indices");
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
               mrhi_success,
           "indices");
-    CHECK(mrhiDrawIndirect(s_device, s_render, s_a, 48) == mrhi_success, "the last arguments");
+    CHECK(mrhiPass_DrawIndirect(s_device, s_render, s_a, 48) == mrhi_success, "the last arguments");
     const mrhiCommand* command = Nth(s_render, 4);
     CHECK(command != nullptr && command->type == mrhiCommandDrawIndirect &&
               command->a == s_a.index1 && command->b == 0 && command->c == 48 && command->d == 0,
           "recorded");
-    CHECK(mrhiDrawIndexedIndirect(s_device, s_render, s_a, 44) == mrhi_success,
+    CHECK(mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 44) == mrhi_success,
           "the last indexed arguments");
     command = Nth(s_render, 5);
     CHECK(command != nullptr && command->type == mrhiCommandDrawIndexedIndirect &&
               command->a == s_a.index1 && command->c == 44,
           "recorded");
-    CHECK(mrhiDrawIndirect(s_device, s_render, s_a, 52) == mrhi_errorInvalid &&
-              mrhiDrawIndexedIndirect(s_device, s_render, s_a, 48) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DrawIndirect(s_device, s_render, s_a, 52) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 48) == mrhi_errorInvalid,
           "arguments past the buffer");
-    CHECK(mrhiDrawIndirect(s_device, s_render, s_a, UINT64_MAX - 3) == mrhi_errorInvalid &&
-              mrhiDrawIndexedIndirect(s_device, s_render, s_a, 68) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DrawIndirect(s_device, s_render, s_a, UINT64_MAX - 3) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 68) == mrhi_errorInvalid,
           "an offset past it");
-    CHECK(mrhiDrawIndirect(s_device, s_render, s_a, 2) == mrhi_errorInvalid &&
-              mrhiDrawIndexedIndirect(s_device, s_render, s_a, 6) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DrawIndirect(s_device, s_render, s_a, 2) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 6) == mrhi_errorInvalid,
           "an offset off 4");
-    CHECK(mrhiDrawIndirect(s_device, s_render, s_v, 0) == mrhi_errorInvalid &&
-              mrhiDrawIndexedIndirect(s_device, s_render, s_u, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DrawIndirect(s_device, s_render, s_v, 0) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndexedIndirect(s_device, s_render, s_u, 0) == mrhi_errorInvalid,
           "a buffer declared for another access");
-    CHECK(mrhiDrawIndirect(s_device, s_compute, s_a, 0) == mrhi_errorInvalid &&
-              mrhiDrawIndexedIndirect(s_device, s_copy, s_a, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DrawIndirect(s_device, s_compute, s_a, 0) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndexedIndirect(s_device, s_copy, s_a, 0) == mrhi_errorInvalid,
           "a pass without targets");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 10, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 10, "each counted");
     mrhiResourceId none = {0};
-    CHECK(mrhiDrawIndirect(s_device, s_render, none, 0) == mrhi_errorStale &&
-              mrhiDrawIndexedIndirect(s_device, s_render, none, 0) == mrhi_errorStale,
+    CHECK(mrhiPass_DrawIndirect(s_device, s_render, none, 0) == mrhi_errorStale &&
+              mrhiPass_DrawIndexedIndirect(s_device, s_render, none, 0) == mrhi_errorStale,
           "none");
-    CHECK(mrhiDrawIndirect(nullptr, s_render, s_a, 0) == mrhi_errorInvalid &&
-              mrhiDrawIndexedIndirect(nullptr, s_render, s_a, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DrawIndirect(nullptr, s_render, s_a, 0) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndexedIndirect(nullptr, s_render, s_a, 0) == mrhi_errorInvalid,
           "no device");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 10, "neither counted");
-    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success &&
-              mrhiDrawIndirect(s_device, s_render, s_a, 0) == mrhi_errorState &&
-              mrhiDrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorState,
+    CHECK(mrhiDevice_GetMisuse(s_device) == 10, "neither counted");
+    CHECK(mrhiPass_End(s_device, s_render) == mrhi_success &&
+              mrhiPass_DrawIndirect(s_device, s_render, s_a, 0) == mrhi_errorState &&
+              mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorState,
           "not recording");
     Drop();
     // A strip with a strip index format takes indices of that width.
@@ -625,20 +644,20 @@ static void TestIndirectDraws(void)
     def.stripIndexFormat = mrhi_indexUint32;
     mrhiGraphicsPipelineId strip = Graphics(&def);
     Frame();
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, strip) == mrhi_success, "a strip");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint32, 0, MRHI_WHOLE_SIZE) ==
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, strip) == mrhi_success, "a strip");
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint32, 0, MRHI_WHOLE_SIZE) ==
                   mrhi_success &&
-              mrhiDrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorState,
+              mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorState,
           "indices of its width but no vertex buffers");
     SetVertices();
-    CHECK(mrhiDrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_success, "its width");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+    CHECK(mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_success, "its width");
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
                   mrhi_success &&
-              mrhiDrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorState,
+              mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorState,
           "not the strip's width");
     CHECK(mrhiDestroyGraphicsPipeline(s_device, strip) == mrhi_success &&
-              mrhiDrawIndirect(s_device, s_render, s_a, 0) == mrhi_errorStale &&
-              mrhiDrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorStale,
+              mrhiPass_DrawIndirect(s_device, s_render, s_a, 0) == mrhi_errorStale &&
+              mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorStale,
           "a destroyed pipeline");
     Drop();
     CloseDevice();
@@ -650,7 +669,7 @@ static void CountedFrame(mrhiBufferId records, mrhiBufferId counts, mrhiResource
                          mrhiResourceId* countsOut)
 {
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     s_v = Import(s_vertices);
     s_i = Import(s_instances);
     s_x = Import(s_indices);
@@ -669,8 +688,8 @@ static void CountedFrame(mrhiBufferId records, mrhiBufferId counts, mrhiResource
     def.accesses = accesses;
     def.accessCount = 5;
     CHECK(mrhiAddPass(s_device, &def, &s_render) == mrhi_success &&
-              mrhiCompileFrame(s_device) == mrhi_success &&
-              mrhiBeginPass(s_device, s_render) == mrhi_success,
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_render) == mrhi_success,
           "the render pass begun");
 }
 
@@ -683,12 +702,13 @@ static void TestCountedDraws(void)
     Open();
     mrhiGraphicsPipelineId pipeline = MakeGraphics();
     Frame();
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
     SetVertices();
-    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) == mrhi_errorUnsupported &&
-              mrhiDrawIndexedIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) ==
+    CHECK(mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) ==
                   mrhi_errorUnsupported &&
-              mrhiGetDeviceMisuse(s_device) == 0,
+              mrhiPass_DrawIndexedIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) ==
+                  mrhi_errorUnsupported &&
+              mrhiDevice_GetMisuse(s_device) == 0,
           "unsupported without the feature, and no misuse");
     Drop();
     CloseDevice();
@@ -698,63 +718,65 @@ static void TestCountedDraws(void)
     OpenLimited(deviceDef);
     pipeline = MakeGraphics();
     Frame();
-    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) == mrhi_errorState,
+    CHECK(mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) == mrhi_errorState,
           "no pipeline set");
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
     SetVertices();
-    CHECK(mrhiDrawIndexedIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) == mrhi_errorState,
+    CHECK(mrhiPass_DrawIndexedIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) ==
+              mrhi_errorState,
           "no indices");
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
               mrhi_success,
           "indices");
-    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 3) == mrhi_success,
+    CHECK(mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 3) == mrhi_success,
           "three records and the count after them");
     const mrhiCommand* command = Nth(s_render, 4);
     CHECK(command != nullptr && command->type == mrhiCommandDrawIndirectCount &&
               command->a == s_a.index1 && command->b == ((uint64_t)3 << 32 | s_a.index1) &&
               command->c == 0 && command->d == 60,
           "recorded");
-    CHECK(mrhiDrawIndexedIndirectCount(s_device, s_render, s_a, 4, s_a, 0, 3) == mrhi_success,
+    CHECK(mrhiPass_DrawIndexedIndirectCount(s_device, s_render, s_a, 4, s_a, 0, 3) == mrhi_success,
           "three indexed records to the end");
     command = Nth(s_render, 5);
     CHECK(command != nullptr && command->type == mrhiCommandDrawIndexedIndirectCount &&
               command->a == s_a.index1 && command->b == ((uint64_t)3 << 32 | s_a.index1) &&
               command->c == 4 && command->d == 0,
           "recorded");
-    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 5) == mrhi_errorInvalid &&
-              mrhiDrawIndexedIndirectCount(s_device, s_render, s_a, 8, s_a, 0, 3) ==
+    CHECK(mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 5) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndexedIndirectCount(s_device, s_render, s_a, 8, s_a, 0, 3) ==
                   mrhi_errorInvalid,
           "records past the buffer");
-    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 64, 1) == mrhi_errorInvalid &&
-              mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, UINT64_MAX - 3, 1) ==
+    CHECK(mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 64, 1) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, UINT64_MAX - 3, 1) ==
                   mrhi_errorInvalid,
           "a count past the buffer");
-    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 2, s_a, 60, 1) == mrhi_errorInvalid &&
-              mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 58, 1) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 2, s_a, 60, 1) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 58, 1) ==
+                  mrhi_errorInvalid,
           "offsets off 4");
-    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 0) == mrhi_errorInvalid &&
-              mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60,
-                                    MRHI_MAX_INDIRECT_DRAWS + 1) == mrhi_errorLimit,
+    CHECK(mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 0) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60,
+                                         MRHI_MAX_INDIRECT_DRAWS + 1) == mrhi_errorLimit,
           "no draws, or too many");
-    CHECK(mrhiDrawIndirectCount(s_device, s_render, s_v, 0, s_a, 60, 1) == mrhi_errorInvalid &&
-              mrhiDrawIndexedIndirectCount(s_device, s_render, s_a, 0, s_u, 0, 1) ==
+    CHECK(mrhiPass_DrawIndirectCount(s_device, s_render, s_v, 0, s_a, 60, 1) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndexedIndirectCount(s_device, s_render, s_a, 0, s_u, 0, 1) ==
                   mrhi_errorInvalid,
           "a buffer declared for another access");
-    CHECK(mrhiDrawIndirectCount(s_device, s_compute, s_a, 0, s_a, 60, 1) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DrawIndirectCount(s_device, s_compute, s_a, 0, s_a, 60, 1) == mrhi_errorInvalid,
           "a pass without targets");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 11, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 11, "each counted");
     mrhiResourceId none = {0};
-    CHECK(mrhiDrawIndirectCount(s_device, s_render, none, 0, s_a, 60, 1) == mrhi_errorStale &&
-              mrhiDrawIndexedIndirectCount(s_device, s_render, s_a, 0, none, 0, 1) ==
+    CHECK(mrhiPass_DrawIndirectCount(s_device, s_render, none, 0, s_a, 60, 1) == mrhi_errorStale &&
+              mrhiPass_DrawIndexedIndirectCount(s_device, s_render, s_a, 0, none, 0, 1) ==
                   mrhi_errorStale,
           "none");
-    CHECK(mrhiDrawIndirectCount(nullptr, s_render, s_a, 0, s_a, 60, 1) == mrhi_errorInvalid &&
-              mrhiDrawIndexedIndirectCount(nullptr, s_render, s_a, 0, s_a, 60, 1) ==
+    CHECK(mrhiPass_DrawIndirectCount(nullptr, s_render, s_a, 0, s_a, 60, 1) == mrhi_errorInvalid &&
+              mrhiPass_DrawIndexedIndirectCount(nullptr, s_render, s_a, 0, s_a, 60, 1) ==
                   mrhi_errorInvalid,
           "no device");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 11, "neither counted");
-    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success &&
-              mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) == mrhi_errorState,
+    CHECK(mrhiDevice_GetMisuse(s_device) == 11, "neither counted");
+    CHECK(mrhiPass_End(s_device, s_render) == mrhi_success &&
+              mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) == mrhi_errorState,
           "not recording");
     Drop();
     // The most draws, in a buffer with room for one more, and the count in
@@ -765,20 +787,20 @@ static void TestCountedDraws(void)
     mrhiResourceId r = {0};
     mrhiResourceId c = {0};
     CountedFrame(records, counts, &r, &c);
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
     SetVertices();
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
                   mrhi_success &&
-              mrhiDrawIndexedIndirectCount(s_device, s_render, r, 20, c, 4,
-                                           MRHI_MAX_INDIRECT_DRAWS) == mrhi_success,
+              mrhiPass_DrawIndexedIndirectCount(s_device, s_render, r, 20, c, 4,
+                                                MRHI_MAX_INDIRECT_DRAWS) == mrhi_success,
           "the most draws");
     command = Nth(s_render, 4);
     CHECK(command != nullptr && command->a == r.index1 &&
               command->b == ((uint64_t)MRHI_MAX_INDIRECT_DRAWS << 32 | c.index1) &&
               command->c == 20 && command->d == 4,
           "recorded with the count's own buffer");
-    CHECK(mrhiDrawIndexedIndirectCount(s_device, s_render, r, 0, c, 4,
-                                       MRHI_MAX_INDIRECT_DRAWS + 1) == mrhi_errorLimit,
+    CHECK(mrhiPass_DrawIndexedIndirectCount(s_device, s_render, r, 0, c, 4,
+                                            MRHI_MAX_INDIRECT_DRAWS + 1) == mrhi_errorLimit,
           "one past the most, though the buffer has room");
     Drop();
     CloseDevice();
@@ -791,22 +813,24 @@ static void TestCountedDraws(void)
     for (int frame = 0; frame < 2; ++frame)
     {
         Frame();
-        CHECK(mrhiSetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+        CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
         SetVertices();
-        CHECK(mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 3) == mrhi_success &&
-                  mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 3) ==
+        CHECK(mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 3) == mrhi_success &&
+                  mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 3) ==
                       mrhi_errorCapacity &&
-                  mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 2) == mrhi_success &&
-                  mrhiDrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) ==
+                  mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 2) ==
+                      mrhi_success &&
+                  mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) ==
                       mrhi_errorCapacity &&
                   Refusal() == mrhi_diagnosticFrameIndirectDraws,
               "five draws in a frame");
         mrhiFrameUsage usage = {0};
-        CHECK(mrhiGetFrameUsage(s_device, &usage) == mrhi_success && usage.frameIndirectDraws == 5,
+        CHECK(mrhiDevice_GetFrameUsage(s_device, &usage) == mrhi_success &&
+                  usage.frameIndirectDraws == 5,
               "all of them taken");
         Drop();
     }
-    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "the limit is no misuse");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "the limit is no misuse");
     CloseDevice();
 }
 
@@ -818,34 +842,35 @@ static void TestIndirectDispatch(void)
     Binding(0, 3, 0, mrhi_bindingUniformBuffer, mrhi_stageCompute);
     mrhiComputePipelineId bound = MakeCompute();
     Frame();
-    CHECK(mrhiDispatchIndirect(s_device, s_compute, s_a, 0) == mrhi_errorState, "no pipeline");
-    CHECK(mrhiSetComputePipeline(s_device, s_compute, pipeline) == mrhi_success, "set");
-    CHECK(mrhiDispatchIndirect(s_device, s_compute, s_a, 52) == mrhi_success, "the last counts");
+    CHECK(mrhiPass_DispatchIndirect(s_device, s_compute, s_a, 0) == mrhi_errorState, "no pipeline");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_compute, pipeline) == mrhi_success, "set");
+    CHECK(mrhiPass_DispatchIndirect(s_device, s_compute, s_a, 52) == mrhi_success,
+          "the last counts");
     const mrhiCommand* command = Nth(s_compute, 1);
     CHECK(command != nullptr && command->type == mrhiCommandDispatchIndirect &&
               command->a == s_a.index1 && command->c == 52,
           "recorded");
-    CHECK(mrhiDispatchIndirect(s_device, s_compute, s_a, 56) == mrhi_errorInvalid &&
-              mrhiDispatchIndirect(s_device, s_compute, s_a, 66) == mrhi_errorInvalid &&
-              mrhiDispatchIndirect(s_device, s_compute, s_a, 1) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DispatchIndirect(s_device, s_compute, s_a, 56) == mrhi_errorInvalid &&
+              mrhiPass_DispatchIndirect(s_device, s_compute, s_a, 66) == mrhi_errorInvalid &&
+              mrhiPass_DispatchIndirect(s_device, s_compute, s_a, 1) == mrhi_errorInvalid,
           "past the buffer or off 4");
-    CHECK(mrhiDispatchIndirect(s_device, s_compute, s_x, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DispatchIndirect(s_device, s_compute, s_x, 0) == mrhi_errorInvalid,
           "a buffer declared for indices");
-    CHECK(mrhiDispatchIndirect(s_device, s_render, s_a, 0) == mrhi_errorInvalid &&
-              mrhiDispatchIndirect(s_device, s_copy, s_a, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_DispatchIndirect(s_device, s_render, s_a, 0) == mrhi_errorInvalid &&
+              mrhiPass_DispatchIndirect(s_device, s_copy, s_a, 0) == mrhi_errorInvalid,
           "a pass with targets or copying");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 6, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 6, "each counted");
     mrhiResourceId none = {0};
-    CHECK(mrhiDispatchIndirect(s_device, s_compute, none, 0) == mrhi_errorStale, "none");
-    CHECK(mrhiSetComputePipeline(s_device, s_compute, bound) == mrhi_success &&
-              mrhiDispatchIndirect(s_device, s_compute, s_a, 0) == mrhi_errorState,
+    CHECK(mrhiPass_DispatchIndirect(s_device, s_compute, none, 0) == mrhi_errorStale, "none");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_compute, bound) == mrhi_success &&
+              mrhiPass_DispatchIndirect(s_device, s_compute, s_a, 0) == mrhi_errorState,
           "its table not set");
     CHECK(mrhiDestroyComputePipeline(s_device, bound) == mrhi_success &&
-              mrhiDispatchIndirect(s_device, s_compute, s_a, 0) == mrhi_errorStale,
+              mrhiPass_DispatchIndirect(s_device, s_compute, s_a, 0) == mrhi_errorStale,
           "destroyed");
-    CHECK(mrhiDispatchIndirect(nullptr, s_compute, s_a, 0) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiEndPass(s_device, s_compute) == mrhi_success &&
-              mrhiDispatchIndirect(s_device, s_compute, s_a, 0) == mrhi_errorState,
+    CHECK(mrhiPass_DispatchIndirect(nullptr, s_compute, s_a, 0) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiPass_End(s_device, s_compute) == mrhi_success &&
+              mrhiPass_DispatchIndirect(s_device, s_compute, s_a, 0) == mrhi_errorState,
           "not recording");
     Drop();
     CloseDevice();
@@ -862,26 +887,26 @@ static void TestSubmitted(void)
     mrhiGraphicsPipelineId graphics = MakeGraphics();
     mrhiComputePipelineId compute = MakeCompute();
     Frame();
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, graphics) == mrhi_success, "set");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, graphics) == mrhi_success, "set");
     SetVertices();
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
               mrhi_success,
           "indices");
-    CHECK(mrhiDraw(s_device, s_render, 3, 1, 0, 0) == mrhi_success &&
-              mrhiDrawIndexed(s_device, s_render, 3, 1, 0, 0, 0) == mrhi_success &&
-              mrhiDrawIndirect(s_device, s_render, s_a, 0) == mrhi_success &&
-              mrhiDrawIndexedIndirect(s_device, s_render, s_a, 16) == mrhi_success,
+    CHECK(mrhiPass_Draw(s_device, s_render, 3, 1, 0, 0) == mrhi_success &&
+              mrhiPass_DrawIndexed(s_device, s_render, 3, 1, 0, 0, 0) == mrhi_success &&
+              mrhiPass_DrawIndirect(s_device, s_render, s_a, 0) == mrhi_success &&
+              mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 16) == mrhi_success,
           "four draws");
-    CHECK(mrhiSetComputePipeline(s_device, s_compute, compute) == mrhi_success &&
-              mrhiDispatch(s_device, s_compute, 1, 1, 1) == mrhi_success &&
-              mrhiDispatchIndirect(s_device, s_compute, s_a, 32) == mrhi_success,
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_compute, compute) == mrhi_success &&
+              mrhiPass_Dispatch(s_device, s_compute, 1, 1, 1) == mrhi_success &&
+              mrhiPass_DispatchIndirect(s_device, s_compute, s_a, 32) == mrhi_success,
           "two dispatches");
-    CHECK(mrhiEndPass(s_device, s_render) == mrhi_success &&
-              mrhiEndPass(s_device, s_compute) == mrhi_success &&
-              mrhiEndPass(s_device, s_copy) == mrhi_success,
+    CHECK(mrhiPass_End(s_device, s_render) == mrhi_success &&
+              mrhiPass_End(s_device, s_compute) == mrhi_success &&
+              mrhiPass_End(s_device, s_copy) == mrhi_success,
           "ended");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
     // And the library's first pass, which clears the five new buffers.
     CHECK(log.frames == 1 && log.passes == 4 && log.commands == 16 && log.records == 16,
           "every command walked");
@@ -898,28 +923,28 @@ static void TestArena(void)
     mrhiGraphicsPipelineId graphics = MakeGraphics();
     mrhiComputePipelineId compute = MakeCompute();
     Frame();
-    CHECK(mrhiSetGraphicsPipeline(s_device, s_render, graphics) == mrhi_success, "set");
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, graphics) == mrhi_success, "set");
     SetVertices();
-    CHECK(mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
               mrhi_success,
           "indices");
     // Four records so far; 123 draws fill the chunk.
     for (uint32_t i = 0; i < 123; ++i)
     {
-        CHECK(mrhiDraw(s_device, s_render, 1, 1, 0, 0) == mrhi_success, "fits");
+        CHECK(mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == mrhi_success, "fits");
     }
-    CHECK(mrhiDraw(s_device, s_render, 1, 1, 0, 0) == mrhi_errorCapacity &&
-              mrhiDrawIndexed(s_device, s_render, 1, 1, 0, 0, 0) == mrhi_errorCapacity &&
-              mrhiSetVertexBuffer(s_device, s_render, 0, s_v, 0, 12) == mrhi_errorCapacity &&
-              mrhiSetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, 4) ==
+    CHECK(mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == mrhi_errorCapacity &&
+              mrhiPass_DrawIndexed(s_device, s_render, 1, 1, 0, 0, 0) == mrhi_errorCapacity &&
+              mrhiPass_SetVertexBuffer(s_device, s_render, 0, s_v, 0, 12) == mrhi_errorCapacity &&
+              mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, 4) ==
                   mrhi_errorCapacity,
           "full");
-    CHECK(mrhiDrawIndirect(s_device, s_render, s_a, 0) == mrhi_errorCapacity &&
-              mrhiDrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorCapacity,
+    CHECK(mrhiPass_DrawIndirect(s_device, s_render, s_a, 0) == mrhi_errorCapacity &&
+              mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorCapacity,
           "for indirect draws");
-    CHECK(mrhiSetComputePipeline(s_device, s_compute, compute) == mrhi_errorCapacity &&
-              mrhiDispatch(s_device, s_compute, 1, 1, 1) == mrhi_errorCapacity &&
-              mrhiDispatchIndirect(s_device, s_compute, s_a, 0) == mrhi_errorCapacity,
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_compute, compute) == mrhi_errorCapacity &&
+              mrhiPass_Dispatch(s_device, s_compute, 1, 1, 1) == mrhi_errorCapacity &&
+              mrhiPass_DispatchIndirect(s_device, s_compute, s_a, 0) == mrhi_errorCapacity,
           "for every pass");
     CHECK(Refusal() == mrhi_diagnosticFrameCommandBytes, "the limit named");
     Drop();

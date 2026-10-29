@@ -920,8 +920,8 @@ void mrhiApplyFinalStates(mrhiDevice* device)
     }
 }
 
-mrhiResult mrhiGetFrameBarriers(mrhiDevice* device, mrhiBarrier* barriers, size_t capacity,
-                                size_t* countOut)
+mrhiResult mrhiDevice_GetFrameBarriers(mrhiDevice* device, mrhiBarrier* barriers, size_t capacity,
+                                       size_t* countOut)
 {
     if (device == nullptr)
     {
@@ -944,8 +944,8 @@ mrhiResult mrhiGetFrameBarriers(mrhiDevice* device, mrhiBarrier* barriers, size_
     return mrhi_success;
 }
 
-mrhiResult mrhiGetResourcePlan(mrhiDevice* device, mrhiResourceId resource,
-                               mrhiResourcePlan* planOut)
+mrhiResult mrhiResource_GetPlan(mrhiDevice* device, mrhiResourceId resource,
+                                mrhiResourcePlan* planOut)
 {
     if (device == nullptr)
     {

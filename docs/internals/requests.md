@@ -8,10 +8,10 @@ The four APIs finish work in four shapes: WebGPU only through promises, Metal th
 
 ## Two queues
 
-- **The instance's queue** (`mrhiNextInstanceNotification`) answers adapter searches (`mrhi_instanceAdaptersFound`) and device openings (`mrhi_instanceDeviceReady`).
-- **A device's queue** (`mrhiNextDeviceNotification`) answers pipelines (`mrhi_devicePipelineReady`), frames (`mrhi_deviceFrameDone`), readbacks (`mrhi_deviceReadbackReady`) and the loss notice.
+- **The instance's queue** (`mrhiInstance_TakeNotification`) answers adapter searches (`mrhi_instanceAdaptersFound`) and device openings (`mrhi_instanceDeviceReady`).
+- **A device's queue** (`mrhiDevice_TakeNotification`) answers pipelines (`mrhi_devicePipelineReady`), frames (`mrhi_deviceFrameDone`), readbacks (`mrhi_deviceReadbackReady`) and the loss notice.
 
-Taking from a queue first polls the driver for what it finished, a small batch at a time, and turns each driver event into its record. A driver never calls the core; the only way its answers arrive is this poll. `mrhiWaitDeviceNotification` adds no driver call: it polls, and if nothing came, waits for the oldest running frame through the driver's `waitFrame` and polls again, since a frame's end is the only answer native work brings later (pipelines are made at their creation). On the web `waitFrame` never blocks, so the wait times out at once.
+Taking from a queue first polls the driver for what it finished, a small batch at a time, and turns each driver event into its record. A driver never calls the core; the only way its answers arrive is this poll. `mrhiDevice_WaitNotification` adds no driver call: it polls, and if nothing came, waits for the oldest running frame through the driver's `waitFrame` and polls again, since a frame's end is the only answer native work brings later (pipelines are made at their creation). On the web `waitFrame` never blocks, so the wait times out at once.
 
 ## Never losing an answer
 
@@ -34,4 +34,4 @@ A driver reports a loss as a poll event with `mrhi_errorDeviceLost`, or by retur
 
 The loss report is fixed-size so a program can keep it or send it with a crash report: the reason, the last frame submitted and the last finished, the frame and pass that were running, and the driver's message, cut to `MRHI_LOSS_MESSAGE_BYTES`. The core fills the frames; the driver fills the rest from what its API tells (`lossReport` in the SPI). Today Direct3D 12 maps its removal reason onto the reason, WebGPU passes the browser's message and Metal the failed command buffer's, and no driver yet reads the faulting frame and pass from Vulkan's device fault extension, DRED or Metal's encoder information.
 
-`mrhiSimulateDeviceLoss` loses a ready device on any driver as a driver's report would, with the reason `mrhi_lossSimulated`. The driver is told nothing: its work finishes unseen and is destroyed with the device. This is what the conformance suite's `loss.simulated` case and programs' recovery tests use. The test driver can also lose its devices when a flag the test owns is set, reporting the reason the test chose, for the paths only a real loss takes.
+`mrhiDevice_SimulateLoss` loses a ready device on any driver as a driver's report would, with the reason `mrhi_lossSimulated`. The driver is told nothing: its work finishes unseen and is destroyed with the device. This is what the conformance suite's `loss.simulated` case and programs' recovery tests use. The test driver can also lose its devices when a flag the test owns is set, reporting the reason the test chose, for the paths only a real loss takes.

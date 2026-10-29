@@ -44,7 +44,7 @@ It traps (`MRHI_ASSERT`) when the core breaks the SPI: work asked of a lost devi
 
 The core checks every call on every build, so an API validation layer above it would repeat the core. What nothing else checks is the other side of the SPI: what a driver answers, which matters most for drivers built outside the tree, and whether the frames the core submits to a real driver hold together. `MAUL_RHI_VALIDATION` builds a layer between the core and whichever driver an instance starts, wrapping both vtables. It walks every submitted frame with the frame walk and checks the driver's answers: events only for requests made and within the room given, adapters with distinct nonzero handles and names inside their buffers, objects with nonzero handles, acquired images, power-of-two memory alignments, sample counts the API knows, device vtables that pass the handshake.
 
-Breaches are counted (`mrhiGetDriverFaults`) and recorded in the instance's diagnostic queue under driver codes, never printed or called back. The call goes on with the driver's answer, except that an event count past the room given is clamped so the core never reads past its array. The native interop headers reach the driver beneath the layer. Release and web builds carry none of it.
+Breaches are counted (`mrhiInstance_GetDriverFaults`) and recorded in the instance's diagnostic queue under driver codes, never printed or called back. The call goes on with the driver's answer, except that an event count past the room given is clamped so the core never reads past its array. The native interop headers reach the driver beneath the layer. Release and web builds carry none of it.
 
 ## Drivers built outside the tree
 

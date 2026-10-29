@@ -79,23 +79,24 @@ static mrhiRequestId Record(Sample* sample, mrhiGraphicsPipelineId pipeline)
     SampleCheck(sample,
                 mrhiAddPass(device, &drawDef, &draw) == mrhi_success &&
                     mrhiAddPass(device, &readDef, &reading) == mrhi_success &&
-                    mrhiCompileFrame(device) == mrhi_success,
+                    mrhiDevice_CompileFrame(device) == mrhi_success,
                 "the frame compiled");
     SampleCheck(sample,
-                mrhiBeginPass(device, draw) == mrhi_success &&
-                    mrhiSetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
-                    mrhiSetRootBlock(device, draw, 0, kTriangle, sizeof(kTriangle)) ==
+                mrhiPass_Begin(device, draw) == mrhi_success &&
+                    mrhiPass_SetGraphicsPipeline(device, draw, pipeline) == mrhi_success &&
+                    mrhiPass_SetRootBlock(device, draw, 0, kTriangle, sizeof(kTriangle)) ==
                         mrhi_success &&
-                    mrhiDraw(device, draw, 3, 1, 0, 0) == mrhi_success &&
-                    mrhiEndPass(device, draw) == mrhi_success,
+                    mrhiPass_Draw(device, draw, 3, 1, 0, 0) == mrhi_success &&
+                    mrhiPass_End(device, draw) == mrhi_success,
                 "the triangle drawn and resolved");
     const mrhiTextureCopy source = {.resource = resolved};
     const mrhiExtent3d extent = {SIZE, SIZE, 1};
     mrhiRequestId pixels = {0};
     SampleCheck(sample,
-                mrhiBeginPass(device, reading) == mrhi_success &&
-                    mrhiReadTexture(device, reading, &source, &extent, &pixels) == mrhi_success &&
-                    mrhiEndPass(device, reading) == mrhi_success,
+                mrhiPass_Begin(device, reading) == mrhi_success &&
+                    mrhiPass_ReadTexture(device, reading, &source, &extent, &pixels) ==
+                        mrhi_success &&
+                    mrhiPass_End(device, reading) == mrhi_success,
                 "the resolved target read");
     return pixels;
 }
@@ -136,7 +137,7 @@ int main(void)
     mrhiShaderId shader = SampleShader(&sample, s_triangleContainer, sizeof(s_triangleContainer));
     mrhiGraphicsPipelineId pipeline = MakePipeline(&sample, shader);
     mrhiFrameDef frame = mrhiDefaultFrameDef();
-    SampleCheck(&sample, mrhiBeginFrame(sample.device, &frame) == mrhi_success, "a frame");
+    SampleCheck(&sample, mrhiDevice_BeginFrame(sample.device, &frame) == mrhi_success, "a frame");
     mrhiRequestId pixels = Record(&sample, pipeline);
     static uint8_t image[SIZE * SIZE * 4];
     if (SampleFinish(&sample) && SampleTake(&sample, pixels, image, sizeof(image)))

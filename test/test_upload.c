@@ -95,7 +95,7 @@ static void CloseDevice(void)
 static void Frame(void)
 {
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     CHECK(mrhiImportBuffer(s_device, s_buffer, &s_r[BUFFER]) == mrhi_success, "imported");
     for (uint32_t i = ARRAY; i < RESOURCES; ++i)
     {
@@ -120,26 +120,26 @@ static void Frame(void)
     def.colorTargets[0] = (mrhiColorTarget){.resource = s_r[TARGET], .load = mrhi_loadClear};
     def.colorTargetCount = 1;
     CHECK(mrhiAddPass(s_device, &def, &s_render) == mrhi_success, "a render pass");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
-    CHECK(mrhiBeginPass(s_device, s_pass) == mrhi_success &&
-              mrhiBeginPass(s_device, s_render) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_Begin(s_device, s_pass) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_render) == mrhi_success,
           "begun");
 }
 
 // Ends both passes and submits: the token.
 static mrhiRequestId Submit(void)
 {
-    CHECK(mrhiEndPass(s_device, s_pass) == mrhi_success &&
-              mrhiEndPass(s_device, s_render) == mrhi_success,
+    CHECK(mrhiPass_End(s_device, s_pass) == mrhi_success &&
+              mrhiPass_End(s_device, s_render) == mrhi_success,
           "ended");
     mrhiRequestId token = {0};
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
     return token;
 }
 
 static void Drop(void)
 {
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 static const mrhiCommand* Nth(uint32_t n)
@@ -161,7 +161,8 @@ static void TestBuffers(void)
     Open(4096);
     Frame();
     mrhiResourceId buffer = s_r[BUFFER];
-    CHECK(mrhiWriteBuffer(s_device, s_pass, buffer, 8, s_bytes, 12) == mrhi_success, "written");
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, buffer, 8, s_bytes, 12) == mrhi_success,
+          "written");
     const mrhiCommand* command = Nth(0);
     const mrhiCommandBufferSide* from = (const mrhiCommandBufferSide*)Nth(1);
     const mrhiCommandBufferSide* to = (const mrhiCommandBufferSide*)Nth(2);
@@ -170,36 +171,37 @@ static void TestBuffers(void)
               to->offset == 8,
           "recorded as a copy from staging");
     CHECK(memcmp(Staged(0), s_bytes, 12) == 0, "the bytes staged at the call");
-    CHECK(mrhiWriteBuffer(s_device, s_pass, buffer, 1020, s_bytes + 4, 4) == mrhi_success,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, buffer, 1020, s_bytes + 4, 4) == mrhi_success,
           "the last word");
     CHECK(((const mrhiCommandBufferSide*)Nth(4))->offset == 512 &&
               memcmp(Staged(512), s_bytes + 4, 4) == 0,
           "at the next 512 bytes");
-    CHECK(mrhiWriteBuffer(s_device, s_pass, buffer, 0, nullptr, 0) == mrhi_success, "nothing");
-    CHECK(mrhiWriteBuffer(s_device, s_pass, buffer, 2, s_bytes, 4) == mrhi_errorInvalid &&
-              mrhiWriteBuffer(s_device, s_pass, buffer, 0, s_bytes, 6) == mrhi_errorInvalid,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, buffer, 0, nullptr, 0) == mrhi_success, "nothing");
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, buffer, 2, s_bytes, 4) == mrhi_errorInvalid &&
+              mrhiPass_WriteBuffer(s_device, s_pass, buffer, 0, s_bytes, 6) == mrhi_errorInvalid,
           "not multiples of 4");
-    CHECK(mrhiWriteBuffer(s_device, s_pass, buffer, 1024, s_bytes, 4) == mrhi_errorInvalid &&
-              mrhiWriteBuffer(s_device, s_pass, buffer, 1028, s_bytes, 0) == mrhi_errorInvalid,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, buffer, 1024, s_bytes, 4) == mrhi_errorInvalid &&
+              mrhiPass_WriteBuffer(s_device, s_pass, buffer, 1028, s_bytes, 0) == mrhi_errorInvalid,
           "past the buffer");
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[ARRAY], 0, s_bytes, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[ARRAY], 0, s_bytes, 4) == mrhi_errorInvalid,
           "a texture");
-    CHECK(mrhiWriteBuffer(s_device, s_render, buffer, 0, s_bytes, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_render, buffer, 0, s_bytes, 4) == mrhi_errorInvalid,
           "a pass with targets");
-    CHECK(mrhiWriteBuffer(s_device, s_pass, buffer, 0, nullptr, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, buffer, 0, nullptr, 4) == mrhi_errorInvalid,
           "no bytes");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 7, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 7, "each counted");
     mrhiResourceId none = {0};
-    CHECK(mrhiWriteBuffer(s_device, s_pass, none, 0, s_bytes, 4) == mrhi_errorStale, "none");
-    CHECK(mrhiWriteBuffer(nullptr, s_pass, buffer, 0, s_bytes, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, none, 0, s_bytes, 4) == mrhi_errorStale, "none");
+    CHECK(mrhiPass_WriteBuffer(nullptr, s_pass, buffer, 0, s_bytes, 4) == mrhi_errorInvalid,
           "no device");
     Submit();
-    CHECK(mrhiWriteBuffer(s_device, s_pass, buffer, 0, s_bytes, 4) == mrhi_errorState, "no frame");
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, buffer, 0, s_bytes, 4) == mrhi_errorState,
+          "no frame");
     CloseDevice();
     // A pass declaring the buffer a copy source.
     Open(4096);
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success, "begun");
     mrhiResourceId source = {0};
     CHECK(mrhiImportBuffer(s_device, s_buffer, &source) == mrhi_success, "imported");
     mrhiAccess access = {.resource = source, .kind = mrhi_accessCopySource};
@@ -209,10 +211,10 @@ static void TestBuffers(void)
     def.accesses = &access;
     def.accessCount = 1;
     CHECK(mrhiAddPass(s_device, &def, &s_pass) == mrhi_success &&
-              mrhiCompileFrame(s_device) == mrhi_success &&
-              mrhiBeginPass(s_device, s_pass) == mrhi_success,
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_pass) == mrhi_success,
           "a pass");
-    CHECK(mrhiWriteBuffer(s_device, s_pass, source, 0, s_bytes, 4) == mrhi_errorInvalid,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, source, 0, s_bytes, 4) == mrhi_errorInvalid,
           "a buffer declared a copy source");
     Drop();
     CloseDevice();
@@ -223,40 +225,43 @@ static void TestFull(void)
     Open(1024);
     Frame();
     mrhiResourceId buffer = s_r[BUFFER];
-    CHECK(mrhiWriteBuffer(s_device, s_pass, buffer, 0, s_bytes, 512) == mrhi_success &&
-              mrhiWriteBuffer(s_device, s_pass, buffer, 0, s_bytes, 512) == mrhi_success,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, buffer, 0, s_bytes, 512) == mrhi_success &&
+              mrhiPass_WriteBuffer(s_device, s_pass, buffer, 0, s_bytes, 512) == mrhi_success,
           "the staging filled");
-    CHECK(mrhiWriteBuffer(s_device, s_pass, buffer, 0, s_bytes, 4) == mrhi_errorCapacity, "full");
-    CHECK(mrhiWriteBuffer(s_device, s_pass, buffer, 0, nullptr, 0) == mrhi_errorCapacity,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, buffer, 0, s_bytes, 4) == mrhi_errorCapacity,
+          "full");
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, buffer, 0, nullptr, 0) == mrhi_errorCapacity,
           "nothing more in the pass");
-    CHECK(mrhiEndPass(s_device, s_pass) == mrhi_success, "ended");
+    CHECK(mrhiPass_End(s_device, s_pass) == mrhi_success, "ended");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorCapacity, "the frame refused");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorCapacity, "the frame refused");
     Drop();
     Frame();
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 1024) == mrhi_success,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 1024) == mrhi_success,
           "all of it, in the next frame");
     Drop();
     Frame();
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 1028) == mrhi_errorInvalid,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 1028) ==
+              mrhi_errorInvalid,
           "more than the buffer");
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 4) == mrhi_success,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 4) == mrhi_success,
           "a refusal for input marks nothing");
     Drop();
     CloseDevice();
     Open(0);
     Frame();
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, nullptr, 0) == mrhi_success,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[BUFFER], 0, nullptr, 0) == mrhi_success,
           "nothing, with no staging");
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 4) == mrhi_errorCapacity,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 4) == mrhi_errorCapacity,
           "anything else refused");
     Drop();
     CloseDevice();
     Open(512);
     Frame();
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 1024) == mrhi_errorCapacity,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 1024) ==
+              mrhi_errorCapacity,
           "more than the staging");
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 4) == mrhi_errorCapacity,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 4) == mrhi_errorCapacity,
           "and nothing after, though it would fit");
     Drop();
     CloseDevice();
@@ -271,13 +276,13 @@ static void TestUnevenStaging(void)
     s_adapter.frameLog = &log;
     Open(1000);
     Frame();
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 900) == mrhi_success,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 900) == mrhi_success,
           "within the staging");
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 4) == mrhi_errorCapacity,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 4) == mrhi_errorCapacity,
           "nothing past its end");
     Drop();
     Frame();
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 900) == mrhi_success,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 900) == mrhi_success,
           "again in the next frame");
     (void)Submit();
     CHECK(log.stagingBytes == 1000, "the driver handed the staging and no more");
@@ -291,25 +296,25 @@ static void TestStagingInFlight(void)
 {
     Open(1024);
     Frame();
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 8) == mrhi_success,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes, 8) == mrhi_success,
           "the first frame's bytes");
     const uint8_t* first = Staged(0);
     mrhiRequestId running = Submit();
     Frame();
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes + 40, 8) == mrhi_success &&
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes + 40, 8) == mrhi_success &&
               memcmp(Staged(0), s_bytes + 40, 8) == 0,
           "the second frame's bytes");
     CHECK(memcmp(first, s_bytes, 8) == 0, "the running frame's bytes untouched");
     mrhiRequestId second = Submit();
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_errorCapacity, "two in flight");
-    CHECK(mrhiWaitFrame(s_device, second, 1) == mrhi_success, "the second finished first");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_errorCapacity, "two in flight");
+    CHECK(mrhiRequest_WaitFrame(s_device, second, 1) == mrhi_success, "the second finished first");
     Frame();
-    CHECK(mrhiWriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes + 80, 8) == mrhi_success,
+    CHECK(mrhiPass_WriteBuffer(s_device, s_pass, s_r[BUFFER], 0, s_bytes + 80, 8) == mrhi_success,
           "a third frame's bytes");
     CHECK(memcmp(first, s_bytes, 8) == 0, "the first frame's still untouched");
     Drop();
-    CHECK(mrhiWaitFrame(s_device, running, 1) == mrhi_success, "the first finished");
+    CHECK(mrhiRequest_WaitFrame(s_device, running, 1) == mrhi_success, "the first finished");
     CloseDevice();
 }
 
@@ -318,7 +323,8 @@ static mrhiResult Write(mrhiTextureCopy destination, size_t byteCount, mrhiTexel
                         mrhiExtent3d size)
 {
     destination.resource = s_r[destination.resource.index1];
-    return mrhiWriteTexture(s_device, s_pass, &destination, s_bytes, byteCount, &layout, &size);
+    return mrhiPass_WriteTexture(s_device, s_pass, &destination, s_bytes, byteCount, &layout,
+                                 &size);
 }
 
 static mrhiTextureCopy At(uint32_t resource, uint32_t z)
@@ -384,8 +390,8 @@ static void TestTextures(void)
               mrhi_success,
           "a stencil of a byte per texel");
     mrhiTextureCopy empty = {.resource = s_r[ARRAY]};
-    CHECK(mrhiWriteTexture(s_device, s_pass, &empty, nullptr, 0, &(mrhiTexelLayout){0},
-                           &(mrhiExtent3d){0, 1, 1}) == mrhi_success,
+    CHECK(mrhiPass_WriteTexture(s_device, s_pass, &empty, nullptr, 0, &(mrhiTexelLayout){0},
+                                &(mrhiExtent3d){0, 1, 1}) == mrhi_success,
           "no texels, from no bytes");
     CHECK(Write(At(OUTSIDE, 0), 4096, (mrhiTexelLayout){.bytesPerRow = 32},
                 (mrhiExtent3d){8, 8, 1}) == mrhi_errorInvalid,
@@ -407,20 +413,20 @@ static void TestTextures(void)
     mrhiExtent3d size = {16, 8, 1};
     mrhiTextureCopy destination = At(ARRAY, 0);
     destination.resource = s_r[ARRAY];
-    CHECK(mrhiWriteTexture(s_device, s_pass, nullptr, s_bytes, 512, &layout, &size) ==
+    CHECK(mrhiPass_WriteTexture(s_device, s_pass, nullptr, s_bytes, 512, &layout, &size) ==
                   mrhi_errorInvalid &&
-              mrhiWriteTexture(s_device, s_pass, &destination, nullptr, 512, &layout, &size) ==
+              mrhiPass_WriteTexture(s_device, s_pass, &destination, nullptr, 512, &layout, &size) ==
                   mrhi_errorInvalid &&
-              mrhiWriteTexture(s_device, s_pass, &destination, s_bytes, 512, nullptr, &size) ==
+              mrhiPass_WriteTexture(s_device, s_pass, &destination, s_bytes, 512, nullptr, &size) ==
                   mrhi_errorInvalid &&
-              mrhiWriteTexture(s_device, s_pass, &destination, s_bytes, 512, &layout, nullptr) ==
-                  mrhi_errorInvalid,
+              mrhiPass_WriteTexture(s_device, s_pass, &destination, s_bytes, 512, &layout,
+                                    nullptr) == mrhi_errorInvalid,
           "NULL arguments");
-    CHECK(mrhiWriteTexture(s_device, s_render, &destination, s_bytes, 512, &layout, &size) ==
+    CHECK(mrhiPass_WriteTexture(s_device, s_render, &destination, s_bytes, 512, &layout, &size) ==
               mrhi_errorInvalid,
           "a pass with targets");
-    CHECK(mrhiGetDeviceMisuse(s_device) == 14, "each counted");
-    CHECK(mrhiWriteTexture(nullptr, s_pass, &destination, s_bytes, 512, &layout, &size) ==
+    CHECK(mrhiDevice_GetMisuse(s_device) == 14, "each counted");
+    CHECK(mrhiPass_WriteTexture(nullptr, s_pass, &destination, s_bytes, 512, &layout, &size) ==
               mrhi_errorInvalid,
           "no device");
     Drop();
@@ -429,17 +435,17 @@ static void TestTextures(void)
     destination.resource = s_r[ARRAY];
     mrhiTexelLayout many = {.bytesPerRow = 64, .rowsPerImage = 8};
     mrhiExtent3d three = {16, 8, 3};
-    CHECK(mrhiWriteTexture(s_device, s_pass, &destination, s_bytes, 64 * 8 * 3, &many, &three) ==
-                  mrhi_success &&
-              mrhiWriteTexture(s_device, s_pass, &destination, s_bytes, 64 * 8 * 3, &many,
-                               &three) == mrhi_success,
+    CHECK(mrhiPass_WriteTexture(s_device, s_pass, &destination, s_bytes, 64 * 8 * 3, &many,
+                                &three) == mrhi_success &&
+              mrhiPass_WriteTexture(s_device, s_pass, &destination, s_bytes, 64 * 8 * 3, &many,
+                                    &three) == mrhi_success,
           "three layers, twice");
-    CHECK(mrhiWriteTexture(s_device, s_pass, &destination, s_bytes, 64 * 8 * 3, &many, &three) ==
-              mrhi_errorCapacity,
+    CHECK(mrhiPass_WriteTexture(s_device, s_pass, &destination, s_bytes, 64 * 8 * 3, &many,
+                                &three) == mrhi_errorCapacity,
           "not three times");
-    CHECK(mrhiEndPass(s_device, s_pass) == mrhi_success, "ended");
+    CHECK(mrhiPass_End(s_device, s_pass) == mrhi_success, "ended");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorCapacity, "the frame refused");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorCapacity, "the frame refused");
     Drop();
     CloseDevice();
 }

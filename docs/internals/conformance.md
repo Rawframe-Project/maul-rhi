@@ -7,7 +7,7 @@ How the library proves that every driver does the same thing, and that the core 
 `test/test_conformance.c` is the specification of a driver. It runs the same named cases through the public API on the test driver and on every native adapter the build's driver finds, with shader containers made offline from `test/shaders/` and committed as bytes, so CI needs no shader tools. Its cases fall in ten categories: `api`, `capabilities`, `binding`, `hazards`, `transfers`, `swapchain`, `loss`, `threads`, `limits` and `validation`.
 
 - `test_conformance --list` prints the cases, `--case <name>` runs one, and every run ends with each case's outcome.
-- `loss.simulated` loses a device with `mrhiSimulateDeviceLoss` and checks every answer owed. `threads.recording` records two passes at once on two threads; the web builds, which have no threads, interleave them on one.
+- `loss.simulated` loses a device with `mrhiDevice_SimulateLoss` and checks every answer owed. `threads.recording` records two passes at once on two threads; the web builds, which have no threads, interleave them on one.
 - `swapchain.present` presents to a real window: an XCB window it makes itself where the XCB client library is installed, a Win32 window, a `CAMetalLayer` outside any window, the web runner's canvas, or Android's NativeActivity window.
 - `validation.clean` requires the validation layer to have counted no fault, in builds that have it.
 - The `MAUL_RHI_REQUIRE_*` variables turn what would be a skip into a failure: a driver with no adapter, a missing surface, heaps or pipeline statistics not granted, or the outside-driver path not built. CI sets them for what each runner has, so a runner that changes cannot quietly skip cases.

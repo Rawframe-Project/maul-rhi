@@ -54,7 +54,8 @@ static void MakePipelines(mrhiDevice* device, uint32_t count)
 // Writes the device's cache into s_cache.
 static void Export(mrhiDevice* device)
 {
-    CHECK(mrhiGetPipelineCache(device, s_cache, sizeof(s_cache), &s_cacheSize) == mrhi_success,
+    CHECK(mrhiDevice_GetPipelineCache(device, s_cache, sizeof(s_cache), &s_cacheSize) ==
+              mrhi_success,
           "the cache written");
 }
 
@@ -87,7 +88,7 @@ static void Forge(size_t at, uint32_t value)
 static mrhiResult Outcome(size_t size)
 {
     mrhiDevice* device = OpenCached(s_cache, size);
-    mrhiResult outcome = mrhiGetPipelineCacheOutcome(device);
+    mrhiResult outcome = mrhiDevice_GetPipelineCacheOutcome(device);
     Close(device);
     return outcome;
 }
@@ -95,14 +96,14 @@ static mrhiResult Outcome(size_t size)
 static void TestRoundTrip(void)
 {
     mrhiDevice* device = OpenCached(nullptr, 0);
-    CHECK(mrhiGetPipelineCacheOutcome(device) == mrhi_empty, "no cache given");
+    CHECK(mrhiDevice_GetPipelineCacheOutcome(device) == mrhi_empty, "no cache given");
     size_t size = 0;
-    CHECK(mrhiGetPipelineCache(device, nullptr, 0, &size) == mrhi_success && size == 80,
+    CHECK(mrhiDevice_GetPipelineCache(device, nullptr, 0, &size) == mrhi_success && size == 80,
           "the size alone: the envelope and the driver's 16 bytes");
-    CHECK(mrhiGetPipelineCache(device, s_cache, size - 1, &size) == mrhi_errorCapacity &&
+    CHECK(mrhiDevice_GetPipelineCache(device, s_cache, size - 1, &size) == mrhi_errorCapacity &&
               size == 80,
           "too little room, with the size");
-    CHECK(mrhiGetPipelineCache(device, s_cache, size, &size) == mrhi_success && size == 80,
+    CHECK(mrhiDevice_GetPipelineCache(device, s_cache, size, &size) == mrhi_success && size == 80,
           "room of the size exactly");
     MakePipelines(device, 3);
     Export(device);
@@ -110,7 +111,7 @@ static void TestRoundTrip(void)
           "the cache of three pipelines");
     Close(device);
     device = OpenCached(s_cache, s_cacheSize);
-    CHECK(mrhiGetPipelineCacheOutcome(device) == mrhi_success, "taken by the next device");
+    CHECK(mrhiDevice_GetPipelineCacheOutcome(device) == mrhi_success, "taken by the next device");
     MakePipelines(device, 2);
     Export(device);
     CHECK(CachedCount() == 5, "and carried on");
@@ -128,7 +129,8 @@ static void TestPatterns(void)
     for (int i = 0; i < 2; ++i)
     {
         memset(patterns[i], i == 0 ? 0x00 : 0xFF, CACHE_ROOM);
-        CHECK(mrhiGetPipelineCache(device, patterns[i], CACHE_ROOM, &sizes[i]) == mrhi_success,
+        CHECK(mrhiDevice_GetPipelineCache(device, patterns[i], CACHE_ROOM, &sizes[i]) ==
+                  mrhi_success,
               "the cache written over a pattern");
     }
     CHECK(sizes[0] == 80 && sizes[1] == 80 && memcmp(patterns[0], patterns[1], 80) == 0,
@@ -167,7 +169,8 @@ static void TestDamaged(void)
     memcpy(shortBlob, s_cache, 40);
     Put64(shortBlob + 8, 40);
     device = OpenCached(shortBlob, 40);
-    CHECK(mrhiGetPipelineCacheOutcome(device) == mrhi_errorFormat, "shorter than an envelope");
+    CHECK(mrhiDevice_GetPipelineCacheOutcome(device) == mrhi_errorFormat,
+          "shorter than an envelope");
     Close(device);
     free(shortBlob);
 }
@@ -252,15 +255,17 @@ static void TestMisuse(void)
     def.pipelineCacheBytes = 16;
     mrhiDevice* device = OpenCached(nullptr, 0);
     size_t size = 0;
-    CHECK(mrhiGetPipelineCache(device, s_cache, sizeof(s_cache), nullptr) == mrhi_errorInvalid,
+    CHECK(mrhiDevice_GetPipelineCache(device, s_cache, sizeof(s_cache), nullptr) ==
+              mrhi_errorInvalid,
           "no size out");
-    CHECK(mrhiGetDeviceMisuse(device) == 1, "counted");
-    CHECK(mrhiGetPipelineCache(nullptr, s_cache, sizeof(s_cache), &size) == mrhi_errorInvalid,
+    CHECK(mrhiDevice_GetMisuse(device) == 1, "counted");
+    CHECK(mrhiDevice_GetPipelineCache(nullptr, s_cache, sizeof(s_cache), &size) ==
+              mrhi_errorInvalid,
           "no device");
-    CHECK(mrhiGetPipelineCacheOutcome(nullptr) == mrhi_errorInvalid, "no device's outcome");
+    CHECK(mrhiDevice_GetPipelineCacheOutcome(nullptr) == mrhi_errorInvalid, "no device's outcome");
     mrhiAdapterId adapter = {0};
     size_t count = 0;
-    CHECK(mrhiGetAdapters(s_instance, &adapter, 1, &count) == mrhi_success, "the adapter");
+    CHECK(mrhiInstance_GetAdapters(s_instance, &adapter, 1, &count) == mrhi_success, "the adapter");
     def.adapter = adapter;
     mrhiDevice* other = nullptr;
     mrhiRequestId request;
@@ -269,7 +274,7 @@ static void TestMisuse(void)
           "a cache size without its bytes");
     Close(device);
     device = OpenWith(mrhiDefaultDeviceDef(), false);
-    CHECK(mrhiGetPipelineCache(device, s_cache, sizeof(s_cache), &size) == mrhi_errorState,
+    CHECK(mrhiDevice_GetPipelineCache(device, s_cache, sizeof(s_cache), &size) == mrhi_errorState,
           "a device not ready");
     Close(device);
 }

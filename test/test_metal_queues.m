@@ -222,7 +222,7 @@ static void Hook(mrhiDevice* device)
     s_failuresBefore = s_failures;
     void* native = nullptr;
     void* queue = nullptr;
-    CHECK(mrhiGetMetalDevice(device, &native, &queue) == mrhi_success && queue != nullptr,
+    CHECK(mrhiDevice_GetMetalDevice(device, &native, &queue) == mrhi_success && queue != nullptr,
           "the native objects");
     if (queue == nullptr || s_commitMethod != nullptr)
     {
@@ -395,19 +395,19 @@ static mrhiPassId AddPass(mrhiDevice* device, mrhiPassClass passClass, const mrh
 // Records a dispatch of the noop kernel in a pass.
 static void Dispatch(mrhiDevice* device, mrhiPassId pass, mrhiComputePipelineId pipeline)
 {
-    CHECK(mrhiBeginPass(device, pass) == mrhi_success &&
-              mrhiSetComputePipeline(device, pass, pipeline) == mrhi_success &&
-              mrhiDispatch(device, pass, 1, 1, 1) == mrhi_success &&
-              mrhiEndPass(device, pass) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, pass) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, pass, pipeline) == mrhi_success &&
+              mrhiPass_Dispatch(device, pass, 1, 1, 1) == mrhi_success &&
+              mrhiPass_End(device, pass) == mrhi_success,
           "a dispatch");
 }
 
 static void Upload(mrhiDevice* device, mrhiPassId pass, mrhiResourceId buffer, const void* words,
                    size_t bytes)
 {
-    CHECK(mrhiBeginPass(device, pass) == mrhi_success &&
-              mrhiWriteBuffer(device, pass, buffer, 0, words, bytes) == mrhi_success &&
-              mrhiEndPass(device, pass) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, pass) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, pass, buffer, 0, words, bytes) == mrhi_success &&
+              mrhiPass_End(device, pass) == mrhi_success,
           "uploaded");
 }
 
@@ -415,9 +415,9 @@ static mrhiRequestId ReadBack(mrhiDevice* device, mrhiPassId pass, mrhiResourceI
                               size_t bytes)
 {
     mrhiRequestId request = {0};
-    CHECK(mrhiBeginPass(device, pass) == mrhi_success &&
-              mrhiReadBuffer(device, pass, buffer, 0, bytes, &request) == mrhi_success &&
-              mrhiEndPass(device, pass) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, pass) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, pass, buffer, 0, bytes, &request) == mrhi_success &&
+              mrhiPass_End(device, pass) == mrhi_success,
           "read back");
     return request;
 }
@@ -427,7 +427,7 @@ static mrhiResourceId Begin(mrhiDevice* device, mrhiBufferId buffer)
 {
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiResourceId b = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiImportBuffer(device, buffer, &b) == mrhi_success,
           "a frame with the buffer");
     return b;
@@ -438,11 +438,11 @@ static mrhiResourceId Begin(mrhiDevice* device, mrhiBufferId buffer)
 static void Finish(mrhiDevice* device)
 {
     mrhiRequestId token = {0};
-    CHECK(mrhiSubmitFrame(device, &token) == mrhi_success &&
-              mrhiWaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
+    CHECK(mrhiDevice_SubmitFrame(device, &token) == mrhi_success &&
+              mrhiRequest_WaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
           "submitted and finished");
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
     }
 }
@@ -452,7 +452,7 @@ static bool Took(mrhiDevice* device, mrhiRequestId request, const void* expected
     uint8_t taken[64] = {0};
     size_t size = 0;
     return bytes <= sizeof(taken) &&
-           mrhiTakeReadback(device, request, taken, sizeof(taken), &size) == mrhi_success &&
+           mrhiRequest_TakeReadback(device, request, taken, sizeof(taken), &size) == mrhi_success &&
            size == bytes && memcmp(taken, expected, bytes) == 0;
 }
 
@@ -489,7 +489,7 @@ static void CheckLanes(mrhiDevice* device, mrhiBufferId buffer, mrhiComputePipel
     mrhiPassId upload = AddPass(device, mrhi_passTransfer, &write, false);
     mrhiPassId compute = AddPass(device, mrhi_passAsyncCompute, &storage, false);
     mrhiPassId back = AddPass(device, mrhi_passGraphics, &read, false);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "the first frame compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "the first frame compiled");
     Upload(device, upload, b, kWords, sizeof(kWords));
     Dispatch(device, compute, pipeline);
     mrhiRequestId first = ReadBack(device, back, b, sizeof(kWords));
@@ -519,7 +519,7 @@ static void CheckLanes(mrhiDevice* device, mrhiBufferId buffer, mrhiComputePipel
     upload = AddPass(device, mrhi_passTransfer, &write, false);
     compute = AddPass(device, mrhi_passAsyncCompute, &storage, false);
     back = AddPass(device, mrhi_passTransfer, &read, false);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "the second frame compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "the second frame compiled");
     Upload(device, upload, b, kOther, sizeof(kOther));
     Dispatch(device, compute, pipeline);
     mrhiRequestId second = ReadBack(device, back, b, sizeof(kOther));
@@ -556,7 +556,7 @@ static void CheckGraphics(mrhiDevice* device, mrhiBufferId buffer)
     mrhiAccess read = Whole(b, mrhi_accessCopySource);
     mrhiPassId upload = AddPass(device, mrhi_passGraphics, &write, false);
     mrhiPassId back = AddPass(device, mrhi_passGraphics, &read, false);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "the frame compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "the frame compiled");
     Upload(device, upload, b, kWords, sizeof(kWords));
     mrhiRequestId request = ReadBack(device, back, b, sizeof(kWords));
     Hook(device);
@@ -577,7 +577,7 @@ static void CheckNative(mrhiDevice* device, mrhiBufferId buffer)
 {
     void* native = nullptr;
     void* queue = nullptr;
-    CHECK(mrhiGetMetalDevice(device, &native, &queue) == mrhi_success && queue != nullptr,
+    CHECK(mrhiDevice_GetMetalDevice(device, &native, &queue) == mrhi_success && queue != nullptr,
           "the native objects");
     if (queue == nullptr)
     {
@@ -589,16 +589,16 @@ static void CheckNative(mrhiDevice* device, mrhiBufferId buffer)
     mrhiPassId upload = AddPass(device, mrhi_passTransfer, &write, false);
     mrhiPassId pass = AddPass(device, mrhi_passGraphics, &read, true);
     mrhiPassId back = AddPass(device, mrhi_passGraphics, &read, false);
-    CHECK(mrhiCompileFrame(device) == mrhi_success, "the frame compiled");
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "the frame compiled");
     Upload(device, upload, b, kWords, sizeof(kWords));
     id<MTLCommandBuffer> commands = nil;
     @autoreleasepool
     {
         commands = [[(id<MTLCommandQueue>)queue commandBuffer] retain];
     }
-    CHECK(mrhiBeginPass(device, pass) == mrhi_success &&
-              mrhiSetMetalPassCommands(device, pass, (void*)commands) == mrhi_success &&
-              mrhiEndPass(device, pass) == mrhi_success,
+    CHECK(mrhiPass_Begin(device, pass) == mrhi_success &&
+              mrhiPass_SetMetalCommands(device, pass, (void*)commands) == mrhi_success &&
+              mrhiPass_End(device, pass) == mrhi_success,
           "the native pass");
     mrhiRequestId request = ReadBack(device, back, b, sizeof(kWords));
     Hook(device);
@@ -648,7 +648,7 @@ static mrhiComputePipelineId NoopPipeline(mrhiDevice* device, mrhiShaderId* shad
     CHECK(mrhiCreateShader(device, &shaderDef, shaderOut) == mrhi_success, "the shader");
     def.shader = *shaderOut;
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_success &&
-              mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+              mrhiDevice_TakeNotification(device, &record) == mrhi_success &&
               record.kind == mrhi_devicePipelineReady && record.outcome == mrhi_success,
           "the pipeline");
     return pipeline;
@@ -664,7 +664,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
     mrhiRequestId opened = {0};
     mrhiInstanceNotification record;
     CHECK(mrhiCreateDevice(instance, &def, &device, &opened) == mrhi_success &&
-              mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
+              mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
               record.outcome == mrhi_success,
           "a device");
     if (device == nullptr)
@@ -700,9 +700,10 @@ int main(void)
     mrhiAdapterId adapter = {0};
     size_t count = 0;
     bool found = instance != nullptr &&
-                 mrhiRequestAdapters(instance, &request, &searched) == mrhi_success &&
-                 mrhiNextInstanceNotification(instance, &record) == mrhi_success &&
-                 mrhiGetAdapters(instance, &adapter, 1, &count) == mrhi_success && count >= 1;
+                 mrhiInstance_RequestAdapters(instance, &request, &searched) == mrhi_success &&
+                 mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
+                 mrhiInstance_GetAdapters(instance, &adapter, 1, &count) == mrhi_success &&
+                 count >= 1;
     if (found)
     {
         CheckDevice(instance, adapter);

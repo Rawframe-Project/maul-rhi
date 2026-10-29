@@ -117,7 +117,7 @@ static void TestMakeAndDestroy(void)
     def = mrhiDefaultHeapDef();
     CHECK(mrhiCreateHeap(device, &def, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiCreateHeap(nullptr, &def, &heap) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetDeviceMisuse(device) == 4, "each counted on the device");
+    CHECK(mrhiDevice_GetMisuse(device) == 4, "each counted on the device");
     def.entries = 2049;
     CHECK(mrhiCreateHeap(device, &def, &heap) == mrhi_errorCapacity,
           "past heapSize, within the adapter's");
@@ -147,7 +147,7 @@ static void TestMakeAndDestroy(void)
     CHECK(mrhiDestroyHeap(device, (mrhiHeapId){0}) == mrhi_errorStale, "the null id");
     CHECK(mrhiDestroyHeap(nullptr, second) == mrhi_errorInvalid, "no device");
     CHECK(mrhiCreateHeap(device, &def, &third) == mrhi_success, "its slot taken again");
-    CHECK(mrhiGetDeviceMisuse(device) == 4, "no more misuse");
+    CHECK(mrhiDevice_GetMisuse(device) == 4, "no more misuse");
     // The heaps left end with the device.
     Close(device);
 }
@@ -159,33 +159,33 @@ static void TestEntries(void)
     mrhiTextureId texture = MakeTexture(device, mrhi_textureSampled | mrhi_textureStorage);
     mrhiViewId view = MakeView(device, texture);
     mrhiHeapEntry entry = Sampled(view);
-    CHECK(mrhiSetHeapEntry(device, heap, 0, &entry) == mrhi_success, "a sampled texture");
-    CHECK(mrhiSetHeapEntry(device, heap, 0, &entry) == mrhi_errorState, "not empty");
-    CHECK(mrhiSetHeapEntry(device, heap, 7, &entry) == mrhi_success, "the same view again");
-    CHECK(mrhiSetHeapEntry(device, heap, 8, &entry) == mrhi_errorInvalid, "past the entries");
-    CHECK(mrhiClearHeapEntry(device, heap, 0) == mrhi_success &&
-              mrhiClearHeapEntry(device, heap, 0) == mrhi_success,
+    CHECK(mrhiHeap_SetEntry(device, heap, 0, &entry) == mrhi_success, "a sampled texture");
+    CHECK(mrhiHeap_SetEntry(device, heap, 0, &entry) == mrhi_errorState, "not empty");
+    CHECK(mrhiHeap_SetEntry(device, heap, 7, &entry) == mrhi_success, "the same view again");
+    CHECK(mrhiHeap_SetEntry(device, heap, 8, &entry) == mrhi_errorInvalid, "past the entries");
+    CHECK(mrhiHeap_ClearEntry(device, heap, 0) == mrhi_success &&
+              mrhiHeap_ClearEntry(device, heap, 0) == mrhi_success,
           "cleared, twice");
-    CHECK(mrhiSetHeapEntry(device, heap, 0, &entry) == mrhi_success,
+    CHECK(mrhiHeap_SetEntry(device, heap, 0, &entry) == mrhi_success,
           "free again with no frame running");
-    CHECK(mrhiClearHeapEntry(device, heap, 8) == mrhi_errorInvalid, "a clear past the entries");
+    CHECK(mrhiHeap_ClearEntry(device, heap, 8) == mrhi_errorInvalid, "a clear past the entries");
     entry.writable = true;
-    CHECK(mrhiSetHeapEntry(device, heap, 1, &entry) == mrhi_errorInvalid, "a written sampled");
+    CHECK(mrhiHeap_SetEntry(device, heap, 1, &entry) == mrhi_errorInvalid, "a written sampled");
     entry = Sampled(view);
     entry.kind = 3;
-    CHECK(mrhiSetHeapEntry(device, heap, 1, &entry) == mrhi_errorInvalid, "an unknown kind");
-    CHECK(mrhiSetHeapEntry(device, heap, 1, nullptr) == mrhi_errorInvalid, "no entry");
+    CHECK(mrhiHeap_SetEntry(device, heap, 1, &entry) == mrhi_errorInvalid, "an unknown kind");
+    CHECK(mrhiHeap_SetEntry(device, heap, 1, nullptr) == mrhi_errorInvalid, "no entry");
     entry = (mrhiHeapEntry){.kind = mrhi_heapStorageTexture, .view = view};
-    CHECK(mrhiSetHeapEntry(device, heap, 1, &entry) == mrhi_errorUnsupported,
+    CHECK(mrhiHeap_SetEntry(device, heap, 1, &entry) == mrhi_errorUnsupported,
           "a storage texture without bindless_heterogeneous");
     mrhiTextureId target = MakeTexture(device, mrhi_textureRenderTarget);
     entry = Sampled(MakeView(device, target));
-    CHECK(mrhiSetHeapEntry(device, heap, 1, &entry) == mrhi_errorInvalid, "a view not sampled");
+    CHECK(mrhiHeap_SetEntry(device, heap, 1, &entry) == mrhi_errorInvalid, "a view not sampled");
     entry = Sampled((mrhiViewId){99, 1});
-    CHECK(mrhiSetHeapEntry(device, heap, 1, &entry) == mrhi_errorStale, "a stale view");
-    CHECK(mrhiSetHeapEntry(device, (mrhiHeapId){1, 99}, 1, &entry) == mrhi_errorStale,
+    CHECK(mrhiHeap_SetEntry(device, heap, 1, &entry) == mrhi_errorStale, "a stale view");
+    CHECK(mrhiHeap_SetEntry(device, (mrhiHeapId){1, 99}, 1, &entry) == mrhi_errorStale,
           "a stale heap");
-    CHECK(mrhiSetHeapEntry(nullptr, heap, 1, &entry) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiHeap_SetEntry(nullptr, heap, 1, &entry) == mrhi_errorInvalid, "no device");
     Close(device);
 }
 
@@ -196,35 +196,35 @@ static void TestStorage(void)
     uint32_t alignment = device->limits.storageOffsetAlignment;
     mrhiBufferId buffer = MakeBuffer(device, 4096, mrhi_bufferStorage);
     mrhiHeapEntry entry = Storage(buffer, 0, MRHI_WHOLE_SIZE);
-    CHECK(mrhiSetHeapEntry(device, heap, 0, &entry) == mrhi_success, "a whole buffer");
+    CHECK(mrhiHeap_SetEntry(device, heap, 0, &entry) == mrhi_success, "a whole buffer");
     entry = Storage(buffer, alignment, 64);
     entry.writable = false;
-    CHECK(mrhiSetHeapEntry(device, heap, 1, &entry) == mrhi_success, "a range, read only");
+    CHECK(mrhiHeap_SetEntry(device, heap, 1, &entry) == mrhi_success, "a range, read only");
     entry = Storage(buffer, 64, 64);
-    CHECK(mrhiSetHeapEntry(device, heap, 2, &entry) == mrhi_errorCapacity,
+    CHECK(mrhiHeap_SetEntry(device, heap, 2, &entry) == mrhi_errorCapacity,
           "on the adapter's alignment only");
     entry = Storage(buffer, 4, 64);
-    CHECK(mrhiSetHeapEntry(device, heap, 2, &entry) == mrhi_errorUnsupported, "off the adapter's");
+    CHECK(mrhiHeap_SetEntry(device, heap, 2, &entry) == mrhi_errorUnsupported, "off the adapter's");
     entry = Storage(buffer, 0, 6);
-    CHECK(mrhiSetHeapEntry(device, heap, 2, &entry) == mrhi_errorInvalid, "not 4-byte sized");
+    CHECK(mrhiHeap_SetEntry(device, heap, 2, &entry) == mrhi_errorInvalid, "not 4-byte sized");
     entry = Storage(buffer, 0, 0);
-    CHECK(mrhiSetHeapEntry(device, heap, 2, &entry) == mrhi_errorInvalid, "empty");
+    CHECK(mrhiHeap_SetEntry(device, heap, 2, &entry) == mrhi_errorInvalid, "empty");
     entry = Storage(buffer, 0, 4100);
-    CHECK(mrhiSetHeapEntry(device, heap, 2, &entry) == mrhi_errorInvalid, "past its end");
+    CHECK(mrhiHeap_SetEntry(device, heap, 2, &entry) == mrhi_errorInvalid, "past its end");
     entry = Storage(buffer, 8192, MRHI_WHOLE_SIZE);
-    CHECK(mrhiSetHeapEntry(device, heap, 2, &entry) == mrhi_errorInvalid, "from past its end");
+    CHECK(mrhiHeap_SetEntry(device, heap, 2, &entry) == mrhi_errorInvalid, "from past its end");
     mrhiBufferId uniform = MakeBuffer(device, 256, mrhi_bufferUniform);
     entry = Storage(uniform, 0, MRHI_WHOLE_SIZE);
-    CHECK(mrhiSetHeapEntry(device, heap, 2, &entry) == mrhi_errorInvalid, "no storage usage");
+    CHECK(mrhiHeap_SetEntry(device, heap, 2, &entry) == mrhi_errorInvalid, "no storage usage");
     entry = Storage((mrhiBufferId){77, 1}, 0, 4);
-    CHECK(mrhiSetHeapEntry(device, heap, 2, &entry) == mrhi_errorStale, "a stale buffer");
+    CHECK(mrhiHeap_SetEntry(device, heap, 2, &entry) == mrhi_errorStale, "a stale buffer");
     mrhiTextureId texture = MakeTexture(device, mrhi_textureStorage);
     entry = (mrhiHeapEntry){
         .kind = mrhi_heapStorageTexture, .view = MakeView(device, texture), .writable = true};
-    CHECK(mrhiSetHeapEntry(device, heap, 2, &entry) == mrhi_success, "a storage texture");
+    CHECK(mrhiHeap_SetEntry(device, heap, 2, &entry) == mrhi_success, "a storage texture");
     mrhiTextureId sampled = MakeTexture(device, mrhi_textureSampled);
     entry.view = MakeView(device, sampled);
-    CHECK(mrhiSetHeapEntry(device, heap, 3, &entry) == mrhi_errorInvalid, "no storage usage");
+    CHECK(mrhiHeap_SetEntry(device, heap, 3, &entry) == mrhi_errorInvalid, "no storage usage");
     mrhiTextureDef mipped = mrhiDefaultTextureDef();
     mipped.format = mrhi_formatRgba8Unorm;
     mipped.width = 4;
@@ -233,7 +233,7 @@ static void TestStorage(void)
     mipped.usage = mrhi_textureStorage;
     CHECK(mrhiCreateTexture(device, &mipped, &texture) == mrhi_success, "two mips");
     entry.view = MakeView(device, texture);
-    CHECK(mrhiSetHeapEntry(device, heap, 3, &entry) == mrhi_errorInvalid,
+    CHECK(mrhiHeap_SetEntry(device, heap, 3, &entry) == mrhi_errorInvalid,
           "a storage view of more than one mip");
     Close(device);
 }
@@ -243,21 +243,21 @@ static void TestSamplers(void)
     mrhiDevice* device = Open(2, true, false);
     mrhiHeapId heap = MakeHeap(device, 1, 2);
     mrhiSamplerId sampler = MakeSampler(device);
-    CHECK(mrhiSetHeapSampler(device, heap, 0, sampler) == mrhi_success, "a sampler");
-    CHECK(mrhiSetHeapSampler(device, heap, 0, sampler) == mrhi_errorState, "not empty");
-    CHECK(mrhiSetHeapSampler(device, heap, 2, sampler) == mrhi_errorInvalid, "past the samplers");
-    CHECK(mrhiSetHeapSampler(device, heap, 1, (mrhiSamplerId){9, 9}) == mrhi_errorStale,
+    CHECK(mrhiHeap_SetSampler(device, heap, 0, sampler) == mrhi_success, "a sampler");
+    CHECK(mrhiHeap_SetSampler(device, heap, 0, sampler) == mrhi_errorState, "not empty");
+    CHECK(mrhiHeap_SetSampler(device, heap, 2, sampler) == mrhi_errorInvalid, "past the samplers");
+    CHECK(mrhiHeap_SetSampler(device, heap, 1, (mrhiSamplerId){9, 9}) == mrhi_errorStale,
           "a stale sampler");
-    CHECK(mrhiClearHeapSampler(device, heap, 0) == mrhi_success &&
-              mrhiSetHeapSampler(device, heap, 0, sampler) == mrhi_success,
+    CHECK(mrhiHeap_ClearSampler(device, heap, 0) == mrhi_success &&
+              mrhiHeap_SetSampler(device, heap, 0, sampler) == mrhi_success,
           "cleared and set again");
-    CHECK(mrhiClearHeapSampler(device, heap, 2) == mrhi_errorInvalid, "a clear past them");
+    CHECK(mrhiHeap_ClearSampler(device, heap, 2) == mrhi_errorInvalid, "a clear past them");
     CHECK(mrhiDestroySampler(device, sampler) == mrhi_success, "the sampler destroyed");
     sampler = MakeSampler(device);
-    CHECK(mrhiSetHeapSampler(device, heap, 0, sampler) == mrhi_success,
+    CHECK(mrhiHeap_SetSampler(device, heap, 0, sampler) == mrhi_success,
           "its entry emptied by its destruction");
     mrhiHeapId none = MakeHeap(device, 1, 0);
-    CHECK(mrhiSetHeapSampler(device, none, 0, sampler) == mrhi_errorInvalid, "no sampler part");
+    CHECK(mrhiHeap_SetSampler(device, none, 0, sampler) == mrhi_errorInvalid, "no sampler part");
     Close(device);
 }
 
@@ -271,12 +271,12 @@ static mrhiRequestId SubmitWith(mrhiDevice* device, mrhiHeapId heap)
     def.heap = heap;
     mrhiPassId pass = {0};
     mrhiRequestId token = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiAddPass(device, &def, &pass) == mrhi_success &&
-              mrhiCompileFrame(device) == mrhi_success &&
-              mrhiBeginPass(device, pass) == mrhi_success &&
-              mrhiEndPass(device, pass) == mrhi_success &&
-              mrhiSubmitFrame(device, &token) == mrhi_success,
+              mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, pass) == mrhi_success &&
+              mrhiPass_End(device, pass) == mrhi_success &&
+              mrhiDevice_SubmitFrame(device, &token) == mrhi_success,
           "a frame with the heap");
     return token;
 }
@@ -285,7 +285,7 @@ static mrhiRequestId SubmitWith(mrhiDevice* device, mrhiHeapId heap)
 static void Drain(mrhiDevice* device)
 {
     mrhiDeviceNotification record;
-    while (mrhiNextDeviceNotification(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
     {
         CHECK(record.kind == mrhi_deviceFrameDone && record.outcome == mrhi_success, "done");
     }
@@ -298,21 +298,21 @@ static void TestFreedAfterFrames(void)
     mrhiTextureId texture = MakeTexture(device, mrhi_textureSampled);
     mrhiHeapEntry entry = Sampled(MakeView(device, texture));
     mrhiSamplerId sampler = MakeSampler(device);
-    CHECK(mrhiSetHeapEntry(device, heap, 0, &entry) == mrhi_success &&
-              mrhiSetHeapSampler(device, heap, 0, sampler) == mrhi_success,
+    CHECK(mrhiHeap_SetEntry(device, heap, 0, &entry) == mrhi_success &&
+              mrhiHeap_SetSampler(device, heap, 0, sampler) == mrhi_success,
           "set");
     (void)SubmitWith(device, heap);
-    CHECK(mrhiSetHeapEntry(device, heap, 1, &entry) == mrhi_success,
+    CHECK(mrhiHeap_SetEntry(device, heap, 1, &entry) == mrhi_success,
           "an entry empty while the frame was made");
-    CHECK(mrhiClearHeapEntry(device, heap, 0) == mrhi_success &&
-              mrhiClearHeapSampler(device, heap, 0) == mrhi_success,
+    CHECK(mrhiHeap_ClearEntry(device, heap, 0) == mrhi_success &&
+              mrhiHeap_ClearSampler(device, heap, 0) == mrhi_success,
           "cleared while the frame runs");
-    CHECK(mrhiSetHeapEntry(device, heap, 0, &entry) == mrhi_errorState &&
-              mrhiSetHeapSampler(device, heap, 0, sampler) == mrhi_errorState,
+    CHECK(mrhiHeap_SetEntry(device, heap, 0, &entry) == mrhi_errorState &&
+              mrhiHeap_SetSampler(device, heap, 0, sampler) == mrhi_errorState,
           "not until the frame finishes");
     Drain(device);
-    CHECK(mrhiSetHeapEntry(device, heap, 0, &entry) == mrhi_success &&
-              mrhiSetHeapSampler(device, heap, 0, sampler) == mrhi_success,
+    CHECK(mrhiHeap_SetEntry(device, heap, 0, &entry) == mrhi_success &&
+              mrhiHeap_SetSampler(device, heap, 0, sampler) == mrhi_success,
           "free once it has");
     Close(device);
 }
@@ -325,23 +325,24 @@ static void TestDestroyEmpties(void)
     mrhiTextureId texture = MakeTexture(device, mrhi_textureSampled);
     mrhiViewId view = MakeView(device, texture);
     mrhiHeapEntry entry = Sampled(view);
-    CHECK(mrhiSetHeapEntry(device, heap, 0, &entry) == mrhi_success &&
-              mrhiSetHeapEntry(device, other, 3, &entry) == mrhi_success,
+    CHECK(mrhiHeap_SetEntry(device, heap, 0, &entry) == mrhi_success &&
+              mrhiHeap_SetEntry(device, other, 3, &entry) == mrhi_success,
           "one view in two heaps");
     CHECK(mrhiDestroyView(device, view) == mrhi_success, "the view destroyed");
     entry = Sampled(MakeView(device, texture));
-    CHECK(mrhiSetHeapEntry(device, heap, 0, &entry) == mrhi_success &&
-              mrhiSetHeapEntry(device, other, 3, &entry) == mrhi_success,
+    CHECK(mrhiHeap_SetEntry(device, heap, 0, &entry) == mrhi_success &&
+              mrhiHeap_SetEntry(device, other, 3, &entry) == mrhi_success,
           "both entries emptied");
     CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "the texture and its view");
     mrhiBufferId buffer = MakeBuffer(device, 256, mrhi_bufferStorage);
     entry = Storage(buffer, 0, MRHI_WHOLE_SIZE);
-    CHECK(mrhiSetHeapEntry(device, heap, 0, &entry) == mrhi_success,
+    CHECK(mrhiHeap_SetEntry(device, heap, 0, &entry) == mrhi_success,
           "emptied by the texture's end");
     CHECK(mrhiDestroyBuffer(device, buffer) == mrhi_success, "the buffer destroyed");
     texture = MakeTexture(device, mrhi_textureSampled);
     entry = Sampled(MakeView(device, texture));
-    CHECK(mrhiSetHeapEntry(device, heap, 0, &entry) == mrhi_success, "emptied by the buffer's end");
+    CHECK(mrhiHeap_SetEntry(device, heap, 0, &entry) == mrhi_success,
+          "emptied by the buffer's end");
     // A heap's end lets go of what it names: destroying them later
     // finds nothing to empty.
     CHECK(mrhiDestroyHeap(device, heap) == mrhi_success &&
@@ -363,11 +364,11 @@ static void TestSameSlots(void)
     CHECK(view.index1 == buffer.index1, "the same slot");
     mrhiHeapEntry entry = Sampled(view);
     mrhiHeapEntry range = Storage(buffer, 0, MRHI_WHOLE_SIZE);
-    CHECK(mrhiSetHeapEntry(device, heap, 0, &entry) == mrhi_success &&
-              mrhiSetHeapEntry(device, heap, 1, &range) == mrhi_success,
+    CHECK(mrhiHeap_SetEntry(device, heap, 0, &entry) == mrhi_success &&
+              mrhiHeap_SetEntry(device, heap, 1, &range) == mrhi_success,
           "both set");
     CHECK(mrhiDestroyBuffer(device, buffer) == mrhi_success, "the buffer destroyed");
-    CHECK(mrhiSetHeapEntry(device, heap, 0, &entry) == mrhi_errorState, "the view's entry kept");
+    CHECK(mrhiHeap_SetEntry(device, heap, 0, &entry) == mrhi_errorState, "the view's entry kept");
     Close(device);
 }
 
@@ -381,13 +382,13 @@ static void TestPassHeap(void)
     mrhiPassDef def = mrhiDefaultPassDef();
     def.heap = (mrhiHeapId){1, 99};
     mrhiPassId pass = {0};
-    CHECK(mrhiBeginFrame(device, &frame) == mrhi_success &&
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success &&
               mrhiAddPass(device, &def, &pass) == mrhi_errorStale,
           "a stale heap");
     CHECK(mrhiDestroyHeap(device, heap) == mrhi_success, "destroyed while the frame is open");
     def.heap = heap;
     CHECK(mrhiAddPass(device, &def, &pass) == mrhi_errorStale, "its id ended");
-    CHECK(mrhiDropFrame(device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(device) == mrhi_success, "dropped");
     Close(device);
 }
 

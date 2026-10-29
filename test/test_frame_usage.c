@@ -30,7 +30,7 @@ static void Open(mrhiDeviceDef def)
 
 static void CloseDevice(void)
 {
-    CHECK(mrhiGetDeviceMisuse(s_device) == 0, "no limit is misuse");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "no limit is misuse");
     Close(s_device);
     s_device = nullptr;
 }
@@ -38,14 +38,14 @@ static void CloseDevice(void)
 static void Begin(void)
 {
     mrhiFrameDef def = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &def) == mrhi_success, "begun");
+    CHECK(mrhiDevice_BeginFrame(s_device, &def) == mrhi_success, "begun");
 }
 
 static mrhiFrameUsage Usage(void)
 {
     mrhiFrameUsage usage;
     memset(&usage, 0xFF, sizeof(usage));
-    CHECK(mrhiGetFrameUsage(s_device, &usage) == mrhi_success, "the usage");
+    CHECK(mrhiDevice_GetFrameUsage(s_device, &usage) == mrhi_success, "the usage");
     return usage;
 }
 
@@ -66,10 +66,10 @@ static bool SameUsage(const mrhiFrameUsage* a, const mrhiFrameUsage* b)
 static bool Refused(mrhiDiagnosticCode code, uint32_t count)
 {
     mrhiDiagnostic record = {0};
-    bool taken = mrhiNextDeviceDiagnostic(s_device, &record) == mrhi_success;
+    bool taken = mrhiDevice_TakeDiagnostic(s_device, &record) == mrhi_success;
     mrhiDiagnostic after;
     return taken && record.code == code && record.count == count &&
-           mrhiNextDeviceDiagnostic(s_device, &after) == mrhi_empty;
+           mrhiDevice_TakeDiagnostic(s_device, &after) == mrhi_empty;
 }
 
 static mrhiResourceId DeclareBuffer(uint64_t size)
@@ -125,14 +125,14 @@ static mrhiPassId Recording(mrhiResourceId resource, mrhiAccessKind kind)
     mrhiAccess access = Access(resource, kind);
     mrhiPassId pass = {0};
     CHECK(AddPass(&access, 1, &pass) == mrhi_success, "a pass");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
-    CHECK(mrhiBeginPass(s_device, pass) == mrhi_success, "begun");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiPass_Begin(s_device, pass) == mrhi_success, "begun");
     return pass;
 }
 
 static void Drop(void)
 {
-    CHECK(mrhiDropFrame(s_device) == mrhi_success, "dropped");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
 
 static void TestBeforeFrames(void)
@@ -141,9 +141,9 @@ static void TestBeforeFrames(void)
     mrhiFrameUsage usage = Usage();
     mrhiFrameUsage zero = {0};
     CHECK(SameUsage(&usage, &zero), "nothing before the first frame");
-    CHECK(mrhiGetFrameUsage(nullptr, &usage) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiGetFrameUsage(s_device, nullptr) == mrhi_errorInvalid &&
-              Refused(mrhi_diagnosticNullArgument, 1) && mrhiGetDeviceMisuse(s_device) == 1,
+    CHECK(mrhiDevice_GetFrameUsage(nullptr, &usage) == mrhi_errorInvalid, "no device");
+    CHECK(mrhiDevice_GetFrameUsage(s_device, nullptr) == mrhi_errorInvalid &&
+              Refused(mrhi_diagnosticNullArgument, 1) && mrhiDevice_GetMisuse(s_device) == 1,
           "no usage, a misuse");
     Close(s_device);
     s_device = nullptr;
@@ -172,25 +172,26 @@ static void TestCounts(void)
               usage.frameUploadBytes == 0 && usage.frameIndirectDraws == 0 &&
               usage.frameMemoryBytes == 0,
           "resources, passes and accesses before the compile");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     // The two buffers are both written in the first pass, so they share
     // no bytes.
     CHECK(Usage().frameMemoryBytes >= 2048, "the declared buffers' memory once compiled");
     size_t barriers = 0;
-    CHECK(mrhiGetFrameBarriers(s_device, nullptr, 0, &barriers) == mrhi_success && barriers > 0,
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, nullptr, 0, &barriers) == mrhi_success &&
+              barriers > 0,
           "barriers planned");
     CHECK(Usage().frameBarriers == barriers, "the compile's barriers, all the program's");
-    CHECK(mrhiBeginPass(s_device, writes) == mrhi_success, "begun");
-    CHECK(mrhiClearBuffer(s_device, writes, first, 0, 4) == mrhi_success, "a command");
-    CHECK(mrhiWriteBuffer(s_device, writes, second, 0, s_bytes, 4) == mrhi_success &&
-              mrhiWriteBuffer(s_device, writes, second, 0, s_bytes, 516) == mrhi_success,
+    CHECK(mrhiPass_Begin(s_device, writes) == mrhi_success, "begun");
+    CHECK(mrhiPass_ClearBuffer(s_device, writes, first, 0, 4) == mrhi_success, "a command");
+    CHECK(mrhiPass_WriteBuffer(s_device, writes, second, 0, s_bytes, 4) == mrhi_success &&
+              mrhiPass_WriteBuffer(s_device, writes, second, 0, s_bytes, 516) == mrhi_success,
           "two uploads");
     usage = Usage();
     CHECK(usage.frameCommandBytes == CHUNK_BYTES, "one chunk of commands");
     CHECK(usage.frameUploadBytes == 512 + 1024, "each upload at a 512-byte boundary");
-    CHECK(mrhiEndPass(s_device, writes) == mrhi_success, "ended");
+    CHECK(mrhiPass_End(s_device, writes) == mrhi_success, "ended");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
     mrhiFrameUsage submitted = Usage();
     CHECK(SameUsage(&submitted, &usage), "kept once submitted");
     Begin();
@@ -209,12 +210,13 @@ static void TestLibraryLeftOut(void)
     Begin();
     mrhiPassId pass = Recording(ImportBuffer(buffer), mrhi_accessCopySource);
     size_t barriers = 0;
-    CHECK(mrhiGetFrameBarriers(s_device, nullptr, 0, &barriers) == mrhi_success && barriers > 0,
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, nullptr, 0, &barriers) == mrhi_success &&
+              barriers > 0,
           "the clear's barriers");
     mrhiFrameUsage usage = Usage();
     CHECK(usage.framePasses == 1 && usage.frameBarriers == 0 && usage.frameCommandBytes == 0,
           "the library's pass, barrier and commands left out");
-    CHECK(mrhiEndPass(s_device, pass) == mrhi_success, "ended");
+    CHECK(mrhiPass_End(s_device, pass) == mrhi_success, "ended");
     Drop();
     CloseDevice();
 }
@@ -311,7 +313,8 @@ static bool PlansAliasing(void)
     mrhiBarrier barriers[16];
     size_t count = 0;
     bool aliasing = false;
-    CHECK(mrhiGetFrameBarriers(s_device, barriers, 16, &count) == mrhi_success && count <= 16,
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, barriers, 16, &count) == mrhi_success &&
+              count <= 16,
           "the barriers");
     for (size_t i = 0; i < count; ++i)
     {
@@ -327,7 +330,7 @@ static void CheckBarriers(void (*declare)(void), bool aliasing)
     Open(mrhiDefaultDeviceDef());
     Begin();
     declare();
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     uint32_t planned = Usage().frameBarriers;
     CHECK(planned >= 2 && PlansAliasing() == aliasing, "planned");
     Drop();
@@ -337,12 +340,12 @@ static void CheckBarriers(void (*declare)(void), bool aliasing)
     Open(def);
     Begin();
     declare();
-    CHECK(mrhiCompileFrame(s_device) == mrhi_errorCapacity &&
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticFrameBarriers, 1),
           "one barrier too many");
     CHECK(Usage().frameBarriers == planned - 1, "those planned before the refusal");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorCapacity &&
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticFrameBarriers, 1),
           "the submission's compile too");
     Drop();
@@ -369,20 +372,20 @@ static void TestCommands(void)
     uint32_t cleared = 0;
     while (status == mrhi_success && cleared <= CHUNK_BYTES)
     {
-        status = mrhiClearBuffer(s_device, pass, buffer, 0, 4);
+        status = mrhiPass_ClearBuffer(s_device, pass, buffer, 0, 4);
         cleared += status == mrhi_success ? 1 : 0;
     }
     CHECK(status == mrhi_errorCapacity && cleared > 0 &&
               Refused(mrhi_diagnosticFrameCommandBytes, 1),
           "the arena full");
     CHECK(Usage().frameCommandBytes == CHUNK_BYTES, "all of it");
-    CHECK(mrhiClearBuffer(s_device, pass, buffer, 0, 4) == mrhi_errorCapacity &&
-              mrhiWriteBuffer(s_device, pass, buffer, 0, s_bytes, 0) == mrhi_errorCapacity &&
+    CHECK(mrhiPass_ClearBuffer(s_device, pass, buffer, 0, 4) == mrhi_errorCapacity &&
+              mrhiPass_WriteBuffer(s_device, pass, buffer, 0, s_bytes, 0) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticFrameCommandBytes, 2),
           "the pass's later calls");
-    CHECK(mrhiEndPass(s_device, pass) == mrhi_success, "ended");
+    CHECK(mrhiPass_End(s_device, pass) == mrhi_success, "ended");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorCapacity &&
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticFrameCommandBytes, 1),
           "the submission");
     CHECK(Usage().frameCommandBytes == CHUNK_BYTES, "after it");
@@ -407,27 +410,29 @@ static void TestUploads(void)
     CHECK(AddPass(&firstAccess, 1, &firstPass) == mrhi_success &&
               AddPass(&secondAccess, 1, &secondPass) == mrhi_success,
           "two passes");
-    CHECK(mrhiCompileFrame(s_device) == mrhi_success &&
-              mrhiBeginPass(s_device, firstPass) == mrhi_success &&
-              mrhiBeginPass(s_device, secondPass) == mrhi_success,
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, firstPass) == mrhi_success &&
+              mrhiPass_Begin(s_device, secondPass) == mrhi_success,
           "both recording");
-    CHECK(mrhiWriteBuffer(s_device, firstPass, first, 0, s_bytes, 1024) == mrhi_success, "half");
-    CHECK(mrhiWriteBuffer(s_device, firstPass, first, 0, s_bytes, 1032) == mrhi_errorCapacity &&
+    CHECK(mrhiPass_WriteBuffer(s_device, firstPass, first, 0, s_bytes, 1024) == mrhi_success,
+          "half");
+    CHECK(mrhiPass_WriteBuffer(s_device, firstPass, first, 0, s_bytes, 1032) ==
+                  mrhi_errorCapacity &&
               Refused(mrhi_diagnosticFrameUploadBytes, 1),
           "more than the rest");
     CHECK(Usage().frameUploadBytes == 1024, "the staging as it was");
-    CHECK(mrhiWriteBuffer(s_device, firstPass, first, 0, s_bytes, 4) == mrhi_errorCapacity &&
-              mrhiClearBuffer(s_device, firstPass, first, 0, 4) == mrhi_errorCapacity &&
+    CHECK(mrhiPass_WriteBuffer(s_device, firstPass, first, 0, s_bytes, 4) == mrhi_errorCapacity &&
+              mrhiPass_ClearBuffer(s_device, firstPass, first, 0, 4) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticFrameUploadBytes, 2),
           "the pass's later calls");
-    CHECK(mrhiWriteBuffer(s_device, secondPass, second, 0, s_bytes, 1028) == mrhi_success,
+    CHECK(mrhiPass_WriteBuffer(s_device, secondPass, second, 0, s_bytes, 1028) == mrhi_success,
           "the rest, for another pass");
     CHECK(Usage().frameUploadBytes == 2052, "all of it");
-    CHECK(mrhiEndPass(s_device, firstPass) == mrhi_success &&
-              mrhiEndPass(s_device, secondPass) == mrhi_success,
+    CHECK(mrhiPass_End(s_device, firstPass) == mrhi_success &&
+              mrhiPass_End(s_device, secondPass) == mrhi_success,
           "ended");
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorCapacity &&
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticFrameUploadBytes, 1),
           "the submission");
     Drop();
@@ -445,14 +450,14 @@ static void TestReadbacks(void)
     mrhiResourceId resource = ImportBuffer(buffer);
     mrhiPassId pass = Recording(resource, mrhi_accessCopySource);
     mrhiRequestId request;
-    CHECK(mrhiReadBuffer(s_device, pass, resource, 0, 1024, &request) == mrhi_errorCapacity &&
+    CHECK(mrhiPass_ReadBuffer(s_device, pass, resource, 0, 1024, &request) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticReadbackBytes, 1),
           "more than the ring");
-    CHECK(mrhiReadBuffer(s_device, pass, resource, 0, 4, &request) == mrhi_success, "one");
-    CHECK(mrhiReadBuffer(s_device, pass, resource, 0, 4, &request) == mrhi_errorCapacity &&
+    CHECK(mrhiPass_ReadBuffer(s_device, pass, resource, 0, 4, &request) == mrhi_success, "one");
+    CHECK(mrhiPass_ReadBuffer(s_device, pass, resource, 0, 4, &request) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticReadbacks, 1),
           "a second");
-    CHECK(mrhiEndPass(s_device, pass) == mrhi_success, "ended");
+    CHECK(mrhiPass_End(s_device, pass) == mrhi_success, "ended");
     Drop();
     CloseDevice();
 }
@@ -464,10 +469,10 @@ static void TestFramesInFlight(void)
     for (int i = 0; i < 2; ++i)
     {
         Begin();
-        CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success, "submitted");
+        CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
     }
     mrhiFrameDef frameDef = mrhiDefaultFrameDef();
-    CHECK(mrhiBeginFrame(s_device, &frameDef) == mrhi_errorCapacity &&
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticFramesInFlight, 1),
           "a third in flight");
     CloseDevice();
@@ -484,22 +489,22 @@ static void TestNotifications(void)
     mrhiBufferId buffer = MakeBuffer(1024);
     mrhiRequestId token;
     Begin();
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_success &&
-              mrhiWaitFrame(s_device, token, 1) == mrhi_success,
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success &&
+              mrhiRequest_WaitFrame(s_device, token, 1) == mrhi_success,
           "one answer owed");
     Begin();
     mrhiResourceId resource = ImportBuffer(buffer);
     mrhiPassId pass = Recording(resource, mrhi_accessCopySource);
     mrhiRequestId request;
-    CHECK(mrhiReadBuffer(s_device, pass, resource, 0, 4, &request) == mrhi_errorCapacity &&
+    CHECK(mrhiPass_ReadBuffer(s_device, pass, resource, 0, 4, &request) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticNotifications, 1),
           "no room for a readback and its frame");
-    CHECK(mrhiEndPass(s_device, pass) == mrhi_success &&
-              mrhiSubmitFrame(s_device, &token) == mrhi_success &&
-              mrhiWaitFrame(s_device, token, 1) == mrhi_success,
+    CHECK(mrhiPass_End(s_device, pass) == mrhi_success &&
+              mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success &&
+              mrhiRequest_WaitFrame(s_device, token, 1) == mrhi_success,
           "two owed");
     Begin();
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorCapacity &&
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticNotifications, 1),
           "no room for a third");
     Drop();
@@ -514,10 +519,10 @@ static void TestDriverBudget(void)
     Open(mrhiDefaultDeviceDef());
     Begin();
     mrhiRequestId token;
-    CHECK(mrhiSubmitFrame(s_device, &token) == mrhi_errorCapacity &&
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticSubmitDescriptors, 1),
           "the driver's budget");
-    CHECK(mrhiDropFrame(s_device) == mrhi_errorState, "the frame closed");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_errorState, "the frame closed");
     CloseDevice();
 }
 

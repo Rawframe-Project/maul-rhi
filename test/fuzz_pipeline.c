@@ -251,15 +251,16 @@ static void Open(Device* open, bool featured)
     mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
     mrhiRequestId request;
     mrhiInstanceNotification record;
-    Expect(mrhiRequestAdapters(open->instance, &search, &request) == mrhi_success &&
-           mrhiNextInstanceNotification(open->instance, &record) == mrhi_success);
+    Expect(mrhiInstance_RequestAdapters(open->instance, &search, &request) == mrhi_success &&
+           mrhiInstance_TakeNotification(open->instance, &record) == mrhi_success);
     size_t count = 0;
-    Expect(mrhiGetAdapters(open->instance, &deviceDef.adapter, 1, &count) == mrhi_success &&
+    Expect(mrhiInstance_GetAdapters(open->instance, &deviceDef.adapter, 1, &count) ==
+               mrhi_success &&
            count == 1);
     Expect(mrhiCreateDevice(open->instance, &deviceDef, &open->device, &request) == mrhi_success &&
-           mrhiNextInstanceNotification(open->instance, &record) == mrhi_success);
-    Expect(mrhiGetDeviceFeatures(open->device, &open->features) == mrhi_success &&
-           mrhiGetDeviceLimits(open->device, &open->limits) == mrhi_success);
+           mrhiInstance_TakeNotification(open->instance, &record) == mrhi_success);
+    Expect(mrhiDevice_GetFeatures(open->device, &open->features) == mrhi_success &&
+           mrhiDevice_GetLimits(open->device, &open->limits) == mrhi_success);
     open->conformance =
         MakeShader(open->device, s_conformanceContainer, sizeof(s_conformanceContainer));
     open->destroyed =
@@ -627,7 +628,7 @@ static Named Diagnostics(mrhiDevice* device)
 {
     Named named = {0};
     mrhiDiagnostic record;
-    while (mrhiNextDeviceDiagnostic(device, &record) == mrhi_success)
+    while (mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success)
     {
         Expect(record.code != 0);
         if (IsLimitCode(record.code))
@@ -654,7 +655,7 @@ static void CheckAnswer(mrhiDevice* device, mrhiResult status, uint64_t misuse)
            status == mrhi_errorFormat || status == mrhi_errorUnsupported ||
            status == mrhi_errorCapacity || status == mrhi_errorStale);
     bool misused = status == mrhi_errorInvalid || status == mrhi_errorLimit;
-    Expect(mrhiGetDeviceMisuse(device) - misuse == (misused ? 1u : 0u));
+    Expect(mrhiDevice_GetMisuse(device) - misuse == (misused ? 1u : 0u));
     Named named = Diagnostics(device);
     Expect(named.others == (misused || status == mrhi_errorFormat ? 1u : 0u));
     bool refused = status != mrhi_success && status != mrhi_errorStale;
@@ -666,10 +667,10 @@ static void CheckAnswer(mrhiDevice* device, mrhiResult status, uint64_t misuse)
 static void CheckReady(mrhiDevice* device, mrhiRequestId request)
 {
     mrhiDeviceNotification record = {0};
-    Expect(request.index1 != 0 && mrhiNextDeviceNotification(device, &record) == mrhi_success &&
+    Expect(request.index1 != 0 && mrhiDevice_TakeNotification(device, &record) == mrhi_success &&
            record.kind == mrhi_devicePipelineReady && record.request.index1 == request.index1 &&
            record.request.generation == request.generation && record.outcome == mrhi_success);
-    Expect(mrhiNextDeviceNotification(device, &record) == mrhi_empty);
+    Expect(mrhiDevice_TakeNotification(device, &record) == mrhi_empty);
 }
 
 static void RunGraphics(Input* in, const Device* device, mrhiShaderId shader)
@@ -692,7 +693,7 @@ static void RunGraphics(Input* in, const Device* device, mrhiShaderId shader)
     mrhiResult first = mrhi_success;
     for (int i = 0; i < 2; ++i)
     {
-        uint64_t misuse = mrhiGetDeviceMisuse(device->device);
+        uint64_t misuse = mrhiDevice_GetMisuse(device->device);
         mrhiResult status = mrhiCreateGraphicsPipeline(device->device, &def, &pipeline, &request);
         CheckAnswer(device->device, status, misuse);
         Expect(i == 0 || status == first);
@@ -728,7 +729,7 @@ static void RunCompute(Input* in, const Device* device, mrhiShaderId shader)
     mrhiResult first = mrhi_success;
     for (int i = 0; i < 2; ++i)
     {
-        uint64_t misuse = mrhiGetDeviceMisuse(device->device);
+        uint64_t misuse = mrhiDevice_GetMisuse(device->device);
         mrhiResult status = mrhiCreateComputePipeline(device->device, &def, &pipeline, &request);
         CheckAnswer(device->device, status, misuse);
         Expect(i == 0 || status == first);
