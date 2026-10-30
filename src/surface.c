@@ -176,13 +176,18 @@ uint64_t mrhiFindSurface(const mrhiInstance* instance, mrhiSurfaceId surface)
 // id.
 static void EndSurface(mrhiInstance* instance, uint32_t index1)
 {
-    const mrhiSurfaceSlot* slot = &instance->surfaceSlots[index1 - 1];
-    if (slot->device != nullptr)
-    {
-        mrhiEndConfiguration(slot->device, slot->swapchain);
-    }
-    instance->driver.vtable->destroySurface(instance->driver.self, slot->handle);
+    // The id goes stale first: ending the configuration may give the
+    // swapchain's memory back to the device's allocator, and a hook
+    // reading the surface then finds it gone. The rest reads a copy, never
+    // the released slot.
+    mrhiSurfaceSlot ended = instance->surfaceSlots[index1 - 1];
+    instance->surfaceSlots[index1 - 1] = (mrhiSurfaceSlot){0};
     mrhiPoolRelease(&instance->surfaces, index1);
+    if (ended.device != nullptr)
+    {
+        mrhiEndConfiguration(ended.device, ended.swapchain);
+    }
+    instance->driver.vtable->destroySurface(instance->driver.self, ended.handle);
 }
 
 mrhiResult mrhiDestroySurface(mrhiInstance* instance, mrhiSurfaceId surface)

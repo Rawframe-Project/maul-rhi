@@ -4,7 +4,9 @@
 // Calls from inside an allocator: the instance and the device refuse
 // each function that would change them with mrhi_errorBusy, one misuse
 // counted, while their allocator runs, and take calls again once it
-// returns. A take call refused as busy leaves its record or bytes.
+// returns. A take call refused as busy leaves its record or bytes. A
+// destroy makes its id stale before the object's memory goes back to the
+// allocator, so a hook reading the object then finds it gone.
 
 #include "test_device_setup.h"
 
@@ -31,6 +33,13 @@ static mrhiSurfaceId s_surface;
 static int s_answered;
 // The take calls' outputs a busy refusal wrote.
 static int s_written;
+// The objects a hook reads back while they are destroyed, and what the
+// read returned.
+static mrhiShaderId s_shader;
+static mrhiComputePipelineId s_pipeline;
+static mrhiPassId s_pass;
+static mrhiAdapterId s_adapterId;
+static mrhiResult s_read;
 
 enum
 {
@@ -268,11 +277,73 @@ static void TestShader(void)
     Close(s_device);
 }
 
+static void ReadShader(void)
+{
+    mrhiShaderInfo info;
+    s_read = mrhiShader_GetInfo(s_device, s_shader, &info);
+}
+
+static void SetPipeline(void)
+{
+    s_read = mrhiPass_SetComputePipeline(s_device, s_pass, s_pipeline);
+}
+
+// A shader's reflection goes back to the allocator once its id is stale.
+static void TestShaderStale(void)
+{
+    s_device = Open();
+    mrhiShaderDef def = mrhiDefaultShaderDef();
+    def.bytes = s_noopContainer;
+    def.byteCount = sizeof(s_noopContainer);
+    CHECK(mrhiCreateShader(s_device, &def, &s_shader) == mrhi_success, "the shader made");
+    s_read = mrhi_success;
+    s_hook = ReadShader;
+    CHECK(mrhiDestroyShader(s_device, s_shader) == mrhi_success, "the shader destroyed");
+    CHECK(s_hook == nullptr && s_read == mrhi_errorStale, "stale to the allocator");
+    Close(s_device);
+}
+
+// A pipeline holding the last of a shader's reflection gives it back to
+// the allocator once its id is stale, so a pass cannot record it then.
+static void TestPipelineStale(void)
+{
+    s_device = Open();
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &s_shader) == mrhi_success, "the shader made");
+    mrhiComputePipelineDef def = mrhiDefaultComputePipelineDef();
+    def.shader = s_shader;
+    def.entry = "cs";
+    def.entryLength = 2;
+    mrhiRequestId request;
+    mrhiDeviceNotification record;
+    CHECK(mrhiCreateComputePipeline(s_device, &def, &s_pipeline, &request) == mrhi_success &&
+              mrhiDevice_TakeNotification(s_device, &record) == mrhi_success,
+          "the pipeline ready");
+    CHECK(mrhiDestroyShader(s_device, s_shader) == mrhi_success, "its shader destroyed");
+    mrhiFrameDef frameDef = mrhiDefaultFrameDef();
+    mrhiPassDef passDef = mrhiDefaultPassDef();
+    passDef.neverCull = true;
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success &&
+              mrhiAddPass(s_device, &passDef, &s_pass) == mrhi_success &&
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, s_pass) == mrhi_success,
+          "a dispatch pass recording");
+    s_read = mrhi_success;
+    s_hook = SetPipeline;
+    CHECK(mrhiDestroyComputePipeline(s_device, s_pipeline) == mrhi_success,
+          "the pipeline destroyed");
+    CHECK(s_hook == nullptr && s_read == mrhi_errorStale, "stale to the allocator");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "the frame dropped");
+    Close(s_device);
+}
+
 // A second device on the instance, with the C library's allocator.
 static mrhiDevice* s_second;
 
-// A surface on the instance, presenting on its adapter.
-static mrhiSurfaceId MakeSurface(void)
+// Creates a surface on the instance, presenting on its adapter.
+static mrhiResult CreateSurface(mrhiSurfaceId* surfaceOut)
 {
     mrhiSurfaceSourceTest source = {
         .chain = {.next = nullptr, .type = mrhi_structSurfaceSourceTest},
@@ -281,8 +352,13 @@ static mrhiSurfaceId MakeSurface(void)
     };
     mrhiSurfaceDef def = mrhiDefaultSurfaceDef();
     def.next = &source.chain;
+    return mrhiCreateSurface(s_instance, &def, surfaceOut);
+}
+
+static mrhiSurfaceId MakeSurface(void)
+{
     mrhiSurfaceId surface = {0};
-    CHECK(mrhiCreateSurface(s_instance, &def, &surface) == mrhi_success, "the surface");
+    CHECK(CreateSurface(&surface) == mrhi_success, "the surface");
     return surface;
 }
 
@@ -316,6 +392,20 @@ static void HeldCalls(void)
 static void DestroySurface(void)
 {
     Busy(mrhiDestroySurface(s_instance, s_surface));
+}
+
+static void ReadSurface(void)
+{
+    mrhiSurfaceCaps caps;
+    s_read = mrhiSurface_GetCaps(s_instance, s_surface, s_adapterId, &caps);
+}
+
+// The surface a hook made, if any.
+static mrhiSurfaceId s_made;
+
+static void MakeSurfaceInHook(void)
+{
+    s_read = CreateSurface(&s_made);
 }
 
 // The device, with s_surface configured on it, and the second device.
@@ -399,6 +489,53 @@ static void TestBusyConfiguredDevice(void)
     CloseConfigured();
 }
 
+// A destroyed surface's configuration gives its swapchain back to the
+// device's allocator once the surface's id is stale.
+static void TestSurfaceStale(void)
+{
+    OpenConfigured();
+    size_t count = 0;
+    CHECK(mrhiInstance_GetAdapters(s_instance, &s_adapterId, 1, &count) == mrhi_success,
+          "the adapter");
+    s_read = mrhi_success;
+    s_hook = ReadSurface;
+    CHECK(mrhiDestroySurface(s_instance, s_surface) == mrhi_success, "the surface destroyed");
+    CHECK(s_hook == nullptr && s_read == mrhi_errorStale, "stale to the allocator");
+    CloseConfigured();
+}
+
+// A surface made from the hook while another's configuration ends is
+// refused as busy, since the instance is held, so the ending surface's
+// released slot is never taken again before its driver surface goes:
+// the old surface ends with its own handle, and surfaces made afterwards
+// work.
+static void TestSurfaceRefusedWhileOneEnds(void)
+{
+    OpenConfigured();
+    size_t count = 0;
+    CHECK(mrhiInstance_GetAdapters(s_instance, &s_adapterId, 1, &count) == mrhi_success,
+          "the adapter");
+    mrhiSurfaceId old = s_surface;
+    s_read = mrhi_success;
+    s_made = (mrhiSurfaceId){0};
+    s_hook = MakeSurfaceInHook;
+    CHECK(mrhiDestroySurface(s_instance, s_surface) == mrhi_success, "the surface destroyed");
+    CHECK(s_hook == nullptr && s_read == mrhi_errorBusy && s_made.index1 == 0 &&
+              s_made.generation == 0,
+          "a surface made from the hook refused");
+    mrhiSurfaceCaps caps;
+    s_surface = MakeSurface();
+    CHECK(mrhiSurface_GetCaps(s_instance, old, s_adapterId, &caps) == mrhi_errorStale &&
+              mrhiSurface_GetCaps(s_instance, s_surface, s_adapterId, &caps) == mrhi_success &&
+              caps.presentable,
+          "the old surface gone, a new one working");
+    mrhiSurfaceConfig config = Config(64);
+    CHECK(mrhiDevice_ConfigureSurface(s_device, &config) == mrhi_success &&
+              mrhiDestroySurface(s_instance, s_surface) == mrhi_success,
+          "configured and destroyed with its own handle");
+    CloseConfigured();
+}
+
 // The device's driver goes back to the device's allocator as the device
 // is destroyed, and a call then is refused.
 static void TestDestroy(void)
@@ -433,9 +570,13 @@ int main(void)
     TestDeviceCreation();
     TestHeap();
     TestShader();
+    TestShaderStale();
+    TestPipelineStale();
     TestReconfigure();
     TestUnconfigure();
     TestBusyConfiguredDevice();
+    TestSurfaceStale();
+    TestSurfaceRefusedWhileOneEnds();
     TestDestroy();
     TestDestroyHeld();
     return s_failures == 0 ? 0 : 1;
