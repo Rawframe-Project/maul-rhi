@@ -108,14 +108,16 @@ static void PollDriver(mrhiInstance* instance)
 mrhiResult mrhiInstance_TakeNotification(mrhiInstance* instance,
                                          mrhiInstanceNotification* notificationOut)
 {
+    // Refused as busy, it leaves the record: the call the allocator runs
+    // in may be filling it.
+    if (instance != nullptr && instance->allocatorGuard.busy)
+    {
+        return mrhiInstanceBusy(instance);
+    }
     mrhiClearOutput(notificationOut, sizeof(*notificationOut));
     if (instance == nullptr)
     {
         return mrhi_errorInvalid;
-    }
-    if (instance->allocatorGuard.busy)
-    {
-        return mrhiInstanceBusy(instance);
     }
     if (notificationOut == nullptr)
     {

@@ -1626,7 +1626,7 @@
               "name": "diagnostic_out",
               "type": "struct.diagnostic",
               "pointer": "mutable",
-              "doc": "Receives the record; zeros unless one is taken."
+              "doc": "Receives the record; zeros unless one is taken, but left as it was on `mrhi_errorBusy`."
             }
           ],
           "thread_safety": {
@@ -1743,7 +1743,7 @@
               "name": "notification_out",
               "type": "struct.instance_notification",
               "pointer": "mutable",
-              "doc": "Receives the record; zeros unless one is taken."
+              "doc": "Receives the record; zeros unless one is taken, but left as it was on `mrhi_errorBusy`."
             }
           ],
           "thread_safety": {
@@ -7072,7 +7072,7 @@
               "name": "diagnostic_out",
               "type": "struct.diagnostic",
               "pointer": "mutable",
-              "doc": "Receives the record; zeros unless one is taken."
+              "doc": "Receives the record; zeros unless one is taken, but left as it was on `mrhi_errorBusy`."
             }
           ],
           "thread_safety": {
@@ -12152,7 +12152,7 @@
               "name": "notification_out",
               "type": "struct.device_notification",
               "pointer": "mutable",
-              "doc": "Receives the record; zeros unless one is taken."
+              "doc": "Receives the record; zeros unless one is taken, but left as it was on `mrhi_errorBusy`."
             }
           ],
           "thread_safety": {
@@ -21037,7 +21037,7 @@
               "name": "bytes_out",
               "type": "void",
               "pointer": "mutable",
-              "doc": "Where the bytes go, or NULL for the size only; zeros, as many as capacity, on any failure."
+              "doc": "Where the bytes go, or NULL for the size only; zeros, as many as capacity, on any failure but `mrhi_errorBusy`, which leaves them."
             },
             {
               "name": "capacity",
@@ -21048,7 +21048,7 @@
               "name": "size_out",
               "type": "size",
               "pointer": "mutable",
-              "doc": "The readback's bytes; 0 on any failure but `mrhi_errorCapacity`, which gives them."
+              "doc": "The readback's bytes; 0 on any failure but `mrhi_errorCapacity`, which gives them, and `mrhi_errorBusy`, which leaves them."
             }
           ],
           "thread_safety": {
@@ -22668,5 +22668,5 @@
       ]
     }
   ],
-  "contract_version": 24
+  "contract_version": 25
 }

@@ -453,7 +453,9 @@ static bool Cleared(const uint8_t* bytes, size_t capacity, size_t size, size_t w
 }
 
 // Each failed take leaves zeros in the array and no size, but the size
-// an array too small needed, over bytes and a size the caller filled.
+// an array too small needed, over bytes and a size the caller filled. A
+// frame a driver ends with mrhi_errorBusy is a failure like any other:
+// only a take refused from inside the allocator leaves them.
 static void TestFailureClears(void)
 {
     Open(4096, 4, 16);
@@ -488,20 +490,24 @@ static void TestFailureClears(void)
               Cleared(bytes, sizeof(bytes), size, 0),
           "no readback");
     CloseDevice();
-    s_adapter.frameOutcome = mrhi_errorPlatform;
-    Open(4096, 4, 16);
-    s_adapter.frameOutcome = mrhi_errorPlatform;
-    Frame();
-    CHECK(Read(0, 16, &request) == mrhi_success, "read");
-    token = Submit();
-    CHECK(Finish(token, &request, 1, mrhi_errorPlatform), "answered with the failure");
-    size = 99;
-    memset(bytes, 0xA5, sizeof(bytes));
-    CHECK(mrhiRequest_TakeReadback(s_device, request, bytes, sizeof(bytes), &size) ==
-                  mrhi_errorPlatform &&
-              Cleared(bytes, sizeof(bytes), size, 0),
-          "a readback its frame's failure ended");
-    CloseDevice();
+    const mrhiResult failures[] = {mrhi_errorPlatform, mrhi_errorBusy};
+    for (size_t i = 0; i < sizeof(failures) / sizeof(failures[0]); ++i)
+    {
+        s_adapter.frameOutcome = failures[i];
+        Open(4096, 4, 16);
+        s_adapter.frameOutcome = failures[i];
+        Frame();
+        CHECK(Read(0, 16, &request) == mrhi_success, "read");
+        token = Submit();
+        CHECK(Finish(token, &request, 1, failures[i]), "answered with the failure");
+        size = 99;
+        memset(bytes, 0xA5, sizeof(bytes));
+        CHECK(mrhiRequest_TakeReadback(s_device, request, bytes, sizeof(bytes), &size) ==
+                      failures[i] &&
+                  Cleared(bytes, sizeof(bytes), size, 0),
+              "a readback its frame's failure ended");
+        CloseDevice();
+    }
 }
 
 static void TestAnswerRoom(void)

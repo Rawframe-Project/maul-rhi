@@ -4,7 +4,7 @@
 // Calls from inside an allocator: the instance and the device refuse
 // each function that would change them with mrhi_errorBusy, one misuse
 // counted, while their allocator runs, and take calls again once it
-// returns.
+// returns. A take call refused as busy leaves its record or bytes.
 
 #include "test_device_setup.h"
 
@@ -18,6 +18,7 @@
 #include "shaders/noop_container.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 // The program code an allocation or release runs, once, after s_skip
 // others; NULL for none.
@@ -28,6 +29,13 @@ static mrhiDevice* s_device;
 static mrhiSurfaceId s_surface;
 // What a hook's calls returned that was not mrhi_errorBusy.
 static int s_answered;
+// The take calls' outputs a busy refusal wrote.
+static int s_written;
+
+enum
+{
+    kPattern = 0xA5
+};
 
 static void RunHook(void)
 {
@@ -68,6 +76,20 @@ static void Busy(mrhiResult result)
     s_answered += result == mrhi_errorBusy ? 0 : 1;
 }
 
+// Counts an output a busy take call wrote, filled with kPattern before.
+static void Kept(const void* out, size_t bytes)
+{
+    const unsigned char* at = out;
+    for (size_t i = 0; i < bytes; ++i)
+    {
+        if (at[i] != kPattern)
+        {
+            ++s_written;
+            return;
+        }
+    }
+}
+
 // Every function that would change the instance, called with what it
 // would refuse anyway: the busy refusal comes first.
 #define INSTANCE_CALLS 7
@@ -76,10 +98,14 @@ static void InstanceCalls(void)
     mrhiRequestId request;
     mrhiInstanceNotification notification;
     mrhiDiagnostic diagnostic;
+    memset(&notification, kPattern, sizeof(notification));
+    memset(&diagnostic, kPattern, sizeof(diagnostic));
     mrhiDevice* device = nullptr;
     Busy(mrhiInstance_RequestAdapters(s_instance, nullptr, &request));
     Busy(mrhiInstance_TakeNotification(s_instance, &notification));
     Busy(mrhiInstance_TakeDiagnostic(s_instance, &diagnostic));
+    Kept(&notification, sizeof(notification));
+    Kept(&diagnostic, sizeof(diagnostic));
     Busy(mrhiCreateDevice(s_instance, nullptr, &device, &request));
     mrhiSurfaceId surface = {0};
     Busy(mrhiCreateSurface(s_instance, nullptr, &surface));
@@ -96,9 +122,15 @@ static void DeviceCalls(void)
     mrhiResourceId resource = {0};
     mrhiDiagnostic diagnostic;
     mrhiDeviceNotification notification;
-    size_t size = 0;
+    unsigned char bytes[16];
+    size_t size;
+    memset(&diagnostic, kPattern, sizeof(diagnostic));
+    memset(&notification, kPattern, sizeof(notification));
+    memset(bytes, kPattern, sizeof(bytes));
+    memset(&size, kPattern, sizeof(size));
     Busy(mrhiDevice_SimulateLoss(d));
     Busy(mrhiDevice_TakeDiagnostic(d, &diagnostic));
+    Kept(&diagnostic, sizeof(diagnostic));
     Busy(mrhiCreateSampler(d, nullptr, nullptr));
     Busy(mrhiDestroySampler(d, (mrhiSamplerId){0}));
     Busy(mrhiCreateBuffer(d, nullptr, nullptr));
@@ -122,6 +154,7 @@ static void DeviceCalls(void)
     Busy(mrhiDevice_SubmitFrame(d, &request));
     Busy(mrhiRequest_WaitFrame(d, request, 0));
     Busy(mrhiDevice_TakeNotification(d, &notification));
+    Kept(&notification, sizeof(notification));
     Busy(mrhiDevice_WaitNotification(d, 0));
     Busy(mrhiDeclareTexture(d, nullptr, &resource));
     Busy(mrhiDeclareBuffer(d, nullptr, &resource));
@@ -138,7 +171,9 @@ static void DeviceCalls(void)
     Busy(mrhiDestroyGraphicsPipeline(d, (mrhiGraphicsPipelineId){0}));
     Busy(mrhiCreateComputePipeline(d, nullptr, nullptr, nullptr));
     Busy(mrhiDestroyComputePipeline(d, (mrhiComputePipelineId){0}));
-    Busy(mrhiRequest_TakeReadback(d, request, nullptr, 0, &size));
+    Busy(mrhiRequest_TakeReadback(d, request, bytes, sizeof(bytes), &size));
+    Kept(bytes, sizeof(bytes));
+    Kept(&size, sizeof(size));
     mrhiDestroyDevice(d);
 }
 
@@ -179,10 +214,12 @@ static void TestDeviceCreation(void)
     for (int skip = 0; skip <= 1; ++skip)
     {
         s_answered = 0;
+        s_written = 0;
         s_skip = skip;
         s_hook = InstanceCalls;
         s_device = Open();
         CHECK(s_hook == nullptr && s_answered == 0, "every instance call refused as busy");
+        CHECK(s_written == 0, "the take calls' records left");
         CHECK(mrhiInstance_GetMisuse(s_instance) == INSTANCE_CALLS, "each counted");
         mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
         mrhiRequestId request;
@@ -197,6 +234,7 @@ static void TestHeap(void)
 {
     s_device = Open();
     s_answered = 0;
+    s_written = 0;
     s_hook = DeviceCalls;
     mrhiHeapDef def = mrhiDefaultHeapDef();
     def.entries = 16;
@@ -204,6 +242,7 @@ static void TestHeap(void)
     mrhiHeapId heap = {0};
     CHECK(mrhiCreateHeap(s_device, &def, &heap) == mrhi_success, "the heap made");
     CHECK(s_hook == nullptr && s_answered == 0, "every device call refused as busy");
+    CHECK(s_written == 0, "the take calls' records and bytes left");
     CHECK(mrhiDevice_GetMisuse(s_device) == DEVICE_CALLS, "each counted");
     s_hook = CreateBuffer;
     CHECK(mrhiDestroyHeap(s_device, heap) == mrhi_success, "the heap destroyed");

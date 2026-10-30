@@ -311,14 +311,16 @@ mrhiResult mrhiOverLimit(mrhiInstance* instance, mrhiDiagnosticCode code)
 
 mrhiResult mrhiInstance_TakeDiagnostic(mrhiInstance* instance, mrhiDiagnostic* diagnosticOut)
 {
+    // Refused as busy, it leaves the record: the call the allocator runs
+    // in may be filling it.
+    if (instance != nullptr && instance->allocatorGuard.busy)
+    {
+        return mrhiInstanceBusy(instance);
+    }
     mrhiClearOutput(diagnosticOut, sizeof(*diagnosticOut));
     if (instance == nullptr)
     {
         return mrhi_errorInvalid;
-    }
-    if (instance->allocatorGuard.busy)
-    {
-        return mrhiInstanceBusy(instance);
     }
     if (diagnosticOut == nullptr)
     {
