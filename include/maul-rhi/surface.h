@@ -300,8 +300,9 @@ extern "C"
     /// @param caps      The caps the surface reported.
     /// @param asked     The color the program wants first.
     /// @param colorOut  Receives the color to configure; left as it was on any
-    ///                  failure. It may be `asked`, so a color can be replaced
-    ///                  with its suggestion in place.
+    ///                  failure. It may be `asked` or one of the caps' colors,
+    ///                  so a color can be replaced with its suggestion in
+    ///                  place.
     /// @return `mrhi_success` with the color; `mrhi_errorInvalid` for a NULL
     /// argument, or caps reporting more than MRHI_SURFACE_COLORS colors;
     /// `mrhi_errorUnsupported` when the caps report none of the three, which a
