@@ -248,7 +248,8 @@ extern "C"
     /// the diagnostics budget; refusals past it are counted but not recorded.
     ///
     /// @param device         The device.
-    /// @param diagnosticOut  Receives the record; zeros unless one is taken.
+    /// @param diagnosticOut  Receives the record; zeros unless one is taken,
+    ///                       but left as it was on `mrhi_errorBusy`.
     /// @return `mrhi_success` with a record; `mrhi_empty` when the queue is
     /// drained or keeps none; `mrhi_errorInvalid` for a NULL argument;
     /// `mrhi_errorBusy` for a call from inside the device's allocator.

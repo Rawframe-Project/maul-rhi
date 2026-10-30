@@ -138,7 +138,8 @@ extern "C"
     /// for one.
     ///
     /// @param device           The device.
-    /// @param notificationOut  Receives the record; zeros unless one is taken.
+    /// @param notificationOut  Receives the record; zeros unless one is taken,
+    ///                         but left as it was on `mrhi_errorBusy`.
     /// @return `mrhi_success` with a record; `mrhi_empty` when the queue is
     /// drained; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorBusy` for a
     /// call from inside the device's allocator.

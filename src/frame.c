@@ -412,14 +412,16 @@ mrhiResult mrhiRequest_WaitFrame(mrhiDevice* device, mrhiRequestId token, uint64
 
 mrhiResult mrhiDevice_TakeNotification(mrhiDevice* device, mrhiDeviceNotification* notificationOut)
 {
+    // Refused as busy, it leaves the record: the call the allocator runs
+    // in may be filling it.
+    if (device != nullptr && device->allocatorGuard.busy)
+    {
+        return mrhiDeviceBusy(device);
+    }
     mrhiClearOutput(notificationOut, sizeof(*notificationOut));
     if (device == nullptr)
     {
         return mrhi_errorInvalid;
-    }
-    if (device->allocatorGuard.busy)
-    {
-        return mrhiDeviceBusy(device);
     }
     if (notificationOut == nullptr)
     {
