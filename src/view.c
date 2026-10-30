@@ -63,8 +63,10 @@ static bool IsKindValid(const mrhiTextureDef* texture, const mrhiViewDef* view)
         return cube && view->layerCount == 6;
     case mrhi_textureCubeArray:
         return cube && view->layerCount % 6 == 0;
-    default:
+    case mrhi_texture3d:
         return !flat;
+    default:
+        return false;
     }
 }
 
@@ -94,8 +96,10 @@ bool mrhiFormatHasAspect(mrhiFormat format, mrhiTextureAspect aspect)
         return mrhiFormatHasDepth(format);
     case mrhi_aspectStencilOnly:
         return mrhiFormatHasStencil(format);
-    default:
+    case mrhi_aspectAll:
         return true;
+    default:
+        return false;
     }
 }
 

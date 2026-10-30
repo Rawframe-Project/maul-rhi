@@ -98,8 +98,12 @@ static uint32_t UsageOf(uint8_t use, bool buffer)
         return buffer ? mrhi_bufferCopyDestination : mrhi_textureCopyDestination;
     case mrhi_accessQueryResolve:
         return mrhi_bufferQueryResolve;
-    default:
+    case mrhiUseColorTarget:
+    case mrhiUseResolve:
+    case mrhiUseDepthTarget:
         return mrhi_textureRenderTarget;
+    default:
+        return 0;
     }
 }
 

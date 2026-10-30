@@ -89,8 +89,10 @@ static uint32_t KindsOf(const mrhiShaderBinding* binding)
         return MRHI_KIND(mrhi_accessStorageRead) | readWrite;
     case mrhi_storageWriteOnly:
         return MRHI_KIND(mrhi_accessStorageWrite) | readWrite;
-    default:
+    case mrhi_storageReadWrite:
         return readWrite;
+    default:
+        return 0;
     }
 }
 

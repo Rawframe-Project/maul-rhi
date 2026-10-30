@@ -277,6 +277,17 @@ static void TestNegativeKinds(void)
         }
     }
     CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "the texture destroyed");
+    // A 3D texture too: its views are of the one kind a 2D texture's never
+    // are, so an unknown kind must not pass as that one.
+    mrhiTextureId volume =
+        MakeTexture(s_device, mrhi_texture3d, mrhi_formatRgba8Unorm, 4, 1, kSampled);
+    CHECK(Make(Def(volume, mrhi_texture3d)) == mrhi_success, "a 3D view made");
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        CHECK(Make(Def(volume, negative[i])) == mrhi_errorInvalid,
+              "a negative kind of a 3D texture");
+    }
+    CHECK(mrhiDestroyTexture(s_device, volume) == mrhi_success, "the 3D texture destroyed");
 }
 
 static void TestRefusalsAndState(void)
