@@ -13,7 +13,7 @@ It never compromises on:
 ## Commands
 
 ```sh
-tools/check.sh changed          # before every push: rules, contract, format, the asan preset without integration tests (< 2 min)
+tools/check.sh changed          # before every push: rules, contract, format, tidy on changed sources, the asan preset without integration tests (< 2 min)
 tools/check.sh pr               # the Linux part of the pull request check: clang-tidy, asan and gcc presets on lavapipe, seam on X11, short fuzzing
 tools/check.sh full             # adds TSan, the shared library, labels compiled out, seam on Wayland, longer fuzzing
 cmake --preset linux-clang-20-asan && cmake --build --preset linux-clang-20-asan   # one CI cell

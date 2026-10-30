@@ -6,10 +6,12 @@
 #
 #   tools/check.sh changed   the files changed against origin/main: the
 #                            source rules, the contract's generated files,
-#                            formatting, the documentation checks, and the
-#                            linux-clang-20-asan preset's tests without the
-#                            integration label (the test driver, no GPU).
-#                            Under two minutes; run it before every push.
+#                            formatting, the documentation checks,
+#                            clang-tidy in Release and in Debug on the
+#                            changed sources, and the linux-clang-20-asan
+#                            preset's tests without the integration label
+#                            (the test driver, no GPU). Under two minutes;
+#                            run it before every push.
 #   tools/check.sh pr        what the pull request check runs on Linux:
 #                            every check, clang-tidy, the linux-clang-20-asan
 #                            and linux-gcc-14 presets with their integration
@@ -102,6 +104,29 @@ all_c_files() {
     git ls-files 'include/*.h' 'src/*.[chm]' 'test/*.[chm]' 'tools/*.[ch]' 'bench/*.[ch]' 'samples/*.[chm]'
 }
 
+# Of the src/*.c files given, those clang-tidy reads here. The web sources
+# need Emscripten's sysroot, the D3D12 ones Windows' headers and the Metal
+# ones (src/*.m) Apple's: CI checks those in their own cells.
+tidy_sources() { # files
+    [ $# -gt 0 ] || return 0
+    grep -L '"web_js.h"' "$@" | grep -v d3d12 || true
+}
+
+# clang-tidy on the files given, as CI's checks job runs it: on the Release
+# preset, where the assertions compile out, and with them live. Each hides
+# findings the other shows.
+tidy() { # files
+    local build f
+    for build in Release Debug; do
+        step "clang-tidy, $build, on $# files"
+        configure "tidy-$build" --preset linux-clang-20 -DCMAKE_BUILD_TYPE=$build \
+            -DMAUL_RHI_LABELS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+        for f in "$@"; do
+            clang-tidy-20 -p "$out/check-tidy-$build" --quiet --warnings-as-errors='*' "$f" 2>/dev/null
+        done
+    done
+}
+
 if [ "$tier" = changed ]; then
     base=$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD)
     mapfile -t changed < <({
@@ -122,6 +147,15 @@ if [ "$tier" = changed ]; then
         step "clang-format on ${#present[@]} changed files"
         clang-format --dry-run -Werror "${present[@]}"
     fi
+    # The pr tier's set: src/*.c, not src/generated/.
+    sources=()
+    for f in "${present[@]+"${present[@]}"}"; do
+        [[ $f == src/*.c && $f != src/*/* ]] && sources+=("$f")
+    done
+    mapfile -t sources < <(tidy_sources "${sources[@]+"${sources[@]}"}")
+    if [ ${#sources[@]} -gt 0 ]; then
+        tidy "${sources[@]}"
+    fi
     if ! printf '%s\n' "${changed[@]}" | grep -qvE '\.md$|^docs/|^LICENSE$|^\.github/'; then
         echo "only documentation changed: no build"
         exit 0
@@ -136,18 +170,8 @@ step "clang-format on every file"
 mapfile -t all_files < <(all_c_files)
 clang-format --dry-run -Werror "${all_files[@]}"
 
-# The web sources need Emscripten's sysroot, the D3D12 ones Windows' headers
-# and the Metal ones Apple's: CI checks those in their own cells. As CI's
-# checks job, on the Release preset, where the assertions compile out, and
-# with them live: each hides findings the other shows.
-for build in Release Debug; do
-    step "clang-tidy, $build"
-    configure "tidy-$build" --preset linux-clang-20 -DCMAKE_BUILD_TYPE=$build \
-        -DMAUL_RHI_LABELS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-    for f in $(grep -L '"web_js.h"' src/*.c | grep -v d3d12); do
-        clang-tidy-20 -p "$out/check-tidy-$build" --quiet --warnings-as-errors='*' "$f" 2>/dev/null
-    done
-done
+mapfile -t sources < <(tidy_sources src/*.c)
+tidy "${sources[@]}"
 
 preset linux-clang-20-asan
 preset linux-gcc-14
