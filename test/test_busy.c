@@ -342,8 +342,8 @@ static void TestPipelineStale(void)
 // A second device on the instance, with the C library's allocator.
 static mrhiDevice* s_second;
 
-// A surface on the instance, presenting on its adapter.
-static mrhiSurfaceId MakeSurface(void)
+// Creates a surface on the instance, presenting on its adapter.
+static mrhiResult CreateSurface(mrhiSurfaceId* surfaceOut)
 {
     mrhiSurfaceSourceTest source = {
         .chain = {.next = nullptr, .type = mrhi_structSurfaceSourceTest},
@@ -352,8 +352,13 @@ static mrhiSurfaceId MakeSurface(void)
     };
     mrhiSurfaceDef def = mrhiDefaultSurfaceDef();
     def.next = &source.chain;
+    return mrhiCreateSurface(s_instance, &def, surfaceOut);
+}
+
+static mrhiSurfaceId MakeSurface(void)
+{
     mrhiSurfaceId surface = {0};
-    CHECK(mrhiCreateSurface(s_instance, &def, &surface) == mrhi_success, "the surface");
+    CHECK(CreateSurface(&surface) == mrhi_success, "the surface");
     return surface;
 }
 
@@ -393,6 +398,14 @@ static void ReadSurface(void)
 {
     mrhiSurfaceCaps caps;
     s_read = mrhiSurface_GetCaps(s_instance, s_surface, s_adapterId, &caps);
+}
+
+// The surface a hook made, if any.
+static mrhiSurfaceId s_made;
+
+static void MakeSurfaceInHook(void)
+{
+    s_read = CreateSurface(&s_made);
 }
 
 // The device, with s_surface configured on it, and the second device.
@@ -491,6 +504,38 @@ static void TestSurfaceStale(void)
     CloseConfigured();
 }
 
+// A surface made from the hook while another's configuration ends is
+// refused as busy, since the instance is held, so the ending surface's
+// released slot is never taken again before its driver surface goes:
+// the old surface ends with its own handle, and surfaces made afterwards
+// work.
+static void TestSurfaceRefusedWhileOneEnds(void)
+{
+    OpenConfigured();
+    size_t count = 0;
+    CHECK(mrhiInstance_GetAdapters(s_instance, &s_adapterId, 1, &count) == mrhi_success,
+          "the adapter");
+    mrhiSurfaceId old = s_surface;
+    s_read = mrhi_success;
+    s_made = (mrhiSurfaceId){0};
+    s_hook = MakeSurfaceInHook;
+    CHECK(mrhiDestroySurface(s_instance, s_surface) == mrhi_success, "the surface destroyed");
+    CHECK(s_hook == nullptr && s_read == mrhi_errorBusy && s_made.index1 == 0 &&
+              s_made.generation == 0,
+          "a surface made from the hook refused");
+    mrhiSurfaceCaps caps;
+    s_surface = MakeSurface();
+    CHECK(mrhiSurface_GetCaps(s_instance, old, s_adapterId, &caps) == mrhi_errorStale &&
+              mrhiSurface_GetCaps(s_instance, s_surface, s_adapterId, &caps) == mrhi_success &&
+              caps.presentable,
+          "the old surface gone, a new one working");
+    mrhiSurfaceConfig config = Config(64);
+    CHECK(mrhiDevice_ConfigureSurface(s_device, &config) == mrhi_success &&
+              mrhiDestroySurface(s_instance, s_surface) == mrhi_success,
+          "configured and destroyed with its own handle");
+    CloseConfigured();
+}
+
 // The device's driver goes back to the device's allocator as the device
 // is destroyed, and a call then is refused.
 static void TestDestroy(void)
@@ -531,6 +576,7 @@ int main(void)
     TestUnconfigure();
     TestBusyConfiguredDevice();
     TestSurfaceStale();
+    TestSurfaceRefusedWhileOneEnds();
     TestDestroy();
     TestDestroyHeld();
     return s_failures == 0 ? 0 : 1;
