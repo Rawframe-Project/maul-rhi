@@ -130,14 +130,6 @@ mrhiResult mrhiTakePipelineSlot(mrhiDevice* device, mrhiPipelineKind kind,
     return mrhi_success;
 }
 
-void mrhiFreePipelineSlot(mrhiDevice* device, uint32_t index1)
-{
-    mrhiPipelineSlot* slot = &device->pipelineSlots[index1 - 1];
-    mrhiReleaseReflection(&device->allocator, slot->reflection);
-    *slot = (mrhiPipelineSlot){0};
-    mrhiPoolRelease(&device->pipelines, index1);
-}
-
 void mrhiUntakePipelineSlot(mrhiDevice* device, uint32_t index1)
 {
     mrhiPipelineSlot* slot = &device->pipelineSlots[index1 - 1];
@@ -283,8 +275,14 @@ mrhiResult mrhiDestroyPipeline(mrhiDevice* device, mrhiPipelineKind kind, uint32
         --device->pendingCount;
         mrhiQueueAnswer(device, mrhi_devicePipelineReady, slot->request, mrhi_errorStale);
     }
-    device->driver.vtable->destroyPipeline(device->driver.self, slot->handle);
-    mrhiFreePipelineSlot(device, index1);
+    // The id goes stale first: the driver and the reflection may give
+    // memory back to the allocator, and a hook naming the pipeline then
+    // finds it gone.
+    mrhiPipelineSlot ended = *slot;
+    *slot = (mrhiPipelineSlot){0};
+    mrhiPoolRelease(&device->pipelines, index1);
+    device->driver.vtable->destroyPipeline(device->driver.self, ended.handle);
+    mrhiReleaseReflection(&device->allocator, ended.reflection);
     return mrhi_success;
 }
 
