@@ -256,6 +256,29 @@ static void TestManyViews(void)
     CHECK(mrhiDestroyView(s_device, view) == mrhi_errorStale, "the last one ended");
 }
 
+// Kinds are int32_t, so a check against a kind's last value alone would
+// let a negative one through: each field refuses -1 and INT32_MIN.
+static void TestNegativeKinds(void)
+{
+    mrhiTextureId texture =
+        MakeTexture(s_device, mrhi_texture2d, mrhi_formatRgba8Unorm, 1, 1, kSampled);
+    const mrhiViewDef valid = Def(texture, mrhi_texture2d);
+    CHECK(Make(valid) == mrhi_success, "the valid def made");
+    static const int32_t negative[] = {-1, INT32_MIN};
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        mrhiViewDef defs[3] = {valid, valid, valid};
+        defs[0].kind = negative[i];
+        defs[1].format = negative[i];
+        defs[2].aspect = negative[i];
+        for (size_t f = 0; f < 3; ++f)
+        {
+            CHECK(Make(defs[f]) == mrhi_errorInvalid, "a negative kind refused");
+        }
+    }
+    CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "the texture destroyed");
+}
+
 static void TestRefusalsAndState(void)
 {
     mrhiTextureId texture =
@@ -309,6 +332,7 @@ int main(void)
     TestFormatsAndUsages();
     TestAspects();
     TestManyViews();
+    TestNegativeKinds();
     TestRefusalsAndState();
     s_instance = instance;
     CHECK(mrhiDevice_GetMisuse(s_device) > 0, "the refusals were counted");

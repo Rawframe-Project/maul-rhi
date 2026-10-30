@@ -268,7 +268,7 @@ static void Follow(mrhiFramePass* pass, const uint32_t* passes)
 {
     for (uint32_t c = 0; c < MRHI_PASS_CLASSES; ++c)
     {
-        if (c != pass->passClass && passes[c] > pass->waitFor[c])
+        if (c != (uint32_t)pass->passClass && passes[c] > pass->waitFor[c])
         {
             pass->waitFor[c] = passes[c];
         }

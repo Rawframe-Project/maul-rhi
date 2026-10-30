@@ -33,7 +33,7 @@ extern "C"
     } mrhiFrameDef;
 
     // What a device notification reports.
-    typedef uint8_t mrhiDeviceNotificationKind;
+    typedef int32_t mrhiDeviceNotificationKind;
 
     enum
     {
@@ -338,7 +338,7 @@ extern "C"
 
     // Where a pass runs: a hint drivers without the queue ignore, running it on
     // the graphics queue.
-    typedef uint8_t mrhiPassClass;
+    typedef int32_t mrhiPassClass;
 
     enum
     {
@@ -351,7 +351,7 @@ extern "C"
     };
 
     // How a pass uses a resource.
-    typedef uint8_t mrhiAccessKind;
+    typedef int32_t mrhiAccessKind;
 
     enum
     {
@@ -380,7 +380,7 @@ extern "C"
     };
 
     // What a target holds when its pass begins.
-    typedef uint8_t mrhiLoadOp;
+    typedef int32_t mrhiLoadOp;
 
     enum
     {
@@ -393,7 +393,7 @@ extern "C"
     };
 
     // What a target keeps when its pass ends.
-    typedef uint8_t mrhiStoreOp;
+    typedef int32_t mrhiStoreOp;
 
     enum
     {
@@ -638,7 +638,7 @@ extern "C"
 
     // The state a compiled frame leaves a part of a resource in, from the use
     // that made it.
-    typedef uint8_t mrhiResourceState;
+    typedef int32_t mrhiResourceState;
 
     enum
     {

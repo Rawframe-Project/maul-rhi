@@ -25,7 +25,7 @@ extern "C"
     typedef struct mrhiDevice mrhiDevice;
 
     // Where a device is in its life.
-    typedef uint8_t mrhiDeviceState;
+    typedef int32_t mrhiDeviceState;
 
     enum
     {
@@ -259,7 +259,7 @@ extern "C"
                                                                  mrhiDiagnostic* diagnosticOut);
 
     // Why a device was lost.
-    typedef uint8_t mrhiDeviceLossReason;
+    typedef int32_t mrhiDeviceLossReason;
 
     enum
     {

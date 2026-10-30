@@ -981,6 +981,64 @@ static void TestUnknownValues(void)
     Close(device);
 }
 
+// Kinds are int32_t, so a check against a kind's last value alone would
+// let a negative one through: each kind of a pipeline def refuses -1 and
+// INT32_MIN, each case from a def with depth, stencil and blending on,
+// which is made.
+static void TestNegativeKinds(void)
+{
+    mrhiDevice* device = Open();
+    mrhiGraphicsPipelineDef valid = Def();
+    valid.depthStencilFormat = mrhi_formatDepthStencil;
+    valid.colorTargets[0].blend = true;
+    valid.colorTargets[0].color =
+        (mrhiBlendComponent){mrhi_blendSrcAlpha, mrhi_blendOneMinusSrcAlpha, mrhi_blendAdd};
+    CHECK(Made(device, &valid) == mrhi_success, "the valid def made");
+    static const int32_t negative[] = {-1, INT32_MIN};
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        int32_t n = negative[i];
+        mrhiGraphicsPipelineDef defs[18];
+        for (size_t f = 0; f < 18; ++f)
+        {
+            defs[f] = valid;
+        }
+        defs[0].topology = n;
+        // A strip index format is checked on a strip; any other topology
+        // refuses every format but none.
+        defs[1].topology = mrhi_topologyTriangleStrip;
+        defs[1].stripIndexFormat = n;
+        defs[2].frontFace = n;
+        defs[3].cullMode = n;
+        defs[4].depthStencilFormat = n;
+        defs[5].depthCompare = n;
+        defs[6].stencilFront.compare = n;
+        defs[7].stencilFront.failOp = n;
+        defs[8].stencilFront.depthFailOp = n;
+        defs[9].stencilBack.passOp = n;
+        defs[10].colorTargets[0].format = n;
+        defs[11].colorTargets[0].color.srcFactor = n;
+        defs[12].colorTargets[0].color.dstFactor = n;
+        defs[13].colorTargets[0].color.operation = n;
+        defs[14].colorTargets[0].alpha.srcFactor = n;
+        defs[15].colorTargets[0].alpha.dstFactor = n;
+        defs[16].colorTargets[0].alpha.operation = n;
+        defs[17].stencilBack.compare = n;
+        for (size_t f = 0; f < 18; ++f)
+        {
+            CHECK(Made(device, &defs[f]) == mrhi_errorInvalid, "a negative kind refused");
+        }
+        s_attributes[0].format = n;
+        CHECK(Made(device, &valid) == mrhi_errorInvalid, "a negative vertex format");
+        s_attributes[0].format = mrhi_vertexFloat32x3;
+        s_buffers[0].stepMode = n;
+        CHECK(Made(device, &valid) == mrhi_errorInvalid, "a negative step mode");
+        s_buffers[0].stepMode = mrhi_stepVertex;
+    }
+    CHECK(Made(device, &valid) == mrhi_success, "the valid def made again");
+    Close(device);
+}
+
 // A device whose pipelines are all taken refuses one more for capacity.
 static void TestCapacity(void)
 {
@@ -1296,6 +1354,7 @@ int main(void)
     TestLimitsNamedOnce();
     TestMultisample();
     TestUnknownValues();
+    TestNegativeKinds();
     TestCapacity();
     ResetAdapter();
     TestInterface();

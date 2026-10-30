@@ -358,6 +358,54 @@ static void TestInvalidRequests(void)
     mrhiDestroyInstance(instance);
 }
 
+// An instance whose driver lists an adapter of a kind, then a discrete
+// one, so that ranking them compares the kind.
+static mrhiInstance* CreateListing(mrhiAdapterKind kind)
+{
+    s_adapters[0] = Adapter(kind, "neg");
+    s_adapters[1] = Adapter(mrhi_adapterDiscrete, "dgpu");
+    s_driver = (mrhiTestDriverDef){
+        .chain = {.next = nullptr, .type = mrhi_structTestDriver},
+        .adapters = s_adapters,
+        .adapterCount = 2,
+    };
+    mrhiInstanceDef def = mrhiDefaultInstanceDef();
+    def.next = &s_driver.chain;
+    mrhiInstance* instance = nullptr;
+    CHECK(mrhiCreateInstance(&def, &instance) == mrhi_success, "the instance");
+    return instance;
+}
+
+// Kinds are int32_t, so a check against a kind's last value alone would
+// let a negative one through: a request's preference refuses -1 and
+// INT32_MIN, and an adapter a driver lists with either ranks as no kind,
+// read from no table.
+static void TestNegativeKinds(void)
+{
+    static const int32_t negative[] = {-1, INT32_MIN};
+    mrhiInstance* instance = Create(64, 16, true);
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        mrhiAdapterRequestDef def = mrhiDefaultAdapterRequestDef();
+        def.preference = negative[i];
+        mrhiRequestId request;
+        CHECK(mrhiInstance_RequestAdapters(instance, &def, &request) == mrhi_errorInvalid,
+              "a negative preference");
+    }
+    mrhiDestroyInstance(instance);
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        instance = CreateListing(negative[i]);
+        char letters[5];
+        CHECK(Find(instance, mrhi_powerHigh, true) == mrhi_success &&
+                  Find(instance, mrhi_powerLow, true) == mrhi_success,
+              "ranked under each preference");
+        Listing(instance, letters);
+        CHECK(strlen(letters) == 2, "both listed");
+        mrhiDestroyInstance(instance);
+    }
+}
+
 static void TestTestDriverDef(void)
 {
     mrhiTestDriverDef driver = {
@@ -385,6 +433,7 @@ int main(void)
     TestDefaultLimits();
     TestWithoutTheTestDriver();
     TestInvalidRequests();
+    TestNegativeKinds();
     TestTestDriverDef();
     return s_failures == 0 ? 0 : 1;
 }

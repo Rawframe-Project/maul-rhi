@@ -50,7 +50,6 @@ LIMITS_WITHOUT_CODE = {
 KINDS = ("constant", "result", "enum", "bitflags", "opaque", "id", "struct", "function")
 # The kinds a type reference may name, as kind.name.
 REFERABLE = ("enum", "bitflags", "opaque", "id", "struct")
-WIDTHS = ("uint8", "uint16", "uint32", "int32")
 POINTERS = (None, "const", "mutable", "out")
 PRIMITIVES = {
     "bool": "bool",
@@ -178,8 +177,13 @@ def check_values(errors, where, item):
             errors.append(f"{where}: '{value.get('name')}' needs an integer value and a doc")
     if item["kind"] == "result" and 0 not in seen_values:
         errors.append(f"{where}: a result needs success as zero")
-    if item["kind"] in ("enum", "bitflags") and item.get("width") not in WIDTHS:
-        errors.append(f"{where}: needs a width, one of {', '.join(WIDTHS)}")
+    # An enum is int32_t, a packed enum (values that carry bits, as a
+    # chained struct's type does) and bitflags uint32_t, as the family's
+    # rule sets, so none names a width.
+    if item["kind"] in ("enum", "bitflags") and "width" in item:
+        errors.append(f"{where}: takes no width: an enum is int32_t, bitflags uint32_t")
+    if "packed" in item and (item["kind"] != "enum" or item["packed"] is not True):
+        errors.append(f"{where}: only an enum is packed, with packed true")
     if item["kind"] == "bitflags":
         for value in item.get("values", []):
             bits = value.get("value")
@@ -518,7 +522,7 @@ PREAMBLES = {
 
 
 def emit_values(names, item):
-    width = PRIMITIVES[item["width"]] if item["kind"] != "result" else "int32_t"
+    width = "uint32_t" if item["kind"] == "bitflags" or item.get("packed") else "int32_t"
     lines = comment(item["doc"], 4, "//")
     lines.append(f"    typedef {width} {names.type(item['name'])};")
     lines += ["", "    enum", "    {"]

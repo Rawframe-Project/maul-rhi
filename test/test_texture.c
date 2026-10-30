@@ -157,6 +157,26 @@ static void TestFormats(void)
           "BC without the device's feature");
 }
 
+// Kinds are int32_t, so a check against a kind's last value alone would
+// let a negative one through: each field refuses -1 and INT32_MIN.
+static void TestNegativeKinds(void)
+{
+    const mrhiTextureDef valid = Def(mrhi_texture2d, mrhi_formatRgba8Unorm, 64, 64, 1, kSampled);
+    CHECK(Make(valid) == mrhi_success, "the valid def made");
+    static const int32_t negative[] = {-1, INT32_MIN};
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        mrhiTextureDef defs[3] = {valid, valid, valid};
+        defs[0].kind = negative[i];
+        defs[1].format = negative[i];
+        defs[2].viewFormats[0] = negative[i];
+        for (size_t f = 0; f < 3; ++f)
+        {
+            CHECK(Make(defs[f]) == mrhi_errorInvalid, "a negative kind refused");
+        }
+    }
+}
+
 static void TestCompressedWithTheFeature(void)
 {
     s_adapter.features.textureCompressionBc = true;
@@ -263,6 +283,7 @@ int main(void)
     TestLimits();
     TestSamplesAndUsages();
     TestFormats();
+    TestNegativeKinds();
     TestRefusalsStateAndLimit();
     s_instance = instance;
     CHECK(mrhiDevice_GetMisuse(s_device) > 0, "the refusals were counted");

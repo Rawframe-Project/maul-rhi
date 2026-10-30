@@ -24,7 +24,7 @@ extern "C"
 #endif
 
     // The primaries a surface's colors are in.
-    typedef uint8_t mrhiColorPrimaries;
+    typedef int32_t mrhiColorPrimaries;
 
     enum
     {
@@ -37,7 +37,7 @@ extern "C"
     };
 
     // How a surface's values are encoded.
-    typedef uint8_t mrhiTransfer;
+    typedef int32_t mrhiTransfer;
 
     enum
     {
@@ -50,7 +50,7 @@ extern "C"
     };
 
     // Whether a surface's values may pass 1.0.
-    typedef uint8_t mrhiColorRange;
+    typedef int32_t mrhiColorRange;
 
     enum
     {
@@ -76,7 +76,7 @@ extern "C"
     } mrhiSurfaceColor;
 
     // How presented images reach the display.
-    typedef uint8_t mrhiPresentMode;
+    typedef int32_t mrhiPresentMode;
 
     enum
     {
@@ -103,7 +103,7 @@ extern "C"
     };
 
     // How a surface's alpha blends with what is behind the window.
-    typedef uint8_t mrhiAlphaMode;
+    typedef int32_t mrhiAlphaMode;
 
     enum
     {

@@ -27,12 +27,14 @@ static mrhiDeviceDriverVtable s_deviceVtable;
 static const mrhiDeviceDriverVtable* s_deviceInner;
 // Whether the next driver lists its adapter with a name of the most bytes.
 static bool s_longName;
+// The kind the next driver lists its adapter with.
+static mrhiAdapterKind s_kind = mrhi_adapterDiscrete;
 
 // The test driver, its vtable copied for the test to break.
 static void Open(void)
 {
     s_adapter = (mrhiTestAdapter){
-        .info = {.driver = mrhi_driverTest, .kind = mrhi_adapterDiscrete},
+        .info = {.driver = mrhi_driverTest, .kind = s_kind},
         .limits = mrhiDefaultLimits(),
     };
     if (s_longName)
@@ -238,6 +240,27 @@ static mrhiResult CreateGivenDevice(void* self, uint64_t adapter, const mrhiDevi
 }
 
 // The layer's answers at their edges, called as the core calls them.
+// An adapter kind is int32_t, so a check against the last kind alone
+// would miss a driver listing a negative one: -1 and INT32_MIN are each
+// a breach.
+static void TestNegativeAdapterKind(void)
+{
+    static const int32_t negative[] = {-1, INT32_MIN};
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        s_kind = negative[i];
+        Open();
+        mrhiInstance* instance = Start();
+        mrhiAdapterId adapter = {0};
+        Search(instance, &adapter);
+        CHECK(mrhiInstance_GetDriverFaults(instance) == 1 &&
+                  Recorded(instance) == mrhi_diagnosticDriverAdapter,
+              "a negative adapter kind");
+        mrhiDestroyInstance(instance);
+    }
+    s_kind = mrhi_adapterDiscrete;
+}
+
 static void TestDeviceEdges(void)
 {
     Open();
@@ -504,14 +527,60 @@ static void TestWalkEdges(void)
     CHECK(WalkOne(&chunk, &pass) == 0, "a pass of the most color targets");
 }
 
+// Kinds are int32_t, so a walk check against a kind's last value alone
+// would pass a negative one: a pass's class, an access's state and a
+// barrier's states of -1 or INT32_MIN are each a fault.
+static void TestWalkNegativeKinds(void)
+{
+    static mrhiCommandChunk chunk;
+    chunk = (mrhiCommandChunk){.count = 1};
+    chunk.commands[0] = (mrhiCommand){.type = mrhiCommandDraw};
+    static const mrhiDriverResource resources[1] = {
+        {.kind = mrhiDriverDeviceBuffer, .handle = 1, .size = 256},
+    };
+    mrhiDriverAccess access = {.resource = 1, .state = mrhi_stateSealed};
+    mrhiDriverPass pass = {.id = {1, 1}, .firstChunk = 1, .accesses = &access, .accessCount = 1};
+    mrhiBarrier barrier = {
+        .resource = {1, 1}, .before = mrhi_stateUndefined, .after = mrhi_stateSealed};
+    mrhiDriverFrame frame = {
+        .resources = resources,
+        .resourceCount = 1,
+        .passes = &pass,
+        .passCount = 1,
+        .chunks = &chunk,
+        .chunkCount = 1,
+        .barriers = &barrier,
+        .barrierCount = 1,
+    };
+    CHECK(mrhiWalkFrame(&frame, AnyHandle, nullptr, nullptr) == 0, "a frame that holds");
+    static const int32_t negative[] = {-1, INT32_MIN};
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        pass.passClass = negative[i];
+        CHECK(mrhiWalkFrame(&frame, AnyHandle, nullptr, nullptr) >= 1, "a negative class");
+        pass.passClass = mrhi_passGraphics;
+        access.state = negative[i];
+        CHECK(mrhiWalkFrame(&frame, AnyHandle, nullptr, nullptr) == 1, "a negative access state");
+        access.state = mrhi_stateSealed;
+        barrier.before = negative[i];
+        CHECK(mrhiWalkFrame(&frame, AnyHandle, nullptr, nullptr) == 1, "a negative state before");
+        barrier.before = mrhi_stateUndefined;
+        barrier.after = negative[i];
+        CHECK(mrhiWalkFrame(&frame, AnyHandle, nullptr, nullptr) == 1, "a negative state after");
+        barrier.after = mrhi_stateSealed;
+    }
+}
+
 int main(void)
 {
     TestClean();
     TestInstanceAnswers();
+    TestNegativeAdapterKind();
     TestDeviceAnswers();
     TestDeviceEdges();
     TestInstanceRoom();
     TestWalk();
     TestWalkEdges();
+    TestWalkNegativeKinds();
     return s_failures == 0 ? 0 : 1;
 }

@@ -310,6 +310,17 @@ static void TestSuggestion(void)
     CHECK(mrhiSuggestSurfaceColor(&caps, &hdr, &color) == mrhi_success &&
               memcmp(&color, &hdr, sizeof(color)) == 0,
           "the most colors, the one asked for last");
+    // Kinds are int32_t: an asked color of negative kinds matches none
+    // the caps report, so the fallback order picks.
+    static const int32_t negative[] = {-1, INT32_MIN};
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        int32_t n = negative[i];
+        const mrhiSurfaceColor asked = {n, n, n, n};
+        CHECK(mrhiSuggestSurfaceColor(&caps, &asked, &color) == mrhi_success &&
+                  memcmp(&color, &hdr, sizeof(color)) == 0,
+              "a negative color asked for, the fallback picked");
+    }
     caps.colorCount = 1;
     CHECK(mrhiSuggestSurfaceColor(nullptr, &hdr, &color) == mrhi_errorInvalid &&
               mrhiSuggestSurfaceColor(&caps, nullptr, &color) == mrhi_errorInvalid &&

@@ -177,7 +177,7 @@ static mrhiResult CheckTexture(const mrhiDevice* device, const mrhiShaderBinding
     };
     mrhiViewDef view;
     bool both = mrhiFormatHasDepth(texture->format) && mrhiFormatHasStencil(texture->format);
-    if (def.kind != slot->viewDimension || def.aspect > mrhi_aspectStencilOnly ||
+    if (def.kind != slot->viewDimension || (uint32_t)def.aspect > mrhi_aspectStencilOnly ||
         (both && def.aspect == mrhi_aspectAll) || !mrhiResolveView(texture, &def, &view))
     {
         return mrhi_errorInvalid;
