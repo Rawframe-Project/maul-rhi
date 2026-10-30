@@ -314,6 +314,7 @@ static void TestSuggestion(void)
                   mrhi_success &&
               memcmp(&caps.colors[MRHI_SURFACE_COLORS - 1], &hdr, sizeof(hdr)) == 0,
           "into the caps' own color it picks");
+    caps.colors[MRHI_SURFACE_COLORS - 1] = hdr;
     CHECK(mrhiSuggestSurfaceColor(&caps, &hdr, &caps.colors[0]) == mrhi_success &&
               memcmp(&caps.colors[0], &hdr, sizeof(hdr)) == 0,
           "into another of the caps' colors");
