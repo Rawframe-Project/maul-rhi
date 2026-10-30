@@ -252,9 +252,10 @@ jobs:
 
   # Each fuzz target over what programs load from disk or fill from their
   # own data and hand the library (shader containers, pipeline caches and
-  # pipeline defs), from its seeds:
-  # briefly on a pull request, longer on main. The nightly run is
-  # fuzz-nightly.
+  # pipeline defs), from its seeds and the corpus fuzz-nightly saved on
+  # main, restored read-only, so a change that breaks a harness's promise
+  # fails on its own pull request: briefly on a pull request, longer on
+  # main. Only fuzz-nightly saves the corpus.
   fuzz:
     needs: changes
     if: needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || github.event_name == 'push')
@@ -267,6 +268,8 @@ jobs:
       FUZZ_SECONDS: ${{ github.event_name == 'pull_request' && 30 || 300 }}
       # The CI image has lavapipe, so every target must run.
       MAUL_RHI_FUZZ_REQUIRE_ADAPTER: "1"
+      # The targets with a restore step below; Run fails on any other.
+      CORPUS_TARGETS: fuzz_cache fuzz_container fuzz_pipeline fuzz_vulkan_cache
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -276,6 +279,33 @@ jobs:
           cmake -B out/fuzz -G Ninja -DCMAKE_C_COMPILER=clang-20 -DMAUL_RHI_FUZZ=ON \
             -DMAUL_RHI_BUILD_TESTS=OFF -DMAUL_RHI_WERROR=ON
           cmake --build out/fuzz
+      # Each target's latest corpus fuzz-nightly saved, of whatever build:
+      # its inputs stay valid against this one. The keys never match
+      # exactly, so only the prefix restores, and nothing here saves.
+      - name: Restore fuzz_cache's corpus
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/corpus/fuzz_cache
+          key: corpus-fuzz_cache-restore-${{ github.run_id }}
+          restore-keys: corpus-fuzz_cache-
+      - name: Restore fuzz_container's corpus
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/corpus/fuzz_container
+          key: corpus-fuzz_container-restore-${{ github.run_id }}
+          restore-keys: corpus-fuzz_container-
+      - name: Restore fuzz_pipeline's corpus
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/corpus/fuzz_pipeline
+          key: corpus-fuzz_pipeline-restore-${{ github.run_id }}
+          restore-keys: corpus-fuzz_pipeline-
+      - name: Restore fuzz_vulkan_cache's corpus
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/corpus/fuzz_vulkan_cache
+          key: corpus-fuzz_vulkan_cache-restore-${{ github.run_id }}
+          restore-keys: corpus-fuzz_vulkan_cache-
       - name: Run
         # The targets side by side through tools/fuzz_target.sh, which keeps
         # each finding and log on the runner and writes a report without
@@ -293,6 +323,13 @@ jobs:
           : >out/fuzz-run.txt
           for target in out/fuzz/fuzz_*; do
             name=${target##*/}
+            case " $CORPUS_TARGETS " in
+            *" $name "*) ;;
+            *)
+              echo "::error::$name has no corpus restore step in the fuzz job"
+              exit 1
+              ;;
+            esac
             mkdir -p "out/corpus/$name"
             status=0
             "$target" -runs=0 -error_exitcode=1 "$probe" >/dev/null 2>&1 || status=$?
@@ -337,11 +374,13 @@ jobs:
   # build's inputs (the library, its CMake, the target and the compiler), so
   # an unchanged build restores its own corpus exactly; a target whose build
   # changed restores its latest corpus of an earlier build, since a corpus
-  # is only inputs, which stay valid against a new binary. After the run
-  # the fuzzer's merge minimizes the seeds and the corpus together against
-  # this binary, and the result is saved for the next night unless the
-  # run found something, as its corpus holds inputs near the finding. The
-  # summary compares the seeds' coverage with the corpus's. No run uploads
+  # is only inputs, which stay valid against a new binary. After a run on
+  # main the fuzzer's merge minimizes the seeds and the corpus together
+  # against this binary, and the result is saved for the next night and
+  # for the fuzz job's restores unless the run found something, as its
+  # corpus holds inputs near the finding; a run dispatched on another
+  # branch saves nothing. The summary compares the seeds' coverage with
+  # the corpus's. No run uploads
   # the corpus or a finding: the corpus stays in the cache, and a finding
   # is reported without its input.
   fuzz-nightly:
@@ -398,7 +437,7 @@ jobs:
           fi
       - name: Restore the corpus
         id: restore
-        if: github.event_name != 'pull_request' && env.RUNNABLE == '1'
+        if: env.RUNNABLE == '1'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out/corpus/${{ matrix.target }}
@@ -419,7 +458,7 @@ jobs:
           cat out/fuzz-reports/*.txt 2>/dev/null || true
           exit "$status"
       - name: Minimize the corpus
-        if: env.RUNNABLE == '1'
+        if: env.RUNNABLE == '1' && github.ref == 'refs/heads/main'
         env:
           MATCHED: ${{ steps.restore.outputs.cache-matched-key }}
         run: |
@@ -449,7 +488,7 @@ jobs:
             echo "| \`$TARGET\` | $restored | $(coverage "out/seeds/$TARGET") | $(coverage "out/corpus/$TARGET") | $(ls "out/corpus/$TARGET" | wc -l) |"
           } >>"$GITHUB_STEP_SUMMARY"
       - name: Save the corpus
-        if: env.RUNNABLE == '1'
+        if: env.RUNNABLE == '1' && github.ref == 'refs/heads/main'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out/corpus/${{ matrix.target }}
