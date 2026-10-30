@@ -29,7 +29,7 @@ A source the build's driver cannot use is `mrhi_errorUnsupported`. A surface las
 
 Every presenting adapter offers fifo, opaque alpha, the render target usage and 8-bit sRGB in Rec. 709. Surface formats are unorm, and sRGB is rendered through the format's sRGB twin, reached one of two ways, which the caps report. With `twinViews` the images stay unorm and the program renders through sRGB views of them; DXGI's flip model and WebGPU's canvases work this way. With `twinImages` the images are configured in the sRGB format itself; Android's swapchains work this way. A program that wants sRGB output reads the caps and names the twin as a view format or as the configured format.
 
-`mrhiSuggestSurfaceColor` picks from the caps in a fixed order: the color asked for, then linear half floats in extended-range Rec. 709, then the first 8-bit sRGB color. The program applies the suggestion or chooses otherwise.
+`mrhiSuggestSurfaceColor` picks from the caps in a fixed order: the color asked for, then linear half floats in extended-range Rec. 709, then the first 8-bit sRGB color. The output may be the color asked for, so one variable can be replaced with its suggestion, and a failure leaves it as it was. The program applies the suggestion or chooses otherwise.
 
 ## Configuring
 

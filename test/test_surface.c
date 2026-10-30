@@ -286,12 +286,22 @@ static void TestSuggestion(void)
     CHECK(mrhiSuggestSurfaceColor(&caps, &hdr, &color) == mrhi_success &&
               memcmp(&color, &rgba, sizeof(color)) == 0,
           "any 8-bit sRGB format");
+    mrhiSurfaceColor inPlace = hdr;
+    CHECK(mrhiSuggestSurfaceColor(&caps, &inPlace, &inPlace) == mrhi_success &&
+              memcmp(&inPlace, &rgba, sizeof(inPlace)) == 0,
+          "suggested in place, as into another variable");
+    inPlace = p3;
+    CHECK(mrhiSuggestSurfaceColor(&caps, &inPlace, &inPlace) == mrhi_success &&
+              memcmp(&inPlace, &p3, sizeof(inPlace)) == 0,
+          "the color asked for, in place");
     caps.colorCount = 4;
-    CHECK(mrhiSuggestSurfaceColor(&caps, &hdr, &color) == mrhi_errorUnsupported,
-          "none of the three");
+    CHECK(mrhiSuggestSurfaceColor(&caps, &hdr, &color) == mrhi_errorUnsupported &&
+              memcmp(&color, &rgba, sizeof(color)) == 0,
+          "none of the three, the output left");
     caps.colorCount = MRHI_SURFACE_COLORS + 1;
-    CHECK(mrhiSuggestSurfaceColor(&caps, &hdr, &color) == mrhi_errorInvalid,
-          "caps past their array");
+    CHECK(mrhiSuggestSurfaceColor(&caps, &hdr, &color) == mrhi_errorInvalid &&
+              memcmp(&color, &rgba, sizeof(color)) == 0,
+          "caps past their array, the output left");
     for (uint32_t i = 0; i < MRHI_SURFACE_COLORS; ++i)
     {
         caps.colors[i] = i + 1 == MRHI_SURFACE_COLORS ? hdr : pq;
