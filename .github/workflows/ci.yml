@@ -563,13 +563,11 @@ jobs:
           mkdir -p "$ANDROID_AVD_HOME"
           "$tools/sdkmanager" --install emulator "system-images;android-35;google_apis;x86_64" >/dev/null
           echo no | "$tools/avdmanager" create avd -n maul35 -k "system-images;android-35;google_apis;x86_64" -d pixel_5 >/dev/null
-          # The profile's default userdata partition needs more disk than
-          # a hosted runner may have free; the suites need little of it.
-          config="$ANDROID_AVD_HOME/maul35.avd/config.ini"
-          sed -i '/^disk\.dataPartition\.size *=/d' "$config"
-          echo "disk.dataPartition.size = 2147483648" >> "$config"
+          # -partition-size: the profile's 6 GB userdata partition needs more
+          # disk than a hosted runner may have free; the suites need little.
           nohup "$ANDROID_HOME/emulator/emulator" -avd maul35 -no-window -no-audio -no-boot-anim \
-            -no-snapshot -gpu swiftshader_indirect -port 5554 > "$RUNNER_TEMP/emulator.log" 2>&1 &
+            -no-snapshot -gpu swiftshader_indirect -port 5554 -partition-size 2048 \
+            > "$RUNNER_TEMP/emulator.log" 2>&1 &
           emulator=$!
           echo "EMULATOR_PID=$emulator" >> "$GITHUB_ENV"
           adb="$ANDROID_HOME/platform-tools/adb"
@@ -582,7 +580,7 @@ jobs:
           "$adb" shell df -h /data
           # PROBE
           df -h /home/runner
-          grep -i "partition\|disk" "$config" || true
+          grep -i "partition\|disk" "$ANDROID_AVD_HOME/maul35.avd/config.ini" "$ANDROID_AVD_HOME/maul35.avd/hardware-qemu.ini" || true
           ls -la "$ANDROID_AVD_HOME/maul35.avd/"
           ls -la "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/" | grep -i "img"
           grep -i "partition\|userdata\|data size\|resiz" "$RUNNER_TEMP/emulator.log" || true
