@@ -571,7 +571,8 @@ static void TestResolveAccess(void)
     CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     mrhiResourcePlan plan;
     CHECK(mrhiResource_GetPlan(s_device, declared, &plan) == mrhi_success &&
-              plan.usage == (mrhi_bufferQueryResolve | mrhi_bufferCopySource),
+              plan.bufferUsage == (mrhi_bufferQueryResolve | mrhi_bufferCopySource) &&
+              plan.textureUsage == 0,
           "the transient's usage");
     mrhiBarrier barriers[8];
     size_t count = 0;

@@ -155,7 +155,8 @@ static void TestRenderThenSample(void)
     CHECK(Is(2, compose, window, 0, 1, kAll, mrhi_stateUndefined, mrhi_stateColorTarget),
           "the window made a target");
     mrhiResourcePlan plan = Plan(scene);
-    CHECK(plan.usage == (mrhi_textureRenderTarget | mrhi_textureSampled) && !plan.transient,
+    CHECK(plan.textureUsage == (mrhi_textureRenderTarget | mrhi_textureSampled) &&
+              plan.bufferUsage == 0 && !plan.transient,
           "rendered and sampled");
     CHECK(!Plan(window).transient, "an imported target is never transient");
     CHECK(plan.firstPass.index1 == draw.index1 && plan.lastPass.index1 == compose.index1 &&
@@ -250,7 +251,9 @@ static void TestBuffers(void)
     CHECK(Is(1, vertex, buffer, 0, 1, kAll, mrhi_stateStorageRead, mrhi_stateVertex),
           "before the read in another state, none between the two in one");
     mrhiResourcePlan plan = Plan(buffer);
-    CHECK(plan.usage == (mrhi_bufferCopyDestination | mrhi_bufferStorage | mrhi_bufferVertex),
+    CHECK(plan.bufferUsage ==
+                  (mrhi_bufferCopyDestination | mrhi_bufferStorage | mrhi_bufferVertex) &&
+              plan.textureUsage == 0,
           "its usages");
     CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }
@@ -398,7 +401,7 @@ static void TestLayers(void)
     CHECK(mrhiDestroyTexture(s_device, volume) == mrhi_success, "done");
 }
 
-// An imported buffer's state carried to the next frame.
+// An imported buffer's state carried to the next frame, and its usages.
 static void TestBufferCarried(void)
 {
     mrhiBufferDef def = mrhiDefaultBufferDef();
@@ -421,6 +424,9 @@ static void TestBufferCarried(void)
     CHECK(s_count == 1 &&
               Is(0, pass, imported, 0, 1, kAll, mrhi_stateStorageWrite, mrhi_stateStorageRead),
           "after the last frame's write");
+    mrhiResourcePlan plan = Plan(imported);
+    CHECK(plan.bufferUsage == mrhi_bufferStorage && plan.textureUsage == 0,
+          "an imported buffer's usages");
     CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     CHECK(mrhiDestroyBuffer(s_device, buffer) == mrhi_success, "done");
 }
@@ -478,7 +484,9 @@ static void TestTransient(void)
     Compute(&read, 1, true);
     CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     mrhiResourcePlan plan = Plan(samples);
-    CHECK(plan.transient && plan.usage == (mrhi_textureRenderTarget | mrhi_textureTransient),
+    CHECK(plan.transient &&
+              plan.textureUsage == (mrhi_textureRenderTarget | mrhi_textureTransient) &&
+              plan.bufferUsage == 0,
           "the samples live in the pass");
     plan = Plan(resolved);
     CHECK(!plan.transient, "what they resolve to is read later");
@@ -516,8 +524,8 @@ static void TestTransient(void)
     CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(!Plan(samples).transient, "contents kept between passes");
     plan = Plan(unused);
-    CHECK(!plan.transient && plan.usage == 0 && plan.firstPass.index1 == 0 &&
-              plan.lastPass.generation == 0,
+    CHECK(!plan.transient && plan.bufferUsage == 0 && plan.textureUsage == 0 &&
+              plan.firstPass.index1 == 0 && plan.lastPass.generation == 0,
           "an unused resource");
     CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
 }

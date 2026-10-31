@@ -14007,9 +14007,14 @@
           "doc": "What a compiled frame does with a resource.",
           "members": [
             {
-              "name": "usage",
-              "type": "uint32",
-              "doc": "The texture or buffer usages its kept passes make of it."
+              "name": "buffer_usage",
+              "type": "bitflags.buffer_usage",
+              "doc": "For a buffer, the usages its kept passes make of it; 0 for a texture or a surface image."
+            },
+            {
+              "name": "texture_usage",
+              "type": "bitflags.texture_usage",
+              "doc": "For a texture or a surface image, the usages its kept passes make of it; 0 for a buffer."
             },
             {
               "name": "transient",
@@ -22710,5 +22715,5 @@
       ]
     }
   ],
-  "contract_version": 25
+  "contract_version": 26
 }

@@ -714,8 +714,12 @@ extern "C"
     // What a compiled frame does with a resource.
     typedef struct mrhiResourcePlan
     {
-        // The texture or buffer usages its kept passes make of it.
-        uint32_t usage;
+        // For a buffer, the usages its kept passes make of it; 0 for a texture
+        // or a surface image.
+        mrhiBufferUsage bufferUsage;
+        // For a texture or a surface image, the usages its kept passes make of
+        // it; 0 for a buffer.
+        mrhiTextureUsage textureUsage;
         // Whether it is a declared texture living only inside its render
         // passes, which tile GPUs keep on chip; never one listing view formats,
         // which WebGPU keeps off chip.
