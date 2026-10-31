@@ -149,12 +149,17 @@ static void TestRefusals(void)
     mrhiFormatCaps caps;
     CHECK(mrhiAdapter_GetFormatCaps(instance, adapter, mrhi_formatNone, &caps) == mrhi_errorInvalid,
           "no format");
+    // Formats are int32_t: a check against the last format alone would
+    // let a negative one through.
+    CHECK(mrhiAdapter_GetFormatCaps(instance, adapter, -1, &caps) == mrhi_errorInvalid &&
+              mrhiAdapter_GetFormatCaps(instance, adapter, INT32_MIN, &caps) == mrhi_errorInvalid,
+          "a negative format");
     CHECK(mrhiAdapter_GetFormatCaps(instance, adapter, 999, &caps) == mrhi_errorInvalid,
           "unlisted");
     CHECK(mrhiAdapter_GetFormatCaps(instance, adapter, mrhi_formatR8Unorm, nullptr) ==
               mrhi_errorInvalid,
           "no out");
-    CHECK(mrhiInstance_GetMisuse(instance) == 3, "counted");
+    CHECK(mrhiInstance_GetMisuse(instance) == 5, "counted");
     CHECK(mrhiAdapter_GetFormatCaps(instance, (mrhiAdapterId){0, 0}, mrhi_formatR8Unorm, &caps) ==
               mrhi_errorStale,
           "a stale adapter");

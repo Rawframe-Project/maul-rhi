@@ -593,6 +593,69 @@ static void TestViewFormats(void)
     Drop();
 }
 
+// Kinds are int32_t, so a check against a kind's last value alone would
+// let a negative one through: each kind of a pass def refuses -1 and
+// INT32_MIN, each case from a def that is added.
+static void TestNegativeKinds(void)
+{
+    Begin();
+    mrhiResourceId texture = DeclareMips(4);
+    mrhiResourceId color = Declare(mrhi_formatRgba8Unorm, 64, 1);
+    mrhiResourceId both = Declare(mrhi_formatDepthStencil, 64, 1);
+    mrhiAccess upload = Access(texture, mrhi_accessCopyDestination);
+    mrhiPassDef access = Pass((mrhiColorTarget){0}, &upload, 1);
+    access.passClass = mrhi_passTransfer;
+    mrhiPassDef target = Pass(Color(color, mrhi_loadClear), nullptr, 0);
+    // A graphics pass reading what the upload wrote: every class allows
+    // its access, so only the kind can refuse it.
+    mrhiAccess read = Access(texture, mrhi_accessSampled);
+    mrhiPassDef reading = Pass(Color(color, mrhi_loadClear), &read, 1);
+    mrhiPassDef empty = mrhiDefaultPassDef();
+    mrhiPassDef depth = mrhiDefaultPassDef();
+    depth.depthTarget = (mrhiDepthTarget){
+        .resource = both, .depthLoad = mrhi_loadClear, .stencilLoad = mrhi_loadClear};
+    CHECK(Add(access) == mrhi_success && Add(target) == mrhi_success &&
+              Add(reading) == mrhi_success && Add(empty) == mrhi_success &&
+              Add(depth) == mrhi_success,
+          "the valid defs added");
+    static const int32_t negative[] = {-1, INT32_MIN};
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        mrhiPassDef def = empty;
+        def.passClass = negative[i];
+        CHECK(Add(def) == mrhi_errorInvalid, "a negative class");
+        read.kind = negative[i];
+        CHECK(Add(reading) == mrhi_errorInvalid, "a negative access kind");
+        read = Access(texture, mrhi_accessSampled);
+        upload = Access(texture, mrhi_accessCopyDestination);
+        upload.range.aspect = negative[i];
+        CHECK(Add(access) == mrhi_errorInvalid, "a negative aspect");
+        upload = Access(texture, mrhi_accessCopyDestination);
+        def = target;
+        def.colorTargets[0].load = negative[i];
+        CHECK(Add(def) == mrhi_errorInvalid, "a negative load");
+        def = target;
+        def.colorTargets[0].store = negative[i];
+        CHECK(Add(def) == mrhi_errorInvalid, "a negative store");
+        def = target;
+        def.colorTargets[0].viewFormat = negative[i];
+        CHECK(Add(def) == mrhi_errorInvalid, "a negative view format");
+        def = depth;
+        def.depthTarget.depthLoad = negative[i];
+        CHECK(Add(def) == mrhi_errorInvalid, "a negative depth load");
+        def = depth;
+        def.depthTarget.depthStore = negative[i];
+        CHECK(Add(def) == mrhi_errorInvalid, "a negative depth store");
+        def = depth;
+        def.depthTarget.stencilLoad = negative[i];
+        CHECK(Add(def) == mrhi_errorInvalid, "a negative stencil load");
+        def = depth;
+        def.depthTarget.stencilStore = negative[i];
+        CHECK(Add(def) == mrhi_errorInvalid, "a negative stencil store");
+    }
+    Drop();
+}
+
 // Imported buffers and textures: their usages, written as outputs and
 // read without a pass writing them first.
 static void TestImports(void)
@@ -802,6 +865,7 @@ int main(void)
     TestScopes();
     TestTargets();
     TestViewFormats();
+    TestNegativeKinds();
     TestImports();
     TestStaleAndLimits();
     TestViews();

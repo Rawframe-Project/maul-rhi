@@ -439,6 +439,12 @@ static void TestIndices(void)
                   mrhi_errorInvalid &&
               mrhiPass_SetIndexBuffer(s_device, s_render, s_x, 3, 0, 4) == mrhi_errorInvalid,
           "no width");
+    // Formats are int32_t: a check against the last format alone would let a
+    // negative one through.
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, -1, 0, 4) == mrhi_errorInvalid &&
+              mrhiPass_SetIndexBuffer(s_device, s_render, s_x, INT32_MIN, 0, 4) ==
+                  mrhi_errorInvalid,
+          "a negative format");
     CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 66, MRHI_WHOLE_SIZE) ==
                   mrhi_errorInvalid &&
               mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 2, 64) ==
@@ -450,7 +456,7 @@ static void TestIndices(void)
     CHECK(mrhiPass_SetIndexBuffer(s_device, s_compute, s_x, mrhi_indexUint16, 0, 4) ==
               mrhi_errorInvalid,
           "a pass without targets");
-    CHECK(mrhiDevice_GetMisuse(s_device) == 15, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 17, "each counted");
     mrhiResourceId none = {0};
     CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, none, mrhi_indexUint16, 0, 4) ==
               mrhi_errorStale,

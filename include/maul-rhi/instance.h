@@ -35,7 +35,7 @@ extern "C"
     } mrhiAdapterId;
 
     // The GPU API a driver speaks.
-    typedef uint8_t mrhiDriverKind;
+    typedef int32_t mrhiDriverKind;
 
     enum
     {
@@ -55,7 +55,7 @@ extern "C"
     };
 
     // What kind of processor an adapter is.
-    typedef uint8_t mrhiAdapterKind;
+    typedef int32_t mrhiAdapterKind;
 
     enum
     {
@@ -72,7 +72,7 @@ extern "C"
     };
 
     // Which adapters a request prefers.
-    typedef uint8_t mrhiPowerPreference;
+    typedef int32_t mrhiPowerPreference;
 
     enum
     {
@@ -121,7 +121,7 @@ extern "C"
     } mrhiAdapterRequestDef;
 
     // What an instance notification reports.
-    typedef uint8_t mrhiInstanceNotificationKind;
+    typedef int32_t mrhiInstanceNotificationKind;
 
     enum
     {

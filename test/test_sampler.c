@@ -103,6 +103,34 @@ static void TestInvalidDefs(void)
     Close(device);
 }
 
+// Kinds are int32_t, so a check against a kind's last value alone would
+// let a negative one through: each field refuses -1 and INT32_MIN.
+static void TestNegativeKinds(void)
+{
+    mrhiDevice* device = Open(4, true);
+    mrhiSamplerId sampler;
+    const mrhiSamplerDef valid = mrhiDefaultSamplerDef();
+    CHECK(mrhiCreateSampler(device, &valid, &sampler) == mrhi_success, "the default def made");
+    static const int32_t negative[] = {-1, INT32_MIN};
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        mrhiSamplerDef defs[7] = {valid, valid, valid, valid, valid, valid, valid};
+        defs[0].magFilter = negative[i];
+        defs[1].minFilter = negative[i];
+        defs[2].mipFilter = negative[i];
+        defs[3].addressU = negative[i];
+        defs[4].addressV = negative[i];
+        defs[5].addressW = negative[i];
+        defs[6].compare = negative[i];
+        for (size_t f = 0; f < 7; ++f)
+        {
+            CHECK(mrhiCreateSampler(device, &defs[f], &sampler) == mrhi_errorInvalid,
+                  "a negative kind refused");
+        }
+    }
+    Close(device);
+}
+
 static void TestStateAndLimit(void)
 {
     mrhiDevice* device = Open(2, false);
@@ -143,6 +171,7 @@ int main(void)
     ResetAdapter();
     TestMakeAndDestroy();
     TestInvalidDefs();
+    TestNegativeKinds();
     TestStateAndLimit();
     TestDriverFailure();
     return s_failures == 0 ? 0 : 1;

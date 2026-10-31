@@ -26,7 +26,7 @@ static const uint8_t MAGIC[4] = {'M', 'R', 'P', 'C'};
 // Whether an envelope names this driver and adapter.
 static bool IsOurs(const mrhiDevice* device, const uint8_t* bytes)
 {
-    return mrhiRead32(bytes + 52) == device->adapterInfo.driver &&
+    return mrhiRead32(bytes + 52) == (uint32_t)device->adapterInfo.driver &&
            mrhiRead32(bytes + 56) == device->adapterInfo.vendorId &&
            mrhiRead32(bytes + 60) == device->adapterInfo.deviceId;
 }

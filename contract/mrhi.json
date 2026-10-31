@@ -189,7 +189,7 @@
         {
           "kind": "enum",
           "name": "struct_type",
-          "width": "uint32",
+          "packed": true,
           "doc": "The type of a chained struct. Bit 31 clear marks a critical extension, which a library that does not know it refuses; bit 31 set marks a hint it may skip. Types with bit 30 set (MRHI_STRUCT_DRIVER_DEFINED) belong to drivers built outside the tree.",
           "values": [
             {
@@ -341,7 +341,6 @@
         {
           "kind": "enum",
           "name": "diagnostic_code",
-          "width": "uint16",
           "doc": "The check a diagnostic record reports: one check of the core that refused a call as invalid input, one budget a frame call reached or driver budget a submission ran out of, or, in a build with the validation layer, one rule of the driver SPI that the driver broke (the driver codes, recorded in the instance's queue). mrhiGetDiagnosticText gives each one's text.",
           "values": [
             {
@@ -1108,7 +1107,6 @@
         {
           "kind": "enum",
           "name": "driver_kind",
-          "width": "uint8",
           "doc": "The GPU API a driver speaks.",
           "values": [
             {
@@ -1147,7 +1145,6 @@
         {
           "kind": "enum",
           "name": "adapter_kind",
-          "width": "uint8",
           "doc": "What kind of processor an adapter is.",
           "values": [
             {
@@ -1198,7 +1195,6 @@
         {
           "kind": "enum",
           "name": "power_preference",
-          "width": "uint8",
           "doc": "Which adapters a request prefers.",
           "values": [
             {
@@ -1339,7 +1335,6 @@
         {
           "kind": "enum",
           "name": "instance_notification_kind",
-          "width": "uint8",
           "doc": "What an instance notification reports.",
           "values": [
             {
@@ -3067,7 +3062,6 @@
         {
           "kind": "enum",
           "name": "format",
-          "width": "uint16",
           "mapped": true,
           "doc": "A texel format. The compressed families need their feature; `format_caps` says what each format can do on an adapter.",
           "values": [
@@ -6221,6 +6215,83 @@
           ]
         },
         {
+          "kind": "bitflags",
+          "name": "sample_counts",
+          "mapped": true,
+          "doc": "The multisample counts a format supports, as a mask: the bit worth n is set when n samples per pixel are.",
+          "values": [
+            {
+              "name": "samples1_bit",
+              "value": 1,
+              "doc": "One sample per pixel.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_SAMPLE_COUNT_1_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SampleDesc.Count 1"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "supportsTextureSampleCount 1"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sampleCount 1"
+                }
+              }
+            },
+            {
+              "name": "samples2_bit",
+              "value": 2,
+              "doc": "Two samples per pixel.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_SAMPLE_COUNT_2_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SampleDesc.Count 2"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "supportsTextureSampleCount 2"
+                },
+                "web_gpu": {
+                  "class": "absent_rejected",
+                  "note": "sampleCount is 1 or 4"
+                }
+              }
+            },
+            {
+              "name": "samples4_bit",
+              "value": 4,
+              "doc": "Four samples per pixel.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "VK_SAMPLE_COUNT_4_BIT"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "SampleDesc.Count 4"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "supportsTextureSampleCount 4"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "sampleCount 4"
+                }
+              }
+            }
+          ]
+        },
+        {
           "kind": "struct",
           "name": "format_caps",
           "mapped": true,
@@ -6343,8 +6414,8 @@
             },
             {
               "name": "sample_counts",
-              "type": "uint8",
-              "doc": "The multisample counts as a mask: the bit worth n is set when n samples are supported (1, 2, 4).",
+              "type": "bitflags.sample_counts",
+              "doc": "The multisample counts it supports.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -6555,7 +6626,6 @@
         {
           "kind": "enum",
           "name": "device_state",
-          "width": "uint8",
           "doc": "Where a device is in its life.",
           "values": [
             {
@@ -7084,7 +7154,6 @@
         {
           "kind": "enum",
           "name": "device_loss_reason",
-          "width": "uint8",
           "mapped": true,
           "doc": "Why a device was lost.",
           "values": [
@@ -7363,7 +7432,6 @@
         {
           "kind": "enum",
           "name": "filter",
-          "width": "uint8",
           "mapped": true,
           "doc": "How texels are filtered.",
           "values": [
@@ -7418,7 +7486,6 @@
         {
           "kind": "enum",
           "name": "address_mode",
-          "width": "uint8",
           "mapped": true,
           "doc": "How coordinates outside a texture are treated. Clamp to border is absent: WebGPU has no border colors.",
           "values": [
@@ -7496,7 +7563,6 @@
         {
           "kind": "enum",
           "name": "compare_function",
-          "width": "uint8",
           "mapped": true,
           "doc": "A comparison of a new value with a stored one: for comparison samplers, and for depth and stencil tests.",
           "values": [
@@ -8092,7 +8158,6 @@
         {
           "kind": "bitflags",
           "name": "buffer_usage",
-          "width": "uint32",
           "mapped": true,
           "doc": "What a buffer is used for, declared when it is made.",
           "values": [
@@ -8501,7 +8566,6 @@
         {
           "kind": "enum",
           "name": "texture_kind",
-          "width": "uint8",
           "mapped": true,
           "doc": "The shape of a texture, or of a view of one.",
           "values": [
@@ -8625,7 +8689,6 @@
         {
           "kind": "bitflags",
           "name": "texture_usage",
-          "width": "uint32",
           "mapped": true,
           "doc": "What a texture is used for, declared when it is made; each needs the format's capability.",
           "values": [
@@ -9157,7 +9220,6 @@
         {
           "kind": "enum",
           "name": "texture_aspect",
-          "width": "uint8",
           "mapped": true,
           "doc": "The part of a texture's texels a view sees.",
           "values": [
@@ -9618,7 +9680,6 @@
         {
           "kind": "enum",
           "name": "query_type",
-          "width": "uint8",
           "mapped": true,
           "doc": "What a query set's queries measure.",
           "values": [
@@ -9938,7 +9999,6 @@
         {
           "kind": "enum",
           "name": "heap_entry_kind",
-          "width": "uint8",
           "mapped": true,
           "doc": "How shaders read a resource heap entry.",
           "values": [
@@ -10559,7 +10619,6 @@
         {
           "kind": "enum",
           "name": "color_primaries",
-          "width": "uint8",
           "mapped": true,
           "doc": "The primaries a surface's colors are in.",
           "values": [
@@ -10637,7 +10696,6 @@
         {
           "kind": "enum",
           "name": "transfer",
-          "width": "uint8",
           "mapped": true,
           "doc": "How a surface's values are encoded.",
           "values": [
@@ -10715,7 +10773,6 @@
         {
           "kind": "enum",
           "name": "color_range",
-          "width": "uint8",
           "mapped": true,
           "doc": "Whether a surface's values may pass 1.0.",
           "values": [
@@ -10870,7 +10927,6 @@
         {
           "kind": "enum",
           "name": "present_mode",
-          "width": "uint8",
           "mapped": true,
           "doc": "How presented images reach the display.",
           "values": [
@@ -10948,7 +11004,6 @@
         {
           "kind": "bitflags",
           "name": "present_modes",
-          "width": "uint32",
           "doc": "A set of mrhiPresentMode values, one bit each: the bit of a mode is 1 shifted left by its value.",
           "library": "a set of the mrhiPresentMode values a surface reports",
           "values": [
@@ -10972,7 +11027,6 @@
         {
           "kind": "enum",
           "name": "alpha_mode",
-          "width": "uint8",
           "mapped": true,
           "doc": "How a surface's alpha blends with what is behind the window.",
           "values": [
@@ -11027,7 +11081,6 @@
         {
           "kind": "bitflags",
           "name": "alpha_modes",
-          "width": "uint32",
           "doc": "A set of mrhiAlphaMode values, one bit each: the bit of a mode is 1 shifted left by its value.",
           "library": "a set of the mrhiAlphaMode values a surface reports",
           "values": [
@@ -11904,7 +11957,6 @@
         {
           "kind": "enum",
           "name": "device_notification_kind",
-          "width": "uint8",
           "doc": "What a device notification reports.",
           "values": [
             {
@@ -12497,7 +12549,6 @@
         {
           "kind": "enum",
           "name": "pass_class",
-          "width": "uint8",
           "mapped": true,
           "doc": "Where a pass runs: a hint drivers without the queue ignore, running it on the graphics queue.",
           "values": [
@@ -12578,7 +12629,6 @@
         {
           "kind": "enum",
           "name": "access_kind",
-          "width": "uint8",
           "mapped": true,
           "doc": "How a pass uses a resource.",
           "values": [
@@ -12840,7 +12890,6 @@
         {
           "kind": "enum",
           "name": "load_op",
-          "width": "uint8",
           "mapped": true,
           "doc": "What a target holds when its pass begins.",
           "values": [
@@ -12919,7 +12968,6 @@
         {
           "kind": "enum",
           "name": "store_op",
-          "width": "uint8",
           "mapped": true,
           "doc": "What a target keeps when its pass ends.",
           "values": [
@@ -13463,7 +13511,6 @@
         {
           "kind": "enum",
           "name": "resource_state",
-          "width": "uint8",
           "mapped": true,
           "doc": "The state a compiled frame leaves a part of a resource in, from the use that made it.",
           "values": [
@@ -14202,7 +14249,6 @@
         {
           "kind": "bitflags",
           "name": "shader_stages",
-          "width": "uint32",
           "mapped": true,
           "doc": "The stages of a pipeline.",
           "values": [
@@ -14280,7 +14326,6 @@
         {
           "kind": "enum",
           "name": "binding_kind",
-          "width": "uint8",
           "mapped": true,
           "doc": "What a binding slot holds.",
           "values": [
@@ -14463,7 +14508,6 @@
         {
           "kind": "enum",
           "name": "sampler_binding",
-          "width": "uint8",
           "mapped": true,
           "doc": "The samplers a sampler slot takes.",
           "values": [
@@ -14547,7 +14591,6 @@
         {
           "kind": "enum",
           "name": "sample_type",
-          "width": "uint8",
           "mapped": true,
           "doc": "What a sampled texture slot returns.",
           "values": [
@@ -14677,7 +14720,6 @@
         {
           "kind": "enum",
           "name": "storage_access",
-          "width": "uint8",
           "mapped": true,
           "doc": "How a storage texture slot is used.",
           "values": [
@@ -14761,7 +14803,6 @@
         {
           "kind": "enum",
           "name": "scalar_type",
-          "width": "uint8",
           "mapped": true,
           "doc": "The scalar type of a shader interface variable: a vertex input, a color output or an inter-stage variable.",
           "values": [
@@ -14868,7 +14909,6 @@
         {
           "kind": "enum",
           "name": "interpolation",
-          "width": "uint8",
           "mapped": true,
           "doc": "How an inter-stage variable is interpolated.",
           "values": [
@@ -14952,7 +14992,6 @@
         {
           "kind": "enum",
           "name": "sampling",
-          "width": "uint8",
           "mapped": true,
           "doc": "Where an interpolated inter-stage variable is sampled, or which vertex a flat one takes.",
           "values": [
@@ -15082,7 +15121,6 @@
         {
           "kind": "bitflags",
           "name": "shader_builtins",
-          "width": "uint32",
           "mapped": true,
           "doc": "The builtins an entry point uses that constrain its pipelines: the fragment builtins, and the view index.",
           "values": [
@@ -15252,7 +15290,6 @@
         {
           "kind": "bitflags",
           "name": "shader_heap_uses",
-          "width": "uint32",
           "mapped": true,
           "doc": "What an entry point reads through the pass's heap; none for an entry point that uses no heap.",
           "values": [
@@ -15376,7 +15413,6 @@
         {
           "kind": "enum",
           "name": "constant_type",
-          "width": "uint8",
           "mapped": true,
           "doc": "The type of a specialization constant.",
           "values": [
@@ -15732,7 +15768,6 @@
         {
           "kind": "enum",
           "name": "vertex_format",
-          "width": "uint8",
           "mapped": true,
           "doc": "The format of a vertex attribute in its buffer. Floats, unorm and snorm formats feed f32 inputs, uint formats u32 inputs and sint formats i32 inputs, of any component count.",
           "values": [
@@ -16931,7 +16966,6 @@
         {
           "kind": "enum",
           "name": "vertex_step_mode",
-          "width": "uint8",
           "mapped": true,
           "doc": "How a vertex buffer advances.",
           "values": [
@@ -16986,7 +17020,6 @@
         {
           "kind": "enum",
           "name": "primitive_topology",
-          "width": "uint8",
           "mapped": true,
           "doc": "How vertices form primitives.",
           "values": [
@@ -17110,7 +17143,6 @@
         {
           "kind": "enum",
           "name": "index_format",
-          "width": "uint8",
           "mapped": true,
           "doc": "The width of an index.",
           "values": [
@@ -17171,7 +17203,6 @@
         {
           "kind": "enum",
           "name": "front_face",
-          "width": "uint8",
           "mapped": true,
           "doc": "Which winding faces front.",
           "values": [
@@ -17226,7 +17257,6 @@
         {
           "kind": "enum",
           "name": "cull_mode",
-          "width": "uint8",
           "mapped": true,
           "doc": "Which faces are culled.",
           "values": [
@@ -17304,7 +17334,6 @@
         {
           "kind": "enum",
           "name": "stencil_operation",
-          "width": "uint8",
           "mapped": true,
           "doc": "What a stencil test does to the stencil value.",
           "values": [
@@ -17497,7 +17526,6 @@
         {
           "kind": "enum",
           "name": "blend_factor",
-          "width": "uint8",
           "mapped": true,
           "doc": "A factor of blending's source or destination.",
           "values": [
@@ -17897,7 +17925,6 @@
         {
           "kind": "enum",
           "name": "blend_operation",
-          "width": "uint8",
           "mapped": true,
           "doc": "How blending combines its weighted source and destination.",
           "values": [
@@ -18021,7 +18048,6 @@
         {
           "kind": "bitflags",
           "name": "color_writes",
-          "width": "uint32",
           "mapped": true,
           "doc": "The channels a color target writes.",
           "values": [

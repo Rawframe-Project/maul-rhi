@@ -78,7 +78,7 @@ mrhiResult mrhiCreateQuerySet(mrhiDevice* device, const mrhiQuerySetDef* def,
     {
         return status;
     }
-    if (def->type > mrhi_queryPipelineStatistics || def->count == 0)
+    if ((uint32_t)def->type > mrhi_queryPipelineStatistics || def->count == 0)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticQuerySetDef);
     }

@@ -1,4 +1,4 @@
-# Maul RHI conformance cases, SPI version 11.
+# Maul RHI conformance cases, SPI version 12.
 # A driver is admitted on a run that passes every case listed.
 api.adapters
 api.devices

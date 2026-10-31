@@ -28,7 +28,7 @@ static int Rank(mrhiAdapterKind kind, mrhiPowerPreference preference)
 {
     static const int high[] = {3, 0, 1, 2, 4};
     static const int low[] = {3, 1, 0, 2, 4};
-    if (kind > mrhi_adapterSoftware || preference == mrhi_powerDefault)
+    if ((uint32_t)kind > mrhi_adapterSoftware || preference == mrhi_powerDefault)
     {
         return 0;
     }
@@ -191,7 +191,7 @@ mrhiResult mrhiInstance_RequestAdapters(mrhiInstance* instance, const mrhiAdapte
         return mrhiInstanceBusy(instance);
     }
     if (def == nullptr || requestOut == nullptr || def->cookie != ADAPTER_REQUEST_DEF_COOKIE ||
-        def->preference > mrhi_powerHigh)
+        (uint32_t)def->preference > mrhi_powerHigh)
     {
         return mrhiMisuse(instance, mrhi_diagnosticAdapterRequestDef);
     }

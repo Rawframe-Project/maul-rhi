@@ -212,7 +212,11 @@ static void TestTexts(void)
     const char* text = mrhiGetDiagnosticText(mrhi_diagnosticBufferSize);
     CHECK(strcmp(text, "A buffer size of zero or not a multiple of 4.") == 0, "a code's text");
     CHECK(strcmp(mrhiGetDiagnosticText(0), "An unknown diagnostic code.") == 0, "zero");
-    CHECK(strcmp(mrhiGetDiagnosticText(0xFFFFu), "An unknown diagnostic code.") == 0, "past them");
+    CHECK(strcmp(mrhiGetDiagnosticText(0xFFFF), "An unknown diagnostic code.") == 0, "past them");
+    // Codes are int32_t: a negative code is unknown too.
+    CHECK(strcmp(mrhiGetDiagnosticText(-1), "An unknown diagnostic code.") == 0 &&
+              strcmp(mrhiGetDiagnosticText(INT32_MIN), "An unknown diagnostic code.") == 0,
+          "negative");
 }
 
 #ifdef TEST_THREADS

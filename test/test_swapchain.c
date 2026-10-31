@@ -93,7 +93,7 @@ static void TestInvalid(void)
     mrhiDevice* device = OpenWith(mrhiDefaultDeviceDef(), true);
     mrhiSurfaceId surface = MakeSurface(1);
     mrhiSurfaceConfig good = Config(surface);
-    mrhiSurfaceConfig bad[20];
+    mrhiSurfaceConfig bad[32];
     size_t count = 0;
     for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i)
     {
@@ -112,9 +112,21 @@ static void TestInvalid(void)
     bad[count++].width = 0;
     bad[count++].height = 0;
     bad[count++].presentMode = mrhi_presentImmediate + 1;
-    bad[count++].presentMode = UINT8_MAX;
     bad[count++].alphaMode = mrhi_alphaPremultiplied + 1;
-    bad[count++].alphaMode = UINT8_MAX;
+    // Kinds are int32_t: a check against a kind's last value alone would
+    // let a negative one through.
+    static const int32_t negative[] = {-1, INT32_MIN};
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        bad[count].viewFormats[0] = mrhi_formatNone;
+        bad[count++].color.format = negative[i];
+        bad[count++].color.primaries = negative[i];
+        bad[count++].color.transfer = negative[i];
+        bad[count++].color.range = negative[i];
+        bad[count++].viewFormats[1] = negative[i];
+        bad[count++].presentMode = negative[i];
+        bad[count++].alphaMode = negative[i];
+    }
     for (size_t i = 0; i < count; ++i)
     {
         CHECK(mrhiDevice_ConfigureSurface(device, &bad[i]) == mrhi_errorInvalid, "invalid");

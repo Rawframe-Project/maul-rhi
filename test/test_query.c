@@ -95,6 +95,23 @@ static void TestInvalidDefs(void)
     Close(device);
 }
 
+// Kinds are int32_t, so a check against the last type alone would let a
+// negative one through: the type refuses -1 and INT32_MIN.
+static void TestNegativeKinds(void)
+{
+    mrhiDevice* device = Open(4, 8192, false, true);
+    mrhiQuerySetId set;
+    mrhiQuerySetDef def = Def(mrhi_queryOcclusion, 1);
+    CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_success, "the valid def made");
+    static const int32_t negative[] = {-1, INT32_MIN};
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        def = Def(negative[i], 1);
+        CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorInvalid, "a negative type");
+    }
+    Close(device);
+}
+
 static void TestStateAndLimits(void)
 {
     mrhiDevice* device = Open(2, 8, false, false);
@@ -802,6 +819,7 @@ int main(void)
     ResetAdapter();
     TestMakeAndDestroy();
     TestInvalidDefs();
+    TestNegativeKinds();
     TestStateAndLimits();
     TestRunOrder();
     TestNoQueries();

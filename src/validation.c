@@ -124,7 +124,7 @@ static size_t GetAdapters(const void* self, mrhiDriverAdapter* adapters, size_t 
         }
         Expect(&layer->watch,
                distinct && adapter->info.nameLength <= MRHI_ADAPTER_NAME_BYTES &&
-                   adapter->info.kind <= mrhi_adapterSoftware,
+                   (uint32_t)adapter->info.kind <= mrhi_adapterSoftware,
                mrhi_diagnosticDriverAdapter);
     }
     return total;
@@ -136,7 +136,8 @@ static void GetFormatCaps(const void* self, uint64_t adapter, mrhiFormat format,
     const Layer* layer = self;
     layer->inner.vtable->getFormatCaps(layer->inner.self, adapter, format, capsOut);
     // One, two and four samples are all a cap can name.
-    Expect(&layer->watch, (capsOut->sampleCounts & ~0x7u) == 0, mrhi_diagnosticDriverSampleCounts);
+    const mrhiSampleCounts named = mrhi_samples1Bit | mrhi_samples2Bit | mrhi_samples4Bit;
+    Expect(&layer->watch, (capsOut->sampleCounts & ~named) == 0, mrhi_diagnosticDriverSampleCounts);
 }
 
 static mrhiResult CreateSurface(void* self, const mrhiChain* source, const mrhiSurfaceDef* def,

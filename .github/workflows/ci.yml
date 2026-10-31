@@ -30,7 +30,7 @@ defaults:
 jobs:
   # Whether anything beyond documentation changed; the builds skip when not.
   changes:
-    uses: Rawframe-Project/.github/.github/workflows/changes.yml@6ce8dd114cb71948ce6a28dd7b122cb9f4514e0b # v0.0.38
+    uses: Rawframe-Project/.github/.github/workflows/changes.yml@8414d388d2116b581c5c5d8f6641e1da4d863244 # v0.0.42
     permissions:
       pull-requests: read
 
@@ -46,12 +46,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Rawframe-Project/.github/.github/actions/docs-check@6ce8dd114cb71948ce6a28dd7b122cb9f4514e0b # v0.0.38
+      - uses: Rawframe-Project/.github/.github/actions/docs-check@8414d388d2116b581c5c5d8f6641e1da4d863244 # v0.0.42
         with:
           exclude: khronos directx
 
   zizmor:
-    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@6ce8dd114cb71948ce6a28dd7b122cb9f4514e0b # v0.0.38
+    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@8414d388d2116b581c5c5d8f6641e1da4d863244 # v0.0.42
     permissions:
       contents: read
 
@@ -175,7 +175,7 @@ jobs:
           - { preset: macos-clang-debug, runner: macos-26, setup: tools/ci_metal.sh }
           - { preset: windows-d3d12, runner: windows-2025, setup: tools/ci_agility.sh }
           - { preset: windows-vulkan, runner: windows-2025 }
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@6ce8dd114cb71948ce6a28dd7b122cb9f4514e0b # v0.0.38
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@8414d388d2116b581c5c5d8f6641e1da4d863244 # v0.0.42
     permissions:
       contents: read
     with:
@@ -370,11 +370,10 @@ jobs:
   # fuzz_container's are what tools/container_seed.py writes, and
   # fuzz_cache and fuzz_pipeline have none, as the one builds each
   # envelope from the input's first byte and the other starts each def
-  # from a valid one. The cache is keyed by the target and by the fuzz
-  # build's inputs (the library, its CMake, the target and the compiler), so
-  # an unchanged build restores its own corpus exactly; a target whose build
-  # changed restores its latest corpus of an earlier build, since a corpus
-  # is only inputs, which stay valid against a new binary. After a run on
+  # from a valid one. The cache is keyed by the target and the run, so
+  # each run restores the target's latest corpus, whatever build saved it:
+  # a corpus is only inputs, which stay valid against a new binary, and
+  # one key per target lets prune-caches keep only the newest. After a run on
   # main the fuzzer's merge minimizes the seeds and the corpus together
   # against this binary, and the result is saved for the next night and
   # for the fuzz job's restores unless the run found something, as its
@@ -403,15 +402,11 @@ jobs:
         with:
           persist-credentials: false
       - name: Build
-        env:
-          INPUTS: ${{ hashFiles('src/**', 'include/**', 'cmake/**', 'CMakeLists.txt', 'test/fuzz_coverage_ignore.txt', format('test/{0}.c', matrix.target)) }}
         run: |
           cmake -B out/fuzz -G Ninja -DCMAKE_C_COMPILER=clang-20 -DMAUL_RHI_FUZZ=ON \
             -DMAUL_RHI_BUILD_TESTS=OFF -DMAUL_RHI_WERROR=ON
           cmake --build out/fuzz --target "$TARGET"
           [ -x "out/fuzz/$TARGET" ] || { echo "::error::$TARGET was not built"; exit 1; }
-          compiler=$(clang-20 --version | head -1 | sha256sum | cut -c1-16)
-          echo "CORPUS_KEY=corpus-$TARGET-$INPUTS-$compiler" >>"$GITHUB_ENV"
       - name: Seeds
         run: |
           mkdir -p "out/seeds/$TARGET"
@@ -441,12 +436,10 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out/corpus/${{ matrix.target }}
-          key: ${{ env.CORPUS_KEY }}-${{ github.run_id }}
-          # This build's corpus, else the target's from an earlier build:
-          # its inputs stay valid, and the merge re-scores them.
-          restore-keys: |
-            ${{ env.CORPUS_KEY }}-
-            corpus-${{ matrix.target }}-
+          key: corpus-${{ matrix.target }}-${{ github.run_id }}
+          # The target's latest corpus, of whatever build: its inputs stay
+          # valid, and the merge re-scores them.
+          restore-keys: corpus-${{ matrix.target }}-
       - name: Fuzz
         if: env.RUNNABLE == '1'
         run: |
@@ -477,11 +470,7 @@ jobs:
           rm -rf "out/corpus/$TARGET"
           mv out/merged "out/corpus/$TARGET"
           coverage() { "out/fuzz/$TARGET" -runs=0 "$@" 2>&1 | sed -n 's/.*INITED cov: \([0-9]*\).*/\1/p'; }
-          case "$MATCHED" in
-          "") restored="none: the seeds alone" ;;
-          "$CORPUS_KEY"-*) restored="this build's" ;;
-          *) restored="an earlier build's" ;;
-          esac
+          restored=${MATCHED:-none: the seeds alone}
           {
             echo "| Target | Corpus restored | Seeds' coverage | Corpus's coverage | Corpus files |"
             echo "|---|---|---|---|---|"
@@ -492,7 +481,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out/corpus/${{ matrix.target }}
-          key: ${{ env.CORPUS_KEY }}-${{ github.run_id }}
+          key: corpus-${{ matrix.target }}-${{ github.run_id }}
 
   # The windows-d3d12 cell with GPU-based validation's resource state
   # tracking, which pull requests run without: on a device whose objects
@@ -501,7 +490,7 @@ jobs:
   # and never retried, until the Agility SDK fixes it.
   windows-d3d12-states:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@6ce8dd114cb71948ce6a28dd7b122cb9f4514e0b # v0.0.38
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@8414d388d2116b581c5c5d8f6641e1da4d863244 # v0.0.42
     permissions:
       contents: read
     with:
@@ -654,6 +643,17 @@ jobs:
         if: always() && env.MWIN_IOS_DEVICE != ''
         run: xcrun simctl shutdown "$MWIN_IOS_DEVICE" || true
 
+  # Deletes the cache entries of main a newer save replaced: the ccache and
+  # Mesa entries of the build cells and windows-d3d12-states, keyed by the
+  # commit, and fuzz-nightly's corpora, keyed by the run. Main's runs only,
+  # after every job that saves a cache.
+  prune-caches:
+    needs: [build, windows-d3d12-states, fuzz-nightly]
+    if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    uses: Rawframe-Project/.github/.github/workflows/cache-prune.yml@8414d388d2116b581c5c5d8f6641e1da4d863244 # v0.0.42
+    permissions:
+      actions: write
+
   # The one check the ruleset requires: it passes when every job above
   # passed or was skipped (for a documentation-only change, or a nightly
   # job on a pull request), so adding or renaming a job never touches the
@@ -662,7 +662,7 @@ jobs:
     if: always()
     needs: [changes, docs, zizmor, checks, build, msvc-headers, web-emscripten, fuzz, fuzz-targets,
             fuzz-nightly, windows-d3d12-states, quarantine-d3d12, android-emulator,
-            ios-simulator]
+            ios-simulator, prune-caches]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     permissions: {}
