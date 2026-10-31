@@ -135,11 +135,16 @@ def check_name(errors, where, name):
         errors.append(f"{where}: '{name}' is not a snake_case name")
 
 
-def check_type(errors, where, kind_of, spec):
-    """Checks a type spec: a type and, for members and arguments, a pointer."""
+def check_type(errors, where, kind_of, spec, markable=False):
+    """Checks a type spec: a type and, for members and arguments, a pointer.
+    Only a function's own argument is markable input_only; check_function
+    checks the mark there."""
     type_name, pointer = spec.get("type"), spec.get("pointer")
     if pointer not in POINTERS:
         errors.append(f"{where}: unknown pointer '{pointer}'")
+    if "input_only" in spec and not markable:
+        errors.append(f"{where}: '{spec.get('name', 'the return value')}' is input_only, which "
+                      "only a function's argument may be")
     if type_name == "function":
         check_signature(errors, where, kind_of, spec)
         return
@@ -155,14 +160,15 @@ def check_type(errors, where, kind_of, spec):
         errors.append(f"{where}: unknown type '{type_name}'")
 
 
-def check_signature(errors, where, kind_of, spec):
-    """Checks a function's or a function pointer's return and arguments."""
+def check_signature(errors, where, kind_of, spec, markable=False):
+    """Checks a function's or a function pointer's return and arguments;
+    markable for a function's, whose arguments may be input_only."""
     returns = spec.get("returns")
     if returns is not None:
         check_type(errors, where, kind_of, returns)
     for arg in spec.get("args", []):
         check_name(errors, where, arg.get("name"))
-        check_type(errors, where, kind_of, arg)
+        check_type(errors, where, kind_of, arg, markable)
 
 
 def check_values(errors, where, item):
@@ -311,7 +317,7 @@ def object_of(item):
 
 
 def check_function(errors, where, item, kind_of):
-    check_signature(errors, where, kind_of, item)
+    check_signature(errors, where, kind_of, item, markable=True)
     if item.get("returns") is not None and not item["returns"].get("doc"):
         errors.append(f"{where}: the return value needs a doc")
     for arg in item.get("args", []):
@@ -1083,8 +1089,8 @@ def self_test(contract):
     def code(name, value):
         return {"name": name, "value": value, "doc": "A limit's refusal."}
 
-    def only_input(item, name, value=True):
-        next(arg for arg in item["args"] if arg["name"] == name)["input_only"] = value
+    def only_input(item, name, value=True, members="args"):
+        next(arg for arg in item[members] if arg["name"] == name)["input_only"] = value
 
     top = max(value["value"] for value in find_item(contract, "diagnostic_code")["values"])
     cases = [
@@ -1150,6 +1156,16 @@ def self_test(contract):
         ("input_only on an output id",
          lambda limits, codes, items: only_input(items["pass_read_buffer"], "request_out"),
          "'request_out' is input_only"),
+        ("input_only on a return value",
+         lambda limits, codes, items: items["pass_begin"]["returns"].update(input_only=True),
+         "'the return value' is input_only"),
+        ("input_only on a struct member",
+         lambda limits, codes, items: only_input(items["buffer_def"], "size", members="members"),
+         "'size' is input_only"),
+        ("input_only on a function pointer's argument",
+         lambda limits, codes, items: only_input(
+             next(m for m in items["allocator"]["members"] if m["name"] == "alloc"), "size"),
+         "'size' is input_only"),
     ]
     wrong = 0
     for name, change, expected in cases:
