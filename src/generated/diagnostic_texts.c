@@ -291,7 +291,7 @@ const char* mrhiGetDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticAllocatorCall:
         return "A function that would change the instance or device was called from inside its allocator.";
     case mrhi_diagnosticDriverLossReport:
-        return "A driver reported a device loss with an unknown reason, or a message longer than MRHI_LOSS_MESSAGE_BYTES; the core passed on mrhi_lossUnknown and the message's first MRHI_LOSS_MESSAGE_BYTES bytes.";
+        return "A driver reported a device loss with an unknown reason, or a message longer than MRHI_LOSS_MESSAGE_BYTES or not well-formed UTF-8; the core passed on mrhi_lossUnknown, and the message up to its first byte that is not well-formed UTF-8 within its room.";
     case mrhi_diagnosticDriverSurfaceCaps:
         return "A driver reported surface caps with more than MRHI_SURFACE_COLORS colors, or a color whose format, primaries, transfer or range is unknown; the core kept the first MRHI_SURFACE_COLORS, dropped each unknown one, and reported a surface left without a color as not presentable.";
     default:

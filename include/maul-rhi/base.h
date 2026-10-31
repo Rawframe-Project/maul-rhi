@@ -685,9 +685,9 @@ extern "C"
         // inside its allocator.
         mrhi_diagnosticAllocatorCall = 156,
         // A driver reported a device loss with an unknown reason, or a message
-        // longer than MRHI_LOSS_MESSAGE_BYTES; the core passed on
-        // mrhi_lossUnknown and the message's first MRHI_LOSS_MESSAGE_BYTES
-        // bytes.
+        // longer than MRHI_LOSS_MESSAGE_BYTES or not well-formed UTF-8; the
+        // core passed on mrhi_lossUnknown, and the message up to its first byte
+        // that is not well-formed UTF-8 within its room.
         mrhi_diagnosticDriverLossReport = 157,
         // A driver reported surface caps with more than MRHI_SURFACE_COLORS
         // colors, or a color whose format, primaries, transfer or range is

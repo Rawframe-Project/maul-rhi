@@ -18,6 +18,7 @@
 #include "allocator.h"
 #include "capabilities_core.h"
 #include "frame_walk.h"
+#include "label.h"
 
 #include <stdalign.h>
 
@@ -385,7 +386,8 @@ static void LossReport(void* self, mrhiDeviceLossReport* reportOut)
     device->inner.vtable->lossReport(device->inner.self, reportOut);
     Expect(&device->watch,
            (uint32_t)reportOut->reason <= mrhi_lossSimulated &&
-               reportOut->messageLength <= MRHI_LOSS_MESSAGE_BYTES,
+               reportOut->messageLength <= MRHI_LOSS_MESSAGE_BYTES &&
+               mrhiIsTextValid(reportOut->message, reportOut->messageLength),
            mrhi_diagnosticDriverLossReport);
 }
 

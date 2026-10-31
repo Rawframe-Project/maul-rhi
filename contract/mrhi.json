@@ -1041,7 +1041,7 @@
             {
               "name": "diagnostic_driver_loss_report",
               "value": 157,
-              "doc": "A driver reported a device loss with an unknown reason, or a message longer than MRHI_LOSS_MESSAGE_BYTES; the core passed on mrhi_lossUnknown and the message's first MRHI_LOSS_MESSAGE_BYTES bytes."
+              "doc": "A driver reported a device loss with an unknown reason, or a message longer than MRHI_LOSS_MESSAGE_BYTES or not well-formed UTF-8; the core passed on mrhi_lossUnknown, and the message up to its first byte that is not well-formed UTF-8 within its room."
             },
             {
               "name": "diagnostic_driver_surface_caps",
@@ -7351,7 +7351,7 @@
               "name": "message",
               "type": "char",
               "array": "loss_message_bytes",
-              "doc": "The driver's message: UTF-8 without NUL, messageLength bytes."
+              "doc": "The driver's message: well-formed UTF-8 without NUL, messageLength bytes. It ends before the driver's first byte that would break that: a character cut by the room, a malformed sequence or a NUL."
             },
             {
               "name": "message_length",

@@ -330,23 +330,53 @@ static void TestDeviceEdges(void)
     mrhiDestroyInstance(instance);
 }
 
+// A report a driver gives: its reason; its message, every byte 'a' but
+// tailLength bytes of tail at the offset at; and its length. Then what
+// the program reads, and whether the layer counts a breach.
+typedef struct GivenReport
+{
+    mrhiDeviceLossReason reason;
+    size_t at;
+    const char* tail;
+    size_t tailLength;
+    size_t length;
+    mrhiDeviceLossReason readReason;
+    size_t readLength;
+    bool breach;
+} GivenReport;
+
 // A device lost by its driver with each report the test gives. A reason
-// the contract does not list (-1, INT32_MIN or one past the last) or a
-// message past its room is a breach, and the program reads
-// mrhi_lossUnknown and the room's bytes; the last reason and a message
-// of the most bytes keep the contract.
+// the contract does not list (-1, INT32_MIN or one past the last) reads
+// as mrhi_lossUnknown. A message ends within its room before the first
+// byte that is not well-formed UTF-8: a character the room cuts (a
+// lead byte at the last byte, two of a character's three), a malformed
+// byte or a NUL. Each is a breach; a character that ends at the room's
+// last byte, and no message, keep the contract.
 static void TestLossReports(void)
 {
-    static const mrhiDeviceLossReport given[] = {
-        {.reason = -1},
-        {.reason = INT32_MIN},
-        {.reason = mrhi_lossSimulated + 1},
-        {.reason = mrhi_lossHung, .messageLength = MRHI_LOSS_MESSAGE_BYTES + 1},
-        {.reason = mrhi_lossSimulated, .messageLength = MRHI_LOSS_MESSAGE_BYTES},
+    enum
+    {
+        ROOM = MRHI_LOSS_MESSAGE_BYTES
+    };
+    static const GivenReport given[] = {
+        {-1, 0, "", 0, 4, mrhi_lossUnknown, 4, true},
+        {INT32_MIN, 0, "", 0, 4, mrhi_lossUnknown, 4, true},
+        {mrhi_lossSimulated + 1, 0, "", 0, 4, mrhi_lossUnknown, 4, true},
+        {mrhi_lossHung, 0, "", 0, ROOM + 1, mrhi_lossHung, ROOM, true},
+        {mrhi_lossHung, ROOM - 1, "\xC3", 1, ROOM + 1, mrhi_lossHung, ROOM - 1, true},
+        {mrhi_lossHung, ROOM - 2, "\xE2\x82", 2, ROOM + 1, mrhi_lossHung, ROOM - 2, true},
+        {mrhi_lossHung, ROOM - 1, "\xC3", 1, ROOM, mrhi_lossHung, ROOM - 1, true},
+        {mrhi_lossHung, 2, "\xFF", 1, 5, mrhi_lossHung, 2, true},
+        {mrhi_lossHung, 2, "\0", 1, 5, mrhi_lossHung, 2, true},
+        {mrhi_lossSimulated, ROOM - 2, "\xC3\xA9", 2, ROOM, mrhi_lossSimulated, ROOM, false},
+        {mrhi_lossHung, 0, "", 0, 0, mrhi_lossHung, 0, false},
     };
     for (size_t i = 0; i < sizeof(given) / sizeof(given[0]); ++i)
     {
-        s_report = given[i];
+        const GivenReport* row = &given[i];
+        s_report = (mrhiDeviceLossReport){.reason = row->reason, .messageLength = row->length};
+        memset(s_report.message, 'a', ROOM);
+        memcpy(s_report.message + row->at, row->tail, row->tailLength);
         Open();
         s_vtable.createDevice = CreateGivenDevice;
         mrhiInstance* instance = Start();
@@ -363,15 +393,14 @@ static void TestLossReports(void)
         CHECK(mrhiDevice_TakeNotification(device, &notice) == mrhi_success &&
                   notice.kind == mrhi_deviceLostNotice,
               "lost by the driver");
-        bool kept = i == 4;
         mrhiDeviceLossReport report;
         CHECK(mrhiDevice_GetLossReport(device, &report) == mrhi_success &&
-                  report.reason == (i < 3 ? mrhi_lossUnknown : given[i].reason) &&
-                  report.messageLength == (i < 3 ? 0 : MRHI_LOSS_MESSAGE_BYTES),
+                  report.reason == row->readReason && report.messageLength == row->readLength &&
+                  memcmp(report.message, s_report.message, report.messageLength) == 0,
               "the report the program reads");
-        CHECK(mrhiInstance_GetDriverFaultCount(instance) == (kept ? 0 : 1) &&
-                  Recorded(instance) == (kept ? 0 : mrhi_diagnosticDriverLossReport),
-              "each breach counted, and the edge left alone");
+        CHECK(mrhiInstance_GetDriverFaultCount(instance) == (row->breach ? 1 : 0) &&
+                  Recorded(instance) == (row->breach ? mrhi_diagnosticDriverLossReport : 0),
+              "each breach counted, and the edges left alone");
         mrhiDestroyDevice(device);
         mrhiDestroyInstance(instance);
     }
