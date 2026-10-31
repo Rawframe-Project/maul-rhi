@@ -171,6 +171,8 @@ static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
         known = known && mrhiIsSurfaceColorKnown(&capsOut->colors[i]);
     }
     Expect(&layer->watch, known, mrhi_diagnosticDriverSurfaceCaps);
+    Expect(&layer->watch, !capsOut->presentable || mrhiSurfaceCapsMeetFloors(capsOut),
+           mrhi_diagnosticDriverSurfaceFloors);
 }
 
 static const mrhiDeviceDriverVtable s_deviceVtable;

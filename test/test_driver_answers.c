@@ -7,8 +7,9 @@
 // the room it was given, a pipeline cache too large for its envelope, a
 // memory alignment that would place resources over each other, a
 // refused submission naming a code that is not a budget, an adapter of
-// an unknown kind or with a name that is too long or not UTF-8, and a
-// pipeline answer for no pipeline compiling.
+// an unknown kind or with a name that is too long or not UTF-8, a
+// pipeline answer for no pipeline compiling, and presentable surface caps
+// that miss a floor.
 
 #include "driver_test.h"
 #include "test_container.h"
@@ -17,6 +18,7 @@
 #include "maul-rhi/device.h"
 #include "maul-rhi/frame.h"
 #include "maul-rhi/instance.h"
+#include "maul-rhi/surface.h"
 
 #include <string.h>
 
@@ -44,6 +46,11 @@ static uint64_t s_alignment;
 static bool s_onChip;
 // The code a refused submission names; 0 to submit.
 static mrhiDiagnosticCode s_budget;
+// The caps the driver gives for its one surface of its own source.
+static mrhiSurfaceCaps s_surfaceCaps;
+
+// A source struct the driver defines, for a surface it makes itself.
+#define OWN_SOURCE (MRHI_STRUCT_DRIVER_DEFINED | 1u)
 
 // The claim: the room filled with answers to a tag nothing asked, the
 // driver's own events left for the next poll, and a count past the room.
@@ -117,6 +124,30 @@ static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t
     return s_deviceInner->submitFrame(self, frame, tag, budgetOut);
 }
 
+static mrhiResult CreateSurface(void* self, const mrhiChain* source, const mrhiSurfaceDef* def,
+                                uint64_t* handleOut)
+{
+    (void)self;
+    (void)def;
+    *handleOut = 1;
+    return source->type == OWN_SOURCE ? mrhi_success : mrhi_errorUnsupported;
+}
+
+static void DestroySurface(void* self, uint64_t handle)
+{
+    (void)self;
+    (void)handle;
+}
+
+static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
+                           mrhiSurfaceCaps* capsOut)
+{
+    (void)self;
+    (void)surface;
+    (void)adapter;
+    *capsOut = s_surfaceCaps;
+}
+
 static mrhiResult CreateDevice(void* self, uint64_t adapter, const mrhiDeviceDef* def, uint64_t tag,
                                mrhiDeviceDriver* deviceOut)
 {
@@ -153,6 +184,9 @@ static mrhiInstance* Start(void)
     s_vtable = *s_made.vtable;
     s_vtable.poll = PollInstance;
     s_vtable.createDevice = CreateDevice;
+    s_vtable.createSurface = CreateSurface;
+    s_vtable.destroySurface = DestroySurface;
+    s_vtable.getSurfaceCaps = GetSurfaceCaps;
     mrhiExternalDriverDef external = {
         .chain = {.next = nullptr, .type = mrhi_structExternalDriver},
         .vtable = &s_vtable,
@@ -476,6 +510,84 @@ static void TestPipelineAnswers(void)
     mrhiDestroyInstance(instance);
 }
 
+// Caps a driver reports as presentable without one of the floors: FIFO,
+// opaque alpha, render target usage, a twin, views or images, or 8-bit
+// sRGB in Rec. 709 (here 8-bit in Display P3, linear, or of extended
+// range, or half floats only). The
+// adapter reads as not presenting, its caps all zeros, and a search for
+// adapters that present to the surface finds none; twin images alone,
+// and an rgba8 sRGB color behind another, meet the floors.
+static void TestSurfaceFloors(void)
+{
+    const mrhiSurfaceCaps floors = {
+        .presentable = true,
+        .colorCount = 1,
+        .colors = {{.format = mrhi_formatBgra8Unorm}},
+        .presentModes = mrhi_presentFifoBit | mrhi_presentMailboxBit,
+        .alphaModes = mrhi_alphaOpaqueBit,
+        .usages = mrhi_textureRenderTarget | mrhi_textureCopySource,
+        .twinViews = true,
+    };
+    // Missing each floor in turn, and last two that meet them all: twin
+    // images alone, and 8-bit sRGB as rgba8 behind another color.
+    mrhiSurfaceCaps missing[10];
+    for (size_t i = 0; i < 10; ++i)
+    {
+        missing[i] = floors;
+    }
+    missing[0].presentModes = mrhi_presentMailboxBit;
+    missing[1].alphaModes = mrhi_alphaPremultipliedBit;
+    missing[2].usages = mrhi_textureCopySource;
+    missing[3].twinViews = false;
+    missing[4].colors[0].primaries = mrhi_primariesDisplayP3;
+    missing[5].colors[0] = (mrhiSurfaceColor){mrhi_formatRgba16Float, mrhi_primariesBt709,
+                                              mrhi_transferLinear, mrhi_rangeExtended};
+    missing[6].colors[0].transfer = mrhi_transferLinear;
+    missing[7].colors[0].range = mrhi_rangeExtended;
+    missing[8].twinViews = false;
+    missing[8].twinImages = true;
+    missing[9].colorCount = 2;
+    missing[9].colors[0] = missing[5].colors[0];
+    missing[9].colors[1] = (mrhiSurfaceColor){.format = mrhi_formatRgba8Unorm};
+    mrhiInstance* instance = Start();
+    mrhiAdapterId adapter = FindAdapter(instance);
+    mrhiSurfaceDef def = mrhiDefaultSurfaceDef();
+    mrhiChain own = {.next = nullptr, .type = OWN_SOURCE};
+    def.next = &own;
+    mrhiSurfaceId surface = {0};
+    CHECK(mrhiCreateSurface(instance, &def, &surface) == mrhi_success, "a surface");
+    const mrhiSurfaceCaps none = {0};
+    mrhiSurfaceCaps caps;
+    for (size_t i = 0; i < 10; ++i)
+    {
+        s_surfaceCaps = missing[i];
+        bool presents = i >= 8;
+        CHECK(mrhiSurface_GetCaps(instance, surface, adapter, &caps) == mrhi_success &&
+                  caps.presentable == presents &&
+                  (presents || memcmp(&caps, &none, sizeof(caps)) == 0),
+              "presenting only with every floor");
+    }
+    s_surfaceCaps = floors;
+    CHECK(mrhiSurface_GetCaps(instance, surface, adapter, &caps) == mrhi_success &&
+              caps.presentable,
+          "and with all of them");
+    // Last, since the search's answer replaces the adapters listed.
+    s_surfaceCaps = missing[0];
+    mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
+    search.compatibleSurface = surface;
+    mrhiRequestId request;
+    mrhiInstanceNotification record;
+    size_t count = 1;
+    CHECK(mrhiInstance_RequestAdapters(instance, &search, &request) == mrhi_success &&
+              mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
+              record.outcome == mrhi_success &&
+              mrhiInstance_GetAdapters(instance, nullptr, 0, &count) == mrhi_success && count == 0,
+          "no adapter found for a surface without a floor");
+    CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "destroyed");
+    s_surfaceCaps = (mrhiSurfaceCaps){0};
+    mrhiDestroyInstance(instance);
+}
+
 int main(void)
 {
     TestPollClaims();
@@ -484,5 +596,6 @@ int main(void)
     TestSubmitBudget();
     TestAdapterInfo();
     TestPipelineAnswers();
+    TestSurfaceFloors();
     return s_failures == 0 ? 0 : 1;
 }

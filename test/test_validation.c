@@ -451,7 +451,8 @@ static void CapsGiven(const void* self, uint64_t surface, uint64_t adapter,
 // The layer's surface caps, called as the core calls them: a color whose
 // format, primaries, transfer or range the contract does not list (-1,
 // INT32_MIN or one past the last), or more colors than the array holds,
-// is a breach; the most colors, each of the last values, keep the
+// is a breach, and so are presentable caps missing a floor; the most
+// colors, each of the last values, keep the
 // contract.
 static void TestSurfaceCaps(void)
 {
@@ -465,8 +466,17 @@ static void TestSurfaceCaps(void)
         .transfer = mrhi_transferPq,
         .range = mrhi_rangeExtended,
     };
-    s_caps = (mrhiSurfaceCaps){.presentable = true, .colorCount = MRHI_SURFACE_COLORS};
-    for (uint32_t i = 0; i < MRHI_SURFACE_COLORS; ++i)
+    // 8-bit sRGB in Rec. 709 first, the floor, then the last values.
+    s_caps = (mrhiSurfaceCaps){
+        .presentable = true,
+        .colorCount = MRHI_SURFACE_COLORS,
+        .presentModes = mrhi_presentFifoBit,
+        .alphaModes = mrhi_alphaOpaqueBit,
+        .usages = mrhi_textureRenderTarget,
+        .twinViews = true,
+    };
+    s_caps.colors[0] = (mrhiSurfaceColor){.format = mrhi_formatBgra8Unorm};
+    for (uint32_t i = 1; i < MRHI_SURFACE_COLORS; ++i)
     {
         s_caps.colors[i] = last;
     }
@@ -498,6 +508,45 @@ static void TestSurfaceCaps(void)
                   "an unknown part of the last color");
         }
     }
+    s_caps.colors[MRHI_SURFACE_COLORS - 1] = last;
+    // Presentable caps without a floor: FIFO, opaque alpha, render target
+    // usage, a twin, or 8-bit sRGB in Rec. 709. Caps that do not present
+    // need none.
+    const mrhiSurfaceCaps floors = s_caps;
+    for (int floor = 0; floor < 5; ++floor)
+    {
+        s_caps = floors;
+        s_caps.colors[0] = floor == 4 ? last : s_caps.colors[0];
+        s_caps.presentModes = floor == 0 ? mrhi_presentMailboxBit : s_caps.presentModes;
+        s_caps.alphaModes = floor == 1 ? mrhi_alphaPremultipliedBit : s_caps.alphaModes;
+        s_caps.usages = floor == 2 ? mrhi_textureCopySource : s_caps.usages;
+        s_caps.twinViews = floor != 3;
+        layer->vtable->getSurfaceCaps(layer->self, 1, 1, &caps);
+        CHECK(mrhiInstance_GetDriverFaultCount(instance) == ++faults &&
+                  Recorded(instance) == mrhi_diagnosticDriverSurfaceFloors,
+              "presentable caps without a floor");
+    }
+    // A count past the array with no 8-bit sRGB in the colors it holds:
+    // both breaches, the colors read no further than the array.
+    s_caps = floors;
+    s_caps.colors[0] = last;
+    s_caps.colorCount = UINT32_MAX;
+    layer->vtable->getSurfaceCaps(layer->self, 1, 1, &caps);
+    faults += 2;
+    CHECK(mrhiInstance_GetDriverFaultCount(instance) == faults &&
+              Recorded(instance) == mrhi_diagnosticDriverSurfaceCaps &&
+              Recorded(instance) == mrhi_diagnosticDriverSurfaceFloors,
+          "too many colors, none of them 8-bit sRGB");
+    s_caps.colorCount = MRHI_SURFACE_COLORS;
+    s_caps.presentable = false;
+    layer->vtable->getSurfaceCaps(layer->self, 1, 1, &caps);
+    CHECK(mrhiInstance_GetDriverFaultCount(instance) == faults,
+          "caps that do not present, without the floors");
+    s_caps = floors;
+    s_caps.twinViews = false;
+    s_caps.twinImages = true;
+    layer->vtable->getSurfaceCaps(layer->self, 1, 1, &caps);
+    CHECK(mrhiInstance_GetDriverFaultCount(instance) == faults, "twin images alone");
     s_caps = (mrhiSurfaceCaps){0};
     mrhiDestroyInstance(instance);
 }
