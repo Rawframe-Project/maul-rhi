@@ -687,6 +687,22 @@ static void TestTextures(void)
     array.viewKind = mrhi_texture2d;
     CHECK(With1(1, array) == mrhi_errorInvalid, "of another kind");
     CHECK(mrhiDevice_GetMisuse(s_device) == 8, "each counted");
+    // Kinds are int32_t: a check against a kind's last value alone would
+    // let a negative one through.
+    CHECK(With1(0, textures[0]) == mrhi_success, "the table's own binding");
+    static const int32_t negative[] = {-1, INT32_MIN};
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        cube = textures[0];
+        cube.viewKind = negative[i];
+        CHECK(With1(0, cube) == mrhi_errorInvalid, "a negative kind");
+        cube = textures[0];
+        cube.viewFormat = negative[i];
+        CHECK(With1(0, cube) == mrhi_errorInvalid, "a negative format");
+        cube = textures[0];
+        cube.range.aspect = negative[i];
+        CHECK(With1(0, cube) == mrhi_errorInvalid, "a negative aspect");
+    }
     Drop();
     mrhiTextureId depth =
         MakeTexture(mrhi_texture2d, mrhi_formatDepth32Float, 1, 1, mrhi_textureSampled);

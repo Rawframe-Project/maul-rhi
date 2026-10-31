@@ -174,6 +174,14 @@ static void TestEntries(void)
     entry = Sampled(view);
     entry.kind = 3;
     CHECK(mrhiHeap_SetEntry(device, heap, 1, &entry) == mrhi_errorInvalid, "an unknown kind");
+    // Kinds are int32_t: a check against the last kind alone would let a
+    // negative one through.
+    static const int32_t negative[] = {-1, INT32_MIN};
+    for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
+    {
+        entry.kind = negative[i];
+        CHECK(mrhiHeap_SetEntry(device, heap, 1, &entry) == mrhi_errorInvalid, "a negative kind");
+    }
     CHECK(mrhiHeap_SetEntry(device, heap, 1, nullptr) == mrhi_errorInvalid, "no entry");
     entry = (mrhiHeapEntry){.kind = mrhi_heapStorageTexture, .view = view};
     CHECK(mrhiHeap_SetEntry(device, heap, 1, &entry) == mrhi_errorUnsupported,

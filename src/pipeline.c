@@ -33,8 +33,10 @@ static bool IsValueValid(mrhiConstantType type, double value)
         return value >= -2147483648.0 && value <= 2147483647.0 && (double)(int32_t)value == value;
     case mrhi_constantUint32:
         return value >= 0.0 && value <= 4294967295.0 && (double)(uint32_t)value == value;
-    default:
+    case mrhi_constantFloat32:
         return value >= -(double)FLT_MAX && value <= (double)FLT_MAX;
+    default:
+        return false;
     }
 }
 

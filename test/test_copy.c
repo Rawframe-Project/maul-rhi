@@ -443,10 +443,18 @@ static void TestRegions(void)
     texture.aspect = 3;
     CHECK(Upload(buffer, texture, (mrhiExtent3d){16, 8, 1}) == mrhi_errorInvalid,
           "an unknown aspect");
+    // Kinds are int32_t: a check against the last aspect alone would let a
+    // negative one through.
+    texture.aspect = -1;
+    CHECK(Upload(buffer, texture, (mrhiExtent3d){16, 8, 1}) == mrhi_errorInvalid,
+          "a negative aspect");
+    texture.aspect = INT32_MIN;
+    CHECK(Upload(buffer, texture, (mrhiExtent3d){16, 8, 1}) == mrhi_errorInvalid,
+          "the most negative aspect");
     CHECK(Download(Texture(ARRAY, 0, 1), Buffer(DESTINATION, 0, 256, 0),
                    (mrhiExtent3d){16, 8, 1}) == mrhi_errorInvalid,
           "a texture declared as a destination copied from");
-    CHECK(mrhiDevice_GetMisuse(s_device) == 10, "each counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 12, "each counted");
     Drop();
     Declare(ARRAY, mrhi_accessCopySource, ALL);
     CHECK(Download(Texture(ARRAY, 1, 2), Buffer(DESTINATION, 256, 256, 0),

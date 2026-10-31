@@ -300,7 +300,7 @@ mrhiResult mrhiHeap_SetEntry(mrhiDevice* device, mrhiHeapId heap, uint32_t index
     {
         return mrhiDeviceBusy(device);
     }
-    if (entry == nullptr || entry->kind > mrhi_heapStorageBuffer)
+    if (entry == nullptr || (uint32_t)entry->kind > mrhi_heapStorageBuffer)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticHeapEntry);
     }

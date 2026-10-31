@@ -244,7 +244,7 @@ extern "C"
     // a submission ran out of, or, in a build with the validation layer, one
     // rule of the driver SPI that the driver broke (the driver codes, recorded
     // in the instance's queue). mrhiGetDiagnosticText gives each one's text.
-    typedef uint16_t mrhiDiagnosticCode;
+    typedef int32_t mrhiDiagnosticCode;
 
     enum
     {
