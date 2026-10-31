@@ -183,6 +183,9 @@ static void TakeFinished(mrhiDevice* device)
     size_t moved;
     while ((moved = device->driver.vtable->poll(device->driver.self, events, POLL_BATCH)) > 0)
     {
+        // A driver may claim more than the room it was given; the rest
+        // is not there to read.
+        moved = moved <= POLL_BATCH ? moved : POLL_BATCH;
         // A lost device answered everything it owed when it was lost.
         for (size_t i = 0; i < moved && device->state != mrhi_deviceLost; ++i)
         {
@@ -330,7 +333,11 @@ mrhiResult mrhiDevice_SubmitFrame(mrhiDevice* device, mrhiRequestId* tokenOut)
     mrhiDiagnosticCode budget = 0;
     mrhiResult status = mrhiDriverStatus(
         device, device->driver.vtable->submitFrame(device->driver.self, &view, token, &budget));
-    if (status == mrhi_errorCapacity && budget != 0)
+    // Only a submit code reaches the program; a driver that names
+    // another named no budget.
+    if (status == mrhi_errorCapacity &&
+        (budget == mrhi_diagnosticSubmitMemory || budget == mrhi_diagnosticSubmitDescriptors ||
+         budget == mrhi_diagnosticSubmitScratch || budget == mrhi_diagnosticSubmitCommandLists))
     {
         mrhiRecordDiagnostic(&device->diagnostics, budget);
     }

@@ -622,7 +622,8 @@ extern "C"
     /// bytesOut is NULL; `mrhi_errorInvalid` for a NULL device or sizeOut;
     /// `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity`
     /// when capacity is less than the size, which sizeOut receives;
-    /// `mrhi_errorPlatform` when the driver fails to write it.
+    /// `mrhi_errorPlatform` when the driver fails to write it, or gives a size
+    /// too large to hold with the envelope's header.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDevice_GetPipelineCache(mrhiDevice* device,

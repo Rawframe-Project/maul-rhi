@@ -126,6 +126,7 @@ static size_t GetAdapters(const void* self, mrhiDriverAdapter* adapters, size_t 
         }
         Expect(&layer->watch,
                distinct && adapter->info.nameLength <= MRHI_ADAPTER_NAME_BYTES &&
+                   mrhiIsTextValid(adapter->info.name, adapter->info.nameLength) &&
                    (uint32_t)adapter->info.kind <= mrhi_adapterSoftware,
                mrhi_diagnosticDriverAdapter);
     }

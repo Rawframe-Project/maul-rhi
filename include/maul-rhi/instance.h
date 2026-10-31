@@ -88,12 +88,17 @@ extern "C"
     typedef struct mrhiAdapterInfo
     {
         mrhiDriverKind driver;
+        // Its kind; mrhi_adapterUnknown also when the driver named a kind this
+        // list lacks.
         mrhiAdapterKind kind;
         // The PCI vendor id, or 0 where the platform hides it.
         uint32_t vendorId;
         // The PCI device id, or 0 where the platform hides it.
         uint32_t deviceId;
-        // The adapter's name in UTF-8, nameLength bytes, not NUL-terminated.
+        // The adapter's name: well-formed UTF-8 without NUL, nameLength bytes,
+        // not NUL-terminated. It ends before the driver's first byte that would
+        // break that: a character cut by the room, a malformed sequence or a
+        // NUL.
         char name[MRHI_ADAPTER_NAME_BYTES];
         size_t nameLength;
     } mrhiAdapterInfo;

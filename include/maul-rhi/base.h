@@ -413,7 +413,10 @@ extern "C"
         // loss.
         mrhi_diagnosticDriverEventTag = 75,
         // A driver listed an adapter with a zero or repeated handle, a name
-        // longer than MRHI_ADAPTER_NAME_BYTES, or an unknown kind.
+        // longer than MRHI_ADAPTER_NAME_BYTES or not well-formed UTF-8, or an
+        // unknown kind; the core lists an unknown kind as mrhi_adapterUnknown
+        // and the name up to its first byte that is not well-formed UTF-8
+        // within its room.
         mrhi_diagnosticDriverAdapter = 76,
         // A driver reported format caps naming sample counts other than 1, 2
         // and 4.

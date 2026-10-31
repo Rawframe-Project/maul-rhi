@@ -91,6 +91,9 @@ static void PollDriver(mrhiInstance* instance)
     size_t moved;
     while ((moved = instance->driver.vtable->poll(instance->driver.self, events, POLL_BATCH)) > 0)
     {
+        // A driver may claim more than the room it was given; the rest
+        // is not there to read.
+        moved = moved <= POLL_BATCH ? moved : POLL_BATCH;
         for (size_t i = 0; i < moved; ++i)
         {
             for (uint32_t p = 0; p < instance->pendingCount; ++p)

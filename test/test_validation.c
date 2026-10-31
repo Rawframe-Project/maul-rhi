@@ -30,6 +30,9 @@ static const mrhiDeviceDriverVtable* s_deviceInner;
 static bool s_longName;
 // The kind the next driver lists its adapter with.
 static mrhiAdapterKind s_kind = mrhi_adapterDiscrete;
+// The name the next driver lists its adapter with, when not NULL.
+static const char* s_name;
+static size_t s_nameLength;
 
 // The test driver, its vtable copied for the test to break.
 static void Open(void)
@@ -45,6 +48,11 @@ static void Open(void)
         {
             s_adapter.info.name[i] = 'a';
         }
+    }
+    if (s_name != nullptr)
+    {
+        memcpy(s_adapter.info.name, s_name, s_nameLength);
+        s_adapter.info.nameLength = s_nameLength;
     }
     mrhiTestDriverDef test = {
         .chain = {.next = nullptr, .type = mrhi_structTestDriver},
@@ -277,6 +285,28 @@ static void TestNegativeAdapterKind(void)
         mrhiDestroyInstance(instance);
     }
     s_kind = mrhi_adapterDiscrete;
+}
+
+// A name that is not well-formed UTF-8 without NUL is a breach: a
+// malformed byte, a NUL, or a character its length cuts.
+static void TestAdapterName(void)
+{
+    // Octal escapes, since a hex escape would take the 'a' after it.
+    static const char* const names[] = {"a\377a", "a\0a", "aa\303"};
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i)
+    {
+        s_name = names[i];
+        s_nameLength = 3;
+        Open();
+        mrhiInstance* instance = Start();
+        mrhiAdapterId adapter = {0};
+        Search(instance, &adapter);
+        CHECK(mrhiInstance_GetDriverFaultCount(instance) == 1 &&
+                  Recorded(instance) == mrhi_diagnosticDriverAdapter,
+              "a name that is not UTF-8");
+        mrhiDestroyInstance(instance);
+    }
+    s_name = nullptr;
 }
 
 static void TestDeviceEdges(void)
@@ -737,6 +767,7 @@ int main(void)
     TestClean();
     TestInstanceAnswers();
     TestNegativeAdapterKind();
+    TestAdapterName();
     TestDeviceAnswers();
     TestDeviceEdges();
     TestLossReports();

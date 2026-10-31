@@ -85,6 +85,11 @@ static mrhiResult ExportCache(mrhiDevice* device, void* bytes, size_t capacity, 
         return status;
     }
     size_t payload = device->driver.vtable->exportPipelineCache(device->driver.self, nullptr, 0);
+    // A driver's size that leaves no room for the header has failed.
+    if (payload > SIZE_MAX - HEADER_BYTES)
+    {
+        return mrhi_errorPlatform;
+    }
     *sizeOut = HEADER_BYTES + payload;
     if (bytes == nullptr)
     {
