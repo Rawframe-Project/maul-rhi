@@ -975,8 +975,10 @@ mrhiResult mrhiResource_GetPlan(mrhiDevice* device, mrhiResourceId resource,
     }
     const mrhiFrameResource* planned = &device->frameResources[resource.index1 - 1];
     uint32_t serial = device->frameSerial;
+    bool buffer = planned->kind == mrhiFrameBuffer || planned->kind == mrhiImportedBuffer;
     const mrhiResourcePlan plan = {
-        .usage = planned->usage,
+        .bufferUsage = buffer ? planned->usage : 0,
+        .textureUsage = buffer ? 0 : planned->usage,
         .transient = planned->transient,
         .firstPass = {planned->firstPass, planned->firstPass == 0 ? 0 : serial},
         .lastPass = {planned->lastPass, planned->lastPass == 0 ? 0 : serial},

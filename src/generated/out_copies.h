@@ -250,7 +250,8 @@ static inline void mrhiOutResourcePlan(
 {
     const mrhiResourcePlan value = *from;
     memset(out, 0, sizeof(*out));
-    out->usage = value.usage;
+    out->bufferUsage = value.bufferUsage;
+    out->textureUsage = value.textureUsage;
     out->transient = value.transient;
     out->firstPass = value.firstPass;
     out->lastPass = value.lastPass;
