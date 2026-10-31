@@ -6,7 +6,8 @@
 // swapchain does, and not where one is missing. Then what a surface can
 // do from what it lists: its colors, present modes, alpha modes and
 // usages, and each floor it needs to present; and the format a color
-// takes.
+// takes. Last, both readers of a surface's formats on a fake Vulkan
+// whose list runs past the bound they read.
 
 #include "test_harness.h"
 #include "vulkan_surface.h"
@@ -228,6 +229,118 @@ static void TestManyColors(void)
           "listed first, in its place, the next colors after it");
 }
 
+// A surface's formats from a fake Vulkan: LISTED of them, read from the
+// start, VK_INCOMPLETE when the caller's room holds fewer; the 8-bit sRGB
+// pair at s_pairAt, the others of TestManyColors' kinds.
+#define LISTED 300
+
+static uint32_t s_pairAt;
+static uint32_t s_asked;
+
+static VkSurfaceFormatKHR Listed(uint32_t i)
+{
+    static const VkFormat others[] = {VK_FORMAT_A2B10G10R10_UNORM_PACK32,
+                                      VK_FORMAT_R16G16B16A16_SFLOAT};
+    static const VkColorSpaceKHR spaces[] = {VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT,
+                                             VK_COLOR_SPACE_HDR10_ST2084_EXT};
+    if (i == s_pairAt)
+    {
+        return (VkSurfaceFormatKHR){VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+    }
+    return (VkSurfaceFormatKHR){others[i % 2], spaces[(i / 2) % 2]};
+}
+
+static VkResult VKAPI_CALL Formats(VkPhysicalDevice device, VkSurfaceKHR surface, uint32_t* count,
+                                   VkSurfaceFormatKHR* formats)
+{
+    (void)device;
+    (void)surface;
+    s_asked = *count;
+    uint32_t written = *count < LISTED ? *count : LISTED;
+    for (uint32_t i = 0; i < written; ++i)
+    {
+        formats[i] = Listed(i);
+    }
+    *count = written;
+    return written < LISTED ? VK_INCOMPLETE : VK_SUCCESS;
+}
+
+static void VKAPI_CALL Families(VkPhysicalDevice device, uint32_t* count,
+                                VkQueueFamilyProperties* families)
+{
+    (void)device;
+    families[0] = (VkQueueFamilyProperties){
+        .queueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT,
+        .queueCount = 1,
+    };
+    *count = 1;
+}
+
+static VkResult VKAPI_CALL Support(VkPhysicalDevice device, uint32_t family, VkSurfaceKHR surface,
+                                   VkBool32* supported)
+{
+    (void)device;
+    (void)family;
+    (void)surface;
+    *supported = VK_TRUE;
+    return VK_SUCCESS;
+}
+
+static VkResult VKAPI_CALL SurfaceCaps(VkPhysicalDevice device, VkSurfaceKHR surface,
+                                       VkSurfaceCapabilitiesKHR* caps)
+{
+    (void)device;
+    (void)surface;
+    *caps = (VkSurfaceCapabilitiesKHR){
+        .supportedCompositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .supportedUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    };
+    return VK_SUCCESS;
+}
+
+static VkResult VKAPI_CALL Modes(VkPhysicalDevice device, VkSurfaceKHR surface, uint32_t* count,
+                                 VkPresentModeKHR* modes)
+{
+    (void)device;
+    (void)surface;
+    modes[0] = VK_PRESENT_MODE_FIFO_KHR;
+    *count = 1;
+    return VK_SUCCESS;
+}
+
+// A surface listing more formats than the driver reads: both readers take
+// the first 256 of the incomplete list, the documented bound, so the
+// 8-bit sRGB pair as the last of them is found, by the caps and by the
+// format a configuration picks, and as the first past them is not.
+static void TestIncompleteList(void)
+{
+    const mrhiVulkan vulkan = {
+        .vkGetPhysicalDeviceQueueFamilyProperties = Families,
+        .vkGetPhysicalDeviceSurfaceSupportKHR = Support,
+        .vkGetPhysicalDeviceSurfaceCapabilitiesKHR = SurfaceCaps,
+        .vkGetPhysicalDeviceSurfaceFormatsKHR = Formats,
+        .vkGetPhysicalDeviceSurfacePresentModesKHR = Modes,
+    };
+    const uint32_t at[] = {255, 256};
+    for (size_t i = 0; i < 2; ++i)
+    {
+        s_pairAt = at[i];
+        bool read = i == 0;
+        mrhiSurfaceCaps caps;
+        mrhiVulkanSurfaceCaps(&vulkan, VK_NULL_HANDLE, true, true, VK_NULL_HANDLE, &caps);
+        CHECK(s_asked == 256 && caps.presentable == read &&
+                  (!read || IsColor(caps.colors[caps.colorCount - 1], mrhi_formatBgra8Unorm,
+                                    mrhi_primariesBt709, mrhi_transferSrgb, mrhi_rangeStandard)),
+              "the caps from the list's first formats");
+        VkSurfaceFormatKHR format = {0};
+        s_asked = 0;
+        CHECK(mrhiVulkanSurfaceFormat(&vulkan, VK_NULL_HANDLE, VK_NULL_HANDLE, s_bgra, &format) ==
+                      read &&
+                  s_asked == 256 && (!read || format.format == VK_FORMAT_B8G8R8A8_UNORM),
+              "the format a configuration picks from them");
+    }
+}
+
 static void TestPick(void)
 {
     const VkSurfaceFormatKHR formats[] = {
@@ -257,6 +370,7 @@ int main(void)
     TestCaps();
     TestFloors();
     TestManyColors();
+    TestIncompleteList();
     TestPick();
     return s_failures == 0 ? 0 : 1;
 }
