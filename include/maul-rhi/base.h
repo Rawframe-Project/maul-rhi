@@ -210,6 +210,9 @@ extern "C"
     typedef struct mrhiChain
     {
         const struct mrhiChain* next;
+        // What struct this is, as Vulkan's sType says: the chain's tag, read
+        // before the rest of the struct. It is not a choice the struct makes,
+        // so it is a type, not a kind.
         mrhiStructType type;
     } mrhiChain;
 

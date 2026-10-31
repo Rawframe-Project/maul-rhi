@@ -489,7 +489,7 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDestroyView(mrhiDevice* device, mrhiViewId view);
 
     // What a query set's queries measure.
-    typedef int32_t mrhiQueryType;
+    typedef int32_t mrhiQueryKind;
 
     enum
     {
@@ -536,7 +536,7 @@ extern "C"
         // The label's bytes.
         size_t labelLength;
         // What its queries measure.
-        mrhiQueryType type;
+        mrhiQueryKind kind;
         // Its queries, 1 to MRHI_MAX_QUERY_SET_QUERIES.
         uint32_t count;
     } mrhiQuerySetDef;

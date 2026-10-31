@@ -937,7 +937,7 @@ static void TimeFrame(mrhiDevice* device, mrhiPassClass passClass, mrhiComputePi
                       bool beside)
 {
     mrhiQuerySetDef setDef = mrhiDefaultQuerySetDef();
-    setDef.type = mrhi_queryTimestamp;
+    setDef.kind = mrhi_queryTimestamp;
     setDef.count = 2;
     mrhiQuerySetId set = {0};
     CHECK(mrhiCreateQuerySet(device, &setDef, &set) == mrhi_success, "a timestamp set");
