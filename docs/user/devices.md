@@ -4,7 +4,7 @@ An adapter is a GPU a driver found; a device is a program's connection to one. T
 
 ## Finding adapters
 
-`mrhiInstance_RequestAdapters` searches with a power preference, software rasterizers allowed when the request says so, and the instance's queue answers it with `mrhi_instanceAdaptersFound`. `mrhiInstance_GetAdapters` then lists the adapters best first and reports the total, which may exceed the room given. `mrhiAdapter_GetInfo` names an adapter and its driver.
+`mrhiInstance_RequestAdapters` searches with a power preference, software rasterizers allowed when the request says so, and the instance's queue answers it with `mrhi_instanceAdaptersFound`. `mrhiInstance_GetAdapters` then lists the adapters best first and reports the total, which may exceed the room given. `mrhiAdapter_GetInfo` names an adapter and its driver. Its kind is always one the library lists, `mrhi_adapterUnknown` when the driver named another, and its name always well-formed UTF-8 within `MRHI_ADAPTER_NAME_BYTES`, ending before the driver's first byte that would break that.
 
 A request may name a surface (`compatibleSurface`): only adapters that present to it are listed, and the search answers `mrhi_errorStale` if the surface ends first. An adapter found again by a later search keeps its id.
 

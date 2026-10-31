@@ -5,7 +5,6 @@
 // driver with a tag that carries their slot, and answered in the
 // device's queue, whose room each creation reserves.
 
-#include "invariant.h"
 #include "label.h"
 #include "pipeline_core.h"
 
@@ -321,10 +320,19 @@ void mrhiFinishPipeline(mrhiDevice* device, uint64_t tag, mrhiResult outcome)
 {
     uint32_t index1 = (uint32_t)(tag >> 32);
     uint32_t request = (uint32_t)tag;
-    // The driver reports only pipelines it was not asked to destroy.
-    MRHI_ASSERT(index1 <= device->budgets.pipelines);
+    // A driver reports only the pipelines still compiling; an event for a
+    // slot past the budget, one not compiling, or another request answers
+    // nothing the core asked. A pipeline's tag is above UINT32_MAX, so its
+    // index is at least 1.
+    if (index1 > device->budgets.pipelines)
+    {
+        return;
+    }
     mrhiPipelineSlot* slot = &device->pipelineSlots[index1 - 1];
-    MRHI_ASSERT(slot->state == mrhiPipelinePending && slot->request == request);
+    if (slot->state != mrhiPipelinePending || slot->request != request)
+    {
+        return;
+    }
     slot->state = outcome == mrhi_success ? mrhiPipelineReady : mrhiPipelineFailed;
     --device->pendingCount;
     mrhiQueueAnswer(device, mrhi_devicePipelineReady, request, outcome);

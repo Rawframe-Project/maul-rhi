@@ -129,7 +129,7 @@ const char* mrhiGetDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticDriverEventTag:
         return "A device driver reported an event without a tag that is not a device loss.";
     case mrhi_diagnosticDriverAdapter:
-        return "A driver listed an adapter with a zero or repeated handle, a name longer than MRHI_ADAPTER_NAME_BYTES, or an unknown kind.";
+        return "A driver listed an adapter with a zero or repeated handle, a name longer than MRHI_ADAPTER_NAME_BYTES or not well-formed UTF-8, or an unknown kind; the core lists an unknown kind as mrhi_adapterUnknown and the name up to its first byte that is not well-formed UTF-8 within its room.";
     case mrhi_diagnosticDriverSampleCounts:
         return "A driver reported format caps naming sample counts other than 1, 2 and 4.";
     case mrhi_diagnosticDriverZeroHandle:

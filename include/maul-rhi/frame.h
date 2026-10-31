@@ -109,8 +109,10 @@ extern "C"
     /// format cannot take, the frame staying open; `mrhi_errorCapacity` when
     /// the device's queue has no room for the answer, or a pass's commands did
     /// not fit the frame's, the frame staying open to be dropped;
-    /// `mrhi_errorPlatform` when the driver fails, the frame closing;
-    /// `mrhi_errorBusy` for a call from inside the device's allocator.
+    /// `mrhi_errorPlatform` when the driver fails, the frame closing, or when
+    /// compiling meets a memory alignment of zero or not a power of two from
+    /// the driver, the frame staying open; `mrhi_errorBusy` for a call from
+    /// inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDevice_SubmitFrame(mrhiDevice* device,
@@ -615,8 +617,10 @@ extern "C"
     /// render target, or with storage; `mrhi_errorUnsupported` for a declared
     /// texture whose format cannot take the usages its kept passes make of it,
     /// the frame staying open; `mrhi_errorCapacity` when the barriers exceed
-    /// the device's frameBarriers, the frame staying open; `mrhi_errorState`
-    /// for a device without an open frame, or a frame already compiled;
+    /// the device's frameBarriers, the frame staying open; `mrhi_errorPlatform`
+    /// when the driver gives a declared resource a memory alignment of zero or
+    /// not a power of two, the frame staying open; `mrhi_errorState` for a
+    /// device without an open frame, or a frame already compiled;
     /// `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.

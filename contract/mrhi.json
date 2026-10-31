@@ -636,7 +636,7 @@
             {
               "name": "diagnostic_driver_adapter",
               "value": 76,
-              "doc": "A driver listed an adapter with a zero or repeated handle, a name longer than MRHI_ADAPTER_NAME_BYTES, or an unknown kind."
+              "doc": "A driver listed an adapter with a zero or repeated handle, a name longer than MRHI_ADAPTER_NAME_BYTES or not well-formed UTF-8, or an unknown kind; the core lists an unknown kind as mrhi_adapterUnknown and the name up to its first byte that is not well-formed UTF-8 within its room."
             },
             {
               "name": "diagnostic_driver_sample_counts",
@@ -1255,7 +1255,8 @@
             },
             {
               "name": "kind",
-              "type": "enum.adapter_kind"
+              "type": "enum.adapter_kind",
+              "doc": "Its kind; mrhi_adapterUnknown also when the driver named a kind this list lacks."
             },
             {
               "name": "vendor_id",
@@ -1271,7 +1272,7 @@
               "name": "name",
               "type": "char",
               "array": "adapter_name_bytes",
-              "doc": "The adapter's name in UTF-8, nameLength bytes, not NUL-terminated."
+              "doc": "The adapter's name: well-formed UTF-8 without NUL, nameLength bytes, not NUL-terminated. It ends before the driver's first byte that would break that: a character cut by the room, a malformed sequence or a NUL."
             },
             {
               "name": "name_length",
@@ -12104,7 +12105,7 @@
           "doc": "Submits the open frame to the GPU, compiling it first if it is not, and closes it. Its token is answered by one mrhi_deviceFrameDone record.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` with the token; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorState` for a device without an open frame, or a pass begun and not ended, the frame staying open; `mrhi_errorUnsupported` when compiling finds a declared texture its format cannot take, the frame staying open; `mrhi_errorCapacity` when the device's queue has no room for the answer, or a pass's commands did not fit the frame's, the frame staying open to be dropped; `mrhi_errorPlatform` when the driver fails, the frame closing; `mrhi_errorBusy` for a call from inside the device's allocator."
+            "doc": "`mrhi_success` with the token; `mrhi_errorInvalid` for a NULL argument; `mrhi_errorState` for a device without an open frame, or a pass begun and not ended, the frame staying open; `mrhi_errorUnsupported` when compiling finds a declared texture its format cannot take, the frame staying open; `mrhi_errorCapacity` when the device's queue has no room for the answer, or a pass's commands did not fit the frame's, the frame staying open to be dropped; `mrhi_errorPlatform` when the driver fails, the frame closing, or when compiling meets a memory alignment of zero or not a power of two from the driver, the frame staying open; `mrhi_errorBusy` for a call from inside the device's allocator."
           },
           "args": [
             {
@@ -13468,7 +13469,7 @@
           "doc": "Compiles the open frame: culls the passes nothing kept needs, checks each declared resource's derived usages against its format, and plans the barriers between uses. After it, nothing more is declared; submitting compiles a frame not yet compiled.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, or a declared texture of several samples its kept passes use other than as a render target, or with storage; `mrhi_errorUnsupported` for a declared texture whose format cannot take the usages its kept passes make of it, the frame staying open; `mrhi_errorCapacity` when the barriers exceed the device's frameBarriers, the frame staying open; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorBusy` for a call from inside the device's allocator."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device, or a declared texture of several samples its kept passes use other than as a render target, or with storage; `mrhi_errorUnsupported` for a declared texture whose format cannot take the usages its kept passes make of it, the frame staying open; `mrhi_errorCapacity` when the barriers exceed the device's frameBarriers, the frame staying open; `mrhi_errorPlatform` when the driver gives a declared resource a memory alignment of zero or not a power of two, the frame staying open; `mrhi_errorState` for a device without an open frame, or a frame already compiled; `mrhi_errorBusy` for a call from inside the device's allocator."
           },
           "args": [
             {
@@ -18884,7 +18885,7 @@
           "doc": "Writes the device's pipeline cache, for a later device's def: the driver's compiled pipelines in a checked envelope.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` with the cache written, or only its size when bytesOut is NULL; `mrhi_errorInvalid` for a NULL device or sizeOut; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when capacity is less than the size, which sizeOut receives; `mrhi_errorPlatform` when the driver fails to write it."
+            "doc": "`mrhi_success` with the cache written, or only its size when bytesOut is NULL; `mrhi_errorInvalid` for a NULL device or sizeOut; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` when capacity is less than the size, which sizeOut receives; `mrhi_errorPlatform` when the driver fails to write it, or gives a size too large to hold with the envelope's header."
           },
           "args": [
             {

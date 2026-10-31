@@ -8,6 +8,7 @@
 #include "capabilities_core.h"
 #include "chain.h"
 #include "instance_core.h"
+#include "label.h"
 #include "outputs.h"
 
 #include "generated/out_copies.h"
@@ -146,6 +147,15 @@ mrhiResult mrhiRefreshAdapters(mrhiInstance* instance, const mrhiPending* search
         {
             adapter->info.driver = mrhi_driverExternal;
         }
+        // The program reads a kind the contract lists, and the name within
+        // its room up to its first byte that is not well-formed UTF-8.
+        if ((uint32_t)adapter->info.kind > mrhi_adapterSoftware)
+        {
+            adapter->info.kind = mrhi_adapterUnknown;
+        }
+        size_t room = adapter->info.nameLength <= MRHI_ADAPTER_NAME_BYTES ? adapter->info.nameLength
+                                                                          : MRHI_ADAPTER_NAME_BYTES;
+        adapter->info.nameLength = mrhiValidTextLength(adapter->info.name, room);
         mrhiMaskFeatures(&adapter->features, adapter->info.driver);
         if ((!search->allowSoftware && adapter->info.kind == mrhi_adapterSoftware) ||
             !MeetsFloor(instance, adapter) || !Presents(instance, search, adapter))
