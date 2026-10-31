@@ -15,8 +15,12 @@
 #include <stdint.h>
 
 // Turns the debug layer on where asked and watches every adapter's
-// device, printing each error it reports.
-void mrhiTestWatchD3d12(void);
+// device, printing each error it reports. synchronizedQueues keeps the
+// layer's synchronized command queue validation, which holds a queue's
+// later calls until the fences it waits for are met: a suite that holds
+// a queue behind a fence it signals from the CPU turns it off, since
+// the layer may never let that queue go.
+void mrhiTestWatchD3d12(bool synchronizedQueues);
 
 // The errors the debug layer has reported so far.
 uint32_t mrhiTestD3d12Errors(void);

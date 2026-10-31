@@ -404,7 +404,7 @@ int main(int argc, char** argv)
 {
     int frames = argc > 1 ? (int)strtol(argv[1], nullptr, 10) : 1;
     int rounds = argc > 2 ? (int)strtol(argv[2], nullptr, 10) : 1;
-    mrhiTestWatchD3d12();
+    mrhiTestWatchD3d12(true);
     IDXGIFactory4* factory = nullptr;
     CHECKED(CreateDXGIFactory2(0, &IID_IDXGIFactory4, (void**)&factory));
     IDXGIAdapter1* adapter = nullptr;

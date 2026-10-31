@@ -4791,7 +4791,7 @@ static int Run(void)
 {
 #ifdef MAUL_RHI_D3D12_DRIVER
     // Before the library opens a device, as the debug layer needs.
-    mrhiTestWatchD3d12();
+    mrhiTestWatchD3d12(true);
 #endif
     TestTestDriver();
     TestNativeDriver();

@@ -62,7 +62,7 @@ static void Watch(ID3D12Device* device)
     }
 }
 
-void mrhiTestWatchD3d12(void)
+void mrhiTestWatchD3d12(bool synchronizedQueues)
 {
     const char* asked = getenv("MAUL_RHI_D3D12_DEBUG");
     if (asked == nullptr || asked[0] == '\0')
@@ -81,6 +81,8 @@ void mrhiTestWatchD3d12(void)
     if (SUCCEEDED(ID3D12Debug_QueryInterface(debug, &IID_ID3D12Debug1, (void**)&validation)))
     {
         ID3D12Debug1_SetEnableGPUBasedValidation(validation, TRUE);
+        ID3D12Debug1_SetEnableSynchronizedCommandQueueValidation(validation,
+                                                                 synchronizedQueues ? TRUE : FALSE);
         ID3D12Debug1_Release(validation);
     }
     // MAUL_RHI_D3D12_GBV_STATES=0 keeps GPU-based validation but its

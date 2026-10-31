@@ -16,8 +16,9 @@
 // for before its device goes, so nothing the GPU still reads is
 // released. A transfer pass that clears runs on the compute queue, and
 // clears past a slot's views zero their words too. Under the debug layer,
-// whose errors fail the suite. Skipped where there is no D3D12 adapter,
-// unless MAUL_RHI_REQUIRE_D3D12 is set.
+// whose errors fail the suite; the checks holding a queue behind a
+// fence the suite signals from the CPU run apart, as main says. Skipped
+// where there is no D3D12 adapter, unless MAUL_RHI_REQUIRE_D3D12 is set.
 
 // getenv is standard C; MSVC's runtime deprecates it for its own.
 #define _CRT_SECURE_NO_WARNINGS
@@ -1162,10 +1163,16 @@ static void CheckClears(mrhiInstance* instance, mrhiAdapterId adapter)
     mrhiDestroyDevice(device);
 }
 
-int main(void)
+// With the argument "held", the checks whose queues wait for a fence
+// the suite signals from the CPU, without the debug layer's synchronized
+// queue validation, which may hold such a queue for good; without it,
+// the others, under that validation.
+int main(int argc, char** argv)
 {
+    bool held = argc == 2 && strcmp(argv[1], "held") == 0;
+    CHECK(argc == 1 || held, "no argument, or held");
     // Before the library opens a device, as the debug layer needs.
-    mrhiTestWatchD3d12();
+    mrhiTestWatchD3d12(!held);
     mrhiInstanceDef def = mrhiDefaultInstanceDef();
     mrhiInstance* instance = nullptr;
     CHECK(mrhiCreateInstance(&def, &instance) == mrhi_success, "an instance");
@@ -1180,10 +1187,8 @@ int main(void)
                  mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
                  mrhiInstance_GetAdapters(instance, &adapter, 1, &count) == mrhi_success &&
                  count >= 1;
-    if (found)
+    if (found && held)
     {
-        CheckDevice(instance, adapter, false);
-        CheckDevice(instance, adapter, true);
         mrhiDevice* lost = OpenDevice(instance, adapter);
         if (lost != nullptr)
         {
@@ -1191,6 +1196,11 @@ int main(void)
         }
         CheckLostLane(instance, adapter, 0);
         CheckLostLane(instance, adapter, 1);
+    }
+    else if (found)
+    {
+        CheckDevice(instance, adapter, false);
+        CheckDevice(instance, adapter, true);
         CheckTimed(instance, adapter);
         CheckClears(instance, adapter);
     }

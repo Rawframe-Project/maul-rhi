@@ -506,7 +506,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
 int main(void)
 {
     // Before the library opens a device, as the debug layer needs.
-    mrhiTestWatchD3d12();
+    mrhiTestWatchD3d12(true);
     mrhiInstanceDef def = mrhiDefaultInstanceDef();
     mrhiInstance* instance = nullptr;
     CHECK(mrhiCreateInstance(&def, &instance) == mrhi_success, "an instance");
