@@ -698,9 +698,10 @@ extern "C"
         // unknown one, and reported a surface left without a color as not
         // presentable.
         mrhi_diagnosticDriverSurfaceCaps = 158,
-        // A driver reported surface caps as presentable without FIFO, opaque
-        // alpha, render target usage, or twin views or images; the core
-        // reported the adapter as not presenting to the surface.
+        // A driver reported surface caps as presentable without 8-bit sRGB in
+        // Rec. 709 among its colors, FIFO, opaque alpha, render target usage,
+        // or twin views or images; the core reported the adapter as not
+        // presenting to the surface.
         mrhi_diagnosticDriverSurfaceFloors = 159,
     };
 

@@ -510,11 +510,13 @@ static void TestPipelineAnswers(void)
     mrhiDestroyInstance(instance);
 }
 
-// Caps a driver reports as presentable without one of the floors:
-// FIFO, opaque alpha, render target usage, or a twin, views or images.
-// The adapter reads as not presenting, its caps all zeros, and a search
-// for adapters that present to the surface finds none; twin images alone
-// meet the last floor.
+// Caps a driver reports as presentable without one of the floors: FIFO,
+// opaque alpha, render target usage, a twin, views or images, or 8-bit
+// sRGB in Rec. 709 (here 8-bit in Display P3, linear, or of extended
+// range, or half floats only). The
+// adapter reads as not presenting, its caps all zeros, and a search for
+// adapters that present to the surface finds none; twin images alone,
+// and an rgba8 sRGB color behind another, meet the floors.
 static void TestSurfaceFloors(void)
 {
     const mrhiSurfaceCaps floors = {
@@ -526,8 +528,10 @@ static void TestSurfaceFloors(void)
         .usages = mrhi_textureRenderTarget | mrhi_textureCopySource,
         .twinViews = true,
     };
-    mrhiSurfaceCaps missing[5];
-    for (size_t i = 0; i < 5; ++i)
+    // Missing each floor in turn, and last two that meet them all: twin
+    // images alone, and 8-bit sRGB as rgba8 behind another color.
+    mrhiSurfaceCaps missing[10];
+    for (size_t i = 0; i < 10; ++i)
     {
         missing[i] = floors;
     }
@@ -535,8 +539,16 @@ static void TestSurfaceFloors(void)
     missing[1].alphaModes = mrhi_alphaPremultipliedBit;
     missing[2].usages = mrhi_textureCopySource;
     missing[3].twinViews = false;
-    missing[4].twinViews = false;
-    missing[4].twinImages = true;
+    missing[4].colors[0].primaries = mrhi_primariesDisplayP3;
+    missing[5].colors[0] = (mrhiSurfaceColor){mrhi_formatRgba16Float, mrhi_primariesBt709,
+                                              mrhi_transferLinear, mrhi_rangeExtended};
+    missing[6].colors[0].transfer = mrhi_transferLinear;
+    missing[7].colors[0].range = mrhi_rangeExtended;
+    missing[8].twinViews = false;
+    missing[8].twinImages = true;
+    missing[9].colorCount = 2;
+    missing[9].colors[0] = missing[5].colors[0];
+    missing[9].colors[1] = (mrhiSurfaceColor){.format = mrhi_formatRgba8Unorm};
     mrhiInstance* instance = Start();
     mrhiAdapterId adapter = FindAdapter(instance);
     mrhiSurfaceDef def = mrhiDefaultSurfaceDef();
@@ -546,10 +558,10 @@ static void TestSurfaceFloors(void)
     CHECK(mrhiCreateSurface(instance, &def, &surface) == mrhi_success, "a surface");
     const mrhiSurfaceCaps none = {0};
     mrhiSurfaceCaps caps;
-    for (size_t i = 0; i < 5; ++i)
+    for (size_t i = 0; i < 10; ++i)
     {
         s_surfaceCaps = missing[i];
-        bool presents = i == 4;
+        bool presents = i >= 8;
         CHECK(mrhiSurface_GetCaps(instance, surface, adapter, &caps) == mrhi_success &&
                   caps.presentable == presents &&
                   (presents || memcmp(&caps, &none, sizeof(caps)) == 0),

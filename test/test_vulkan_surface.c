@@ -127,16 +127,22 @@ static void TestCaps(void)
 static void TestFloors(void)
 {
     const VkPresentModeKHR mailbox[] = {VK_PRESENT_MODE_MAILBOX_KHR};
-    mrhiVulkanSurfaceFacts facts[5] = {Full(), Full(), Full(), Full(), Full()};
+    // 8-bit, but in Display P3: no 8-bit sRGB in Rec. 709.
+    const VkSurfaceFormatKHR p3[] = {
+        {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT},
+        {VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT},
+    };
+    mrhiVulkanSurfaceFacts facts[6] = {Full(), Full(), Full(), Full(), Full(), Full()};
     facts[0].formatCount = 0;
     facts[1].modes = mailbox;
     facts[1].modeCount = 1;
     facts[2].alpha = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
     facts[3].usages = ALL_USAGES & ~(VkImageUsageFlags)VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     facts[4].formatCount = 1;
-    static const char* const floors[5] = {"no color", "no FIFO", "no opaque alpha",
-                                          "no render targets", "no way to sRGB"};
-    for (int i = 0; i < 5; ++i)
+    facts[5].formats = p3;
+    static const char* const floors[6] = {"no color",          "no FIFO",        "no opaque alpha",
+                                          "no render targets", "no way to sRGB", "no 8-bit sRGB"};
+    for (int i = 0; i < 6; ++i)
     {
         mrhiSurfaceCaps caps = CapsOf(facts[i]);
         CHECK(!caps.presentable && caps.colorCount == 0 && caps.presentModes == 0, floors[i]);

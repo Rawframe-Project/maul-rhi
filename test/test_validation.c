@@ -466,6 +466,7 @@ static void TestSurfaceCaps(void)
         .transfer = mrhi_transferPq,
         .range = mrhi_rangeExtended,
     };
+    // 8-bit sRGB in Rec. 709 first, the floor, then the last values.
     s_caps = (mrhiSurfaceCaps){
         .presentable = true,
         .colorCount = MRHI_SURFACE_COLORS,
@@ -474,7 +475,8 @@ static void TestSurfaceCaps(void)
         .usages = mrhi_textureRenderTarget,
         .twinViews = true,
     };
-    for (uint32_t i = 0; i < MRHI_SURFACE_COLORS; ++i)
+    s_caps.colors[0] = (mrhiSurfaceColor){.format = mrhi_formatBgra8Unorm};
+    for (uint32_t i = 1; i < MRHI_SURFACE_COLORS; ++i)
     {
         s_caps.colors[i] = last;
     }
@@ -508,11 +510,13 @@ static void TestSurfaceCaps(void)
     }
     s_caps.colors[MRHI_SURFACE_COLORS - 1] = last;
     // Presentable caps without a floor: FIFO, opaque alpha, render target
-    // usage, or a twin. Caps that do not present need none.
+    // usage, a twin, or 8-bit sRGB in Rec. 709. Caps that do not present
+    // need none.
     const mrhiSurfaceCaps floors = s_caps;
-    for (int floor = 0; floor < 4; ++floor)
+    for (int floor = 0; floor < 5; ++floor)
     {
         s_caps = floors;
+        s_caps.colors[0] = floor == 4 ? last : s_caps.colors[0];
         s_caps.presentModes = floor == 0 ? mrhi_presentMailboxBit : s_caps.presentModes;
         s_caps.alphaModes = floor == 1 ? mrhi_alphaPremultipliedBit : s_caps.alphaModes;
         s_caps.usages = floor == 2 ? mrhi_textureCopySource : s_caps.usages;
@@ -522,6 +526,18 @@ static void TestSurfaceCaps(void)
                   Recorded(instance) == mrhi_diagnosticDriverSurfaceFloors,
               "presentable caps without a floor");
     }
+    // A count past the array with no 8-bit sRGB in the colors it holds:
+    // both breaches, the colors read no further than the array.
+    s_caps = floors;
+    s_caps.colors[0] = last;
+    s_caps.colorCount = UINT32_MAX;
+    layer->vtable->getSurfaceCaps(layer->self, 1, 1, &caps);
+    faults += 2;
+    CHECK(mrhiInstance_GetDriverFaultCount(instance) == faults &&
+              Recorded(instance) == mrhi_diagnosticDriverSurfaceCaps &&
+              Recorded(instance) == mrhi_diagnosticDriverSurfaceFloors,
+          "too many colors, none of them 8-bit sRGB");
+    s_caps.colorCount = MRHI_SURFACE_COLORS;
     s_caps.presentable = false;
     layer->vtable->getSurfaceCaps(layer->self, 1, 1, &caps);
     CHECK(mrhiInstance_GetDriverFaultCount(instance) == faults,

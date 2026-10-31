@@ -243,9 +243,9 @@ void mrhiSurfaceCapsOf(const mrhiInstance* instance, uint64_t surface, uint64_t 
         caps.colors[i] = (mrhiSurfaceColor){0};
     }
     caps.colorCount = kept;
-    // A surface with no color left to present in, or without a floor,
-    // presents nothing.
-    bool presents = caps.presentable && kept > 0 && mrhiSurfaceCapsMeetFloors(&caps);
+    // A surface without a floor presents nothing; one left with no color
+    // has lost the 8-bit sRGB floor too.
+    bool presents = caps.presentable && mrhiSurfaceCapsMeetFloors(&caps);
     *capsOut = presents ? caps : (mrhiSurfaceCaps){0};
 }
 
@@ -276,15 +276,6 @@ static bool IsSameColor(const mrhiSurfaceColor* a, const mrhiSurfaceColor* b)
            a->range == b->range;
 }
 
-// 8-bit sRGB in Rec. 709 of standard range, the floor every presenting
-// surface reports.
-static bool IsSrgb8(const mrhiSurfaceColor* color)
-{
-    return (color->format == mrhi_formatRgba8Unorm || color->format == mrhi_formatBgra8Unorm) &&
-           color->primaries == mrhi_primariesBt709 && color->transfer == mrhi_transferSrgb &&
-           color->range == mrhi_rangeStandard;
-}
-
 mrhiResult mrhiSuggestSurfaceColor(const mrhiSurfaceCaps* caps, const mrhiSurfaceColor* asked,
                                    mrhiSurfaceColor* colorOut)
 {
@@ -304,7 +295,7 @@ mrhiResult mrhiSuggestSurfaceColor(const mrhiSurfaceCaps* caps, const mrhiSurfac
             const mrhiSurfaceColor* color = &caps->colors[i];
             bool fits = step == 0   ? IsSameColor(color, asked)
                         : step == 1 ? IsSameColor(color, &hdr)
-                                    : IsSrgb8(color);
+                                    : mrhiIsSurfaceColorSrgb8(color);
             if (fits)
             {
                 mrhiOutSurfaceColor(colorOut, color);

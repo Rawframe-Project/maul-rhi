@@ -383,12 +383,9 @@ void mrhiVulkanCapsOf(const mrhiVulkanSurfaceFacts* facts, mrhiSurfaceCaps* caps
     caps.alphaModes |=
         (alpha & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR) != 0 ? mrhi_alphaPremultipliedBit : 0u;
     caps.usages = UsagesOf(facts->usages);
-    // The floors: a color, FIFO, opaque alpha, render targets and a way to
-    // sRGB.
-    caps.presentable = caps.colorCount > 0 && (caps.presentModes & mrhi_presentFifoBit) != 0 &&
-                       (caps.alphaModes & mrhi_alphaOpaqueBit) != 0 &&
-                       (caps.usages & mrhi_textureRenderTarget) != 0 &&
-                       (caps.twinViews || caps.twinImages);
+    // The floors: 8-bit sRGB in Rec. 709, FIFO, opaque alpha, render
+    // targets and a way to sRGB.
+    caps.presentable = mrhiSurfaceCapsMeetFloors(&caps);
     if (caps.presentable)
     {
         *capsOut = caps;

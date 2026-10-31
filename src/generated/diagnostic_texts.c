@@ -295,7 +295,7 @@ const char* mrhiGetDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticDriverSurfaceCaps:
         return "A driver reported surface caps with more than MRHI_SURFACE_COLORS colors, or a color whose format, primaries, transfer or range is unknown; the core kept the first MRHI_SURFACE_COLORS, dropped each unknown one, and reported a surface left without a color as not presentable.";
     case mrhi_diagnosticDriverSurfaceFloors:
-        return "A driver reported surface caps as presentable without FIFO, opaque alpha, render target usage, or twin views or images; the core reported the adapter as not presenting to the surface.";
+        return "A driver reported surface caps as presentable without 8-bit sRGB in Rec. 709 among its colors, FIFO, opaque alpha, render target usage, or twin views or images; the core reported the adapter as not presenting to the surface.";
     default:
         return "An unknown diagnostic code.";
     }
