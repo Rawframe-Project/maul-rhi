@@ -283,6 +283,14 @@ if(MAUL_RHI_BUILD_TESTS)
         # GPU-based validation's false state errors (#7) reproduced without
         # library code: built with the tests so that it keeps compiling,
         # run by hand as docs/operations/debugging.md says.
+        # The buffer transitions the D3D12 driver records, closed one chain
+        # at a time on a list under GPU-based validation without library
+        # code, to try an Agility SDK on: built with the tests so that it
+        # keeps compiling, run by hand as docs/operations/debugging.md says.
+        add_executable(d3d12_indirect_check test/d3d12_indirect_check.c test/d3d12_debug.c)
+        target_include_directories(d3d12_indirect_check SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
+        target_link_libraries(d3d12_indirect_check PRIVATE d3d12 dxgi)
+        maul_apply_flags(d3d12_indirect_check)
         add_executable(d3d12_uav_check test/d3d12_uav_check.c test/d3d12_debug.c)
         target_include_directories(d3d12_uav_check SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
         target_link_libraries(d3d12_uav_check PRIVATE d3d12 dxgi)
