@@ -360,7 +360,7 @@ static mrhiTextureId MakeVolume(mrhiDevice* device)
     return texture;
 }
 
-static mrhiQuerySetId MakeQuerySet(mrhiDevice* device, mrhiQueryType type, uint32_t count);
+static mrhiQuerySetId MakeQuerySet(mrhiDevice* device, mrhiQueryKind kind, uint32_t count);
 static bool IsNear(const uint8_t* pixel, const uint8_t* expected);
 
 // Objects of every kind: many buffers over more than one block, one
@@ -2514,11 +2514,11 @@ static void CheckCulling(Scene* scene)
     CHECK(!s_runs || black, "a counter-clockwise triangle culled as a back face");
 }
 
-static mrhiQuerySetId MakeQuerySet(mrhiDevice* device, mrhiQueryType type, uint32_t count)
+static mrhiQuerySetId MakeQuerySet(mrhiDevice* device, mrhiQueryKind kind, uint32_t count)
 {
     mrhiQuerySetDef def = mrhiDefaultQuerySetDef();
     LABEL(def, "queries");
-    def.type = type;
+    def.kind = kind;
     def.count = count;
     mrhiQuerySetId set = {0};
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_success, "a query set");

@@ -404,7 +404,7 @@ static void TestTimestamps(void)
     deviceDef.features.timestampQuery = true;
     OpenDef(deviceDef);
     mrhiQuerySetDef setDef = mrhiDefaultQuerySetDef();
-    setDef.type = mrhi_queryTimestamp;
+    setDef.kind = mrhi_queryTimestamp;
     setDef.count = 8;
     mrhiQuerySetId set = {0};
     CHECK(mrhiCreateQuerySet(s_device, &setDef, &set) == mrhi_success, "a timestamp set");

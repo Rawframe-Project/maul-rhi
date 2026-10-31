@@ -86,7 +86,7 @@ static void TestView(void)
     mrhiQuerySetId occlusion;
     mrhiQuerySetId timestamps;
     CHECK(mrhiCreateQuerySet(s_device, &setDef, &occlusion) == mrhi_success, "occlusion");
-    setDef.type = mrhi_queryTimestamp;
+    setDef.kind = mrhi_queryTimestamp;
     setDef.count = 2;
     CHECK(mrhiCreateQuerySet(s_device, &setDef, &timestamps) == mrhi_success, "timestamps");
     mrhiPassDef def = mrhiDefaultPassDef();

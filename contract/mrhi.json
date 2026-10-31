@@ -288,7 +288,8 @@
             },
             {
               "name": "type",
-              "type": "enum.struct_type"
+              "type": "enum.struct_type",
+              "doc": "What struct this is, as Vulkan's sType says: the chain's tag, read before the rest of the struct. It is not a choice the struct makes, so it is a type, not a kind."
             }
           ],
           "library": "the library's extension chain"
@@ -9695,7 +9696,7 @@
         },
         {
           "kind": "enum",
-          "name": "query_type",
+          "name": "query_kind",
           "mapped": true,
           "doc": "What a query set's queries measure.",
           "values": [
@@ -9842,8 +9843,8 @@
               }
             },
             {
-              "name": "type",
-              "type": "enum.query_type",
+              "name": "kind",
+              "type": "enum.query_kind",
               "doc": "What its queries measure.",
               "mapping": {
                 "vulkan": {
@@ -22710,5 +22711,5 @@
       ]
     }
   ],
-  "contract_version": 25
+  "contract_version": 26
 }

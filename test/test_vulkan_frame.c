@@ -328,7 +328,7 @@ static void CheckFailedBegins(mrhiDevice* device, bool timestamps)
     if (timestamps)
     {
         mrhiQuerySetDef def = mrhiDefaultQuerySetDef();
-        def.type = mrhi_queryTimestamp;
+        def.kind = mrhi_queryTimestamp;
         def.count = 2;
         CHECK(mrhiCreateQuerySet(device, &def, &times) == mrhi_success, "a timestamp set");
     }

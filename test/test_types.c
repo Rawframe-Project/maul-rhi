@@ -43,7 +43,7 @@ static void TestKinds(void)
     KIND(mrhiCompareFunction);
     KIND(mrhiTextureKind);
     KIND(mrhiTextureAspect);
-    KIND(mrhiQueryType);
+    KIND(mrhiQueryKind);
     KIND(mrhiHeapEntryKind);
     KIND(mrhiColorPrimaries);
     KIND(mrhiTransfer);

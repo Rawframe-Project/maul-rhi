@@ -24,10 +24,10 @@ static mrhiDevice* Open(uint32_t sets, uint32_t queries, bool timestamps, bool r
     return OpenWith(def, ready);
 }
 
-static mrhiQuerySetDef Def(mrhiQueryType type, uint32_t count)
+static mrhiQuerySetDef Def(mrhiQueryKind kind, uint32_t count)
 {
     mrhiQuerySetDef def = mrhiDefaultQuerySetDef();
-    def.type = type;
+    def.kind = kind;
     def.count = count;
     return def;
 }
@@ -36,7 +36,7 @@ static void TestMakeAndDestroy(void)
 {
     mrhiDevice* device = Open(4, 4097, true, true);
     mrhiQuerySetDef def = mrhiDefaultQuerySetDef();
-    CHECK(def.type == mrhi_queryOcclusion && def.count == 1, "one occlusion query");
+    CHECK(def.kind == mrhi_queryOcclusion && def.count == 1, "one occlusion query");
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     CHECK(deviceDef.budgets.querySets == 16 && deviceDef.budgets.queries == 4096,
           "the device's defaults");
@@ -65,7 +65,7 @@ static void TestInvalidDefs(void)
     def.count = MRHI_MAX_QUERY_SET_QUERIES + 1;
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorLimit, "past the bound");
     def = Def(3, 1);
-    CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorInvalid, "a type");
+    CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorInvalid, "a kind");
     def = mrhiDefaultQuerySetDef();
     def.cookie = 0;
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorInvalid, "no cookie");
@@ -95,8 +95,8 @@ static void TestInvalidDefs(void)
     Close(device);
 }
 
-// Kinds are int32_t, so a check against the last type alone would let a
-// negative one through: the type refuses -1 and INT32_MIN.
+// Kinds are int32_t, so a check against the last kind alone would let a
+// negative one through: the kind refuses -1 and INT32_MIN.
 static void TestNegativeKinds(void)
 {
     mrhiDevice* device = Open(4, 8192, false, true);
@@ -107,7 +107,7 @@ static void TestNegativeKinds(void)
     for (size_t i = 0; i < sizeof(negative) / sizeof(negative[0]); ++i)
     {
         def = Def(negative[i], 1);
-        CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorInvalid, "a negative type");
+        CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorInvalid, "a negative kind");
     }
     Close(device);
 }
@@ -238,9 +238,9 @@ static void OpenFrames(uint32_t commandBytes)
     CHECK(mrhiCreateBuffer(s_device, &bufferDef, &s_results) == mrhi_success, "a results buffer");
 }
 
-static mrhiQuerySetId MakeSet(mrhiQueryType type, uint32_t count)
+static mrhiQuerySetId MakeSet(mrhiQueryKind kind, uint32_t count)
 {
-    mrhiQuerySetDef def = Def(type, count);
+    mrhiQuerySetDef def = Def(kind, count);
     mrhiQuerySetId set = {0};
     CHECK(mrhiCreateQuerySet(s_device, &def, &set) == mrhi_success, "a set");
     return set;

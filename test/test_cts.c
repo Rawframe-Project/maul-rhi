@@ -1793,10 +1793,10 @@ static void TestRenderPasses(void)
            RenderPass(&color, nullptr, 1, multiDepth), false);
 }
 
-static mrhiQuerySetId MakeQuerySet(mrhiQueryType type, uint32_t count)
+static mrhiQuerySetId MakeQuerySet(mrhiQueryKind kind, uint32_t count)
 {
     mrhiQuerySetDef def = mrhiDefaultQuerySetDef();
-    def.type = type;
+    def.kind = kind;
     def.count = count;
     mrhiQuerySetId set = {0};
     CHECK(mrhiCreateQuerySet(s_device, &def, &set) == mrhi_success, "a query set");
