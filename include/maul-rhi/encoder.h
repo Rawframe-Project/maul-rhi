@@ -751,7 +751,7 @@ extern "C"
     MRHI_NODISCARD MRHI_API mrhiResult mrhiPass_WriteBuffer(mrhiDevice* device, mrhiPassId pass,
                                                             mrhiResourceId resource,
                                                             uint64_t offset, const void* bytes,
-                                                            uint64_t size);
+                                                            size_t size);
 
     /// Uploads texels into a texture's mip, copying them at the call.
     ///

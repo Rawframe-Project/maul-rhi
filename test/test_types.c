@@ -5,12 +5,14 @@
 // set them: every enumeration of kinds, modes and choices is int32_t,
 // as mrhiResult is; bitflags and the packed struct type are uint32_t.
 // The structs made only of such types keep the layout that follows.
+// Every length of bytes in the program's memory a call takes is size_t.
 
 #include "test_harness.h"
 
 #include "maul-rhi/base.h"
 #include "maul-rhi/capabilities.h"
 #include "maul-rhi/device.h"
+#include "maul-rhi/encoder.h"
 #include "maul-rhi/frame.h"
 #include "maul-rhi/heap.h"
 #include "maul-rhi/instance.h"
@@ -110,10 +112,31 @@ static void TestLayouts(void)
           "a chain node: its next, then its type");
 }
 
+// Where size_t is narrower than 64 bits, as on wasm32, a uint64_t in
+// its place is another type.
+static void TestByteLengths(void)
+{
+    CHECK(_Generic(&mrhiPass_WriteBuffer,
+              mrhiResult (*)(mrhiDevice*, mrhiPassId, mrhiResourceId, uint64_t, const void*,
+                             size_t): true,
+              default: false),
+          "mrhiPass_WriteBuffer takes its byte count as size_t");
+    CHECK(_Generic(&mrhiPass_WriteTexture,
+              mrhiResult (*)(mrhiDevice*, mrhiPassId, const mrhiTextureCopy*, const void*, size_t,
+                             const mrhiTexelLayout*, const mrhiExtent3d*): true,
+              default: false),
+          "mrhiPass_WriteTexture takes its byte count as size_t");
+    CHECK(_Generic(&mrhiPass_SetRootBlock,
+              mrhiResult (*)(mrhiDevice*, mrhiPassId, uint32_t, const void*, size_t): true,
+              default: false),
+          "mrhiPass_SetRootBlock takes its byte count as size_t");
+}
+
 int main(void)
 {
     TestKinds();
     TestBits();
     TestLayouts();
+    TestByteLengths();
     return s_failures == 0 ? 0 : 1;
 }
