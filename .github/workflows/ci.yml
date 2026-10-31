@@ -563,6 +563,11 @@ jobs:
           mkdir -p "$ANDROID_AVD_HOME"
           "$tools/sdkmanager" --install emulator "system-images;android-35;google_apis;x86_64" >/dev/null
           echo no | "$tools/avdmanager" create avd -n maul35 -k "system-images;android-35;google_apis;x86_64" -d pixel_5 >/dev/null
+          # The profile's default userdata partition needs more disk than
+          # a hosted runner may have free; the suites need little of it.
+          config="$ANDROID_AVD_HOME/maul35.avd/config.ini"
+          sed -i '/^disk\.dataPartition\.size=/d' "$config"
+          echo "disk.dataPartition.size=2G" >> "$config"
           nohup "$ANDROID_HOME/emulator/emulator" -avd maul35 -no-window -no-audio -no-boot-anim \
             -no-snapshot -gpu swiftshader_indirect -port 5554 > "$RUNNER_TEMP/emulator.log" 2>&1 &
           emulator=$!
@@ -574,6 +579,7 @@ jobs:
             sleep 5
           done
           "$adb" shell getprop sys.boot_completed | grep -q 1 || { tail -50 "$RUNNER_TEMP/emulator.log"; exit 1; }
+          "$adb" shell df -h /data
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
       - name: Configure
         run: cmake --preset android-emulator
