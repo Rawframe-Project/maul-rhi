@@ -46,6 +46,16 @@ static inline bool mrhiIsSurfaceColorKnown(const mrhiSurfaceColor* color)
            (uint32_t)color->range <= mrhi_rangeExtended;
 }
 
+// Whether surface caps meet the floors every presenting surface has:
+// FIFO, opaque alpha, render target usage, and sRGB through twin views
+// or twin images.
+static inline bool mrhiSurfaceCapsMeetFloors(const mrhiSurfaceCaps* caps)
+{
+    return (caps->presentModes & mrhi_presentFifoBit) != 0 &&
+           (caps->alphaModes & mrhi_alphaOpaqueBit) != 0 &&
+           (caps->usages & mrhi_textureRenderTarget) != 0 && (caps->twinViews || caps->twinImages);
+}
+
 // What every adapter can do with a format: WebGPU's guaranteed
 // capabilities; nothing for the compressed families.
 mrhiFormatCaps mrhiFloorFormatCaps(mrhiFormat format);

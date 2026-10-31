@@ -9,7 +9,6 @@
 #include "chain.h"
 #include "device_core.h"
 #include "instance_core.h"
-#include "invariant.h"
 #include "label.h"
 #include "outputs.h"
 
@@ -244,8 +243,10 @@ void mrhiSurfaceCapsOf(const mrhiInstance* instance, uint64_t surface, uint64_t 
         caps.colors[i] = (mrhiSurfaceColor){0};
     }
     caps.colorCount = kept;
-    // A surface with no color left to present in presents nothing.
-    *capsOut = caps.presentable && kept > 0 ? caps : (mrhiSurfaceCaps){0};
+    // A surface with no color left to present in, or without a floor,
+    // presents nothing.
+    bool presents = caps.presentable && kept > 0 && mrhiSurfaceCapsMeetFloors(&caps);
+    *capsOut = presents ? caps : (mrhiSurfaceCaps){0};
 }
 
 mrhiResult mrhiSurface_GetCaps(mrhiInstance* instance, mrhiSurfaceId surface, mrhiAdapterId adapter,
@@ -265,10 +266,6 @@ mrhiResult mrhiSurface_GetCaps(mrhiInstance* instance, mrhiSurfaceId surface, mr
     }
     mrhiSurfaceCaps caps;
     mrhiSurfaceCapsOf(instance, handle, found->handle, &caps);
-    MRHI_ASSERT(!caps.presentable || ((caps.presentModes & mrhi_presentFifoBit) != 0 &&
-                                      (caps.alphaModes & mrhi_alphaOpaqueBit) != 0 &&
-                                      (caps.usages & mrhi_textureRenderTarget) != 0 &&
-                                      (caps.twinViews || caps.twinImages)));
     mrhiOutSurfaceCaps(capsOut, &caps);
     return mrhi_success;
 }

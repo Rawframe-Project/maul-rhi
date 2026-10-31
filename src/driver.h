@@ -23,7 +23,7 @@
 #define MRHI_SPI_VERSION 12
 // What a driver sees at this version, as tools/check_spi_version.py
 // digests it; --write records it.
-// SPI digest: 12a6a6eb916a12f8fe8f559a4db4646dd14ba6ac97ec4a478310e504fdd75387
+// SPI digest: 2e6079d5c8f66df959f922e2a4a99f9e07b20b851ffc94f01b3e023097938921
 
 // The pass classes (mrhiPassClass): graphics, async compute and transfer.
 #define MRHI_PASS_CLASSES 3

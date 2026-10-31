@@ -1047,6 +1047,11 @@
               "name": "diagnostic_driver_surface_caps",
               "value": 158,
               "doc": "A driver reported surface caps with more than MRHI_SURFACE_COLORS colors, or a color whose format, primaries, transfer or range is unknown; the core kept the first MRHI_SURFACE_COLORS, dropped each unknown one, and reported a surface left without a color as not presentable."
+            },
+            {
+              "name": "diagnostic_driver_surface_floors",
+              "value": 159,
+              "doc": "A driver reported surface caps as presentable without FIFO, opaque alpha, render target usage, or twin views or images; the core reported the adapter as not presenting to the surface."
             }
           ],
           "library": "names the library's own checks"
