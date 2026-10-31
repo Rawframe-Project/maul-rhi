@@ -47,6 +47,7 @@ The core checks every call on every build, so an API validation layer above it w
 Breaches are counted (`mrhiInstance_GetDriverFaultCount`) and recorded in the instance's diagnostic queue under driver codes, never printed or called back. The call goes on with the driver's answer, except that an event count past the room given is clamped. The core does not rely on the layer for anything it would read past, place wrong or pass on, and checks it itself on every build:
 
 - An event count past the room the core gave is cut to the room, so the core never reads past its array.
+- A pipeline's answer is taken only for a slot within the device's pipeline budget whose pipeline is still compiling under that request; any other is ignored, as an unknown frame token is.
 - A pipeline cache size too large to hold with the envelope's header fails the export with `mrhi_errorPlatform`.
 - A declared resource's memory alignment of zero, or one that is not a power of two, fails the compile with `mrhi_errorPlatform` instead of placing resources over each other; a resource of 0 bytes, kept on chip, is not placed and its alignment not read.
 - A refused submission's budget is recorded only when it is one of the `mrhi_diagnosticSubmit` codes.

@@ -6,10 +6,12 @@
 // with one answer broken at a time. A poll that claims more events than
 // the room it was given, a pipeline cache too large for its envelope, a
 // memory alignment that would place resources over each other, a
-// refused submission naming a code that is not a budget, and an adapter
-// of an unknown kind or with a name that is too long or not UTF-8.
+// refused submission naming a code that is not a budget, an adapter of
+// an unknown kind or with a name that is too long or not UTF-8, and a
+// pipeline answer for no pipeline compiling.
 
 #include "driver_test.h"
+#include "test_container.h"
 #include "test_harness.h"
 
 #include "maul-rhi/device.h"
@@ -30,6 +32,9 @@ static mrhiDeviceDriverVtable s_deviceVtable;
 // SIZE_MAX of them when s_claimAll is set, one past the room otherwise.
 static bool s_claiming;
 static bool s_claimAll;
+// Set to make the next device poll report s_injected alone, once.
+static bool s_injecting;
+static mrhiDriverEvent s_injected;
 // The cache size the driver gives when asked for it; 0 for its own.
 static size_t s_cacheBytes;
 // Whether the driver gives s_alignment for a buffer's memory, and
@@ -61,6 +66,12 @@ static size_t PollInstance(void* self, mrhiDriverEvent* events, size_t capacity)
 // Device tags at most UINT32_MAX are frames; none has that token.
 static size_t PollDevice(void* self, mrhiDriverEvent* events, size_t capacity)
 {
+    if (s_injecting && capacity > 0)
+    {
+        s_injecting = false;
+        events[0] = s_injected;
+        return 1;
+    }
     return s_claiming ? Claim(events, capacity, UINT32_MAX)
                       : s_deviceInner->poll(self, events, capacity);
 }
@@ -171,11 +182,16 @@ static mrhiAdapterId FindAdapter(mrhiInstance* instance)
     return adapter;
 }
 
+// The pipelines each device holds at once: one, so that the slot in use
+// is the budget's last.
+#define PIPELINES 1
+
 static mrhiDevice* Open(mrhiInstance* instance)
 {
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.adapter = FindAdapter(instance);
     def.budgets.diagnostics = 8;
+    def.budgets.pipelines = PIPELINES;
     mrhiDevice* device = nullptr;
     mrhiRequestId request;
     mrhiInstanceNotification record;
@@ -393,6 +409,73 @@ static void TestAdapterInfo(void)
     s_info = (mrhiAdapterInfo){.driver = mrhi_driverTest, .kind = mrhi_adapterDiscrete};
 }
 
+// A compute pipeline left compiling, and its request.
+static mrhiRequestId StartPipeline(mrhiDevice* device, mrhiComputePipelineId* pipelineOut)
+{
+    Reset();
+    s_sections[BINDINGS].size = 0;
+    Assemble();
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_container;
+    shaderDef.byteCount = s_size;
+    mrhiComputePipelineDef def = mrhiDefaultComputePipelineDef();
+    CHECK(mrhiCreateShader(device, &shaderDef, &def.shader) == mrhi_success, "a shader");
+    def.entry = "cs";
+    def.entryLength = 2;
+    mrhiRequestId request = {0};
+    CHECK(mrhiCreateComputePipeline(device, &def, pipelineOut, &request) == mrhi_success,
+          "a pipeline compiling");
+    CHECK(mrhiDestroyShader(device, def.shader) == mrhi_success, "its shader destroyed");
+    return request;
+}
+
+// Whether the device's next answer is the pipeline request's, with the
+// outcome, and nothing follows it.
+static bool AnsweredOnce(mrhiDevice* device, mrhiRequestId request, mrhiResult outcome)
+{
+    mrhiDeviceNotification record;
+    return mrhiDevice_TakeNotification(device, &record) == mrhi_success &&
+           record.kind == mrhi_devicePipelineReady && record.request.index1 == request.index1 &&
+           record.outcome == outcome && mrhiDevice_TakeNotification(device, &record) == mrhi_empty;
+}
+
+// Pipeline answers that name no compiling pipeline: a slot past the
+// budget, the slot of a pipeline already answered, and a compiling
+// slot's other request. The core asked none of them, so each is left
+// unanswered and the pipelines keep their own answers.
+static void TestPipelineAnswers(void)
+{
+    mrhiInstance* instance = Start();
+    mrhiDevice* device = Open(instance);
+    mrhiComputePipelineId ready = {0};
+    mrhiRequestId readyRequest = StartPipeline(device, &ready);
+    CHECK(AnsweredOnce(device, readyRequest, mrhi_success), "a pipeline ready");
+    const uint64_t unasked[] = {
+        ((uint64_t)(PIPELINES + 1) << 32) | readyRequest.index1,
+        ((uint64_t)UINT32_MAX << 32) | readyRequest.index1,
+        ((uint64_t)ready.index1 << 32) | readyRequest.index1,
+    };
+    for (size_t i = 0; i < sizeof(unasked) / sizeof(unasked[0]); ++i)
+    {
+        s_injected = (mrhiDriverEvent){unasked[i], mrhi_errorPlatform};
+        s_injecting = true;
+        mrhiDeviceNotification record;
+        CHECK(mrhiDevice_TakeNotification(device, &record) == mrhi_empty && !s_injecting,
+              "an answer past the budget, or for a ready pipeline, ignored");
+    }
+    CHECK(mrhiDestroyComputePipeline(device, ready) == mrhi_success, "the ready one destroyed");
+    mrhiComputePipelineId compiling = {0};
+    mrhiRequestId request = StartPipeline(device, &compiling);
+    s_injected = (mrhiDriverEvent){((uint64_t)compiling.index1 << 32) | (request.index1 + 1),
+                                   mrhi_errorPlatform};
+    s_injecting = true;
+    CHECK(AnsweredOnce(device, request, mrhi_success) && !s_injecting,
+          "another request's answer ignored, the pipeline's own taken");
+    CHECK(mrhiDestroyComputePipeline(device, compiling) == mrhi_success, "destroyed");
+    mrhiDestroyDevice(device);
+    mrhiDestroyInstance(instance);
+}
+
 int main(void)
 {
     TestPollClaims();
@@ -400,5 +483,6 @@ int main(void)
     TestAlignments();
     TestSubmitBudget();
     TestAdapterInfo();
+    TestPipelineAnswers();
     return s_failures == 0 ? 0 : 1;
 }
