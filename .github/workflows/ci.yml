@@ -483,20 +483,47 @@ jobs:
           path: out/corpus/${{ matrix.target }}
           key: corpus-${{ matrix.target }}-${{ github.run_id }}
 
-  # The windows-d3d12 cell with GPU-based validation's resource state
-  # tracking, which pull requests run without: on a device whose objects
-  # were made and released before, it reports false errors in about one
-  # run in fifty (#7, test/d3d12_uav_check.c). Nightly and by hand only,
-  # and never retried, until the Agility SDK fixes it.
-  windows-d3d12-states:
+  # GPU-based validation's state tracking on the 1.619 Agility SDK
+  # reported a texture still in COMMON at a dispatch, in a few runs in a
+  # hundred, once objects had been made and released on the device.
+  # test/d3d12_uav_check.c does that without library code; a hundred runs
+  # of it on the pinned SDK each night show an SDK that brings the false
+  # error back. Nightly and by hand only, and never retried.
+  windows-d3d12-canary:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@8414d388d2116b581c5c5d8f6641e1da4d863244 # v0.0.42
+    runs-on: windows-2025
+    timeout-minutes: 45
     permissions:
       contents: read
-    with:
-      preset: windows-d3d12-states
-      runner: windows-2025
-      setup: tools/ci_agility.sh
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Fetch the Agility SDK
+        run: tools/ci_agility.sh
+      - name: Build
+        run: |
+          cmake --preset windows-d3d12 -DMAUL_RHI_SEAM=OFF
+          cmake --build --preset windows-d3d12 --target d3d12_uav_check maul_rhi_agility
+      - name: Run it a hundred times
+        env:
+          MAUL_RHI_D3D12_DEBUG: "1"
+        run: |
+          exe=$(find out/windows-d3d12 -name d3d12_uav_check.exe | head -1)
+          cd "$(dirname "$exe")"
+          test -f D3D12/D3D12Core.dll
+          failed=0
+          for _ in $(seq 1 100); do
+            if ! ./d3d12_uav_check.exe 20 8 >run.log 2>&1; then
+              failed=$((failed + 1))
+              [ "$failed" -gt 3 ] || cut -c1-400 run.log
+            fi
+          done
+          echo "d3d12_uav_check 20 8: $failed of 100 runs failed" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$failed" = 0 ]
 
   # The windows-d3d12 cell's quarantined tests, which the required runs
   # leave out: a failed one is a known flake and a warning, anything else
@@ -516,7 +543,6 @@ jobs:
       MAUL_RHI_REQUIRE_STATISTICS: "1"
       MAUL_RHI_REQUIRE_TIMESTAMPS: "1"
       MAUL_RHI_D3D12_DEBUG: "1"
-      MAUL_RHI_D3D12_GBV_STATES: "0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -653,11 +679,11 @@ jobs:
         run: xcrun simctl shutdown "$MWIN_IOS_DEVICE" || true
 
   # Deletes the cache entries of main a newer save replaced: the ccache and
-  # Mesa entries of the build cells and windows-d3d12-states, keyed by the
-  # commit, and fuzz-nightly's corpora, keyed by the run. Main's runs only,
-  # after every job that saves a cache.
+  # Mesa entries of the build cells, keyed by the commit, and
+  # fuzz-nightly's corpora, keyed by the run. Main's runs only, after
+  # every job that saves a cache.
   prune-caches:
-    needs: [build, windows-d3d12-states, fuzz-nightly]
+    needs: [build, fuzz-nightly]
     if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     uses: Rawframe-Project/.github/.github/workflows/cache-prune.yml@8414d388d2116b581c5c5d8f6641e1da4d863244 # v0.0.42
     permissions:
@@ -670,7 +696,7 @@ jobs:
   required:
     if: always()
     needs: [changes, docs, zizmor, checks, build, msvc-headers, web-emscripten, fuzz, fuzz-targets,
-            fuzz-nightly, windows-d3d12-states, quarantine-d3d12, android-emulator,
+            fuzz-nightly, windows-d3d12-canary, quarantine-d3d12, android-emulator,
             ios-simulator, prune-caches]
     runs-on: ubuntu-24.04
     timeout-minutes: 2

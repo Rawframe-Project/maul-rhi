@@ -280,16 +280,24 @@ if(MAUL_RHI_BUILD_TESTS)
         # finishes is reported by the suite, with what it waited on, before
         # ctest stops it.
         set_tests_properties(d3d12_queues d3d12_queues_held PROPERTIES TIMEOUT 30)
-        # GPU-based validation's false state errors (#7) reproduced without
-        # library code: built with the tests so that it keeps compiling,
-        # run by hand as docs/operations/debugging.md says.
+        # The buffer transitions the D3D12 driver records, closed one chain
+        # at a time on a list under GPU-based validation without library
+        # code, to try an Agility SDK on: built with the tests so that it
+        # keeps compiling, run by hand as docs/operations/debugging.md says.
+        add_executable(d3d12_indirect_check test/d3d12_indirect_check.c test/d3d12_debug.c)
+        target_include_directories(d3d12_indirect_check SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
+        target_link_libraries(d3d12_indirect_check PRIVATE d3d12 dxgi)
+        maul_apply_flags(d3d12_indirect_check)
+        # GPU-based validation's false state errors of the 1.619 Agility SDK
+        # reproduced without library code: built with the tests so that it
+        # keeps compiling, and run by the nightly canary in ci.yml.
         add_executable(d3d12_uav_check test/d3d12_uav_check.c test/d3d12_debug.c)
         target_include_directories(d3d12_uav_check SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
         target_link_libraries(d3d12_uav_check PRIVATE d3d12 dxgi)
         maul_apply_flags(d3d12_uav_check)
         # The suites export the Agility SDK they run on from D3D12/ beside
         # them (test/d3d12_debug.c), where this copies the redistributable
-        # DLLs of its NuGet package, the version the directx/ headers are.
+        # DLLs of its NuGet package, the version tools/ci_agility.sh pins.
         set(MAUL_RHI_D3D12_AGILITY "" CACHE PATH
             "The Agility SDK's bin/x64 folder, copied into D3D12/ beside the tests")
         if(MAUL_RHI_D3D12_AGILITY)

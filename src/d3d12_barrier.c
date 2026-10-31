@@ -238,7 +238,14 @@ D3D12_RESOURCE_STATES mrhiD3d12BufferState(mrhiResourceState state)
     case mrhi_stateIndex:
         return D3D12_RESOURCE_STATE_INDEX_BUFFER;
     case mrhi_stateIndirect:
-        return D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+        // With the non-pixel shader resource state too, which the counted
+        // draws' expand kernel reads it in: the 1.620.1 Agility SDK's
+        // GPU-based validation makes Close fail, with no message, after a
+        // buffer moves from the indirect argument state alone to both,
+        // though the move is legal (test/d3d12_indirect_check.c). Taking
+        // both at the start, which every SDK accepts, never asks for it.
+        return D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT |
+               D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     case mrhi_stateStorageRead:
         return SHADER_READ;
     case mrhi_stateStorageWrite:
