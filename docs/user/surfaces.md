@@ -21,7 +21,7 @@ A source the build's driver cannot use is `mrhi_errorUnsupported`. A surface las
 
 `mrhiSurface_GetCaps` tells, per adapter, whether it presents to the surface at all, and if so:
 
-- the colors it offers, preferred first, each a format with its primaries, transfer function and range given separately;
+- the colors it offers, preferred first, each a format with its primaries, transfer function and range given separately, every one a value the library lists: a color the driver reports with another value is left out, and an adapter left with no color does not present;
 - the present modes, a set of `mrhiPresentMode` bits (`mrhi_presentFifoBit`, `mrhi_presentMailboxBit`, `mrhi_presentImmediateBit`), each 1 shifted left by its mode;
 - the alpha modes, a set of `mrhiAlphaMode` bits (`mrhi_alphaOpaqueBit`, `mrhi_alphaPremultipliedBit`);
 - the usages its images take;

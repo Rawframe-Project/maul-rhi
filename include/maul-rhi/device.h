@@ -285,7 +285,8 @@ extern "C"
     // device is lost.
     typedef struct mrhiDeviceLossReport
     {
-        // Why it was lost.
+        // Why it was lost; mrhi_lossUnknown also when the driver named a reason
+        // this list lacks.
         mrhiDeviceLossReason reason;
         // The token of the last frame submitted, or a null id.
         mrhiRequestId lastSubmitted;
@@ -297,7 +298,9 @@ extern "C"
         mrhiRequestId faultingFrame;
         // That frame's pass, its id's index, when the API tells; 0 otherwise.
         uint32_t faultingPass;
-        // The driver's message: UTF-8 without NUL, messageLength bytes.
+        // The driver's message: well-formed UTF-8 without NUL, messageLength
+        // bytes. It ends before the driver's first byte that would break that:
+        // a character cut by the room, a malformed sequence or a NUL.
         char message[MRHI_LOSS_MESSAGE_BYTES];
         // Its bytes.
         size_t messageLength;

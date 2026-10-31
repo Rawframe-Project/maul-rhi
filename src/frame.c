@@ -8,6 +8,7 @@
 
 #include "device_core.h"
 #include "invariant.h"
+#include "label.h"
 #include "outputs.h"
 
 #include "generated/out_copies.h"
@@ -113,10 +114,19 @@ static void Lose(mrhiDevice* device, const mrhiDeviceLossReport* given)
     else
     {
         device->driver.vtable->lossReport(device->driver.self, &report);
+        // A reason the contract does not name is not passed on, and the
+        // message only up to its room and its first byte that is not
+        // well-formed UTF-8, so a character the room cuts goes whole.
+        if ((uint32_t)report.reason > mrhi_lossSimulated)
+        {
+            report.reason = mrhi_lossUnknown;
+        }
+        size_t room = report.messageLength <= MRHI_LOSS_MESSAGE_BYTES ? report.messageLength
+                                                                      : MRHI_LOSS_MESSAGE_BYTES;
+        report.messageLength = mrhiValidTextLength(report.message, room);
     }
     report.lastSubmitted = (mrhiRequestId){device->lastSubmitted, device->lastSubmitted != 0};
     report.lastFinished = (mrhiRequestId){device->lastFinished, device->lastFinished != 0};
-    MRHI_ASSERT(report.messageLength <= MRHI_LOSS_MESSAGE_BYTES);
     device->lossReport = report;
     // The notice's record was kept free, and every other answer reserved.
     mrhiQueueAnswer(device, mrhi_deviceLostNotice, 0, mrhi_errorDeviceLost);

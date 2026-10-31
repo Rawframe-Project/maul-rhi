@@ -197,6 +197,78 @@ static void TestCaps(void)
     mrhiDestroyInstance(instance);
 }
 
+// A color with one part of four set to a value the contract does not
+// list: part 0 the format, 1 the primaries, 2 the transfer, 3 the range.
+static mrhiSurfaceColor Unknown(uint32_t part, int32_t value)
+{
+    mrhiSurfaceColor color = {.format = mrhi_formatRgba16Float,
+                              .transfer = mrhi_transferLinear,
+                              .range = mrhi_rangeExtended};
+    int32_t* parts[] = {&color.format, &color.primaries, &color.transfer, &color.range};
+    *parts[part] = value;
+    return color;
+}
+
+// A driver's colors whose format, primaries, transfer or range the
+// contract does not list, each as -1, INT32_MIN and one past the last:
+// each is dropped, the colors after it kept in order, and a surface left
+// with none presents on no adapter.
+static void TestUnknownColors(void)
+{
+    static const int32_t pastLast[] = {mrhi_formatAstc12x12UnormSrgb + 1,
+                                       mrhi_primariesDisplayP3 + 1, mrhi_transferPq + 1,
+                                       mrhi_rangeExtended + 1};
+    mrhiAdapterId adapters[2];
+    mrhiInstance* instance = Create(4, adapters);
+    for (uint32_t part = 0; part < 4; ++part)
+    {
+        const int32_t unknown[] = {-1, INT32_MIN, pastLast[part]};
+        for (size_t i = 0; i < sizeof(unknown) / sizeof(unknown[0]); ++i)
+        {
+            mrhiSurfaceSourceTest test = Source(1);
+            test.caps.colorCount = 2;
+            test.caps.colors[0] = Unknown(part, unknown[i]);
+            test.caps.colors[1] = (mrhiSurfaceColor){.format = mrhi_formatBgra8Unorm};
+            mrhiSurfaceId surface;
+            mrhiSurfaceCaps caps;
+            const mrhiSurfaceColor none = {0};
+            CHECK(Make(instance, &test.chain, &surface) == mrhi_success &&
+                      mrhiSurface_GetCaps(instance, surface, adapters[0], &caps) == mrhi_success,
+                  "read");
+            CHECK(caps.presentable && caps.colorCount == 1 &&
+                      caps.colors[0].format == mrhi_formatBgra8Unorm &&
+                      memcmp(&caps.colors[1], &none, sizeof(none)) == 0,
+                  "the unknown color dropped, the next kept");
+            CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "destroyed");
+            test.caps.colorCount = 1;
+            CHECK(Make(instance, &test.chain, &surface) == mrhi_success &&
+                      mrhiSurface_GetCaps(instance, surface, adapters[0], &caps) == mrhi_success,
+                  "read");
+            CHECK(!caps.presentable && caps.colorCount == 0 && caps.presentModes == 0,
+                  "no color left, so nothing presents");
+            CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "destroyed");
+        }
+    }
+    // Last, since the search's answer replaces the adapters listed.
+    mrhiSurfaceSourceTest test = Source(1);
+    test.caps.colorCount = 1;
+    test.caps.colors[0] = Unknown(0, -1);
+    mrhiSurfaceId surface;
+    CHECK(Make(instance, &test.chain, &surface) == mrhi_success, "a surface of no known color");
+    mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
+    search.compatibleSurface = surface;
+    mrhiRequestId request;
+    mrhiInstanceNotification record;
+    size_t count = 1;
+    CHECK(mrhiInstance_RequestAdapters(instance, &search, &request) == mrhi_success &&
+              mrhiInstance_TakeNotification(instance, &record) == mrhi_success &&
+              record.outcome == mrhi_success &&
+              mrhiInstance_GetAdapters(instance, nullptr, 0, &count) == mrhi_success && count == 0,
+          "no adapter found for it");
+    CHECK(mrhiDestroySurface(instance, surface) == mrhi_success, "destroyed");
+    mrhiDestroyInstance(instance);
+}
+
 // Searches for adapters that present to a surface.
 static void TestCompatibleSurface(void)
 {
@@ -341,6 +413,7 @@ int main(void)
     TestSources();
     TestRefusals();
     TestCaps();
+    TestUnknownColors();
     TestCompatibleSurface();
     TestInstanceEnds();
     TestSuggestion();

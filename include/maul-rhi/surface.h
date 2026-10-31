@@ -135,7 +135,9 @@ extern "C"
         // Whether the adapter can present to the surface; nothing else is
         // filled when it cannot.
         bool presentable;
-        // The combinations it can show, the platform's preferred first.
+        // The combinations it can show, the platform's preferred first; a
+        // combination with a format, primaries, transfer or range the library
+        // does not list is left out.
         mrhiSurfaceColor colors[MRHI_SURFACE_COLORS];
         // How many colors are filled, at least 1.
         uint32_t colorCount;

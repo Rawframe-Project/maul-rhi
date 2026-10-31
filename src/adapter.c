@@ -115,10 +115,9 @@ static bool Presents(const mrhiInstance* instance, const mrhiPending* search,
     {
         return true;
     }
-    mrhiSurfaceCaps caps = {0};
-    instance->driver.vtable->getSurfaceCaps(instance->driver.self,
-                                            mrhiFindSurface(instance, search->compatibleSurface),
-                                            adapter->handle, &caps);
+    mrhiSurfaceCaps caps;
+    mrhiSurfaceCapsOf(instance, mrhiFindSurface(instance, search->compatibleSurface),
+                      adapter->handle, &caps);
     return caps.presentable;
 }
 

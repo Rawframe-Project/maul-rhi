@@ -8,6 +8,7 @@
 #define MAUL_RHI_SRC_CAPABILITIES_CORE_H
 
 #include "maul-rhi/pipeline.h"
+#include "maul-rhi/surface.h"
 
 // Whether every feature asked for is granted.
 bool mrhiFeaturesWithin(const mrhiFeatures* asked, const mrhiFeatures* granted);
@@ -34,6 +35,16 @@ extern const mrhiFormat mrhiKnownFormats[MRHI_KNOWN_FORMATS];
 
 // Whether a value is a format the contract lists.
 bool mrhiIsFormatKnown(mrhiFormat format);
+
+// Whether a surface color's format, primaries, transfer and range are
+// each one the contract lists.
+static inline bool mrhiIsSurfaceColorKnown(const mrhiSurfaceColor* color)
+{
+    return mrhiIsFormatKnown(color->format) &&
+           (uint32_t)color->primaries <= mrhi_primariesDisplayP3 &&
+           (uint32_t)color->transfer <= mrhi_transferPq &&
+           (uint32_t)color->range <= mrhi_rangeExtended;
+}
 
 // What every adapter can do with a format: WebGPU's guaranteed
 // capabilities; nothing for the compressed families.
