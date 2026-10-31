@@ -566,8 +566,8 @@ jobs:
           # The profile's default userdata partition needs more disk than
           # a hosted runner may have free; the suites need little of it.
           config="$ANDROID_AVD_HOME/maul35.avd/config.ini"
-          sed -i '/^disk\.dataPartition\.size=/d' "$config"
-          echo "disk.dataPartition.size=2G" >> "$config"
+          sed -i '/^disk\.dataPartition\.size *=/d' "$config"
+          echo "disk.dataPartition.size = 2147483648" >> "$config"
           nohup "$ANDROID_HOME/emulator/emulator" -avd maul35 -no-window -no-audio -no-boot-anim \
             -no-snapshot -gpu swiftshader_indirect -port 5554 > "$RUNNER_TEMP/emulator.log" 2>&1 &
           emulator=$!
