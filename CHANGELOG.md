@@ -5,6 +5,32 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.15.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.14.0...v0.15.0) (2026-10-31)
+
+### Changed
+
+- **Breaking:** `mrhiPass_WriteBuffer` takes the number of bytes it
+  reads as `size_t`, like every other length of bytes in the program's
+  memory: `mrhiPass_WriteTexture`'s `byteCount`, `mrhiPass_SetRootBlock`'s
+  size, the readback and pipeline cache capacities. Before, it took a
+  `uint64_t`, so on wasm32 a program passed a 64-bit count for a 32-bit
+  memory length. The offset into the buffer stays `uint64_t`.
+  ([#301](https://github.com/Rawframe-Project/maul-rhi/pull/301))
+- **Breaking:** `mrhiResourcePlan.usage`, a bare `uint32_t` that held
+  either kind of usage bits, is replaced by two typed fields:
+  `bufferUsage` (`mrhiBufferUsage`) for a buffer and `textureUsage`
+  (`mrhiTextureUsage`) for a texture or a surface image.
+  `mrhiResource_GetPlan` fills the one that fits the resource and leaves
+  the other at 0.
+  ([#303](https://github.com/Rawframe-Project/maul-rhi/pull/303))
+- **Breaking:** `mrhiQuerySetDef.type` is `kind`, and its enum
+  `mrhiQueryType` is `mrhiQueryKind`, as every other field holding a
+  choice is a kind. The values keep their names.
+  ([#306](https://github.com/Rawframe-Project/maul-rhi/pull/306))
+
+  Programs see all three changes. Drivers built outside the tree see
+  the last, and `MRHI_SPI_VERSION` is 13.
+
 ## [0.14.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.13.0...v0.14.0) (2026-10-31)
 
 ### Changed
