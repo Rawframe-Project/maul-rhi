@@ -519,7 +519,7 @@ if(MAUL_RHI_BUILD_TESTS)
     # check leaves them out, every other check runs them.
     foreach(test conformance conformance_worker conformance_external conformance_app
                  vulkan_external vulkan_frame vulkan_zero vulkan_cache metal_native metal_queues
-                 d3d12_native d3d12_queues external_build)
+                 d3d12_native d3d12_queues d3d12_queues_held external_build)
         if(TEST ${test})
             set_property(TEST ${test} APPEND PROPERTY LABELS integration)
         endif()
