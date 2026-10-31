@@ -385,23 +385,50 @@ static void Dispatch(mrhiDevice* device, mrhiPassId pass, mrhiComputePipelineId 
 
 // Prints why a frame did not finish: whether the hooks were in and the
 // queues held, and each call the queues took since the hooks went in, a
-// wait's or a signal's fence with the value it named. It reads no fence:
-// a call noted before the last device went may name a released one, and
-// a wait whose fence and value no signal matches is the one stuck.
+// wait's or a signal's fence with the value it named. With the hooks in,
+// every call noted is this check's, on the device still open, so each
+// fence is read too: its completed value beside each call, and for each
+// kind of queue the first wait it took whose fence has not reached the
+// value, where that queue is stuck. With the hooks out, a call noted
+// before the last device went may name a released fence, so none is read.
 static void PrintCalls(mrhiRequestId token, mrhiResult waited)
 {
     fprintf(stderr, "frame %u.%u not finished within 10 s: %s\n", token.index1, token.generation,
             mrhiGetResultName(waited));
+    bool live = s_queueTable != nullptr;
     fprintf(stderr, "  hooks %s, hold %s, held: copy %d, compute %d, direct %d\n",
-            s_queueTable == nullptr ? "off" : "on", s_hold == nullptr ? "off" : "on",
+            live ? "on" : "off", s_hold == nullptr ? "off" : "on",
             s_held[D3D12_COMMAND_LIST_TYPE_COPY], s_held[D3D12_COMMAND_LIST_TYPE_COMPUTE],
             s_held[D3D12_COMMAND_LIST_TYPE_DIRECT]);
+    if (s_hold != nullptr)
+    {
+        fprintf(stderr, "  hold fence %p completed %llu\n", (void*)s_hold,
+                (unsigned long long)ID3D12Fence_GetCompletedValue(s_hold));
+    }
     static const char* const kinds[] = {"execute", "wait", "signal"};
+    bool stuck[4] = {false};
     for (uint32_t i = 0; i < s_callCount; ++i)
     {
         const Call* call = &s_calls[i];
-        fprintf(stderr, "  %u: %s on queue type %d, fence %p, value %llu\n", i, kinds[call->kind],
+        fprintf(stderr, "  %u: %s on queue type %d, fence %p, value %llu", i, kinds[call->kind],
                 (int)call->queue, (void*)call->fence, (unsigned long long)call->value);
+        if (!live || call->fence == nullptr)
+        {
+            fprintf(stderr, "\n");
+            continue;
+        }
+        uint64_t completed = ID3D12Fence_GetCompletedValue(call->fence);
+        fprintf(stderr, ", completed %llu\n", (unsigned long long)completed);
+        if (call->kind == CALL_WAIT && completed < call->value && call->queue < 4 &&
+            !stuck[call->queue])
+        {
+            stuck[call->queue] = true;
+            fprintf(stderr,
+                    "  stuck: queue type %d at call %u, waiting for fence %p to reach %llu, "
+                    "completed %llu\n",
+                    (int)call->queue, i, (void*)call->fence, (unsigned long long)call->value,
+                    (unsigned long long)completed);
+        }
     }
 }
 
