@@ -49,15 +49,15 @@ static void TestDevice(void)
     Refuse(device, false);
     CHECK(mrhiDevice_GetMisuse(device) == 5, "every refusal counted");
     CHECK(mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success &&
-              record.code == mrhi_diagnosticBufferSize && record.count == 2,
+              record.code == mrhi_diagnosticBufferSize && record.callsRefused == 2,
           "the first check's two refusals, one record");
     CHECK(mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success &&
-              record.code == mrhi_diagnosticBufferUsage && record.count == 2,
+              record.code == mrhi_diagnosticBufferUsage && record.callsRefused == 2,
           "the second's");
     CHECK(mrhiDevice_TakeDiagnostic(device, &record) == mrhi_empty, "the third's dropped");
     // Drained, the next refusal takes a record of its own again.
     Refuse(device, false);
-    CHECK(mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success && record.count == 1,
+    CHECK(mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success && record.callsRefused == 1,
           "a new record after draining");
     CHECK(mrhiDevice_TakeDiagnostic(device, nullptr) == mrhi_errorInvalid &&
               mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success &&
@@ -97,7 +97,7 @@ static void TestInstance(void)
     CHECK(mrhiInstance_GetAdapters(instance, nullptr, 1, nullptr) == mrhi_errorInvalid, "no count");
     mrhiDiagnostic record = {0};
     CHECK(mrhiInstance_TakeDiagnostic(instance, &record) == mrhi_success &&
-              record.code == mrhi_diagnosticAdapterRequestDef && record.count == 1,
+              record.code == mrhi_diagnosticAdapterRequestDef && record.callsRefused == 1,
           "the request def's check");
     CHECK(mrhiInstance_TakeDiagnostic(instance, &record) == mrhi_success &&
               record.code == mrhi_diagnosticNullArgument,
@@ -249,7 +249,7 @@ static void TestThreads(void)
     mrhiDiagnostic record;
     while (mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success)
     {
-        total += record.count;
+        total += record.callsRefused;
     }
     CHECK(total == THREADS * REFUSALS && mrhiDevice_GetMisuse(device) == total,
           "every refusal in a record");

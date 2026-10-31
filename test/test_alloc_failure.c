@@ -436,7 +436,7 @@ static uint64_t InstanceDigest(World* world)
     mrhiDiagnostic diagnostic;
     while (mrhiInstance_TakeDiagnostic(world->instance, &diagnostic) == mrhi_success)
     {
-        hash = Mix(Mix(hash, diagnostic.code), diagnostic.count);
+        hash = Mix(Mix(hash, diagnostic.code), diagnostic.callsRefused);
     }
     return hash;
 }
@@ -453,7 +453,7 @@ static uint64_t DeviceDigest(mrhiDevice* device, uint64_t hash)
     mrhiDiagnostic diagnostic;
     while (mrhiDevice_TakeDiagnostic(device, &diagnostic) == mrhi_success)
     {
-        hash = Mix(Mix(hash, diagnostic.code), diagnostic.count);
+        hash = Mix(Mix(hash, diagnostic.code), diagnostic.callsRefused);
     }
     return hash;
 }

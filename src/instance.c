@@ -334,7 +334,7 @@ uint64_t mrhiInstance_GetMisuse(mrhiInstance* instance)
     return instance == nullptr ? 0 : instance->misuse;
 }
 
-uint64_t mrhiInstance_GetDriverFaults(const mrhiInstance* instance)
+uint64_t mrhiInstance_GetDriverFaultCount(const mrhiInstance* instance)
 {
     return instance == nullptr
                ? 0

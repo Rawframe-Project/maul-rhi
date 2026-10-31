@@ -4089,7 +4089,7 @@ static void TestTestDriver(void)
         return;
     }
     CHECK(CheckDriver(instance, mrhi_driverTest) == 1, "the test adapter");
-    s_driverFaults += mrhiInstance_GetDriverFaults(instance);
+    s_driverFaults += mrhiInstance_GetDriverFaultCount(instance);
     mrhiDestroyInstance(instance);
 }
 
@@ -4741,7 +4741,7 @@ static void TestNativeDriver(void)
     {
         CheckSurfaces(instance);
     }
-    s_driverFaults += mrhiInstance_GetDriverFaults(instance);
+    s_driverFaults += mrhiInstance_GetDriverFaultCount(instance);
     mrhiDestroyInstance(instance);
 }
 
