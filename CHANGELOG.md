@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.15.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.15.0...v0.15.1) (2026-10-31)
+
+
+### Fixed
+
+* **d3d12:** run whole GPU-based validation on Agility SDK 1.620.1 ([#312](https://github.com/Rawframe-Project/maul-rhi/issues/312)) ([89d7069](https://github.com/Rawframe-Project/maul-rhi/commit/89d7069c2828a77185019dccf1278ebc9fbea951)), closes [#311](https://github.com/Rawframe-Project/maul-rhi/issues/311) [#310](https://github.com/Rawframe-Project/maul-rhi/issues/310) [#7](https://github.com/Rawframe-Project/maul-rhi/issues/7)
+
 ## [0.15.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.14.0...v0.15.0) (2026-10-31)
 
 ### Changed
