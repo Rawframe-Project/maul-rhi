@@ -5,6 +5,27 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.14.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.13.0...v0.14.0) (2026-10-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* **contract:** mrhiFrameUsage's counts are frameResourceCount, framePassCount, frameAccessCount, frameBarrierCount and frameIndirectDrawCount; mrhiDiagnostic.count is callsRefused; mrhiInstance_GetDriverFaults is mrhiInstance_GetDriverFaultCount.
+* **contract:** every public enumeration type is int32_t, bitflags and mrhiStructType are uint32_t, and mrhiFormatCaps.sampleCounts is mrhiSampleCounts; struct layouts change, and MRHI_SPI_VERSION is 12.
+* **contract:** a take call refused with `mrhi_errorBusy` from inside an allocator (`mrhiInstance_TakeDiagnostic`, `mrhiInstance_TakeNotification`, `mrhiDevice_TakeDiagnostic`, `mrhiDevice_TakeNotification`, `mrhiRequest_TakeReadback`) leaves its record, bytes and size as they were instead of zeroing them.
+
+### Fixed
+
+* **contract:** leave a take call's outputs when it is refused as busy ([#266](https://github.com/Rawframe-Project/maul-rhi/issues/266)) ([0d76f77](https://github.com/Rawframe-Project/maul-rhi/commit/0d76f770b34e6a7ed2d761d1d629315049d90aa8)), closes [#262](https://github.com/Rawframe-Project/maul-rhi/issues/262)
+* **contract:** make every kind int32_t and every set of bits uint32_t ([#283](https://github.com/Rawframe-Project/maul-rhi/issues/283)) ([acf466c](https://github.com/Rawframe-Project/maul-rhi/commit/acf466c31a630ec0f72684144dd8494a61ee3a21)), closes [#272](https://github.com/Rawframe-Project/maul-rhi/issues/272)
+* **contract:** name the counters for what they count ([#286](https://github.com/Rawframe-Project/maul-rhi/issues/286)) ([dbbe477](https://github.com/Rawframe-Project/maul-rhi/commit/dbbe47739a7cf90e0c5352966663a05957945c9f)), closes [#275](https://github.com/Rawframe-Project/maul-rhi/issues/275)
+* **contract:** read an output's source before clearing the output ([#281](https://github.com/Rawframe-Project/maul-rhi/issues/281)) ([8d251f2](https://github.com/Rawframe-Project/maul-rhi/commit/8d251f29fbd12021196479b6d5abadb0dc632da3)), closes [#280](https://github.com/Rawframe-Project/maul-rhi/issues/280)
+* **device:** make a destroyed id stale before its memory goes back ([#276](https://github.com/Rawframe-Project/maul-rhi/issues/276)) ([d555eb2](https://github.com/Rawframe-Project/maul-rhi/commit/d555eb2a30d3ed662fc6333ac08dff3dfc38f98b)), closes [#273](https://github.com/Rawframe-Project/maul-rhi/issues/273)
+* **spi:** check driver counts, sizes and adapter info in the core ([#289](https://github.com/Rawframe-Project/maul-rhi/issues/289)) ([ef3b7b0](https://github.com/Rawframe-Project/maul-rhi/commit/ef3b7b036b3edb39d26fc0df0f3e6fd67661d349)), closes [#288](https://github.com/Rawframe-Project/maul-rhi/issues/288)
+* **spi:** keep unknown loss reasons and surface colors from the program ([#287](https://github.com/Rawframe-Project/maul-rhi/issues/287)) ([98f04e2](https://github.com/Rawframe-Project/maul-rhi/commit/98f04e275e8d964914b162b15ae3745fd3d909ef)), closes [#282](https://github.com/Rawframe-Project/maul-rhi/issues/282)
+* **spi:** refuse presentable surface caps that miss a floor ([#291](https://github.com/Rawframe-Project/maul-rhi/issues/291)) ([d36b2f4](https://github.com/Rawframe-Project/maul-rhi/commit/d36b2f4e484bc6f7ee6a4743bae80fcac667a275)), closes [#290](https://github.com/Rawframe-Project/maul-rhi/issues/290)
+* **vulkan:** keep a surface's 8-bit sRGB color however many come first ([#293](https://github.com/Rawframe-Project/maul-rhi/issues/293)) ([cefa33c](https://github.com/Rawframe-Project/maul-rhi/commit/cefa33c3d9522692908ea71ca226537d8316e4f2)), closes [#292](https://github.com/Rawframe-Project/maul-rhi/issues/292)
+
 ## [0.13.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.12.0...v0.13.0) (2026-10-29)
 
 ### Changed
