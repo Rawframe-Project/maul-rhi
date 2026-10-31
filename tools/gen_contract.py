@@ -135,11 +135,16 @@ def check_name(errors, where, name):
         errors.append(f"{where}: '{name}' is not a snake_case name")
 
 
-def check_type(errors, where, kind_of, spec):
-    """Checks a type spec: a type and, for members and arguments, a pointer."""
+def check_type(errors, where, kind_of, spec, markable=False):
+    """Checks a type spec: a type and, for members and arguments, a pointer.
+    Only a function's own argument is markable input_only; check_function
+    checks the mark there."""
     type_name, pointer = spec.get("type"), spec.get("pointer")
     if pointer not in POINTERS:
         errors.append(f"{where}: unknown pointer '{pointer}'")
+    if "input_only" in spec and not markable:
+        errors.append(f"{where}: '{spec.get('name', 'the return value')}' is input_only, which "
+                      "only a function's argument may be")
     if type_name == "function":
         check_signature(errors, where, kind_of, spec)
         return
@@ -155,14 +160,15 @@ def check_type(errors, where, kind_of, spec):
         errors.append(f"{where}: unknown type '{type_name}'")
 
 
-def check_signature(errors, where, kind_of, spec):
-    """Checks a function's or a function pointer's return and arguments."""
+def check_signature(errors, where, kind_of, spec, markable=False):
+    """Checks a function's or a function pointer's return and arguments;
+    markable for a function's, whose arguments may be input_only."""
     returns = spec.get("returns")
     if returns is not None:
         check_type(errors, where, kind_of, returns)
     for arg in spec.get("args", []):
         check_name(errors, where, arg.get("name"))
-        check_type(errors, where, kind_of, arg)
+        check_type(errors, where, kind_of, arg, markable)
 
 
 def check_values(errors, where, item):
@@ -296,26 +302,31 @@ CREATION_VERBS = ("create", "destroy", "declare", "import", "add", "acquire")
 
 def object_of(item):
     """The object a function acts on by the family's rule: the kind of its
-    first id that is not an output, else its root's type; None for a call
-    that takes no root, or makes or ends an object."""
+    first id that is neither an output nor marked input_only, else its
+    root's type; None for a call that takes no root, or makes or ends an
+    object."""
     args = item.get("args", [])
     if (not args or not args[0].get("type", "").startswith("opaque.")
             or item["name"].partition("_")[0] in CREATION_VERBS):
         return None
     for arg in args:
         kind, _, name = arg.get("type", "").partition(".")
-        if kind == "id" and arg.get("pointer") is None:
+        if kind == "id" and arg.get("pointer") is None and not arg.get("input_only"):
             return name.removesuffix("_id")
     return args[0]["type"].partition(".")[2]
 
 
 def check_function(errors, where, item, kind_of):
-    check_signature(errors, where, kind_of, item)
+    check_signature(errors, where, kind_of, item, markable=True)
     if item.get("returns") is not None and not item["returns"].get("doc"):
         errors.append(f"{where}: the return value needs a doc")
     for arg in item.get("args", []):
         if not arg.get("doc"):
             errors.append(f"{where}: argument '{arg.get('name')}' needs a doc")
+        by_value_id = arg.get("type", "").startswith("id.") and arg.get("pointer") is None
+        if "input_only" in arg and (arg["input_only"] is not True or not by_value_id):
+            errors.append(f"{where}: argument '{arg.get('name')}' is input_only, which is true "
+                          "on an id taken by value or absent")
     body = item.get("inline_body")
     if body is not None and (not isinstance(body, list) or not body or
                              not all(isinstance(line, str) for line in body)):
@@ -1061,9 +1072,9 @@ def outputs(contract):
 
 
 def self_test(contract):
-    """Plants each case of the limits' codes, and of a function's object,
-    in a copy of the contract: whether validate refuses it, naming the
-    member or the object."""
+    """Plants each case of the limits' codes, of a function's object and of
+    an input-only id, in a copy of the contract: whether validate refuses
+    it, naming the member, the object or the argument."""
 
     def planted(change):
         made = copy.deepcopy(contract)
@@ -1077,6 +1088,9 @@ def self_test(contract):
 
     def code(name, value):
         return {"name": name, "value": value, "doc": "A limit's refusal."}
+
+    def only_input(item, name, value=True, members="args"):
+        next(arg for arg in item[members] if arg["name"] == name)["input_only"] = value
 
     top = max(value["value"] for value in find_item(contract, "diagnostic_code")["values"])
     cases = [
@@ -1116,11 +1130,48 @@ def self_test(contract):
         ("a name that starts with the object's letters only",
          lambda limits, codes, items: items["pass_begin"].update(name="passes_begin"),
          "its object 'pass' does not start"),
+        ("an input-only first id, the next id named",
+         lambda limits, codes, items: (
+             only_input(items["pass_set_compute_pipeline"], "pass"),
+             items["pass_set_compute_pipeline"].update(object="compute_pipeline",
+                                                       name="compute_pipeline_set")),
+         None),
+        ("an input-only first id named",
+         lambda limits, codes, items: only_input(items["pass_set_compute_pipeline"], "pass"),
+         "its object 'pass' is not 'compute_pipeline'"),
+        ("an input-only only id, the root named",
+         lambda limits, codes, items: (only_input(items["pass_begin"], "pass"),
+                                       items["pass_begin"].update(object="device",
+                                                                  name="device_begin")),
+         None),
+        ("an input-only only id named",
+         lambda limits, codes, items: only_input(items["pass_begin"], "pass"),
+         "its object 'pass' is not 'device'"),
+        ("input_only on the root",
+         lambda limits, codes, items: only_input(items["pass_begin"], "device"),
+         "'device' is input_only"),
+        ("input_only false",
+         lambda limits, codes, items: only_input(items["pass_begin"], "pass", False),
+         "'pass' is input_only"),
+        ("input_only on an output id",
+         lambda limits, codes, items: only_input(items["pass_read_buffer"], "request_out"),
+         "'request_out' is input_only"),
+        ("input_only on a return value",
+         lambda limits, codes, items: items["pass_begin"]["returns"].update(input_only=True),
+         "'the return value' is input_only"),
+        ("input_only on a struct member",
+         lambda limits, codes, items: only_input(items["buffer_def"], "size", members="members"),
+         "'size' is input_only"),
+        ("input_only on a function pointer's argument",
+         lambda limits, codes, items: only_input(
+             next(m for m in items["allocator"]["members"] if m["name"] == "alloc"), "size"),
+         "'size' is input_only"),
     ]
     wrong = 0
     for name, change, expected in cases:
         errors = [error for error in validate(planted(change))
-                  if "limits" in error or "diagnostic_limit_" in error or "its object" in error]
+                  if "limits" in error or "diagnostic_limit_" in error or "its object" in error
+                  or "input_only" in error]
         right = not errors if expected is None else any(expected in e for e in errors)
         if not right:
             print(f"self-test: {name}: {errors or 'taken'}", file=sys.stderr)
