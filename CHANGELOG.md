@@ -5,6 +5,21 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.15.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.14.0...v0.15.0) (2026-10-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* **contract:** mrhiQuerySetDef.type is renamed kind, and mrhiQueryType is renamed mrhiQueryKind.
+* **contract:** mrhiResourcePlan.usage is replaced by bufferUsage (mrhiBufferUsage) and textureUsage (mrhiTextureUsage).
+* **contract:** mrhiPass_WriteBuffer takes its byte count as size_t, not uint64_t.
+
+### Changed
+
+* **contract:** give the resource plan's usages their types ([#303](https://github.com/Rawframe-Project/maul-rhi/issues/303)) ([e3618fb](https://github.com/Rawframe-Project/maul-rhi/commit/e3618fb8f4427a742afd477ac6f7126fd2a9abf2)), closes [#302](https://github.com/Rawframe-Project/maul-rhi/issues/302)
+* **contract:** name the query set's choice kind ([#306](https://github.com/Rawframe-Project/maul-rhi/issues/306)) ([63ebe34](https://github.com/Rawframe-Project/maul-rhi/commit/63ebe341b5669b9dc3b1c6feebdec4e7dfa1e586)), closes [#304](https://github.com/Rawframe-Project/maul-rhi/issues/304)
+* **contract:** take mrhiPass_WriteBuffer's byte count as size_t ([#301](https://github.com/Rawframe-Project/maul-rhi/issues/301)) ([d275e62](https://github.com/Rawframe-Project/maul-rhi/commit/d275e6282b5a5d2badf5552d8a12b4ae1ed7c96b)), closes [#300](https://github.com/Rawframe-Project/maul-rhi/issues/300)
+
 ## [0.14.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.13.0...v0.14.0) (2026-10-31)
 
 ### Changed
