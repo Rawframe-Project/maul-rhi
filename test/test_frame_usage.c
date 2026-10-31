@@ -53,11 +53,12 @@ static mrhiFrameUsage Usage(void)
 // struct returned by value may carry any bytes in its padding.
 static bool SameUsage(const mrhiFrameUsage* a, const mrhiFrameUsage* b)
 {
-    return a->frameResources == b->frameResources && a->framePasses == b->framePasses &&
-           a->frameAccesses == b->frameAccesses && a->frameBarriers == b->frameBarriers &&
+    return a->frameResourceCount == b->frameResourceCount &&
+           a->framePassCount == b->framePassCount && a->frameAccessCount == b->frameAccessCount &&
+           a->frameBarrierCount == b->frameBarrierCount &&
            a->frameCommandBytes == b->frameCommandBytes &&
            a->frameUploadBytes == b->frameUploadBytes &&
-           a->frameIndirectDraws == b->frameIndirectDraws &&
+           a->frameIndirectDrawCount == b->frameIndirectDrawCount &&
            a->frameMemoryBytes == b->frameMemoryBytes;
 }
 
@@ -68,7 +69,7 @@ static bool Refused(mrhiDiagnosticCode code, uint32_t count)
     mrhiDiagnostic record = {0};
     bool taken = mrhiDevice_TakeDiagnostic(s_device, &record) == mrhi_success;
     mrhiDiagnostic after;
-    return taken && record.code == code && record.count == count &&
+    return taken && record.code == code && record.callsRefused == count &&
            mrhiDevice_TakeDiagnostic(s_device, &after) == mrhi_empty;
 }
 
@@ -167,10 +168,10 @@ static void TestCounts(void)
               AddPass(&read, 1, &reads) == mrhi_success,
           "two passes");
     mrhiFrameUsage usage = Usage();
-    CHECK(usage.frameResources == 2 && usage.framePasses == 2 && usage.frameAccesses == 3 &&
-              usage.frameBarriers == 0 && usage.frameCommandBytes == 0 &&
-              usage.frameUploadBytes == 0 && usage.frameIndirectDraws == 0 &&
-              usage.frameMemoryBytes == 0,
+    CHECK(usage.frameResourceCount == 2 && usage.framePassCount == 2 &&
+              usage.frameAccessCount == 3 && usage.frameBarrierCount == 0 &&
+              usage.frameCommandBytes == 0 && usage.frameUploadBytes == 0 &&
+              usage.frameIndirectDrawCount == 0 && usage.frameMemoryBytes == 0,
           "resources, passes and accesses before the compile");
     CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     // The two buffers are both written in the first pass, so they share
@@ -180,7 +181,7 @@ static void TestCounts(void)
     CHECK(mrhiDevice_GetFrameBarriers(s_device, nullptr, 0, &barriers) == mrhi_success &&
               barriers > 0,
           "barriers planned");
-    CHECK(Usage().frameBarriers == barriers, "the compile's barriers, all the program's");
+    CHECK(Usage().frameBarrierCount == barriers, "the compile's barriers, all the program's");
     CHECK(mrhiPass_Begin(s_device, writes) == mrhi_success, "begun");
     CHECK(mrhiPass_ClearBuffer(s_device, writes, first, 0, 4) == mrhi_success, "a command");
     CHECK(mrhiPass_WriteBuffer(s_device, writes, second, 0, s_bytes, 4) == mrhi_success &&
@@ -214,7 +215,7 @@ static void TestLibraryLeftOut(void)
               barriers > 0,
           "the clear's barriers");
     mrhiFrameUsage usage = Usage();
-    CHECK(usage.framePasses == 1 && usage.frameBarriers == 0 && usage.frameCommandBytes == 0,
+    CHECK(usage.framePassCount == 1 && usage.frameBarrierCount == 0 && usage.frameCommandBytes == 0,
           "the library's pass, barrier and commands left out");
     CHECK(mrhiPass_End(s_device, pass) == mrhi_success, "ended");
     Drop();
@@ -236,7 +237,7 @@ static void TestResources(void)
     CHECK(mrhiDeclareBuffer(s_device, &bufferDef, &resource) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticFrameResources, 1),
           "a third resource");
-    CHECK(Usage().frameResources == 2, "the frame's resources");
+    CHECK(Usage().frameResourceCount == 2, "the frame's resources");
     Drop();
     CloseDevice();
 }
@@ -260,12 +261,12 @@ static void TestPasses(void)
               Refused(mrhi_diagnosticFrameAccesses, 1),
           "a fourth access and its room");
     mrhiFrameUsage usage = Usage();
-    CHECK(usage.framePasses == 1 && usage.frameAccesses == 3, "below the limit");
+    CHECK(usage.framePassCount == 1 && usage.frameAccessCount == 3, "below the limit");
     CHECK(AddPass(nullptr, 0, &pass) == mrhi_success, "a pass without accesses");
     CHECK(AddPass(nullptr, 0, &pass) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticFramePasses, 1),
           "a third pass");
-    CHECK(Usage().framePasses == 2, "the frame's passes");
+    CHECK(Usage().framePassCount == 2, "the frame's passes");
     Drop();
     CloseDevice();
 }
@@ -331,7 +332,7 @@ static void CheckBarriers(void (*declare)(void), bool aliasing)
     Begin();
     declare();
     CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
-    uint32_t planned = Usage().frameBarriers;
+    uint32_t planned = Usage().frameBarrierCount;
     CHECK(planned >= 2 && PlansAliasing() == aliasing, "planned");
     Drop();
     CloseDevice();
@@ -343,7 +344,7 @@ static void CheckBarriers(void (*declare)(void), bool aliasing)
     CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticFrameBarriers, 1),
           "one barrier too many");
-    CHECK(Usage().frameBarriers == planned - 1, "those planned before the refusal");
+    CHECK(Usage().frameBarrierCount == planned - 1, "those planned before the refusal");
     mrhiRequestId token;
     CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorCapacity &&
               Refused(mrhi_diagnosticFrameBarriers, 1),

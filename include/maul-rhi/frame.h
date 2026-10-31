@@ -794,17 +794,17 @@ extern "C"
     typedef struct mrhiFrameUsage
     {
         // The resources it declared, imported and acquired.
-        uint32_t frameResources;
+        uint32_t frameResourceCount;
         // The passes it added; the library's own pass is not counted.
-        uint32_t framePasses;
+        uint32_t framePassCount;
         // The accesses and targets its passes declared, as the limit counts
         // them. A pass is refused when its accesses, with two for each color
         // target and one for the depth target, could pass the limit, so the
         // last pass may be refused below it.
-        uint32_t frameAccesses;
+        uint32_t frameAccessCount;
         // The barriers its compile planned, the program's alone: 0 before the
         // compile, and those planned before a compile the limit refused.
-        uint32_t frameBarriers;
+        uint32_t frameBarrierCount;
         // The bytes its passes' commands took, in whole 4 KiB chunks, so a full
         // arena reads the limit rounded down to them; the library's own pass is
         // not counted.
@@ -813,7 +813,7 @@ extern "C"
         // boundary with a texture's rows at a 256-byte pitch.
         uint32_t frameUploadBytes;
         // The maxCounts of its counted multi-draws, in all.
-        uint32_t frameIndirectDraws;
+        uint32_t frameIndirectDrawCount;
         // The bytes its declared resources take together, placed by lifetime so
         // resources whose uses do not overlap share bytes: 0 until its compile
         // succeeds.

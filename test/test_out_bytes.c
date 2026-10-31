@@ -278,7 +278,8 @@ static void TestSameBytes(void)
     CHECK(SAME(frameDone), "the device's notification");
     CHECK(SAME(loss), "the loss report");
     // The bytes compared are the getters' own, not the patterns left.
-    CHECK(a->adapterInfo.vendorId == 7 && a->surfaceCaps.presentable && a->usage.framePasses == 2,
+    CHECK(a->adapterInfo.vendorId == 7 && a->surfaceCaps.presentable &&
+              a->usage.framePassCount == 2,
           "the getters filled them");
 }
 

@@ -832,7 +832,7 @@ static void TestCountedDraws(void)
               "five draws in a frame");
         mrhiFrameUsage usage = {0};
         CHECK(mrhiDevice_GetFrameUsage(s_device, &usage) == mrhi_success &&
-                  usage.frameIndirectDraws == 5,
+                  usage.frameIndirectDrawCount == 5,
               "all of them taken");
         Drop();
     }

@@ -29,7 +29,7 @@ static inline void mrhiOutDiagnostic(
     const mrhiDiagnostic value = *from;
     memset(out, 0, sizeof(*out));
     out->code = value.code;
-    out->count = value.count;
+    out->callsRefused = value.callsRefused;
 }
 
 static inline void mrhiOutInstanceNotification(
@@ -277,13 +277,13 @@ static inline void mrhiOutFrameUsage(
 {
     const mrhiFrameUsage value = *from;
     memset(out, 0, sizeof(*out));
-    out->frameResources = value.frameResources;
-    out->framePasses = value.framePasses;
-    out->frameAccesses = value.frameAccesses;
-    out->frameBarriers = value.frameBarriers;
+    out->frameResourceCount = value.frameResourceCount;
+    out->framePassCount = value.framePassCount;
+    out->frameAccessCount = value.frameAccessCount;
+    out->frameBarrierCount = value.frameBarrierCount;
     out->frameCommandBytes = value.frameCommandBytes;
     out->frameUploadBytes = value.frameUploadBytes;
-    out->frameIndirectDraws = value.frameIndirectDraws;
+    out->frameIndirectDrawCount = value.frameIndirectDrawCount;
     out->frameMemoryBytes = value.frameMemoryBytes;
 }
 

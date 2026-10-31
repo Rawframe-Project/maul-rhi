@@ -691,9 +691,9 @@ extern "C"
     {
         // The check or the limit that refused the call.
         mrhiDiagnosticCode code;
-        // How many refusals in a row the record stands for: a refusal by the
-        // newest record's check adds to its count instead of taking room.
-        uint32_t count;
+        // How many calls in a row the record's check refused: a refusal by the
+        // newest record's check adds one here instead of taking room.
+        uint32_t callsRefused;
     } mrhiDiagnostic;
 
     /// Returns the text of a diagnostic code, for people; programs compare

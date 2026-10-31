@@ -18,12 +18,12 @@ static void TestRepeatCount(void)
     mrhiDiagnosticQueue queue;
     mrhiInitDiagnostics(&queue, records, 2);
     mrhiRecordDiagnostic(&queue, mrhi_diagnosticNullArgument);
-    records[0].count = UINT32_MAX - 1;
+    records[0].callsRefused = UINT32_MAX - 1;
     mrhiRecordDiagnostic(&queue, mrhi_diagnosticNullArgument);
     mrhiRecordDiagnostic(&queue, mrhi_diagnosticNullArgument);
     mrhiDiagnostic record = {0};
     CHECK(mrhiTakeDiagnostic(&queue, &record) == mrhi_success &&
-              record.code == mrhi_diagnosticNullArgument && record.count == UINT32_MAX,
+              record.code == mrhi_diagnosticNullArgument && record.callsRefused == UINT32_MAX,
           "repeats counted up to UINT32_MAX and held there");
     CHECK(mrhiTakeDiagnostic(&queue, &record) == mrhi_empty, "folded into one record");
 }

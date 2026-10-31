@@ -366,14 +366,14 @@ mrhiResult mrhiDevice_GetFrameUsage(mrhiDevice* device, mrhiFrameUsage* usageOut
         device->frameCompiled ? device->frameChunkLimit - device->frameProgramChunks : 0;
     chunks = chunks < device->frameChunkLimit ? chunks : device->frameChunkLimit;
     const mrhiFrameUsage usage = {
-        .frameResources = device->frameResourceCount,
-        .framePasses = device->framePassCount - libraryPasses,
-        .frameAccesses = device->frameUseCount,
-        .frameBarriers = device->frameBarrierCount - device->frameLibraryBarriers,
+        .frameResourceCount = device->frameResourceCount,
+        .framePassCount = device->framePassCount - libraryPasses,
+        .frameAccessCount = device->frameUseCount,
+        .frameBarrierCount = device->frameBarrierCount - device->frameLibraryBarriers,
         .frameCommandBytes = (chunks - libraryChunks) * MRHI_CHUNK_BYTES,
         .frameUploadBytes =
             (uint32_t)(staged < limits->frameUploadBytes ? staged : limits->frameUploadBytes),
-        .frameIndirectDraws =
+        .frameIndirectDrawCount =
             (uint32_t)atomic_load_explicit(&device->countedTaken, memory_order_relaxed),
         .frameMemoryBytes = device->frameCompiled ? device->frameMemory : 0,
     };

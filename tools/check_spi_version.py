@@ -396,8 +396,8 @@ SELF_CASES = [
      [("src/driver.h", "MRHI_STATISTICS_COUNTERS : 1u)", "MRHI_STATISTICS_COUNTERS : 2u)")],
      False),
     ("a type no driver reaches changed",
-     [("include/maul-rhi/frame.h", "uint32_t frameIndirectDraws;",
-       "uint64_t frameIndirectDraws;")], True),
+     [("include/maul-rhi/frame.h", "uint32_t frameIndirectDrawCount;",
+       "uint64_t frameIndirectDrawCount;")], True),
     ("only the version raised", ["raise"], True),
 ]
 

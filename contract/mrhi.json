@@ -1052,9 +1052,9 @@
               "doc": "The check or the limit that refused the call."
             },
             {
-              "name": "count",
+              "name": "calls_refused",
               "type": "uint32",
-              "doc": "How many refusals in a row the record stands for: a refusal by the newest record's check adds to its count instead of taking room."
+              "doc": "How many calls in a row the record's check refused: a refusal by the newest record's check adds one here instead of taking room."
             }
           ],
           "library": "a record of the library's own diagnostic queue"
@@ -1632,7 +1632,7 @@
         },
         {
           "kind": "function",
-          "name": "instance_get_driver_faults",
+          "name": "instance_get_driver_fault_count",
           "object": "instance",
           "doc": "Returns how many breaches of the driver SPI the validation layer has found on the instance and its devices: frames no driver could translate, and driver answers no core could trust. Builds without the layer (MAUL_RHI_VALIDATION) find none.",
           "returns": {
@@ -14166,22 +14166,22 @@
           "doc": "What a frame has taken of each budget a frame has, each member named after the mrhiDeviceBudgets member it is measured against, and the memory its transient resources take, which no budget bounds.",
           "members": [
             {
-              "name": "frame_resources",
+              "name": "frame_resource_count",
               "type": "uint32",
               "doc": "The resources it declared, imported and acquired."
             },
             {
-              "name": "frame_passes",
+              "name": "frame_pass_count",
               "type": "uint32",
               "doc": "The passes it added; the library's own pass is not counted."
             },
             {
-              "name": "frame_accesses",
+              "name": "frame_access_count",
               "type": "uint32",
               "doc": "The accesses and targets its passes declared, as the limit counts them. A pass is refused when its accesses, with two for each color target and one for the depth target, could pass the limit, so the last pass may be refused below it."
             },
             {
-              "name": "frame_barriers",
+              "name": "frame_barrier_count",
               "type": "uint32",
               "doc": "The barriers its compile planned, the program's alone: 0 before the compile, and those planned before a compile the limit refused."
             },
@@ -14196,7 +14196,7 @@
               "doc": "The bytes its uploads took of its staging, each at a 512-byte boundary with a texture's rows at a 256-byte pitch."
             },
             {
-              "name": "frame_indirect_draws",
+              "name": "frame_indirect_draw_count",
               "type": "uint32",
               "doc": "The maxCounts of its counted multi-draws, in all."
             },

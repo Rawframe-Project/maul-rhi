@@ -102,7 +102,8 @@ static void TestLayouts(void)
               offsetof(mrhiStencilFace, depthFailOp) == 8 &&
               offsetof(mrhiStencilFace, passOp) == 12,
           "a stencil face");
-    CHECK(sizeof(mrhiDiagnostic) == 8 && offsetof(mrhiDiagnostic, count) == 4, "a diagnostic");
+    CHECK(sizeof(mrhiDiagnostic) == 8 && offsetof(mrhiDiagnostic, callsRefused) == 4,
+          "a diagnostic");
     CHECK(sizeof(mrhiFormatCaps) == 12 && offsetof(mrhiFormatCaps, sampleCounts) == 8,
           "format caps: five bools, then the mask at four bytes");
     CHECK(sizeof(mrhiChain) == sizeof(void*) * 2 && offsetof(mrhiChain, type) == sizeof(void*),

@@ -3,7 +3,7 @@
 //
 // The validation layer, in builds with MAUL_RHI_VALIDATION: the test
 // driver handed in from outside with one function broken at a time,
-// each breach counted by mrhiInstance_GetDriverFaults and recorded in the
+// each breach counted by mrhiInstance_GetDriverFaultCount and recorded in the
 // instance's diagnostic queue with its rule's code while the call goes
 // on, and the edges a driver keeping the contract may reach left alone;
 // and a malformed frame, whose faults the walk counts without reading
@@ -98,9 +98,9 @@ static void TestClean(void)
     mrhiInstance* instance = Start();
     mrhiAdapterId adapter = {0};
     CHECK(Search(instance, &adapter) == 1, "one adapter");
-    CHECK(mrhiInstance_GetDriverFaults(instance) == 0,
+    CHECK(mrhiInstance_GetDriverFaultCount(instance) == 0,
           "none from a driver that keeps the contract");
-    CHECK(mrhiInstance_GetDriverFaults(nullptr) == 0, "no instance");
+    CHECK(mrhiInstance_GetDriverFaultCount(nullptr) == 0, "no instance");
     CHECK(Recorded(instance) == 0, "nothing recorded");
     mrhiDestroyInstance(instance);
 }
@@ -151,14 +151,14 @@ static void TestInstanceAnswers(void)
     mrhiInstance* instance = Start();
     mrhiAdapterId adapter = {0};
     CHECK(Search(instance, &adapter) == 0, "a search answered for another request");
-    CHECK(mrhiInstance_GetDriverFaults(instance) == 1, "counted");
+    CHECK(mrhiInstance_GetDriverFaultCount(instance) == 1, "counted");
     CHECK(Recorded(instance) == mrhi_diagnosticDriverUnaskedAnswer, "recorded");
     mrhiDestroyInstance(instance);
     Open();
     s_vtable.getAdapters = ListTwice;
     instance = Start();
     Search(instance, &adapter);
-    CHECK(mrhiInstance_GetDriverFaults(instance) == 1 &&
+    CHECK(mrhiInstance_GetDriverFaultCount(instance) == 1 &&
               Recorded(instance) == mrhi_diagnosticDriverAdapter,
           "an adapter listed twice");
     mrhiDestroyInstance(instance);
@@ -166,7 +166,7 @@ static void TestInstanceAnswers(void)
     s_vtable.poll = OverReport;
     instance = Start();
     Search(instance, &adapter);
-    CHECK(mrhiInstance_GetDriverFaults(instance) >= 1 &&
+    CHECK(mrhiInstance_GetDriverFaultCount(instance) >= 1 &&
               Recorded(instance) == mrhi_diagnosticDriverEventsOverrun,
           "more events than room, clamped");
     mrhiDestroyInstance(instance);
@@ -174,7 +174,7 @@ static void TestInstanceAnswers(void)
     s_vtable.poll = AnswerTwice;
     instance = Start();
     Search(instance, &adapter);
-    CHECK(mrhiInstance_GetDriverFaults(instance) == 1 &&
+    CHECK(mrhiInstance_GetDriverFaultCount(instance) == 1 &&
               Recorded(instance) == mrhi_diagnosticDriverUnaskedAnswer,
           "a search answered twice");
     mrhiDestroyInstance(instance);
@@ -183,7 +183,7 @@ static void TestInstanceAnswers(void)
     Open();
     s_longName = false;
     instance = Start();
-    CHECK(Search(instance, &adapter) == 1 && mrhiInstance_GetDriverFaults(instance) == 0,
+    CHECK(Search(instance, &adapter) == 1 && mrhiInstance_GetDriverFaultCount(instance) == 0,
           "an adapter's name of the most bytes");
     mrhiDestroyInstance(instance);
 }
@@ -253,7 +253,7 @@ static void TestNegativeAdapterKind(void)
         mrhiInstance* instance = Start();
         mrhiAdapterId adapter = {0};
         Search(instance, &adapter);
-        CHECK(mrhiInstance_GetDriverFaults(instance) == 1 &&
+        CHECK(mrhiInstance_GetDriverFaultCount(instance) == 1 &&
                   Recorded(instance) == mrhi_diagnosticDriverAdapter,
               "a negative adapter kind");
         mrhiDestroyInstance(instance);
@@ -280,18 +280,18 @@ static void TestDeviceEdges(void)
     s_image = 0;
     s_acquired = mrhi_errorDeviceLost;
     CHECK(layer->acquireImage(self, 1, &image) == mrhi_errorDeviceLost &&
-              mrhiInstance_GetDriverFaults(instance) == 0,
+              mrhiInstance_GetDriverFaultCount(instance) == 0,
           "no image with a failed acquire");
     s_acquired = mrhi_success;
     CHECK(layer->acquireImage(self, 1, &image) == mrhi_success &&
-              mrhiInstance_GetDriverFaults(instance) == 1 &&
+              mrhiInstance_GetDriverFaultCount(instance) == 1 &&
               Recorded(instance) == mrhi_diagnosticDriverZeroHandle,
           "an acquire that gives no image");
     s_period = 0.0;
-    CHECK(layer->timestampPeriod(self) == 0.0 && mrhiInstance_GetDriverFaults(instance) == 1,
+    CHECK(layer->timestampPeriod(self) == 0.0 && mrhiInstance_GetDriverFaultCount(instance) == 1,
           "a period of zero from a driver that does not say");
     s_period = -1.0;
-    CHECK(layer->timestampPeriod(self) == -1.0 && mrhiInstance_GetDriverFaults(instance) == 2 &&
+    CHECK(layer->timestampPeriod(self) == -1.0 && mrhiInstance_GetDriverFaultCount(instance) == 2 &&
               Recorded(instance) == mrhi_diagnosticDriverTimestampPeriod,
           "a negative period");
     // As many events as room, the last the device's loss under tag 0.
@@ -300,11 +300,11 @@ static void TestDeviceEdges(void)
     s_events[1] = (mrhiDriverEvent){0, mrhi_errorDeviceLost};
     s_eventCount = 2;
     s_inject = true;
-    CHECK(layer->poll(self, events, 2) == 2 && mrhiInstance_GetDriverFaults(instance) == 2,
+    CHECK(layer->poll(self, events, 2) == 2 && mrhiInstance_GetDriverFaultCount(instance) == 2,
           "events that fill the room, and the loss under tag 0");
     s_events[0] = (mrhiDriverEvent){0, mrhi_success};
     s_eventCount = 1;
-    CHECK(layer->poll(self, events, 2) == 1 && mrhiInstance_GetDriverFaults(instance) == 3 &&
+    CHECK(layer->poll(self, events, 2) == 1 && mrhiInstance_GetDriverFaultCount(instance) == 3 &&
               Recorded(instance) == mrhi_diagnosticDriverEventTag,
           "tag 0 for anything but the loss");
     s_inject = false;
@@ -367,7 +367,7 @@ static void TestDeviceAnswers(void)
     bufferDef.usage = mrhi_bufferCopyDestination;
     mrhiBufferId buffer;
     CHECK(mrhiCreateBuffer(device, &bufferDef, &buffer) == mrhi_success, "the call goes on");
-    CHECK(mrhiInstance_GetDriverFaults(instance) == 1 &&
+    CHECK(mrhiInstance_GetDriverFaultCount(instance) == 1 &&
               Recorded(instance) == mrhi_diagnosticDriverZeroHandle,
           "a buffer whose handle is zero");
     // A frame no driver could translate, handed to the layer as the core
@@ -377,7 +377,7 @@ static void TestDeviceAnswers(void)
     mrhiDiagnosticCode budget = 0;
     CHECK(device->driver.vtable->submitFrame(device->driver.self, &frame, 1, &budget) ==
                   mrhi_success &&
-              mrhiInstance_GetDriverFaults(instance) == 2 &&
+              mrhiInstance_GetDriverFaultCount(instance) == 2 &&
               Recorded(instance) == mrhi_diagnosticDriverFrameWalk,
           "a frame walked and found wanting");
     // A refusal for capacity names a submit budget, and only it does.
@@ -386,19 +386,20 @@ static void TestDeviceAnswers(void)
     s_submitBudget = mrhi_diagnosticSubmitScratch;
     CHECK(device->driver.vtable->submitFrame(device->driver.self, &empty, 2, &budget) ==
                   mrhi_errorCapacity &&
-              budget == mrhi_diagnosticSubmitScratch && mrhiInstance_GetDriverFaults(instance) == 2,
+              budget == mrhi_diagnosticSubmitScratch &&
+              mrhiInstance_GetDriverFaultCount(instance) == 2,
           "a budget named");
     s_submitBudget = 0;
     budget = 0;
     CHECK(device->driver.vtable->submitFrame(device->driver.self, &empty, 3, &budget) ==
                   mrhi_errorCapacity &&
-              mrhiInstance_GetDriverFaults(instance) == 3 &&
+              mrhiInstance_GetDriverFaultCount(instance) == 3 &&
               Recorded(instance) == mrhi_diagnosticDriverSubmitBudget,
           "no budget named");
     s_submitBudget = mrhi_diagnosticFramePasses;
     CHECK(device->driver.vtable->submitFrame(device->driver.self, &empty, 4, &budget) ==
                   mrhi_errorCapacity &&
-              mrhiInstance_GetDriverFaults(instance) == 4 &&
+              mrhiInstance_GetDriverFaultCount(instance) == 4 &&
               Recorded(instance) == mrhi_diagnosticDriverSubmitBudget,
           "a code that is no submit budget");
     s_submitStatus = mrhi_success;
@@ -406,7 +407,7 @@ static void TestDeviceAnswers(void)
     budget = 0;
     CHECK(device->driver.vtable->submitFrame(device->driver.self, &empty, 5, &budget) ==
                   mrhi_success &&
-              mrhiInstance_GetDriverFaults(instance) == 5 &&
+              mrhiInstance_GetDriverFaultCount(instance) == 5 &&
               Recorded(instance) == mrhi_diagnosticDriverSubmitBudget,
           "a budget named with success");
     s_submitBudget = 0;

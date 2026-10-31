@@ -285,7 +285,7 @@ extern "C"
     /// @return The count; 0 for a NULL instance or a build without the layer.
     /// @par Thread safety
     /// Safe from any thread.
-    MRHI_API uint64_t mrhiInstance_GetDriverFaults(const mrhiInstance* instance);
+    MRHI_API uint64_t mrhiInstance_GetDriverFaultCount(const mrhiInstance* instance);
 
     /// Returns the default adapter request def: the driver's own order,
     /// software rasterizers allowed.
