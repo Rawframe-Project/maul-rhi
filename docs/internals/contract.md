@@ -43,7 +43,7 @@ Every item has a `kind`, a snake_case `name` and a `doc`. The generator turns na
 | `opaque` | none | a typed opaque pointer, for a root object |
 | `id` | none | a generation-checked id, `{ index1, generation }` |
 | `struct` | `members` (`name`, `type`, optional `doc` and `pointer`); optional `def` or `chained` | a typedef struct; a def opens with `cookie` and `next`, a chained struct with `mrhiChain chain` |
-| `function` | `args`, optional `object`, optional `returns`, `thread_safety`, optional `inline_body` | a documented declaration; one with an `object` acts on that object and is named `mrhiObject_Verb`: `pass_begin` with the object `pass` is `mrhiPass_Begin`. The generator refuses an object that is not the kind of the first id taken by value, or else the root's type, and a function on a root without one, unless its verb makes or ends an object (`create`, `destroy`, `declare`, `import`, `add`, `acquire`); one returning `result` is nodiscard; one with an `inline_body` is a `static inline` function built in the program |
+| `function` | `args`, optional `object`, optional `returns`, `thread_safety`, optional `inline_body` | a documented declaration; one with an `object` acts on that object and is named `mrhiObject_Verb`: `pass_begin` with the object `pass` is `mrhiPass_Begin`. The generator refuses an object that is not the kind of the first id taken by value and not marked `input_only`, or else the root's type, and a function on a root without one, unless its verb makes or ends an object (`create`, `destroy`, `declare`, `import`, `add`, `acquire`); one returning `result` is nodiscard; one with an `inline_body` is a `static inline` function built in the program |
 
 An `inline_body` exists for defaults that must be built in the program rather than the library, such as `mrhiDefaultInstanceDef`, which stamps the headers the program was built with.
 
@@ -51,7 +51,7 @@ The generator refuses a contract with structural errors before writing anything:
 
 ## Types
 
-A type is a primitive (`bool`, `char`, `int8` to `int64`, `uint8` to `uint64`, `size`, `float32`, `float64`, `static_cstring`), `result`, `void`, or a reference to an item as `kind.name`, such as `struct.version`. A member or argument may add `pointer`: `const` (`const T*`), `mutable` (`T*`) or `out` (`T**`, for a function that hands back a new root). `void` and opaque types are used only through a pointer. A member of type `function` is a function pointer, with `returns` and `args`. A member with `array` naming a constant is a fixed array of that length.
+A type is a primitive (`bool`, `char`, `int8` to `int64`, `uint8` to `uint64`, `size`, `float32`, `float64`, `static_cstring`), `result`, `void`, or a reference to an item as `kind.name`, such as `struct.version`. A member or argument may add `pointer`: `const` (`const T*`), `mutable` (`T*`) or `out` (`T**`, for a function that hands back a new root). `void` and opaque types are used only through a pointer. A member of type `function` is a function pointer, with `returns` and `args`. A member with `array` naming a constant is a fixed array of that length. A function's argument that is an id taken by value may add `"input_only": true` when the call only reads it as an input, such as the place a search starts from: it does not name the call's object, as the family's naming rule says, and the generator refuses the mark anywhere else.
 
 ## Mappings
 
