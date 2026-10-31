@@ -149,6 +149,85 @@ static void TestFloors(void)
     }
 }
 
+static bool IsColor(mrhiSurfaceColor color, mrhiFormat format, mrhiColorPrimaries primaries,
+                    mrhiTransfer transfer, mrhiColorRange range)
+{
+    return color.format == format && color.primaries == primaries && color.transfer == transfer &&
+           color.range == range;
+}
+
+// More known colors than the caps hold listed before the 8-bit sRGB pair
+// in Rec. 709, as VK_EXT_swapchain_colorspace may list them, in a list
+// as long as the driver reads: the pair keeps a slot, the first colors
+// fill the rest in order, and the surface presents, whether the pair is
+// listed last or in the middle. Listed first, the pair takes its own
+// place and the next colors fill the rest. Without it the surface does
+// not present.
+static void TestManyColors(void)
+{
+    static const VkFormat others[] = {VK_FORMAT_A2B10G10R10_UNORM_PACK32,
+                                      VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_B8G8R8A8_UNORM};
+    static const VkColorSpaceKHR spaces[] = {
+        VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT,
+        VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT,
+        VK_COLOR_SPACE_BT709_LINEAR_EXT,
+        VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT,
+        VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT,
+        VK_COLOR_SPACE_HDR10_ST2084_EXT,
+        VK_COLOR_SPACE_BT2020_LINEAR_EXT,
+    };
+    enum
+    {
+        DISTINCT = 3 * 7
+    };
+    static VkSurfaceFormatKHR formats[MRHI_VULKAN_SURFACE_FORMATS];
+    for (uint32_t i = 0; i < MRHI_VULKAN_SURFACE_FORMATS - 1; ++i)
+    {
+        uint32_t pair = i % DISTINCT;
+        formats[i] = (VkSurfaceFormatKHR){others[pair / 7], spaces[pair % 7]};
+    }
+    const VkSurfaceFormatKHR srgb = {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+    formats[MRHI_VULKAN_SURFACE_FORMATS - 1] = srgb;
+    mrhiVulkanSurfaceFacts facts = Full();
+    facts.formats = formats;
+    facts.formatCount = MRHI_VULKAN_SURFACE_FORMATS;
+    facts.mutableFormat = true;
+    mrhiSurfaceCaps caps = CapsOf(facts);
+    CHECK(caps.presentable && caps.colorCount == MRHI_SURFACE_COLORS &&
+              IsColor(caps.colors[0], mrhi_formatRgb10a2Unorm, mrhi_primariesBt709,
+                      mrhi_transferSrgb, mrhi_rangeExtended) &&
+              IsColor(caps.colors[MRHI_SURFACE_COLORS - 2], mrhi_formatBgra8Unorm,
+                      mrhi_primariesBt709, mrhi_transferSrgb, mrhi_rangeExtended) &&
+              IsColor(caps.colors[MRHI_SURFACE_COLORS - 1], mrhi_formatBgra8Unorm,
+                      mrhi_primariesBt709, mrhi_transferSrgb, mrhi_rangeStandard),
+          "the 8-bit sRGB pair kept after the first colors, listed last");
+    // Listed in the middle, other colors after it.
+    formats[MRHI_VULKAN_SURFACE_FORMATS - 1] = formats[0];
+    formats[100] = srgb;
+    caps = CapsOf(facts);
+    CHECK(caps.presentable && caps.colorCount == MRHI_SURFACE_COLORS &&
+              IsColor(caps.colors[MRHI_SURFACE_COLORS - 1], mrhi_formatBgra8Unorm,
+                      mrhi_primariesBt709, mrhi_transferSrgb, mrhi_rangeStandard),
+          "the 8-bit sRGB pair kept, listed in the middle");
+    formats[100] = formats[100 % DISTINCT];
+    // Without the pair: more distinct colors than the caps hold, none of
+    // them a floor, and no slot kept past MRHI_SURFACE_COLORS.
+    facts.formatCount = DISTINCT;
+    caps = CapsOf(facts);
+    CHECK(!caps.presentable && caps.colorCount == 0, "no 8-bit sRGB pair, no presenting");
+    facts.formatCount = MRHI_VULKAN_SURFACE_FORMATS;
+    formats[0] = srgb;
+    caps = CapsOf(facts);
+    CHECK(caps.presentable && caps.colorCount == MRHI_SURFACE_COLORS &&
+              IsColor(caps.colors[0], mrhi_formatBgra8Unorm, mrhi_primariesBt709, mrhi_transferSrgb,
+                      mrhi_rangeStandard) &&
+              IsColor(caps.colors[1], mrhi_formatRgb10a2Unorm, mrhi_primariesBt709,
+                      mrhi_transferLinear, mrhi_rangeExtended) &&
+              IsColor(caps.colors[MRHI_SURFACE_COLORS - 1], mrhi_formatBgra8Unorm,
+                      mrhi_primariesBt709, mrhi_transferLinear, mrhi_rangeExtended),
+          "listed first, in its place, the next colors after it");
+}
+
 static void TestPick(void)
 {
     const VkSurfaceFormatKHR formats[] = {
@@ -177,6 +256,7 @@ int main(void)
     TestMissing();
     TestCaps();
     TestFloors();
+    TestManyColors();
     TestPick();
     return s_failures == 0 ? 0 : 1;
 }
