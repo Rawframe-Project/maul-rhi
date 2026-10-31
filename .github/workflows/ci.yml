@@ -555,9 +555,9 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           # The emulator refuses to start when the disk has less room than
-          # its userdata partition, which is fixed at 6 GB however the AVD
-          # sets it, and a hosted runner may have less free. This job uses
-          # none of these toolchains.
+          # its 6 GB userdata partition, which neither the AVD's config.ini
+          # nor -partition-size shrinks for this image, and a hosted runner
+          # may have less free. This job uses none of these toolchains.
           df -h "$HOME"
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift \
             /opt/hostedtoolcache/CodeQL
