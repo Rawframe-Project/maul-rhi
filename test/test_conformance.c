@@ -1925,7 +1925,8 @@ static void CheckDrawFrame(Scene* scene, DrawMode mode)
     bool indirect = mode != DRAW_DIRECT;
     BeginScene(scene);
     mrhiBufferDef argumentsDef = mrhiDefaultBufferDef();
-    argumentsDef.size = mode == DRAW_COUNTED ? 40 : 16;
+    const size_t argumentBytes = mode == DRAW_COUNTED ? 40 : 16;
+    argumentsDef.size = argumentBytes;
     mrhiResourceId a = {0};
     CHECK(!indirect || mrhiDeclareBuffer(device, &argumentsDef, &a) == mrhi_success,
           "an arguments buffer");
@@ -1961,8 +1962,8 @@ static void CheckDrawFrame(Scene* scene, DrawMode mode)
                   mrhi_success &&
               mrhiPass_WriteBuffer(device, upload, scene->d, 0, values, sizeof(values)) ==
                   mrhi_success &&
-              (!indirect || mrhiPass_WriteBuffer(device, upload, a, 0, arguments,
-                                                 argumentsDef.size) == mrhi_success) &&
+              (!indirect || mrhiPass_WriteBuffer(device, upload, a, 0, arguments, argumentBytes) ==
+                                mrhi_success) &&
               mrhiPass_End(device, upload) == mrhi_success,
           "uploaded");
     const float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -2186,7 +2187,8 @@ static void CheckCompute(mrhiDevice* device, const uint8_t* container, size_t by
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiBufferDef inputDef = mrhiDefaultBufferDef();
-    inputDef.size = 4 * sizeof(uint32_t);
+    const size_t inputBytes = 4 * sizeof(uint32_t);
+    inputDef.size = inputBytes;
     mrhiBufferDef outputDef = mrhiDefaultBufferDef();
     outputDef.size = words * sizeof(uint32_t);
     mrhiResourceId inputs = {0};
@@ -2208,8 +2210,7 @@ static void CheckCompute(mrhiDevice* device, const uint8_t* container, size_t by
     };
     mrhiRequestId result = {0};
     CHECK(mrhiPass_Begin(device, copy) == mrhi_success &&
-              mrhiPass_WriteBuffer(device, copy, inputs, 0, values, inputDef.size) ==
-                  mrhi_success &&
+              mrhiPass_WriteBuffer(device, copy, inputs, 0, values, inputBytes) == mrhi_success &&
               mrhiPass_End(device, copy) == mrhi_success &&
               mrhiPass_Begin(device, dispatch) == mrhi_success &&
               mrhiPass_SetComputePipeline(device, dispatch, pipeline) == mrhi_success &&

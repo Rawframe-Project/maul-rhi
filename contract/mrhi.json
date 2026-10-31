@@ -20824,7 +20824,7 @@
             },
             {
               "name": "size",
-              "type": "uint64",
+              "type": "size",
               "doc": "How many, a multiple of 4."
             }
           ],
@@ -22710,5 +22710,5 @@
       ]
     }
   ],
-  "contract_version": 25
+  "contract_version": 26
 }
