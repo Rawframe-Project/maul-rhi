@@ -684,6 +684,17 @@ extern "C"
         // A function that would change the instance or device was called from
         // inside its allocator.
         mrhi_diagnosticAllocatorCall = 156,
+        // A driver reported a device loss with an unknown reason, or a message
+        // longer than MRHI_LOSS_MESSAGE_BYTES; the core passed on
+        // mrhi_lossUnknown and the message's first MRHI_LOSS_MESSAGE_BYTES
+        // bytes.
+        mrhi_diagnosticDriverLossReport = 157,
+        // A driver reported surface caps with more than MRHI_SURFACE_COLORS
+        // colors, or a color whose format, primaries, transfer or range is
+        // unknown; the core kept the first MRHI_SURFACE_COLORS, dropped each
+        // unknown one, and reported a surface left without a color as not
+        // presentable.
+        mrhi_diagnosticDriverSurfaceCaps = 158,
     };
 
     // A record from an instance's or a device's diagnostic queue.

@@ -5,6 +5,7 @@
 // source, which the instance's driver turns into its surface, and
 // what each adapter can do with them.
 
+#include "capabilities_core.h"
 #include "chain.h"
 #include "device_core.h"
 #include "instance_core.h"
@@ -225,6 +226,28 @@ void mrhiDestroySurfaces(mrhiInstance* instance)
     }
 }
 
+void mrhiSurfaceCapsOf(const mrhiInstance* instance, uint64_t surface, uint64_t adapter,
+                       mrhiSurfaceCaps* capsOut)
+{
+    mrhiSurfaceCaps caps = {0};
+    instance->driver.vtable->getSurfaceCaps(instance->driver.self, surface, adapter, &caps);
+    uint32_t kept = 0;
+    for (uint32_t i = 0; i < caps.colorCount && i < MRHI_SURFACE_COLORS; ++i)
+    {
+        if (mrhiIsSurfaceColorKnown(&caps.colors[i]))
+        {
+            caps.colors[kept++] = caps.colors[i];
+        }
+    }
+    for (uint32_t i = kept; i < MRHI_SURFACE_COLORS; ++i)
+    {
+        caps.colors[i] = (mrhiSurfaceColor){0};
+    }
+    caps.colorCount = kept;
+    // A surface with no color left to present in presents nothing.
+    *capsOut = caps.presentable && kept > 0 ? caps : (mrhiSurfaceCaps){0};
+}
+
 mrhiResult mrhiSurface_GetCaps(mrhiInstance* instance, mrhiSurfaceId surface, mrhiAdapterId adapter,
                                mrhiSurfaceCaps* capsOut)
 {
@@ -240,17 +263,13 @@ mrhiResult mrhiSurface_GetCaps(mrhiInstance* instance, mrhiSurfaceId surface, mr
     {
         return mrhi_errorStale;
     }
-    mrhiSurfaceCaps caps = {0};
-    instance->driver.vtable->getSurfaceCaps(instance->driver.self, handle, found->handle, &caps);
-    MRHI_ASSERT(!caps.presentable ||
-                (caps.colorCount >= 1 && caps.colorCount <= MRHI_SURFACE_COLORS &&
-                 (caps.presentModes & mrhi_presentFifoBit) != 0 &&
-                 (caps.alphaModes & mrhi_alphaOpaqueBit) != 0 &&
-                 (caps.usages & mrhi_textureRenderTarget) != 0 &&
-                 (caps.twinViews || caps.twinImages)));
-    // Nothing a driver fills for an adapter that cannot present is passed on.
-    const mrhiSurfaceCaps none = {0};
-    mrhiOutSurfaceCaps(capsOut, caps.presentable ? &caps : &none);
+    mrhiSurfaceCaps caps;
+    mrhiSurfaceCapsOf(instance, handle, found->handle, &caps);
+    MRHI_ASSERT(!caps.presentable || ((caps.presentModes & mrhi_presentFifoBit) != 0 &&
+                                      (caps.alphaModes & mrhi_alphaOpaqueBit) != 0 &&
+                                      (caps.usages & mrhi_textureRenderTarget) != 0 &&
+                                      (caps.twinViews || caps.twinImages)));
+    mrhiOutSurfaceCaps(capsOut, &caps);
     return mrhi_success;
 }
 

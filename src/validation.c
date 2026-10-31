@@ -16,6 +16,7 @@
 #include "validation.h"
 
 #include "allocator.h"
+#include "capabilities_core.h"
 #include "frame_walk.h"
 
 #include <stdalign.h>
@@ -162,6 +163,12 @@ static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
 {
     const Layer* layer = self;
     layer->inner.vtable->getSurfaceCaps(layer->inner.self, surface, adapter, capsOut);
+    bool known = capsOut->colorCount <= MRHI_SURFACE_COLORS;
+    for (uint32_t i = 0; i < capsOut->colorCount && i < MRHI_SURFACE_COLORS; ++i)
+    {
+        known = known && mrhiIsSurfaceColorKnown(&capsOut->colors[i]);
+    }
+    Expect(&layer->watch, known, mrhi_diagnosticDriverSurfaceCaps);
 }
 
 static const mrhiDeviceDriverVtable s_deviceVtable;
@@ -376,6 +383,10 @@ static void LossReport(void* self, mrhiDeviceLossReport* reportOut)
 {
     DeviceLayer* device = self;
     device->inner.vtable->lossReport(device->inner.self, reportOut);
+    Expect(&device->watch,
+           (uint32_t)reportOut->reason <= mrhi_lossSimulated &&
+               reportOut->messageLength <= MRHI_LOSS_MESSAGE_BYTES,
+           mrhi_diagnosticDriverLossReport);
 }
 
 static mrhiResult AcquireImage(void* self, uint64_t swapchain, uint64_t* imageOut)

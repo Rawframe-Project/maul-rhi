@@ -1037,6 +1037,16 @@
               "name": "diagnostic_allocator_call",
               "value": 156,
               "doc": "A function that would change the instance or device was called from inside its allocator."
+            },
+            {
+              "name": "diagnostic_driver_loss_report",
+              "value": 157,
+              "doc": "A driver reported a device loss with an unknown reason, or a message longer than MRHI_LOSS_MESSAGE_BYTES; the core passed on mrhi_lossUnknown and the message's first MRHI_LOSS_MESSAGE_BYTES bytes."
+            },
+            {
+              "name": "diagnostic_driver_surface_caps",
+              "value": 158,
+              "doc": "A driver reported surface caps with more than MRHI_SURFACE_COLORS colors, or a color whose format, primaries, transfer or range is unknown; the core kept the first MRHI_SURFACE_COLORS, dropped each unknown one, and reported a surface left without a color as not presentable."
             }
           ],
           "library": "names the library's own checks"
@@ -7315,7 +7325,7 @@
             {
               "name": "reason",
               "type": "enum.device_loss_reason",
-              "doc": "Why it was lost."
+              "doc": "Why it was lost; mrhi_lossUnknown also when the driver named a reason this list lacks."
             },
             {
               "name": "last_submitted",
@@ -11116,7 +11126,7 @@
               "name": "colors",
               "type": "struct.surface_color",
               "array": "surface_colors",
-              "doc": "The combinations it can show, the platform's preferred first."
+              "doc": "The combinations it can show, the platform's preferred first; a combination with a format, primaries, transfer or range the library does not list is left out."
             },
             {
               "name": "color_count",

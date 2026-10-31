@@ -12,6 +12,7 @@
 #include "device_core.h"
 #include "driver_test.h"
 #include "frame_walk.h"
+#include "instance_core.h"
 #include "test_harness.h"
 
 #include "maul-rhi/device.h"
@@ -195,6 +196,8 @@ static double s_period;
 static mrhiDriverEvent s_events[2];
 static size_t s_eventCount;
 static bool s_inject;
+// Set to report the device's loss at the next poll, once.
+static bool s_loseOnce;
 
 static mrhiResult AcquireGiven(void* self, uint64_t swapchain, uint64_t* imageOut)
 {
@@ -212,6 +215,12 @@ static double PeriodGiven(void* self)
 
 static size_t PollGiven(void* self, mrhiDriverEvent* events, size_t capacity)
 {
+    if (s_loseOnce && capacity > 0)
+    {
+        s_loseOnce = false;
+        events[0] = (mrhiDriverEvent){0, mrhi_errorDeviceLost};
+        return 1;
+    }
     if (!s_inject)
     {
         return s_deviceInner->poll(self, events, capacity);
@@ -221,6 +230,14 @@ static size_t PollGiven(void* self, mrhiDriverEvent* events, size_t capacity)
         events[i] = s_events[i];
     }
     return s_eventCount;
+}
+
+static mrhiDeviceLossReport s_report;
+
+static void ReportGiven(void* self, mrhiDeviceLossReport* reportOut)
+{
+    (void)self;
+    *reportOut = s_report;
 }
 
 static mrhiResult CreateGivenDevice(void* self, uint64_t adapter, const mrhiDeviceDef* def,
@@ -234,6 +251,7 @@ static mrhiResult CreateGivenDevice(void* self, uint64_t adapter, const mrhiDevi
         s_deviceVtable.acquireImage = AcquireGiven;
         s_deviceVtable.timestampPeriod = PeriodGiven;
         s_deviceVtable.poll = PollGiven;
+        s_deviceVtable.lossReport = ReportGiven;
         deviceOut->vtable = &s_deviceVtable;
     }
     return status;
@@ -309,6 +327,119 @@ static void TestDeviceEdges(void)
           "tag 0 for anything but the loss");
     s_inject = false;
     mrhiDestroyDevice(device);
+    mrhiDestroyInstance(instance);
+}
+
+// A device lost by its driver with each report the test gives. A reason
+// the contract does not list (-1, INT32_MIN or one past the last) or a
+// message past its room is a breach, and the program reads
+// mrhi_lossUnknown and the room's bytes; the last reason and a message
+// of the most bytes keep the contract.
+static void TestLossReports(void)
+{
+    static const mrhiDeviceLossReport given[] = {
+        {.reason = -1},
+        {.reason = INT32_MIN},
+        {.reason = mrhi_lossSimulated + 1},
+        {.reason = mrhi_lossHung, .messageLength = MRHI_LOSS_MESSAGE_BYTES + 1},
+        {.reason = mrhi_lossSimulated, .messageLength = MRHI_LOSS_MESSAGE_BYTES},
+    };
+    for (size_t i = 0; i < sizeof(given) / sizeof(given[0]); ++i)
+    {
+        s_report = given[i];
+        Open();
+        s_vtable.createDevice = CreateGivenDevice;
+        mrhiInstance* instance = Start();
+        mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+        CHECK(Search(instance, &deviceDef.adapter) == 1, "one adapter");
+        mrhiDevice* device = nullptr;
+        mrhiRequestId request;
+        mrhiInstanceNotification record;
+        CHECK(mrhiCreateDevice(instance, &deviceDef, &device, &request) == mrhi_success &&
+                  mrhiInstance_TakeNotification(instance, &record) == mrhi_success,
+              "a device");
+        s_loseOnce = true;
+        mrhiDeviceNotification notice;
+        CHECK(mrhiDevice_TakeNotification(device, &notice) == mrhi_success &&
+                  notice.kind == mrhi_deviceLostNotice,
+              "lost by the driver");
+        bool kept = i == 4;
+        mrhiDeviceLossReport report;
+        CHECK(mrhiDevice_GetLossReport(device, &report) == mrhi_success &&
+                  report.reason == (i < 3 ? mrhi_lossUnknown : given[i].reason) &&
+                  report.messageLength == (i < 3 ? 0 : MRHI_LOSS_MESSAGE_BYTES),
+              "the report the program reads");
+        CHECK(mrhiInstance_GetDriverFaultCount(instance) == (kept ? 0 : 1) &&
+                  Recorded(instance) == (kept ? 0 : mrhi_diagnosticDriverLossReport),
+              "each breach counted, and the edge left alone");
+        mrhiDestroyDevice(device);
+        mrhiDestroyInstance(instance);
+    }
+    s_report = (mrhiDeviceLossReport){0};
+}
+
+static mrhiSurfaceCaps s_caps;
+
+static void CapsGiven(const void* self, uint64_t surface, uint64_t adapter,
+                      mrhiSurfaceCaps* capsOut)
+{
+    (void)self;
+    (void)surface;
+    (void)adapter;
+    *capsOut = s_caps;
+}
+
+// The layer's surface caps, called as the core calls them: a color whose
+// format, primaries, transfer or range the contract does not list (-1,
+// INT32_MIN or one past the last), or more colors than the array holds,
+// is a breach; the most colors, each of the last values, keep the
+// contract.
+static void TestSurfaceCaps(void)
+{
+    Open();
+    s_vtable.getSurfaceCaps = CapsGiven;
+    mrhiInstance* instance = Start();
+    const mrhiInstanceDriver* layer = &instance->driver;
+    const mrhiSurfaceColor last = {
+        .format = mrhi_formatAstc12x12UnormSrgb,
+        .primaries = mrhi_primariesDisplayP3,
+        .transfer = mrhi_transferPq,
+        .range = mrhi_rangeExtended,
+    };
+    s_caps = (mrhiSurfaceCaps){.presentable = true, .colorCount = MRHI_SURFACE_COLORS};
+    for (uint32_t i = 0; i < MRHI_SURFACE_COLORS; ++i)
+    {
+        s_caps.colors[i] = last;
+    }
+    mrhiSurfaceCaps caps;
+    layer->vtable->getSurfaceCaps(layer->self, 1, 1, &caps);
+    CHECK(mrhiInstance_GetDriverFaultCount(instance) == 0,
+          "the most colors, each of the last values");
+    uint64_t faults = 0;
+    s_caps.colorCount = MRHI_SURFACE_COLORS + 1;
+    layer->vtable->getSurfaceCaps(layer->self, 1, 1, &caps);
+    CHECK(mrhiInstance_GetDriverFaultCount(instance) == ++faults &&
+              Recorded(instance) == mrhi_diagnosticDriverSurfaceCaps,
+          "more colors than the array holds");
+    s_caps.colorCount = MRHI_SURFACE_COLORS;
+    const int32_t pastLast[] = {last.format + 1, last.primaries + 1, last.transfer + 1,
+                                last.range + 1};
+    for (uint32_t part = 0; part < 4; ++part)
+    {
+        const int32_t unknown[] = {-1, INT32_MIN, pastLast[part]};
+        for (size_t i = 0; i < sizeof(unknown) / sizeof(unknown[0]); ++i)
+        {
+            mrhiSurfaceColor* color = &s_caps.colors[MRHI_SURFACE_COLORS - 1];
+            int32_t* parts[] = {&color->format, &color->primaries, &color->transfer, &color->range};
+            *color = last;
+            *parts[part] = unknown[i];
+            layer->vtable->getSurfaceCaps(layer->self, 1, 1, &caps);
+            CHECK(mrhiInstance_GetDriverFaultCount(instance) == ++faults &&
+                      Recorded(instance) == mrhi_diagnosticDriverSurfaceCaps,
+                  "an unknown part of the last color");
+        }
+    }
+    s_caps = (mrhiSurfaceCaps){0};
     mrhiDestroyInstance(instance);
 }
 
@@ -579,6 +710,8 @@ int main(void)
     TestNegativeAdapterKind();
     TestDeviceAnswers();
     TestDeviceEdges();
+    TestLossReports();
+    TestSurfaceCaps();
     TestInstanceRoom();
     TestWalk();
     TestWalkEdges();

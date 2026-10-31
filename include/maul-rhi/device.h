@@ -285,7 +285,8 @@ extern "C"
     // device is lost.
     typedef struct mrhiDeviceLossReport
     {
-        // Why it was lost.
+        // Why it was lost; mrhi_lossUnknown also when the driver named a reason
+        // this list lacks.
         mrhiDeviceLossReason reason;
         // The token of the last frame submitted, or a null id.
         mrhiRequestId lastSubmitted;

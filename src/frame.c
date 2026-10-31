@@ -113,10 +113,19 @@ static void Lose(mrhiDevice* device, const mrhiDeviceLossReport* given)
     else
     {
         device->driver.vtable->lossReport(device->driver.self, &report);
+        // A reason the contract does not name, or a message past its room,
+        // is not passed on as the driver gave it.
+        if ((uint32_t)report.reason > mrhi_lossSimulated)
+        {
+            report.reason = mrhi_lossUnknown;
+        }
+        if (report.messageLength > MRHI_LOSS_MESSAGE_BYTES)
+        {
+            report.messageLength = MRHI_LOSS_MESSAGE_BYTES;
+        }
     }
     report.lastSubmitted = (mrhiRequestId){device->lastSubmitted, device->lastSubmitted != 0};
     report.lastFinished = (mrhiRequestId){device->lastFinished, device->lastFinished != 0};
-    MRHI_ASSERT(report.messageLength <= MRHI_LOSS_MESSAGE_BYTES);
     device->lossReport = report;
     // The notice's record was kept free, and every other answer reserved.
     mrhiQueueAnswer(device, mrhi_deviceLostNotice, 0, mrhi_errorDeviceLost);

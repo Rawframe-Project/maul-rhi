@@ -303,6 +303,29 @@ static void TestSimulated(void)
     CloseDevice();
 }
 
+// A driver whose report names no reason the contract lists: -1,
+// INT32_MIN or one past the last. The program reads mrhi_lossUnknown,
+// never the driver's value.
+static void TestUnknownReason(void)
+{
+    static const mrhiDeviceLossReason unknown[] = {-1, INT32_MIN, mrhi_lossSimulated + 1};
+    for (size_t i = 0; i < sizeof(unknown) / sizeof(unknown[0]); ++i)
+    {
+        s_lose = false;
+        s_adapter.loseDevice = &s_lose;
+        s_adapter.lossReason = unknown[i];
+        s_device = OpenWith(mrhiDefaultDeviceDef(), true);
+        s_lose = true;
+        mrhiDeviceLossReport report;
+        CHECK(Next(mrhi_deviceLostNotice, 0) &&
+                  mrhiDevice_GetLossReport(s_device, &report) == mrhi_success &&
+                  report.reason == mrhi_lossUnknown && report.messageLength == 31,
+              "an unknown reason passed on as mrhi_lossUnknown");
+        Close(s_device);
+        s_adapter.loseDevice = nullptr;
+    }
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -311,5 +334,6 @@ int main(void)
     TestLostWhileOpen();
     TestLostAtAcquire();
     TestSimulated();
+    TestUnknownReason();
     return s_failures == 0 ? 0 : 1;
 }

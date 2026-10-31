@@ -146,8 +146,8 @@ static mrhiSurfaceSlot* CheckConfig(mrhiDevice* device, const mrhiSurfaceConfig*
         *statusOut = mrhi_errorState;
         return nullptr;
     }
-    mrhiSurfaceCaps caps = {0};
-    instance->driver.vtable->getSurfaceCaps(instance->driver.self, handle, device->adapter, &caps);
+    mrhiSurfaceCaps caps;
+    mrhiSurfaceCapsOf(instance, handle, device->adapter, &caps);
     if (!IsSupported(device, &caps, config))
     {
         *statusOut = mrhi_errorUnsupported;
