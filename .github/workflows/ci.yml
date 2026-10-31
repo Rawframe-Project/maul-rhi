@@ -580,6 +580,12 @@ jobs:
           done
           "$adb" shell getprop sys.boot_completed | grep -q 1 || { tail -50 "$RUNNER_TEMP/emulator.log"; exit 1; }
           "$adb" shell df -h /data
+          # PROBE
+          df -h /home/runner
+          grep -i "partition\|disk" "$config" || true
+          ls -la "$ANDROID_AVD_HOME/maul35.avd/"
+          ls -la "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/" | grep -i "img"
+          grep -i "partition\|userdata\|data size\|resiz" "$RUNNER_TEMP/emulator.log" || true
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
       - name: Configure
         run: cmake --preset android-emulator
