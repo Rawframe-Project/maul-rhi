@@ -7,24 +7,105 @@ may change the API, the ABI and every data format.
 
 ## [0.14.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.13.0...v0.14.0) (2026-10-31)
 
+### Changed
 
-### ⚠ BREAKING CHANGES
+- **Breaking:** every public enumeration type is `int32_t`: kinds,
+  modes and choices, as `mrhiResult` is. Sets of bit flags and
+  `mrhiStructType`, whose bits mark hints and driver-defined types, are
+  `uint32_t`. Before, the 44 enumerations were `uint8_t`, `uint16_t` or
+  `uint32_t` each, so struct layouts change. `mrhiFormatCaps.sampleCounts`
+  has a type of its own, `mrhiSampleCounts`, with `mrhi_samples1Bit`,
+  `mrhi_samples2Bit` and `mrhi_samples4Bit`. Every check of a kind
+  refuses -1 and `INT32_MIN` as well as values past the last, and a
+  switch over a kind no longer takes an unknown value for a known one:
+  before, a view of kind -1 on a 3D texture passed as a 3D view.
+  ([#283](https://github.com/Rawframe-Project/maul-rhi/pull/283))
+- **Breaking:** counters are named for what they count.
+  `mrhiFrameUsage`'s counts are `frameResourceCount`, `framePassCount`,
+  `frameAccessCount`, `frameBarrierCount` and `frameIndirectDrawCount`;
+  its byte measures keep their names. `mrhiDiagnostic.count` is
+  `callsRefused`, and `mrhiInstance_GetDriverFaults` is
+  `mrhiInstance_GetDriverFaultCount`.
+  ([#286](https://github.com/Rawframe-Project/maul-rhi/pull/286))
+- **Breaking:** a take call refused with `mrhi_errorBusy` from inside an
+  allocator (`mrhiInstance_TakeDiagnostic`,
+  `mrhiInstance_TakeNotification`, `mrhiDevice_TakeDiagnostic`,
+  `mrhiDevice_TakeNotification`, `mrhiRequest_TakeReadback`) leaves its
+  record, bytes and size as they were. Before, it zeroed them, though
+  the call in progress may have been filling them.
+  ([#266](https://github.com/Rawframe-Project/maul-rhi/pull/266))
 
-* **contract:** mrhiFrameUsage's counts are frameResourceCount, framePassCount, frameAccessCount, frameBarrierCount and frameIndirectDrawCount; mrhiDiagnostic.count is callsRefused; mrhiInstance_GetDriverFaults is mrhiInstance_GetDriverFaultCount.
-* **contract:** every public enumeration type is int32_t, bitflags and mrhiStructType are uint32_t, and mrhiFormatCaps.sampleCounts is mrhiSampleCounts; struct layouts change, and MRHI_SPI_VERSION is 12.
-* **contract:** a take call refused with `mrhi_errorBusy` from inside an allocator (`mrhiInstance_TakeDiagnostic`, `mrhiInstance_TakeNotification`, `mrhiDevice_TakeDiagnostic`, `mrhiDevice_TakeNotification`, `mrhiRequest_TakeReadback`) leaves its record, bytes and size as they were instead of zeroing them.
+  Programs see all three changes. Drivers built outside the tree see
+  the first, and `MRHI_SPI_VERSION` is 12.
 
 ### Fixed
 
-* **contract:** leave a take call's outputs when it is refused as busy ([#266](https://github.com/Rawframe-Project/maul-rhi/issues/266)) ([0d76f77](https://github.com/Rawframe-Project/maul-rhi/commit/0d76f770b34e6a7ed2d761d1d629315049d90aa8)), closes [#262](https://github.com/Rawframe-Project/maul-rhi/issues/262)
-* **contract:** make every kind int32_t and every set of bits uint32_t ([#283](https://github.com/Rawframe-Project/maul-rhi/issues/283)) ([acf466c](https://github.com/Rawframe-Project/maul-rhi/commit/acf466c31a630ec0f72684144dd8494a61ee3a21)), closes [#272](https://github.com/Rawframe-Project/maul-rhi/issues/272)
-* **contract:** name the counters for what they count ([#286](https://github.com/Rawframe-Project/maul-rhi/issues/286)) ([dbbe477](https://github.com/Rawframe-Project/maul-rhi/commit/dbbe47739a7cf90e0c5352966663a05957945c9f)), closes [#275](https://github.com/Rawframe-Project/maul-rhi/issues/275)
-* **contract:** read an output's source before clearing the output ([#281](https://github.com/Rawframe-Project/maul-rhi/issues/281)) ([8d251f2](https://github.com/Rawframe-Project/maul-rhi/commit/8d251f29fbd12021196479b6d5abadb0dc632da3)), closes [#280](https://github.com/Rawframe-Project/maul-rhi/issues/280)
-* **device:** make a destroyed id stale before its memory goes back ([#276](https://github.com/Rawframe-Project/maul-rhi/issues/276)) ([d555eb2](https://github.com/Rawframe-Project/maul-rhi/commit/d555eb2a30d3ed662fc6333ac08dff3dfc38f98b)), closes [#273](https://github.com/Rawframe-Project/maul-rhi/issues/273)
-* **spi:** check driver counts, sizes and adapter info in the core ([#289](https://github.com/Rawframe-Project/maul-rhi/issues/289)) ([ef3b7b0](https://github.com/Rawframe-Project/maul-rhi/commit/ef3b7b036b3edb39d26fc0df0f3e6fd67661d349)), closes [#288](https://github.com/Rawframe-Project/maul-rhi/issues/288)
-* **spi:** keep unknown loss reasons and surface colors from the program ([#287](https://github.com/Rawframe-Project/maul-rhi/issues/287)) ([98f04e2](https://github.com/Rawframe-Project/maul-rhi/commit/98f04e275e8d964914b162b15ae3745fd3d909ef)), closes [#282](https://github.com/Rawframe-Project/maul-rhi/issues/282)
-* **spi:** refuse presentable surface caps that miss a floor ([#291](https://github.com/Rawframe-Project/maul-rhi/issues/291)) ([d36b2f4](https://github.com/Rawframe-Project/maul-rhi/commit/d36b2f4e484bc6f7ee6a4743bae80fcac667a275)), closes [#290](https://github.com/Rawframe-Project/maul-rhi/issues/290)
-* **vulkan:** keep a surface's 8-bit sRGB color however many come first ([#293](https://github.com/Rawframe-Project/maul-rhi/issues/293)) ([cefa33c](https://github.com/Rawframe-Project/maul-rhi/commit/cefa33c3d9522692908ea71ca226537d8316e4f2)), closes [#292](https://github.com/Rawframe-Project/maul-rhi/issues/292)
+- A destroy makes its id stale before the allocator gets the object's
+  memory back. Before, `mrhiDestroyShader`, the pipeline destroys and
+  `mrhiDestroyHeap` freed memory while the id was still live, so a free
+  hook could read a shader's reflection being freed, or record a
+  pipeline whose driver object was gone; now such a call gets
+  `mrhi_errorStale`.
+  ([#276](https://github.com/Rawframe-Project/maul-rhi/pull/276))
+- `mrhiSuggestSurfaceColor` with `colorOut` pointing at the caps color
+  it picks answers that color. Before, it answered `mrhi_success` with
+  an all-zero color. Every output copy now reads its source before it
+  clears the output.
+  ([#281](https://github.com/Rawframe-Project/maul-rhi/pull/281))
+- What a driver reports reaches the program only as the contract lists
+  it, in every build, with or without the validation layer:
+  - A device loss reason the contract does not list reads as
+    `mrhi_lossUnknown`, and the loss message is well-formed UTF-8
+    without NUL within `MRHI_LOSS_MESSAGE_BYTES`, ending before a
+    character the room cuts, a malformed byte or a NUL.
+    ([#287](https://github.com/Rawframe-Project/maul-rhi/pull/287))
+  - A surface color with an unknown format, primaries, transfer or
+    range is left out of the caps.
+    ([#287](https://github.com/Rawframe-Project/maul-rhi/pull/287))
+  - An adapter kind the contract does not list reads as
+    `mrhi_adapterUnknown`, and an adapter's name is well-formed UTF-8
+    within `MRHI_ADAPTER_NAME_BYTES`.
+    ([#289](https://github.com/Rawframe-Project/maul-rhi/pull/289))
+  - Caps a driver reports as presentable without every floor (FIFO,
+    opaque alpha, render target usage, a twin, and 8-bit sRGB in
+    Rec. 709) read as an adapter that does not present, in
+    `mrhiSurface_GetCaps`, the compatible-surface search and surface
+    configuration alike. Before, a Debug build trapped and a Release
+    build passed the caps on.
+    ([#291](https://github.com/Rawframe-Project/maul-rhi/pull/291))
+- The core no longer relies on the validation layer to keep a driver's
+  answers in range:
+  - A poll that claims more events than its room no longer makes the
+    core read past its array.
+    ([#289](https://github.com/Rawframe-Project/maul-rhi/pull/289))
+  - A pipeline answer for a slot past the budget, a pipeline not
+    compiling, or another request is ignored, where it wrote past the
+    pipeline slots or flipped a ready pipeline.
+    ([#289](https://github.com/Rawframe-Project/maul-rhi/pull/289))
+  - A pipeline cache size too large to hold with its envelope's header
+    fails `mrhiDevice_GetPipelineCache` with `mrhi_errorPlatform`.
+    ([#289](https://github.com/Rawframe-Project/maul-rhi/pull/289))
+  - A memory alignment of zero, or one that is not a power of two,
+    fails `mrhiDevice_CompileFrame` (and a submission that compiles)
+    with `mrhi_errorPlatform`, the frame staying open, instead of
+    placing transient resources over each other.
+    ([#289](https://github.com/Rawframe-Project/maul-rhi/pull/289))
+  - A refused submission's budget is recorded only when it is one of
+    the `mrhi_diagnosticSubmit` codes.
+    ([#289](https://github.com/Rawframe-Project/maul-rhi/pull/289))
+- The validation layer counts the breaches above as driver faults,
+  under three new codes: `mrhi_diagnosticDriverLossReport`,
+  `mrhi_diagnosticDriverSurfaceCaps` and
+  `mrhi_diagnosticDriverSurfaceFloors`, and under the existing
+  `mrhi_diagnosticDriverAdapter` for an adapter name that is not UTF-8.
+  ([#287](https://github.com/Rawframe-Project/maul-rhi/pull/287),
+  [#289](https://github.com/Rawframe-Project/maul-rhi/pull/289),
+  [#291](https://github.com/Rawframe-Project/maul-rhi/pull/291))
+- On Vulkan, a surface that lists more than 16 colors before its 8-bit
+  sRGB pair in Rec. 709, as `VK_EXT_swapchain_colorspace` may, keeps
+  that color and presents. The driver reads up to 256 surface formats,
+  where it read 64; a pair listed past the 256th is not seen.
+  ([#293](https://github.com/Rawframe-Project/maul-rhi/pull/293))
 
 ## [0.13.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.12.0...v0.13.0) (2026-10-29)
 
