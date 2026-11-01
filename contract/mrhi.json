@@ -572,7 +572,7 @@
             {
               "name": "diagnostic_sampler_def",
               "value": 62,
-              "doc": "A sampler def with an unknown filter, address mode or compare function, a negative or reversed level of detail range, or anisotropy outside 1 to 16 or above 1 without linear filtering."
+              "doc": "A sampler def with an unknown filter, address mode or compare function, a negative, infinite or reversed level of detail range, or anisotropy outside 1 to 16 or above 1 without linear filtering."
             },
             {
               "name": "diagnostic_buffer_size",
@@ -7988,7 +7988,7 @@
             {
               "name": "lod_min",
               "type": "float32",
-              "doc": "The lowest level of detail sampled, at least 0.",
+              "doc": "The lowest level of detail sampled, finite and at least 0.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -8011,7 +8011,7 @@
             {
               "name": "lod_max",
               "type": "float32",
-              "doc": "The highest level of detail sampled, at least lodMin.",
+              "doc": "The highest level of detail sampled, finite and at least lodMin.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -8099,7 +8099,7 @@
           "doc": "Makes a sampler on a ready device.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a value out of range, anisotropy with a nearest filter, or levels of detail out of order; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the device's sampler limit is reached; `mrhi_errorBusy` for a call from inside the device's allocator."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a value out of range, anisotropy with a nearest filter, or levels of detail infinite or out of order; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the device's sampler limit is reached; `mrhi_errorBusy` for a call from inside the device's allocator."
           },
           "args": [
             {
@@ -22732,5 +22732,5 @@
       ]
     }
   ],
-  "contract_version": 30
+  "contract_version": 31
 }

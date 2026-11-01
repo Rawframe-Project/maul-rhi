@@ -10,6 +10,8 @@
 #include "heap_core.h"
 #include "label.h"
 
+#include <math.h>
+
 #define SAMPLER_DEF_COOKIE 0x6D727361u
 #define BUFFER_DEF_COOKIE  0x6D726275u
 
@@ -30,9 +32,9 @@ mrhiSamplerDef mrhiDefaultSamplerDef(void)
     return def;
 }
 
-// Whether a sampler def's values are in range: known enums, levels of
-// detail in order (NaN refused), and anisotropy only with linear
-// filtering.
+// Whether a sampler def's values are in range: known enums, finite
+// levels of detail in order (NaN refused), and anisotropy only with
+// linear filtering.
 static bool IsSamplerDefValid(const mrhiSamplerDef* def)
 {
     bool filters = (uint32_t)def->magFilter <= mrhi_filterLinear &&
@@ -41,7 +43,9 @@ static bool IsSamplerDefValid(const mrhiSamplerDef* def)
     bool address = (uint32_t)def->addressU <= mrhi_addressMirrorRepeat &&
                    (uint32_t)def->addressV <= mrhi_addressMirrorRepeat &&
                    (uint32_t)def->addressW <= mrhi_addressMirrorRepeat;
-    bool lod = def->lodMin >= 0.0f && def->lodMax >= def->lodMin;
+    // WebGPU's clamps are WebIDL floats, which refuse an infinity, so a
+    // finite lodMax keeps lodMin finite too.
+    bool lod = def->lodMin >= 0.0f && def->lodMax >= def->lodMin && isfinite(def->lodMax);
     bool linear = def->magFilter == mrhi_filterLinear && def->minFilter == mrhi_filterLinear &&
                   def->mipFilter == mrhi_filterLinear;
     bool anisotropy =
