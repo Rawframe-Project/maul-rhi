@@ -148,6 +148,10 @@ static void TestMakeAndDestroy(void)
     CHECK(mrhiDestroyHeap(nullptr, second) == mrhi_errorInvalid, "no device");
     CHECK(mrhiCreateHeap(device, &def, &third) == mrhi_success, "its slot taken again");
     CHECK(mrhiDevice_GetMisuse(device) == 4, "no more misuse");
+    CHECK(mrhiDestroyHeap(device, third) == mrhi_success &&
+              mrhiDevice_SimulateLoss(device) == mrhi_success &&
+              mrhiCreateHeap(device, &def, &third) == mrhi_errorDeviceLost,
+          "none on a lost device, though a slot is free");
     // The heaps left end with the device.
     Close(device);
 }
@@ -260,6 +264,10 @@ static void TestSamplers(void)
               mrhiHeap_SetSampler(device, heap, 0, sampler) == mrhi_success,
           "cleared and set again");
     CHECK(mrhiHeap_ClearSampler(device, heap, 2) == mrhi_errorInvalid, "a clear past them");
+    CHECK(mrhiHeap_SetSampler(nullptr, heap, 1, sampler) == mrhi_errorInvalid &&
+              mrhiHeap_ClearSampler(nullptr, heap, 0) == mrhi_errorInvalid &&
+              mrhiHeap_ClearEntry(nullptr, heap, 0) == mrhi_errorInvalid,
+          "no device");
     CHECK(mrhiDestroySampler(device, sampler) == mrhi_success, "the sampler destroyed");
     sampler = MakeSampler(device);
     CHECK(mrhiHeap_SetSampler(device, heap, 0, sampler) == mrhi_success,
