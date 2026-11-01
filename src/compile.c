@@ -118,21 +118,18 @@ static void ElideZeroes(mrhiDevice* device)
 }
 
 // Records the first pass's clears once the compile kept it, from the
-// start of the arena: success, or mrhi_errorCapacity when it is full.
-// Then the program's passes may take their own frameCommandBytes past
-// them.
-static mrhiResult RecordZeroes(mrhiDevice* device)
+// start of the arena, which holds a chunk for each MRHI_CHUNK_COMMANDS of
+// the frameResources clears past the program's chunks. Then the
+// program's passes may take their own frameCommandBytes past them.
+static void RecordZeroes(mrhiDevice* device)
 {
     mrhiFramePass* pass = &device->framePasses[0];
-    MRHI_ASSERT(pass->firstChunk == 0);
+    MRHI_ASSERT(pass->firstChunk == 0 && pass->useCount <= device->budgets.frameResources);
     for (uint32_t i = 0; pass->kept && i < pass->useCount; ++i)
     {
         uint32_t object = device->frameUses[pass->firstUse + i].resource;
         mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
-        if (record == nullptr)
-        {
-            return mrhi_errorCapacity;
-        }
+        MRHI_ASSERT(record != nullptr);
         bool texture = device->frameResources[object - 1].kind == mrhiImportedTexture;
         record[0] = (mrhiCommand){
             .type = texture ? mrhiCommandClearTexture : mrhiCommandClearBuffer,
@@ -142,7 +139,6 @@ static mrhiResult RecordZeroes(mrhiDevice* device)
     }
     device->frameChunkLimit = device->frameProgramChunks +
                               atomic_load_explicit(&device->frameChunksTaken, memory_order_relaxed);
-    return mrhi_success;
 }
 
 void mrhiMarkZeroed(mrhiDevice* device)
@@ -237,9 +233,9 @@ mrhiResult mrhiCompile(mrhiDevice* device)
     }
     mrhiOrderPasses(device);
     mrhiDeriveStores(device);
-    status = RecordZeroes(device);
-    device->frameCompiled = status == mrhi_success;
-    return status;
+    RecordZeroes(device);
+    device->frameCompiled = true;
+    return mrhi_success;
 }
 
 mrhiResult mrhiDevice_CompileFrame(mrhiDevice* device)
