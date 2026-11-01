@@ -492,6 +492,12 @@ static void SetPipeline(mrhiVulkanRecording* recording, const mrhiCommand* comma
     recording->pipeline = pipeline;
     recording->frames->api->vkCmdBindPipeline(recording->slot->commands, pipeline->bindPoint,
                                               pipeline->pipeline);
+    if (pipeline->rootStages != 0)
+    {
+        recording->frames->api->vkCmdPushConstants(recording->slot->commands, pipeline->layout,
+                                                   pipeline->rootStages, 0, pipeline->rootBytes,
+                                                   recording->root);
+    }
     // The pass's heap, bound again with each pipeline reading heaps,
     // since pipelines of other table layouts disturb it.
     uint64_t heap = recording->pass->heap;
@@ -505,17 +511,29 @@ static void SetPipeline(mrhiVulkanRecording* recording, const mrhiCommand* comma
 }
 
 // Sets dynamic state from a command and the payload that follows it.
-static void SetState(const mrhiVulkanRecording* recording, const mrhiCommand* command)
+static void SetState(mrhiVulkanRecording* recording, const mrhiCommand* command)
 {
     const mrhiVulkanDevice* api = recording->frames->api;
     VkCommandBuffer commands = recording->slot->commands;
     switch (command->type)
     {
     case mrhiCommandRootBlock:
-        api->vkCmdPushConstants(commands, recording->pipeline->layout,
-                                recording->pipeline->rootStages, command->a, (uint32_t)command->b,
-                                &command[1]);
+    {
+        // Kept whole; pushed as far as the pipeline set reads, the rest
+        // with the next pipeline that reads it.
+        MRHI_ASSERT(command->a + command->b <= MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES);
+        uint32_t offset = (uint32_t)command->a;
+        uint32_t end = offset + (uint32_t)command->b;
+        memcpy(recording->root + offset, &command[1], (size_t)command->b);
+        const mrhiVulkanPipeline* pipeline = recording->pipeline;
+        if (pipeline != nullptr && pipeline->rootStages != 0 && offset < pipeline->rootBytes)
+        {
+            end = end < pipeline->rootBytes ? end : pipeline->rootBytes;
+            api->vkCmdPushConstants(commands, pipeline->layout, pipeline->rootStages, offset,
+                                    end - offset, recording->root + offset);
+        }
         break;
+    }
     case mrhiCommandViewport:
     {
         mrhiViewport viewport;

@@ -19,9 +19,12 @@ typedef struct mrhiVulkanRecording
     // occlusion query open in the pass.
     uint64_t recorded;
     uint32_t openQuery;
-    // The pass recording, and the pipeline it set last.
+    // The pass recording, the pipeline it set last, and its root block:
+    // zeros where the pass wrote none, pushed whole with each pipeline,
+    // since push constants hold nothing defined until pushed.
     const mrhiDriverPass* pass;
     const mrhiVulkanPipeline* pipeline;
+    uint8_t root[MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES];
     // By lane: whether the frame opened a batch on it, the value its last
     // closed batch signals, the batch it records into (an index plus one,
     // 0 for none), the command buffer it records into now, and the ones

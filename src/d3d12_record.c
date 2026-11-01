@@ -306,10 +306,12 @@ static void Record(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
 }
 
 // Forgets what the last pass set: each pass sets its own pipeline,
-// tables and buffers. The root signatures stay set on the list.
+// tables, buffers and root block. The root signatures stay set on the
+// list.
 static void Forget(mrhiD3d12Recorder* recorder)
 {
     recorder->pipeline = nullptr;
+    memset(recorder->root, 0, sizeof(recorder->root));
     memset(recorder->boundCounts, 0, sizeof(recorder->boundCounts));
     memset(recorder->vertices, 0, sizeof(recorder->vertices));
     recorder->verticesChanged = false;

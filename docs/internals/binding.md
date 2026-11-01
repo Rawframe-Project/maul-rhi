@@ -12,7 +12,7 @@ On each API a table becomes what it binds cheaply: a Vulkan descriptor set taken
 
 ## The root block
 
-The root block is a few bytes of constants per pass, set with `mrhiPass_SetRootBlock` at 4-byte granularity within `rootBlockBytes`: 64 bytes on the floor, raised where every device of an API allows more (128 on D3D12, inside the root signature's 64 words). It is a Vulkan push constant range for the pipeline's stages, D3D12 root constants, a Metal buffer at the index the container's map gives, and WebGPU immediates. Each pass starts with it zeroed, which each driver ensures; the core does not track what a draw reads of it.
+The root block is a few bytes of constants per pass, set with `mrhiPass_SetRootBlock` at 4-byte granularity within `rootBlockBytes`: 64 bytes on the floor, raised where every device of an API allows more (128 on D3D12, inside the root signature's 64 words). It is a Vulkan push constant range for the pipeline's stages, D3D12 root constants, a Metal buffer at the index the container's map gives, and WebGPU immediates. Each pass starts with it zeroed, which each driver ensures; the core does not track what a draw reads of it. Push constants, root constants and immediates hold nothing defined until set, WebGPU refuses a draw or dispatch that reads immediates not set, and a new D3D12 root signature drops the root constants. So each driver keeps the pass's root block, zeroed when the pass begins and updated by each write, and sets it as far as each pipeline reads when the pass sets that pipeline. A write before any pipeline is kept for the first one.
 
 ## Bindless heaps
 

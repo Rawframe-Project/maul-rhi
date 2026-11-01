@@ -283,8 +283,10 @@ EM_JS(void, mrhiJsEndPass, (int state), {
     }
 });
 
-// Sets a pipeline, and the empty bind groups of its tables without
-// bindings.
+// Sets a pipeline, the empty bind groups of its tables without bindings,
+// and the pass's root block as far as it reads, zeros where the pass
+// wrote none: WebGPU refuses a draw or dispatch reading immediates not
+// set.
 EM_JS(void, mrhiJsSetPipeline, (int state, int handle), {
     const self = Module.mrhiGpu.states[state];
     const frame = self.frame;
@@ -293,6 +295,10 @@ EM_JS(void, mrhiJsSetPipeline, (int state, int handle), {
     pass.setPipeline(entry.pipeline);
     frame.bound.pipeline = entry.pipeline;
     frame.bound.entry = entry;
+    if (entry.immediates > 0) {
+        pass.setImmediates(0, frame.bound.immediates.subarray(0, entry.immediates));
+        frame.bound.high = Math.max(frame.bound.high, entry.immediates);
+    }
     entry.empty.forEach((group, table) => {
         if (group) {
             pass.setBindGroup(table, group);

@@ -87,6 +87,10 @@ void mrhiD3d12SetPipeline(mrhiD3d12Recorder* recorder, uint64_t handle)
         SetConstants(recorder, layout->constantsParameter, layout->constantWords,
                      pipeline->constants, 0);
     }
+    if (layout->rootParameter != MRHI_D3D12_NO_PARAMETER)
+    {
+        SetConstants(recorder, layout->rootParameter, layout->rootWords, recorder->root, 0);
+    }
     // The core sets a pipeline reading heaps only in a pass with one.
     const D3D12_GPU_DESCRIPTOR_HANDLE heaps[MRHI_D3D12_HEAP_CLASSES] = {
         recorder->heapViews, recorder->heapViews, recorder->heapSamplerViews};
@@ -317,12 +321,22 @@ void mrhiD3d12BindTable(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
     }
 }
 
-void mrhiD3d12SetRootBlock(const mrhiD3d12Recorder* recorder, const mrhiCommand* command)
+void mrhiD3d12SetRootBlock(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
 {
+    // Kept whole; set as far as the pipeline reads, the rest with the
+    // next pipeline that reads it.
+    MRHI_ASSERT(command->a + command->b <= MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES);
+    uint32_t first = (uint32_t)(command->a / sizeof(uint32_t));
+    uint32_t end = first + (uint32_t)(command->b / sizeof(uint32_t));
+    memcpy(recorder->root + command->a, &command[1], (size_t)command->b);
     const mrhiD3d12Pipeline* pipeline = recorder->pipeline;
-    MRHI_ASSERT(pipeline != nullptr && pipeline->layout.rootParameter != MRHI_D3D12_NO_PARAMETER);
-    SetConstants(recorder, pipeline->layout.rootParameter, (UINT)(command->b / sizeof(uint32_t)),
-                 &command[1], command->a / (UINT)sizeof(uint32_t));
+    if (pipeline != nullptr && pipeline->layout.rootParameter != MRHI_D3D12_NO_PARAMETER &&
+        first < pipeline->layout.rootWords)
+    {
+        end = end < pipeline->layout.rootWords ? end : pipeline->layout.rootWords;
+        SetConstants(recorder, pipeline->layout.rootParameter, end - first,
+                     recorder->root + command->a, first);
+    }
 }
 
 void mrhiD3d12BindBuffer(mrhiD3d12Recorder* recorder, const mrhiCommand* command)

@@ -2960,7 +2960,7 @@
               "mapping": {
                 "vulkan": {
                   "class": "direct",
-                  "note": "push constants (at least 128)"
+                  "note": "push constants (at least 128), at most 256 as no container's root block passes it"
                 },
                 "d3d12": {
                   "class": "direct",

@@ -153,7 +153,11 @@ typedef struct mrhiD3d12Recorder
     uint32_t readbackCount;
     uint32_t readbackLimit;
     // The pipeline set, and the root signatures set for each bind point.
+    // The pass's root block: zeros where it wrote none, set whole with
+    // each pipeline, since root constants hold nothing defined until set
+    // and a new root signature drops them.
     const mrhiD3d12Pipeline* pipeline;
+    uint8_t root[MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES];
     ID3D12RootSignature* graphicsRoot;
     ID3D12RootSignature* computeRoot;
     // The buffers each table bound for graphics (0) and compute (1) uses.

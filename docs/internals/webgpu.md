@@ -18,7 +18,7 @@ A WebGPU adapter makes one device, so a device asks a fresh adapter for its `GPU
 
 Objects live on the JavaScript side under small handles. Frames are recorded at submission, so a destroyed object waits there until the next frame submitted after its destruction finishes. A view of one aspect takes the format the browser resolves for it. WebGPU places memory itself, so a declared resource's bytes are an estimate for the frame's report.
 
-A shader is a module over the container's WGSL. A pipeline's layout is the whole container's: a bind group layout per table up to the last one used, empty for a table without bindings, and the root block's bytes as immediates. Pipelines are made with the browser's asynchronous calls and answered by the poll after they settle; one the browser refuses is reported as a platform failure and kept with the device's errors, since the core has already checked it. The pipeline cache is empty and takes back only its own.
+A shader is a module over the container's WGSL. A pipeline's layout is the whole container's: a bind group layout per table up to the last one used, empty for a table without bindings, and the root block's bytes as immediates, set from the pass's zeroed copy as far as the pipeline reads each time a pass sets it, since WebGPU refuses a draw or dispatch reading immediates not set. Pipelines are made with the browser's asynchronous calls and answered by the poll after they settle; one the browser refuses is reported as a platform failure and kept with the device's errors, since the core has already checked it. The pipeline cache is empty and takes back only its own.
 
 ## Frames
 
