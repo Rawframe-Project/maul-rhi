@@ -511,6 +511,34 @@ static void TestTransient(void)
     CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
     CHECK(!Plan(twin).transient, "a target listing view formats is never transient");
     CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
+    // Nor in a later entry, rendered in its own format.
+    Begin();
+    twinDef.viewFormats[0] = mrhi_formatNone;
+    twinDef.viewFormats[1] = mrhi_formatRgba8UnormSrgb;
+    CHECK(mrhiDeclareTexture(s_device, &twinDef, &twin) == mrhi_success, "declared");
+    def.colorTargets[0].resource = twin;
+    def.colorTargets[0].viewFormat = mrhi_formatNone;
+    AddPass(def);
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(!Plan(twin).transient, "a target listing a view format second is never transient");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
+    // WebGPU's transient attachments are of one mip: a target of two,
+    // each mip cleared and discarded in its pass, is not transient.
+    Begin();
+    mrhiResourceId mips = Declare(mrhi_formatRgba8Unorm, 2, 1);
+    for (uint32_t mip = 0; mip < 2; ++mip)
+    {
+        def.colorTargets[0] = (mrhiColorTarget){
+            .resource = mips,
+            .mip = mip,
+            .load = mrhi_loadClear,
+            .store = mrhi_storeDiscard,
+        };
+        AddPass(def);
+    }
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    CHECK(!Plan(mips).transient, "a target of two mips is never transient");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
     Begin();
     samples = Declare(mrhi_formatRgba8Unorm, 1, 1);
     def = mrhiDefaultPassDef();

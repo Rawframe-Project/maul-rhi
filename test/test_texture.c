@@ -138,6 +138,41 @@ static void TestSamplesAndUsages(void)
           "an unknown usage");
 }
 
+// A transient texture is one 2D layer of one mip without view formats,
+// as WebGPU's transient attachments are; each refusal starts from a
+// valid def.
+static void TestTransientShapes(void)
+{
+    const mrhiTextureUsage transient = kTarget | mrhi_textureTransient;
+    const mrhiTextureDef valid = Def(mrhi_texture2d, mrhi_formatRgba8Unorm, 64, 64, 1, transient);
+    CHECK(Make(valid) == mrhi_success, "a transient 2D target");
+    mrhiTextureDef def = valid;
+    def.mipLevels = 2;
+    CHECK(Make(def) == mrhi_errorInvalid, "a transient target of two mips");
+    def.usage = kTarget;
+    CHECK(Make(def) == mrhi_success, "two mips, not transient");
+    CHECK(Make(Def(mrhi_texture2dArray, mrhi_formatRgba8Unorm, 64, 64, 1, transient)) ==
+              mrhi_success,
+          "a transient array of one layer");
+    CHECK(Make(Def(mrhi_texture2dArray, mrhi_formatRgba8Unorm, 64, 64, 2, transient)) ==
+              mrhi_errorInvalid,
+          "a transient array");
+    CHECK(Make(Def(mrhi_textureCube, mrhi_formatRgba8Unorm, 64, 64, 6, transient)) ==
+              mrhi_errorInvalid,
+          "a transient cube");
+    CHECK(Make(Def(mrhi_texture3d, mrhi_formatRgba8Unorm, 64, 64, 1, transient)) ==
+              mrhi_errorInvalid,
+          "a transient volume of one slice");
+    def = valid;
+    def.viewFormats[0] = mrhi_formatRgba8UnormSrgb;
+    CHECK(Make(def) == mrhi_errorInvalid, "a transient target with a view format");
+    def = valid;
+    def.viewFormats[MRHI_VIEW_FORMATS - 1] = mrhi_formatRgba8UnormSrgb;
+    CHECK(Make(def) == mrhi_errorInvalid, "a transient target with a last view format");
+    def.usage = kTarget;
+    CHECK(Make(def) == mrhi_success, "a view format, not transient");
+}
+
 static void TestFormats(void)
 {
     mrhiTextureDef def = Def(mrhi_texture2d, mrhi_formatRgba8Unorm, 64, 64, 1, kSampled);
@@ -196,6 +231,14 @@ static void TestCompressedWithTheFeature(void)
     CHECK(Make(Def(mrhi_texture3d, mrhi_formatBc1RgbaUnorm, 64, 64, 4, kSampled)) ==
               mrhi_errorInvalid,
           "a compressed volume");
+    CHECK(Make(Def(mrhi_texture3d, mrhi_formatDepth32Float, 64, 64, 4, kSampled)) ==
+              mrhi_errorInvalid,
+          "a depth volume");
+    CHECK(Make(Def(mrhi_texture3d, mrhi_formatDepthStencil, 64, 64, 4, kSampled)) ==
+              mrhi_errorInvalid,
+          "a depth and stencil volume");
+    CHECK(Make(Def(mrhi_texture3d, mrhi_formatR32Float, 64, 64, 4, kSampled)) == mrhi_success,
+          "a 32-bit float volume");
     CHECK(Make(Def(mrhi_texture2d, mrhi_formatBc1RgbaUnorm, 64, 64, 1, kTarget)) ==
               mrhi_errorUnsupported,
           "a compressed target");
@@ -282,6 +325,7 @@ int main(void)
     TestKinds();
     TestLimits();
     TestSamplesAndUsages();
+    TestTransientShapes();
     TestFormats();
     TestNegativeKinds();
     TestRefusalsStateAndLimit();

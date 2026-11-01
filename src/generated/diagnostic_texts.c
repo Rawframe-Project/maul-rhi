@@ -113,7 +113,7 @@ const char* mrhiGetDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticShaderContainer:
         return "Shader bytes that are not a well-formed container: its bounds, version, digest or reflection.";
     case mrhi_diagnosticTextureUsage:
-        return "A texture def with a usage that is unknown or that its format, kind or sample count cannot take.";
+        return "A texture def with a usage that is unknown or that its format, kind, mips, view formats or sample count cannot take.";
     case mrhi_diagnosticTextureAdopt:
         return "A texture adopting a Vulkan image without an image, or without render target usage.";
     case mrhi_diagnosticViewDef:
@@ -171,7 +171,7 @@ const char* mrhiGetDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticTextureFormat:
         return "A texture def names an unknown format.";
     case mrhi_diagnosticTextureSize:
-        return "A texture def's size or layers do not fit its kind and its format's block, or its mips are more than a full chain.";
+        return "A texture def's size or layers do not fit its kind and its format's block, its format cannot be 3D, or its mips are more than a full chain.";
     case mrhi_diagnosticTextureSamples:
         return "A texture def's sample count is not 1, 2 or 4, or several samples are asked for a texture that is not 2D with one mip.";
     case mrhi_diagnosticTextureViewFormats:

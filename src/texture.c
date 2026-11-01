@@ -69,7 +69,9 @@ static bool IsShapeValid(const mrhiTextureDef* def)
         layers = square && def->depthOrLayers % 6 == 0;
         break;
     case mrhi_texture3d:
-        layers = !compressed;
+        // WebGPU makes no 3D texture of a depth or stencil format.
+        layers =
+            !compressed && !mrhiFormatHasDepth(def->format) && !mrhiFormatHasStencil(def->format);
         break;
     default:
         return false;
@@ -105,15 +107,26 @@ static bool AreSamplesValid(const mrhiTextureDef* def)
            (def->sampleCount == 1 || (def->kind == mrhi_texture2d && def->mipLevels == 1));
 }
 
+bool mrhiIsTransientShape(const mrhiTextureDef* def)
+{
+    bool views = false;
+    for (uint32_t i = 0; i < MRHI_VIEW_FORMATS; ++i)
+    {
+        views = views || def->viewFormats[i] != mrhi_formatNone;
+    }
+    return def->kind != mrhi_texture3d && def->depthOrLayers == 1 && def->mipLevels == 1 && !views;
+}
+
 // Whether the usages are well formed: known bits, a transient texture
-// only a render target, several samples only on a render target without
-// storage.
+// only a render target of a transient shape, several samples only on a
+// render target without storage.
 static bool IsUsageValid(const mrhiTextureDef* def)
 {
     mrhiTextureUsage usage = def->usage;
     mrhiTextureUsage transient = mrhi_textureTransient | mrhi_textureRenderTarget;
-    bool bits = usage != 0 && (usage & ~mrhiTextureUsageKnown) == 0 &&
-                ((usage & mrhi_textureTransient) == 0 || usage == transient);
+    bool bits =
+        usage != 0 && (usage & ~mrhiTextureUsageKnown) == 0 &&
+        ((usage & mrhi_textureTransient) == 0 || (usage == transient && mrhiIsTransientShape(def)));
     return bits && (def->sampleCount == 1 || ((usage & mrhi_textureRenderTarget) != 0 &&
                                               (usage & mrhi_textureStorage) == 0));
 }

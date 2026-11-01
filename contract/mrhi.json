@@ -597,7 +597,7 @@
             {
               "name": "diagnostic_texture_usage",
               "value": 68,
-              "doc": "A texture def with a usage that is unknown or that its format, kind or sample count cannot take."
+              "doc": "A texture def with a usage that is unknown or that its format, kind, mips, view formats or sample count cannot take."
             },
             {
               "name": "diagnostic_texture_adopt",
@@ -742,7 +742,7 @@
             {
               "name": "diagnostic_texture_size",
               "value": 97,
-              "doc": "A texture def's size or layers do not fit its kind and its format's block, or its mips are more than a full chain."
+              "doc": "A texture def's size or layers do not fit its kind and its format's block, its format cannot be 3D, or its mips are more than a full chain."
             },
             {
               "name": "diagnostic_texture_samples",
@@ -8697,7 +8697,7 @@
             {
               "name": "texture_3d",
               "value": 4,
-              "doc": "A volume.",
+              "doc": "A volume, of a format neither compressed nor depth or stencil.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -8797,7 +8797,7 @@
             {
               "name": "texture_transient",
               "value": 8,
-              "doc": "A render target whose contents live only inside a render pass; only with render target.",
+              "doc": "A render target whose contents live only inside a render pass; only with render target, on one 2D layer of one mip without view formats.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -9161,7 +9161,7 @@
           "doc": "Makes a texture on a ready device. It reads as zeros until the frame graph writes it, in every mip, layer and aspect: the first frame that imports it clears it whole, in a pass of the library's own that takes nothing from the frame's budgets, so the program's first use of it sees zeros. Passes that do not use it may run beside that clear. A texture of one mip and layer whose first use is a target that clears it and keeps the result is not cleared before, as that use writes all of it. A transient texture is never cleared, as its contents live only inside a render pass.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, an unknown kind, format, usage or view format, a zero size, a size or layer count that does not fit the kind or the format's block, too many mips, an unusable sample count, or a transient texture that is not only a render target; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the adapter's limits, a usage or sample count the format cannot take on the device, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` for a size past the device's limits within the adapter's, or when the device's texture limit is reached; `mrhi_errorPlatform` when the driver fails; `mrhi_errorBusy` for a call from inside the device's allocator."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, an unknown kind, format, usage or view format, a zero size, a size or layer count that does not fit the kind or the format's block, a 3D texture of a compressed, depth or stencil format, too many mips, an unusable sample count, or a transient texture that is not only a render target, or is not one 2D layer of one mip without view formats; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the adapter's limits, a usage or sample count the format cannot take on the device, a compressed format without its feature, or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` for a size past the device's limits within the adapter's, or when the device's texture limit is reached; `mrhi_errorPlatform` when the driver fails; `mrhi_errorBusy` for a call from inside the device's allocator."
           },
           "args": [
             {
@@ -22732,5 +22732,5 @@
       ]
     }
   ],
-  "contract_version": 30
+  "contract_version": 31
 }

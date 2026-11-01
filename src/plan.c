@@ -405,10 +405,10 @@ static mrhiDiagnosticCode PlanResource(mrhiDevice* device, uint32_t slot)
             map.library = false;
         }
     }
-    // A texture with view formats may be rendered in one, which WebGPU's
-    // transient attachments refuse.
+    // WebGPU's transient attachments are one 2D layer of one mip without
+    // view formats.
     resource->transient = resource->kind == mrhiFrameTexture && resource->firstPass != 0 &&
-                          targetsOnly && resource->texture.viewFormats[0] == mrhi_formatNone;
+                          targetsOnly && mrhiIsTransientShape(&resource->texture);
     // A surface image ends ready to present, a sealed object sealed, and
     // an imported object otherwise in its last use's state.
     if (resource->kind == mrhiSurfaceImage)

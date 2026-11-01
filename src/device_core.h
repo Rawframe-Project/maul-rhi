@@ -692,6 +692,10 @@ mrhiResult mrhiCheckBufferShape(mrhiDevice* device, const mrhiBufferDef* def);
 // sample count on the device: success, or the refusal.
 mrhiResult mrhiCheckTextureUsage(mrhiDevice* device, const mrhiTextureDef* def);
 
+// Whether a texture of the def's shape may be transient: one 2D layer of
+// one mip without view formats, as WebGPU's transient attachments are.
+bool mrhiIsTransientShape(const mrhiTextureDef* def);
+
 // Whether a format has an aspect; every format has mrhi_aspectAll.
 bool mrhiFormatHasAspect(mrhiFormat format, mrhiTextureAspect aspect);
 

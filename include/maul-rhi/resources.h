@@ -256,7 +256,7 @@ extern "C"
         mrhi_textureCube = 2,
         // An array of cubes, six layers each.
         mrhi_textureCubeArray = 3,
-        // A volume.
+        // A volume, of a format neither compressed nor depth or stencil.
         mrhi_texture3d = 4,
     };
 
@@ -273,7 +273,7 @@ extern "C"
         // A color or depth target of render passes.
         mrhi_textureRenderTarget = 0x4u,
         // A render target whose contents live only inside a render pass; only
-        // with render target.
+        // with render target, on one 2D layer of one mip without view formats.
         mrhi_textureTransient = 0x8u,
         // The source of copies and readbacks.
         mrhi_textureCopySource = 0x10u,
@@ -354,16 +354,18 @@ extern "C"
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a label that is not UTF-8 without NUL, an unknown
     /// kind, format, usage or view format, a zero size, a size or layer count
-    /// that does not fit the kind or the format's block, too many mips, an
-    /// unusable sample count, or a transient texture that is not only a render
-    /// target; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES;
-    /// `mrhi_errorUnsupported` for a size past the adapter's limits, a usage or
-    /// sample count the format cannot take on the device, a compressed format
-    /// without its feature, or a critical extension the library does not know;
-    /// `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity`
-    /// for a size past the device's limits within the adapter's, or when the
-    /// device's texture limit is reached; `mrhi_errorPlatform` when the driver
-    /// fails; `mrhi_errorBusy` for a call from inside the device's allocator.
+    /// that does not fit the kind or the format's block, a 3D texture of a
+    /// compressed, depth or stencil format, too many mips, an unusable sample
+    /// count, or a transient texture that is not only a render target, or is
+    /// not one 2D layer of one mip without view formats; `mrhi_errorLimit` for
+    /// a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size
+    /// past the adapter's limits, a usage or sample count the format cannot
+    /// take on the device, a compressed format without its feature, or a
+    /// critical extension the library does not know; `mrhi_errorState` for a
+    /// device that is not ready; `mrhi_errorCapacity` for a size past the
+    /// device's limits within the adapter's, or when the device's texture limit
+    /// is reached; `mrhi_errorPlatform` when the driver fails; `mrhi_errorBusy`
+    /// for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateTexture(mrhiDevice* device,
