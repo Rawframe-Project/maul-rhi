@@ -103,7 +103,7 @@ const char* mrhiGetDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticStatisticsQuery:
         return "A statistics query begun outside a graphics-class pass of one view, while one is open, on a set of another type, past the set or written twice in a frame; or ended with none open.";
     case mrhi_diagnosticSamplerDef:
-        return "A sampler def with an unknown filter, address mode or compare function, a negative or reversed level of detail range, or anisotropy outside 1 to 16 or above 1 without linear filtering.";
+        return "A sampler def with an unknown filter, address mode or compare function, a negative, infinite or reversed level of detail range, or anisotropy outside 1 to 16 or above 1 without linear filtering.";
     case mrhi_diagnosticBufferSize:
         return "A buffer size of zero or not a multiple of 4.";
     case mrhi_diagnosticBufferUsage:
@@ -119,7 +119,7 @@ const char* mrhiGetDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticViewDef:
         return "A view def with an unknown kind or aspect.";
     case mrhi_diagnosticViewRange:
-        return "A view whose mips, layers, format, aspect or kind its texture cannot give.";
+        return "A view whose mips, layers, format, aspect, kind or uses its texture cannot give.";
     case mrhi_diagnosticDriverRequestTags:
         return "A request reached the driver past the notifications limit, so its answer could not be matched.";
     case mrhi_diagnosticDriverUnaskedAnswer:

@@ -48,7 +48,8 @@ bool mrhiIsRangeValid(uint32_t base, uint32_t count, uint32_t total)
     return count > 0 && !ckd_add(&end, base, count) && end <= total;
 }
 
-// Whether the texture may be seen with the view's kind and layers.
+// Whether the texture may be seen with the view's kind and layers. A
+// multisampled texture is seen only as 2D, as WebGPU requires.
 static bool IsKindValid(const mrhiTextureDef* texture, const mrhiViewDef* view)
 {
     bool flat = texture->kind != mrhi_texture3d;
@@ -58,7 +59,7 @@ static bool IsKindValid(const mrhiTextureDef* texture, const mrhiViewDef* view)
     case mrhi_texture2d:
         return flat && view->layerCount == 1;
     case mrhi_texture2dArray:
-        return flat;
+        return flat && texture->sampleCount == 1;
     case mrhi_textureCube:
         return cube && view->layerCount == 6;
     case mrhi_textureCubeArray:
@@ -120,9 +121,10 @@ bool mrhiResolveView(const mrhiTextureDef* texture, const mrhiViewDef* def,
     view.mipCount = mrhiResolveCount(view.mipCount, view.baseMip, texture->mipLevels);
     view.layerCount = mrhiResolveCount(view.layerCount, view.baseLayer, layers);
     *resolvedOut = view;
-    mrhiTextureUsage transient = mrhi_textureTransient | mrhi_textureRenderTarget;
+    // A view of a transient texture takes all of its usages, as WebGPU
+    // requires.
     bool usage = (view.usage & ~texture->usage) == 0 &&
-                 ((view.usage & mrhi_textureTransient) == 0 || view.usage == transient);
+                 ((texture->usage & mrhi_textureTransient) == 0 || view.usage == texture->usage);
     return usage && IsFormatGiven(texture, view.format) &&
            mrhiFormatHasAspect(texture->format, view.aspect) &&
            mrhiIsRangeValid(view.baseMip, view.mipCount, texture->mipLevels) &&

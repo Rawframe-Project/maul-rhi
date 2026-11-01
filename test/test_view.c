@@ -122,7 +122,18 @@ static void TestKinds(void)
     CHECK(Make(Def(array, mrhi_texture3d)) == mrhi_errorInvalid, "3D of an array");
     CHECK(Make(Def(cube, mrhi_texture3d)) == mrhi_errorInvalid, "3D of a cube");
     CHECK(Make(Def(volume, 5)) == mrhi_errorInvalid, "an unknown kind");
-    mrhiTextureId textures[] = {array, cube, cubes, volume};
+    mrhiTextureDef samplesDef = mrhiDefaultTextureDef();
+    samplesDef.format = mrhi_formatRgba8Unorm;
+    samplesDef.width = 64;
+    samplesDef.height = 64;
+    samplesDef.sampleCount = 4;
+    samplesDef.usage = kTarget;
+    mrhiTextureId samples = {0};
+    CHECK(mrhiCreateTexture(s_device, &samplesDef, &samples) == mrhi_success, "multisampled");
+    CHECK(Make(Def(samples, mrhi_texture2d)) == mrhi_success, "2D of a multisampled texture");
+    CHECK(Make(Def(samples, mrhi_texture2dArray)) == mrhi_errorInvalid,
+          "a 2D array of a multisampled texture");
+    mrhiTextureId textures[] = {array, cube, cubes, volume, samples};
     for (size_t i = 0; i < sizeof(textures) / sizeof(textures[0]); ++i)
     {
         CHECK(mrhiDestroyTexture(s_device, textures[i]) == mrhi_success, "done");
@@ -161,8 +172,10 @@ static void TestFormatsAndUsages(void)
                                           mrhi_textureTransient | kTarget);
     def = Def(transient, mrhi_texture2d);
     CHECK(Make(def) == mrhi_success, "a transient target");
+    def.usage = mrhi_textureTransient | kTarget;
+    CHECK(Make(def) == mrhi_success, "with all of its uses");
     def.usage = kTarget;
-    CHECK(Make(def) == mrhi_success, "as a target alone");
+    CHECK(Make(def) == mrhi_errorInvalid, "as a target alone");
     def.usage = mrhi_textureTransient;
     CHECK(Make(def) == mrhi_errorInvalid, "transient but no target");
     CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "done");
