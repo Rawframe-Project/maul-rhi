@@ -1865,6 +1865,61 @@ static void TestTransientTargets(void)
     }
 }
 
+// api,validation,createView:texture_view_usage_of_multiple_usages: on an
+// rgba8unorm texture of two usages, a view takes no usage or any of them,
+// but one of a transient texture takes none or all.
+static void TestViewUsages(void)
+{
+    char name[160];
+    // The CTS's usages, in its order.
+    static const mrhiTextureUsage usages[] = {
+        mrhi_textureCopySource, mrhi_textureCopyDestination, mrhi_textureSampled,
+        mrhi_textureStorage,    mrhi_textureRenderTarget,    mrhi_textureTransient,
+    };
+    const mrhiTextureUsage transient = mrhi_textureRenderTarget | mrhi_textureTransient;
+    const size_t count = sizeof(usages) / sizeof(usages[0]);
+    for (size_t i = 0; i < count; ++i)
+    {
+        for (size_t j = i; j < count; ++j)
+        {
+            mrhiTextureUsage usage = usages[i] | usages[j];
+            // The CTS's valid combinations: transient only with a target.
+            if ((usage & mrhi_textureTransient) != 0 && usage != transient)
+            {
+                continue;
+            }
+            mrhiTextureDef textureDef = mrhiDefaultTextureDef();
+            textureDef.format = RGBA8;
+            textureDef.width = 1;
+            textureDef.height = 1;
+            textureDef.usage = usage;
+            mrhiTextureId texture = {0};
+            CHECK(mrhiCreateTexture(s_device, &textureDef, &texture) == mrhi_success,
+                  "a texture of two usages");
+            const mrhiTextureUsage views[] = {0, usages[i], usages[j], usage};
+            for (size_t v = 0; v < sizeof(views) / sizeof(views[0]); ++v)
+            {
+                mrhiViewDef def = mrhiDefaultViewDef();
+                def.texture = texture;
+                def.usage = views[v];
+                mrhiViewId view = {0};
+                mrhiResult status = mrhiCreateView(s_device, &def, &view);
+                bool valid =
+                    (usage & mrhi_textureTransient) == 0 || views[v] == 0 || views[v] == usage;
+                snprintf(name, sizeof(name),
+                         "createView:texture_view_usage_of_multiple_usages usage 0x%x, view 0x%x",
+                         (unsigned)usage, (unsigned)views[v]);
+                Expect(name, status, valid);
+                if (status == mrhi_success)
+                {
+                    CHECK(mrhiDestroyView(s_device, view) == mrhi_success, "the view");
+                }
+            }
+            CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "the texture");
+        }
+    }
+}
+
 // The color renderable formats, with WebGPU's render target pixel byte
 // cost and component alignment of each.
 static const struct
@@ -2294,6 +2349,7 @@ int main(void)
     CHECK(s_differs == 878 && s_inexpressible == 966, "the draw cases set aside");
     TestRenderPasses();
     TestTransientTargets();
+    TestViewUsages();
     TestColorBytes();
     TestQueries();
     CHECK(s_differs == 879 && s_inexpressible == 966, "the pass and query cases set aside");

@@ -422,14 +422,16 @@ extern "C"
         size_t labelLength;
         // The texture it views.
         mrhiTextureId texture;
-        // Its shape: 2D or 2D array on any texture but a 3D one, a cube or cube
-        // array on a cube or cube array texture, 3D on a 3D texture.
+        // Its shape: 2D on any texture but a 3D one, 2D array on one neither 3D
+        // nor multisampled, a cube or cube array on a cube or cube array
+        // texture, 3D on a 3D texture.
         mrhiTextureKind kind;
         // The texture's format or one of its view formats; mrhi_formatNone for
         // the texture's.
         mrhiFormat format;
         // Some of the texture's uses, each one the view's format can take on
-        // the device; 0 for all of the texture's.
+        // the device, and all of them on a transient texture; 0 for all of the
+        // texture's.
         mrhiTextureUsage usage;
         // The aspect it sees; depth or stencil only on a format that has it.
         mrhiTextureAspect aspect;
@@ -460,12 +462,13 @@ extern "C"
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a label that is not UTF-8 without NUL, an unknown
     /// kind, usage or aspect, a kind the texture cannot be seen as, a format
-    /// the texture was not given, uses the texture lacks, an aspect its format
-    /// lacks, or a mip or layer range that is empty, past the texture's end or
-    /// wrong for the kind; `mrhi_errorLimit` for a label past
-    /// MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for a texture the device no
-    /// longer has; `mrhi_errorUnsupported` for a use the view's format cannot
-    /// take on the device, or a critical extension the library does not know;
+    /// the texture was not given, uses the texture lacks or, on a transient
+    /// texture, not all of its uses, an aspect its format lacks, or a mip or
+    /// layer range that is empty, past the texture's end or wrong for the kind;
+    /// `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES;
+    /// `mrhi_errorStale` for a texture the device no longer has;
+    /// `mrhi_errorUnsupported` for a use the view's format cannot take on the
+    /// device, or a critical extension the library does not know;
     /// `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity`
     /// when the device's view limit is reached; `mrhi_errorPlatform` when the
     /// driver fails; `mrhi_errorBusy` for a call from inside the device's

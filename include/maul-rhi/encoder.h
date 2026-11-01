@@ -74,9 +74,10 @@ extern "C"
         // within the device's uniformBindingBytes or storageBindingBytes, at
         // least the shader's minimum, and a multiple of 4 for storage.
         uint64_t size;
-        // A texture's shape as the shader sees it, as a view's kind: 2D or 2D
-        // array on any texture but a 3D one, a cube or cube array on a cube or
-        // cube array texture, 3D on a 3D texture.
+        // A texture's shape as the shader sees it, as a view's kind: 2D on any
+        // texture but a 3D one, 2D array on one neither 3D nor multisampled, a
+        // cube or cube array on a cube or cube array texture, 3D on a 3D
+        // texture.
         mrhiTextureKind viewKind;
         // The texture's format or one of its view formats; mrhi_formatNone for
         // the texture's.
