@@ -501,6 +501,14 @@ static void TestViewport(void)
         {.width = 1, .height = limit + 1, .maxDepth = 1},
         {.x = limit, .width = limit, .height = 1, .maxDepth = 1},
         {.y = limit, .width = 1, .height = limit, .maxDepth = 1},
+        // A far edge just past the range, by less than half a float step
+        // there, which a float sum would round onto the edge.
+        {.x = limit - 1 + 0x1p-11f, .width = limit, .height = 1, .maxDepth = 1},
+        {.y = limit - 1 + 0x1p-11f, .width = 1, .height = limit, .maxDepth = 1},
+        // And past it by less than half a double step there: a double sum
+        // rounds onto the edge too.
+        {.x = 2 * limit - 1, .width = 0x1p-41f, .height = 1, .maxDepth = 1},
+        {.y = 2 * limit - 1, .width = 1, .height = 0x1p-41f, .maxDepth = 1},
     };
     for (size_t i = 0; i < sizeof(past) / sizeof(past[0]); ++i)
     {
