@@ -426,14 +426,19 @@ static bool IsViewportValid(const mrhiViewport* viewport)
 
 // The limit a viewport passes, by WebGPU's ranges for a 2D texture limit
 // (its size within the limit, its edges within twice it): the 2D
-// texture dimension, or MRHI_WITHIN_LIMITS.
+// texture dimension, or MRHI_WITHIN_LIMITS. The far edges are summed as
+// doubles, which hold the sum of two floats exactly; a float sum could
+// round down onto the edge.
 static size_t ViewportPast(const mrhiViewport* viewport, uint32_t textureDimension2d)
 {
-    float limit = (float)textureDimension2d;
-    float range = 2.0f * limit;
-    bool fits = viewport->x >= -range && viewport->y >= -range && viewport->width <= limit &&
-                viewport->height <= limit && viewport->x + viewport->width <= range - 1.0f &&
-                viewport->y + viewport->height <= range - 1.0f;
+    double limit = (double)textureDimension2d;
+    double range = 2.0 * limit;
+    double x = (double)viewport->x;
+    double y = (double)viewport->y;
+    double width = (double)viewport->width;
+    double height = (double)viewport->height;
+    bool fits = x >= -range && y >= -range && width <= limit && height <= limit &&
+                x + width <= range - 1.0 && y + height <= range - 1.0;
     return fits ? MRHI_WITHIN_LIMITS : offsetof(mrhiLimits, textureDimension2d);
 }
 
