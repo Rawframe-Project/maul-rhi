@@ -5,6 +5,25 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.18.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.17.0...v0.18.0) (2026-11-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* **shader:** containers with such storage textures, which were accepted, are refused. MRHI_SPI_VERSION is 15: a driver may assume a read and written storage texture is one of the three formats, and that the device stores every storage texture's format.
+* **pipeline:** values that were refused with mrhi_errorFormat are accepted. MRHI_SPI_VERSION is 15: a driver may be handed an integer constant with a fraction, which it truncates, and a boolean other than 0 or 1, which is true.
+* **graph:** mrhiAddPass refuses a resolve of r32float, rg32float, rgba32float, r32uint or r32sint, and a resolve into a 3D texture, as WebGPU's beginRenderPass does.
+* **graph:** mrhiAddPass refuses a transient texture as a target that loads or stores (its stencil too) and as a resolve target, as WebGPU's beginRenderPass does.
+* **graph:** mrhiAddPass refuses a pass whose color targets' bytes per sample pass the device's colorBytesPerSample limit, as WebGPU's beginRenderPass does.
+
+### Fixed
+
+* **graph:** refuse color targets past colorBytesPerSample ([#353](https://github.com/Rawframe-Project/maul-rhi/issues/353)) ([35a7baf](https://github.com/Rawframe-Project/maul-rhi/commit/35a7baf7e1759e689daa9cca649c833ead93a05b)), closes [#352](https://github.com/Rawframe-Project/maul-rhi/issues/352)
+* **graph:** refuse transient targets that keep or take a resolve ([#355](https://github.com/Rawframe-Project/maul-rhi/issues/355)) ([3f4308e](https://github.com/Rawframe-Project/maul-rhi/commit/3f4308e1530d36ddcfdfac608282e431eea25f09)), closes [#354](https://github.com/Rawframe-Project/maul-rhi/issues/354)
+* **graph:** resolve only formats WebGPU resolves, never into 3D ([#358](https://github.com/Rawframe-Project/maul-rhi/issues/358)) ([89af624](https://github.com/Rawframe-Project/maul-rhi/commit/89af62474f0e716abc5e6b213040ab9c79e00aba)), closes [#356](https://github.com/Rawframe-Project/maul-rhi/issues/356) [#357](https://github.com/Rawframe-Project/maul-rhi/issues/357)
+* **pipeline:** convert constant values as WebGPU does ([#361](https://github.com/Rawframe-Project/maul-rhi/issues/361)) ([84014d4](https://github.com/Rawframe-Project/maul-rhi/commit/84014d470a1c31a574220df947ad07af33b10eae)), closes [#360](https://github.com/Rawframe-Project/maul-rhi/issues/360)
+* **shader:** refuse storage textures WebGPU does not store ([#363](https://github.com/Rawframe-Project/maul-rhi/issues/363)) ([98500be](https://github.com/Rawframe-Project/maul-rhi/commit/98500be1bc116887da3ad8dd0da413882fbe7e7a)), closes [#362](https://github.com/Rawframe-Project/maul-rhi/issues/362)
+
 ## [0.17.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.16.0...v0.17.0) (2026-11-01)
 
 ### Changed

@@ -26,7 +26,7 @@ extern "C"
 #define MRHI_VERSION_MAJOR 0
 // x-release-please-end
 // x-release-please-start-minor
-#define MRHI_VERSION_MINOR 17
+#define MRHI_VERSION_MINOR 18
 // x-release-please-end
 // x-release-please-start-patch
 #define MRHI_VERSION_PATCH 0
