@@ -326,8 +326,11 @@ static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* tar
     const mrhiTextureDef* def = mrhiFrameTextureOf(&device->frameResources[slot - 1]);
     *statusOut = mrhi_errorInvalid;
     mrhiFormat format = mrhiViewFormatOf(def, target->viewFormat);
+    // A transient texture lives only in the pass: cleared, then discarded.
+    bool transient = (def->usage & mrhi_textureTransient) != 0;
     if ((uint32_t)target->load > mrhi_loadDiscard || (uint32_t)target->store > mrhi_storeDiscard ||
         mrhiFormatHasDepth(def->format) || format == mrhi_formatNone ||
+        (transient && (target->load != mrhi_loadClear || target->store != mrhi_storeDiscard)) ||
         (target->load == mrhi_loadClear && !Converts(&target->clear, format)) ||
         !Agrees(shape, def, target->mip))
     {
@@ -362,6 +365,7 @@ static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* tar
     // The resolve takes the target's own format, viewed in its view
     // format too.
     if (def->sampleCount == 1 || into->sampleCount != 1 || into->format != def->format ||
+        (into->usage & mrhi_textureTransient) != 0 ||
         mrhiViewFormatOf(into, format) == mrhi_formatNone || resolveShape.width != shape->width ||
         resolveShape.height != shape->height)
     {
@@ -402,11 +406,16 @@ static mrhiResult UseOfDepth(const mrhiDevice* device, const mrhiDepthTarget* ta
     bool keeps = target->depthLoad == mrhi_loadKeep && target->depthStore == mrhi_storeKeep &&
                  (!stencil ||
                   (target->stencilLoad == mrhi_loadKeep && target->stencilStore == mrhi_storeKeep));
+    // A transient texture lives only in the pass: cleared, then discarded.
+    bool transient = (def->usage & mrhi_textureTransient) != 0;
+    bool passes = target->depthLoad == mrhi_loadClear && target->depthStore == mrhi_storeDiscard &&
+                  (!stencil || (target->stencilLoad == mrhi_loadClear &&
+                                target->stencilStore == mrhi_storeDiscard));
     // A depth cleared takes a value from 0 to 1, never NaN.
     bool clears = target->depthLoad == mrhi_loadClear;
     bool cleared = !clears || (target->clearDepth >= 0.0f && target->clearDepth <= 1.0f);
     if (!known || !mrhiFormatHasDepth(def->format) || (target->readOnly && !keeps) || !cleared ||
-        !Agrees(shape, def, target->mip))
+        (transient && !passes) || !Agrees(shape, def, target->mip))
     {
         return mrhi_errorInvalid;
     }

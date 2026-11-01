@@ -1716,6 +1716,81 @@ static mrhiResult RenderPass(const Attachment* colors, const Attachment* resolve
 #define DEPTH mrhi_formatDepthStencil
 static const Attachment s_none = {0};
 
+static bool IsDepth(mrhiFormat format)
+{
+    return format == mrhi_formatDepth32Float || format == DEPTH;
+}
+
+// A pass with one target of a format, made with the usages, loaded and
+// stored as given; a depth format's stencil, if any, as its depth. The
+// pass's refusal, or success.
+static mrhiResult OpsPass(mrhiFormat format, mrhiTextureUsage usage, mrhiLoadOp load,
+                          mrhiStoreOp store)
+{
+    mrhiTextureId texture = MakeAttachment(&(Attachment){.format = format, .usage = usage});
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success, "a frame");
+    mrhiResourceId resource = {0};
+    CHECK(mrhiImportTexture(s_device, texture, &resource) == mrhi_success, "imported");
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    if (IsDepth(format))
+    {
+        def.depthTarget = (mrhiDepthTarget){
+            .resource = resource,
+            .depthLoad = load,
+            .depthStore = store,
+            .stencilLoad = load,
+            .stencilStore = store,
+        };
+    }
+    else
+    {
+        def.colorTargets[0] = (mrhiColorTarget){.resource = resource, .load = load, .store = store};
+        def.colorTargetCount = 1;
+    }
+    mrhiPassId pass = {0};
+    mrhiResult status = mrhiAddPass(s_device, &def, &pass);
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
+              mrhiDestroyTexture(s_device, texture) == mrhi_success,
+          "dropped");
+    return status;
+}
+
+// color_attachments,loadOp_storeOp and the transient part of
+// depth_stencil_attachment,loadOp_storeOp_match_depthReadOnly_stencilReadOnly:
+// a transient texture is cleared and discarded, depth and stencil both.
+// The depth case's undefined operations and read-only aspects have no
+// counterpart, as a target's operations are always given.
+static void TestTransientTargets(void)
+{
+    char name[192];
+    static const mrhiFormat formats[] = {RGBA8, mrhi_formatRgba16Float, mrhi_formatDepth32Float,
+                                         DEPTH};
+    const mrhiTextureUsage transient = mrhi_textureRenderTarget | mrhi_textureTransient;
+    for (size_t f = 0; f < sizeof(formats) / sizeof(formats[0]); ++f)
+    {
+        bool depth = IsDepth(formats[f]);
+        for (uint32_t t = 0; t < 2; ++t)
+        {
+            for (uint32_t op = 0; op < 4; ++op)
+            {
+                mrhiLoadOp load = op & 1 ? mrhi_loadKeep : mrhi_loadClear;
+                mrhiStoreOp store = op & 2 ? mrhi_storeKeep : mrhi_storeDiscard;
+                snprintf(name, sizeof(name), "render_pass_descriptor:%s format %d, %s, %s, %s",
+                         depth ? "depth_stencil_attachment,"
+                                 "loadOp_storeOp_match_depthReadOnly_stencilReadOnly"
+                               : "color_attachments,loadOp_storeOp",
+                         (int)formats[f], t ? "transient" : "not transient",
+                         op & 1 ? "load" : "clear", op & 2 ? "store" : "discard");
+                Expect(name,
+                       OpsPass(formats[f], t ? transient : mrhi_textureRenderTarget, load, store),
+                       t == 0 || op == 0);
+            }
+        }
+    }
+}
+
 // api,validation,render_pass,render_pass_descriptor: the cases whose
 // attachments Maul RHI's targets express. Its targets name one mip and
 // one layer, so the cases of views of several (attachments,layer_count
@@ -2031,6 +2106,7 @@ int main(void)
     TestVertexIndexBuffers();
     CHECK(s_differs == 878 && s_inexpressible == 966, "the draw cases set aside");
     TestRenderPasses();
+    TestTransientTargets();
     TestQueries();
     CHECK(s_differs == 879 && s_inexpressible == 966, "the pass and query cases set aside");
     Close(s_device);
