@@ -306,7 +306,11 @@ extern "C"
     /// instances; `mrhi_errorStale` for a pass of another frame or a destroyed
     /// pipeline; `mrhi_errorState` for a pass that is not recording, has no
     /// pipeline set, or lacks a table or vertex buffer the pipeline reads;
-    /// `mrhi_errorCapacity` when the frame's commands are full.
+    /// `mrhi_errorUnsupported` for the tables and vertex buffers set, counted
+    /// to the highest of each, past the adapter's tablesPlusVertexBuffers;
+    /// `mrhi_errorCapacity` for the tables and vertex buffers set, counted to
+    /// the highest of each, past the device's tablesPlusVertexBuffers within
+    /// the adapter's, or when the frame's commands are full.
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiPass_Draw(mrhiDevice* device, mrhiPassId pass,
@@ -329,8 +333,12 @@ extern "C"
     /// pass of another frame or a destroyed pipeline; `mrhi_errorState` for a
     /// pass that is not recording, has no pipeline set, lacks a table or vertex
     /// buffer the pipeline reads, or lacks an index buffer of the pipeline's
-    /// strip index format; `mrhi_errorCapacity` when the frame's commands are
-    /// full.
+    /// strip index format; `mrhi_errorUnsupported` for the tables and vertex
+    /// buffers set, counted to the highest of each, past the adapter's
+    /// tablesPlusVertexBuffers; `mrhi_errorCapacity` for the tables and vertex
+    /// buffers set, counted to the highest of each, past the device's
+    /// tablesPlusVertexBuffers within the adapter's, or when the frame's
+    /// commands are full.
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiPass_DrawIndexed(mrhiDevice* device, mrhiPassId pass,
@@ -377,7 +385,11 @@ extern "C"
     /// frame, a destroyed pipeline, or a resource that is not live;
     /// `mrhi_errorState` for a pass that is not recording, has no pipeline set,
     /// or lacks a table or vertex buffer the pipeline reads;
-    /// `mrhi_errorCapacity` when the frame's commands are full.
+    /// `mrhi_errorUnsupported` for the tables and vertex buffers set, counted
+    /// to the highest of each, past the adapter's tablesPlusVertexBuffers;
+    /// `mrhi_errorCapacity` for the tables and vertex buffers set, counted to
+    /// the highest of each, past the device's tablesPlusVertexBuffers within
+    /// the adapter's, or when the frame's commands are full.
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiPass_DrawIndirect(mrhiDevice* device, mrhiPassId pass,
@@ -404,8 +416,12 @@ extern "C"
     /// frame, a destroyed pipeline, or a resource that is not live;
     /// `mrhi_errorState` for a pass that is not recording, has no pipeline set,
     /// lacks a table or vertex buffer the pipeline reads, or has no index
-    /// buffer of the pipeline's strip index format; `mrhi_errorCapacity` when
-    /// the frame's commands are full.
+    /// buffer of the pipeline's strip index format; `mrhi_errorUnsupported` for
+    /// the tables and vertex buffers set, counted to the highest of each, past
+    /// the adapter's tablesPlusVertexBuffers; `mrhi_errorCapacity` for the
+    /// tables and vertex buffers set, counted to the highest of each, past the
+    /// device's tablesPlusVertexBuffers within the adapter's, or when the
+    /// frame's commands are full.
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiPass_DrawIndexedIndirect(mrhiDevice* device,
@@ -437,15 +453,19 @@ extern "C"
     /// @param maxCount       The draws made at most, 1 to
     ///                       MRHI_MAX_INDIRECT_DRAWS.
     /// @return `mrhi_success`; `mrhi_errorUnsupported` for a device without the
-    /// multi_draw_indirect_count feature; `mrhi_errorInvalid` for a NULL
-    /// device, a maxCount of 0, a pass without targets, or an arguments or
-    /// count resource that is not a buffer the pass declares with the indirect
-    /// access, or an offset not a multiple of 4 or without maxCount records, or
-    /// the count's 4 bytes, after it; `mrhi_errorLimit` for a maxCount past
+    /// multi_draw_indirect_count feature, or the tables and vertex buffers set,
+    /// counted to the highest of each, past the adapter's
+    /// tablesPlusVertexBuffers; `mrhi_errorInvalid` for a NULL device, a
+    /// maxCount of 0, a pass without targets, or an arguments or count resource
+    /// that is not a buffer the pass declares with the indirect access, or an
+    /// offset not a multiple of 4 or without maxCount records, or the count's 4
+    /// bytes, after it; `mrhi_errorLimit` for a maxCount past
     /// MRHI_MAX_INDIRECT_DRAWS; `mrhi_errorStale` for a pass of another frame,
     /// a destroyed pipeline, or a resource that is not live; `mrhi_errorState`
     /// for a pass that is not recording, has no pipeline set, or lacks a table
-    /// or vertex buffer the pipeline reads; `mrhi_errorCapacity` when the
+    /// or vertex buffer the pipeline reads; `mrhi_errorCapacity` for the tables
+    /// and vertex buffers set, counted to the highest of each, past the
+    /// device's tablesPlusVertexBuffers within the adapter's, or when the
     /// frame's commands are full, or its counted draws would pass the device's
     /// frameIndirectDraws.
     /// @par Thread safety
@@ -475,16 +495,20 @@ extern "C"
     /// @param maxCount       The draws made at most, 1 to
     ///                       MRHI_MAX_INDIRECT_DRAWS.
     /// @return `mrhi_success`; `mrhi_errorUnsupported` for a device without the
-    /// multi_draw_indirect_count feature; `mrhi_errorInvalid` for a NULL
-    /// device, a maxCount of 0, a pass without targets, or an arguments or
-    /// count resource that is not a buffer the pass declares with the indirect
-    /// access, or an offset not a multiple of 4 or without maxCount records, or
-    /// the count's 4 bytes, after it; `mrhi_errorLimit` for a maxCount past
+    /// multi_draw_indirect_count feature, or the tables and vertex buffers set,
+    /// counted to the highest of each, past the adapter's
+    /// tablesPlusVertexBuffers; `mrhi_errorInvalid` for a NULL device, a
+    /// maxCount of 0, a pass without targets, or an arguments or count resource
+    /// that is not a buffer the pass declares with the indirect access, or an
+    /// offset not a multiple of 4 or without maxCount records, or the count's 4
+    /// bytes, after it; `mrhi_errorLimit` for a maxCount past
     /// MRHI_MAX_INDIRECT_DRAWS; `mrhi_errorStale` for a pass of another frame,
     /// a destroyed pipeline, or a resource that is not live; `mrhi_errorState`
     /// for a pass that is not recording, has no pipeline set, lacks a table or
     /// vertex buffer the pipeline reads, or has no index buffer of the
-    /// pipeline's strip index format; `mrhi_errorCapacity` when the frame's
+    /// pipeline's strip index format; `mrhi_errorCapacity` for the tables and
+    /// vertex buffers set, counted to the highest of each, past the device's
+    /// tablesPlusVertexBuffers within the adapter's, or when the frame's
     /// commands are full, or its counted draws would pass the device's
     /// frameIndirectDraws.
     /// @par Thread safety

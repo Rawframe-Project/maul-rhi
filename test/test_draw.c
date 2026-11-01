@@ -538,6 +538,55 @@ static void TestTables(void)
     CloseDevice();
 }
 
+// The tables and vertex buffers a pass has set count toward
+// tablesPlusVertexBuffers at each draw as WebGPU counts them: up to the
+// highest of each, whether or not the pipeline reads them. A table set
+// for one pipeline still counts at a draw by another that reads none.
+static void TestSlotsUsed(bool adapterHolds)
+{
+    s_adapter.limits.vertexBuffers = 24;
+    s_adapter.limits.tablesPlusVertexBuffers = adapterHolds ? 64 : 24;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.limits.vertexBuffers = 24;
+    OpenLimited(deviceDef);
+    Unbound();
+    Binding(0, 3, 0, mrhi_bindingUniformBuffer, mrhi_stageFragment);
+    mrhiGraphicsPipelineId tabled = MakeGraphics();
+    Unbound();
+    mrhiGraphicsPipelineId plain = MakeGraphics();
+    mrhiResult past = adapterHolds ? mrhi_errorCapacity : mrhi_errorUnsupported;
+    Frame();
+    SetVertices();
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 20, s_v, 0, MRHI_WHOLE_SIZE) ==
+                  mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(s_device, s_render, plain) == mrhi_success &&
+              mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == mrhi_success,
+          "21 vertex buffer slots and no table");
+    Drop();
+    Frame();
+    mrhiBinding binding = {.slot = 0, .resource = s_u, .size = 256};
+    SetVertices();
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, tabled) == mrhi_success &&
+              mrhiPass_SetBindings(s_device, s_render, 3, &binding, 1) == mrhi_success &&
+              mrhiPass_SetVertexBuffer(s_device, s_render, 19, s_v, 0, MRHI_WHOLE_SIZE) ==
+                  mrhi_success &&
+              mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == mrhi_success,
+          "4 tables and 20 vertex buffer slots, the limit");
+    CHECK(mrhiPass_SetVertexBuffer(s_device, s_render, 20, s_v, 0, MRHI_WHOLE_SIZE) ==
+                  mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(s_device, s_render, plain) == mrhi_success,
+          "one more slot, and a pipeline reading no table");
+    CHECK(mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == past &&
+              mrhiPass_DrawIndexed(s_device, s_render, 0, 1, 0, 0, 0) == past &&
+              mrhiPass_DrawIndirect(s_device, s_render, s_a, 0) == past &&
+              mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 0) == past,
+          "past the limit with the table counted");
+    CHECK(Refusal() == mrhi_diagnosticLimitTablesPlusVertexBuffers, "named");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 0, "not misuse");
+    Drop();
+    CloseDevice();
+}
+
 static void TestDispatch(void)
 {
     // An adapter of twice the device's workgroups.
@@ -1021,6 +1070,11 @@ int main(void)
     TestAttributeReach();
     TestIndices();
     TestTables();
+    ResetAdapter();
+    TestSlotsUsed(true);
+    ResetAdapter();
+    TestSlotsUsed(false);
+    ResetAdapter();
     TestDispatch();
     ResetAdapter();
     TestIndirectDraws();
