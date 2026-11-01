@@ -7,15 +7,48 @@ may change the API, the ABI and every data format.
 
 ## [0.17.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.16.0...v0.17.0) (2026-11-01)
 
+### Changed
 
-### ⚠ BREAKING CHANGES
+- **Breaking:** `mrhiAddPass` accepts a color target whose resource is
+  the null id as a location without a target, as WebGPU accepts a null
+  color attachment. Before, it refused one as `mrhi_errorStale`, so a
+  pipeline with a target of no format between two targets matched no
+  pass.
+  - A pass with targets still needs at least one color or depth
+    target.
+  - A null target that names a resolve target is refused as
+    `mrhi_errorInvalid`, counted as `mrhi_diagnosticPassUses`.
+  - `mrhiPassPlan.colorStores` reads `mrhi_storeDiscard` at a null
+    location.
 
-* **graph:** drivers built outside the tree must be rebuilt for SPI version 14; a pass view can now hold a null color target, never the last one, and a pipeline def's last color target always has a format.
+  The core also leaves trailing empty locations out of what drivers
+  see: a pass's trailing null targets, and a pipeline's trailing
+  targets without a format. Before, a pipeline `[rgba8unorm, none]`
+  drawn in a pass `[t]` broke
+  `VUID-vkCmdDraw-colorAttachmentCount-06179` on Vulkan, as the two
+  color attachment counts differed.
+
+  Drivers built outside the tree may now see a pass color target of
+  resource 0, never the last one, and a pipeline def's last color
+  target always has a format. They must be rebuilt for
+  `MRHI_SPI_VERSION` 14, whose mustpass list is
+  `conformance/mustpass/spi-14.txt`.
+  ([#343](https://github.com/Rawframe-Project/maul-rhi/pull/343))
 
 ### Fixed
 
-* **graph:** accept null color targets as WebGPU does ([#343](https://github.com/Rawframe-Project/maul-rhi/issues/343)) ([d383faf](https://github.com/Rawframe-Project/maul-rhi/commit/d383faf559624b247ecf7c134f5fba53f7a877d7)), closes [#341](https://github.com/Rawframe-Project/maul-rhi/issues/341) [#342](https://github.com/Rawframe-Project/maul-rhi/issues/342)
-* **vulkan:** make readback copies visible to the host and ordered ([#349](https://github.com/Rawframe-Project/maul-rhi/issues/349)) ([f9bd581](https://github.com/Rawframe-Project/maul-rhi/commit/f9bd58186510bd6142e53ebe4a5adf77bd9cc3e7)), closes [#346](https://github.com/Rawframe-Project/maul-rhi/issues/346) [#347](https://github.com/Rawframe-Project/maul-rhi/issues/347)
+- The Vulkan driver orders each frame's copies into the readback ring
+  after every earlier frame's. Before, once the ring wrapped, a later
+  frame copied into bytes an earlier frame wrote with no dependency
+  between them, and synchronization validation reported
+  `SYNC-HAZARD-WRITE-AFTER-WRITE`.
+  ([#349](https://github.com/Rawframe-Project/maul-rhi/pull/349))
+- The Vulkan driver makes readback bytes visible to the host before
+  the program takes them. Before, no barrier to the host stage was
+  recorded, so a GPU whose caches the host does not snoop could hand
+  `mrhiRequest_TakeReadback` stale bytes. One memory barrier at the end
+  of a frame that copied into the ring fixes both.
+  ([#349](https://github.com/Rawframe-Project/maul-rhi/pull/349))
 
 ## [0.16.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.15.1...v0.16.0) (2026-11-01)
 
