@@ -1690,7 +1690,7 @@
           "doc": "Asks the instance's drivers for adapters. The request is answered by one mrhi_instanceAdaptersFound record; until then, mrhiInstance_GetAdapters lists the adapters found before.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success` with the request accepted; `mrhi_errorInvalid` for a NULL argument or a def without its cookie; `mrhi_errorStale` for a compatible surface the instance no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the notification queue has no room for the answer; `mrhi_errorBusy` for a call from inside the instance's allocator."
+            "doc": "`mrhi_success` with the request accepted; `mrhi_errorInvalid` for a NULL argument or a def without its cookie; `mrhi_errorStale` for a compatible surface the instance no longer has; `mrhi_errorUnsupported` for a critical extension the library does not know; `mrhi_errorCapacity` when the notification queue has no room for the answer; `mrhi_errorBusy` for a call from inside the instance's allocator; or the status a driver refuses the search with, in which case no answer follows."
           },
           "args": [
             {
@@ -10358,7 +10358,7 @@
           "doc": "Makes a bindless heap on a ready device, every entry empty.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, or 0 entries; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know, a device without the bindless_sampling feature, or entries or samplers past the adapter's heapSize or samplerHeapSize; `mrhi_errorCapacity` for entries or samplers past the device's heapSize or samplerHeapSize within the adapter's, or when the device's heaps budget is reached or the allocator fails; `mrhi_errorBusy` for a call from inside the device's allocator."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, or 0 entries; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorState` for a device still opening or that failed to open; `mrhi_errorDeviceLost` for a lost device; `mrhi_errorUnsupported` for a critical extension the library does not know, a device without the bindless_sampling feature, or entries or samplers past the adapter's heapSize or samplerHeapSize; `mrhi_errorCapacity` for entries or samplers past the device's heapSize or samplerHeapSize within the adapter's, or when the device's heaps budget is reached or the allocator fails; `mrhi_errorBusy` for a call from inside the device's allocator."
           },
           "args": [
             {

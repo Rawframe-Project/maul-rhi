@@ -313,7 +313,8 @@ extern "C"
     /// compatible surface the instance no longer has; `mrhi_errorUnsupported`
     /// for a critical extension the library does not know; `mrhi_errorCapacity`
     /// when the notification queue has no room for the answer; `mrhi_errorBusy`
-    /// for a call from inside the instance's allocator.
+    /// for a call from inside the instance's allocator; or the status a driver
+    /// refuses the search with, in which case no answer follows.
     /// @par Thread safety
     /// Safe from any thread; the instance is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiInstance_RequestAdapters(

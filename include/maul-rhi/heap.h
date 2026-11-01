@@ -98,14 +98,14 @@ extern "C"
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a label that is not UTF-8 without NUL, or 0 entries;
     /// `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES;
-    /// `mrhi_errorState` for a device that is not ready;
-    /// `mrhi_errorUnsupported` for a critical extension the library does not
-    /// know, a device without the bindless_sampling feature, or entries or
-    /// samplers past the adapter's heapSize or samplerHeapSize;
-    /// `mrhi_errorCapacity` for entries or samplers past the device's heapSize
-    /// or samplerHeapSize within the adapter's, or when the device's heaps
-    /// budget is reached or the allocator fails; `mrhi_errorBusy` for a call
-    /// from inside the device's allocator.
+    /// `mrhi_errorState` for a device still opening or that failed to open;
+    /// `mrhi_errorDeviceLost` for a lost device; `mrhi_errorUnsupported` for a
+    /// critical extension the library does not know, a device without the
+    /// bindless_sampling feature, or entries or samplers past the adapter's
+    /// heapSize or samplerHeapSize; `mrhi_errorCapacity` for entries or
+    /// samplers past the device's heapSize or samplerHeapSize within the
+    /// adapter's, or when the device's heaps budget is reached or the allocator
+    /// fails; `mrhi_errorBusy` for a call from inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateHeap(mrhiDevice* device, const mrhiHeapDef* def,
