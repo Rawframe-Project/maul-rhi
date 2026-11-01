@@ -269,6 +269,12 @@ if(MAUL_RHI_BUILD_TESTS)
             target_include_directories(test_${test} SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/directx)
             target_link_libraries(test_${test} PRIVATE d3d12 dxgi)
         endforeach()
+        # Acquired images, from a fake DXGI swapchain.
+        maul_add_test(d3d12_swapchain WHITEBOX)
+        if(TARGET test_d3d12_swapchain)
+            target_include_directories(test_d3d12_swapchain SYSTEM PRIVATE
+                                       ${PROJECT_SOURCE_DIR}/directx)
+        endif()
         # The checks whose queues wait for a fence the suite signals from
         # the CPU, run apart without the debug layer's synchronized queue
         # validation, which may hold such a queue for good.
