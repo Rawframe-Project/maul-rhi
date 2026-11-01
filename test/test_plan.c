@@ -656,6 +656,53 @@ static void TestBarrierLimit(void)
     s_instance = instance;
 }
 
+// A texture whose mips and then layers are used apart is cut into a grid
+// of parts, which grows with the square of the uses: a frame within
+// frameAccesses compiles and plans each part's barrier.
+static void TestGrid(void)
+{
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    // The library's first pass takes one.
+    deviceDef.budgets.frameAccesses = 9;
+    mrhiInstance* instance = s_instance;
+    mrhiDevice* previous = s_device;
+    s_device = OpenWith(deviceDef, true);
+    Begin();
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.kind = mrhi_texture2dArray;
+    def.format = mrhi_formatRgba16Float;
+    def.width = 64;
+    def.height = 64;
+    def.depthOrLayers = 8;
+    def.mipLevels = 7;
+    mrhiResourceId grid = {0};
+    CHECK(mrhiDeclareTexture(s_device, &def, &grid) == mrhi_success, "declared");
+    mrhiAccess accesses[8];
+    for (uint32_t i = 0; i < 4; ++i)
+    {
+        accesses[i] = Access(grid, mrhi_accessStorageWrite, 2 * i, 1);
+        Compute(&accesses[i], 1, true);
+    }
+    for (uint32_t i = 0; i < 4; ++i)
+    {
+        accesses[4 + i] = (mrhiAccess){
+            .resource = grid,
+            .kind = mrhi_accessSampled,
+            .range = {.mipCount = MRHI_REMAINING, .baseLayer = 2 * i, .layerCount = 1},
+        };
+        Compute(&accesses[4 + i], 1, true);
+    }
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    size_t count = 0;
+    CHECK(mrhiDevice_GetFrameBarriers(s_device, nullptr, 0, &count) == mrhi_success &&
+              count == 4 + 4 * 7,
+          "a barrier into each written mip, then one for each mip of each read layer");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
+    Close(s_device);
+    s_device = previous;
+    s_instance = instance;
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -673,6 +720,7 @@ int main(void)
     TestRefusals();
     TestFailureClears();
     TestBarrierLimit();
+    TestGrid();
     s_instance = instance;
     Close(s_device);
     return s_failures == 0 ? 0 : 1;
