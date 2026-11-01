@@ -11,9 +11,10 @@
 // coherent, and buffers may take it: the readback ring takes it, and
 // each readback's bytes are invalidated before they are read, in ranges
 // of whole atoms or to the end of the memory, with an atom of 256 bytes.
-// A command buffer that copies into the ring ends with a barrier making
-// the copies visible to the host, and a frame that reuses the ring's bytes
-// is ordered after the one that wrote them.
+// A frame that copies into the ring records, after its copies and
+// before it is submitted, a barrier making them visible to the host, and
+// a frame that reuses the ring's bytes is ordered after the one that
+// wrote them.
 // Skipped where there is no Vulkan 1.3 adapter, unless
 // MAUL_RHI_REQUIRE_VULKAN is set.
 
@@ -56,7 +57,7 @@ static PFN_vkBindBufferMemory s_bindBuffer;
 static PFN_vkCmdCopyBuffer s_copyBuffer;
 static PFN_vkCmdCopyImageToBuffer s_copyImage;
 static PFN_vkCmdPipelineBarrier2 s_barrier;
-static PFN_vkEndCommandBuffer s_end;
+static PFN_vkQueueSubmit2 s_submit;
 static PFN_vkInvalidateMappedMemoryRanges s_invalidate;
 
 // The added types' indices, and the adapter's types that back them.
@@ -135,11 +136,11 @@ static struct
     bool invalidated;
 } s_copies[COPIES];
 static uint32_t s_copyCount;
-// The command buffers that copied into the readback ring since their
-// last barrier making transfer writes visible to the host, and those that
-// ended so.
-static Handles s_unreleased;
-static uint32_t s_endedUnreleased;
+// Whether a copy into the readback ring was recorded since the last
+// barrier making transfer writes visible to the host, in whichever command
+// buffer, and the submissions made so.
+static bool s_unreleased;
+static uint32_t s_submittedUnreleased;
 // Invalidated ranges: to the end of the memory, of whole atoms, and
 // breaking the rules for either, or of other memory.
 static uint32_t s_wholeRanges;
@@ -324,10 +325,7 @@ static VKAPI_ATTR void VKAPI_CALL CopyBuffer(VkCommandBuffer commands, VkBuffer 
             s_copies[s_copyCount++].invalidated = false;
         }
     }
-    if (ValueOf(&destination) == s_readback && !Holds(&s_unreleased, ValueOf(&commands)))
-    {
-        Add(&s_unreleased, ValueOf(&commands));
-    }
+    s_unreleased = s_unreleased || ValueOf(&destination) == s_readback;
     s_copyBuffer(commands, source, destination, count, regions);
 }
 
@@ -335,10 +333,7 @@ static VKAPI_ATTR void VKAPI_CALL CopyImage(VkCommandBuffer commands, VkImage so
                                             VkImageLayout layout, VkBuffer destination,
                                             uint32_t count, const VkBufferImageCopy* regions)
 {
-    if (ValueOf(&destination) == s_readback && !Holds(&s_unreleased, ValueOf(&commands)))
-    {
-        Add(&s_unreleased, ValueOf(&commands));
-    }
+    s_unreleased = s_unreleased || ValueOf(&destination) == s_readback;
     s_copyImage(commands, source, layout, destination, count, regions);
 }
 
@@ -372,21 +367,15 @@ static VKAPI_ATTR void VKAPI_CALL Barrier(VkCommandBuffer commands,
                                 ToHost(barrier->srcStageMask, barrier->srcAccessMask,
                                        barrier->dstStageMask, barrier->dstAccessMask));
     }
-    if (released)
-    {
-        Remove(&s_unreleased, ValueOf(&commands));
-    }
+    s_unreleased = s_unreleased && !released;
     s_barrier(commands, dependency);
 }
 
-static VKAPI_ATTR VkResult VKAPI_CALL End(VkCommandBuffer commands)
+static VKAPI_ATTR VkResult VKAPI_CALL Submit(VkQueue queue, uint32_t count,
+                                             const VkSubmitInfo2* submits, VkFence fence)
 {
-    if (Holds(&s_unreleased, ValueOf(&commands)))
-    {
-        ++s_endedUnreleased;
-        Remove(&s_unreleased, ValueOf(&commands));
-    }
-    return s_end(commands);
+    s_submittedUnreleased += s_unreleased ? 1 : 0;
+    return s_submit(queue, count, submits, fence);
 }
 
 static VKAPI_ATTR VkResult VKAPI_CALL Invalidate(VkDevice device, uint32_t count,
@@ -444,7 +433,7 @@ static PFN_vkVoidFunction Wrap(const char* name, PFN_vkVoidFunction own)
         {"vkCmdCopyImageToBuffer", (PFN_vkVoidFunction*)&s_copyImage,
          (PFN_vkVoidFunction)CopyImage},
         {"vkCmdPipelineBarrier2", (PFN_vkVoidFunction*)&s_barrier, (PFN_vkVoidFunction)Barrier},
-        {"vkEndCommandBuffer", (PFN_vkVoidFunction*)&s_end, (PFN_vkVoidFunction)End},
+        {"vkQueueSubmit2", (PFN_vkVoidFunction*)&s_submit, (PFN_vkVoidFunction)Submit},
         {"vkInvalidateMappedMemoryRanges", (PFN_vkVoidFunction*)&s_invalidate,
          (PFN_vkVoidFunction)Invalidate},
     };
@@ -746,8 +735,9 @@ int main(void)
         CheckNonCoherent(device);
         mrhiDestroyDevice(device);
     }
-    CHECK(s_endedUnreleased == 0, "each command buffer copying into the ring ends with a barrier "
-                                  "making its writes visible to the host");
+    CHECK(s_submittedUnreleased == 0,
+          "each copy into the ring followed by a barrier making its writes visible to the host "
+          "before the frame is submitted");
     mrhiDestroyInstance(instance);
     PFN_vkDestroyInstance destroy =
         (PFN_vkDestroyInstance)s_vulkan.vkGetInstanceProcAddr(made, "vkDestroyInstance");
