@@ -235,10 +235,12 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(vulkan_memory WHITEBOX)
         maul_add_test(vulkan_external WHITEBOX)
         maul_add_test(vulkan_frame WHITEBOX)
+        maul_add_test(vulkan_memory_types WHITEBOX)
         maul_add_test(vulkan_zero)
         maul_add_test(vulkan_cache WHITEBOX)
         foreach(test vulkan_label vulkan_limits vulkan_facts vulkan_surface vulkan_swapchain
-                     vulkan_memory vulkan_external vulkan_frame vulkan_zero vulkan_cache)
+                     vulkan_memory vulkan_external vulkan_frame vulkan_memory_types vulkan_zero
+                     vulkan_cache)
             if(TARGET test_${test})
                 target_include_directories(test_${test} SYSTEM PRIVATE
                                            ${PROJECT_SOURCE_DIR}/khronos)
