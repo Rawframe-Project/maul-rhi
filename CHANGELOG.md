@@ -41,10 +41,9 @@ may change the API, the ABI and every data format.
   - Metal zeroed the block once per frame, so a pass that wrote none
     saw the last pass's bytes.
 
-  On Vulkan, an adapter whose push constants pass 256 bytes now
-  reports `rootBlockBytes` 256, the most a container's root block holds.
-  Before, a device could ask for more and write the root block past the
-  driver's copy of it.
+  On Vulkan, `rootBlockBytes` is now at most 256, the most a container's
+  root block holds. Before, it was the adapter's `maxPushConstantsSize`,
+  so a device could ask for up to 4096 bytes no container can use.
   ([#371](https://github.com/Rawframe-Project/maul-rhi/pull/371))
 
 ## [0.18.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.17.0...v0.18.0) (2026-11-01)
