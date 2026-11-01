@@ -319,7 +319,8 @@ typedef struct mrhiFramePass
     // none); the tables set, by bit,
     // with the digests of the containers they were set under; and the
     // index buffer's format (none when unset) and bytes. Its vertex
-    // buffers' bytes are in the device's frameVertexBytes.
+    // buffers' bytes are in the device's frameVertexBytes, and the
+    // highest slot set, plus one, is its vertexSlots.
     _Atomic uint32_t recording;
     uint32_t firstChunk;
     uint32_t lastChunk;
@@ -334,6 +335,7 @@ typedef struct mrhiFramePass
     uint8_t tableDigests[MRHI_TABLES][MRHI_DIGEST_BYTES];
     mrhiIndexFormat indexFormat;
     uint64_t indexBytes;
+    uint32_t vertexSlots;
     // Its occlusion query set (a slot plus one and its generation, 0 for
     // none), and whether one of its queries is open.
     uint32_t occlusionSet;

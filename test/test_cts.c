@@ -1166,6 +1166,75 @@ static mrhiResult DrawIndirect(uint64_t size, mrhiBufferUsage usage, bool indexe
     return status;
 }
 
+// limits,maxBindGroupsPlusVertexBuffers:draw,at_over, preferring
+// vertex buffers, on a device of 32 vertex buffers: one vertex buffer
+// set at the slot that brings the slots used to the limit or one past
+// it, then a draw of each kind with the no-op pipeline, which reads no
+// vertex buffer. Its preference for bind groups has no counterpart: a
+// table is set only for a pipeline that reads it, and the no-op
+// pipeline reads none.
+static void TestBindGroupsPlusVertexBuffers(void)
+{
+    s_adapter.limits.vertexBuffers = 32;
+    s_adapter.limits.tablesPlusVertexBuffers = 64;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.limits.vertexBuffers = 32;
+    s_device = OpenWith(deviceDef, true);
+    MakePipelines();
+    static const char* const draws[] = {"draw", "drawIndexed", "drawIndirect",
+                                        "drawIndexedIndirect"};
+    char name[160];
+    for (uint32_t over = 0; over < 2; ++over)
+    {
+        uint32_t slots = s_limits.tablesPlusVertexBuffers + over;
+        for (uint32_t d = 0; d < 4; ++d)
+        {
+            mrhiBufferId buffer = MakeBuffer(32, mrhi_bufferVertex | mrhi_bufferIndirect);
+            mrhiFrameDef frame = mrhiDefaultFrameDef();
+            mrhiResourceId target = {0};
+            mrhiResourceId vertices = {0};
+            mrhiResourceId index = {0};
+            CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
+                      mrhiImportBuffer(s_device, buffer, &vertices) == mrhi_success &&
+                      mrhiImportBuffer(s_device, s_index, &index) == mrhi_success &&
+                      mrhiImportTexture(s_device, s_target, &target) == mrhi_success,
+                  "a frame of the case");
+            const mrhiAccess accesses[3] = {{.resource = vertices, .kind = mrhi_accessVertex},
+                                            {.resource = vertices, .kind = mrhi_accessIndirect},
+                                            {.resource = index, .kind = mrhi_accessIndex}};
+            mrhiPassDef def = mrhiDefaultPassDef();
+            def.neverCull = true;
+            def.accesses = accesses;
+            def.accessCount = 3;
+            def.colorTargets[0] = (mrhiColorTarget){.resource = target, .load = mrhi_loadClear};
+            def.colorTargetCount = 1;
+            mrhiPassId pass = {0};
+            CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success &&
+                      mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+                      mrhiPass_Begin(s_device, pass) == mrhi_success &&
+                      mrhiPass_SetVertexBuffer(s_device, pass, slots - 1, vertices, 0,
+                                               MRHI_WHOLE_SIZE) == mrhi_success &&
+                      mrhiPass_SetGraphicsPipeline(s_device, pass, s_graphics) == mrhi_success &&
+                      mrhiPass_SetIndexBuffer(s_device, pass, index, mrhi_indexUint16, 0,
+                                              MRHI_WHOLE_SIZE) == mrhi_success,
+                  "the pass begun");
+            mrhiResult status = d == 0   ? mrhiPass_Draw(s_device, pass, 0, 1, 0, 0)
+                                : d == 1 ? mrhiPass_DrawIndexed(s_device, pass, 0, 1, 0, 0, 0)
+                                : d == 2
+                                    ? mrhiPass_DrawIndirect(s_device, pass, vertices, 0)
+                                    : mrhiPass_DrawIndexedIndirect(s_device, pass, vertices, 0);
+            snprintf(name, sizeof(name),
+                     "limits,maxBindGroupsPlusVertexBuffers:draw,at_over, %s, %s, vertex buffers",
+                     over ? "over" : "at", draws[d]);
+            ExpectPastLimit(name, status, over == 0);
+            CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
+                      mrhiDestroyBuffer(s_device, buffer) == mrhi_success,
+                  "dropped");
+        }
+    }
+    Close(s_device);
+}
+
 // api,validation,encoding,cmds,render,indirect_draw; its render bundle
 // encoder has no counterpart.
 static void TestIndirectDraws(void)
@@ -2229,5 +2298,6 @@ int main(void)
     TestQueries();
     CHECK(s_differs == 879 && s_inexpressible == 966, "the pass and query cases set aside");
     Close(s_device);
+    TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
 }
