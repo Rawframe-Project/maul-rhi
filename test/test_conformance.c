@@ -1912,33 +1912,51 @@ typedef enum DrawMode
     // maxCount of 1, one with a count of 1 under a maxCount of 2, so that
     // only the first record draws.
     DRAW_COUNTED,
+    // The same from indices 2, 3 and 4, a record of indexed arguments;
+    // the counted second record takes a base vertex of -2, so that it too
+    // would cover the whole target.
+    DRAW_INDEXED_INDIRECT,
+    DRAW_INDEXED_COUNTED,
 } DrawMode;
 
 // One frame uploads the scene, draws the upper left half of the target
 // (vertices 2 to 4, the triangle y > x with +Y up), directly, from
-// indirect arguments or by counted multi-draws, scales the storage
-// buffer in a compute pass and reads both back. The vertex entry reads
-// its vertex index, which includes the first vertex either way.
+// indirect arguments or by counted multi-draws, of vertices or of
+// indices, scales the storage buffer in a compute pass and reads both
+// back. The vertex entry reads its vertex index, which includes the
+// first vertex or the base vertex either way.
 static void CheckDrawFrame(Scene* scene, DrawMode mode)
 {
     mrhiDevice* device = scene->device;
     bool indirect = mode != DRAW_DIRECT;
+    bool indexed = mode == DRAW_INDEXED_INDIRECT || mode == DRAW_INDEXED_COUNTED;
     BeginScene(scene);
     mrhiBufferDef argumentsDef = mrhiDefaultBufferDef();
-    const size_t argumentBytes = mode == DRAW_COUNTED ? 40 : 16;
+    const size_t argumentBytes = mode == DRAW_COUNTED            ? 40
+                                 : mode == DRAW_INDEXED_INDIRECT ? 20
+                                 : mode == DRAW_INDEXED_COUNTED  ? 48
+                                                                 : 16;
     argumentsDef.size = argumentBytes;
     mrhiResourceId a = {0};
     CHECK(!indirect || mrhiDeclareBuffer(device, &argumentsDef, &a) == mrhi_success,
           "an arguments buffer");
-    mrhiAccess uploads[4] = {
+    mrhiBufferDef indicesDef = mrhiDefaultBufferDef();
+    indicesDef.size = 8;
+    mrhiResourceId x = {0};
+    CHECK(!indexed || mrhiDeclareBuffer(device, &indicesDef, &x) == mrhi_success,
+          "an index buffer");
+    mrhiAccess uploads[5] = {
         Whole(scene->u, mrhi_accessCopyDestination), Whole(scene->w, mrhi_accessCopyDestination),
-        Whole(scene->d, mrhi_accessCopyDestination), Whole(a, mrhi_accessCopyDestination)};
-    mrhiPassId upload = CopyPass(device, uploads, indirect ? 4 : 3);
-    mrhiAccess draws[4] = {Whole(scene->u, mrhi_accessUniform),
+        Whole(scene->d, mrhi_accessCopyDestination), Whole(a, mrhi_accessCopyDestination),
+        Whole(x, mrhi_accessCopyDestination)};
+    uint32_t extra = (indirect ? 1u : 0u) + (indexed ? 1u : 0u);
+    mrhiPassId upload = CopyPass(device, uploads, 3 + extra);
+    mrhiAccess draws[5] = {Whole(scene->u, mrhi_accessUniform),
                            Whole(scene->d, mrhi_accessStorageReadWrite),
-                           Whole(scene->w, mrhi_accessSampled), Whole(a, mrhi_accessIndirect)};
+                           Whole(scene->w, mrhi_accessSampled), Whole(a, mrhi_accessIndirect),
+                           Whole(x, mrhi_accessIndex)};
     mrhiPassDef drawDef = DrawDef(scene, draws);
-    drawDef.accessCount = indirect ? 4 : 3;
+    drawDef.accessCount = 3 + extra;
     LABEL(drawDef, "draw");
     mrhiPassId draw = {0};
     CHECK(mrhiAddPass(device, &drawDef, &draw) == mrhi_success, "a drawing pass");
@@ -1950,8 +1968,12 @@ static void CheckDrawFrame(Scene* scene, DrawMode mode)
     const uint8_t white[4] = {255, 255, 255, 255};
     uint32_t values[8] = {1, 2, 3, 4, 5, 6, 7, 8};
     // Three vertices from vertex 2, one instance from instance 0; then
-    // the whole target, and the two counts.
-    const uint32_t arguments[10] = {3, 1, 2, 0, 3, 1, 0, 0, 7, 1};
+    // the whole target, and the two counts. Indexed, three indices from
+    // index 0 at base vertex 0, then at base vertex -2.
+    const uint32_t vertexArguments[10] = {3, 1, 2, 0, 3, 1, 0, 0, 7, 1};
+    const uint32_t indexArguments[12] = {3, 1, 0, 0, 0, 3, 1, 0, (uint32_t)-2, 0, 7, 1};
+    const uint32_t* arguments = indexed ? indexArguments : vertexArguments;
+    const uint16_t indices[4] = {2, 3, 4, 0};
     const mrhiTextureCopy texel = {.resource = scene->w};
     const mrhiTexelLayout layout = {.bytesPerRow = 4, .rowsPerImage = 1};
     const mrhiExtent3d one = {1, 1, 1};
@@ -1964,6 +1986,8 @@ static void CheckDrawFrame(Scene* scene, DrawMode mode)
                   mrhi_success &&
               (!indirect || mrhiPass_WriteBuffer(device, upload, a, 0, arguments, argumentBytes) ==
                                 mrhi_success) &&
+              (!indexed || mrhiPass_WriteBuffer(device, upload, x, 0, indices, sizeof(indices)) ==
+                               mrhi_success) &&
               mrhiPass_End(device, upload) == mrhi_success,
           "uploaded");
     const float tint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -1992,6 +2016,17 @@ static void CheckDrawFrame(Scene* scene, DrawMode mode)
     case DRAW_COUNTED:
         drawn = mrhiPass_DrawIndirectCount(device, draw, a, 0, a, 32, 1) == mrhi_success &&
                 mrhiPass_DrawIndirectCount(device, draw, a, 0, a, 36, 2) == mrhi_success;
+        break;
+    case DRAW_INDEXED_INDIRECT:
+        drawn = mrhiPass_SetIndexBuffer(device, draw, x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+                    mrhi_success &&
+                mrhiPass_DrawIndexedIndirect(device, draw, a, 0) == mrhi_success;
+        break;
+    case DRAW_INDEXED_COUNTED:
+        drawn = mrhiPass_SetIndexBuffer(device, draw, x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+                    mrhi_success &&
+                mrhiPass_DrawIndexedIndirectCount(device, draw, a, 0, a, 40, 1) == mrhi_success &&
+                mrhiPass_DrawIndexedIndirectCount(device, draw, a, 0, a, 44, 2) == mrhi_success;
         break;
     }
     CHECK(drawn && mrhiPass_PopDebugGroup(device, draw) == mrhi_success &&
@@ -3597,9 +3632,11 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
         CheckDrawFrame(&scene, DRAW_DIRECT);
         CheckSampledTwin(&scene);
         CheckDrawFrame(&scene, DRAW_INDIRECT);
+        CheckDrawFrame(&scene, DRAW_INDEXED_INDIRECT);
         if (features.multiDrawIndirectCount)
         {
             CheckDrawFrame(&scene, DRAW_COUNTED);
+            CheckDrawFrame(&scene, DRAW_INDEXED_COUNTED);
         }
     });
     if (!features.multiDrawIndirectCount)
