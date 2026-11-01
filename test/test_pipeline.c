@@ -255,19 +255,32 @@ static void TestConstants(void)
     mrhiShaderId shader = Shader(device);
     CHECK(WithValue(device, shader, 8, 1.0) == mrhi_success, "true");
     CHECK(WithValue(device, shader, 8, 0.0) == mrhi_success, "false");
-    CHECK(WithValue(device, shader, 8, 0.5) == mrhi_errorFormat, "a boolean of one half");
-    CHECK(WithValue(device, shader, 8, 2.0) == mrhi_errorFormat, "a boolean of 2");
+    CHECK(WithValue(device, shader, 8, 0.5) == mrhi_success, "a boolean of one half, true");
+    CHECK(WithValue(device, shader, 8, -DBL_MAX) == mrhi_success, "a boolean of the least double");
+    CHECK(WithValue(device, shader, 8, (double)INFINITY) == mrhi_errorFormat, "a boolean infinity");
+    CHECK(WithValue(device, shader, 8, (double)NAN) == mrhi_errorFormat, "a boolean NaN");
     CHECK(WithValue(device, shader, 9, -2147483648.0) == mrhi_success, "the least int32");
     CHECK(WithValue(device, shader, 9, 2147483647.0) == mrhi_success, "the greatest int32");
     CHECK(WithValue(device, shader, 9, 2147483648.0) == mrhi_errorFormat, "past int32");
     CHECK(WithValue(device, shader, 9, -2147483649.0) == mrhi_errorFormat, "below int32");
-    CHECK(WithValue(device, shader, 9, 1.5) == mrhi_errorFormat, "an int32 with a fraction");
+    CHECK(WithValue(device, shader, 9, 1.5) == mrhi_success, "an int32 with a fraction");
+    CHECK(WithValue(device, shader, 9, 2147483647.75) == mrhi_success,
+          "an int32 truncated to its greatest");
+    CHECK(WithValue(device, shader, 9, -2147483648.75) == mrhi_success,
+          "an int32 truncated to its least");
     CHECK(WithValue(device, shader, 10, 4294967295.0) == mrhi_success, "the greatest uint32");
     CHECK(WithValue(device, shader, 10, 4294967296.0) == mrhi_errorFormat, "past uint32");
     CHECK(WithValue(device, shader, 10, -1.0) == mrhi_errorFormat, "a negative uint32");
-    CHECK(WithValue(device, shader, 10, 0.25) == mrhi_errorFormat, "a uint32 with a fraction");
+    CHECK(WithValue(device, shader, 10, 0.25) == mrhi_success, "a uint32 with a fraction");
+    CHECK(WithValue(device, shader, 10, -0.75) == mrhi_success, "a uint32 truncated to 0");
+    CHECK(WithValue(device, shader, 10, 4294967295.5) == mrhi_success,
+          "a uint32 truncated to its greatest");
     CHECK(WithValue(device, shader, 7, (double)FLT_MAX) == mrhi_success, "the greatest float");
     CHECK(WithValue(device, shader, 7, -(double)FLT_MAX) == mrhi_success, "the least float");
+    CHECK(WithValue(device, shader, 7, 0x1.fffffefffffffp127) == mrhi_success,
+          "a float that rounds to the greatest");
+    CHECK(WithValue(device, shader, 7, 0x1.ffffffp127) == mrhi_errorFormat,
+          "a float that rounds past the greatest");
     CHECK(WithValue(device, shader, 7, 3.5e38) == mrhi_errorFormat, "past float");
     CHECK(WithValue(device, shader, 7, -3.5e38) == mrhi_errorFormat, "below float");
     CHECK(WithValue(device, shader, 7, (double)INFINITY) == mrhi_errorFormat, "infinity");
@@ -296,6 +309,53 @@ static void TestConstants(void)
     def.constantCount = 3;
     CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_errorFormat,
           "every value but the required one");
+    Close(device);
+}
+
+// The WebGPU CTS's compute_pipeline:overrides,value,type_error and
+// overrides,value,validation_error, and render_pipeline's cases of each
+// stage, which are the same values: constants are a pipeline's here, not
+// a stage's. cb, ci, cu and cf are the constants 8, 9, 10 and 7. A value
+// its type cannot take is mrhi_errorFormat, as the reflection decides
+// it. Kept here, as test_cts.c has no container with constants.
+static void TestCtsOverrides(void)
+{
+    mrhiDevice* device = Open(4, 16, true);
+    Constants();
+    mrhiShaderId shader = Shader(device);
+    static const struct
+    {
+        const char* test;
+        uint32_t id;
+        double value;
+        bool succeeds;
+    } cases[] = {
+        {"type_error, cf 1", 7, 1.0, true},
+        {"type_error, cf NaN", 7, (double)NAN, false},
+        {"type_error, cf infinity", 7, (double)INFINITY, false},
+        {"type_error, cf -infinity", 7, -(double)INFINITY, false},
+        {"validation_error, cu u32.min", 10, 0.0, true},
+        {"validation_error, cu u32.min - 1", 10, -1.0, false},
+        {"validation_error, cu u32.max", 10, 4294967295.0, true},
+        {"validation_error, cu u32.max + 1", 10, 4294967296.0, false},
+        {"validation_error, ci i32.negative.min", 9, -2147483648.0, true},
+        {"validation_error, ci i32.negative.min - 1", 9, -2147483649.0, false},
+        {"validation_error, ci i32.positive.max", 9, 2147483647.0, true},
+        {"validation_error, ci i32.positive.max + 1", 9, 2147483648.0, false},
+        {"validation_error, cf f32.negative.min", 7, -(double)FLT_MAX, true},
+        {"validation_error, cf f32.negative.first_non_castable_pipeline_override", 7,
+         -0x1.ffffffp127, false},
+        {"validation_error, cf f32.positive.max", 7, (double)FLT_MAX, true},
+        {"validation_error, cf f32.positive.first_non_castable_pipeline_override", 7,
+         0x1.ffffffp127, false},
+        {"validation_error, cb Number.MAX_VALUE", 8, DBL_MAX, true},
+        {"validation_error, cb i32.negative.min - 1", 8, -2147483649.0, true},
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+    {
+        mrhiResult status = WithValue(device, shader, cases[i].id, cases[i].value);
+        CHECK(status == (cases[i].succeeds ? mrhi_success : mrhi_errorFormat), cases[i].test);
+    }
     Close(device);
 }
 
@@ -464,6 +524,7 @@ int main(void)
     TestRequestsShared();
     TestInvalid();
     TestConstants();
+    TestCtsOverrides();
     TestBadData();
     TestPendingAndOutcome();
     TestRoomAndLimits();
