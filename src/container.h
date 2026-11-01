@@ -40,6 +40,8 @@ typedef struct mrhiShaderBinding
     mrhiSamplerBinding sampler;
     mrhiSampleType sampleType;
     mrhiTextureKind viewDimension;
+    // A storage texture's access and format, which the device stores;
+    // read and written only for r32float, r32uint and r32sint.
     mrhiStorageAccess access;
     mrhiFormat format;
     bool multisampled;

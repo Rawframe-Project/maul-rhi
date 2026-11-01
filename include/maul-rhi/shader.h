@@ -313,13 +313,14 @@ extern "C"
     /// interface variables past the adapter's limits, 16-bit floats on a device
     /// without shaderF16, the primitive index builtin, heap uses on a device
     /// without bindless_sampling, or storage ones without
-    /// bindless_heterogeneous, or a critical extension the library does not
-    /// know; `mrhi_errorState` for a device that is not ready;
-    /// `mrhi_errorCapacity` for a root block, bindings, a workgroup or
-    /// interface variables past the device's limits within the adapter's, or
-    /// when the device's shader limit is reached or its allocator fails;
-    /// `mrhi_errorPlatform` when the driver refuses the code; `mrhi_errorBusy`
-    /// for a call from inside the device's allocator.
+    /// bindless_heterogeneous, a storage texture of a format the device does
+    /// not store, or a critical extension the library does not know;
+    /// `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity`
+    /// for a root block, bindings, a workgroup or interface variables past the
+    /// device's limits within the adapter's, or when the device's shader limit
+    /// is reached or its allocator fails; `mrhi_errorPlatform` when the driver
+    /// refuses the code; `mrhi_errorBusy` for a call from inside the device's
+    /// allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateShader(mrhiDevice* device,

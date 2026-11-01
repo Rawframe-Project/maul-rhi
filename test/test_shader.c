@@ -667,6 +667,25 @@ static void TestBindings(void)
     CHECK(BindingWith(5, 12, 0) == mrhi_errorFormat, "a storage texture with no format");
     CHECK(BindingWith(5, 12, 0xFF) == mrhi_errorFormat, "an unknown format");
     CHECK(BindingWith(4, 12, mrhi_formatRgba8Unorm) == mrhi_errorFormat, "a sampled format");
+    // WebGPU reads and writes through one binding only the 32-bit
+    // single-channel formats.
+    static const mrhiFormat readWrite[] = {mrhi_formatR32Float, mrhi_formatR32Uint,
+                                           mrhi_formatR32Sint};
+    for (size_t i = 0; i < sizeof(readWrite) / sizeof(readWrite[0]); ++i)
+    {
+        Reset();
+        storage = Record(BINDINGS, 5, 24);
+        storage[11] = mrhi_storageReadWrite;
+        Put16(storage + 12, (uint16_t)readWrite[i]);
+        CHECK(Built() == mrhi_success, "a 32-bit single-channel format read and written");
+    }
+    Reset();
+    Record(BINDINGS, 5, 24)[11] = mrhi_storageReadWrite;
+    CHECK(Built() == mrhi_errorFormat, "rgba8unorm read and written");
+    Put16(Record(BINDINGS, 5, 24) + 12, mrhi_formatRg32Float);
+    CHECK(Built() == mrhi_errorFormat, "rg32float read and written");
+    Record(BINDINGS, 5, 24)[11] = mrhi_storageReadOnly;
+    CHECK(Built() == mrhi_success, "rg32float read only");
     CHECK(BindingWith(4, 14, 1) == mrhi_errorFormat, "a filterable multisampled cube");
     Reset();
     uint8_t* sampled = Record(BINDINGS, 4, 24);
@@ -1102,6 +1121,48 @@ static void TestFeatures(void)
     device = OpenWith(deviceDef, true);
     CHECK(mrhiCreateShader(device, &def, &shader) == mrhi_success, "with it");
     Close(device);
+}
+
+// A shader with the default storage texture in a format, on a device of
+// the test adapter: its creation's result.
+static mrhiResult StorageOf(mrhiFormat format)
+{
+    Reset();
+    Put16(Record(BINDINGS, 5, 24) + 12, (uint16_t)format);
+    Assemble();
+    mrhiDevice* device = Open(2, true);
+    mrhiShaderDef def = Def();
+    mrhiShaderId shader;
+    mrhiResult status = mrhiCreateShader(device, &def, &shader);
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "no misuse");
+    Close(device);
+    return status;
+}
+
+// A storage texture's format is one the device stores, as WebGPU's
+// layout requires: never an sRGB format, and not one the adapter does
+// not store, whatever WebGPU's floor.
+static void TestStorageFormats(void)
+{
+    CHECK(StorageOf(mrhi_formatRgba8Unorm) == mrhi_success, "rgba8unorm stored");
+    CHECK(StorageOf(mrhi_formatRgba8UnormSrgb) == mrhi_errorUnsupported, "an sRGB format");
+    CHECK(StorageOf(mrhi_formatDepth32Float) == mrhi_errorUnsupported, "a depth format");
+    // Closing a device resets the adapter, so each case limits it anew.
+    const mrhiFormatCaps unstored = {
+        .sampling = true,
+        .filtering = true,
+        .rendering = true,
+        .blending = true,
+        .sampleCounts = mrhi_samples1Bit | mrhi_samples4Bit,
+    };
+    s_adapter.limitedFormat = mrhi_formatBgra8Unorm;
+    s_adapter.limitedCaps = unstored;
+    CHECK(StorageOf(mrhi_formatBgra8Unorm) == mrhi_errorUnsupported,
+          "bgra8unorm on an adapter that does not store it");
+    s_adapter.limitedFormat = mrhi_formatBgra8Unorm;
+    s_adapter.limitedCaps = unstored;
+    s_adapter.limitedCaps.storage = true;
+    CHECK(StorageOf(mrhi_formatBgra8Unorm) == mrhi_success, "bgra8unorm where the adapter does");
 }
 
 // The SPIR-V instructions after the header, a word each.
@@ -1701,6 +1762,7 @@ int main(int argc, char** argv)
     TestCreate();
     TestRefusals();
     TestFeatures();
+    TestStorageFormats();
     TestCapabilities();
     TestHeapFeatures();
     TestLimits();

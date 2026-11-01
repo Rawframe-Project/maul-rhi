@@ -153,6 +153,22 @@ static bool HasFeatures(const mrhiDevice* device, const mrhiContainer* container
            ((container->heapUses & heterogeneous) == 0 || features->bindlessHeterogeneous);
 }
 
+// Whether the device stores the format of each storage texture binding,
+// as WebGPU's layout requires.
+static bool StoresFormats(const mrhiDevice* device, const mrhiContainer* container)
+{
+    for (uint32_t i = 0; i < container->bindingCount; ++i)
+    {
+        mrhiShaderBinding binding = mrhiContainerBinding(container, i);
+        if (binding.kind == mrhi_bindingStorageTexture &&
+            !device->formatCaps[mrhiFormatIndex(binding.format)].storage)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 // The first limit a container passes (its root block, bindings and
 // entries), or MRHI_WITHIN_LIMITS.
 static size_t ContainerPast(const mrhiLimits* limits, const mrhiContainer* container)
@@ -208,7 +224,7 @@ static mrhiResult CheckShaderDef(mrhiDevice* device, const mrhiShaderDef* def,
     {
         return status;
     }
-    if (!HasFeatures(device, containerOut))
+    if (!HasFeatures(device, containerOut) || !StoresFormats(device, containerOut))
     {
         return mrhi_errorUnsupported;
     }

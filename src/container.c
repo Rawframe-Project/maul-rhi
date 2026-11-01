@@ -343,6 +343,15 @@ static bool AreEntryLocationsUnique(const mrhiContainer* container, mrhiShaderEn
                                            entry.variableCount, false);
 }
 
+// Whether WebGPU reads and writes a storage texture of a format through
+// one binding: only the 32-bit single-channel formats, without its
+// texture-formats-tier2 feature.
+static bool IsReadWriteFormat(mrhiFormat format)
+{
+    return format == mrhi_formatR32Float || format == mrhi_formatR32Uint ||
+           format == mrhi_formatR32Sint;
+}
+
 // Whether a binding's details suit its kind.
 static bool AreDetailsValid(const mrhiShaderBinding* binding)
 {
@@ -358,10 +367,12 @@ static bool AreDetailsValid(const mrhiShaderBinding* binding)
     bool sampleOk =
         sampled ? binding->sampleType >= mrhi_sampleFloat && binding->sampleType <= mrhi_sampleUint
                 : binding->sampleType == mrhi_sampleNone;
-    bool accessOk = storage ? binding->access >= mrhi_storageReadOnly &&
-                                  binding->access <= mrhi_storageReadWrite &&
-                                  mrhiIsFormatKnown(binding->format)
-                            : binding->access == mrhi_storageNone && binding->format == 0;
+    bool accessOk =
+        storage
+            ? binding->access >= mrhi_storageReadOnly && binding->access <= mrhi_storageReadWrite &&
+                  mrhiIsFormatKnown(binding->format) &&
+                  (binding->access != mrhi_storageReadWrite || IsReadWriteFormat(binding->format))
+            : binding->access == mrhi_storageNone && binding->format == 0;
     bool texture = sampled || storage;
     bool dimension = !texture  ? binding->viewDimension == 0
                      : storage ? binding->viewDimension == mrhi_texture2d ||
