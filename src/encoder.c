@@ -424,11 +424,21 @@ static bool IsViewportValid(const mrhiViewport* viewport)
            viewport->minDepth <= viewport->maxDepth;
 }
 
+// Whether a + b is at most an edge, exactly. A double sum rounds when
+// the two lie far apart, so the error two-sum recovers decides a sum
+// that lands on the edge: past it, or below it, the rounding cannot
+// cross the edge.
+static bool IsSumWithin(double a, double b, double edge)
+{
+    double sum = a + b;
+    double bPart = sum - a;
+    double error = (a - (sum - bPart)) + (b - bPart);
+    return sum < edge || (sum == edge && error <= 0.0);
+}
+
 // The limit a viewport passes, by WebGPU's ranges for a 2D texture limit
 // (its size within the limit, its edges within twice it): the 2D
-// texture dimension, or MRHI_WITHIN_LIMITS. The far edges are summed as
-// doubles, which hold the sum of two floats exactly; a float sum could
-// round down onto the edge.
+// texture dimension, or MRHI_WITHIN_LIMITS.
 static size_t ViewportPast(const mrhiViewport* viewport, uint32_t textureDimension2d)
 {
     double limit = (double)textureDimension2d;
@@ -438,7 +448,7 @@ static size_t ViewportPast(const mrhiViewport* viewport, uint32_t textureDimensi
     double width = (double)viewport->width;
     double height = (double)viewport->height;
     bool fits = x >= -range && y >= -range && width <= limit && height <= limit &&
-                x + width <= range - 1.0 && y + height <= range - 1.0;
+                IsSumWithin(x, width, range - 1.0) && IsSumWithin(y, height, range - 1.0);
     return fits ? MRHI_WITHIN_LIMITS : offsetof(mrhiLimits, textureDimension2d);
 }
 
