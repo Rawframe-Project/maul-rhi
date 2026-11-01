@@ -11,6 +11,7 @@
 #include "heap_core.h"
 #include "label.h"
 
+#include <math.h>
 #include <string.h>
 
 #define PASS_DEF_COOKIE 0x6D727061u
@@ -293,6 +294,26 @@ static uint32_t FindTarget(const mrhiDevice* device, mrhiResourceId id, uint32_t
 
 // Makes the uses of a color target and its resolve: how many, or 0 with
 // the refusal in statusOut.
+// Whether a clear color converts to a format's texels, as WebGPU's
+// clearValue must: finite components, each of whose integer parts an
+// integer format's 32-bit type holds (the driver converts all four).
+static bool Converts(const mrhiColor* clear, mrhiFormat format)
+{
+    mrhiScalarType scalar = mrhiGetFormatTarget(format).scalar;
+    bool sint = scalar == mrhi_scalarSint32;
+    bool uint = scalar == mrhi_scalarUint32;
+    double low = sint ? -2147483649.0 : uint ? -1.0 : -(double)INFINITY;
+    double high = sint ? 2147483648.0 : uint ? 4294967296.0 : (double)INFINITY;
+    const double components[4] = {(double)clear->red, (double)clear->green, (double)clear->blue,
+                                  (double)clear->alpha};
+    bool converts = true;
+    for (uint32_t i = 0; i < 4; ++i)
+    {
+        converts = converts && components[i] > low && components[i] < high;
+    }
+    return converts;
+}
+
 static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* target, uint32_t views,
                             TargetShape* shape, mrhiFrameUse* usesOut, mrhiResult* statusOut)
 {
@@ -307,6 +328,7 @@ static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* tar
     mrhiFormat format = mrhiViewFormatOf(def, target->viewFormat);
     if ((uint32_t)target->load > mrhi_loadDiscard || (uint32_t)target->store > mrhi_storeDiscard ||
         mrhiFormatHasDepth(def->format) || format == mrhi_formatNone ||
+        (target->load == mrhi_loadClear && !Converts(&target->clear, format)) ||
         !Agrees(shape, def, target->mip))
     {
         return 0;
@@ -380,7 +402,10 @@ static mrhiResult UseOfDepth(const mrhiDevice* device, const mrhiDepthTarget* ta
     bool keeps = target->depthLoad == mrhi_loadKeep && target->depthStore == mrhi_storeKeep &&
                  (!stencil ||
                   (target->stencilLoad == mrhi_loadKeep && target->stencilStore == mrhi_storeKeep));
-    if (!known || !mrhiFormatHasDepth(def->format) || (target->readOnly && !keeps) ||
+    // A depth cleared takes a value from 0 to 1, never NaN.
+    bool clears = target->depthLoad == mrhi_loadClear;
+    bool cleared = !clears || (target->clearDepth >= 0.0f && target->clearDepth <= 1.0f);
+    if (!known || !mrhiFormatHasDepth(def->format) || (target->readOnly && !keeps) || !cleared ||
         !Agrees(shape, def, target->mip))
     {
         return mrhi_errorInvalid;

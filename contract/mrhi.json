@@ -13189,7 +13189,7 @@
             {
               "name": "clear",
               "type": "struct.color",
-              "doc": "The clear value, for mrhi_loadClear."
+              "doc": "The clear value, for mrhi_loadClear: finite, and for an integer format each component's integer part within its 32-bit type, as WebGPU converts a clearValue."
             },
             {
               "name": "resolve",
@@ -13264,7 +13264,7 @@
             {
               "name": "clear_depth",
               "type": "float32",
-              "doc": "The depth clear value, from 0 to 1."
+              "doc": "The depth clear value, for mrhi_loadClear: from 0 to 1."
             },
             {
               "name": "stencil_load",
@@ -22716,5 +22716,5 @@
       ]
     }
   ],
-  "contract_version": 26
+  "contract_version": 27
 }
