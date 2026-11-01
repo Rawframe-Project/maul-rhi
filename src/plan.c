@@ -168,12 +168,8 @@ static uint64_t Volume(const mrhiBox* box)
 
 static void Push(Map* map, mrhiBox box)
 {
-    // The boxes are sized from the accesses.
-    if (map->nextCount == map->half)
-    {
-        map->full = mrhi_diagnosticFrameAccesses;
-        return;
-    }
+    // Each half holds the most boxes a resource's uses cut it into.
+    MRHI_ASSERT(map->nextCount < map->half);
     map->next[map->nextCount++] = box;
 }
 

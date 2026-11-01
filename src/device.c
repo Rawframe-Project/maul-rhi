@@ -293,6 +293,21 @@ typedef struct FrameParts
     uint32_t programChunks;
 } FrameParts;
 
+// The most boxes the planner cuts one resource into: its uses (the
+// frame's accesses and the library's clear) bound at most 2 c + 1 runs
+// of its mips and of its layers, within the most mips and layers a
+// texture of the device has, each of up to two planes.
+static size_t BoxesOfOne(const mrhiDeviceDef* def)
+{
+    uint64_t runs = 2 * ((uint64_t)def->budgets.frameAccesses + 1) + 1;
+    uint32_t widest = def->limits.textureDimension2d > def->limits.textureDimension3d
+                          ? def->limits.textureDimension2d
+                          : def->limits.textureDimension3d;
+    uint64_t mips = 32 - (uint64_t)__builtin_clz(widest | 1u);
+    uint64_t layers = def->limits.textureArrayLayers;
+    return (size_t)((runs < mips ? runs : mips) * (runs < layers ? runs : layers) * 2);
+}
+
 // Lays out the tables of the open frame, sized by the device's budgets.
 static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
 {
@@ -304,7 +319,8 @@ static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
     // And a barrier each, for the first use after the clear.
     size_t barriers = (size_t)limits->frameBarriers + limits->frameResources;
     FrameParts parts = {
-        .boxLimit = (size_t)limits->frameAccesses * 4 + 16,
+        // The map of a resource, and the next one built beside it.
+        .boxLimit = 2 * BoxesOfOne(def),
         .programChunks = limits->frameCommandBytes / MRHI_CHUNK_BYTES,
         .barrierLimit = barriers,
     };
