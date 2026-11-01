@@ -5,6 +5,20 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.16.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.15.1...v0.16.0) (2026-11-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* **graph:** mrhiAddPass refuses a cleared color target whose clear value has a NaN or infinite component, or, for r32uint and r32sint, a component whose integer part leaves the 32-bit type, and a cleared depth target whose clearDepth is outside 0 to 1.
+
+### Fixed
+
+* **d3d12:** refuse a back buffer index past the swapchain ([#319](https://github.com/Rawframe-Project/maul-rhi/issues/319)) ([40b0d6c](https://github.com/Rawframe-Project/maul-rhi/commit/40b0d6ceb3ecbac323579e6f1e5f8fbb1eb424a2)), closes [#318](https://github.com/Rawframe-Project/maul-rhi/issues/318)
+* **graph:** compile a frame whose uses cut a texture into a grid ([#322](https://github.com/Rawframe-Project/maul-rhi/issues/322)) ([16356de](https://github.com/Rawframe-Project/maul-rhi/commit/16356deb77a706f1fc45a59e2167a3863c5f31fa)), closes [#320](https://github.com/Rawframe-Project/maul-rhi/issues/320)
+* **graph:** refuse clear values WebGPU refuses ([#336](https://github.com/Rawframe-Project/maul-rhi/issues/336)) ([e4e5d04](https://github.com/Rawframe-Project/maul-rhi/commit/e4e5d040847ef70432dbb5d14dbdbd877a94a489)), closes [#335](https://github.com/Rawframe-Project/maul-rhi/issues/335)
+* **vulkan:** refuse a bad acquired index or memory requirement ([#317](https://github.com/Rawframe-Project/maul-rhi/issues/317)) ([0859d65](https://github.com/Rawframe-Project/maul-rhi/commit/0859d658ddce371af94d3fab37230efc8474db3d)), closes [#316](https://github.com/Rawframe-Project/maul-rhi/issues/316)
+
 ## [0.15.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.15.0...v0.15.1) (2026-10-31)
 
 ### Fixed
