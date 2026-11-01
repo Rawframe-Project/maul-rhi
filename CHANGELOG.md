@@ -7,19 +7,51 @@ may change the API, the ABI and every data format.
 
 ## [0.20.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.19.0...v0.20.0) (2026-11-01)
 
+### Changed
 
-### ⚠ BREAKING CHANGES
+- **Breaking:** `mrhiCreateSampler` refuses an infinite `lodMin` or
+  `lodMax` with `mrhi_errorInvalid`, counted as
+  `mrhi_diagnosticSamplerDef`, as WebGPU's `createSampler` never takes
+  one. Before, Vulkan, D3D12 and Metal took such a sampler, and the
+  WebGPU driver passed it on to the browser.
+  ([#377](https://github.com/Rawframe-Project/maul-rhi/pull/377))
+- **Breaking:** `mrhiCreateView` refuses two views WebGPU refuses, with
+  `mrhi_errorInvalid`, counted as `mrhi_diagnosticViewRange`:
+  - a 2D array view of a multisampled texture;
+  - a view of a transient texture without all of the texture's usages.
+    A usage of 0 still resolves to all of them.
 
-* **resources:** mrhiCreateTexture and mrhiDeclareTexture refuse a 3D texture of a depth or stencil format, and mrhiCreateTexture a transient texture that is not one 2D layer of one mip without view formats, with mrhi_errorInvalid. A declared texture of several mips or layers is no longer made transient.
-* **resources:** mrhiCreateView refuses a 2D array view of a multisampled texture, and a view of a transient texture whose usages are not all of the texture's, with mrhi_errorInvalid as mrhi_diagnosticViewRange.
-* **resources:** mrhiCreateSampler refuses an infinite lodMin or lodMax with mrhi_errorInvalid as mrhi_diagnosticSamplerDef.
+  Binding a texture through a table resolves its view the same way, so
+  such a binding is refused too. Before, both views were made on every
+  driver, and the browser refused the first.
+  ([#378](https://github.com/Rawframe-Project/maul-rhi/pull/378))
+- **Breaking:** textures follow WebGPU's `createTexture` rules:
+  - `mrhiCreateTexture` and `mrhiDeclareTexture` refuse a 3D texture of
+    a depth or stencil format with `mrhi_errorInvalid`, counted as
+    `mrhi_diagnosticTextureSize`, as for a compressed volume.
+  - `mrhiCreateTexture` refuses a transient texture that is not one 2D
+    layer of one mip without view formats, with `mrhi_errorInvalid`,
+    counted as `mrhi_diagnosticTextureUsage`. A 2D array of one layer
+    qualifies.
+  - The frame graph makes a declared texture transient only with that
+    shape. On Vulkan and Metal, a declared texture of several mips or
+    layers, or with a view format in a later entry, now takes frame
+    memory where it was kept on chip.
+
+  Before, the core took a 3D depth or stencil texture and checked only
+  a transient texture's usages, and the plan checked only the first
+  view format entry.
+  ([#379](https://github.com/Rawframe-Project/maul-rhi/pull/379))
 
 ### Fixed
 
-* **resources:** refuse 3D depth and non-WebGPU transient textures ([#379](https://github.com/Rawframe-Project/maul-rhi/issues/379)) ([5e2cdfd](https://github.com/Rawframe-Project/maul-rhi/commit/5e2cdfd26d203724da5324c8fb5a2574ce3cfe5a)), closes [#374](https://github.com/Rawframe-Project/maul-rhi/issues/374)
-* **resources:** refuse a sampler with an infinite level of detail ([#377](https://github.com/Rawframe-Project/maul-rhi/issues/377)) ([05e9606](https://github.com/Rawframe-Project/maul-rhi/commit/05e9606aabf6da6a53534392fb5e3cfe0899110d)), closes [#376](https://github.com/Rawframe-Project/maul-rhi/issues/376)
-* **resources:** refuse multisampled array and partial transient views ([#378](https://github.com/Rawframe-Project/maul-rhi/issues/378)) ([16a6dd7](https://github.com/Rawframe-Project/maul-rhi/commit/16a6dd714cf322a5d7285dfa10d4a669a09371c5)), closes [#375](https://github.com/Rawframe-Project/maul-rhi/issues/375)
-* **webgpu:** take every view format, even those after an unused entry ([#381](https://github.com/Rawframe-Project/maul-rhi/issues/381)) ([79a2917](https://github.com/Rawframe-Project/maul-rhi/commit/79a2917dc7e8a0bb478813dfbecfe820416291bd)), closes [#380](https://github.com/Rawframe-Project/maul-rhi/issues/380)
+- The WebGPU driver and Metal surfaces read every view format entry, as
+  the contract says unused entries may be anywhere. Before, WebGPU
+  stopped at the first unused entry, so a view in the sRGB twin listed
+  after one was refused by the browser, for textures and canvases alike.
+  A Metal surface's drawables were framebuffer-only when the first entry
+  was unused, whatever the others named.
+  ([#381](https://github.com/Rawframe-Project/maul-rhi/pull/381))
 
 ## [0.19.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.18.0...v0.19.0) (2026-11-01)
 
