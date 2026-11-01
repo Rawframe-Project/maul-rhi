@@ -46,6 +46,7 @@
 #include "maul-rhi/shader.h"
 #include "shaders/noop_container.h"
 
+#include <math.h>
 #include <stdio.h>
 
 static mrhiDevice* s_device;
@@ -1631,6 +1632,9 @@ typedef struct Attachment
     mrhiTextureUsage usage;
     uint32_t mip;
     uint32_t layer;
+    // A depth target's: kept rather than cleared, and the clear value.
+    bool keepDepth;
+    float clearDepth;
 } Attachment;
 
 static mrhiTextureId MakeAttachment(const Attachment* a)
@@ -1687,9 +1691,9 @@ static mrhiResult RenderPass(const Attachment* colors, const Attachment* resolve
         CHECK(mrhiImportTexture(s_device, textures[made++], &def.depthTarget.resource) ==
                   mrhi_success,
               "imported");
-        def.depthTarget.depthLoad = mrhi_loadClear;
+        def.depthTarget.depthLoad = depth.keepDepth ? mrhi_loadKeep : mrhi_loadClear;
         def.depthTarget.depthStore = mrhi_storeKeep;
-        def.depthTarget.clearDepth = 1.0F;
+        def.depthTarget.clearDepth = depth.clearDepth;
         def.depthTarget.stencilLoad = mrhi_loadClear;
         def.depthTarget.stencilStore = mrhi_storeKeep;
     }
@@ -1791,6 +1795,23 @@ static void TestRenderPasses(void)
            RenderPass(&multi, nullptr, 1, depth), false);
     Expect("render_pass_descriptor:depth_stencil_attachment,sample_counts_mismatch 1 and 4",
            RenderPass(&color, nullptr, 1, multiDepth), false);
+    // depth_stencil_attachment,depth_clear_value: a value from 0 to 1 when
+    // the depth is cleared, any when it is loaded. The CTS's value left
+    // undefined is NaN; its pass of no depth load has no counterpart, as a
+    // depth target has depth.
+    const float values[] = {NAN, -1.0f, 0.0f, 0.5f, 1.0f, 1.5f};
+    for (uint32_t load = 0; load < 2; ++load)
+    {
+        for (uint32_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i)
+        {
+            snprintf(name, sizeof(name),
+                     "render_pass_descriptor:depth_stencil_attachment,depth_clear_value %s %g",
+                     load == 0 ? "load" : "clear", (double)values[i]);
+            Attachment cleared = {.format = DEPTH, .keepDepth = load == 0, .clearDepth = values[i]};
+            bool inRange = values[i] >= 0.0f && values[i] <= 1.0f;
+            Expect(name, RenderPass(&color, nullptr, 1, cleared), load == 0 || inRange);
+        }
+    }
 }
 
 static mrhiQuerySetId MakeQuerySet(mrhiQueryKind kind, uint32_t count)

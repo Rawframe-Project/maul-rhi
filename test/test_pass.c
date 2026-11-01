@@ -8,6 +8,8 @@
 
 #include "test_device_setup.h"
 
+#include <math.h>
+
 static mrhiDevice* s_device;
 
 static void Begin(void)
@@ -852,6 +854,48 @@ static void TestRefusals(void)
     Drop();
 }
 
+// A cleared color target's clear value converts to its format's texels
+// as WebGPU converts a clearValue, which is finite: an integer format's
+// components, all four, may carry fractions, which are dropped, but
+// their integer parts must fit its 32-bit type. A target loaded or
+// discarded takes any clear value.
+static void TestClearValues(void)
+{
+    Begin();
+    mrhiResourceId u = Declare(mrhi_formatR32Uint, 64, 1);
+    mrhiResourceId s = Declare(mrhi_formatR32Sint, 64, 1);
+    mrhiResourceId f = Declare(mrhi_formatRgba16Float, 64, 1);
+    mrhiPassDef def = Pass(Color(u, mrhi_loadClear), nullptr, 0);
+    def.colorTargets[0].clear = (mrhiColor){0.0f, 4294967040.0f, 7.5f, -0.5f};
+    CHECK(Add(def) == mrhi_success, "unsigned, to the largest float below 2^32, and fractions");
+    def.colorTargets[0].clear.alpha = -1.0f;
+    CHECK(Add(def) == mrhi_errorInvalid && Refusal() == mrhi_diagnosticPassUses,
+          "negative, for an unsigned format");
+    def.colorTargets[0].clear.alpha = 4294967296.0f;
+    CHECK(Add(def) == mrhi_errorInvalid, "past 32 bits");
+    def.colorTargets[0].clear.alpha = NAN;
+    CHECK(Add(def) == mrhi_errorInvalid, "not a number");
+    def.colorTargets[0].load = mrhi_loadKeep;
+    CHECK(Add(def) == mrhi_success, "not read when loaded");
+    def.colorTargets[0].load = mrhi_loadDiscard;
+    CHECK(Add(def) == mrhi_success, "nor when discarded");
+    def = Pass(Color(s, mrhi_loadClear), nullptr, 0);
+    def.colorTargets[0].clear = (mrhiColor){-2147483648.0f, 2147483520.0f, -1.5f, 0.0f};
+    CHECK(Add(def) == mrhi_success, "signed, from -2^31 to the largest float below 2^31");
+    def.colorTargets[0].clear.green = 2147483648.0f;
+    CHECK(Add(def) == mrhi_errorInvalid, "2^31, for a signed format");
+    def.colorTargets[0].clear.green = -INFINITY;
+    CHECK(Add(def) == mrhi_errorInvalid, "infinite");
+    def = Pass(Color(f, mrhi_loadClear), nullptr, 0);
+    def.colorTargets[0].clear = (mrhiColor){-70000.0f, 1e30f, 0.5f, 1.0f};
+    CHECK(Add(def) == mrhi_success, "any finite value, for a float format");
+    def.colorTargets[0].clear.blue = INFINITY;
+    CHECK(Add(def) == mrhi_errorInvalid, "but not an infinite one");
+    def.colorTargets[0].clear.blue = NAN;
+    CHECK(Add(def) == mrhi_errorInvalid, "nor not a number");
+    Drop();
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -869,6 +913,7 @@ int main(void)
     TestImports();
     TestStaleAndLimits();
     TestViews();
+    TestClearValues();
     TestRefusals();
     s_instance = instance;
     CHECK(mrhiDevice_GetMisuse(s_device) > 30, "the refusals were counted");

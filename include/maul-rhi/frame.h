@@ -457,7 +457,9 @@ extern "C"
         mrhiLoadOp load;
         // What it keeps when the pass ends.
         mrhiStoreOp store;
-        // The clear value, for mrhi_loadClear.
+        // The clear value, for mrhi_loadClear: finite, and for an integer
+        // format each component's integer part within its 32-bit type, as
+        // WebGPU converts a clearValue.
         mrhiColor clear;
         // A single-sampled texture of the same format and size the samples
         // resolve to, or a null id.
@@ -486,7 +488,7 @@ extern "C"
         mrhiLoadOp depthLoad;
         // What its depth keeps when the pass ends.
         mrhiStoreOp depthStore;
-        // The depth clear value, from 0 to 1.
+        // The depth clear value, for mrhi_loadClear: from 0 to 1.
         float clearDepth;
         // What its stencil holds, when the format has one.
         mrhiLoadOp stencilLoad;
