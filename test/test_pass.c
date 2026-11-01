@@ -859,6 +859,34 @@ static void TestRefusals(void)
 // components, all four, may carry fractions, which are dropped, but
 // their integer parts must fit its 32-bit type. A target loaded or
 // discarded takes any clear value.
+// Null color targets: locations without a target, as WebGPU's null
+// attachments, beside one target or a depth target.
+static void TestNullTargets(void)
+{
+    Begin();
+    mrhiResourceId color = Declare(mrhi_formatRgba8Unorm, 64, 1);
+    mrhiResourceId msaa = Declare(mrhi_formatRgba8Unorm, 64, 4);
+    mrhiResourceId depth = Declare(mrhi_formatDepth32Float, 64, 1);
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.colorTargets[1] = Color(color, mrhi_loadClear);
+    def.colorTargetCount = 2;
+    CHECK(Add(def) == mrhi_success, "a null target before one");
+    def.colorTargets[1] = (mrhiColorTarget){0};
+    CHECK(Add(def) == mrhi_errorInvalid && Refusal() == mrhi_diagnosticPassUses,
+          "only null targets");
+    def.depthTarget = (mrhiDepthTarget){.resource = depth, .depthLoad = mrhi_loadClear};
+    CHECK(Add(def) == mrhi_success, "only null targets, with depth");
+    def = mrhiDefaultPassDef();
+    def.colorTargets[0] = Color(msaa, mrhi_loadClear);
+    def.colorTargets[0].resolve = color;
+    def.colorTargetCount = 2;
+    CHECK(Add(def) == mrhi_success, "a resolved target before a null one");
+    def.colorTargets[1].resolve = Declare(mrhi_formatRgba8Unorm, 64, 1);
+    CHECK(Add(def) == mrhi_errorInvalid && Refusal() == mrhi_diagnosticPassUses,
+          "a null target resolved");
+    Drop();
+}
+
 static void TestClearValues(void)
 {
     Begin();
@@ -914,6 +942,7 @@ int main(void)
     TestStaleAndLimits();
     TestViews();
     TestClearValues();
+    TestNullTargets();
     TestRefusals();
     s_instance = instance;
     CHECK(mrhiDevice_GetMisuse(s_device) > 30, "the refusals were counted");

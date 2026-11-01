@@ -211,11 +211,20 @@ void mrhiDeriveStores(mrhiDevice* device)
     {
         mrhiFramePass* pass = &device->framePasses[p];
         const mrhiFrameUse* uses = &device->frameUses[pass->firstUse];
+        // A location without a target stores nothing; the uses skip it.
+        for (uint32_t c = 0; c < MRHI_MAX_COLOR_TARGETS; ++c)
+        {
+            pass->colorStores[c] = mrhi_storeDiscard;
+        }
         uint32_t color = 0;
         for (uint32_t i = 0; i < pass->useCount; ++i)
         {
             if (uses[i].use == mrhiUseColorTarget)
             {
+                while (pass->colorTargets[color].resource.index1 == 0)
+                {
+                    ++color;
+                }
                 pass->colorStores[color] =
                     Store(device, p, &uses[i], pass->colorTargets[color].store, 1);
                 ++color;
@@ -255,7 +264,7 @@ mrhiResult mrhiPass_GetPlan(mrhiDevice* device, mrhiPassId pass, mrhiPassPlan* p
         .depthStore = planned->depthStore,
         .stencilStore = planned->stencilStore,
     };
-    for (uint32_t i = 0; i < planned->colorTargetCount; ++i)
+    for (uint32_t i = 0; i < MRHI_MAX_COLOR_TARGETS; ++i)
     {
         plan.colorStores[i] = planned->colorStores[i];
     }

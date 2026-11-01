@@ -1654,8 +1654,9 @@ static mrhiTextureId MakeAttachment(const Attachment* a)
 }
 
 // A render pass case: its color attachments, each with a resolve
-// target or none, and a depth attachment or none, declared; the pass's
-// refusal, or success. The CTS's loads clear and its stores store.
+// target or none, or left undefined by format none, and a depth
+// attachment or none, declared; the pass's refusal, or success. The
+// CTS's loads clear and its stores store.
 static mrhiResult RenderPass(const Attachment* colors, const Attachment* resolves, uint32_t count,
                              Attachment depth)
 {
@@ -1668,6 +1669,10 @@ static mrhiResult RenderPass(const Attachment* colors, const Attachment* resolve
     for (uint32_t i = 0; i < count && i < MRHI_MAX_COLOR_TARGETS; ++i)
     {
         mrhiColorTarget* target = &def.colorTargets[i];
+        if (colors[i].format == mrhi_formatNone)
+        {
+            continue;
+        }
         textures[made] = MakeAttachment(&colors[i]);
         CHECK(mrhiImportTexture(s_device, textures[made++], &target->resource) == mrhi_success,
               "imported");
@@ -1733,6 +1738,24 @@ static void TestRenderPasses(void)
            RenderPass(&color, nullptr, 1, s_none), true);
     Expect("render_pass_descriptor:attachments,one_depth_stencil_attachment",
            RenderPass(nullptr, nullptr, 0, depth), true);
+    // color_attachments,empty: undefined attachments need a defined one
+    // or depth. Its case of none at all without depth is a compute pass.
+    const Attachment undefinedOr[MRHI_MAX_COLOR_TARGETS] = {0};
+    static const uint32_t counts[] = {1, 2, MRHI_MAX_COLOR_TARGETS};
+    for (uint32_t withDepth = 0; withDepth < 2; ++withDepth)
+    {
+        for (size_t i = 0; i < sizeof(counts) / sizeof(counts[0]); ++i)
+        {
+            snprintf(name, sizeof(name),
+                     "render_pass_descriptor:color_attachments,empty %u undefined, %s",
+                     (unsigned)counts[i], withDepth ? "depth" : "no depth");
+            Expect(name, RenderPass(undefinedOr, nullptr, counts[i], withDepth ? depth : s_none),
+                   withDepth == 1);
+        }
+        snprintf(name, sizeof(name), "render_pass_descriptor:color_attachments,empty one, %s",
+                 withDepth ? "depth" : "no depth");
+        Expect(name, RenderPass(&color, nullptr, 1, withDepth ? depth : s_none), true);
+    }
     // color_attachments,limits,maxColorAttachments.
     const Attachment many[MRHI_MAX_COLOR_TARGETS + 1] = {r8, r8, r8, r8, r8, r8, r8, r8, r8};
     Expect("render_pass_descriptor:color_attachments,limits,maxColorAttachments 8",
