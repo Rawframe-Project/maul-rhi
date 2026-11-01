@@ -222,7 +222,7 @@ static void TestTransient(void)
     def.usage = mrhi_textureRenderTarget | mrhi_textureTransient;
     mrhiTextureId onChip = {0};
     CHECK(mrhiCreateTexture(device, &def, &onChip) == mrhi_success, "a transient device texture");
-    Render(device, Begin(device, onChip), false, mrhi_loadDiscard, mrhi_storeKeep, mrhi_loadKeep);
+    Render(device, Begin(device, onChip), false, mrhi_loadClear, mrhi_storeDiscard, mrhi_loadKeep);
     Submit(device);
     CHECK(s_log.passes == 1 && s_log.commands == 0, "its contents live in a pass, never cleared");
     Close(device);
