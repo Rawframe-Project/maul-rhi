@@ -1813,6 +1813,34 @@ static void TestRenderPasses(void)
                RenderPass(&multi, &(Attachment){.format = RGBA8, .usage = usages[i]}, 1, s_none),
                (usages[i] & mrhi_textureRenderTarget) != 0);
     }
+    // resolveTarget,format_supports_resolve: each color renderable format
+    // the device multisamples, resolved only if WebGPU resolves it.
+    static const struct
+    {
+        mrhiFormat format;
+        bool resolves;
+    } multisampled[] = {
+        {mrhi_formatR8Unorm, true},
+        {mrhi_formatRg8Unorm, true},
+        {RGBA8, true},
+        {mrhi_formatRgba8UnormSrgb, true},
+        {mrhi_formatBgra8Unorm, true},
+        {mrhi_formatBgra8UnormSrgb, true},
+        {mrhi_formatR16Float, true},
+        {mrhi_formatRg16Float, true},
+        {mrhi_formatRgba16Float, true},
+        {mrhi_formatRgb10a2Unorm, true},
+        {mrhi_formatR32Float, false},
+    };
+    for (size_t i = 0; i < sizeof(multisampled) / sizeof(multisampled[0]); ++i)
+    {
+        snprintf(name, sizeof(name),
+                 "render_pass_descriptor:resolveTarget,format_supports_resolve %d",
+                 (int)multisampled[i].format);
+        const Attachment samples = {.format = multisampled[i].format, .samples = 4};
+        const Attachment into = {.format = multisampled[i].format};
+        Expect(name, RenderPass(&samples, &into, 1, s_none), multisampled[i].resolves);
+    }
     // depth_stencil_attachment,sample_counts_mismatch.
     Expect("render_pass_descriptor:depth_stencil_attachment,sample_counts_mismatch 4 and 1",
            RenderPass(&multi, nullptr, 1, depth), false);
@@ -2013,6 +2041,15 @@ int main(void)
     // past a device limit is one a device asking for more would take.
     s_adapter.limits.workgroupsPerDimension = UINT32_MAX;
     s_adapter.limits.vertexBuffers = 16;
+    // r32float multisampled, as WebGPU allows and many GPUs report, so that
+    // a format that multisamples without resolving is there to resolve.
+    s_adapter.limitedFormat = mrhi_formatR32Float;
+    s_adapter.limitedCaps = (mrhiFormatCaps){
+        .sampling = true,
+        .rendering = true,
+        .storage = true,
+        .sampleCounts = mrhi_samples1Bit | mrhi_samples4Bit,
+    };
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     deviceDef.features = s_adapter.features;
     s_device = OpenWith(deviceDef, true);

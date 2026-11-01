@@ -1263,37 +1263,37 @@ mrhiFormatTarget mrhiGetFormatTarget(mrhiFormat format)
     switch (format)
     {
     case mrhi_formatRgba8Unorm:
-        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 1};
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 1, true};
     case mrhi_formatRgba8UnormSrgb:
-        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 1};
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 1, true};
     case mrhi_formatBgra8Unorm:
-        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 1};
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 1, true};
     case mrhi_formatBgra8UnormSrgb:
-        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 1};
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 1, true};
     case mrhi_formatR8Unorm:
-        return (mrhiFormatTarget){1, mrhi_scalarFloat32, 1, 1};
+        return (mrhiFormatTarget){1, mrhi_scalarFloat32, 1, 1, true};
     case mrhi_formatRg8Unorm:
-        return (mrhiFormatTarget){2, mrhi_scalarFloat32, 2, 1};
+        return (mrhiFormatTarget){2, mrhi_scalarFloat32, 2, 1, true};
     case mrhi_formatR16Float:
-        return (mrhiFormatTarget){1, mrhi_scalarFloat32, 2, 2};
+        return (mrhiFormatTarget){1, mrhi_scalarFloat32, 2, 2, true};
     case mrhi_formatRg16Float:
-        return (mrhiFormatTarget){2, mrhi_scalarFloat32, 4, 2};
+        return (mrhiFormatTarget){2, mrhi_scalarFloat32, 4, 2, true};
     case mrhi_formatRgba16Float:
-        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 2};
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 2, true};
     case mrhi_formatR32Float:
-        return (mrhiFormatTarget){1, mrhi_scalarFloat32, 4, 4};
+        return (mrhiFormatTarget){1, mrhi_scalarFloat32, 4, 4, false};
     case mrhi_formatRg32Float:
-        return (mrhiFormatTarget){2, mrhi_scalarFloat32, 8, 4};
+        return (mrhiFormatTarget){2, mrhi_scalarFloat32, 8, 4, false};
     case mrhi_formatRgba32Float:
-        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 16, 4};
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 16, 4, false};
     case mrhi_formatR32Uint:
-        return (mrhiFormatTarget){1, mrhi_scalarUint32, 4, 4};
+        return (mrhiFormatTarget){1, mrhi_scalarUint32, 4, 4, false};
     case mrhi_formatR32Sint:
-        return (mrhiFormatTarget){1, mrhi_scalarSint32, 4, 4};
+        return (mrhiFormatTarget){1, mrhi_scalarSint32, 4, 4, false};
     case mrhi_formatRgb10a2Unorm:
-        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 4};
+        return (mrhiFormatTarget){4, mrhi_scalarFloat32, 8, 4, true};
     case mrhi_formatRg11b10Ufloat:
-        return (mrhiFormatTarget){3, mrhi_scalarFloat32, 8, 4};
+        return (mrhiFormatTarget){3, mrhi_scalarFloat32, 8, 4, true};
     default:
         return (mrhiFormatTarget){0};
     }

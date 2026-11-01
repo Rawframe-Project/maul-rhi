@@ -546,6 +546,15 @@ static void TestTargets(void)
     def = Pass(Color(color, mrhi_loadClear), nullptr, 0);
     def.depthTarget = (mrhiDepthTarget){.resource = depth, .depthLoad = mrhi_loadClear, .mip = 1};
     CHECK(Add(def) == mrhi_errorInvalid, "depth at a mip it lacks");
+    // WebGPU resolves into no 3D texture, whose slices render.
+    mrhiResourceId volumeOut = DeclareSized(mrhi_texture3d, 64, 64, 4, 1);
+    def = Pass(Color(msaa, mrhi_loadClear), nullptr, 0);
+    def.colorTargets[0].resolve = volumeOut;
+    def.colorTargets[0].resolveLayer = 2;
+    CHECK(Add(def) == mrhi_errorInvalid, "resolved into a 3D texture's slice");
+    def = Pass(Color(volumeOut, mrhi_loadClear), nullptr, 0);
+    def.colorTargets[0].layer = 2;
+    CHECK(Add(def) == mrhi_success, "the slice a target");
     Drop();
     CHECK(mrhiDestroyTexture(s_device, sampledOnly) == mrhi_success, "done");
 }
@@ -924,6 +933,30 @@ static void TestClearValues(void)
     Drop();
 }
 
+// On an adapter that multisamples r32uint, as many GPUs report: its
+// samples render, but WebGPU resolves no integer format.
+static void TestIntegerResolve(void)
+{
+    ResetAdapter();
+    s_adapter.limitedFormat = mrhi_formatR32Uint;
+    s_adapter.limitedCaps = (mrhiFormatCaps){
+        .sampling = true,
+        .rendering = true,
+        .storage = true,
+        .sampleCounts = mrhi_samples1Bit | mrhi_samples4Bit,
+    };
+    s_device = OpenWith(mrhiDefaultDeviceDef(), true);
+    Begin();
+    mrhiResourceId samples = Declare(mrhi_formatR32Uint, 64, 4);
+    mrhiResourceId single = Declare(mrhi_formatR32Uint, 64, 1);
+    mrhiPassDef def = Pass(Color(samples, mrhi_loadClear), nullptr, 0);
+    CHECK(Add(def) == mrhi_success, "integer samples rendered");
+    def.colorTargets[0].resolve = single;
+    CHECK(Add(def) == mrhi_errorInvalid, "integer samples resolved");
+    Drop();
+    Close(s_device);
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -947,5 +980,6 @@ int main(void)
     s_instance = instance;
     CHECK(mrhiDevice_GetMisuse(s_device) > 30, "the refusals were counted");
     Close(s_device);
+    TestIntegerResolve();
     return s_failures == 0 ? 0 : 1;
 }

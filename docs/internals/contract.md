@@ -73,7 +73,7 @@ A mapping has a row for each of `vulkan`, `d3d12`, `metal` and `web_gpu`: a `cla
 ## Defaults, limits and formats
 
 - A struct with `defaults` gives each member a `default`, from which its `Default` function in `src/generated/defaults.c` is made. A limit member may add `better: lower`, as alignments do; every other limit is better higher, which is how the core compares a request against an adapter. A limit that is better lower must also be a power of two, on an adapter and in a device def.
-- The `format` enum's texture formats carry, beside their mapping, the capabilities every adapter has (`floor`), their block size, the feature a compressed format needs (`family`), their sRGB or linear twin (`srgb_pair`) and their depth and stencil `aspects`. They make `src/generated/capabilities.c`: the known formats, the floor, the twins and the aspect checks.
+- The `format` enum's texture formats carry, beside their mapping, the capabilities every adapter has (`floor`), their block size, the feature a compressed format needs (`family`), their sRGB or linear twin (`srgb_pair`) and their depth and stencil `aspects`; a color renderable one adds what it is as a render target (`target`: its channels, the scalar type its outputs write, its bytes per sample and their alignment, and whether WebGPU resolves it). They make `src/generated/capabilities.c`: the known formats, the floor, the twins and the aspect checks.
 - Diagnostic codes are an enum like any other; their docs become the texts `mrhiGetDiagnosticText` returns, in `src/generated/diagnostic_texts.c`.
 
 ## Thread safety

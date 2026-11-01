@@ -211,10 +211,11 @@ def check_values(errors, where, item):
             errors.append(f"{where}: '{value.get('name')}' has aspects other than depth and stencil")
         target = value.get("target")
         if target is not None and not (
-                isinstance(target, dict) and set(target) == {"channels", "scalar", "bytes", "alignment"}
+                isinstance(target, dict)
+                and set(target) == {"channels", "scalar", "bytes", "alignment", "resolves"}
                 and target["channels"] in (1, 2, 3, 4) and target["scalar"] in SCALARS
                 and target["alignment"] in (1, 2, 4) and isinstance(target["bytes"], int)
-                and target["bytes"] > 0):
+                and target["bytes"] > 0 and isinstance(target["resolves"], bool)):
             errors.append(f"{where}: '{value.get('name')}' has a malformed target")
         layout = value.get("layout")
         if layout is not None and not (
@@ -956,7 +957,8 @@ def format_checks(contract):
         if target:
             lines += [f"    case {names.value(value['name'])}:",
                       f"        return (mrhiFormatTarget){{{target['channels']}, "
-                      f"{SCALARS[target['scalar']]}, {target['bytes']}, {target['alignment']}}};"]
+                      f"{SCALARS[target['scalar']]}, {target['bytes']}, {target['alignment']}, "
+                      f"{'true' if target['resolves'] else 'false'}}};"]
     lines += ["    default:", "        return (mrhiFormatTarget){0};", "    }", "}"]
     vertex = find_item(contract, "vertex_format")
     lines += ["", "mrhiVertexLayout mrhiGetVertexLayout(mrhiVertexFormat format)", "{",

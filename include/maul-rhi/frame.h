@@ -588,10 +588,11 @@ extern "C"
     /// use of a sealed resource other than the reads its sealed state allows),
     /// targets of different sizes or sample counts, views past one on a native
     /// pass or one without targets, targets without a layer for each view or of
-    /// a 3D texture with views past one, a resolve that does not match, a
-    /// subresource written and used otherwise in the pass, an access the class
-    /// does not allow, a declared resource read before any pass wrote it, an
-    /// occlusion query set that is not one or is named by a pass without
+    /// a 3D texture with views past one, a resolve that does not match, of a
+    /// format WebGPU does not resolve (32-bit floats and integers) or into a 3D
+    /// texture, a subresource written and used otherwise in the pass, an access
+    /// the class does not allow, a declared resource read before any pass wrote
+    /// it, an occlusion query set that is not one or is named by a pass without
     /// targets, or timestamps of a set that is not a timestamp set, without a
     /// set, with neither query, with both the same, or with a query past the
     /// set's count or already written in this frame; `mrhi_errorLimit` for more

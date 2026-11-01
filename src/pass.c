@@ -361,7 +361,10 @@ static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* tar
     Agrees(&resolveShape, into, target->resolveMip);
     // The resolve takes the target's own format, viewed in its view
     // format too.
+    // As WebGPU's resolveTarget: a format that resolves, into a texture
+    // that is not 3D.
     if (def->sampleCount == 1 || into->sampleCount != 1 || into->format != def->format ||
+        !mrhiGetFormatTarget(format).resolves || into->kind == mrhi_texture3d ||
         mrhiViewFormatOf(into, format) == mrhi_formatNone || resolveShape.width != shape->width ||
         resolveShape.height != shape->height)
     {
