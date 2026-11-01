@@ -364,7 +364,8 @@ static mrhiQuerySetId MakeQuerySet(mrhiDevice* device, mrhiQueryKind kind, uint3
 static bool IsNear(const uint8_t* pixel, const uint8_t* expected);
 
 // Objects of every kind: many buffers over more than one block, one
-// larger than half a block, textures and views of each shape, a
+// larger than half a block, textures and views of each shape and
+// aspect, a
 // comparing anisotropic sampler, query sets (timestamps where granted);
 // some destroyed, the rest left for the device's end.
 static void CheckObjects(mrhiDevice* device, bool timestamps)
@@ -390,6 +391,7 @@ static void CheckObjects(mrhiDevice* device, bool timestamps)
     mrhiTextureId cube = MakeTexture(device, mrhi_textureCube, mrhi_formatRgba16Float, 6);
     (void)MakeView(device, color, mrhi_texture2d, mrhi_aspectAll);
     mrhiViewId depthView = MakeView(device, depth, mrhi_texture2d, mrhi_aspectDepthOnly);
+    (void)MakeView(device, depth, mrhi_texture2d, mrhi_aspectStencilOnly);
     (void)MakeView(device, depth, mrhi_texture2d, mrhi_aspectAll);
     (void)MakeView(device, cube, mrhi_textureCube, mrhi_aspectAll);
     mrhiTextureId array = MakeTexture(device, mrhi_texture2dArray, mrhi_formatRgba8Unorm, 4);
@@ -779,7 +781,7 @@ static bool ReadsZeros(mrhiDevice* device, mrhiTextureId texture, const ZeroedTe
 {
     enum
     {
-        READS = 16,
+        READS = 48,
     };
     static const uint8_t zeros[4096];
     bool depth = z->format == mrhi_formatDepth32Float;
@@ -897,6 +899,7 @@ static bool ReadsZerosWhereOnesWere(mrhiDevice* device, const ZeroedTexture* tar
 // whichever way the driver clears it: one only sampled, a render target,
 // storage textures, a depth target and a depth texture only sampled,
 // volumes, one a render target, BC1 blocks where the device has them,
+// in more layers than a driver's batch of copies takes at once,
 // and textures larger than a driver's zeros, read at their first and
 // last rows of blocks; and a render target, depth textures and a large
 // texture made, after a target of their size was cleared to ones and
@@ -925,6 +928,8 @@ static void CheckZeroedTextures(mrhiDevice* device, const mrhiFeatures* granted)
          mrhi_textureSampled, 512, true},
         {"BC1 rows past the zeros", mrhi_formatBc1RgbaUnorm, mrhi_texture2d, 512, 1, 1,
          mrhi_textureSampled, 0, true},
+        {"BC1 layers past a batch of copies", mrhi_formatBc1RgbaUnorm, mrhi_texture2dArray, 16, 40,
+         1, mrhi_textureSampled, 0, false},
     };
     for (size_t i = 0; i < sizeof(textures) / sizeof(textures[0]); ++i)
     {
@@ -2439,6 +2444,67 @@ static void CheckClear(Scene* scene)
           "a volume's depth slice cleared");
 }
 
+// Integer targets cleared and read back: an unsigned one to 4000000000,
+// past a signed 32-bit integer, and a signed one to -123456, both exact
+// in a float.
+static void CheckIntegerClear(mrhiDevice* device)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = mrhi_formatR32Uint;
+    def.width = 4;
+    def.height = 4;
+    mrhiResourceId u = {0};
+    mrhiResourceId s = {0};
+    CHECK(mrhiDeclareTexture(device, &def, &u) == mrhi_success, "an unsigned target");
+    def.format = mrhi_formatR32Sint;
+    CHECK(mrhiDeclareTexture(device, &def, &s) == mrhi_success, "a signed target");
+    mrhiPassDef pass = mrhiDefaultPassDef();
+    pass.colorTargets[0] = (mrhiColorTarget){
+        .resource = u,
+        .load = mrhi_loadClear,
+        .store = mrhi_storeKeep,
+        .clear = {4000000000.0f, 0.0f, 0.0f, 0.0f},
+    };
+    pass.colorTargets[1] = (mrhiColorTarget){
+        .resource = s,
+        .load = mrhi_loadClear,
+        .store = mrhi_storeKeep,
+        .clear = {-123456.0f, 0.0f, 0.0f, 0.0f},
+    };
+    pass.colorTargetCount = 2;
+    mrhiPassId clear = {0};
+    CHECK(mrhiAddPass(device, &pass, &clear) == mrhi_success, "a pass clearing both");
+    mrhiAccess reads[2] = {Whole(u, mrhi_accessCopySource), Whole(s, mrhi_accessCopySource)};
+    mrhiPassId read = CopyPass(device, reads, 2);
+    const mrhiExtent3d extent = {4, 4, 1};
+    mrhiRequestId requests[2] = {0};
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+              mrhiPass_Begin(device, clear) == mrhi_success &&
+              mrhiPass_End(device, clear) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadTexture(device, read, &(mrhiTextureCopy){.resource = u}, &extent,
+                                   &requests[0]) == mrhi_success &&
+              mrhiPass_ReadTexture(device, read, &(mrhiTextureCopy){.resource = s}, &extent,
+                                   &requests[1]) == mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
+          "cleared and read");
+    Finish(device, 2);
+    uint32_t unsignedTexels[16];
+    int32_t signedTexels[16];
+    for (int i = 0; i < 16; ++i)
+    {
+        unsignedTexels[i] = 4000000000u;
+        signedTexels[i] = -123456;
+    }
+    bool unsignedRead =
+        Taken(device, requests[0], (const uint8_t*)unsignedTexels, sizeof(unsignedTexels));
+    bool signedRead =
+        Taken(device, requests[1], (const uint8_t*)signedTexels, sizeof(signedTexels));
+    CHECK(unsignedRead && signedRead, "each integer cleared exactly");
+}
+
 // An rgba8 texture of the samples, declared viewable as its sRGB twin.
 static mrhiResourceId DeclareTwin(mrhiDevice* device, uint32_t samples)
 {
@@ -3645,6 +3711,7 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     }
     RUN("transfers.clear", {
         CheckClear(&scene);
+        CheckIntegerClear(device);
         CheckViewFormat(&scene);
     });
     RUN("binding.culling", CheckCulling(&scene));
