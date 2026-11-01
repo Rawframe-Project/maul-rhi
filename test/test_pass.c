@@ -410,6 +410,7 @@ static void TestScopes(void)
 static void TestTargets(void)
 {
     mrhiTextureId sampledOnly = MakeTexture(mrhi_textureSampled);
+    mrhiTextureId onChip = MakeTexture(mrhi_textureRenderTarget | mrhi_textureTransient);
     Begin();
     mrhiResourceId color = Declare(mrhi_formatRgba8Unorm, 64, 1);
     mrhiResourceId small = Declare(mrhi_formatRgba8Unorm, 32, 1);
@@ -555,8 +556,45 @@ static void TestTargets(void)
     def = Pass(Color(volumeOut, mrhi_loadClear), nullptr, 0);
     def.colorTargets[0].layer = 2;
     CHECK(Add(def) == mrhi_success, "the slice a target");
+    // A transient texture lives only in its pass, so no resolve lands in
+    // it, as WebGPU requires.
+    mrhiResourceId transient;
+    CHECK(mrhiImportTexture(s_device, onChip, &transient) == mrhi_success, "imported");
+    def = Pass(Color(msaa, mrhi_loadClear), nullptr, 0);
+    def.colorTargets[0].resolve = transient;
+    CHECK(Add(def) == mrhi_errorInvalid, "resolved into a transient texture");
+    def.colorTargets[0].resolve = color;
+    CHECK(Add(def) == mrhi_success, "resolved into one that is not");
+    // Its stencil too is cleared and discarded.
+    mrhiTextureDef onChipDepthDef = mrhiDefaultTextureDef();
+    onChipDepthDef.format = mrhi_formatDepthStencil;
+    onChipDepthDef.width = 64;
+    onChipDepthDef.height = 64;
+    onChipDepthDef.usage = mrhi_textureRenderTarget | mrhi_textureTransient;
+    mrhiTextureId onChipDepth = {0};
+    mrhiResourceId transientDepth = {0};
+    CHECK(mrhiCreateTexture(s_device, &onChipDepthDef, &onChipDepth) == mrhi_success &&
+              mrhiImportTexture(s_device, onChipDepth, &transientDepth) == mrhi_success,
+          "a transient depth texture imported");
+    def = mrhiDefaultPassDef();
+    def.depthTarget = (mrhiDepthTarget){
+        .resource = transientDepth,
+        .depthLoad = mrhi_loadClear,
+        .depthStore = mrhi_storeDiscard,
+        .stencilLoad = mrhi_loadClear,
+        .stencilStore = mrhi_storeDiscard,
+    };
+    CHECK(Add(def) == mrhi_success, "transient depth and stencil cleared and discarded");
+    def.depthTarget.stencilStore = mrhi_storeKeep;
+    CHECK(Add(def) == mrhi_errorInvalid, "transient stencil kept");
+    def.depthTarget.stencilStore = mrhi_storeDiscard;
+    def.depthTarget.stencilLoad = mrhi_loadKeep;
+    CHECK(Add(def) == mrhi_errorInvalid, "transient stencil loaded");
     Drop();
-    CHECK(mrhiDestroyTexture(s_device, sampledOnly) == mrhi_success, "done");
+    CHECK(mrhiDestroyTexture(s_device, onChipDepth) == mrhi_success, "destroyed");
+    CHECK(mrhiDestroyTexture(s_device, sampledOnly) == mrhi_success &&
+              mrhiDestroyTexture(s_device, onChip) == mrhi_success,
+          "done");
 }
 
 // A declared rgba8 texture of the samples, viewable in its sRGB twin

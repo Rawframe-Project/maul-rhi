@@ -326,8 +326,11 @@ static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* tar
     const mrhiTextureDef* def = mrhiFrameTextureOf(&device->frameResources[slot - 1]);
     *statusOut = mrhi_errorInvalid;
     mrhiFormat format = mrhiViewFormatOf(def, target->viewFormat);
+    // A transient texture lives only in the pass: cleared, then discarded.
+    bool transient = (def->usage & mrhi_textureTransient) != 0;
     if ((uint32_t)target->load > mrhi_loadDiscard || (uint32_t)target->store > mrhi_storeDiscard ||
         mrhiFormatHasDepth(def->format) || format == mrhi_formatNone ||
+        (transient && (target->load != mrhi_loadClear || target->store != mrhi_storeDiscard)) ||
         (target->load == mrhi_loadClear && !Converts(&target->clear, format)) ||
         !Agrees(shape, def, target->mip))
     {
@@ -365,6 +368,7 @@ static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* tar
     // that is not 3D.
     if (def->sampleCount == 1 || into->sampleCount != 1 || into->format != def->format ||
         !mrhiGetFormatTarget(format).resolves || into->kind == mrhi_texture3d ||
+        (into->usage & mrhi_textureTransient) != 0 ||
         mrhiViewFormatOf(into, format) == mrhi_formatNone || resolveShape.width != shape->width ||
         resolveShape.height != shape->height)
     {
@@ -405,11 +409,16 @@ static mrhiResult UseOfDepth(const mrhiDevice* device, const mrhiDepthTarget* ta
     bool keeps = target->depthLoad == mrhi_loadKeep && target->depthStore == mrhi_storeKeep &&
                  (!stencil ||
                   (target->stencilLoad == mrhi_loadKeep && target->stencilStore == mrhi_storeKeep));
+    // A transient texture lives only in the pass: cleared, then discarded.
+    bool transient = (def->usage & mrhi_textureTransient) != 0;
+    bool passes = target->depthLoad == mrhi_loadClear && target->depthStore == mrhi_storeDiscard &&
+                  (!stencil || (target->stencilLoad == mrhi_loadClear &&
+                                target->stencilStore == mrhi_storeDiscard));
     // A depth cleared takes a value from 0 to 1, never NaN.
     bool clears = target->depthLoad == mrhi_loadClear;
     bool cleared = !clears || (target->clearDepth >= 0.0f && target->clearDepth <= 1.0f);
     if (!known || !mrhiFormatHasDepth(def->format) || (target->readOnly && !keeps) || !cleared ||
-        !Agrees(shape, def, target->mip))
+        (transient && !passes) || !Agrees(shape, def, target->mip))
     {
         return mrhi_errorInvalid;
     }
@@ -691,6 +700,30 @@ static void CopyTargets(const mrhiDevice* device, const mrhiPassDef* def, mrhiFr
     }
 }
 
+// The bytes a sample of a pass's color targets takes, as WebGPU counts
+// them: each format's render target bytes, from a multiple of its
+// component alignment, in the targets' order.
+static uint64_t ColorBytes(const mrhiDevice* device, const mrhiPassDef* def)
+{
+    uint64_t bytes = 0;
+    for (uint32_t i = 0; i < def->colorTargetCount; ++i)
+    {
+        const mrhiColorTarget* target = &def->colorTargets[i];
+        if (target->resource.index1 == 0)
+        {
+            continue;
+        }
+        uint32_t slot = mrhiFindFrameResource(device, target->resource);
+        const mrhiTextureDef* texture = mrhiFrameTextureOf(&device->frameResources[slot - 1]);
+        mrhiFormatTarget facts = mrhiGetFormatTarget(mrhiViewFormatOf(texture, target->viewFormat));
+        if (facts.alignment > 0)
+        {
+            bytes = (bytes + facts.alignment - 1) / facts.alignment * facts.alignment + facts.bytes;
+        }
+    }
+    return bytes;
+}
+
 mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* passOut)
 {
     if (passOut != nullptr)
@@ -725,6 +758,10 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
         }
     }
     uint32_t count = status == mrhi_success ? MakeUses(device, def, &status) : 0;
+    if (status == mrhi_success)
+    {
+        status = MRHI_DEVICE_LIMIT(device, colorBytesPerSample, ColorBytes(device, def));
+    }
     if (status != mrhi_success)
     {
         return status == mrhi_errorInvalid ? mrhiDeviceMisuse(device, mrhi_diagnosticPassUses)
