@@ -400,8 +400,8 @@ extern "C"
         mrhi_diagnosticTextureAdopt = 69,
         // A view def with an unknown kind or aspect.
         mrhi_diagnosticViewDef = 70,
-        // A view whose mips, layers, format, aspect or kind its texture cannot
-        // give.
+        // A view whose mips, layers, format, aspect, kind or uses its texture
+        // cannot give.
         mrhi_diagnosticViewRange = 71,
         // A request reached the driver past the notifications limit, so its
         // answer could not be matched.

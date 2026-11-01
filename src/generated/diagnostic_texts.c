@@ -119,7 +119,7 @@ const char* mrhiGetDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticViewDef:
         return "A view def with an unknown kind or aspect.";
     case mrhi_diagnosticViewRange:
-        return "A view whose mips, layers, format, aspect or kind its texture cannot give.";
+        return "A view whose mips, layers, format, aspect, kind or uses its texture cannot give.";
     case mrhi_diagnosticDriverRequestTags:
         return "A request reached the driver past the notifications limit, so its answer could not be matched.";
     case mrhi_diagnosticDriverUnaskedAnswer:
