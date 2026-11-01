@@ -183,6 +183,12 @@ mrhiResult mrhiVulkanPlace(mrhiVulkanMemory* memory, VkBuffer buffer, VkImage im
         memory->api->vkGetImageMemoryRequirements2(memory->device, &info, &needs);
     }
     const VkMemoryRequirements* size = &needs.memoryRequirements;
+    // No bytes, or an alignment not a power of two, would place it over
+    // another: the implementation has failed.
+    if (size->size == 0 || size->alignment == 0 || (size->alignment & (size->alignment - 1)) != 0)
+    {
+        return mrhi_errorPlatform;
+    }
     uint32_t type = mrhiVulkanMemoryType(&memory->properties, size->memoryTypeBits,
                                          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0,
                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);

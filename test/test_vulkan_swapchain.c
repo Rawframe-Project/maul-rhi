@@ -8,7 +8,8 @@
 // present mode and alpha asked, opaque or inherited alpha otherwise,
 // and the surface's transform. A reconfiguration retires the old
 // swapchain only once vkCreateSwapchainKHR has been called with it,
-// whatever it answers; a refusal before that keeps the old one.
+// whatever it answers; a refusal before that keeps the old one. An
+// acquired index past the swapchain's images loses the device.
 
 #include "test_harness.h"
 #include "vulkan_swapchain.h"
@@ -91,6 +92,7 @@ static VkResult s_createResult;
 static VkResult s_imagesResult;
 static uint32_t s_created;
 static uint32_t s_destroyed;
+static uint32_t s_acquiredIndex;
 static uint64_t s_nextHandle;
 
 static uint64_t NextHandle(void)
@@ -186,6 +188,28 @@ static VKAPI_ATTR void VKAPI_CALL DestroySemaphore(VkDevice device, VkSemaphore 
     (void)callbacks;
 }
 
+static VKAPI_ATTR VkResult VKAPI_CALL Counter(VkDevice device, VkSemaphore semaphore,
+                                              uint64_t* value)
+{
+    (void)device;
+    (void)semaphore;
+    *value = 0;
+    return VK_SUCCESS;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL Acquire(VkDevice device, VkSwapchainKHR swapchain,
+                                              uint64_t timeout, VkSemaphore semaphore,
+                                              VkFence fence, uint32_t* index)
+{
+    (void)device;
+    (void)swapchain;
+    (void)timeout;
+    (void)semaphore;
+    (void)fence;
+    *index = s_acquiredIndex;
+    return VK_SUCCESS;
+}
+
 static VKAPI_ATTR VkResult VKAPI_CALL WaitIdle(VkQueue queue)
 {
     (void)queue;
@@ -211,6 +235,8 @@ static uint64_t Configured(mrhiVulkanSwapchains* swapchains, uint32_t capacity)
         .vkCreateSemaphore = CreateSemaphore,
         .vkDestroySemaphore = DestroySemaphore,
         .vkQueueWaitIdle = WaitIdle,
+        .vkGetSemaphoreCounterValue = Counter,
+        .vkAcquireNextImageKHR = Acquire,
     };
     memset(s_slots, 0, sizeof(s_slots));
     *swapchains = (mrhiVulkanSwapchains){
@@ -308,11 +334,30 @@ static void TestRetired(void)
     mrhiVulkanSwapchainsDestroy(&swapchains);
 }
 
+// The image an acquire hands out is the index plus one, and an index
+// past the three images is refused as a lost device, not handed out.
+static void TestAcquired(void)
+{
+    mrhiVulkanSwapchains swapchains;
+    uint64_t handle = Configured(&swapchains, 1);
+    s_acquiredIndex = 2;
+    uint64_t image = 0;
+    CHECK(mrhiVulkanAcquire(&swapchains, handle, &image) == mrhi_success && image == 3,
+          "the last image");
+    mrhiVulkanSwapchainsDestroy(&swapchains);
+    handle = Configured(&swapchains, 1);
+    s_acquiredIndex = 3;
+    CHECK(mrhiVulkanAcquire(&swapchains, handle, &image) == mrhi_errorDeviceLost,
+          "an index past the images");
+    mrhiVulkanSwapchainsDestroy(&swapchains);
+}
+
 int main(void)
 {
     TestSizes();
     TestShapes();
     TestRefusalsKeep();
     TestRetired();
+    TestAcquired();
     return s_failures == 0 ? 0 : 1;
 }
