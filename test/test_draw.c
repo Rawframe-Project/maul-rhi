@@ -463,7 +463,8 @@ static void TestIndices(void)
           "none");
     CHECK(mrhiPass_SetIndexBuffer(nullptr, s_render, s_x, mrhi_indexUint16, 0, 4) ==
                   mrhi_errorInvalid &&
-              mrhiPass_DrawIndexed(nullptr, s_render, 0, 0, 0, 0, 0) == mrhi_errorInvalid,
+              mrhiPass_DrawIndexed(nullptr, s_render, 0, 0, 0, 0, 0) == mrhi_errorInvalid &&
+              mrhiPass_Draw(nullptr, s_render, 0, 0, 0, 0) == mrhi_errorInvalid,
           "no device");
     CHECK(mrhiPass_End(s_device, s_copy) == mrhi_success, "the copying pass ended");
     CHECK(mrhiPass_SetIndexBuffer(s_device, s_copy, s_x, mrhi_indexUint16, 0, 4) == mrhi_errorState,
@@ -920,6 +921,41 @@ static void TestSubmitted(void)
     s_adapter.frameLog = nullptr;
 }
 
+// Counted draws reach a driver: each walked as one record, beside the
+// library's clears of the five new buffers, the pipeline, two vertex
+// buffers and the indices.
+static void TestSubmittedCounted(void)
+{
+    mrhiTestFrameLog log = {0};
+    s_adapter.frameLog = &log;
+    s_adapter.features.multiDrawIndirectCount = true;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.features.multiDrawIndirectCount = true;
+    OpenLimited(deviceDef);
+    Unbound();
+    mrhiGraphicsPipelineId graphics = MakeGraphics();
+    Frame();
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, graphics) == mrhi_success, "set");
+    SetVertices();
+    CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, mrhi_indexUint16, 0, MRHI_WHOLE_SIZE) ==
+              mrhi_success,
+          "indices");
+    CHECK(mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 3) == mrhi_success &&
+              mrhiPass_DrawIndexedIndirectCount(s_device, s_render, s_a, 4, s_a, 0, 3) ==
+                  mrhi_success,
+          "two counted draws");
+    CHECK(mrhiPass_End(s_device, s_render) == mrhi_success &&
+              mrhiPass_End(s_device, s_compute) == mrhi_success &&
+              mrhiPass_End(s_device, s_copy) == mrhi_success,
+          "ended");
+    mrhiRequestId token;
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success, "submitted");
+    CHECK(log.frames == 1 && log.commands == 11 && log.records == 11, "every command walked");
+    CloseDevice();
+    s_adapter.frameLog = nullptr;
+    s_adapter.features.multiDrawIndirectCount = false;
+}
+
 static void TestArena(void)
 {
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
@@ -955,6 +991,26 @@ static void TestArena(void)
     CHECK(Refusal() == mrhi_diagnosticFrameCommandBytes, "the limit named");
     Drop();
     CloseDevice();
+    // A counted draw too, though its draws are within frameIndirectDraws.
+    s_adapter.features.multiDrawIndirectCount = true;
+    deviceDef.features.multiDrawIndirectCount = true;
+    OpenLimited(deviceDef);
+    Unbound();
+    graphics = MakeGraphics();
+    Frame();
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, graphics) == mrhi_success, "set");
+    SetVertices();
+    for (uint32_t i = 0; i < 124; ++i)
+    {
+        CHECK(mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == mrhi_success, "fits");
+    }
+    CHECK(mrhiPass_DrawIndirectCount(s_device, s_render, s_a, 0, s_a, 60, 1) ==
+                  mrhi_errorCapacity &&
+              Refusal() == mrhi_diagnosticFrameCommandBytes && mrhiDevice_GetMisuse(s_device) == 0,
+          "a counted draw refused for the arena");
+    Drop();
+    CloseDevice();
+    s_adapter.features.multiDrawIndirectCount = false;
 }
 
 int main(void)
@@ -971,6 +1027,7 @@ int main(void)
     TestCountedDraws();
     TestIndirectDispatch();
     TestSubmitted();
+    TestSubmittedCounted();
     TestArena();
     return s_failures == 0 ? 0 : 1;
 }

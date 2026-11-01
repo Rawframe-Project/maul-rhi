@@ -68,13 +68,16 @@ static mrhiTextureId MakeTexture(mrhiTextureKind kind, mrhiFormat format, uint32
 // of 8 by 8; multisampled rgba8 pairs; an 8 by 8 by 2 volume of 3 mips;
 // a BC1 texture of 12 by 12 and 2 mips; a single-sampled rgba8 texture
 // of 8 by 8; an rgba8 array of 8 layers of 4 by 4; and a multisampled
-// render target.
-static void Open(void)
+// render target. Its frames hold commandBytes of commands, the default
+// for 0.
+static void OpenCommands(uint32_t commandBytes)
 {
     s_adapter.features.textureCompressionBc = true;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
     def.features.textureCompressionBc = true;
     def.budgets.diagnostics = 8;
+    def.budgets.frameCommandBytes =
+        commandBytes != 0 ? commandBytes : def.budgets.frameCommandBytes;
     s_device = OpenWith(def, true);
     for (uint32_t i = 0; i < 2; ++i)
     {
@@ -100,6 +103,11 @@ static void Open(void)
     s_textures[SINGLE] = MakeTexture(mrhi_texture2d, mrhi_formatRgba8Unorm, 8, 8, 1, 1, 1);
     s_textures[LAYERS] = MakeTexture(flat, mrhi_formatRgba8Unorm, 4, 4, 8, 1, 1);
     s_textures[TARGET] = MakeTexture(mrhi_texture2d, mrhi_formatRgba8Unorm, 8, 8, 1, 1, 4);
+}
+
+static void Open(void)
+{
+    OpenCommands(0);
 }
 
 static void CloseDevice(void)
@@ -776,6 +784,57 @@ static void TestImportOrder(void)
     CloseDevice();
 }
 
+// A buffer-texture copy's buffer side must name a buffer. Once the
+// frame's commands fill the arena, every kind of copy is refused for
+// capacity, recording nothing, and so is the frame.
+static void TestFullArena(void)
+{
+    OpenCommands(MRHI_CHUNK_BYTES);
+    BeginFrame();
+    mrhiAccess accesses[] = {
+        Access(SOURCE, mrhi_accessCopySource),
+        Access(DESTINATION, mrhi_accessCopyDestination),
+        Access(ARRAY, mrhi_accessCopySource),
+        Access(ARRAY, mrhi_accessCopyDestination),
+    };
+    accesses[2].range = (mrhiTextureRange){.mipCount = MRHI_REMAINING, .layerCount = 1};
+    accesses[3].range =
+        (mrhiTextureRange){.mipCount = MRHI_REMAINING, .baseLayer = 1, .layerCount = 2};
+    Passes(accesses, 4);
+    mrhiExtent3d one = {16, 8, 1};
+    CHECK(Upload(Buffer(ARRAY, 0, 256, 0), Texture(ARRAY, 0, 1), one) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticResourceKind,
+          "a texture as the buffer side");
+    mrhiResourceId from = s_r[SOURCE];
+    mrhiResourceId to = s_r[DESTINATION];
+    // Each copy takes three records of the one chunk.
+    uint32_t copies = 0;
+    while (copies <= MRHI_CHUNK_COMMANDS &&
+           mrhiPass_CopyBuffer(s_device, s_pass, from, 0, to, 0, 4) == mrhi_success)
+    {
+        ++copies;
+    }
+    CHECK(copies == MRHI_CHUNK_COMMANDS / 3 && Refusal() == mrhi_diagnosticFrameCommandBytes,
+          "buffer copies fill the arena");
+    mrhiTextureCopy source = Texture(ARRAY, 0, 0);
+    mrhiTextureCopy destination = Texture(ARRAY, 0, 2);
+    CHECK(Upload(Buffer(SOURCE, 0, 256, 0), Texture(ARRAY, 0, 1), one) == mrhi_errorCapacity &&
+              Download(source, Buffer(DESTINATION, 0, 256, 0), one) == mrhi_errorCapacity &&
+              mrhiPass_CopyTexture(s_device, s_pass, &source, &destination, &one) ==
+                  mrhi_errorCapacity &&
+              Refusal() == mrhi_diagnosticFrameCommandBytes,
+          "then copies between buffers and textures and between textures");
+    CHECK(Nth(3 * copies) == nullptr && mrhiDevice_GetMisuse(s_device) == 1,
+          "nothing recorded, and only the texture counted as misuse");
+    CHECK(mrhiPass_End(s_device, s_pass) == mrhi_success &&
+              mrhiPass_End(s_device, s_render) == mrhi_success,
+          "ended");
+    mrhiRequestId token;
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorCapacity, "the frame refused");
+    Drop();
+    CloseDevice();
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -788,5 +847,6 @@ int main(void)
     TestBlocks();
     TestDepth();
     TestTextures();
+    TestFullArena();
     return s_failures == 0 ? 0 : 1;
 }
