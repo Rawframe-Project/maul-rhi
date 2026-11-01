@@ -7,16 +7,45 @@ may change the API, the ABI and every data format.
 
 ## [0.19.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.18.0...v0.19.0) (2026-11-01)
 
+### Changed
 
-### ⚠ BREAKING CHANGES
+- **Breaking:** every draw checks the device's `tablesPlusVertexBuffers`
+  limit, as WebGPU checks `maxBindGroupsPlusVertexBuffers` at each draw.
+  The highest table set plus one and the highest vertex buffer slot set
+  plus one must together stay within it, even for slots the pipeline
+  does not read. Before, the core checked the limit only against a
+  pipeline's own tables and vertex buffers, when the pipeline was made.
+  - Past the device's limit within the adapter's is
+    `mrhi_errorCapacity`, past the adapter's `mrhi_errorUnsupported`,
+    both naming `mrhi_diagnosticLimitTablesPlusVertexBuffers`.
+  - The direct, indexed, indirect and counted draws are checked alike.
 
-* **encoder:** a draw whose pass has set tables and vertex buffers past tablesPlusVertexBuffers is refused: mrhi_errorCapacity within the adapter's limit, mrhi_errorUnsupported past it.
+  ([#367](https://github.com/Rawframe-Project/maul-rhi/pull/367))
 
 ### Fixed
 
-* **binding:** keep each pass's root block zeroed in the drivers ([#371](https://github.com/Rawframe-Project/maul-rhi/issues/371)) ([01f6d33](https://github.com/Rawframe-Project/maul-rhi/commit/01f6d3369c05ce715b1e192d8a35d1a46dfab8c1)), closes [#370](https://github.com/Rawframe-Project/maul-rhi/issues/370)
-* **encoder:** check tablesPlusVertexBuffers at each draw ([#367](https://github.com/Rawframe-Project/maul-rhi/issues/367)) ([3ea403c](https://github.com/Rawframe-Project/maul-rhi/commit/3ea403c43078464e23bd986fd64ed68be36c697d)), closes [#366](https://github.com/Rawframe-Project/maul-rhi/issues/366)
-* **encoder:** sum a viewport's far edges exactly ([#369](https://github.com/Rawframe-Project/maul-rhi/issues/369)) ([403ce28](https://github.com/Rawframe-Project/maul-rhi/commit/403ce2846184473372eabefda118674438067106)), closes [#368](https://github.com/Rawframe-Project/maul-rhi/issues/368)
+- `mrhiPass_SetViewport` compares a viewport's far edges, `x + width`
+  and `y + height`, with the range exactly, as WebGPU does. Before, the
+  core added them as floats, so a sum just past the range could round
+  onto its edge: on a device with `textureDimension2d` 8192,
+  `x = 8191 + 2^-11` with `width = 8192` was accepted. Such a viewport
+  is now refused like any other past the range.
+  ([#369](https://github.com/Rawframe-Project/maul-rhi/pull/369))
+- Each pass starts with its root block zeroed on every driver, as
+  `docs/user/shaders.md` promises, and bytes written before the pass
+  sets a pipeline are kept for it. Before:
+  - WebGPU sent immediates only for bytes a pass wrote, so a pass that
+    drew without `mrhiPass_SetRootBlock` failed its frame in Chrome;
+  - Vulkan and D3D12 set only the bytes a pass wrote, and a write
+    before any pipeline stopped the driver;
+  - Metal zeroed the block once per frame, so a pass that wrote none
+    saw the last pass's bytes.
+
+  On Vulkan, an adapter whose push constants pass 256 bytes now
+  reports `rootBlockBytes` 256, the most a container's root block holds.
+  Before, a device could ask for more and write the root block past the
+  driver's copy of it.
+  ([#371](https://github.com/Rawframe-Project/maul-rhi/pull/371))
 
 ## [0.18.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.17.0...v0.18.0) (2026-11-01)
 
