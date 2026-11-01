@@ -5,6 +5,47 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.19.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.18.0...v0.19.0) (2026-11-01)
+
+### Changed
+
+- **Breaking:** every draw checks the device's `tablesPlusVertexBuffers`
+  limit, as WebGPU checks `maxBindGroupsPlusVertexBuffers` at each draw.
+  The highest table set plus one and the highest vertex buffer slot set
+  plus one must together stay within it, even for slots the pipeline
+  does not read. Before, the core checked the limit only against a
+  pipeline's own tables and vertex buffers, when the pipeline was made.
+  - Past the device's limit within the adapter's is
+    `mrhi_errorCapacity`, past the adapter's `mrhi_errorUnsupported`,
+    both naming `mrhi_diagnosticLimitTablesPlusVertexBuffers`.
+  - The direct, indexed, indirect and counted draws are checked alike.
+
+  ([#367](https://github.com/Rawframe-Project/maul-rhi/pull/367))
+
+### Fixed
+
+- `mrhiPass_SetViewport` compares a viewport's far edges, `x + width`
+  and `y + height`, with the range exactly, as WebGPU does. Before, the
+  core added them as floats, so a sum just past the range could round
+  onto its edge: on a device with `textureDimension2d` 8192,
+  `x = 8191 + 2^-11` with `width = 8192` was accepted. Such a viewport
+  is now refused like any other past the range.
+  ([#369](https://github.com/Rawframe-Project/maul-rhi/pull/369))
+- Each pass starts with its root block zeroed on every driver, as
+  `docs/user/shaders.md` promises, and bytes written before the pass
+  sets a pipeline are kept for it. Before:
+  - WebGPU sent immediates only for bytes a pass wrote, so a pass that
+    drew without `mrhiPass_SetRootBlock` failed its frame in Chrome;
+  - Vulkan and D3D12 set only the bytes a pass wrote, and a write
+    before any pipeline stopped the driver;
+  - Metal zeroed the block once per frame, so a pass that wrote none
+    saw the last pass's bytes.
+
+  On Vulkan, `rootBlockBytes` is now at most 256, the most a container's
+  root block holds. Before, it was the adapter's `maxPushConstantsSize`,
+  so a device could ask for up to 4096 bytes no container can use.
+  ([#371](https://github.com/Rawframe-Project/maul-rhi/pull/371))
+
 ## [0.18.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.17.0...v0.18.0) (2026-11-01)
 
 ### Changed
