@@ -5,9 +5,11 @@
 // mrhiExternalDriverDef as a program would hand its own. Its adapters
 // are reported as external; the handshake refuses another SPI version,
 // a short vtable or a missing function, of the instance driver and of
-// its devices; a refused driver stays the program's, and an accepted
-// one is destroyed with the instance (the sanitizers see either
-// mistake); its own surface sources reach it unexamined.
+// its devices, and a device of no vtable; a refused driver stays the
+// program's, and an accepted one is destroyed with the instance (the
+// sanitizers see either mistake); a search the driver refuses owes no
+// answer, and a cache export whose size changes fails; its own surface
+// sources reach it unexamined.
 
 #include "driver_test.h"
 #include "test_harness.h"
@@ -125,6 +127,12 @@ static int s_breaking;
 static mrhiResult CreateBrokenDevice(void* self, uint64_t adapter, const mrhiDeviceDef* def,
                                      uint64_t tag, mrhiDeviceDriver* deviceOut)
 {
+    // A device of no vtable, which the core can neither use nor destroy.
+    if (s_breaking == 3)
+    {
+        *deviceOut = (mrhiDeviceDriver){0};
+        return mrhi_success;
+    }
     mrhiResult status = s_made.vtable->createDevice(self, adapter, def, tag, deviceOut);
     if (status == mrhi_success)
     {
@@ -145,8 +153,9 @@ static void TestDeviceHandshake(void)
     CHECK(Create(&external, &instance) == mrhi_success, "taken");
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     deviceDef.adapter = FindAdapter(instance);
-    const mrhiResult expected[3] = {mrhi_errorVersion, mrhi_errorInvalid, mrhi_errorInvalid};
-    for (s_breaking = 0; s_breaking < 3; ++s_breaking)
+    const mrhiResult expected[4] = {mrhi_errorVersion, mrhi_errorInvalid, mrhi_errorInvalid,
+                                    mrhi_errorInvalid};
+    for (s_breaking = 0; s_breaking < 4; ++s_breaking)
     {
         // The refused device is destroyed through its vtable's first
         // function.
@@ -159,6 +168,83 @@ static void TestDeviceHandshake(void)
     mrhiInstanceNotification record;
     CHECK(mrhiInstance_TakeNotification(instance, &record) == mrhi_empty,
           "the refused devices' answers dropped");
+    mrhiDestroyInstance(instance);
+}
+
+static mrhiResult RefuseSearch(void* self, uint64_t tag)
+{
+    (void)self;
+    (void)tag;
+    return mrhi_errorCapacity;
+}
+
+// A cache export that grows by a byte between the call that sizes it and
+// the one that writes it.
+static size_t s_exports;
+
+static size_t GrowingExport(void* self, void* bytes, size_t capacity)
+{
+    (void)self;
+    (void)capacity;
+    ++s_exports;
+    if (bytes != nullptr)
+    {
+        memset(bytes, 0xA5, 8);
+    }
+    return 8 + (s_exports > 1 ? 1u : 0u);
+}
+
+static mrhiResult CreateGrowingDevice(void* self, uint64_t adapter, const mrhiDeviceDef* def,
+                                      uint64_t tag, mrhiDeviceDriver* deviceOut)
+{
+    mrhiResult status = s_made.vtable->createDevice(self, adapter, def, tag, deviceOut);
+    if (status == mrhi_success)
+    {
+        s_deviceVtable = *deviceOut->vtable;
+        s_deviceVtable.exportPipelineCache = GrowingExport;
+        deviceOut->vtable = &s_deviceVtable;
+    }
+    return status;
+}
+
+// A driver that refuses a search answers the program's call with its
+// status and owes no answer; one whose cache changes size while the
+// library exports it fails the export, which clears what it wrote.
+static void TestDriverFailures(void)
+{
+    mrhiExternalDriverDef external = MakeDriver();
+    s_vtable.requestAdapters = RefuseSearch;
+    mrhiInstance* instance = nullptr;
+    CHECK(Create(&external, &instance) == mrhi_success, "taken");
+    mrhiAdapterRequestDef search = mrhiDefaultAdapterRequestDef();
+    mrhiRequestId request = {1, 1};
+    mrhiInstanceNotification record;
+    CHECK(mrhiInstance_RequestAdapters(instance, &search, &request) == mrhi_errorCapacity &&
+              mrhiInstance_TakeNotification(instance, &record) == mrhi_empty,
+          "the driver's refusal, and no answer owed");
+    mrhiDestroyInstance(instance);
+    external = MakeDriver();
+    s_vtable.createDevice = CreateGrowingDevice;
+    CHECK(Create(&external, &instance) == mrhi_success, "taken");
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.adapter = FindAdapter(instance);
+    mrhiDevice* device = nullptr;
+    CHECK(mrhiCreateDevice(instance, &deviceDef, &device, &request) == mrhi_success &&
+              mrhiInstance_TakeNotification(instance, &record) == mrhi_success,
+          "a device");
+    uint8_t bytes[256];
+    memset(bytes, 0x5A, sizeof(bytes));
+    size_t size = 1;
+    s_exports = 0;
+    bool cleared = true;
+    mrhiResult status = mrhiDevice_GetPipelineCache(device, bytes, sizeof(bytes), &size);
+    for (size_t i = 0; i < sizeof(bytes); ++i)
+    {
+        cleared = cleared && bytes[i] == 0;
+    }
+    CHECK(status == mrhi_errorPlatform && s_exports == 2 && size == 0 && cleared,
+          "a cache that changed size fails, its bytes and size cleared");
+    mrhiDestroyDevice(device);
     mrhiDestroyInstance(instance);
 }
 
@@ -247,6 +333,7 @@ int main(void)
     TestAccepted();
     TestRefused();
     TestDeviceHandshake();
+    TestDriverFailures();
     TestOwnSources();
     return s_failures == 0 ? 0 : 1;
 }
