@@ -5,6 +5,82 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.18.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.17.0...v0.18.0) (2026-11-01)
+
+### Changed
+
+- **Breaking:** `mrhiAddPass` refuses a pass whose color targets' bytes
+  per sample pass the device's `colorBytesPerSample` limit, as WebGPU's
+  `beginRenderPass` does. Before, the core applied the limit to a
+  pipeline's targets but not to a pass, so eight `rgba8unorm` targets,
+  64 bytes, were accepted at the default limit of 32.
+  - The sum is WebGPU's: the render target bytes of each target's view
+    format, each from a multiple of its component alignment, in the
+    targets' order, skipping null targets.
+  - Past the device's limit within the adapter's is
+    `mrhi_errorCapacity`, past the adapter's `mrhi_errorUnsupported`,
+    both naming `mrhi_diagnosticLimitColorBytesPerSample` as a pipeline
+    past it does.
+
+  ([#353](https://github.com/Rawframe-Project/maul-rhi/pull/353))
+- **Breaking:** `mrhiAddPass` refuses a transient texture
+  (`mrhi_textureTransient`) where WebGPU's `beginRenderPass` does, with
+  `mrhi_errorInvalid` counted as `mrhi_diagnosticPassUses`:
+  - as a color target, unless it loads `mrhi_loadClear` and stores
+    `mrhi_storeDiscard`;
+  - as a depth target, unless its depth does both, and its stencil too
+    if the format has one;
+  - as a resolve target.
+
+  A transient texture's contents live only in its pass, so nothing can
+  be loaded from it or kept in it.
+  ([#355](https://github.com/Rawframe-Project/maul-rhi/pull/355))
+- **Breaking:** `mrhiAddPass` refuses two resolves that WebGPU's
+  `beginRenderPass` refuses, with `mrhi_errorInvalid` counted as
+  `mrhi_diagnosticPassUses`:
+  - a resolve of a format WebGPU does not resolve: `r32float`,
+    `rg32float`, `rgba32float`, `r32uint` and `r32sint`;
+  - a resolve into a 3D texture's slice.
+
+  A multisampled target of such a format, without a resolve, stays
+  allowed where the adapter reports it, and a 3D slice stays a valid
+  target. Before, on an adapter that multisamples `r32uint` or
+  `r32sint`, as lavapipe does, the Vulkan driver's resolve broke
+  `VUID-VkRenderingAttachmentInfo-imageView-06130`.
+  ([#358](https://github.com/Rawframe-Project/maul-rhi/pull/358))
+- **Breaking:** a pipeline's constant values convert to their
+  constants' types as WebGPU converts them. Before,
+  `mrhiCreateComputePipeline` and `mrhiCreateGraphicsPipeline` refused
+  each of these with `mrhi_errorFormat`:
+  - a boolean other than 0 or 1; any finite value is now taken, true
+    when it is not 0;
+  - an integer with a fraction, which is now truncated toward zero and
+    must then fit its type;
+  - a float just above `FLT_MAX` that rounds to it.
+
+  NaN and infinities are still refused.
+
+  Drivers built outside the tree must be rebuilt for
+  `MRHI_SPI_VERSION` 15, whose mustpass list is
+  `conformance/mustpass/spi-15.txt`. A driver may now be handed an
+  integer constant with a fraction, which it must truncate, and a
+  boolean other than 0 or 1, which is true.
+  ([#361](https://github.com/Rawframe-Project/maul-rhi/pull/361))
+- **Breaking:** `mrhiCreateShader` refuses storage textures that
+  WebGPU's layout refuses:
+  - one read and written (`mrhi_storageReadWrite`) in a format other
+    than `r32float`, `r32uint` or `r32sint`, as `mrhi_errorFormat`;
+  - one of a format the device does not store
+    (`mrhiFormatCaps.storage`), such as an sRGB or depth format, as
+    `mrhi_errorUnsupported`.
+
+  `tools/mrhi_container.py` does not check the first rule yet
+  ([#365](https://github.com/Rawframe-Project/maul-rhi/issues/365)).
+  Until it does, the library refuses such a container when the shader
+  is made. A driver built outside the tree may assume both rules, also
+  from `MRHI_SPI_VERSION` 15.
+  ([#363](https://github.com/Rawframe-Project/maul-rhi/pull/363))
+
 ## [0.17.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.16.0...v0.17.0) (2026-11-01)
 
 ### Changed
