@@ -301,7 +301,12 @@ mrhiResult mrhiVulkanAcquire(mrhiVulkanSwapchains* swapchains, uint64_t handle, 
                                                slot->acquired[semaphore], VK_NULL_HANDLE, &index);
     if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
     {
-        MRHI_ASSERT(index < slot->imageCount);
+        // An index past the swapchain's images is the implementation's
+        // failure, not one the library can hand out.
+        if (index >= slot->imageCount)
+        {
+            return mrhi_errorDeviceLost;
+        }
         slot->acquiredBy[semaphore] = UINT64_MAX;
         slot->waitOf[index] = semaphore;
         *imageOut = index + 1;
