@@ -173,6 +173,7 @@ mrhiResult mrhiVulkanMakeLayout(mrhiVulkanPipelines* pipelines, const mrhiReflec
     pipelineOut->heap = heap;
     pipelineOut->sets[MRHI_VULKAN_TABLES] = pipelines->heapLayout;
     pipelineOut->rootStages = reflection->rootBlockBytes > 0 ? rootStages : 0;
+    pipelineOut->rootBytes = reflection->rootBlockBytes;
     const VkPushConstantRange root = {
         .stageFlags = rootStages,
         .size = reflection->rootBlockBytes,

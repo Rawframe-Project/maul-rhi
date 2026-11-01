@@ -237,6 +237,7 @@ void mrhiVulkanBeginPass(mrhiVulkanRecording* recording)
 {
     const mrhiDriverPass* pass = recording->pass;
     recording->pipeline = nullptr;
+    memset(recording->root, 0, sizeof(recording->root));
     if (!HasTargets(pass))
     {
         return;

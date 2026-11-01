@@ -575,6 +575,7 @@ static Case s_cases[] = {
     {"binding.draws", 0, 0},
     {"binding.culling", 0, 0},
     {"binding.render_state", 0, 0},
+    {"binding.root_block", 0, 0},
     {"binding.compute_split", 0, 0},
     {"binding.heaps", 0, 0},
     {"hazards.aliasing", 0, 0},
@@ -2635,6 +2636,58 @@ static mrhiQuerySetId MakeQuerySet(mrhiDevice* device, mrhiQueryKind kind, uint3
     return set;
 }
 
+// A pass's root block starts zeroed, and keeps bytes written before a
+// pipeline is set: the adding pipeline adds nothing to the data in a
+// pass that writes no root block, then 5 in one that writes it before
+// setting the pipeline.
+static void CheckRootBlock(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    BeginScene(scene);
+    mrhiAccess upload = Whole(scene->d, mrhi_accessCopyDestination);
+    mrhiPassId write = CopyPass(device, &upload, 1);
+    mrhiAccess uses[3] = {Whole(scene->u, mrhi_accessUniform),
+                          Whole(scene->d, mrhi_accessStorageReadWrite),
+                          Whole(scene->w, mrhi_accessSampled)};
+    mrhiPassId zeroed = CopyPass(device, uses, 3);
+    mrhiPassId early = CopyPass(device, uses, 3);
+    mrhiAccess reads = Whole(scene->d, mrhi_accessCopySource);
+    mrhiPassId read = CopyPass(device, &reads, 1);
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
+    uint32_t values[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    const float five[4] = {5.0f, 0.0f, 0.0f, 0.0f};
+    CHECK(mrhiPass_Begin(device, write) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, write, scene->d, 0, values, sizeof(values)) ==
+                  mrhi_success &&
+              mrhiPass_End(device, write) == mrhi_success &&
+              mrhiPass_Begin(device, zeroed) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, zeroed, scene->adding) == mrhi_success,
+          "a pass without a root block");
+    BindScene(scene, zeroed);
+    CHECK(mrhiPass_Dispatch(device, zeroed, 1, 1, 1) == mrhi_success &&
+              mrhiPass_End(device, zeroed) == mrhi_success &&
+              mrhiPass_Begin(device, early) == mrhi_success &&
+              mrhiPass_SetRootBlock(device, early, 0, five, sizeof(five)) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, early, scene->adding) == mrhi_success,
+          "a root block written before the pipeline");
+    BindScene(scene, early);
+    mrhiRequestId added = {0};
+    CHECK(mrhiPass_Dispatch(device, early, 1, 1, 1) == mrhi_success &&
+              mrhiPass_End(device, early) == mrhi_success &&
+              mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, scene->d, 0, sizeof(values), &added) ==
+                  mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
+          "dispatched and read");
+    Finish(device, 1);
+    for (int i = 0; i < 8; ++i)
+    {
+        values[i] += 5;
+    }
+    CHECK(Taken(device, added, (const uint8_t*)values, sizeof(values)),
+          "zeros added first, then the 5 written before the pipeline");
+}
+
 // Draws a triangle from firstVertex with a pipeline of the scene, its
 // root block and tables set.
 static void DrawWith(const Scene* scene, mrhiPassId pass, mrhiGraphicsPipelineId pipeline,
@@ -3804,6 +3857,7 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
         Skip("api.pass_timestamps", "without timestampQuery");
     }
     RUN("binding.render_state", CheckRenderState(&scene));
+    RUN("binding.root_block", CheckRootBlock(&scene));
     if (features.unclippedDepth)
     {
         RUN("capabilities.unclipped_depth", CheckUnclippedDepth(&scene));

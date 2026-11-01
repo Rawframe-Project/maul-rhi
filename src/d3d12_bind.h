@@ -18,14 +18,16 @@
 void mrhiD3d12EnterHeap(mrhiD3d12Recorder* recorder, uint64_t heap);
 
 // Sets a pipeline, by its handle, with its root signature where that
-// changes, its constants, its heap tables and its topology.
+// changes, its constants, the pass's root block, its heap tables and its
+// topology.
 void mrhiD3d12SetPipeline(mrhiD3d12Recorder* recorder, uint64_t handle);
 
 // Sets a table from a bindings command with its payload.
 void mrhiD3d12BindTable(mrhiD3d12Recorder* recorder, const mrhiCommand* command);
 
-// Sets root block bytes from a command with its payload.
-void mrhiD3d12SetRootBlock(const mrhiD3d12Recorder* recorder, const mrhiCommand* command);
+// Keeps root block bytes from a command with its payload, setting those
+// the pipeline set reads.
+void mrhiD3d12SetRootBlock(mrhiD3d12Recorder* recorder, const mrhiCommand* command);
 
 // Sets a vertex or index buffer.
 void mrhiD3d12BindBuffer(mrhiD3d12Recorder* recorder, const mrhiCommand* command);

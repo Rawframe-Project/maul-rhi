@@ -8,8 +8,8 @@
 // the whole container's, as on every driver: a bind group layout per
 // table up to the last one used, empty where a table has no binding,
 // and the root block's bytes as immediates. The pipeline's entry holds
-// its bind group layouts for the bind groups frames make, and an empty
-// bind group for each table without bindings.
+// its bind group layouts for the bind groups frames make, an empty bind
+// group for each table without bindings, and its immediates' bytes.
 
 #include "webgpu_pipeline.h"
 
@@ -204,7 +204,7 @@ EM_JS(int, mrhiJsStart, (int state, bool compute, int shader, const char* vertex
     // pipeline, since WebGPU wants every group of the layout.
     const empty = building.tables.map((entries, table) => entries.length > 0 ? null :
         device.createBindGroup({layout: layouts[table], entries: []}));
-    const entry = {pipeline: null, layouts, empty};
+    const entry = {pipeline: null, layouts, empty, immediates};
     const handle = gpu.put(self, entry);
     const descriptor = {label: UTF8ToString(label, labelLength), layout};
     let started;

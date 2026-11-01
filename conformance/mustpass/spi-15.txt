@@ -23,6 +23,7 @@ capabilities.required
 binding.draws
 binding.culling
 binding.render_state
+binding.root_block
 binding.compute_split
 binding.heaps
 hazards.aliasing

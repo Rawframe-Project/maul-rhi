@@ -30,8 +30,10 @@ typedef struct mrhiVulkanPipeline
     VkDescriptorSetLayout sets[MRHI_VULKAN_TABLES + 1];
     uint32_t setCount;
     bool heap;
-    // The stages its push constants reach; 0 without a root block.
+    // The stages its push constants reach and the root block's bytes; 0
+    // without a root block.
     VkShaderStageFlags rootStages;
+    uint32_t rootBytes;
     VkPipelineBindPoint bindPoint;
 } mrhiVulkanPipeline;
 

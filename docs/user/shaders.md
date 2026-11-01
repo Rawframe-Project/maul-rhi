@@ -41,7 +41,7 @@ A pipeline reads its resources through up to four binding tables, set per pass w
 - `mrhiPass_SetBindings` sets one whole table: exactly the slots the pass's pipeline's reflection lists for it, at most `MRHI_MAX_TABLE_BINDINGS`. A binding is a buffer range, a texture of the frame seen through an inline view, or a sampler, each checked as WebGPU checks a bind group entry.
 - Every bound resource needs an access the pass declares, of the kind the slot needs, so the frame's barriers always cover it.
 - A draw or dispatch needs every table its pipeline reads to be set, under a container with the same digest; identical containers are compatible.
-- Each pass starts with its root block zeroed.
+- Each pass starts with its root block zeroed. Bytes written before the pass sets a pipeline are kept for it.
 
 ## Bindless heaps
 

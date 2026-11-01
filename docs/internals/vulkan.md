@@ -45,7 +45,7 @@ The core's clear of a new texture runs in the transfer destination layout: `vkCm
 
 ## Passes
 
-A pass renders between `vkCmdBeginRendering` and `vkCmdEndRendering` over views of its targets, a resolve averaging samples. Its viewport covers the targets with a negative height, so that +Y points up in normalized device coordinates as on every driver, with the targets' origin at their top-left corner. Every draw state starts at its default. A table's bindings are written into a descriptor set taken from the slot's pools, and each recorded binding carries its slot's kind, so the driver knows the descriptor type without the reflection. The root block is pushed as constants to the pipeline's stages.
+A pass renders between `vkCmdBeginRendering` and `vkCmdEndRendering` over views of its targets, a resolve averaging samples. Its viewport covers the targets with a negative height, so that +Y points up in normalized device coordinates as on every driver, with the targets' origin at their top-left corner. Every draw state starts at its default. A table's bindings are written into a descriptor set taken from the slot's pools, and each recorded binding carries its slot's kind, so the driver knows the descriptor type without the reflection. The root block is pushed as constants to the pipeline's stages: whole, from the pass's zeroed copy, with each pipeline, and each write after it as far as the pipeline reads.
 
 Counted multi-draw is `vkCmdDrawIndirectCount` (with `drawIndirectCount` and `multiDrawIndirect`); multiview is the rendering view mask.
 
