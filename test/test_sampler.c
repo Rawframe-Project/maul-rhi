@@ -8,6 +8,7 @@
 
 #include "maul-rhi/resources.h"
 
+#include <float.h>
 #include <math.h>
 
 // A ready device holding at most count samplers, or an opening one; the
@@ -74,6 +75,15 @@ static void TestInvalidDefs(void)
     def.lodMin = NAN;
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorInvalid, "NaN");
     def = mrhiDefaultSamplerDef();
+    def.lodMax = INFINITY;
+    CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorInvalid, "an infinite lodMax");
+    def.lodMin = INFINITY;
+    CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorInvalid, "both lods infinite");
+    def.lodMin = def.lodMax = FLT_MAX;
+    CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_success &&
+              mrhiDestroySampler(device, sampler) == mrhi_success,
+          "the largest finite lods");
+    def = mrhiDefaultSamplerDef();
     def.addressW = 3;
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorInvalid, "clamp to border");
     def = mrhiDefaultSamplerDef();
@@ -92,14 +102,14 @@ static void TestInvalidDefs(void)
     CHECK(mrhiCreateSampler(device, nullptr, &sampler) == mrhi_errorInvalid, "no def");
     CHECK(mrhiCreateSampler(device, &def, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiCreateSampler(nullptr, &def, &sampler) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiDevice_GetMisuse(device) == 13, "each counted on the device");
+    CHECK(mrhiDevice_GetMisuse(device) == 15, "each counted on the device");
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def.next = &critical;
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorUnsupported, "an extension");
     mrhiChain untyped = {.next = nullptr, .type = mrhi_structNone};
     def.next = &untyped;
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorInvalid, "an untyped node");
-    CHECK(mrhiDevice_GetMisuse(device) == 14, "the untyped node counted");
+    CHECK(mrhiDevice_GetMisuse(device) == 16, "the untyped node counted");
     Close(device);
 }
 

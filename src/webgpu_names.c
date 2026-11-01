@@ -175,8 +175,13 @@ void mrhiWebGpuViewFormats(const mrhiTextureDef* def, char out[MRHI_WEBGPU_VIEW_
     {
         return;
     }
-    for (uint32_t i = 0; i < MRHI_VIEW_FORMATS && def->viewFormats[i] != mrhi_formatNone; ++i)
+    // Any entry may be unused, not only the last ones.
+    for (uint32_t i = 0; i < MRHI_VIEW_FORMATS; ++i)
     {
+        if (def->viewFormats[i] == mrhi_formatNone)
+        {
+            continue;
+        }
         const char* name = mrhiWebGpuFormat(def->viewFormats[i]);
         size_t bytes = strlen(name);
         MRHI_ASSERT(length + bytes + 2 <= MRHI_WEBGPU_VIEW_FORMAT_BYTES);

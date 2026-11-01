@@ -26,7 +26,7 @@ extern "C"
 #define MRHI_VERSION_MAJOR 0
 // x-release-please-end
 // x-release-please-start-minor
-#define MRHI_VERSION_MINOR 18
+#define MRHI_VERSION_MINOR 19
 // x-release-please-end
 // x-release-please-start-patch
 #define MRHI_VERSION_PATCH 0
@@ -380,8 +380,8 @@ extern "C"
         // twice in a frame; or ended with none open.
         mrhi_diagnosticStatisticsQuery = 60,
         // A sampler def with an unknown filter, address mode or compare
-        // function, a negative or reversed level of detail range, or anisotropy
-        // outside 1 to 16 or above 1 without linear filtering.
+        // function, a negative, infinite or reversed level of detail range, or
+        // anisotropy outside 1 to 16 or above 1 without linear filtering.
         mrhi_diagnosticSamplerDef = 62,
         // A buffer size of zero or not a multiple of 4.
         mrhi_diagnosticBufferSize = 63,
