@@ -205,7 +205,8 @@ static void LinkAfter(mrhiTlsfNodes* store, uint32_t id, uint32_t added)
 
 // Moves a free range's first bytes, which alignment skips, into a free
 // node of their own; or, with no node left, onto the range before,
-// which a block's start never lacks since offset 0 is always aligned.
+// which a block's start never lacks since offset 0 is always aligned,
+// and which is in use since free neighbours always merge.
 static uint32_t SplitFront(mrhiTlsf* pool, mrhiTlsfNodes* store, uint32_t id, uint64_t skip)
 {
     mrhiTlsfNode* node = NODE(store, id);
@@ -220,18 +221,8 @@ static uint32_t SplitFront(mrhiTlsf* pool, mrhiTlsfNodes* store, uint32_t id, ui
         Insert(pool, store, id);
         return used;
     }
-    MRHI_ASSERT(node->previous != 0);
-    mrhiTlsfNode* before = NODE(store, node->previous);
-    bool wasFree = before->free;
-    if (wasFree)
-    {
-        Remove(pool, store, node->previous);
-    }
-    before->size += skip;
-    if (wasFree)
-    {
-        Insert(pool, store, node->previous);
-    }
+    MRHI_ASSERT(node->previous != 0 && IsMerged(store, id));
+    NODE(store, node->previous)->size += skip;
     node->offset += skip;
     node->size -= skip;
     return id;
