@@ -1716,6 +1716,81 @@ static mrhiResult RenderPass(const Attachment* colors, const Attachment* resolve
 #define DEPTH mrhi_formatDepthStencil
 static const Attachment s_none = {0};
 
+// The color renderable formats, with WebGPU's render target pixel byte
+// cost and component alignment of each.
+static const struct
+{
+    mrhiFormat format;
+    uint32_t bytes;
+    uint32_t alignment;
+} s_renderable[] = {
+    {mrhi_formatR8Unorm, 1, 1},      {mrhi_formatRg8Unorm, 2, 1},
+    {mrhi_formatRgba8Unorm, 8, 1},   {mrhi_formatRgba8UnormSrgb, 8, 1},
+    {mrhi_formatBgra8Unorm, 8, 1},   {mrhi_formatBgra8UnormSrgb, 8, 1},
+    {mrhi_formatR16Float, 2, 2},     {mrhi_formatRg16Float, 4, 2},
+    {mrhi_formatRgba16Float, 8, 2},  {mrhi_formatR32Float, 4, 4},
+    {mrhi_formatRg32Float, 8, 4},    {mrhi_formatRgba32Float, 16, 4},
+    {mrhi_formatR32Uint, 4, 4},      {mrhi_formatR32Sint, 4, 4},
+    {mrhi_formatRgb10a2Unorm, 8, 4},
+};
+
+// The bytes a sample of targets of the formats takes, as WebGPU counts
+// them; the formats are indices into s_renderable.
+static uint32_t BytesPerSample(const uint32_t* formats, uint32_t count)
+{
+    uint32_t total = 0;
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        uint32_t alignment = s_renderable[formats[i]].alignment;
+        total = (total + alignment - 1) / alignment * alignment + s_renderable[formats[i]].bytes;
+    }
+    return total;
+}
+
+// color_attachments,limits,maxColorAttachmentBytesPerSample: aligned,
+// every renderable format from one target to the most; unaligned, two
+// orders of one set of formats, whose alignment puts the first past 32
+// bytes and leaves the second within them.
+static void TestColorBytes(void)
+{
+    char name[160];
+    for (uint32_t f = 0; f < sizeof(s_renderable) / sizeof(s_renderable[0]); ++f)
+    {
+        Attachment same[MRHI_MAX_COLOR_TARGETS];
+        uint32_t indices[MRHI_MAX_COLOR_TARGETS];
+        for (uint32_t i = 0; i < MRHI_MAX_COLOR_TARGETS; ++i)
+        {
+            same[i] = (Attachment){.format = s_renderable[f].format};
+            indices[i] = f;
+        }
+        for (uint32_t count = 1; count <= MRHI_MAX_COLOR_TARGETS; ++count)
+        {
+            snprintf(name, sizeof(name),
+                     "render_pass_descriptor:color_attachments,limits,"
+                     "maxColorAttachmentBytesPerSample,aligned format %d, %u",
+                     (int)s_renderable[f].format, (unsigned)count);
+            ExpectPastLimit(name, RenderPass(same, nullptr, count, (Attachment){0}),
+                            BytesPerSample(indices, count) <= 32);
+        }
+    }
+    // r8unorm, r32float, rgba8unorm, rgba32float, then the two r8unorm last.
+    static const uint32_t orders[2][5] = {{0, 9, 2, 11, 0}, {9, 2, 11, 0, 0}};
+    for (uint32_t o = 0; o < 2; ++o)
+    {
+        Attachment formats[5];
+        for (uint32_t i = 0; i < 5; ++i)
+        {
+            formats[i] = (Attachment){.format = s_renderable[orders[o][i]].format};
+        }
+        snprintf(name, sizeof(name),
+                 "render_pass_descriptor:color_attachments,limits,"
+                 "maxColorAttachmentBytesPerSample,unaligned %s",
+                 o == 0 ? "r8unorm first" : "r8unorm last");
+        ExpectPastLimit(name, RenderPass(formats, nullptr, 5, (Attachment){0}),
+                        BytesPerSample(orders[o], 5) <= 32);
+    }
+}
+
 // api,validation,render_pass,render_pass_descriptor: the cases whose
 // attachments Maul RHI's targets express. Its targets name one mip and
 // one layer, so the cases of views of several (attachments,layer_count
@@ -2013,6 +2088,7 @@ int main(void)
     // past a device limit is one a device asking for more would take.
     s_adapter.limits.workgroupsPerDimension = UINT32_MAX;
     s_adapter.limits.vertexBuffers = 16;
+    s_adapter.limits.colorBytesPerSample = 128;
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     deviceDef.features = s_adapter.features;
     s_device = OpenWith(deviceDef, true);
@@ -2031,6 +2107,7 @@ int main(void)
     TestVertexIndexBuffers();
     CHECK(s_differs == 878 && s_inexpressible == 966, "the draw cases set aside");
     TestRenderPasses();
+    TestColorBytes();
     TestQueries();
     CHECK(s_differs == 879 && s_inexpressible == 966, "the pass and query cases set aside");
     Close(s_device);
