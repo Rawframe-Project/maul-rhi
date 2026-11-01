@@ -2316,7 +2316,8 @@ static void CheckShaderInt64(mrhiDevice* device)
 
 // A texel of 188 sampled through the texture's sRGB twin decodes to
 // about 0.503, where the texture's own format would give 0.737: the
-// triangle drawn with it is the scene's color at half strength.
+// triangle drawn with it is the scene's color at half strength. The twin
+// is the last view format, after unused entries.
 static void CheckSampledTwin(Scene* scene)
 {
     mrhiDevice* device = scene->device;
@@ -2325,7 +2326,7 @@ static void CheckSampledTwin(Scene* scene)
     def.format = mrhi_formatRgba8Unorm;
     def.width = 1;
     def.height = 1;
-    def.viewFormats[0] = mrhi_formatRgba8UnormSrgb;
+    def.viewFormats[MRHI_VIEW_FORMATS - 1] = mrhi_formatRgba8UnormSrgb;
     mrhiResourceId gray = {0};
     CHECK(mrhiDeclareTexture(device, &def, &gray) == mrhi_success, "a texture with a twin");
     mrhiAccess uploads[2] = {Whole(gray, mrhi_accessCopyDestination),
@@ -4436,12 +4437,13 @@ static mrhiResult Configure(mrhiDevice* device, mrhiSurfaceId surface, const mrh
     mrhiSurfaceConfig config = mrhiDefaultSurfaceConfig();
     config.surface = surface;
     // sRGB through the twin: as a view where the surface allows one, else
-    // as the images' own format.
+    // as the images' own format. The twin is the last view format, after
+    // unused entries.
     mrhiFormat twin = mrhi_formatNone;
     config.color = Srgb8(caps, &twin);
     if (caps->twinViews)
     {
-        config.viewFormats[0] = twin;
+        config.viewFormats[MRHI_VIEW_FORMATS - 1] = twin;
     }
     else
     {
@@ -4458,6 +4460,9 @@ static bool IsAcquired(mrhiResult result)
 {
     return result == mrhi_success || result == mrhi_suboptimal;
 }
+
+// The format RecordRed renders the image in: none for the image's own.
+static mrhiFormat s_redView;
 
 // Records a frame, opened already, that clears the surface's image to
 // red and reads its first pixel back when asked: the acquire's outcome.
@@ -4478,6 +4483,7 @@ static mrhiResult RecordRed(mrhiDevice* device, mrhiSurfaceId surface, bool read
         .load = mrhi_loadClear,
         .store = mrhi_storeKeep,
         .clear = {1.0f, 0.0f, 0.0f, 1.0f},
+        .viewFormat = s_redView,
     };
     def.colorTargetCount = 1;
     mrhiPassId clear = {0};
@@ -4620,6 +4626,17 @@ static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiS
         uint8_t pixel[4] = {0};
         CHECK(IsAcquired(PresentRed(device, surface, read, pixel)), "presented");
         CHECK(!read || memcmp(pixel, red, 4) == 0, "red, in the format's channel order");
+    }
+    // Rendered through the twin, which Configure lists last, where the
+    // surface takes it: red encodes to the same bytes.
+    if (caps->twinViews)
+    {
+        s_redView = twin;
+        uint8_t pixel[4] = {0};
+        CHECK(IsAcquired(PresentRed(device, surface, read, pixel)) &&
+                  (!read || memcmp(pixel, red, 4) == 0),
+              "red through the twin");
+        s_redView = mrhi_formatNone;
     }
     CheckFramesInFlight(device, surface);
     CheckUnwrittenImages(device, surface);
