@@ -709,6 +709,35 @@ static void TestOcclusionCapacity(void)
     Close(s_device);
 }
 
+// A statistics query's end with no room in the arena is refused for
+// capacity and still closes it; a begin is refused too and still opens
+// it, so that its end is not misuse.
+static void TestStatisticsCapacity(void)
+{
+    OpenFrames(MRHI_CHUNK_BYTES);
+    mrhiQuerySetId occlusion = MakeSet(mrhi_queryOcclusion, 64);
+    mrhiQuerySetId set = MakeSet(mrhi_queryPipelineStatistics, 4);
+    Frame(occlusion);
+    for (uint32_t i = 0; i < 63; ++i)
+    {
+        CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_render, i) == mrhi_success &&
+                  mrhiPass_EndOcclusionQuery(s_device, s_render) == mrhi_success,
+              "fits");
+    }
+    CHECK(mrhiPass_BeginStatisticsQuery(s_device, s_render, set, 0) == mrhi_success,
+          "the last record");
+    CHECK(mrhiPass_EndStatisticsQuery(s_device, s_render) == mrhi_errorCapacity, "full");
+    CHECK(mrhiPass_BeginStatisticsQuery(s_device, s_render, set, 1) == mrhi_errorCapacity,
+          "a begin full too");
+    CHECK(mrhiPass_End(s_device, s_render) == mrhi_errorInvalid, "yet open");
+    CHECK(mrhiPass_EndStatisticsQuery(s_device, s_render) == mrhi_errorCapacity &&
+              mrhiPass_End(s_device, s_render) == mrhi_success,
+          "closed by its refused end");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 1, "only the early end counted");
+    Drop();
+    Close(s_device);
+}
+
 // In a render pass beside an occlusion query and in a pass without
 // targets, one open at a time, each query written once a frame; a
 // resolve writes 88 bytes a query.
@@ -834,6 +863,7 @@ int main(void)
     TestResolveAccess();
     TestResolve();
     TestStatistics();
+    TestStatisticsCapacity();
     TestStatisticsPasses();
     return s_failures == 0 ? 0 : 1;
 }

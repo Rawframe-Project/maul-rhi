@@ -53,10 +53,16 @@ static mrhiTextureId MakeTexture(mrhiTextureKind kind, mrhiFormat format, uint32
 // room, frames held until waited on, and the resources read: a 4 KiB
 // buffer, an rgba8 array of 16 by 8 and 2 layers, depth32float and
 // combined depth-stencil textures, a multisampled one and a target.
-static void Open(uint32_t ringBytes, uint32_t readbacks, uint32_t notifications)
+// Opens a ready device of a ring of ringBytes, readbacks records and room
+// for notifications answers, its frames holding commandBytes of
+// commands, the default for 0.
+static void OpenCommands(uint32_t ringBytes, uint32_t readbacks, uint32_t notifications,
+                         uint32_t commandBytes)
 {
     s_adapter.holdFrames = true;
     mrhiDeviceDef def = mrhiDefaultDeviceDef();
+    def.budgets.frameCommandBytes =
+        commandBytes != 0 ? commandBytes : def.budgets.frameCommandBytes;
     def.budgets.readbackBytes = ringBytes;
     def.budgets.readbacks = readbacks;
     // The answers asked for, and the record kept for the loss notice.
@@ -72,6 +78,11 @@ static void Open(uint32_t ringBytes, uint32_t readbacks, uint32_t notifications)
     s_textures[MULTI] = MakeTexture(mrhi_texture2d, mrhi_formatRgba8Unorm, 1, 4);
     s_textures[TARGET] = MakeTexture(mrhi_texture2d, mrhi_formatRgba8Unorm, 1, 4);
     s_textures[OUTSIDE] = MakeTexture(mrhi_texture2d, mrhi_formatRgba8Unorm, 1, 1);
+}
+
+static void Open(uint32_t ringBytes, uint32_t readbacks, uint32_t notifications)
+{
+    OpenCommands(ringBytes, readbacks, notifications, 0);
 }
 
 static void CloseDevice(void)
@@ -620,6 +631,43 @@ static void TestLimits(void)
           "1 MiB and 64 readbacks by default");
 }
 
+// A texture read with no room left in the frame's arena is refused for
+// capacity with no request, and the record and ring bytes it reserved
+// come back with the dropped frame.
+static void TestFullArena(void)
+{
+    OpenCommands(8192, 2, 16, MRHI_CHUNK_BYTES);
+    Frame();
+    // The render pass takes the arena's one chunk.
+    uint32_t references = 0;
+    while (references <= MRHI_CHUNK_COMMANDS &&
+           mrhiPass_SetStencilReference(s_device, s_render, references) == mrhi_success)
+    {
+        ++references;
+    }
+    CHECK(references == MRHI_CHUNK_COMMANDS, "the render pass fills the arena");
+    mrhiTextureCopy source = {.resource = s_r[ARRAY], .z = 1};
+    mrhiExtent3d size = {8, 8, 1};
+    mrhiRequestId request = {1, 1};
+    CHECK(mrhiPass_ReadTexture(s_device, s_pass, &source, &size, &request) == mrhi_errorCapacity &&
+              request.index1 == 0 && mrhiDevice_GetMisuse(s_device) == 0,
+          "a texture read refused for capacity, with no request");
+    CHECK(mrhiPass_End(s_device, s_pass) == mrhi_success &&
+              mrhiPass_End(s_device, s_render) == mrhi_success,
+          "ended");
+    mrhiRequestId token = {0};
+    CHECK(mrhiDevice_SubmitFrame(s_device, &token) == mrhi_errorCapacity &&
+              mrhiDevice_DropFrame(s_device) == mrhi_success,
+          "the frame refused and dropped");
+    Frame();
+    mrhiRequestId a = {0};
+    mrhiRequestId b = {0};
+    CHECK(Read(0, 4096, &a) == mrhi_success && Read(0, 4096, &b) == mrhi_success,
+          "both records and the whole ring free again");
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
+    CloseDevice();
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -634,5 +682,6 @@ int main(void)
     TestOutOfOrder();
     TestSubmitFailure();
     TestLimits();
+    TestFullArena();
     return s_failures == 0 ? 0 : 1;
 }
