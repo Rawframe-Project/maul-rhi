@@ -236,6 +236,7 @@ mrhiResult mrhiPass_Begin(mrhiDevice* device, mrhiPassId id)
     }
     uint32_t slots = device->limits.vertexBuffers;
     memset(&device->frameVertexBytes[(size_t)(id.index1 - 1) * slots], 0, slots * sizeof(uint64_t));
+    pass->vertexSlots = 0;
     return mrhi_success;
 }
 
