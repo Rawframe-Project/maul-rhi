@@ -838,6 +838,8 @@ void mrhiMetalEncodePass(mrhiMetalEncoder* encoder, const mrhiDriverPass* pass)
     MRHI_ASSERT(pass->heap == 0 && pass->timestampSet == 0);
     encoder->pass = pass;
     encoder->pipeline = nullptr;
+    // Each pass starts with its root block zeroed, not the last pass's.
+    memset(encoder->root, 0, sizeof(encoder->root));
     encoder->dirty = false;
     encoder->indexBuffer = nil;
     encoder->labelCount = 0;

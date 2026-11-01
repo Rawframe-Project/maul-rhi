@@ -2639,7 +2639,8 @@ static mrhiQuerySetId MakeQuerySet(mrhiDevice* device, mrhiQueryKind kind, uint3
 // A pass's root block starts zeroed, and keeps bytes written before a
 // pipeline is set: the adding pipeline adds nothing to the data in a
 // pass that writes no root block, then 5 in one that writes it before
-// setting the pipeline.
+// setting the pipeline, then nothing again in a pass after it, which
+// starts zeroed rather than with the last pass's block.
 static void CheckRootBlock(Scene* scene)
 {
     mrhiDevice* device = scene->device;
@@ -2651,6 +2652,7 @@ static void CheckRootBlock(Scene* scene)
                           Whole(scene->w, mrhi_accessSampled)};
     mrhiPassId zeroed = CopyPass(device, uses, 3);
     mrhiPassId early = CopyPass(device, uses, 3);
+    mrhiPassId after = CopyPass(device, uses, 3);
     mrhiAccess reads = Whole(scene->d, mrhi_accessCopySource);
     mrhiPassId read = CopyPass(device, &reads, 1);
     CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
@@ -2674,6 +2676,12 @@ static void CheckRootBlock(Scene* scene)
     mrhiRequestId added = {0};
     CHECK(mrhiPass_Dispatch(device, early, 1, 1, 1) == mrhi_success &&
               mrhiPass_End(device, early) == mrhi_success &&
+              mrhiPass_Begin(device, after) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, after, scene->adding) == mrhi_success,
+          "a pass after one that wrote its root block");
+    BindScene(scene, after);
+    CHECK(mrhiPass_Dispatch(device, after, 1, 1, 1) == mrhi_success &&
+              mrhiPass_End(device, after) == mrhi_success &&
               mrhiPass_Begin(device, read) == mrhi_success &&
               mrhiPass_ReadBuffer(device, read, scene->d, 0, sizeof(values), &added) ==
                   mrhi_success &&
@@ -2685,7 +2693,7 @@ static void CheckRootBlock(Scene* scene)
         values[i] += 5;
     }
     CHECK(Taken(device, added, (const uint8_t*)values, sizeof(values)),
-          "zeros added first, then the 5 written before the pipeline");
+          "zeros added first, then the 5 written before the pipeline, then zeros");
 }
 
 // Draws a triangle from firstVertex with a pipeline of the scene, its
