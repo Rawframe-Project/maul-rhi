@@ -178,7 +178,14 @@ mrhiResult mrhiD3d12Acquire(mrhiD3d12Swapchains* swapchains, uint64_t handle, ui
         (void)WaitForSingleObjectEx(swapchain->waitable, WAIT_MS, FALSE);
         swapchain->waited = true;
     }
-    *imageOut = (uint64_t)IDXGISwapChain3_GetCurrentBackBufferIndex(swapchain->swapchain) + 1;
+    UINT index = IDXGISwapChain3_GetCurrentBackBufferIndex(swapchain->swapchain);
+    // An index past the swapchain's images is DXGI's failure, not one the
+    // library can hand out.
+    if (index >= MRHI_D3D12_IMAGES)
+    {
+        return mrhi_errorDeviceLost;
+    }
+    *imageOut = (uint64_t)index + 1;
     RECT client = {0};
     bool fits = GetClientRect(swapchain->window, &client) &&
                 (uint32_t)(client.right - client.left) == swapchain->width &&
