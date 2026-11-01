@@ -29,6 +29,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import mrhi_container  # noqa: E402
 
 CAPABILITY_SHADER = 1
+CAPABILITY_FLOAT16 = 9
 CAPABILITY_INT64 = 11
 CAPABILITY_MULTIVIEW = 4439
 # PSV0 resource classes: a shader resource view and a sampler.
@@ -42,6 +43,19 @@ FRAGMENT = {"name": "f", "stage": "fragment",
             "variables": [{"location": 0, "type": "float32", "components": 2}],
             "outputs": [{"location": 0, "type": "float32", "components": 4}]}
 COMPUTE = {"name": "c", "stage": "compute", "workgroup": [1, 1, 1]}
+# Inter-stage variables of every kind WGSL allows: integers flat from
+# the first vertex or either, floats linear at the centroid, and 16-bit
+# floats per sample.
+VARYINGS = [
+    {"location": 0, "type": "float32", "components": 2},
+    {"location": 1, "type": "sint32", "components": 1},
+    {"location": 2, "type": "uint32", "components": 4, "interpolation": "flat",
+     "sampling": "either"},
+    {"location": 3, "type": "float32", "components": 4, "interpolation": "linear",
+     "sampling": "centroid"},
+    {"location": 4, "type": "float16", "components": 2, "interpolation": "perspective",
+     "sampling": "sample"},
+]
 
 # Each seed: its reflection, the SPIR-V capabilities beyond Shader, and
 # whether it carries Metal and D3D12 code (neither reads a heap yet).
@@ -76,7 +90,45 @@ MINIMAL = {
     "min_heap_places": ({"entries": [dict(COMPUTE, heap_uses=["sampled_textures", "samplers"])]},
                         (), False),
     "min_metallib": ({"entries": [COMPUTE]}, (), True),
+    "min_interface": ({"entries": [dict(VERTEX, variables=VARYINGS), dict(FRAGMENT, variables=VARYINGS, outputs=[
+        {"location": 0, "type": "float32", "components": 4},
+        {"location": 1, "type": "uint32", "components": 4},
+        {"location": 2, "type": "float16", "components": 4},
+    ])]}, (CAPABILITY_FLOAT16,), True),
+    "min_textures": ({"entries": [COMPUTE], "bindings": [
+        {"table": 0, "slot": 0, "kind": "sampled_texture", "stages": ["compute"],
+         "sample_type": "sint", "view_dimension": "2d_array"},
+        {"table": 0, "slot": 1, "kind": "sampled_texture", "stages": ["compute"],
+         "sample_type": "uint", "view_dimension": "cube"},
+        {"table": 0, "slot": 2, "kind": "sampled_texture", "stages": ["compute"],
+         "sample_type": "float", "view_dimension": "cube_array"},
+        {"table": 0, "slot": 3, "kind": "sampled_texture", "stages": ["compute"],
+         "sample_type": "unfilterable_float", "view_dimension": "3d"},
+        {"table": 0, "slot": 4, "kind": "sampled_texture", "stages": ["compute"],
+         "sample_type": "depth", "view_dimension": "2d", "multisampled": True},
+        {"table": 0, "slot": 5, "kind": "sampled_texture", "stages": ["compute"],
+         "sample_type": "unfilterable_float", "view_dimension": "2d", "multisampled": True},
+        {"table": 1, "slot": 0, "kind": "sampler", "stages": ["compute"],
+         "sampler": "non_filtering"},
+        {"table": 1, "slot": 1, "kind": "sampler", "stages": ["compute"],
+         "sampler": "comparison"},
+        {"table": 2, "slot": 0, "kind": "storage_texture", "stages": ["compute"],
+         "access": "read_write", "format": "r32_float", "view_dimension": "2d_array"},
+        {"table": 2, "slot": 1, "kind": "storage_texture", "stages": ["compute"],
+         "access": "read_only", "format": "rgba8_unorm", "view_dimension": "3d"},
+    ]}, (), True),
+    "min_msl_only": ({"entries": [VERTEX, FRAGMENT]}, (), True),
+    "min_dxil_only": ({"entries": [VERTEX, FRAGMENT]}, (), True),
+    "min_metallib_only": ({"entries": [COMPUTE]}, (), True),
 }
+
+# Seeds that carry the code of one native API only: a container may
+# leave out either.
+WITHOUT = {"min_msl_only": "dxil", "min_dxil_only": "msl", "min_metallib_only": "msl"}
+
+# The capabilities only native code may declare: a container declaring
+# one carries no WGSL.
+NATIVE_CAPABILITIES = {CAPABILITY_INT64, CAPABILITY_MULTIVIEW}
 
 # Seeds whose D3D12 heap ranges are not one per class, each a (class,
 # space, register): resource ranges of one class on two registers of one
@@ -88,7 +140,7 @@ RANGES = {
 
 # Seeds that carry a Metal library beside their MSL: its magic and
 # version, which the library checks.
-METALLIBS = {"min_metallib": b"MTLB\1\0\0\0"}
+METALLIBS = {"min_metallib": b"MTLB\1\0\0\0", "min_metallib_only": b"MTLB\1\0\0\0"}
 
 
 def compiled(header):
@@ -163,7 +215,7 @@ def minimal(enums):
         entries = reflection["entries"]
         code = spirv(entries, capabilities)
         heaps = {use for e in entries for use in e.get("heap_uses", [])}
-        bare = heaps or capabilities
+        bare = heaps or NATIVE_CAPABILITIES.intersection(capabilities)
         ranges = []
         if "sampled_textures" in heaps:
             ranges.append((PSV_SRV, 16, 0))
@@ -171,10 +223,12 @@ def minimal(enums):
             ranges.append((PSV_SAMPLER, 17, 0))
         ranges = RANGES.get(name, ranges)
         blobs = {e["name"]: dxil(e, ranges) for e in entries}
+        without = WITHOUT.get(name)
         data = mrhi_container.build(code, None if bare else wgsl(entries), reflection, enums,
-                                    msl=msl(entries) if native else None,
+                                    msl=msl(entries) if native and without != "msl" else None,
                                     metallib=METALLIBS.get(name),
-                                    dxil=blobs if native or ranges else None)
+                                    dxil=blobs if (native or ranges) and without != "dxil"
+                                    else None)
         heap_bits = 0
         for use in heaps:
             heap_bits |= uses[use]

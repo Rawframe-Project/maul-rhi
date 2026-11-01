@@ -724,8 +724,9 @@ def main():
         # tools/container_seed.py's minimal seeds: each one the library
         # reads, with the reflection it was written from. A seed declaring
         # no capability past Shader is read on a device without features,
-        # which refuses one that needs a feature; only the 64-bit integer
-        # and view index seeds are read on a device granting every feature.
+        # which refuses one that needs a feature; only the 64-bit integer,
+        # view index and 16-bit float seeds are read on a device granting
+        # every feature.
         with open(mrhi_container.CONTRACT, encoding="utf-8") as f:
             enums = mrhi_container.Enums(json.load(f))
         for name, data, facts in container_seed.minimal(enums):
