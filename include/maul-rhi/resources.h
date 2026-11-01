@@ -100,9 +100,9 @@ extern "C"
         mrhiAddressMode addressU;
         mrhiAddressMode addressV;
         mrhiAddressMode addressW;
-        // The lowest level of detail sampled, at least 0.
+        // The lowest level of detail sampled, finite and at least 0.
         float lodMin;
-        // The highest level of detail sampled, at least lodMin.
+        // The highest level of detail sampled, finite and at least lodMin.
         float lodMax;
         // 1 to 16; above 1, every filter must be linear.
         uint16_t maxAnisotropy;
@@ -125,9 +125,9 @@ extern "C"
     /// @param samplerOut  Receives the sampler; the null id on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
     /// without its cookie, a label that is not UTF-8 without NUL, a value out
-    /// of range, anisotropy with a nearest filter, or levels of detail out of
-    /// order; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES;
-    /// `mrhi_errorState` for a device that is not ready;
+    /// of range, anisotropy with a nearest filter, or levels of detail infinite
+    /// or out of order; `mrhi_errorLimit` for a label past
+    /// MRHI_MAX_LABEL_BYTES; `mrhi_errorState` for a device that is not ready;
     /// `mrhi_errorUnsupported` for a critical extension the library does not
     /// know; `mrhi_errorCapacity` when the device's sampler limit is reached;
     /// `mrhi_errorBusy` for a call from inside the device's allocator.
