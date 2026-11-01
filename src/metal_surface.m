@@ -106,9 +106,14 @@ static void Set(CAMetalLayer* layer, id<MTLDevice> device, const mrhiSurfaceConf
             config->color.range == mrhi_rangeExtended || config->color.transfer == mrhi_transferPq;
     }
     layer.drawableSize = CGSizeMake(config->width, config->height);
-    // A drawable viewed in another format is no framebuffer only.
-    layer.framebufferOnly =
-        config->usage == mrhi_textureRenderTarget && config->viewFormats[0] == mrhi_formatNone;
+    // A drawable viewed in another format is no framebuffer only; any
+    // entry may name that format.
+    bool views = false;
+    for (uint32_t i = 0; i < MRHI_VIEW_FORMATS; ++i)
+    {
+        views = views || config->viewFormats[i] != mrhi_formatNone;
+    }
+    layer.framebufferOnly = config->usage == mrhi_textureRenderTarget && !views;
     layer.maximumDrawableCount = 3;
     layer.opaque = config->alphaMode == mrhi_alphaOpaque;
 #if TARGET_OS_OSX
