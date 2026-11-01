@@ -88,6 +88,7 @@ mrhiResult mrhiPass_SetVertexBuffer(mrhiDevice* device, mrhiPassId id, uint32_t 
     };
     device->frameVertexBytes[(size_t)(id.index1 - 1) * device->limits.vertexBuffers + slot] =
         size + 1;
+    pass->vertexSlots = slot + 1 > pass->vertexSlots ? slot + 1 : pass->vertexSlots;
     return mrhi_success;
 }
 
@@ -218,8 +219,9 @@ static mrhiResult CheckVertexBuffers(const mrhiDevice* device, mrhiPassId id,
     return status;
 }
 
-// The render pass a draw records in, with its pipeline ready to run:
-// or NULL with the refusal.
+// The render pass a draw records in, with its pipeline ready to run
+// and its tables and vertex buffers within tablesPlusVertexBuffers: or
+// NULL with the refusal.
 static mrhiFramePass* DrawPass(mrhiDevice* device, mrhiPassId id, const mrhiPipelineSlot** slotOut,
                                mrhiResult* statusOut)
 {
@@ -234,7 +236,21 @@ static mrhiFramePass* DrawPass(mrhiDevice* device, mrhiPassId id, const mrhiPipe
         return nullptr;
     }
     *slotOut = ReadyToRun(device, pass, statusOut);
-    return *slotOut == nullptr ? nullptr : pass;
+    if (*slotOut == nullptr)
+    {
+        return nullptr;
+    }
+    // As WebGPU's draw: the highest table and vertex buffer set, each
+    // counted from 0, stay within tablesPlusVertexBuffers together,
+    // whatever the pipeline reads.
+    uint32_t tables = 0;
+    for (uint32_t table = 0; table < MRHI_TABLES; ++table)
+    {
+        tables = (pass->tablesSet & (1u << table)) != 0 ? table + 1 : tables;
+    }
+    *statusOut =
+        MRHI_DEVICE_LIMIT(device, tablesPlusVertexBuffers, (uint64_t)tables + pass->vertexSlots);
+    return *statusOut == mrhi_success ? pass : nullptr;
 }
 
 mrhiResult mrhiPass_Draw(mrhiDevice* device, mrhiPassId id, uint32_t vertexCount,
