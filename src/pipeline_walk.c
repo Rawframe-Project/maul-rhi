@@ -12,6 +12,7 @@
 #include "capabilities_core.h"
 
 #include <float.h>
+#include <math.h>
 
 // The scalar class a type writes or reads: a 16-bit float is a float.
 static mrhiScalarType ClassOf(mrhiScalarType type)
@@ -19,22 +20,24 @@ static mrhiScalarType ClassOf(mrhiScalarType type)
     return type == mrhi_scalarFloat16 ? mrhi_scalarFloat32 : type;
 }
 
-// Whether a constant's type holds a value exactly: false or true, a
-// whole number in an integer's range, or a float a 32-bit float can
-// hold. NaN is none of them.
+// Whether a constant's type takes a value as WebIDL converts a double
+// to it: any finite boolean; an integer whose whole part, toward zero,
+// is in its range, so short of one past either end; a float within half
+// a step past FLT_MAX, where rounding still lands on FLT_MAX. NaN is
+// none of them.
 static bool TypeHolds(mrhiConstantType type, double value)
 {
+    const double past = (double)FLT_MAX + 0x1p103;
     switch (type)
     {
     case mrhi_constantBool:
-        return value == 0.0 || value == 1.0;
+        return isfinite(value);
     case mrhi_constantInt32:
-        return value >= (double)INT32_MIN && value <= (double)INT32_MAX &&
-               (double)(int64_t)value == value;
+        return value > (double)INT32_MIN - 1.0 && value < (double)INT32_MAX + 1.0;
     case mrhi_constantUint32:
-        return value >= 0.0 && value <= (double)UINT32_MAX && (double)(int64_t)value == value;
+        return value > -1.0 && value < (double)UINT32_MAX + 1.0;
     case mrhi_constantFloat32:
-        return value >= -(double)FLT_MAX && value <= (double)FLT_MAX;
+        return value > -past && value < past;
     default:
         return false;
     }

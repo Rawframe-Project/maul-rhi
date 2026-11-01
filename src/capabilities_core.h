@@ -79,14 +79,16 @@ mrhiFormatCaps mrhiFloorFormatCaps(mrhiFormat format);
 bool mrhiFormatFamilyGranted(mrhiFormat format, const mrhiFeatures* features);
 
 // What a color format is as a render target: its channels, the scalar
-// type of the outputs that write it, and its bytes per sample and their
-// alignment toward the color bytes limit. All zero for other formats.
+// type of the outputs that write it, its bytes per sample and their
+// alignment toward the color bytes limit, and whether WebGPU resolves its
+// samples. All zero for other formats.
 typedef struct mrhiFormatTarget
 {
     uint8_t channels;
     mrhiScalarType scalar;
     uint8_t bytes;
     uint8_t alignment;
+    bool resolves;
 } mrhiFormatTarget;
 
 mrhiFormatTarget mrhiGetFormatTarget(mrhiFormat format);
