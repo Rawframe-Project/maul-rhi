@@ -4461,6 +4461,9 @@ static bool IsAcquired(mrhiResult result)
     return result == mrhi_success || result == mrhi_suboptimal;
 }
 
+// The format RecordRed renders the image in: none for the image's own.
+static mrhiFormat s_redView;
+
 // Records a frame, opened already, that clears the surface's image to
 // red and reads its first pixel back when asked: the acquire's outcome.
 // A frame without an image is dropped.
@@ -4480,6 +4483,7 @@ static mrhiResult RecordRed(mrhiDevice* device, mrhiSurfaceId surface, bool read
         .load = mrhi_loadClear,
         .store = mrhi_storeKeep,
         .clear = {1.0f, 0.0f, 0.0f, 1.0f},
+        .viewFormat = s_redView,
     };
     def.colorTargetCount = 1;
     mrhiPassId clear = {0};
@@ -4622,6 +4626,17 @@ static void CheckPresenting(mrhiInstance* instance, mrhiAdapterId adapter, mrhiS
         uint8_t pixel[4] = {0};
         CHECK(IsAcquired(PresentRed(device, surface, read, pixel)), "presented");
         CHECK(!read || memcmp(pixel, red, 4) == 0, "red, in the format's channel order");
+    }
+    // Rendered through the twin, which Configure lists last, where the
+    // surface takes it: red encodes to the same bytes.
+    if (caps->twinViews)
+    {
+        s_redView = twin;
+        uint8_t pixel[4] = {0};
+        CHECK(IsAcquired(PresentRed(device, surface, read, pixel)) &&
+                  (!read || memcmp(pixel, red, 4) == 0),
+              "red through the twin");
+        s_redView = mrhi_formatNone;
     }
     CheckFramesInFlight(device, surface);
     CheckUnwrittenImages(device, surface);
