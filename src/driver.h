@@ -20,7 +20,7 @@
 // The SPI version a driver's vtable must carry. Any change to the SPI
 // headers or to a public type they reach, or to what a driver must do or
 // may assume, raises it; 4 is the first installed.
-#define MRHI_SPI_VERSION 14
+#define MRHI_SPI_VERSION 15
 // What a driver sees at this version, as tools/check_spi_version.py
 // digests it; --write records it.
 // SPI digest: d539bc7b52b048c6403274eee7b065f9fe223c8e0c46bf54859f253ac7239243

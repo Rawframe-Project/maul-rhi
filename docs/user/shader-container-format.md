@@ -109,7 +109,7 @@ An entry that reads a multiview pass's view index has the `mrhi_builtinViewIndex
 | 15 | u8 | zero |
 | 16 | u64 | a buffer's minimum size in bytes, else 0 |
 
-WebGPU's rules apply: a storage texture is 2D, a 2D array or 3D; a multisampled texture is 2D and not filterable; the vertex stage uses no writable storage buffer and no written storage texture.
+WebGPU's rules apply: a storage texture is 2D, a 2D array or 3D, and one read and written is `r32_float`, `r32_uint` or `r32_sint`; a multisampled texture is 2D and not filterable; the vertex stage uses no writable storage buffer and no written storage texture.
 
 ## Interface records
 
@@ -209,6 +209,7 @@ The library checks the structure; each driver's API checks the code itself when 
 - 16-bit floats without `shaderF16`, or `mrhi_builtinPrimitiveIndex`;
 - code needing a feature the device lacks, read from the capabilities the SPIR-V declares before its other instructions: `Float16` and the 16-bit storage capabilities (4433 to 4436) need `shaderF16`, `Int64` needs `shaderInt64`, and `GroupNonUniform` to `GroupNonUniformQuad` (61 to 68) need `subgroups`;
 - the view index without `multiview`; heap uses without `bindlessSampling`, or storage textures or buffers from the heap without `bindlessHeterogeneous`.
+- a storage texture of a format the device does not store (`mrhiFormatCaps.storage`), such as an sRGB format.
 
 A pipeline's binding layout is the whole container's, so these hold for every pipeline made from it.
 
