@@ -5,6 +5,18 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.17.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.16.0...v0.17.0) (2026-11-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* **graph:** drivers built outside the tree must be rebuilt for SPI version 14; a pass view can now hold a null color target, never the last one, and a pipeline def's last color target always has a format.
+
+### Fixed
+
+* **graph:** accept null color targets as WebGPU does ([#343](https://github.com/Rawframe-Project/maul-rhi/issues/343)) ([d383faf](https://github.com/Rawframe-Project/maul-rhi/commit/d383faf559624b247ecf7c134f5fba53f7a877d7)), closes [#341](https://github.com/Rawframe-Project/maul-rhi/issues/341) [#342](https://github.com/Rawframe-Project/maul-rhi/issues/342)
+* **vulkan:** make readback copies visible to the host and ordered ([#349](https://github.com/Rawframe-Project/maul-rhi/issues/349)) ([f9bd581](https://github.com/Rawframe-Project/maul-rhi/commit/f9bd58186510bd6142e53ebe4a5adf77bd9cc3e7)), closes [#346](https://github.com/Rawframe-Project/maul-rhi/issues/346) [#347](https://github.com/Rawframe-Project/maul-rhi/issues/347)
+
 ## [0.16.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.15.1...v0.16.0) (2026-11-01)
 
 ### Changed
