@@ -1920,6 +1920,88 @@ static void TestViewUsages(void)
     }
 }
 
+// A target one texel wide of the format, layers and mips, transient or
+// not, viewed as the view format if one is given: its refusal, or success.
+static mrhiResult MakeTarget(mrhiFormat format, uint32_t layers, uint32_t mips, bool transient,
+                             mrhiFormat view)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.kind = layers > 1 ? mrhi_texture2dArray : mrhi_texture2d;
+    def.format = format;
+    def.width = 1;
+    def.height = 1;
+    def.depthOrLayers = layers;
+    def.mipLevels = mips;
+    def.usage = mrhi_textureRenderTarget | (transient ? mrhi_textureTransient : 0);
+    def.viewFormats[0] = view;
+    mrhiTextureId texture = {0};
+    mrhiResult status = mrhiCreateTexture(s_device, &def, &texture);
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "the target");
+    }
+    return status;
+}
+
+// createTexture:depthOrArrayLayers_and_mipLevelCount_for_transient_attachments
+// and createTexture:transient_viewFormats: a transient texture is one
+// layer of one mip, without view formats. depth24plus becomes the
+// library's depth-stencil format. At the CTS's size of one texel, two
+// mips are past the texture's mip count too.
+static void TestTransientTextures(void)
+{
+    char name[192];
+    static const mrhiFormat formats[] = {RGBA8, DEPTH};
+    for (size_t f = 0; f < sizeof(formats) / sizeof(formats[0]); ++f)
+    {
+        for (uint32_t layers = 1; layers <= 2; ++layers)
+        {
+            for (uint32_t mips = 1; mips <= 2; ++mips)
+            {
+                snprintf(name, sizeof(name),
+                         "createTexture:depthOrArrayLayers_and_mipLevelCount_for_transient_"
+                         "attachments format %d, %u layers, %u mips",
+                         (int)formats[f], layers, mips);
+                Expect(name, MakeTarget(formats[f], layers, mips, true, mrhi_formatNone),
+                       layers == 1 && mips == 1);
+            }
+        }
+    }
+    static const mrhiFormat pairs[][2] = {{RGBA8, mrhi_formatRgba8UnormSrgb},
+                                          {mrhi_formatRgba8UnormSrgb, RGBA8}};
+    // The CTS's subcases: transient or not, and its view format, none,
+    // the texture's own or the other one of the pair.
+    static const struct
+    {
+        bool transient;
+        uint32_t view;
+    } subcases[] = {{true, 0}, {false, 1}, {false, 2}, {true, 1}, {true, 2}};
+    for (size_t p = 0; p < 2; ++p)
+    {
+        for (size_t s = 0; s < sizeof(subcases) / sizeof(subcases[0]); ++s)
+        {
+            uint32_t view = subcases[s].view;
+            bool transient = subcases[s].transient;
+            snprintf(name, sizeof(name), "createTexture:transient_viewFormats format %d, %s, %s",
+                     (int)pairs[p][0], transient ? "transient" : "not transient",
+                     view == 0   ? "no view format"
+                     : view == 1 ? "its own format"
+                                 : "the twin");
+            mrhiFormat format = view == 0 ? mrhi_formatNone : pairs[p][view - 1];
+            mrhiResult status = MakeTarget(pairs[p][0], 1, 1, transient, format);
+            // A view format is the twin, never the texture's own format,
+            // which every view takes without it being listed.
+            if (!transient && view == 1)
+            {
+                Expect(name, status, false);
+                s_differs += 1;
+                continue;
+            }
+            Expect(name, status, !transient || view == 0);
+        }
+    }
+}
+
 // The color renderable formats, with WebGPU's render target pixel byte
 // cost and component alignment of each.
 static const struct
@@ -2350,9 +2432,10 @@ int main(void)
     TestRenderPasses();
     TestTransientTargets();
     TestViewUsages();
+    TestTransientTextures();
     TestColorBytes();
     TestQueries();
-    CHECK(s_differs == 879 && s_inexpressible == 966, "the pass and query cases set aside");
+    CHECK(s_differs == 881 && s_inexpressible == 966, "the pass and query cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
