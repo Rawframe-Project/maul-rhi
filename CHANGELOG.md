@@ -5,6 +5,19 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.19.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.18.0...v0.19.0) (2026-11-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* **encoder:** a draw whose pass has set tables and vertex buffers past tablesPlusVertexBuffers is refused: mrhi_errorCapacity within the adapter's limit, mrhi_errorUnsupported past it.
+
+### Fixed
+
+* **binding:** keep each pass's root block zeroed in the drivers ([#371](https://github.com/Rawframe-Project/maul-rhi/issues/371)) ([01f6d33](https://github.com/Rawframe-Project/maul-rhi/commit/01f6d3369c05ce715b1e192d8a35d1a46dfab8c1)), closes [#370](https://github.com/Rawframe-Project/maul-rhi/issues/370)
+* **encoder:** check tablesPlusVertexBuffers at each draw ([#367](https://github.com/Rawframe-Project/maul-rhi/issues/367)) ([3ea403c](https://github.com/Rawframe-Project/maul-rhi/commit/3ea403c43078464e23bd986fd64ed68be36c697d)), closes [#366](https://github.com/Rawframe-Project/maul-rhi/issues/366)
+* **encoder:** sum a viewport's far edges exactly ([#369](https://github.com/Rawframe-Project/maul-rhi/issues/369)) ([403ce28](https://github.com/Rawframe-Project/maul-rhi/commit/403ce2846184473372eabefda118674438067106)), closes [#368](https://github.com/Rawframe-Project/maul-rhi/issues/368)
+
 ## [0.18.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.17.0...v0.18.0) (2026-11-01)
 
 ### Changed
