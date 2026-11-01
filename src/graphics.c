@@ -672,6 +672,13 @@ mrhiResult mrhiCreateGraphicsPipeline(mrhiDevice* device, const mrhiGraphicsPipe
         stages.vertex->heapUses | (stages.fragment == nullptr ? 0 : stages.fragment->heapUses);
     mrhiGraphicsPipelineDef driverDef = *def;
     mrhiDropLabel(&driverDef.label, &driverDef.labelLength);
+    // Trailing targets without a format count for nothing, as a pass's
+    // trailing null ones, so that the driver's counts agree.
+    while (driverDef.colorTargetCount > 0 &&
+           driverDef.colorTargets[driverDef.colorTargetCount - 1].format == mrhi_formatNone)
+    {
+        --driverDef.colorTargetCount;
+    }
     mrhiDriverGraphicsPipeline pipeline = {
         .shader = shader->handle,
         .reflection = reflection,

@@ -129,9 +129,15 @@ static void TestValid(void)
     f = Valid();
     f->def.colorTargets[0].format = mrhi_formatNone;
     f->def.colorTargets[0].writeMask = mrhiColorWritesKnown;
+    f->def.colorTargets[1] = f->def.colorTargets[0];
+    f->def.colorTargets[1].format = mrhi_formatRgba8Unorm;
+    f->def.colorTargets[1].writeMask = 0;
+    f->def.colorTargetCount = 2;
     f->entries[1].outputCount = 0;
-    f->def.depthStencilFormat = mrhi_formatDepth32Float;
     CHECK(Walk(f) == 0, "no target at a location the fragment entry does not write");
+    f->def.colorTargetCount = 1;
+    f->def.depthStencilFormat = mrhi_formatDepth32Float;
+    CHECK(Walk(f) == 1, "a last target without a format, which the core leaves out");
 }
 
 static void TestConstants(void)

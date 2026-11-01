@@ -226,10 +226,14 @@ static void WalkPass(Walk* walk, const mrhiDriverPass* pass)
 {
     const mrhiDriverFrame* frame = walk->frame;
     WALK_CHECK(pass->id.index1 != 0 && mrhiIsLabelValid(pass->label, pass->labelLength) &&
-               pass->colorTargetCount <= MRHI_MAX_COLOR_TARGETS);
+               pass->colorTargetCount <= MRHI_MAX_COLOR_TARGETS &&
+               (pass->colorTargetCount == 0 ||
+                pass->colorTargets[pass->colorTargetCount - 1].resource.index1 != 0));
     for (uint32_t i = 0; i < pass->colorTargetCount; ++i)
     {
-        WALK_CHECK(Names(walk, pass->colorTargets[i].resource.index1, false));
+        uint32_t target = pass->colorTargets[i].resource.index1;
+        WALK_CHECK(target == 0 ? pass->colorTargets[i].resolve.index1 == 0
+                               : Names(walk, target, false));
     }
     WALK_CHECK(pass->depthTarget.resource.index1 <= frame->resourceCount);
     WALK_CHECK(pass->occlusionSet == 0 || IsHandle(walk, pass->occlusionSet));

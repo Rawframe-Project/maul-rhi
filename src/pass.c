@@ -470,6 +470,34 @@ static bool AreUsesValid(const mrhiDevice* device, const mrhiFrameUse* uses, uin
     return true;
 }
 
+// Makes the uses of a pass's color targets: how many, with the refusal in
+// statusOut. A null target leaves its location without one, as WebGPU's
+// null color attachment does, so it resolves into nothing; a pass with
+// targets has at least one, color or depth.
+static uint32_t UsesOfColors(const mrhiDevice* device, const mrhiPassDef* def, TargetShape* shape,
+                             mrhiFrameUse* uses, mrhiResult* statusOut)
+{
+    uint32_t count = 0;
+    uint32_t colors = 0;
+    for (uint32_t i = 0; i < def->colorTargetCount && *statusOut == mrhi_success; ++i)
+    {
+        if (def->colorTargets[i].resource.index1 == 0)
+        {
+            *statusOut = def->colorTargets[i].resolve.index1 == 0 ? *statusOut : mrhi_errorInvalid;
+            continue;
+        }
+        ++colors;
+        count += UsesOfColor(device, &def->colorTargets[i], ViewsOf(def), shape, &uses[count],
+                             statusOut);
+    }
+    if (*statusOut == mrhi_success && def->colorTargetCount > 0 && colors == 0 &&
+        def->depthTarget.resource.index1 == 0)
+    {
+        *statusOut = mrhi_errorInvalid;
+    }
+    return count;
+}
+
 // Makes the uses of a pass at the end of the frame's use table: how many,
 // or 0 with the refusal in statusOut.
 static uint32_t MakeUses(const mrhiDevice* device, const mrhiPassDef* def, mrhiResult* statusOut)
@@ -487,10 +515,9 @@ static uint32_t MakeUses(const mrhiDevice* device, const mrhiPassDef* def, mrhiR
         *statusOut = mrhi_errorInvalid;
     }
     TargetShape shape = {0};
-    for (uint32_t i = 0; i < def->colorTargetCount && *statusOut == mrhi_success; ++i)
+    if (*statusOut == mrhi_success)
     {
-        count += UsesOfColor(device, &def->colorTargets[i], ViewsOf(def), &shape, &uses[count],
-                             statusOut);
+        count += UsesOfColors(device, def, &shape, &uses[count], statusOut);
     }
     if (*statusOut == mrhi_success && def->depthTarget.resource.index1 != 0)
     {
@@ -609,6 +636,10 @@ static void MeasureTargets(const mrhiDevice* device, mrhiFramePass* pass)
     for (uint32_t i = 0; i < pass->colorTargetCount; ++i)
     {
         const mrhiColorTarget* target = &pass->colorTargets[i];
+        if (target->resource.index1 == 0)
+        {
+            continue;
+        }
         const mrhiTextureDef* texture =
             mrhiFrameTextureOf(&device->frameResources[target->resource.index1 - 1]);
         pass->layout.colors[i] = target->viewFormat;
@@ -626,6 +657,18 @@ static void MeasureTargets(const mrhiDevice* device, mrhiFramePass* pass)
         pass->width = texture->width >> depth->mip > 0 ? texture->width >> depth->mip : 1;
         pass->height = texture->height >> depth->mip > 0 ? texture->height >> depth->mip : 1;
     }
+}
+
+// The color targets up to the last one not null: those after it count
+// for nothing, as in WebGPU's render layouts.
+static uint32_t CountTargets(const mrhiPassDef* def)
+{
+    uint32_t count = def->colorTargetCount;
+    while (count > 0 && def->colorTargets[count - 1].resource.index1 == 0)
+    {
+        --count;
+    }
+    return count;
 }
 
 // Copies a def's color targets into its pass, each with the format it
@@ -696,7 +739,7 @@ mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def, mrhiPassId* p
         .native = def->native,
         .firstUse = device->frameUseCount,
         .useCount = count,
-        .colorTargetCount = def->colorTargetCount,
+        .colorTargetCount = CountTargets(def),
         .depthTarget = def->depthTarget,
         .viewCount = ViewsOf(def),
         .occlusionSet = def->occlusionQuerySet.index1,

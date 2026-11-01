@@ -1468,6 +1468,8 @@ typedef struct Scene
     mrhiDevice* device;
     mrhiGraphicsPipelineId draw;
     mrhiGraphicsPipelineId culled;
+    // The triangle's, with a second target of no format.
+    mrhiGraphicsPipelineId padded;
     mrhiComputePipelineId compute;
     mrhiGraphicsPipelineId placed;
     mrhiGraphicsPipelineId tested;
@@ -1783,6 +1785,11 @@ static void MakeScene(Scene* scene)
     draw.frontFace = mrhi_frontClockwise;
     CHECK(mrhiCreateGraphicsPipeline(device, &draw, &scene->culled, &request) == mrhi_success,
           "a culling pipeline");
+    mrhiGraphicsPipelineDef padded = GraphicsDef(shader);
+    padded.colorTargetCount = 2;
+    LABEL(padded, "padded");
+    CHECK(mrhiCreateGraphicsPipeline(device, &padded, &scene->padded, &request) == mrhi_success,
+          "a pipeline with a target of no format");
     mrhiComputePipelineDef compute = mrhiDefaultComputePipelineDef();
     compute.shader = shader;
     compute.entry = "cs";
@@ -1798,7 +1805,7 @@ static void MakeScene(Scene* scene)
     CHECK(mrhiCreateComputePipeline(device, &compute, &scene->adding, &request) == mrhi_success,
           "an adding pipeline");
     MakePlaced(scene, shader);
-    AwaitPipelines(device, 6, 0);
+    AwaitPipelines(device, 7, 0);
     CHECK(mrhiDestroyShader(device, shader) == mrhi_success, "the shader destroyed");
     mrhiBufferDef uniform = mrhiDefaultBufferDef();
     uniform.size = 16;
@@ -2638,6 +2645,76 @@ static void DrawWith(const Scene* scene, mrhiPassId pass, mrhiGraphicsPipelineId
           "a pipeline set");
     BindScene(scene, pass);
     CHECK(mrhiPass_Draw(scene->device, pass, 3, 1, firstVertex, 0) == mrhi_success, "drawn");
+}
+
+// Null color targets: a pass clearing only its second location, and the
+// triangle drawn into targets [t, null] by a pipeline of one target, then
+// into [t] by one of [rgba8, none]. A null location at the end counts
+// for nothing, as in WebGPU's layouts.
+static void CheckNullTargets(Scene* scene)
+{
+    mrhiDevice* device = scene->device;
+    for (int padded = 0; padded < 2; ++padded)
+    {
+        BeginScene(scene);
+        mrhiTextureDef secondDef = mrhiDefaultTextureDef();
+        secondDef.format = mrhi_formatRgba8Unorm;
+        secondDef.width = 4;
+        secondDef.height = 4;
+        mrhiResourceId second = {0};
+        CHECK(mrhiDeclareTexture(device, &secondDef, &second) == mrhi_success, "a second target");
+        mrhiPassDef clearDef = mrhiDefaultPassDef();
+        clearDef.colorTargets[1] = (mrhiColorTarget){
+            .resource = second,
+            .load = mrhi_loadClear,
+            .store = mrhi_storeKeep,
+            .clear = {0.2f, 0.4f, 0.6f, 0.8f},
+        };
+        clearDef.colorTargetCount = 2;
+        mrhiPassId clear = {0};
+        CHECK(mrhiAddPass(device, &clearDef, &clear) == mrhi_success, "a pass with a hole first");
+        mrhiAccess draws[3] = {Whole(scene->u, mrhi_accessUniform),
+                               Whole(scene->d, mrhi_accessStorageReadWrite),
+                               Whole(scene->w, mrhi_accessSampled)};
+        mrhiPassDef drawDef = DrawDef(scene, draws);
+        drawDef.colorTargetCount = padded ? 1 : 2;
+        mrhiPassId draw = {0};
+        CHECK(mrhiAddPass(device, &drawDef, &draw) == mrhi_success, "a drawing pass");
+        mrhiAccess reads[2] = {Whole(scene->t, mrhi_accessCopySource),
+                               Whole(second, mrhi_accessCopySource)};
+        mrhiPassId read = CopyPass(device, reads, 2);
+        CHECK(mrhiDevice_CompileFrame(device) == mrhi_success &&
+                  mrhiPass_Begin(device, clear) == mrhi_success &&
+                  mrhiPass_End(device, clear) == mrhi_success &&
+                  mrhiPass_Begin(device, draw) == mrhi_success,
+              "cleared");
+        DrawWith(scene, draw, padded ? scene->padded : scene->draw, 2);
+        CHECK(mrhiPass_End(device, draw) == mrhi_success &&
+                  mrhiPass_Begin(device, read) == mrhi_success,
+              "drawn");
+        mrhiRequestId pixels = ReadTarget(scene, read);
+        mrhiRequestId texels = {0};
+        CHECK(mrhiPass_ReadTexture(device, read, &(mrhiTextureCopy){.resource = second},
+                                   &(mrhiExtent3d){4, 4, 1}, &texels) == mrhi_success &&
+                  mrhiPass_End(device, read) == mrhi_success,
+              "read");
+        Finish(device, 2);
+        uint8_t image[256];
+        uint8_t cleared[64];
+        size_t size = 0;
+        CHECK(mrhiRequest_TakeReadback(device, pixels, image, sizeof(image), &size) ==
+                      mrhi_success &&
+                  size == sizeof(image) &&
+                  mrhiRequest_TakeReadback(device, texels, cleared, sizeof(cleared), &size) ==
+                      mrhi_success &&
+                  size == sizeof(cleared),
+              "the pixels");
+        CHECK(!s_runs || (IsColor(&image[4]) && IsBlack(&image[(7 * 8 + 6) * 4])),
+              padded ? "drawn into [t] by [rgba8, none]" : "drawn into [t, null]");
+        static const uint8_t kCleared[4] = {51, 102, 153, 204};
+        CHECK(!s_runs || (IsNear(&cleared[0], kCleared) && IsNear(&cleared[60], kCleared)),
+              "the second location cleared");
+    }
 }
 
 // A frame that writes none of a set's queries resolves them all to 0,
@@ -3696,6 +3773,7 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
     CHECK(mrhiDevice_GetFeatures(device, &features) == mrhi_success, "its features");
     RUN("binding.draws", {
         CheckDrawFrame(&scene, DRAW_DIRECT);
+        CheckNullTargets(&scene);
         CheckSampledTwin(&scene);
         CheckDrawFrame(&scene, DRAW_INDIRECT);
         CheckDrawFrame(&scene, DRAW_INDEXED_INDIRECT);

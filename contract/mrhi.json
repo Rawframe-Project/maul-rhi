@@ -13164,7 +13164,7 @@
             {
               "name": "resource",
               "type": "id.resource_id",
-              "doc": "A texture of the open frame whose format renders."
+              "doc": "A texture of the open frame whose format renders, or null to leave this location without a target, as WebGPU's null color attachment does."
             },
             {
               "name": "mip",
@@ -13194,7 +13194,7 @@
             {
               "name": "resolve",
               "type": "id.resource_id",
-              "doc": "A single-sampled texture of the same format and size the samples resolve to, or a null id."
+              "doc": "A single-sampled texture of the same format and size the samples resolve to, or a null id, which a target with a null resource needs."
             },
             {
               "name": "resolve_mip",
@@ -13358,7 +13358,7 @@
               "name": "color_targets",
               "type": "struct.color_target",
               "array": "max_color_targets",
-              "doc": "Its color targets, colorTargetCount of them."
+              "doc": "Its color targets, colorTargetCount of them. A pass with targets has at least one whose resource is not null, or a depth target."
             },
             {
               "name": "color_target_count",
@@ -14133,7 +14133,7 @@
               "name": "color_stores",
               "type": "enum.store_op",
               "array": "max_color_targets",
-              "doc": "What each color target keeps: its own store, made a discard when nothing later reads it and it is not imported."
+              "doc": "What each color target keeps: its own store, made a discard when nothing later reads it and it is not imported; a discard for a location without a target."
             },
             {
               "name": "depth_store",
@@ -22716,5 +22716,5 @@
       ]
     }
   ],
-  "contract_version": 27
+  "contract_version": 28
 }

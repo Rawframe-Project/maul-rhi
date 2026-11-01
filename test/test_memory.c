@@ -352,6 +352,30 @@ static void TestStores(mrhiTextureId windowTexture)
     CHECK(plan.stencilStore == mrhi_storeDiscard, "stencil never read");
     CHECK(!PassPlan(culled).kept, "a culled pass");
     Drop();
+    // Locations without a target store nothing, and the targets after
+    // them keep their own stores.
+    Begin();
+    read = Declare(mrhi_formatRgba8Unorm, 1);
+    unread = Declare(mrhi_formatRgba8Unorm, 1);
+    def = mrhiDefaultPassDef();
+    def.colorTargets[1] = (mrhiColorTarget){.resource = read, .load = mrhi_loadClear};
+    def.colorTargets[3] = (mrhiColorTarget){.resource = unread, .load = mrhi_loadClear};
+    def.colorTargetCount = 5;
+    first = AddPass(def);
+    later = mrhiDefaultPassDef();
+    later.accesses = reads;
+    later.accessCount = 1;
+    later.neverCull = true;
+    reads[0] = Access(read, mrhi_accessSampled);
+    AddPass(later);
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled with null targets");
+    plan = PassPlan(first);
+    CHECK(plan.colorStores[0] == mrhi_storeDiscard && plan.colorStores[2] == mrhi_storeDiscard &&
+              plan.colorStores[4] == mrhi_storeDiscard,
+          "nothing stored where there is no target");
+    CHECK(plan.colorStores[1] == mrhi_storeKeep, "after a null target, read later, kept");
+    CHECK(plan.colorStores[3] == mrhi_storeDiscard, "after two, never read, discarded");
+    Drop();
     Begin();
     mrhiResourceId kept = Declare(mrhi_formatRgba8Unorm, 1);
     mrhiResourceId overwritten = Declare(mrhi_formatRgba8Unorm, 1);

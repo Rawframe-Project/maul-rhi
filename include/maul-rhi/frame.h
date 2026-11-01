@@ -447,7 +447,9 @@ extern "C"
     // A texture a pass renders colors to.
     typedef struct mrhiColorTarget
     {
-        // A texture of the open frame whose format renders.
+        // A texture of the open frame whose format renders, or null to leave
+        // this location without a target, as WebGPU's null color attachment
+        // does.
         mrhiResourceId resource;
         // The mip it renders to.
         uint32_t mip;
@@ -462,7 +464,7 @@ extern "C"
         // WebGPU converts a clearValue.
         mrhiColor clear;
         // A single-sampled texture of the same format and size the samples
-        // resolve to, or a null id.
+        // resolve to, or a null id, which a target with a null resource needs.
         mrhiResourceId resolve;
         // The resolve texture's mip.
         uint32_t resolveMip;
@@ -537,7 +539,8 @@ extern "C"
         const mrhiAccess* accesses;
         // How many.
         uint32_t accessCount;
-        // Its color targets, colorTargetCount of them.
+        // Its color targets, colorTargetCount of them. A pass with targets has
+        // at least one whose resource is not null, or a depth target.
         mrhiColorTarget colorTargets[MRHI_MAX_COLOR_TARGETS];
         // How many, at most MRHI_MAX_COLOR_TARGETS.
         uint32_t colorTargetCount;
@@ -777,7 +780,8 @@ extern "C"
         // Whether it runs; a culled pass is never recorded.
         bool kept;
         // What each color target keeps: its own store, made a discard when
-        // nothing later reads it and it is not imported.
+        // nothing later reads it and it is not imported; a discard for a
+        // location without a target.
         mrhiStoreOp colorStores[MRHI_MAX_COLOR_TARGETS];
         // What the depth target's depth keeps, likewise.
         mrhiStoreOp depthStore;

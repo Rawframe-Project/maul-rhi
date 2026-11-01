@@ -20,7 +20,7 @@
 // The SPI version a driver's vtable must carry. Any change to the SPI
 // headers or to a public type they reach, or to what a driver must do or
 // may assume, raises it; 4 is the first installed.
-#define MRHI_SPI_VERSION 13
+#define MRHI_SPI_VERSION 14
 // What a driver sees at this version, as tools/check_spi_version.py
 // digests it; --write records it.
 // SPI digest: d539bc7b52b048c6403274eee7b065f9fe223c8e0c46bf54859f253ac7239243
@@ -74,7 +74,10 @@ typedef struct mrhiDriverComputePipeline
 
 // A graphics pipeline the core has checked, as its driver makes it: its
 // shader's driver handle and reflection, its entry points there (the
-// fragment entry entryCount for none), and its def.
+// fragment entry entryCount for none), and its def, whose last color
+// target, if any, has a format: the core leaves out trailing ones without,
+// as it does a pass's trailing null targets, so that the counts of a
+// pipeline and a pass it may draw in agree.
 typedef struct mrhiDriverGraphicsPipeline
 {
     uint64_t shader;
@@ -130,8 +133,9 @@ typedef struct mrhiDriverAccess
 
 // A kept pass of a submitted frame: its id, which its barriers name; its
 // class and label (labelLength bytes of UTF-8 without NUL); its targets,
-// naming frame resources by slot plus one, with the stores the compile
-// derived; its render area; its occlusion query set's handle (0 for
+// naming frame resources by slot plus one, a color target 0 for a
+// location without one (WebGPU's null attachment) but never the last,
+// with the stores the compile derived; its render area; its occlusion query set's handle (0 for
 // none); its timestamp query set's handle and the queries written at
 // its start and end (MRHI_NO_QUERY for none); its heap's handle (0 for
 // none); the resources it declares, which a heap may reach unbound; its
