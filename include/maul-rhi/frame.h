@@ -601,12 +601,15 @@ extern "C"
     /// MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for a resource of another frame,
     /// an imported object destroyed since, or a query set or heap the device no
     /// longer has; `mrhi_errorUnsupported` for a critical extension the library
-    /// does not know, or views past one without the multiview feature or past
-    /// the adapter's limit; `mrhi_errorState` for a device without an open
-    /// frame, or a frame already compiled; `mrhi_errorCapacity` for views past
-    /// the device's limit within the adapter's, or when the device's
-    /// framePasses or frameAccesses budget is reached; `mrhi_errorBusy` for a
-    /// call from inside the device's allocator.
+    /// does not know, views past one without the multiview feature or past the
+    /// adapter's limit, or color targets whose bytes per sample (WebGPU's sum
+    /// of each format's render target bytes, each from a multiple of its
+    /// component alignment) pass the adapter's limit; `mrhi_errorState` for a
+    /// device without an open frame, or a frame already compiled;
+    /// `mrhi_errorCapacity` for views or color target bytes per sample past the
+    /// device's limit within the adapter's, or when the device's framePasses or
+    /// frameAccesses budget is reached; `mrhi_errorBusy` for a call from inside
+    /// the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiAddPass(mrhiDevice* device, const mrhiPassDef* def,
