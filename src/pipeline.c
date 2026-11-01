@@ -19,21 +19,23 @@ mrhiComputePipelineDef mrhiDefaultComputePipelineDef(void)
     return def;
 }
 
-// Whether a value converts to a constant's type exactly: a boolean 0 or
-// 1, an integer in its type's range, or a finite float within 32-bit
-// range. NaN fails every comparison.
+// Whether a value converts to a constant's type as WebGPU converts a
+// double: a boolean from any finite value, true when not 0; an integer
+// truncated toward zero into its type's range; a float that rounds to a
+// finite 32-bit one, short of the midpoint between FLT_MAX and 2^128.
+// NaN fails every comparison.
 static bool IsValueValid(mrhiConstantType type, double value)
 {
     switch (type)
     {
     case mrhi_constantBool:
-        return value == 0.0 || value == 1.0;
+        return value >= -DBL_MAX && value <= DBL_MAX;
     case mrhi_constantInt32:
-        return value >= -2147483648.0 && value <= 2147483647.0 && (double)(int32_t)value == value;
+        return value > -2147483649.0 && value < 2147483648.0;
     case mrhi_constantUint32:
-        return value >= 0.0 && value <= 4294967295.0 && (double)(uint32_t)value == value;
+        return value > -1.0 && value < 4294967296.0;
     case mrhi_constantFloat32:
-        return value >= -(double)FLT_MAX && value <= (double)FLT_MAX;
+        return value > -0x1.ffffffp127 && value < 0x1.ffffffp127;
     default:
         return false;
     }

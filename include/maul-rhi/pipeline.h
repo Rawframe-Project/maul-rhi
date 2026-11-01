@@ -116,9 +116,11 @@ extern "C"
         mrhi_vertexUnorm8x4Bgra = 41,
     };
 
-    // A value for a specialization constant, converted to the constant's type:
-    // a boolean 0 or 1, an integer within its type's range, or a finite float
-    // within 32-bit range.
+    // A value for a specialization constant, converted to the constant's type
+    // as WebGPU converts it: a boolean is true when not 0, an integer is
+    // truncated toward zero and must then be within its type's range, and a
+    // float is rounded to the nearest 32-bit float, which must be finite. NaN
+    // and infinities are refused.
     typedef struct mrhiConstantValue
     {
         // The constant's id in the container.

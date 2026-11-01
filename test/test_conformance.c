@@ -1795,7 +1795,8 @@ static void MakeScene(Scene* scene)
     compute.entry = "cs";
     compute.entryLength = 2;
     LABEL(compute, "scale");
-    const mrhiConstantValue scale = {.id = 0, .value = 3.0};
+    // A fraction for the unsigned scale, which every driver truncates to 3.
+    const mrhiConstantValue scale = {.id = 0, .value = 3.75};
     compute.constants = &scale;
     compute.constantCount = 1;
     CHECK(mrhiCreateComputePipeline(device, &compute, &scene->compute, &request) == mrhi_success,

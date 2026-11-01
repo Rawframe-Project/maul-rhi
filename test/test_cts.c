@@ -1020,6 +1020,11 @@ static void TestLayouts(void)
     }
 }
 
+// compute_pipeline:overrides,value,type_error and
+// overrides,value,validation_error, and render_pipeline's cases of each
+// stage, need a shader with constants of every type, which only a suite
+// that builds containers in memory makes: they are in test_pipeline.c.
+
 // The CTS's no-op pipelines and what its draw cases bind: a render
 // target and a 16-byte index buffer.
 static mrhiGraphicsPipelineId s_graphics;
