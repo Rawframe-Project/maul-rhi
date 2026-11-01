@@ -5,6 +5,45 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.16.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.15.1...v0.16.0) (2026-11-01)
+
+### Changed
+
+- **Breaking:** `mrhiAddPass` refuses the clear values WebGPU refuses:
+  a cleared color target whose clear value has a NaN or infinite
+  component, or, for `r32uint` and `r32sint`, a component whose
+  integer part the 32-bit type cannot hold; and a cleared depth target
+  whose `clearDepth` is outside 0 to 1, or NaN. All four color
+  components are checked, as the driver converts all four, and
+  fractions are dropped as WebGPU drops them. Each refusal is misuse
+  counted as `mrhi_diagnosticPassUses`, and a target that is loaded or
+  discarded takes any value. Before, the Vulkan driver converted an
+  integer target's components with C casts, which are undefined for
+  such values. Programs see the refusals, and drivers never receive
+  such a value.
+  ([#336](https://github.com/Rawframe-Project/maul-rhi/pull/336))
+
+### Fixed
+
+- `mrhiDevice_CompileFrame` no longer refuses a frame within
+  `frameAccesses` whose uses cut a texture into a grid, such as one
+  whose mips are used one at a time and then its layers. It returned
+  `mrhi_errorCapacity` naming `mrhi_diagnosticFrameAccesses`. The
+  planner's room now holds the most parts a resource's uses can cut it
+  into, and the default device's room shrinks from 16400 boxes to
+  14336.
+  ([#322](https://github.com/Rawframe-Project/maul-rhi/pull/322))
+- The Vulkan driver refuses a swapchain image index past the
+  swapchain's images from `vkAcquireNextImageKHR` as
+  `mrhi_errorDeviceLost`, and a memory requirement of no bytes or with
+  an alignment of 0 or not a power of two as `mrhi_errorPlatform`. A
+  release build wrote past an array or handed out overlapping memory.
+  ([#317](https://github.com/Rawframe-Project/maul-rhi/pull/317))
+- The D3D12 driver refuses a back buffer index past the swapchain's
+  buffers as `mrhi_errorDeviceLost`, where a release build read past
+  its images.
+  ([#319](https://github.com/Rawframe-Project/maul-rhi/pull/319))
+
 ## [0.15.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.15.0...v0.15.1) (2026-10-31)
 
 ### Fixed
