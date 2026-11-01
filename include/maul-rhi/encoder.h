@@ -530,7 +530,8 @@ extern "C"
     /// written in this frame, or a query already open in the pass;
     /// `mrhi_errorStale` for a pass of another frame or a destroyed query set;
     /// `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity`
-    /// when the frame's commands are full.
+    /// when the frame's commands are full, which still opens the query, so that
+    /// the pass ends only after its end.
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiPass_BeginOcclusionQuery(mrhiDevice* device,
@@ -565,7 +566,8 @@ extern "C"
     /// in this frame, or a statistics query already open in the pass;
     /// `mrhi_errorStale` for a pass of another frame or a destroyed query set;
     /// `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity`
-    /// when the frame's commands are full.
+    /// when the frame's commands are full, which still opens the query, so that
+    /// the pass ends only after its end.
     /// @par Thread safety
     /// Safe from any thread; the pass is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiPass_BeginStatisticsQuery(mrhiDevice* device,
