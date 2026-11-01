@@ -325,6 +325,7 @@ void mrhiD3d12SetRootBlock(mrhiD3d12Recorder* recorder, const mrhiCommand* comma
 {
     // Kept whole; set as far as the pipeline reads, the rest with the
     // next pipeline that reads it.
+    MRHI_ASSERT(command->a + command->b <= MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES);
     uint32_t first = (uint32_t)(command->a / sizeof(uint32_t));
     uint32_t end = first + (uint32_t)(command->b / sizeof(uint32_t));
     memcpy(recorder->root + command->a, &command[1], (size_t)command->b);

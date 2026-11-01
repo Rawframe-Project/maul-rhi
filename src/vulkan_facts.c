@@ -214,7 +214,10 @@ mrhiLimits mrhiVulkanLimitsOf(const mrhiVulkanFacts* facts)
         .workgroupsPerDimension = Smaller(
             Smaller(limits->maxComputeWorkGroupCount[0], limits->maxComputeWorkGroupCount[1]),
             limits->maxComputeWorkGroupCount[2]),
-        .rootBlockBytes = limits->maxPushConstantsSize,
+        // No container's root block passes 256 bytes, which a recording
+        // keeps for each pass.
+        .rootBlockBytes =
+            Smaller(limits->maxPushConstantsSize, MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES),
         .framesInFlight = VULKAN_FRAMES_IN_FLIGHT,
         .heapSize = HeapSize(facts),
         .samplerHeapSize = SamplerHeapSize(facts),

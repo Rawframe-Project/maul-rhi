@@ -521,6 +521,7 @@ static void SetState(mrhiVulkanRecording* recording, const mrhiCommand* command)
     {
         // Kept whole; pushed as far as the pipeline set reads, the rest
         // with the next pipeline that reads it.
+        MRHI_ASSERT(command->a + command->b <= MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES);
         uint32_t offset = (uint32_t)command->a;
         uint32_t end = offset + (uint32_t)command->b;
         memcpy(recording->root + offset, &command[1], (size_t)command->b);

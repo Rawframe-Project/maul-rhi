@@ -221,6 +221,12 @@ static void TestLimits(void)
           "a heap under the reserve is 0, and fewer views kept");
     facts.features11.multiview = VK_FALSE;
     CHECK(mrhiVulkanLimitsOf(&facts).multiviewViews == 1, "one view without multiview");
+    // The root block, within what a container's can be.
+    facts.properties.properties.limits.maxPushConstantsSize = 4096;
+    CHECK(mrhiVulkanLimitsOf(&facts).rootBlockBytes == MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES,
+          "push constants past a container's root block");
+    facts.properties.properties.limits.maxPushConstantsSize = 128;
+    CHECK(mrhiVulkanLimitsOf(&facts).rootBlockBytes == 128, "fewer push constants kept");
 }
 
 int main(void)
