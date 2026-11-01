@@ -7,22 +7,79 @@ may change the API, the ABI and every data format.
 
 ## [0.18.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.17.0...v0.18.0) (2026-11-01)
 
+### Changed
 
-### ⚠ BREAKING CHANGES
+- **Breaking:** `mrhiAddPass` refuses a pass whose color targets' bytes
+  per sample pass the device's `colorBytesPerSample` limit, as WebGPU's
+  `beginRenderPass` does. Before, the core applied the limit to a
+  pipeline's targets but not to a pass, so eight `rgba8unorm` targets,
+  64 bytes, were accepted at the default limit of 32.
+  - The sum is WebGPU's: the render target bytes of each target's view
+    format, each from a multiple of its component alignment, in the
+    targets' order, skipping null targets.
+  - Past the device's limit within the adapter's is
+    `mrhi_errorCapacity`, past the adapter's `mrhi_errorUnsupported`,
+    both naming `mrhi_diagnosticLimitColorBytesPerSample` as a pipeline
+    past it does.
 
-* **shader:** containers with such storage textures, which were accepted, are refused. MRHI_SPI_VERSION is 15: a driver may assume a read and written storage texture is one of the three formats, and that the device stores every storage texture's format.
-* **pipeline:** values that were refused with mrhi_errorFormat are accepted. MRHI_SPI_VERSION is 15: a driver may be handed an integer constant with a fraction, which it truncates, and a boolean other than 0 or 1, which is true.
-* **graph:** mrhiAddPass refuses a resolve of r32float, rg32float, rgba32float, r32uint or r32sint, and a resolve into a 3D texture, as WebGPU's beginRenderPass does.
-* **graph:** mrhiAddPass refuses a transient texture as a target that loads or stores (its stencil too) and as a resolve target, as WebGPU's beginRenderPass does.
-* **graph:** mrhiAddPass refuses a pass whose color targets' bytes per sample pass the device's colorBytesPerSample limit, as WebGPU's beginRenderPass does.
+  ([#353](https://github.com/Rawframe-Project/maul-rhi/pull/353))
+- **Breaking:** `mrhiAddPass` refuses a transient texture
+  (`mrhi_textureTransient`) where WebGPU's `beginRenderPass` does, with
+  `mrhi_errorInvalid` counted as `mrhi_diagnosticPassUses`:
+  - as a color target, unless it loads `mrhi_loadClear` and stores
+    `mrhi_storeDiscard`;
+  - as a depth target, unless its depth does both, and its stencil too
+    if the format has one;
+  - as a resolve target.
 
-### Fixed
+  A transient texture's contents live only in its pass, so nothing can
+  be loaded from it or kept in it.
+  ([#355](https://github.com/Rawframe-Project/maul-rhi/pull/355))
+- **Breaking:** `mrhiAddPass` refuses two resolves that WebGPU's
+  `beginRenderPass` refuses, with `mrhi_errorInvalid` counted as
+  `mrhi_diagnosticPassUses`:
+  - a resolve of a format WebGPU does not resolve: `r32float`,
+    `rg32float`, `rgba32float`, `r32uint` and `r32sint`;
+  - a resolve into a 3D texture's slice.
 
-* **graph:** refuse color targets past colorBytesPerSample ([#353](https://github.com/Rawframe-Project/maul-rhi/issues/353)) ([35a7baf](https://github.com/Rawframe-Project/maul-rhi/commit/35a7baf7e1759e689daa9cca649c833ead93a05b)), closes [#352](https://github.com/Rawframe-Project/maul-rhi/issues/352)
-* **graph:** refuse transient targets that keep or take a resolve ([#355](https://github.com/Rawframe-Project/maul-rhi/issues/355)) ([3f4308e](https://github.com/Rawframe-Project/maul-rhi/commit/3f4308e1530d36ddcfdfac608282e431eea25f09)), closes [#354](https://github.com/Rawframe-Project/maul-rhi/issues/354)
-* **graph:** resolve only formats WebGPU resolves, never into 3D ([#358](https://github.com/Rawframe-Project/maul-rhi/issues/358)) ([89af624](https://github.com/Rawframe-Project/maul-rhi/commit/89af62474f0e716abc5e6b213040ab9c79e00aba)), closes [#356](https://github.com/Rawframe-Project/maul-rhi/issues/356) [#357](https://github.com/Rawframe-Project/maul-rhi/issues/357)
-* **pipeline:** convert constant values as WebGPU does ([#361](https://github.com/Rawframe-Project/maul-rhi/issues/361)) ([84014d4](https://github.com/Rawframe-Project/maul-rhi/commit/84014d470a1c31a574220df947ad07af33b10eae)), closes [#360](https://github.com/Rawframe-Project/maul-rhi/issues/360)
-* **shader:** refuse storage textures WebGPU does not store ([#363](https://github.com/Rawframe-Project/maul-rhi/issues/363)) ([98500be](https://github.com/Rawframe-Project/maul-rhi/commit/98500be1bc116887da3ad8dd0da413882fbe7e7a)), closes [#362](https://github.com/Rawframe-Project/maul-rhi/issues/362)
+  A multisampled target of such a format, without a resolve, stays
+  allowed where the adapter reports it, and a 3D slice stays a valid
+  target. Before, on an adapter that multisamples `r32uint` or
+  `r32sint`, as lavapipe does, the Vulkan driver's resolve broke
+  `VUID-VkRenderingAttachmentInfo-imageView-06130`.
+  ([#358](https://github.com/Rawframe-Project/maul-rhi/pull/358))
+- **Breaking:** a pipeline's constant values convert to their
+  constants' types as WebGPU converts them. Before,
+  `mrhiCreateComputePipeline` and `mrhiCreateGraphicsPipeline` refused
+  each of these with `mrhi_errorFormat`:
+  - a boolean other than 0 or 1; any finite value is now taken, true
+    when it is not 0;
+  - an integer with a fraction, which is now truncated toward zero and
+    must then fit its type;
+  - a float just above `FLT_MAX` that rounds to it.
+
+  NaN and infinities are still refused.
+
+  Drivers built outside the tree must be rebuilt for
+  `MRHI_SPI_VERSION` 15, whose mustpass list is
+  `conformance/mustpass/spi-15.txt`. A driver may now be handed an
+  integer constant with a fraction, which it must truncate, and a
+  boolean other than 0 or 1, which is true.
+  ([#361](https://github.com/Rawframe-Project/maul-rhi/pull/361))
+- **Breaking:** `mrhiCreateShader` refuses storage textures that
+  WebGPU's layout refuses:
+  - one read and written (`mrhi_storageReadWrite`) in a format other
+    than `r32float`, `r32uint` or `r32sint`, as `mrhi_errorFormat`;
+  - one of a format the device does not store
+    (`mrhiFormatCaps.storage`), such as an sRGB or depth format, as
+    `mrhi_errorUnsupported`.
+
+  `tools/mrhi_container.py` does not check the first rule yet
+  ([#365](https://github.com/Rawframe-Project/maul-rhi/issues/365)).
+  Until it does, the library refuses such a container when the shader
+  is made. A driver built outside the tree may assume both rules, also
+  from `MRHI_SPI_VERSION` 15.
+  ([#363](https://github.com/Rawframe-Project/maul-rhi/pull/363))
 
 ## [0.17.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.16.0...v0.17.0) (2026-11-01)
 
