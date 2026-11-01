@@ -135,6 +135,31 @@ static void Flush(const mrhiVulkanRecording* recording, Batch* batch)
     batch->bufferCount = 0;
 }
 
+// Ends a frame that copied into the readback ring with its copies' writes
+// made visible to the host, which a wait for the frame's timeline value
+// alone does not do, and ordered before every later copy, which may reuse
+// the ring's bytes in a frame that waits for nothing of this one.
+static void ReleaseReadbacks(const mrhiVulkanRecording* recording)
+{
+    if (recording->slot->readbackCount == 0)
+    {
+        return;
+    }
+    const VkMemoryBarrier2 barrier = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT,
+        .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT | VK_PIPELINE_STAGE_2_COPY_BIT,
+        .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT,
+    };
+    const VkDependencyInfo dependency = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .memoryBarrierCount = 1,
+        .pMemoryBarriers = &barrier,
+    };
+    recording->frames->api->vkCmdPipelineBarrier2(recording->slot->commands, &dependency);
+}
+
 static bool IsTexture(const mrhiDriverFrame* frame, uint32_t index1)
 {
     MRHI_ASSERT(index1 != 0 && index1 <= frame->resourceCount);
@@ -765,6 +790,7 @@ mrhiResult mrhiVulkanRecord(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot,
     if (recording.status == mrhi_success && recording.result == VK_SUCCESS)
     {
         Barriers(&recording, &barrier, (mrhiPassId){0});
+        ReleaseReadbacks(&recording);
         mrhiVulkanCloseLanes(&recording);
         // The barriers run in pass order, so a recorded frame took them all.
         MRHI_ASSERT(barrier == frame->barrierCount);

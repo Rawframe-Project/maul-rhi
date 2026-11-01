@@ -11,6 +11,10 @@
 // coherent, and buffers may take it: the readback ring takes it, and
 // each readback's bytes are invalidated before they are read, in ranges
 // of whole atoms or to the end of the memory, with an atom of 256 bytes.
+// A frame that copies into the ring records, after its copies and
+// before it is submitted, a barrier making them visible to the host, and
+// a frame that reuses the ring's bytes is ordered after the one that
+// wrote them.
 // Skipped where there is no Vulkan 1.3 adapter, unless
 // MAUL_RHI_REQUIRE_VULKAN is set.
 
@@ -51,6 +55,9 @@ static PFN_vkFreeMemory s_free;
 static PFN_vkBindImageMemory s_bindImage;
 static PFN_vkBindBufferMemory s_bindBuffer;
 static PFN_vkCmdCopyBuffer s_copyBuffer;
+static PFN_vkCmdCopyImageToBuffer s_copyImage;
+static PFN_vkCmdPipelineBarrier2 s_barrier;
+static PFN_vkQueueSubmit2 s_submit;
 static PFN_vkInvalidateMappedMemoryRanges s_invalidate;
 
 // The added types' indices, and the adapter's types that back them.
@@ -129,6 +136,11 @@ static struct
     bool invalidated;
 } s_copies[COPIES];
 static uint32_t s_copyCount;
+// Whether a copy into the readback ring was recorded since the last
+// barrier making transfer writes visible to the host, in whichever command
+// buffer, and the submissions made so.
+static bool s_unreleased;
+static uint32_t s_submittedUnreleased;
 // Invalidated ranges: to the end of the memory, of whole atoms, and
 // breaking the rules for either, or of other memory.
 static uint32_t s_wholeRanges;
@@ -313,7 +325,57 @@ static VKAPI_ATTR void VKAPI_CALL CopyBuffer(VkCommandBuffer commands, VkBuffer 
             s_copies[s_copyCount++].invalidated = false;
         }
     }
+    s_unreleased = s_unreleased || ValueOf(&destination) == s_readback;
     s_copyBuffer(commands, source, destination, count, regions);
+}
+
+static VKAPI_ATTR void VKAPI_CALL CopyImage(VkCommandBuffer commands, VkImage source,
+                                            VkImageLayout layout, VkBuffer destination,
+                                            uint32_t count, const VkBufferImageCopy* regions)
+{
+    s_unreleased = s_unreleased || ValueOf(&destination) == s_readback;
+    s_copyImage(commands, source, layout, destination, count, regions);
+}
+
+// Whether a barrier's scopes take transfer writes to host reads.
+static bool ToHost(VkPipelineStageFlags2 srcStages, VkAccessFlags2 srcAccess,
+                   VkPipelineStageFlags2 dstStages, VkAccessFlags2 dstAccess)
+{
+    const VkPipelineStageFlags2 copies = VK_PIPELINE_STAGE_2_COPY_BIT |
+                                         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT |
+                                         VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    const VkAccessFlags2 writes = VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+    const VkAccessFlags2 reads = VK_ACCESS_2_HOST_READ_BIT | VK_ACCESS_2_MEMORY_READ_BIT;
+    return (srcStages & copies) != 0 && (srcAccess & writes) != 0 &&
+           (dstStages & VK_PIPELINE_STAGE_2_HOST_BIT) != 0 && (dstAccess & reads) != 0;
+}
+
+static VKAPI_ATTR void VKAPI_CALL Barrier(VkCommandBuffer commands,
+                                          const VkDependencyInfo* dependency)
+{
+    bool released = false;
+    for (uint32_t i = 0; i < dependency->memoryBarrierCount; ++i)
+    {
+        const VkMemoryBarrier2* barrier = &dependency->pMemoryBarriers[i];
+        released = released || ToHost(barrier->srcStageMask, barrier->srcAccessMask,
+                                      barrier->dstStageMask, barrier->dstAccessMask);
+    }
+    for (uint32_t i = 0; i < dependency->bufferMemoryBarrierCount; ++i)
+    {
+        const VkBufferMemoryBarrier2* barrier = &dependency->pBufferMemoryBarriers[i];
+        released = released || (ValueOf(&barrier->buffer) == s_readback &&
+                                ToHost(barrier->srcStageMask, barrier->srcAccessMask,
+                                       barrier->dstStageMask, barrier->dstAccessMask));
+    }
+    s_unreleased = s_unreleased && !released;
+    s_barrier(commands, dependency);
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL Submit(VkQueue queue, uint32_t count,
+                                             const VkSubmitInfo2* submits, VkFence fence)
+{
+    s_submittedUnreleased += s_unreleased ? 1 : 0;
+    return s_submit(queue, count, submits, fence);
 }
 
 static VKAPI_ATTR VkResult VKAPI_CALL Invalidate(VkDevice device, uint32_t count,
@@ -368,6 +430,10 @@ static PFN_vkVoidFunction Wrap(const char* name, PFN_vkVoidFunction own)
         {"vkBindImageMemory", (PFN_vkVoidFunction*)&s_bindImage, (PFN_vkVoidFunction)BindImage},
         {"vkBindBufferMemory", (PFN_vkVoidFunction*)&s_bindBuffer, (PFN_vkVoidFunction)BindBuffer},
         {"vkCmdCopyBuffer", (PFN_vkVoidFunction*)&s_copyBuffer, (PFN_vkVoidFunction)CopyBuffer},
+        {"vkCmdCopyImageToBuffer", (PFN_vkVoidFunction*)&s_copyImage,
+         (PFN_vkVoidFunction)CopyImage},
+        {"vkCmdPipelineBarrier2", (PFN_vkVoidFunction*)&s_barrier, (PFN_vkVoidFunction)Barrier},
+        {"vkQueueSubmit2", (PFN_vkVoidFunction*)&s_submit, (PFN_vkVoidFunction)Submit},
         {"vkInvalidateMappedMemoryRanges", (PFN_vkVoidFunction*)&s_invalidate,
          (PFN_vkVoidFunction)Invalidate},
     };
@@ -610,14 +676,20 @@ static void ReadBack(mrhiDevice* device, const uint64_t* sizes, uint32_t count)
 
 // One frame's reads on a fresh ring, which places each at a multiple of
 // 512 bytes: two of 100 and 4 bytes, ending inside an atom, and one of
-// 1024 that ends at the ring's end. The ring takes the cached type, and
-// each read is invalidated, in whole atoms or to the memory's end.
+// 1024 that ends at the ring's end; then a frame whose read wraps to the
+// ring's start. The ring takes the cached type, and each read is
+// invalidated, in whole atoms or to the memory's end.
 static void CheckNonCoherent(mrhiDevice* device)
 {
     CHECK(s_readback != 0 && s_cachedBytes >= RING,
           "the readback ring in the cached, non-coherent type");
     const uint64_t sizes[3] = {100, 4, RING - 1024};
     ReadBack(device, sizes, 3);
+    // The ring wraps: the next frame's read writes the bytes the first
+    // read of the last frame wrote, which the validation layer checks the
+    // two frames order.
+    const uint64_t again[1] = {100};
+    ReadBack(device, again, 1);
     CHECK(s_atomRanges > 0 && s_wholeRanges > 0,
           "ranges of whole atoms, and one to the end of the memory");
     CHECK(s_badRanges == 0, "every range of the ring's memory, aligned to atoms");
@@ -663,6 +735,9 @@ int main(void)
         CheckNonCoherent(device);
         mrhiDestroyDevice(device);
     }
+    CHECK(s_submittedUnreleased == 0,
+          "each copy into the ring followed by a barrier making its writes visible to the host "
+          "before the frame is submitted");
     mrhiDestroyInstance(instance);
     PFN_vkDestroyInstance destroy =
         (PFN_vkDestroyInstance)s_vulkan.vkGetInstanceProcAddr(made, "vkDestroyInstance");
