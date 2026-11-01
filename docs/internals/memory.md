@@ -14,7 +14,7 @@ Every object a root owns is a slot in a fixed pool (`src/pool.c`): a free list, 
 
 ## A frame's memory
 
-Transient resources are placed in one frame memory by lifetime: first fit, in first-use order, with the sizes and alignments the driver reports for each, so resources whose uses do not overlap share bytes. A transient render target that is written and discarded within its pass needs no memory on tile GPUs, where the driver reports none. A texture listing view formats is never transient, because WebGPU's transient attachments take none. `mrhiFrameUsage.frameMemoryBytes` reports the total; [frame-graph.md](frame-graph.md#aliasing) covers the barriers aliasing needs.
+Transient resources are placed in one frame memory by lifetime: first fit, in first-use order, with the sizes and alignments the driver reports for each, so resources whose uses do not overlap share bytes. A transient render target that is written and discarded within its pass needs no memory on tile GPUs, where the driver reports none. Only a texture of one 2D layer and one mip without view formats is transient, because WebGPU's transient attachments are no other (`mrhiIsTransientShape`). `mrhiFrameUsage.frameMemoryBytes` reports the total; [frame-graph.md](frame-graph.md#aliasing) covers the barriers aliasing needs.
 
 Uploads go into the frame's slot of the staging (`frameUploadBytes` for each frame in flight), each at a 512-byte boundary with texture rows at a 256-byte pitch, the strictest of the four APIs' copy rules, so every driver copies from staging without repacking. Readbacks land in the device's ring at the same alignments. [recording.md](recording.md#uploads-and-readbacks) has the rules.
 

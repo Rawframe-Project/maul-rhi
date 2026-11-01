@@ -392,8 +392,8 @@ extern "C"
         // Shader bytes that are not a well-formed container: its bounds,
         // version, digest or reflection.
         mrhi_diagnosticShaderContainer = 66,
-        // A texture def with a usage that is unknown or that its format, kind
-        // or sample count cannot take.
+        // A texture def with a usage that is unknown or that its format, kind,
+        // mips, view formats or sample count cannot take.
         mrhi_diagnosticTextureUsage = 68,
         // A texture adopting a Vulkan image without an image, or without render
         // target usage.
@@ -488,7 +488,8 @@ extern "C"
         // A texture def names an unknown format.
         mrhi_diagnosticTextureFormat = 96,
         // A texture def's size or layers do not fit its kind and its format's
-        // block, or its mips are more than a full chain.
+        // block, its format cannot be 3D, or its mips are more than a full
+        // chain.
         mrhi_diagnosticTextureSize = 97,
         // A texture def's sample count is not 1, 2 or 4, or several samples are
         // asked for a texture that is not 2D with one mip.
