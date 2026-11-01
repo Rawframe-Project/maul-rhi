@@ -590,14 +590,16 @@ extern "C"
     /// the reads its sealed state allows), targets of different sizes or sample
     /// counts, views past one on a native pass or one without targets, targets
     /// without a layer for each view or of a 3D texture with views past one, a
-    /// resolve that does not match, a subresource written and used otherwise in
-    /// the pass, an access the class does not allow, a declared resource read
-    /// before any pass wrote it, an occlusion query set that is not one or is
-    /// named by a pass without targets, or timestamps of a set that is not a
-    /// timestamp set, without a set, with neither query, with both the same, or
-    /// with a query past the set's count or already written in this frame;
-    /// `mrhi_errorLimit` for more than MRHI_MAX_COLOR_TARGETS color targets, a
-    /// native pass past MRHI_MAX_NATIVE_PASSES in the frame or a label past
+    /// resolve that does not match, of a format WebGPU does not resolve (32-bit
+    /// floats and integers) or into a 3D texture, a subresource written and
+    /// used otherwise in the pass, an access the class does not allow, a
+    /// declared resource read before any pass wrote it, an occlusion query set
+    /// that is not one or is named by a pass without targets, or timestamps of
+    /// a set that is not a timestamp set, without a set, with neither query,
+    /// with both the same, or with a query past the set's count or already
+    /// written in this frame; `mrhi_errorLimit` for more than
+    /// MRHI_MAX_COLOR_TARGETS color targets, a native pass past
+    /// MRHI_MAX_NATIVE_PASSES in the frame or a label past
     /// MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for a resource of another frame,
     /// an imported object destroyed since, or a query set or heap the device no
     /// longer has; `mrhi_errorUnsupported` for a critical extension the library
