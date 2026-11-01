@@ -5,6 +5,20 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.15.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.15.0...v0.15.1) (2026-10-31)
+
+### Fixed
+
+- The D3D12 driver gives a buffer read as indirect arguments the
+  non-pixel shader resource state too, from the start. On the Agility
+  SDK 1.620.1 with GPU-based validation, a counted multi-draw for a
+  pipeline that reads the vertex information moved its arguments buffer
+  from the indirect argument state to both, a legal transition that
+  runtime refuses: `Close` returned `E_INVALIDARG` with no debug-layer
+  message, and the program lost the frame. Indirect draws and dispatches
+  no longer fail there. Nothing in the API, the contract or the SPI
+  changes. ([#312](https://github.com/Rawframe-Project/maul-rhi/pull/312))
+
 ## [0.15.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.14.0...v0.15.0) (2026-10-31)
 
 ### Changed
