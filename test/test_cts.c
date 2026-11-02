@@ -2054,10 +2054,11 @@ static uint32_t MaxMips(Dimension dimension, mrhiExtent3d size)
     return levels;
 }
 
-// A texture of a dimension, format, size, mips and usages, a 2D one of
-// several layers a 2D array: its refusal, or success.
-static mrhiResult CreateTexture(Dimension dimension, mrhiFormat format, mrhiExtent3d size,
-                                uint32_t mips, mrhiTextureUsage usage)
+// A texture of a dimension, format, size, mips, sample count and
+// usages, a 2D one of several layers a 2D array: its refusal, or
+// success.
+static mrhiResult CreateSampled(Dimension dimension, mrhiFormat format, mrhiExtent3d size,
+                                uint32_t mips, uint32_t samples, mrhiTextureUsage usage)
 {
     mrhiTextureDef def = mrhiDefaultTextureDef();
     def.kind = KindOf(dimension == DIMENSION_3D, size.depthOrLayers);
@@ -2066,6 +2067,7 @@ static mrhiResult CreateTexture(Dimension dimension, mrhiFormat format, mrhiExte
     def.height = size.height;
     def.depthOrLayers = size.depthOrLayers;
     def.mipLevels = mips;
+    def.sampleCount = samples;
     def.usage = usage;
     mrhiTextureId texture = {0};
     mrhiResult status = mrhiCreateTexture(s_device, &def, &texture);
@@ -2074,6 +2076,13 @@ static mrhiResult CreateTexture(Dimension dimension, mrhiFormat format, mrhiExte
         CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "the texture");
     }
     return status;
+}
+
+// One of one sample.
+static mrhiResult CreateTexture(Dimension dimension, mrhiFormat format, mrhiExtent3d size,
+                                uint32_t mips, mrhiTextureUsage usage)
+{
+    return CreateSampled(dimension, format, size, mips, 1, usage);
 }
 
 // createTexture:zero_size_and_usage: one block of the format, with the
@@ -2212,6 +2221,295 @@ static void TestMipBounds(void)
            CreateTexture(DIMENSION_DEFAULT, RGBA8, (mrhiExtent3d){32, 32, 1}, 100,
                          mrhi_textureSampled),
            false);
+}
+
+// createTexture:dimension_type_and_format_compatibility: one block of
+// every format in every dimension. A compressed or depth format takes
+// no 1D or 3D texture on a device without the sliced 3D features. The
+// 1D cases are counted.
+static void TestDimensionFormats(void)
+{
+    char name[160];
+    for (Dimension d = DIMENSION_DEFAULT; d <= DIMENSION_3D; ++d)
+    {
+        for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+        {
+            if (d == DIMENSION_1D)
+            {
+                ++s_inexpressible;
+                continue;
+            }
+            snprintf(name, sizeof(name),
+                     "createTexture:dimension_type_and_format_compatibility %s, format %d",
+                     s_dimensions[d], (int)format);
+            Expect(name, CreateTexture(d, format, BlockOf(format), 1, mrhi_textureSampled),
+                   Runs(d, format));
+        }
+    }
+}
+
+// Reports a case refused for a format capability. The CTS's validation
+// error is mrhi_errorUnsupported here: the library takes the
+// capabilities an adapter grants, and the test adapter grants what
+// WebGPU's table gives a device without optional features.
+static void ExpectUngranted(const char* test, mrhiResult result, bool succeeds)
+{
+    bool ok = result == (succeeds ? mrhi_success : mrhi_errorUnsupported);
+    if (!ok)
+    {
+        printf("FAIL: %s: %d, the CTS expects %s\n", test, (int)result,
+               succeeds ? "success" : "a validation error for an ungranted capability");
+        ++s_failures;
+    }
+}
+
+// WebGPU's table on a device without optional features, as the CTS's
+// format info gives it: whether a format multisamples, which needs
+// rg11b10ufloat-renderable for rg11b10ufloat, and whether it takes
+// write-only storage.
+static bool Multisamples(mrhiFormat format)
+{
+    switch (format)
+    {
+    case mrhi_formatRg32Float:
+    case mrhi_formatRgba32Float:
+    case mrhi_formatR32Uint:
+    case mrhi_formatR32Sint:
+    case mrhi_formatRg11b10Ufloat:
+        return false;
+    default:
+        return format < mrhi_formatBc1RgbaUnorm;
+    }
+}
+
+static bool Stores(mrhiFormat format)
+{
+    switch (format)
+    {
+    case RGBA8:
+    case mrhi_formatRgba16Float:
+    case mrhi_formatR32Float:
+    case mrhi_formatRg32Float:
+    case mrhi_formatRgba32Float:
+    case mrhi_formatR32Uint:
+    case mrhi_formatR32Sint:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// The CTS's isTextureFormatPossiblyStorageReadable: storage, or
+// read-only and write-only storage with texture-formats-tier1.
+static bool PossiblyStores(mrhiFormat format)
+{
+    switch (format)
+    {
+    case mrhi_formatR8Unorm:
+    case mrhi_formatRg8Unorm:
+    case mrhi_formatR16Float:
+    case mrhi_formatRg16Float:
+    case mrhi_formatRgb10a2Unorm:
+    case mrhi_formatRg11b10Ufloat:
+        return true;
+    default:
+        return Stores(format);
+    }
+}
+
+// The color formats, which the CTS may render to: rg11b10ufloat only
+// with rg11b10ufloat-renderable, so its cases are skipped.
+static bool IsColor(mrhiFormat format)
+{
+    return format < mrhi_formatDepth32Float;
+}
+
+// createTexture:sampleCount,various_sampleCount_with_all_formats: every
+// format, 32 blocks wide and high, with 0 to 256 samples, a render
+// target when several. 1 is valid, and 4 where the format multisamples.
+// A count of 2 is refused as ungranted: the library takes it where an
+// adapter grants it, which a WebGPU adapter never does.
+static void TestSampleCounts(void)
+{
+    static const uint32_t counts[] = {0, 1, 2, 4, 8, 16, 32, 256};
+    static const Dimension dimensions[] = {DIMENSION_DEFAULT, DIMENSION_2D};
+    char name[160];
+    for (size_t d = 0; d < 2; ++d)
+    {
+        for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+        {
+            mrhiExtent3d size = BlockOf(format);
+            size.width *= 32;
+            size.height *= 32;
+            for (size_t c = 0; c < sizeof(counts) / sizeof(counts[0]); ++c)
+            {
+                uint32_t count = counts[c];
+                mrhiResult status =
+                    CreateSampled(dimensions[d], format, size, 1, count,
+                                  mrhi_textureSampled | (count > 1 ? mrhi_textureRenderTarget : 0));
+                snprintf(name, sizeof(name),
+                         "createTexture:sampleCount,various_sampleCount_with_all_formats %s, "
+                         "format %d, %u samples",
+                         s_dimensions[dimensions[d]], (int)format, count);
+                bool succeeds = count == 1 || (count == 4 && Multisamples(format));
+                if (count == 2 || count == 4)
+                {
+                    ExpectUngranted(name, status, succeeds);
+                    continue;
+                }
+                Expect(name, status, succeeds);
+            }
+        }
+    }
+}
+
+// The CTS's kValidCombinationsOfOneOrTwoTextureUsages: each usage, and
+// each pair, a transient one only with a render target.
+static uint32_t UsageCombinations(mrhiTextureUsage combinations[16])
+{
+    static const mrhiTextureUsage usages[] = {
+        mrhi_textureCopySource, mrhi_textureCopyDestination, mrhi_textureSampled,
+        mrhi_textureStorage,    mrhi_textureRenderTarget,    mrhi_textureTransient,
+    };
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < 6; ++i)
+    {
+        for (uint32_t j = i; j < 6; ++j)
+        {
+            mrhiTextureUsage usage = usages[i] | usages[j];
+            bool transient = (usage & mrhi_textureTransient) != 0;
+            if (!transient || usage == (mrhi_textureTransient | mrhi_textureRenderTarget))
+            {
+                combinations[count++] = usage;
+            }
+        }
+    }
+    return count;
+}
+
+// A case of sampleCount,valid_sampleCount_with_other_parameter_varies.
+typedef struct SampleCase
+{
+    Dimension dimension;
+    mrhiFormat format;
+    uint32_t samples;
+    uint32_t layers;
+    uint32_t mips;
+    mrhiTextureUsage usage;
+} SampleCase;
+
+// Whether the CTS runs the case: its filters, and its skip of a render
+// target the device cannot render to.
+static bool RunsSampleCase(const SampleCase* c)
+{
+    bool render = (c->usage & mrhi_textureRenderTarget) != 0;
+    bool storage = (c->usage & mrhi_textureStorage) != 0;
+    bool transient = (c->usage & mrhi_textureTransient) != 0;
+    return Runs(c->dimension, c->format) &&
+           (c->layers == 1 || c->dimension == DIMENSION_DEFAULT || c->dimension == DIMENSION_2D) &&
+           (!render || (IsColor(c->format) && c->dimension == DIMENSION_2D)) &&
+           (!storage || PossiblyStores(c->format)) &&
+           (c->mips == 1 || c->dimension != DIMENSION_1D) &&
+           (!transient || (c->mips == 1 && c->layers == 1)) &&
+           (!render || c->format != mrhi_formatRg11b10Ufloat);
+}
+
+// The case's texture, 32 blocks wide and high, of its layers or 32
+// deep in 3D, against the CTS's outcome. Several samples need a 2D
+// render target of one layer and mip without storage, which is
+// refused as invalid, and a format that multisamples; one sample with
+// storage needs a format that stores. A format's lack is ungranted.
+static void ExpectSampleCase(const SampleCase* c)
+{
+    mrhiExtent3d size = BlockOf(c->format);
+    size.width *= 32;
+    size.height *= 32;
+    size.depthOrLayers = c->dimension == DIMENSION_3D ? 32 : c->layers;
+    bool render = (c->usage & mrhi_textureRenderTarget) != 0;
+    bool storage = (c->usage & mrhi_textureStorage) != 0;
+    bool shaped =
+        c->samples == 1 || ((c->dimension == DIMENSION_DEFAULT || c->dimension == DIMENSION_2D) &&
+                            c->mips == 1 && c->layers == 1 && render && !storage);
+    bool granted = c->samples == 1 ? !storage || Stores(c->format) : Multisamples(c->format);
+    char name[192];
+    snprintf(name, sizeof(name),
+             "createTexture:sampleCount,valid_sampleCount_with_other_parameter_varies %s, "
+             "format %d, %u samples, %u layers, %u mips, usage 0x%x",
+             s_dimensions[c->dimension], (int)c->format, c->samples, c->layers, c->mips,
+             (unsigned)c->usage);
+    mrhiResult status = CreateSampled(c->dimension, c->format, size, c->mips, c->samples, c->usage);
+    if (!shaped)
+    {
+        Expect(name, status, false);
+        return;
+    }
+    ExpectUngranted(name, status, granted);
+}
+
+// createTexture:sampleCount,valid_sampleCount_with_other_parameter_varies:
+// 1 or 4 samples on every format and dimension, with 1 or 2 layers, 1
+// or 2 mips and each combination of one or two usages the CTS keeps.
+// The 1D cases are counted.
+static void TestSampleShapes(void)
+{
+    mrhiTextureUsage usages[16];
+    uint32_t usageCount = UsageCombinations(usages);
+    for (Dimension d = DIMENSION_DEFAULT; d <= DIMENSION_3D; ++d)
+    {
+        for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+        {
+            for (uint32_t i = 0; i < 2 * 2 * 2 * usageCount; ++i)
+            {
+                SampleCase c = {.dimension = d,
+                                .format = format,
+                                .samples = i % 2 == 0 ? 1 : 4,
+                                .layers = i / 2 % 2 + 1,
+                                .mips = i / 4 % 2 + 1,
+                                .usage = usages[i / 8]};
+                if (!RunsSampleCase(&c))
+                {
+                    continue;
+                }
+                if (d == DIMENSION_1D)
+                {
+                    ++s_inexpressible;
+                    continue;
+                }
+                ExpectSampleCase(&c);
+            }
+        }
+    }
+}
+
+// createTexture:sample_count,1d_2d_array_3d: four samples of rgba8unorm
+// only on a 2D texture of one layer. The 1D case is counted.
+static void TestSampledKinds(void)
+{
+    static const struct
+    {
+        Dimension dimension;
+        mrhiExtent3d size;
+    } cases[] = {{DIMENSION_2D, {4, 4, 1}},
+                 {DIMENSION_1D, {4, 1, 1}},
+                 {DIMENSION_2D, {4, 4, 4}},
+                 {DIMENSION_2D, {4, 4, 6}},
+                 {DIMENSION_3D, {4, 4, 4}}};
+    char name[128];
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+    {
+        if (cases[i].dimension == DIMENSION_1D)
+        {
+            ++s_inexpressible;
+            continue;
+        }
+        mrhiExtent3d size = cases[i].size;
+        snprintf(name, sizeof(name), "createTexture:sample_count,1d_2d_array_3d %s %ux%ux%u",
+                 s_dimensions[cases[i].dimension], size.width, size.height, size.depthOrLayers);
+        Expect(name,
+               CreateSampled(cases[i].dimension, RGBA8, size, 1, 4,
+                             mrhi_textureSampled | mrhi_textureRenderTarget),
+               i == 0);
+    }
 }
 
 // The color renderable formats, with WebGPU's render target pixel byte
@@ -2648,9 +2946,13 @@ int main(void)
     TestZeroSizes();
     TestMipCounts();
     TestMipBounds();
+    TestDimensionFormats();
+    TestSampleCounts();
+    TestSampleShapes();
+    TestSampledKinds();
     TestColorBytes();
     TestQueries();
-    CHECK(s_differs == 879 && s_inexpressible == 1060, "the pass and query cases set aside");
+    CHECK(s_differs == 879 && s_inexpressible == 1427, "the pass and query cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
