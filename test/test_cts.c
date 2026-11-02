@@ -1741,14 +1741,8 @@ static mrhiResult RenderPass(const Attachment* colors, const Attachment* resolve
 #define DEPTH mrhi_formatDepthStencil
 static const Attachment s_none = {0};
 
-static bool IsDepth(mrhiFormat format)
-{
-    return format == mrhi_formatDepth32Float || format == DEPTH;
-}
-
-// A pass with one target of a format, made with the usages, loaded and
-// stored as given; a depth format's stencil, if any, as its depth. The
-// pass's refusal, or success.
+// A pass with one color target of a format, made with the usages,
+// loaded and stored as given; the pass's refusal, or success.
 static mrhiResult OpsPass(mrhiFormat format, mrhiTextureUsage usage, mrhiLoadOp load,
                           mrhiStoreOp store)
 {
@@ -1759,21 +1753,8 @@ static mrhiResult OpsPass(mrhiFormat format, mrhiTextureUsage usage, mrhiLoadOp 
     CHECK(mrhiImportTexture(s_device, texture, &resource) == mrhi_success, "imported");
     mrhiPassDef def = mrhiDefaultPassDef();
     def.neverCull = true;
-    if (IsDepth(format))
-    {
-        def.depthTarget = (mrhiDepthTarget){
-            .resource = resource,
-            .depthLoad = load,
-            .depthStore = store,
-            .stencilLoad = load,
-            .stencilStore = store,
-        };
-    }
-    else
-    {
-        def.colorTargets[0] = (mrhiColorTarget){.resource = resource, .load = load, .store = store};
-        def.colorTargetCount = 1;
-    }
+    def.colorTargets[0] = (mrhiColorTarget){.resource = resource, .load = load, .store = store};
+    def.colorTargetCount = 1;
     mrhiPassId pass = {0};
     mrhiResult status = mrhiAddPass(s_device, &def, &pass);
     CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
@@ -1782,35 +1763,165 @@ static mrhiResult OpsPass(mrhiFormat format, mrhiTextureUsage usage, mrhiLoadOp 
     return status;
 }
 
-// color_attachments,loadOp_storeOp and the transient part of
-// depth_stencil_attachment,loadOp_storeOp_match_depthReadOnly_stencilReadOnly:
-// a transient texture is cleared and discarded, depth and stencil both.
-// The depth case's undefined operations and read-only aspects have no
-// counterpart, as a target's operations are always given.
+// color_attachments,loadOp_storeOp: a transient texture is cleared and
+// discarded.
 static void TestTransientTargets(void)
 {
-    char name[192];
-    static const mrhiFormat formats[] = {RGBA8, mrhi_formatRgba16Float, mrhi_formatDepth32Float,
-                                         DEPTH};
+    char name[128];
+    static const mrhiFormat formats[] = {RGBA8, mrhi_formatRgba16Float};
     const mrhiTextureUsage transient = mrhi_textureRenderTarget | mrhi_textureTransient;
     for (size_t f = 0; f < sizeof(formats) / sizeof(formats[0]); ++f)
     {
-        bool depth = IsDepth(formats[f]);
         for (uint32_t t = 0; t < 2; ++t)
         {
             for (uint32_t op = 0; op < 4; ++op)
             {
                 mrhiLoadOp load = op & 1 ? mrhi_loadKeep : mrhi_loadClear;
                 mrhiStoreOp store = op & 2 ? mrhi_storeKeep : mrhi_storeDiscard;
-                snprintf(name, sizeof(name), "render_pass_descriptor:%s format %d, %s, %s, %s",
-                         depth ? "depth_stencil_attachment,"
-                                 "loadOp_storeOp_match_depthReadOnly_stencilReadOnly"
-                               : "color_attachments,loadOp_storeOp",
+                snprintf(name, sizeof(name),
+                         "render_pass_descriptor:color_attachments,loadOp_storeOp format %d, %s, "
+                         "%s, %s",
                          (int)formats[f], t ? "transient" : "not transient",
                          op & 1 ? "load" : "clear", op & 2 ? "store" : "discard");
                 Expect(name,
                        OpsPass(formats[f], t ? transient : mrhi_textureRenderTarget, load, store),
                        t == 0 || op == 0);
+            }
+        }
+    }
+}
+
+// A depth_stencil_attachment,loadOp_storeOp_match_depthReadOnly_stencilReadOnly
+// parameter: undefined (0), or the CTS's first (1) or second (2) choice:
+// true and false for a read-only flag, clear and load for a load, and
+// discard and store for a store.
+//
+// The CTS case a depth target's C call stands for. C always gives both
+// operations, and keep and keep stand for none given: so a present,
+// written aspect's undefined operation is keep, a load or a store, and
+// an absent or read-only aspect's load or store is keep, none given.
+static void Spelled(bool depth, bool stencil, const uint32_t p[6], uint32_t q[6])
+{
+    const bool written[2] = {depth && p[0] != 1, stencil && p[3] != 1};
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        q[3 * a] = p[3 * a];
+        for (uint32_t i = 1; i < 3; ++i)
+        {
+            uint32_t v = p[3 * a + i];
+            q[3 * a + i] = written[a] ? (v == 0 ? 2 : v) : (v == 1 ? 1 : 0);
+        }
+    }
+}
+
+// The CTS's outcome of a case on a format with the aspects given.
+static bool OpsMatch(bool depth, bool stencil, bool transient, const uint32_t p[6])
+{
+    bool depthReadOnly = p[0] == 1;
+    bool stencilReadOnly = p[3] == 1;
+    bool depthSettings = p[1] != 0 && p[2] != 0 && !depthReadOnly;
+    bool stencilSettings = p[4] != 0 && p[5] != 0 && !stencilReadOnly;
+    bool present = (!depthSettings || depth) && (!stencilSettings || stencil);
+    bool depthCombo = depth && !depthReadOnly ? p[1] != 0 && p[2] != 0 : p[1] == 0 && p[2] == 0;
+    bool stencilCombo =
+        stencil && !stencilReadOnly ? p[4] != 0 && p[5] != 0 : p[4] == 0 && p[5] == 0;
+    bool transientOps = !transient || ((!depth || (p[1] == 1 && p[2] == 1)) &&
+                                       (!stencil || (p[4] == 1 && p[5] == 1)));
+    return present && depthCombo && stencilCombo && transientOps;
+}
+
+// The case as a depth target: one read-only flag for both aspects, and
+// each operation clear or discard as given, else keep.
+static mrhiResult DepthOpsPass(mrhiFormat format, bool transient, bool readOnly,
+                               const uint32_t p[6])
+{
+    mrhiTextureUsage usage = mrhi_textureRenderTarget | (transient ? mrhi_textureTransient : 0);
+    mrhiTextureId texture = MakeAttachment(&(Attachment){.format = format, .usage = usage});
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId resource = {0};
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportTexture(s_device, texture, &resource) == mrhi_success,
+          "a frame of the target");
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    def.depthTarget = (mrhiDepthTarget){
+        .resource = resource,
+        .depthLoad = p[1] == 1 ? mrhi_loadClear : mrhi_loadKeep,
+        .depthStore = p[2] == 1 ? mrhi_storeDiscard : mrhi_storeKeep,
+        .stencilLoad = p[4] == 1 ? mrhi_loadClear : mrhi_loadKeep,
+        .stencilStore = p[5] == 1 ? mrhi_storeDiscard : mrhi_storeKeep,
+        .readOnly = readOnly,
+    };
+    mrhiPassId pass = {0};
+    mrhiResult status = mrhiAddPass(s_device, &def, &pass);
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
+              mrhiDestroyTexture(s_device, texture) == mrhi_success,
+          "dropped");
+    return status;
+}
+
+// render_pass_descriptor:depth_stencil_attachment,loadOp_storeOp_match_depthReadOnly_stencilReadOnly,
+// over the CTS's kDepthStencilFormats. depth32float is the library's,
+// and depth24plus-stencil8 becomes its depth-stencil format; the other
+// four have no counterpart and are counted. Each case runs as the C call
+// Spelled finds, whose outcome is that of the CTS case it stands for;
+// where that differs from the case's own, as keep stands for none given,
+// the case differs. The library's read-only flag covers both aspects, so
+// a case whose aspects differ in it has no call and differs too.
+static void TestDepthOps(void)
+{
+    static const struct
+    {
+        const char* name;
+        mrhiFormat format;
+        bool depth;
+        bool stencil;
+    } formats[] = {
+        {"stencil8", mrhi_formatNone, false, true},
+        {"depth16unorm", mrhi_formatNone, true, false},
+        {"depth32float", mrhi_formatDepth32Float, true, false},
+        {"depth24plus", mrhi_formatNone, true, false},
+        {"depth24plus-stencil8", DEPTH, true, true},
+        {"depth32float-stencil8", mrhi_formatNone, true, true},
+    };
+    static const char* const readOnlys[] = {"undefined", "true", "false"};
+    static const char* const loads[] = {"undefined", "clear", "load"};
+    static const char* const stores[] = {"undefined", "discard", "store"};
+    char name[256];
+    for (size_t f = 0; f < sizeof(formats) / sizeof(formats[0]); ++f)
+    {
+        for (uint32_t t = 0; t < 2; ++t)
+        {
+            for (uint32_t c = 0; c < 729; ++c)
+            {
+                // depthReadOnly, depthLoadOp, depthStoreOp, stencilReadOnly,
+                // stencilLoadOp, stencilStoreOp, the last fastest.
+                const uint32_t p[6] = {c / 243,   c / 81 % 3, c / 27 % 3,
+                                       c / 9 % 3, c / 3 % 3,  c % 3};
+                bool depth = formats[f].depth;
+                bool stencil = formats[f].stencil;
+                bool depthReadOnly = p[0] == 1;
+                bool stencilReadOnly = p[3] == 1;
+                if (formats[f].format == mrhi_formatNone)
+                {
+                    ++s_inexpressible;
+                    continue;
+                }
+                if (depth && stencil && depthReadOnly != stencilReadOnly)
+                {
+                    ++s_differs;
+                    continue;
+                }
+                snprintf(name, sizeof(name),
+                         "render_pass_descriptor:depth_stencil_attachment,loadOp_storeOp_match_"
+                         "depthReadOnly_stencilReadOnly %s %s depth %s,%s,%s stencil %s,%s,%s",
+                         formats[f].name, t ? "transient" : "not transient", readOnlys[p[0]],
+                         loads[p[1]], stores[p[2]], readOnlys[p[3]], loads[p[4]], stores[p[5]]);
+                uint32_t q[6];
+                Spelled(depth, stencil, p, q);
+                bool valid = OpsMatch(depth, stencil, t == 1, q);
+                Expect(name, DepthOpsPass(formats[f].format, t == 1, depthReadOnly, p), valid);
+                s_differs += valid != OpsMatch(depth, stencil, t == 1, p) ? 1 : 0;
             }
         }
     }
@@ -3930,8 +4041,8 @@ typedef enum Destroyed
 } Destroyed;
 
 // texture,destroy:submit_a_destroyed_texture_as_attachment: a frame of
-// a render pass clearing a color target and a depth or stencil target,
-// each destroyed as given; the first refusal, from the imports to the
+// a render pass clearing a color target and a depth target, its stencil
+// too when it has one, each destroyed as given; the first refusal, from the imports to the
 // submit, or success once the frame has finished.
 static mrhiResult SubmitTargets(mrhiFormat depthFormat, Destroyed color, Destroyed depth)
 {
@@ -3964,8 +4075,11 @@ static mrhiResult SubmitTargets(mrhiFormat depthFormat, Destroyed color, Destroy
     def.depthTarget.resource = targets[1];
     def.depthTarget.depthLoad = mrhi_loadClear;
     def.depthTarget.depthStore = mrhi_storeDiscard;
-    def.depthTarget.stencilLoad = mrhi_loadClear;
-    def.depthTarget.stencilStore = mrhi_storeDiscard;
+    if (depthFormat == DEPTH)
+    {
+        def.depthTarget.stencilLoad = mrhi_loadClear;
+        def.depthTarget.stencilStore = mrhi_storeDiscard;
+    }
     mrhiPassId pass = {0};
     status = status == mrhi_success ? mrhiAddPass(s_device, &def, &pass) : status;
     for (size_t i = 0; i < 2; ++i)
@@ -3996,8 +4110,9 @@ static mrhiResult SubmitTargets(mrhiFormat depthFormat, Destroyed color, Destroy
 }
 
 // The CTS's aspects become the library's formats: depth24plus-stencil8
-// and stencil8 its depth-stencil format, which is its only one with
-// stencil, and depth32float its own. A target destroyed before the frame
+// its depth-stencil format, and depth32float its own, without stencil
+// operations. The library has no stencil-only format, so stencil8's
+// cases are counted. A target destroyed before the frame
 // imports it is refused as stale. One destroyed after its pass is added
 // is still what the frame runs on, as the library keeps what a frame
 // imported until that frame has finished, where WebGPU fails the submit:
@@ -4005,7 +4120,7 @@ static mrhiResult SubmitTargets(mrhiFormat depthFormat, Destroyed color, Destroy
 static void TestDestroyedTargets(void)
 {
     static const char* const aspects[] = {"all", "depth-only", "stencil-only"};
-    static const mrhiFormat formats[] = {DEPTH, mrhi_formatDepth32Float, DEPTH};
+    static const mrhiFormat formats[] = {DEPTH, mrhi_formatDepth32Float, mrhi_formatNone};
     static const char* const states[] = {"valid", "destroyedBeforeEncode", "destroyedAfterEncode"};
     char name[160];
     for (size_t a = 0; a < 3; ++a)
@@ -4014,6 +4129,11 @@ static void TestDestroyedTargets(void)
         {
             for (uint32_t depth = KEPT; depth <= AFTER; ++depth)
             {
+                if (formats[a] == mrhi_formatNone)
+                {
+                    ++s_inexpressible;
+                    continue;
+                }
                 snprintf(name, sizeof(name),
                          "texture,destroy:submit_a_destroyed_texture_as_attachment %s,%s,%s",
                          aspects[a], states[color], states[depth]);
@@ -4183,6 +4303,7 @@ int main(void)
     CHECK(s_differs == 878 && s_inexpressible == 0, "the draw cases set aside");
     TestRenderPasses();
     TestTransientTargets();
+    TestDepthOps();
     TestViewUsages();
     TestTransientTextures();
     TestZeroSizes();
@@ -4210,12 +4331,12 @@ int main(void)
     TestColorBytes();
     TestQuerySets();
     TestQueries();
-    CHECK(s_differs == 880 && s_inexpressible == 1216, "the pass and query cases set aside");
+    CHECK(s_differs == 2058 && s_inexpressible == 7048, "the pass and query cases set aside");
     TestBufferDestroys();
     TestTextureDestroys();
     TestDestroyedTargets();
     TestQuerySetDestroys();
-    CHECK(s_differs == 889 && s_inexpressible == 1238, "the destroy cases set aside");
+    CHECK(s_differs == 2064 && s_inexpressible == 7079, "the destroy cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;

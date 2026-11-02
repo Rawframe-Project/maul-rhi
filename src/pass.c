@@ -414,11 +414,16 @@ static mrhiResult UseOfDepth(const mrhiDevice* device, const mrhiDepthTarget* ta
     bool passes = target->depthLoad == mrhi_loadClear && target->depthStore == mrhi_storeDiscard &&
                   (!stencil || (target->stencilLoad == mrhi_loadClear &&
                                 target->stencilStore == mrhi_storeDiscard));
+    // A format without stencil takes no stencil operations, as WebGPU's:
+    // keep and keep, the defaults, stand for none given.
+    bool stencilFits =
+        stencil || (target->stencilLoad == mrhi_loadKeep && target->stencilStore == mrhi_storeKeep);
     // A depth cleared takes a value from 0 to 1, never NaN.
     bool clears = target->depthLoad == mrhi_loadClear;
     bool cleared = !clears || (target->clearDepth >= 0.0f && target->clearDepth <= 1.0f);
-    if (!known || !mrhiFormatHasDepth(def->format) || (target->readOnly && !keeps) || !cleared ||
-        (transient && !passes) || !Agrees(shape, def, target->mip))
+    if (!known || !stencilFits || !mrhiFormatHasDepth(def->format) ||
+        (target->readOnly && !keeps) || !cleared || (transient && !passes) ||
+        !Agrees(shape, def, target->mip))
     {
         return mrhi_errorInvalid;
     }
