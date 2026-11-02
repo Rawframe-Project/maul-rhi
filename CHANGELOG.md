@@ -5,6 +5,19 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.22.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.21.0...v0.22.0) (2026-11-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* **resources:** drivers built outside the tree may be handed a sampler's maxAnisotropy above 16 and must clamp it; a sampler def may now ask for any anisotropy of 1 or more.
+* **resources:** drivers built outside the tree must be rebuilt for SPI version 17; a cube array texture may now have any count of six or more layers.
+
+### Fixed
+
+* **resources:** accept a sampler's anisotropy above 16 ([#400](https://github.com/Rawframe-Project/maul-rhi/issues/400)) ([d726248](https://github.com/Rawframe-Project/maul-rhi/commit/d726248515b0b312e789cc4b01771a313d9aee1e)), closes [#398](https://github.com/Rawframe-Project/maul-rhi/issues/398)
+* **resources:** take a cube array texture of any six or more layers ([#397](https://github.com/Rawframe-Project/maul-rhi/issues/397)) ([81ec815](https://github.com/Rawframe-Project/maul-rhi/commit/81ec8158c8365ab46cc1e83d68f413d9691f6bec)), closes [#396](https://github.com/Rawframe-Project/maul-rhi/issues/396)
+
 ## [0.21.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.20.0...v0.21.0) (2026-11-02)
 
 ### Changed
