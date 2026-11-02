@@ -34,7 +34,7 @@ static bool IsWellFormed(const mrhiSurfaceConfig* config)
     for (uint32_t i = 0; i < MRHI_VIEW_FORMATS; ++i)
     {
         mrhiFormat format = config->viewFormats[i];
-        if (format != mrhi_formatNone && format != twin)
+        if (format != mrhi_formatNone && format != color->format && format != twin)
         {
             return false;
         }
@@ -63,13 +63,15 @@ static bool IsColorReported(const mrhiSurfaceCaps* caps, mrhiSurfaceColor color)
 
 // Whether the surface takes the config's color: one it reports, or the
 // sRGB twin of one's format where its images may be sRGB, and the twin
-// as a view only where views may be.
+// as a view only where views may be. The color format itself is a view
+// every surface gives.
 static bool IsColorTaken(const mrhiSurfaceCaps* caps, const mrhiSurfaceConfig* config)
 {
     bool views = false;
     for (uint32_t i = 0; i < MRHI_VIEW_FORMATS; ++i)
     {
-        views = views || config->viewFormats[i] != mrhi_formatNone;
+        mrhiFormat format = config->viewFormats[i];
+        views = views || (format != mrhi_formatNone && format != config->color.format);
     }
     if (views && !caps->twinViews)
     {

@@ -326,7 +326,9 @@ extern "C"
         // Its uses, at least one.
         mrhiTextureUsage usage;
         // The formats its views may take besides its own: the format's sRGB or
-        // linear twin. Unused entries are mrhi_formatNone.
+        // linear twin. The format itself may be listed too, as WebGPU allows,
+        // but a transient texture lists none. Unused entries are
+        // mrhi_formatNone.
         mrhiFormat viewFormats[MRHI_VIEW_FORMATS];
     } mrhiTextureDef;
 

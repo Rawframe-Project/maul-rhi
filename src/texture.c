@@ -131,14 +131,14 @@ static bool IsUsageValid(const mrhiTextureDef* def)
                                               (usage & mrhi_textureStorage) == 0));
 }
 
-// Whether every view format is unused or the format's twin.
+// Whether every view format is unused, the format itself or its twin.
 static bool AreViewFormatsValid(const mrhiTextureDef* def)
 {
     mrhiFormat twin = mrhiFormatSrgbPair(def->format);
     for (uint32_t i = 0; i < MRHI_VIEW_FORMATS; ++i)
     {
         mrhiFormat format = def->viewFormats[i];
-        if (format != mrhi_formatNone && format != twin)
+        if (format != mrhi_formatNone && format != def->format && format != twin)
         {
             return false;
         }
