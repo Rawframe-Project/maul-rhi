@@ -104,8 +104,6 @@ const char* mrhiGetDiagnosticText(mrhiDiagnosticCode code)
         return "A statistics query begun outside a graphics-class pass of one view, while one is open, on a set of another type, past the set or written twice in a frame; or ended with none open.";
     case mrhi_diagnosticSamplerDef:
         return "A sampler def with an unknown filter, address mode or compare function, a negative, infinite or reversed level of detail range, or anisotropy of 0 or above 1 without linear filtering.";
-    case mrhi_diagnosticBufferSize:
-        return "A buffer size of zero or not a multiple of 4.";
     case mrhi_diagnosticBufferUsage:
         return "A buffer def with no usage, or an unknown one.";
     case mrhi_diagnosticShaderBytes:

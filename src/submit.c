@@ -31,6 +31,7 @@ static mrhiDriverResource ViewResource(const mrhiFrameResource* resource)
         break;
     case mrhiFrameBuffer:
         view.kind = mrhiDriverTransientBuffer;
+        view.size = mrhiBufferAllocation(resource->size);
         break;
     case mrhiImportedTexture:
         view.kind = mrhiDriverDeviceTexture;
@@ -38,6 +39,7 @@ static mrhiDriverResource ViewResource(const mrhiFrameResource* resource)
         break;
     case mrhiImportedBuffer:
         view.kind = mrhiDriverDeviceBuffer;
+        view.size = mrhiBufferAllocation(resource->size);
         break;
     case mrhiSurfaceImage:
         view.kind = mrhiDriverSurfaceImage;

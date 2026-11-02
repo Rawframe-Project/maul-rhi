@@ -24,12 +24,19 @@ static mrhiDevice* Open(uint32_t diagnostics)
     return OpenWith(def, true);
 }
 
-// Refuses a buffer def: of a size not a multiple of 4, or of no usage.
-static void Refuse(mrhiDevice* device, bool size)
+// Refuses a def: a sampler's of anisotropy 0, or a buffer's of no usage.
+static void Refuse(mrhiDevice* device, bool sampler)
 {
+    if (sampler)
+    {
+        mrhiSamplerDef def = mrhiDefaultSamplerDef();
+        def.maxAnisotropy = 0;
+        mrhiSamplerId refused;
+        CHECK(mrhiCreateSampler(device, &def, &refused) == mrhi_errorInvalid, "refused");
+        return;
+    }
     mrhiBufferDef def = mrhiDefaultBufferDef();
-    def.size = size ? 6 : 64;
-    def.usage = size ? mrhi_bufferVertex : 0;
+    def.size = 64;
     mrhiBufferId buffer;
     CHECK(mrhiCreateBuffer(device, &def, &buffer) == mrhi_errorInvalid, "refused");
 }
@@ -49,7 +56,7 @@ static void TestDevice(void)
     Refuse(device, false);
     CHECK(mrhiDevice_GetMisuse(device) == 5, "every refusal counted");
     CHECK(mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success &&
-              record.code == mrhi_diagnosticBufferSize && record.callsRefused == 2,
+              record.code == mrhi_diagnosticSamplerDef && record.callsRefused == 2,
           "the first check's two refusals, one record");
     CHECK(mrhiDevice_TakeDiagnostic(device, &record) == mrhi_success &&
               record.code == mrhi_diagnosticBufferUsage && record.callsRefused == 2,
@@ -209,8 +216,8 @@ static void TestTextureShape(void)
 
 static void TestTexts(void)
 {
-    const char* text = mrhiGetDiagnosticText(mrhi_diagnosticBufferSize);
-    CHECK(strcmp(text, "A buffer size of zero or not a multiple of 4.") == 0, "a code's text");
+    const char* text = mrhiGetDiagnosticText(mrhi_diagnosticBufferUsage);
+    CHECK(strcmp(text, "A buffer def with no usage, or an unknown one.") == 0, "a code's text");
     CHECK(strcmp(mrhiGetDiagnosticText(0), "An unknown diagnostic code.") == 0, "zero");
     CHECK(strcmp(mrhiGetDiagnosticText(0xFFFF), "An unknown diagnostic code.") == 0, "past them");
     // Codes are int32_t: a negative code is unknown too.

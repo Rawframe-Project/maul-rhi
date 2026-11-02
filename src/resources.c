@@ -151,10 +151,7 @@ mrhiResult mrhiCheckBufferShape(mrhiDevice* device, const mrhiBufferDef* def)
     {
         return status;
     }
-    if (def->size == 0 || def->size % 4 != 0)
-    {
-        return mrhiDeviceMisuse(device, mrhi_diagnosticBufferSize);
-    }
+    // Any size, as WebGPU's: copies, clears and ranges keep to fours.
     return MRHI_DEVICE_LIMIT(device, bufferBytes, def->size);
 }
 
@@ -199,6 +196,7 @@ mrhiResult mrhiCreateBuffer(mrhiDevice* device, const mrhiBufferDef* def, mrhiBu
     uint64_t handle = 0;
     mrhiBufferDef driverDef = *def;
     mrhiDropLabel(&driverDef.label, &driverDef.labelLength);
+    driverDef.size = mrhiBufferAllocation(def->size);
     // Its first frame zeroes it with a clear, a copy into it.
     driverDef.usage |= mrhi_bufferCopyDestination;
     status = mrhiDriverStatus(

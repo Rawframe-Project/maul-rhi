@@ -384,8 +384,6 @@ extern "C"
         // function, a negative, infinite or reversed level of detail range, or
         // anisotropy of 0 or above 1 without linear filtering.
         mrhi_diagnosticSamplerDef = 62,
-        // A buffer size of zero or not a multiple of 4.
-        mrhi_diagnosticBufferSize = 63,
         // A buffer def with no usage, or an unknown one.
         mrhi_diagnosticBufferUsage = 64,
         // Shader bytes that are NULL or not 8-byte aligned.

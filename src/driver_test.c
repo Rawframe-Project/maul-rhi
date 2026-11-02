@@ -322,6 +322,8 @@ static mrhiResult CreateSampler(void* self, const mrhiSamplerDef* def, uint64_t*
 static mrhiResult CreateBuffer(void* self, const mrhiBufferDef* def, uint64_t* handleOut)
 {
     TestDevice* device = self;
+    // The APIs make no empty buffer, so the core hands whole fours.
+    MRHI_ASSERT(def->size > 0 && def->size % 4 == 0);
     Name(device, def->label, def->labelLength);
     mrhiResult status = MakeObject(device, handleOut);
     if (status == mrhi_success)
@@ -686,6 +688,7 @@ static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* b
                          uint64_t* alignmentOut)
 {
     (void)self;
+    MRHI_ASSERT(def->size > 0 && def->size % 4 == 0);
     *bytesOut = (def->size + 255) & ~(uint64_t)255;
     *alignmentOut = 256;
 }

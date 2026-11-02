@@ -33,7 +33,7 @@ A case the library decides otherwise is listed in the test with its reason. Four
 - A query is written at most once a frame, where WebGPU allows once a pass, so Vulkan never meets a query written twice between resets.
 - A destroyed texture has no views: destroying it frees its id and destroys its views, so a view of that id is refused as stale, where WebGPU still views a destroyed texture.
 
-Cases the library cannot express are counted, not run: data a buffer cannot have (a size not a multiple of 4, where that changes the outcome), and 1D textures and views, which the library does not have. Both counts are pinned in the test, so a change in either is seen. Translating the copy cases found one real difference: WebGPU allows empty copies, which Vulkan refuses, so empty copies, writes and reads now record nothing.
+Cases the library cannot express are counted, not run: 1D textures and views, which the library does not have, and a buffer mapped at creation or with a map usage, as the library maps no buffer. A buffer takes any size, 0 included, as WebGPU's, so every copy case runs with the CTS's own data size. Both counts are pinned in the test, so a change in either is seen. Translating the copy cases found one real difference: WebGPU allows empty copies, which Vulkan refuses, so empty copies, writes and reads now record nothing.
 
 ## Samples and the guide
 
