@@ -7,14 +7,25 @@ may change the API, the ABI and every data format.
 
 ## [0.21.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.20.0...v0.21.0) (2026-11-02)
 
+### Changed
 
-### ⚠ BREAKING CHANGES
+- **Breaking:** a texture def or surface config may list its own format
+  among its view formats, as WebGPU's `createTexture` and `configure`
+  allow:
+  - `mrhiCreateTexture` takes a texture def listing the texture's own
+    format as well as its sRGB or linear twin. A transient texture
+    still lists none, so one listing its own format stays refused, and
+    the frame graph makes no declared texture listing it transient.
+  - `mrhiDevice_ConfigureSurface` takes a config listing its color
+    format, on a surface without twin views too.
 
-* **resources:** drivers built outside the tree must be rebuilt for SPI version 16; a texture def or surface config may now list its own format among its view formats.
-
-### Fixed
-
-* **resources:** accept a texture's own format among its view formats ([#386](https://github.com/Rawframe-Project/maul-rhi/issues/386)) ([f23967d](https://github.com/Rawframe-Project/maul-rhi/commit/f23967d64b73c06b3799a0d261d089d1d9f32ea8)), closes [#385](https://github.com/Rawframe-Project/maul-rhi/issues/385)
+  Before, both were refused on every driver with `mrhi_errorInvalid`,
+  counted as `mrhi_diagnosticTextureViewFormats` and
+  `mrhi_diagnosticSurfaceConfig`. Drivers built outside the tree must
+  be rebuilt for SPI version 16, and may be handed such an entry; the
+  mustpass list is `conformance/mustpass/spi-16.txt`.
+  `contract_version` rises to 32.
+  ([#386](https://github.com/Rawframe-Project/maul-rhi/pull/386))
 
 ## [0.20.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.19.0...v0.20.0) (2026-11-01)
 
