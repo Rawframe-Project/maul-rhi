@@ -557,7 +557,7 @@
             {
               "name": "diagnostic_query_set_def",
               "value": 58,
-              "doc": "A query set def of an unknown type, or of zero or too many queries."
+              "doc": "A query set def of an unknown type or of too many queries."
             },
             {
               "name": "diagnostic_occlusion_query",
@@ -9879,7 +9879,7 @@
             {
               "name": "count",
               "type": "uint32",
-              "doc": "Its queries, 1 to MRHI_MAX_QUERY_SET_QUERIES.",
+              "doc": "Its queries, any count to MRHI_MAX_QUERY_SET_QUERIES, 0 included, as WebGPU's.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -9921,7 +9921,7 @@
           "doc": "Makes a query set on a ready device.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, an unknown type, or a count of 0; `mrhi_errorLimit` for a count past MRHI_MAX_QUERY_SET_QUERIES or a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know, timestamps without the timestamp_query feature, or pipeline statistics without the pipeline_statistics_query feature; `mrhi_errorCapacity` when the device's querySets budget is reached or its queries budget lacks a run of count queries; `mrhi_errorBusy` for a call from inside the device's allocator."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, or an unknown type; `mrhi_errorLimit` for a count past MRHI_MAX_QUERY_SET_QUERIES or a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorState` for a device that is not ready; `mrhi_errorUnsupported` for a critical extension the library does not know, timestamps without the timestamp_query feature, or pipeline statistics without the pipeline_statistics_query feature; `mrhi_errorCapacity` when the device's querySets budget is reached or its queries budget lacks a run of count queries; `mrhi_errorBusy` for a call from inside the device's allocator."
           },
           "args": [
             {
@@ -22727,5 +22727,5 @@
       ]
     }
   ],
-  "contract_version": 34
+  "contract_version": 35
 }

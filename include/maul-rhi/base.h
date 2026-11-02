@@ -370,7 +370,7 @@ extern "C"
         // A heap entry's buffer without storage usage, or a range empty, not a
         // multiple of 4 or past the buffer.
         mrhi_diagnosticHeapBuffer = 57,
-        // A query set def of an unknown type, or of zero or too many queries.
+        // A query set def of an unknown type or of too many queries.
         mrhi_diagnosticQuerySetDef = 58,
         // An occlusion query begun in a pass without an occlusion set, while
         // one is open, past the set or written twice in a frame; or ended with

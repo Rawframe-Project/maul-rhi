@@ -3729,6 +3729,31 @@ static mrhiResult Occlusion(uint32_t setCount, const uint32_t* calls, size_t cal
     return status;
 }
 
+// createQuerySet: count, of the CTS's kQueryTypes, occlusion and
+// timestamp, at 0, kMaxQueryCount (4096) and one past it.
+static void TestQuerySets(void)
+{
+    char name[64];
+    static const mrhiQueryKind kinds[] = {mrhi_queryOcclusion, mrhi_queryTimestamp};
+    static const uint32_t counts[] = {0, 4096, 4097};
+    for (size_t k = 0; k < 2; ++k)
+    {
+        for (size_t c = 0; c < 3; ++c)
+        {
+            mrhiQuerySetDef def = mrhiDefaultQuerySetDef();
+            def.kind = kinds[k];
+            def.count = counts[c];
+            mrhiQuerySetId set = {0};
+            mrhiResult status = mrhiCreateQuerySet(s_device, &def, &set);
+            snprintf(name, sizeof(name), "createQuerySet:count %s %u",
+                     k == 0 ? "occlusion" : "timestamp", counts[c]);
+            Expect(name, status, counts[c] <= 4096);
+            CHECK(status != mrhi_success || mrhiDestroyQuerySet(s_device, set) == mrhi_success,
+                  "destroyed");
+        }
+    }
+}
+
 // api,validation,encoding,queries.
 static void TestQueries(void)
 {
@@ -3834,6 +3859,8 @@ int main(void)
         .sampleCounts = mrhi_samples1Bit | mrhi_samples4Bit,
     };
     s_adapter.limits.colorBytesPerSample = 128;
+    // Timestamps, for the query sets of each of the CTS's types.
+    s_adapter.features.timestampQuery = true;
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     deviceDef.features = s_adapter.features;
     s_device = OpenWith(deviceDef, true);
@@ -3878,6 +3905,7 @@ int main(void)
     TestSamplers();
     TestBuffers();
     TestColorBytes();
+    TestQuerySets();
     TestQueries();
     CHECK(s_differs == 880 && s_inexpressible == 1216, "the pass and query cases set aside");
     Close(s_device);
