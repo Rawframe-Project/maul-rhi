@@ -266,6 +266,14 @@ static void TestTwins(void)
     config = Config(images);
     config.viewFormats[0] = mrhi_formatNone;
     CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success, "unorm images still");
+    // The color format itself is a view every surface gives.
+    config.viewFormats[MRHI_VIEW_FORMATS - 1] = mrhi_formatBgra8Unorm;
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success,
+          "its own format listed, without twin views");
+    config.color.format = mrhi_formatBgra8UnormSrgb;
+    config.viewFormats[MRHI_VIEW_FORMATS - 1] = mrhi_formatBgra8UnormSrgb;
+    CHECK(mrhiDevice_ConfigureSurface(device, &config) == mrhi_success,
+          "sRGB images listing their own format");
     CHECK(mrhiSurface_Unconfigure(device, images) == mrhi_success, "unconfigured");
     mrhiSurfaceId views = MakeTwinSurface(false, false);
     CHECK(mrhiSurface_GetCaps(s_instance, views, adapter, &caps) == mrhi_success &&

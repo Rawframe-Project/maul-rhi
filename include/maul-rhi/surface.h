@@ -327,7 +327,8 @@ extern "C"
         // One of the colors the surface reports on the device's adapter.
         mrhiSurfaceColor color;
         // The formats its images' views may take besides its own: the format's
-        // sRGB twin. Unused entries are mrhi_formatNone.
+        // sRGB twin. The format itself may be listed too, as WebGPU allows.
+        // Unused entries are mrhi_formatNone.
         mrhiFormat viewFormats[MRHI_VIEW_FORMATS];
         // Its images' uses, among the surface's usages and those the format
         // takes on the device; never transient.
@@ -359,22 +360,22 @@ extern "C"
     /// @param config  The configuration.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a
     /// config without its cookie, an unknown color field or usage, a transient
-    /// usage, a view format that is not the color format's twin, a zero size,
-    /// or other than one present mode and one alpha mode; `mrhi_errorStale` for
-    /// a surface the instance no longer has; `mrhi_errorUnsupported` for a
-    /// surface the device's adapter cannot present to, a color, usage, present
-    /// mode or alpha mode it does not report, a usage the format cannot take on
-    /// the device, a size past the adapter's limits, view formats the device
-    /// cannot give the surface's images, or a critical extension the library
-    /// does not know; `mrhi_errorOutOfDate` for a size the window does not take
-    /// now, where the window fixes its images' size (Vulkan on Win32, X11 and
-    /// Android), to be configured again with the window's size;
-    /// `mrhi_errorState` for a device that is not ready, or a surface
-    /// configured on another device; `mrhi_errorCapacity` for a size past the
-    /// device's limits within the adapter's, or when the device's surface limit
-    /// is reached; `mrhi_errorPlatform` when the driver fails; `mrhi_errorBusy`
-    /// for a call from inside the device's allocator, or while its instance is
-    /// busy.
+    /// usage, a view format that is neither the color format nor its twin, a
+    /// zero size, or other than one present mode and one alpha mode;
+    /// `mrhi_errorStale` for a surface the instance no longer has;
+    /// `mrhi_errorUnsupported` for a surface the device's adapter cannot
+    /// present to, a color, usage, present mode or alpha mode it does not
+    /// report, a usage the format cannot take on the device, a size past the
+    /// adapter's limits, view formats the device cannot give the surface's
+    /// images, or a critical extension the library does not know;
+    /// `mrhi_errorOutOfDate` for a size the window does not take now, where the
+    /// window fixes its images' size (Vulkan on Win32, X11 and Android), to be
+    /// configured again with the window's size; `mrhi_errorState` for a device
+    /// that is not ready, or a surface configured on another device;
+    /// `mrhi_errorCapacity` for a size past the device's limits within the
+    /// adapter's, or when the device's surface limit is reached;
+    /// `mrhi_errorPlatform` when the driver fails; `mrhi_errorBusy` for a call
+    /// from inside the device's allocator, or while its instance is busy.
     /// @par Thread safety
     /// Safe from any thread; the device and its instance are used by one thread
     /// at a time.

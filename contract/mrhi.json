@@ -372,7 +372,7 @@
             {
               "name": "diagnostic_surface_config",
               "value": 7,
-              "doc": "A surface config names an unknown format, primaries, transfer or range, or a view format that is not its format's twin."
+              "doc": "A surface config names an unknown format, primaries, transfer or range, or a view format that is neither its format nor its format's twin."
             },
             {
               "name": "diagnostic_native_commands",
@@ -752,7 +752,7 @@
             {
               "name": "diagnostic_texture_view_formats",
               "value": 99,
-              "doc": "A texture def's view format is neither unused nor its format's twin."
+              "doc": "A texture def's view format is neither unused, its format nor its format's twin."
             },
             {
               "name": "diagnostic_transfer_alignment",
@@ -9119,7 +9119,7 @@
               "name": "view_formats",
               "type": "enum.format",
               "array": "view_formats",
-              "doc": "The formats its views may take besides its own: the format's sRGB or linear twin. Unused entries are mrhi_formatNone.",
+              "doc": "The formats its views may take besides its own: the format's sRGB or linear twin. The format itself may be listed too, as WebGPU allows, but a transient texture lists none. Unused entries are mrhi_formatNone.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -11708,7 +11708,7 @@
               "name": "view_formats",
               "type": "enum.format",
               "array": "view_formats",
-              "doc": "The formats its images' views may take besides its own: the format's sRGB twin. Unused entries are mrhi_formatNone.",
+              "doc": "The formats its images' views may take besides its own: the format's sRGB twin. The format itself may be listed too, as WebGPU allows. Unused entries are mrhi_formatNone.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -11866,7 +11866,7 @@
           "doc": "Configures a surface on a ready device, or reconfigures one the device holds. A refused reconfiguration keeps the surface configured as it was, unless the platform's call failed after retiring the old swapchain, which leaves the surface unconfigured.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a config without its cookie, an unknown color field or usage, a transient usage, a view format that is not the color format's twin, a zero size, or other than one present mode and one alpha mode; `mrhi_errorStale` for a surface the instance no longer has; `mrhi_errorUnsupported` for a surface the device's adapter cannot present to, a color, usage, present mode or alpha mode it does not report, a usage the format cannot take on the device, a size past the adapter's limits, view formats the device cannot give the surface's images, or a critical extension the library does not know; `mrhi_errorOutOfDate` for a size the window does not take now, where the window fixes its images' size (Vulkan on Win32, X11 and Android), to be configured again with the window's size; `mrhi_errorState` for a device that is not ready, or a surface configured on another device; `mrhi_errorCapacity` for a size past the device's limits within the adapter's, or when the device's surface limit is reached; `mrhi_errorPlatform` when the driver fails; `mrhi_errorBusy` for a call from inside the device's allocator, or while its instance is busy."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a config without its cookie, an unknown color field or usage, a transient usage, a view format that is neither the color format nor its twin, a zero size, or other than one present mode and one alpha mode; `mrhi_errorStale` for a surface the instance no longer has; `mrhi_errorUnsupported` for a surface the device's adapter cannot present to, a color, usage, present mode or alpha mode it does not report, a usage the format cannot take on the device, a size past the adapter's limits, view formats the device cannot give the surface's images, or a critical extension the library does not know; `mrhi_errorOutOfDate` for a size the window does not take now, where the window fixes its images' size (Vulkan on Win32, X11 and Android), to be configured again with the window's size; `mrhi_errorState` for a device that is not ready, or a surface configured on another device; `mrhi_errorCapacity` for a size past the device's limits within the adapter's, or when the device's surface limit is reached; `mrhi_errorPlatform` when the driver fails; `mrhi_errorBusy` for a call from inside the device's allocator, or while its instance is busy."
           },
           "args": [
             {
@@ -22732,5 +22732,5 @@
       ]
     }
   ],
-  "contract_version": 31
+  "contract_version": 32
 }

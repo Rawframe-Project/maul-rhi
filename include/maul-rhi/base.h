@@ -266,7 +266,8 @@ extern "C"
         // A surface def names no surface source, or more than one.
         mrhi_diagnosticSurfaceSource = 6,
         // A surface config names an unknown format, primaries, transfer or
-        // range, or a view format that is not its format's twin.
+        // range, or a view format that is neither its format nor its format's
+        // twin.
         mrhi_diagnosticSurfaceConfig = 7,
         // Native commands set without a command buffer, or on a pass not added
         // as native.
@@ -494,7 +495,8 @@ extern "C"
         // A texture def's sample count is not 1, 2 or 4, or several samples are
         // asked for a texture that is not 2D with one mip.
         mrhi_diagnosticTextureSamples = 98,
-        // A texture def's view format is neither unused nor its format's twin.
+        // A texture def's view format is neither unused, its format nor its
+        // format's twin.
         mrhi_diagnosticTextureViewFormats = 99,
         // An offset or size not a multiple of what the command needs: 4 for
         // buffer copies, clears, uploads, readbacks, vertex buffers and

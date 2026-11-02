@@ -2317,7 +2317,7 @@ static void CheckShaderInt64(mrhiDevice* device)
 // A texel of 188 sampled through the texture's sRGB twin decodes to
 // about 0.503, where the texture's own format would give 0.737: the
 // triangle drawn with it is the scene's color at half strength. The twin
-// is the last view format, after unused entries.
+// is the last view format, after the texture's own and unused entries.
 static void CheckSampledTwin(Scene* scene)
 {
     mrhiDevice* device = scene->device;
@@ -2326,6 +2326,7 @@ static void CheckSampledTwin(Scene* scene)
     def.format = mrhi_formatRgba8Unorm;
     def.width = 1;
     def.height = 1;
+    def.viewFormats[0] = mrhi_formatRgba8Unorm;
     def.viewFormats[MRHI_VIEW_FORMATS - 1] = mrhi_formatRgba8UnormSrgb;
     mrhiResourceId gray = {0};
     CHECK(mrhiDeclareTexture(device, &def, &gray) == mrhi_success, "a texture with a twin");
@@ -4438,6 +4439,7 @@ static mrhiResult Configure(mrhiDevice* device, mrhiSurfaceId surface, const mrh
     config.surface = surface;
     // sRGB through the twin: as a view where the surface allows one, else
     // as the images' own format. The twin is the last view format, after
+    // the color format itself, which every surface takes as a view, and
     // unused entries.
     mrhiFormat twin = mrhi_formatNone;
     config.color = Srgb8(caps, &twin);
@@ -4449,6 +4451,7 @@ static mrhiResult Configure(mrhiDevice* device, mrhiSurfaceId surface, const mrh
     {
         config.color.format = twin;
     }
+    config.viewFormats[0] = config.color.format;
     config.usage = mrhi_textureRenderTarget | (caps->usages & mrhi_textureCopySource);
     config.width = width;
     config.height = height;

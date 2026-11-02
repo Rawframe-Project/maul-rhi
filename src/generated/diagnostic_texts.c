@@ -23,7 +23,7 @@ const char* mrhiGetDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticSurfaceSource:
         return "A surface def names no surface source, or more than one.";
     case mrhi_diagnosticSurfaceConfig:
-        return "A surface config names an unknown format, primaries, transfer or range, or a view format that is not its format's twin.";
+        return "A surface config names an unknown format, primaries, transfer or range, or a view format that is neither its format nor its format's twin.";
     case mrhi_diagnosticNativeCommands:
         return "Native commands set without a command buffer, or on a pass not added as native.";
     case mrhi_diagnosticRecordedInNativePass:
@@ -175,7 +175,7 @@ const char* mrhiGetDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticTextureSamples:
         return "A texture def's sample count is not 1, 2 or 4, or several samples are asked for a texture that is not 2D with one mip.";
     case mrhi_diagnosticTextureViewFormats:
-        return "A texture def's view format is neither unused nor its format's twin.";
+        return "A texture def's view format is neither unused, its format nor its format's twin.";
     case mrhi_diagnosticTransferAlignment:
         return "An offset or size not a multiple of what the command needs: 4 for buffer copies, clears, uploads, readbacks, vertex buffers and indirect arguments, the index size for index buffers, 256 for query resolves.";
     case mrhi_diagnosticTransferRange:

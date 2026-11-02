@@ -171,6 +171,9 @@ static void TestTransientShapes(void)
     CHECK(Make(def) == mrhi_errorInvalid, "a transient target with a last view format");
     def.usage = kTarget;
     CHECK(Make(def) == mrhi_success, "a view format, not transient");
+    def = valid;
+    def.viewFormats[0] = mrhi_formatRgba8Unorm;
+    CHECK(Make(def) == mrhi_errorInvalid, "a transient target listing its own format");
 }
 
 static void TestFormats(void)
@@ -178,11 +181,16 @@ static void TestFormats(void)
     mrhiTextureDef def = Def(mrhi_texture2d, mrhi_formatRgba8Unorm, 64, 64, 1, kSampled);
     def.viewFormats[0] = mrhi_formatRgba8UnormSrgb;
     CHECK(Make(def) == mrhi_success, "viewed as its sRGB twin");
+    def.viewFormats[MRHI_VIEW_FORMATS - 1] = mrhi_formatRgba8Unorm;
+    CHECK(Make(def) == mrhi_success, "its own format listed too");
+    def.viewFormats[MRHI_VIEW_FORMATS - 1] = mrhi_formatNone;
     def.viewFormats[1] = mrhi_formatR8Unorm;
     CHECK(Make(def) == mrhi_errorInvalid, "viewed as another format");
     def = Def(mrhi_texture2d, mrhi_formatR8Unorm, 64, 64, 1, kSampled);
     def.viewFormats[3] = mrhi_formatRgba8UnormSrgb;
     CHECK(Make(def) == mrhi_errorInvalid, "a format without a twin");
+    def.viewFormats[3] = mrhi_formatR8Unorm;
+    CHECK(Make(def) == mrhi_success, "a format without a twin, listing its own");
     CHECK(Make(Def(mrhi_texture2d, mrhi_formatNone, 64, 64, 1, kSampled)) == mrhi_errorInvalid,
           "no format");
     CHECK(Make(Def(mrhi_texture2d, 999, 64, 64, 1, kSampled)) == mrhi_errorInvalid,
