@@ -2324,6 +2324,14 @@ static bool IsColor(mrhiFormat format)
     return format < mrhi_formatDepth32Float;
 }
 
+// Whether a format renders on a device without optional features: a
+// depth format, or a color one but rg11b10ufloat and the compressed
+// ones.
+static bool Renders(mrhiFormat format)
+{
+    return format < mrhi_formatBc1RgbaUnorm && format != mrhi_formatRg11b10Ufloat;
+}
+
 // createTexture:sampleCount,various_sampleCount_with_all_formats: every
 // format, 32 blocks wide and high, with 0 to 256 samples, a render
 // target when several. 1 is valid, and 4 where the format multisamples.
@@ -2363,14 +2371,17 @@ static void TestSampleCounts(void)
     }
 }
 
+// The CTS's texture usages as the library's, in the CTS's order.
+static const mrhiTextureUsage s_ctsUsages[] = {
+    mrhi_textureCopySource, mrhi_textureCopyDestination, mrhi_textureSampled,
+    mrhi_textureStorage,    mrhi_textureRenderTarget,    mrhi_textureTransient,
+};
+
 // The CTS's kValidCombinationsOfOneOrTwoTextureUsages: each usage, and
 // each pair, a transient one only with a render target.
 static uint32_t UsageCombinations(mrhiTextureUsage combinations[16])
 {
-    static const mrhiTextureUsage usages[] = {
-        mrhi_textureCopySource, mrhi_textureCopyDestination, mrhi_textureSampled,
-        mrhi_textureStorage,    mrhi_textureRenderTarget,    mrhi_textureTransient,
-    };
+    const mrhiTextureUsage* usages = s_ctsUsages;
     uint32_t count = 0;
     for (uint32_t i = 0; i < 6; ++i)
     {
@@ -2509,6 +2520,149 @@ static void TestSampledKinds(void)
                CreateSampled(cases[i].dimension, RGBA8, size, 1, 4,
                              mrhi_textureSampled | mrhi_textureRenderTarget),
                i == 0);
+    }
+}
+
+// createTexture:texture_usage: one block of every format in every
+// dimension, with each usage and pair the CTS keeps. Storage needs a
+// format that stores and a render target a color format that renders,
+// which are ungranted; a transient texture is refused off 2D as
+// invalid. The 1D cases are counted.
+static void TestTextureUsages(void)
+{
+    mrhiTextureUsage usages[16];
+    uint32_t usageCount = UsageCombinations(usages);
+    char name[160];
+    for (Dimension d = DIMENSION_DEFAULT; d <= DIMENSION_3D; ++d)
+    {
+        for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+        {
+            for (uint32_t u = 0; u < usageCount && Runs(d, format); ++u)
+            {
+                if (d == DIMENSION_1D)
+                {
+                    ++s_inexpressible;
+                    continue;
+                }
+                mrhiTextureUsage usage = usages[u];
+                bool granted = ((usage & mrhi_textureStorage) == 0 || Stores(format)) &&
+                               ((usage & mrhi_textureRenderTarget) == 0 || Renders(format));
+                snprintf(name, sizeof(name),
+                         "createTexture:texture_usage %s, format %d, usage 0x%x", s_dimensions[d],
+                         (int)format, (unsigned)usage);
+                mrhiResult status = CreateTexture(d, format, BlockOf(format), 1, usage);
+                if ((usage & mrhi_textureTransient) != 0 && d == DIMENSION_3D)
+                {
+                    Expect(name, status, false);
+                    continue;
+                }
+                ExpectUngranted(name, status, granted);
+            }
+        }
+    }
+}
+
+// createTexture:usage and createTexture:new_usages: an rgba8unorm
+// texture of one texel with no usage, each usage, a bit no usage has,
+// or a pair of them. A usage is valid when it is not empty, has only
+// known bits and is transient only as a transient render target. The
+// library's bit past its usages stands for the CTS's bogus one.
+static void TestUsageBits(void)
+{
+    mrhiTextureUsage usages[8] = {0};
+    for (uint32_t i = 0; i < 6; ++i)
+    {
+        usages[i + 1] = s_ctsUsages[i];
+    }
+    usages[7] = 0x40000000u;
+    mrhiTextureUsage transient = mrhi_textureTransient | mrhi_textureRenderTarget;
+    char name[96];
+    for (uint32_t i = 0; i < 8; ++i)
+    {
+        for (uint32_t j = i; j < 8; ++j)
+        {
+            mrhiTextureUsage usage = usages[i] | usages[j];
+            bool valid = usage != 0 && usage != 0x40000000u && (usage & 0x40000000u) == 0 &&
+                         ((usage & mrhi_textureTransient) == 0 || usage == transient);
+            snprintf(name, sizeof(name), "createTexture:usage 0x%x", (unsigned)usage);
+            Expect(name, CreateTexture(DIMENSION_DEFAULT, RGBA8, (mrhiExtent3d){1, 1, 1}, 1, usage),
+                   valid);
+        }
+    }
+    for (uint32_t i = 0; i < 7; ++i)
+    {
+        mrhiTextureUsage usage = i < 6 ? s_ctsUsages[i] : transient;
+        if (usage == mrhi_textureTransient)
+        {
+            continue;
+        }
+        snprintf(name, sizeof(name), "createTexture:new_usages 0x%x", (unsigned)usage);
+        Expect(name, CreateTexture(DIMENSION_DEFAULT, RGBA8, (mrhiExtent3d){1, 1, 1}, 1, usage),
+               true);
+    }
+}
+
+// The format a WebGPU format names without its -srgb suffix, from the
+// CTS's tables: the library's sRGB formats follow their linear ones.
+static mrhiFormat Linear(mrhiFormat format)
+{
+    switch (format)
+    {
+    case mrhi_formatRgba8UnormSrgb:
+    case mrhi_formatBgra8UnormSrgb:
+    case mrhi_formatBc1RgbaUnormSrgb:
+    case mrhi_formatBc2RgbaUnormSrgb:
+    case mrhi_formatBc3RgbaUnormSrgb:
+    case mrhi_formatBc7RgbaUnormSrgb:
+    case mrhi_formatEtc2Rgb8UnormSrgb:
+    case mrhi_formatEtc2Rgb8a1UnormSrgb:
+    case mrhi_formatEtc2Rgba8UnormSrgb:
+        return format - 1;
+    default:
+        return format >= mrhi_formatAstc4x4Unorm && (format - mrhi_formatAstc4x4Unorm) % 2 == 1
+                   ? format - 1
+                   : format;
+    }
+}
+
+// A sampled texture of one block, listing the view formats: its
+// refusal, or success.
+static mrhiResult CreateViewed(mrhiFormat format, mrhiFormat first, mrhiFormat second)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    mrhiExtent3d block = BlockOf(format);
+    def.format = format;
+    def.width = block.width;
+    def.height = block.height;
+    def.usage = mrhi_textureSampled;
+    def.viewFormats[0] = first;
+    def.viewFormats[1] = second;
+    mrhiTextureId texture = {0};
+    mrhiResult status = mrhiCreateTexture(s_device, &def, &texture);
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "the texture");
+    }
+    return status;
+}
+
+// createTexture:viewFormats: every pair of formats, the view format
+// listed alone, before the format, and twice. A view format is valid
+// when it is the format or differs from it only in sRGB.
+static void TestViewFormatLists(void)
+{
+    char name[128];
+    for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+    {
+        for (mrhiFormat view = RGBA8; view <= LAST_FORMAT; ++view)
+        {
+            bool compatible = Linear(format) == Linear(view);
+            snprintf(name, sizeof(name), "createTexture:viewFormats format %d, view format %d",
+                     (int)format, (int)view);
+            Expect(name, CreateViewed(format, view, mrhi_formatNone), compatible);
+            Expect(name, CreateViewed(format, view, format), compatible);
+            Expect(name, CreateViewed(format, view, view), compatible);
+        }
     }
 }
 
@@ -2950,9 +3104,12 @@ int main(void)
     TestSampleCounts();
     TestSampleShapes();
     TestSampledKinds();
+    TestTextureUsages();
+    TestUsageBits();
+    TestViewFormatLists();
     TestColorBytes();
     TestQueries();
-    CHECK(s_differs == 879 && s_inexpressible == 1427, "the pass and query cases set aside");
+    CHECK(s_differs == 879 && s_inexpressible == 1683, "the pass and query cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
