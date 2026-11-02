@@ -760,7 +760,7 @@ static mrhiResult Transfer(Method method, const Block* block, mrhiTextureKind ki
 // than run: required_bytes_in_copy's data one byte short of a buffer's
 // need that is a multiple of 4, and bound_on_offset's offset past
 // data of 0 bytes, in copies with a buffer; indirect_offset_oob's
-// buffers 1 byte short of the arguments.
+// buffers 1 byte short of the arguments; createTexture's 1D textures.
 static uint32_t s_inexpressible;
 
 // Counts the cases Maul RHI decides otherwise than the CTS: from its
@@ -1993,6 +1993,227 @@ static void TestTransientTextures(void)
     }
 }
 
+// The CTS's texture dimensions: absent, which is 2D, and its three.
+typedef enum Dimension
+{
+    DIMENSION_DEFAULT,
+    DIMENSION_1D,
+    DIMENSION_2D,
+    DIMENSION_3D,
+} Dimension;
+
+static const char* const s_dimensions[] = {"default", "1d", "2d", "3d"};
+
+#define LAST_FORMAT mrhi_formatAstc12x12UnormSrgb
+
+// WebGPU's texel block of a format, as the CTS's tables give it: one
+// texel for the uncompressed formats, 4x4 for BC, ETC2 and EAC, and an
+// ASTC format's own, in pairs of unorm and sRGB.
+static mrhiExtent3d BlockOf(mrhiFormat format)
+{
+    static const uint32_t astc[][2] = {{4, 4},  {5, 4},   {5, 5},   {6, 5},  {6, 6},
+                                       {8, 5},  {8, 6},   {8, 8},   {10, 5}, {10, 6},
+                                       {10, 8}, {10, 10}, {12, 10}, {12, 12}};
+    if (format < mrhi_formatBc1RgbaUnorm)
+    {
+        return (mrhiExtent3d){1, 1, 1};
+    }
+    if (format < mrhi_formatAstc4x4Unorm)
+    {
+        return (mrhiExtent3d){4, 4, 1};
+    }
+    const uint32_t* size = astc[(format - mrhi_formatAstc4x4Unorm) / 2];
+    return (mrhiExtent3d){size[0], size[1], 1};
+}
+
+// Whether the CTS runs a format in a dimension. It filters out a depth
+// or compressed format in 1D and a depth format in 3D, and skips a
+// compressed one in 3D on a device without the sliced 3D features,
+// which the library does not have.
+static bool Runs(Dimension dimension, mrhiFormat format)
+{
+    bool compressed = format >= mrhi_formatBc1RgbaUnorm;
+    bool depth = format == mrhi_formatDepth32Float || format == DEPTH;
+    return (dimension != DIMENSION_1D && dimension != DIMENSION_3D) || (!compressed && !depth);
+}
+
+// The CTS's maxMipLevelCount: a full chain over the width and height,
+// and the depth too in 3D.
+static uint32_t MaxMips(Dimension dimension, mrhiExtent3d size)
+{
+    uint32_t largest = size.width > size.height ? size.width : size.height;
+    if (dimension == DIMENSION_3D && size.depthOrLayers > largest)
+    {
+        largest = size.depthOrLayers;
+    }
+    uint32_t levels = 1;
+    for (; largest > 1; largest >>= 1)
+    {
+        ++levels;
+    }
+    return levels;
+}
+
+// A texture of a dimension, format, size, mips and usages, a 2D one of
+// several layers a 2D array: its refusal, or success.
+static mrhiResult CreateTexture(Dimension dimension, mrhiFormat format, mrhiExtent3d size,
+                                uint32_t mips, mrhiTextureUsage usage)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.kind = KindOf(dimension == DIMENSION_3D, size.depthOrLayers);
+    def.format = format;
+    def.width = size.width;
+    def.height = size.height;
+    def.depthOrLayers = size.depthOrLayers;
+    def.mipLevels = mips;
+    def.usage = usage;
+    mrhiTextureId texture = {0};
+    mrhiResult status = mrhiCreateTexture(s_device, &def, &texture);
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "the texture");
+    }
+    return status;
+}
+
+// createTexture:zero_size_and_usage: one block of the format, with the
+// width, height, layers, mips or usages 0 in turn. rgb10a2unorm and
+// depth24plus-stencil8 become the library's rgb10a2 and depth-stencil
+// formats. The library has no 1D texture, so those cases are counted.
+static void TestZeroSizes(void)
+{
+    static const mrhiFormat formats[] = {RGBA8, mrhi_formatRgb10a2Unorm, mrhi_formatBc1RgbaUnorm,
+                                         DEPTH};
+    static const char* const zeros[] = {"none",          "width", "height", "depthOrArrayLayers",
+                                        "mipLevelCount", "usage"};
+    char name[160];
+    for (Dimension d = DIMENSION_DEFAULT; d <= DIMENSION_3D; ++d)
+    {
+        for (size_t f = 0; f < sizeof(formats) / sizeof(formats[0]); ++f)
+        {
+            if (!Runs(d, formats[f]))
+            {
+                continue;
+            }
+            for (uint32_t z = 0; z < 6; ++z)
+            {
+                if (d == DIMENSION_1D)
+                {
+                    ++s_inexpressible;
+                    continue;
+                }
+                mrhiExtent3d size = BlockOf(formats[f]);
+                size.width = z == 1 ? 0 : size.width;
+                size.height = z == 2 ? 0 : size.height;
+                size.depthOrLayers = z == 3 ? 0 : 1;
+                snprintf(name, sizeof(name),
+                         "createTexture:zero_size_and_usage %s, format %d, %s zero",
+                         s_dimensions[d], (int)formats[f], zeros[z]);
+                Expect(name,
+                       CreateTexture(d, formats[f], size, z == 4 ? 0 : 1,
+                                     z == 5 ? 0 : mrhi_textureSampled),
+                       z == 0);
+            }
+        }
+    }
+}
+
+// createTexture:mipLevelCount,format: every format at one block, with
+// its width, height or layers raised to 17 to 32 texels in whole
+// blocks, and 1, 2, 3, 6 or 7 mips; valid up to a full chain. A 1D
+// texture takes only the width, and is counted.
+static void TestMipCounts(void)
+{
+    static const uint32_t counts[] = {1, 2, 3, 6, 7};
+    char name[160];
+    for (Dimension d = DIMENSION_DEFAULT; d <= DIMENSION_3D; ++d)
+    {
+        for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+        {
+            if (!Runs(d, format))
+            {
+                continue;
+            }
+            mrhiExtent3d block = BlockOf(format);
+            for (uint32_t m = 0; m < sizeof(counts) / sizeof(counts[0]); ++m)
+            {
+                for (uint32_t largest = 0; largest < (d == DIMENSION_1D ? 1u : 3u); ++largest)
+                {
+                    if (d == DIMENSION_1D)
+                    {
+                        ++s_inexpressible;
+                        continue;
+                    }
+                    mrhiExtent3d size = block;
+                    size.width = largest == 0 ? 31 / block.width * block.width : size.width;
+                    size.height = largest == 1 ? 31 / block.height * block.height : size.height;
+                    size.depthOrLayers = largest == 2 ? 31 : 1;
+                    snprintf(name, sizeof(name),
+                             "createTexture:mipLevelCount,format %s, format %d, %u mips, "
+                             "largest dimension %u",
+                             s_dimensions[d], (int)format, counts[m], largest);
+                    Expect(name, CreateTexture(d, format, size, counts[m], mrhi_textureSampled),
+                           counts[m] <= MaxMips(d, size));
+                }
+            }
+        }
+    }
+}
+
+// createTexture:mipLevelCount,bound_check and its
+// bigger_than_integer_bit_width: a full chain is valid and one more mip
+// is not, on power of two, odd and uneven sizes; a 2D array's layers
+// take no mips. bc1-rgba-unorm takes only the 2D sizes in whole blocks.
+// The 1D sizes are counted.
+static void TestMipBounds(void)
+{
+    static const struct
+    {
+        Dimension dimension;
+        mrhiExtent3d size;
+    } sizes[] = {
+        {DIMENSION_DEFAULT, {32, 32, 1}},  {DIMENSION_DEFAULT, {31, 32, 1}},
+        {DIMENSION_DEFAULT, {28, 32, 1}},  {DIMENSION_DEFAULT, {32, 31, 1}},
+        {DIMENSION_DEFAULT, {32, 28, 1}},  {DIMENSION_DEFAULT, {31, 31, 1}},
+        {DIMENSION_1D, {32, 1, 1}},        {DIMENSION_1D, {31, 1, 1}},
+        {DIMENSION_3D, {32, 32, 32}},      {DIMENSION_3D, {32, 31, 31}},
+        {DIMENSION_3D, {31, 32, 31}},      {DIMENSION_3D, {31, 31, 32}},
+        {DIMENSION_3D, {31, 31, 31}},      {DIMENSION_DEFAULT, {32, 8, 1}},
+        {DIMENSION_DEFAULT, {32, 32, 64}}, {DIMENSION_3D, {32, 32, 64}},
+    };
+    static const mrhiFormat formats[] = {RGBA8, mrhi_formatBc1RgbaUnorm};
+    char name[160];
+    for (size_t f = 0; f < 2; ++f)
+    {
+        for (size_t s = 0; s < sizeof(sizes) / sizeof(sizes[0]); ++s)
+        {
+            Dimension d = sizes[s].dimension;
+            mrhiExtent3d size = sizes[s].size;
+            if (formats[f] != RGBA8 &&
+                (d != DIMENSION_DEFAULT || size.width % 4 != 0 || size.height % 4 != 0))
+            {
+                continue;
+            }
+            if (d == DIMENSION_1D)
+            {
+                ++s_inexpressible;
+                continue;
+            }
+            uint32_t mips = MaxMips(d, size);
+            snprintf(name, sizeof(name),
+                     "createTexture:mipLevelCount,bound_check format %d, %s %ux%ux%u, %u mips",
+                     (int)formats[f], s_dimensions[d], size.width, size.height, size.depthOrLayers,
+                     mips);
+            Expect(name, CreateTexture(d, formats[f], size, mips, mrhi_textureSampled), true);
+            Expect(name, CreateTexture(d, formats[f], size, mips + 1, mrhi_textureSampled), false);
+        }
+    }
+    Expect("createTexture:mipLevelCount,bound_check,bigger_than_integer_bit_width",
+           CreateTexture(DIMENSION_DEFAULT, RGBA8, (mrhiExtent3d){32, 32, 1}, 100,
+                         mrhi_textureSampled),
+           false);
+}
+
 // The color renderable formats, with WebGPU's render target pixel byte
 // cost and component alignment of each.
 static const struct
@@ -2424,9 +2645,12 @@ int main(void)
     TestTransientTargets();
     TestViewUsages();
     TestTransientTextures();
+    TestZeroSizes();
+    TestMipCounts();
+    TestMipBounds();
     TestColorBytes();
     TestQueries();
-    CHECK(s_differs == 879 && s_inexpressible == 966, "the pass and query cases set aside");
+    CHECK(s_differs == 879 && s_inexpressible == 1060, "the pass and query cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
