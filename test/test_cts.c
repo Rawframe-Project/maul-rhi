@@ -1988,16 +1988,7 @@ static void TestTransientTextures(void)
                      : view == 1 ? "its own format"
                                  : "the twin");
             mrhiFormat format = view == 0 ? mrhi_formatNone : pairs[p][view - 1];
-            mrhiResult status = MakeTarget(pairs[p][0], 1, 1, transient, format);
-            // A view format is the twin, never the texture's own format,
-            // which every view takes without it being listed.
-            if (!transient && view == 1)
-            {
-                Expect(name, status, false);
-                s_differs += 1;
-                continue;
-            }
-            Expect(name, status, !transient || view == 0);
+            Expect(name, MakeTarget(pairs[p][0], 1, 1, transient, format), !transient || view == 0);
         }
     }
 }
@@ -2435,7 +2426,7 @@ int main(void)
     TestTransientTextures();
     TestColorBytes();
     TestQueries();
-    CHECK(s_differs == 881 && s_inexpressible == 966, "the pass and query cases set aside");
+    CHECK(s_differs == 879 && s_inexpressible == 966, "the pass and query cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
