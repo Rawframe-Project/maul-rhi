@@ -2666,6 +2666,187 @@ static void TestViewFormatLists(void)
     }
 }
 
+// The CTS's makeValueTestVariant for one of a size's three values: the
+// limit times mult, plus add, in blocks of the format's width or height
+// when the variant says so.
+typedef struct Variant
+{
+    uint32_t mult;
+    int32_t add;
+    uint32_t inBlock;
+} Variant;
+
+#define IN_WIDTH  1u
+#define IN_HEIGHT 2u
+
+static uint32_t Varied(uint32_t limit, Variant variant, mrhiExtent3d block)
+{
+    int32_t unit = variant.inBlock == IN_WIDTH    ? (int32_t)block.width
+                   : variant.inBlock == IN_HEIGHT ? (int32_t)block.height
+                                                  : 1;
+    return (uint32_t)((int64_t)limit * variant.mult + (int64_t)variant.add * unit);
+}
+
+// A limit rounded down to whole blocks.
+static uint32_t RoundDown(uint32_t limit, uint32_t block)
+{
+    return limit / block * block;
+}
+
+// The uncompressed size variants: each value one under, at and one past
+// its limit, the others 1.
+static const Variant s_sizeVariants[9][3] = {
+    {{1, -1, 0}, {0, 1, 0}, {0, 1, 0}}, {{1, 0, 0}, {0, 1, 0}, {0, 1, 0}},
+    {{1, 1, 0}, {0, 1, 0}, {0, 1, 0}},  {{0, 1, 0}, {1, -1, 0}, {0, 1, 0}},
+    {{0, 1, 0}, {1, 0, 0}, {0, 1, 0}},  {{0, 1, 0}, {1, 1, 0}, {0, 1, 0}},
+    {{0, 1, 0}, {0, 1, 0}, {1, -1, 0}}, {{0, 1, 0}, {0, 1, 0}, {1, 0, 0}},
+    {{0, 1, 0}, {0, 1, 0}, {1, 1, 0}},
+};
+
+// The compressed 2D size variants: each value a texel or a block under,
+// at and past its limit in whole blocks, the others 1 or a block.
+static const Variant s_blockVariants[28][3] = {
+    {{1, -1, 0}, {0, 1, 0}, {0, 1, 0}},
+    {{1, -1, IN_WIDTH}, {0, 1, 0}, {0, 1, 0}},
+    {{1, -1, IN_WIDTH}, {0, 1, IN_HEIGHT}, {0, 1, 0}},
+    {{1, 0, 0}, {0, 1, 0}, {0, 1, 0}},
+    {{1, 0, 0}, {0, 1, IN_HEIGHT}, {0, 1, 0}},
+    {{1, 1, 0}, {0, 1, 0}, {0, 1, 0}},
+    {{1, 1, IN_WIDTH}, {0, 1, 0}, {0, 1, 0}},
+    {{1, 1, IN_WIDTH}, {0, 1, IN_HEIGHT}, {0, 1, 0}},
+    {{0, 1, 0}, {1, -1, 0}, {0, 1, 0}},
+    {{0, 1, 0}, {1, -1, IN_HEIGHT}, {0, 1, 0}},
+    {{0, 1, IN_WIDTH}, {1, -1, IN_HEIGHT}, {0, 1, 0}},
+    {{0, 1, 0}, {1, 0, 0}, {0, 1, 0}},
+    {{0, 1, IN_WIDTH}, {1, 0, 0}, {0, 1, 0}},
+    {{0, 1, 0}, {1, 1, 0}, {0, 1, 0}},
+    {{0, 1, 0}, {1, 1, IN_WIDTH}, {0, 1, 0}},
+    {{0, 1, IN_WIDTH}, {1, 1, IN_HEIGHT}, {0, 1, 0}},
+    {{0, 1, 0}, {0, 1, 0}, {1, -1, 0}},
+    {{0, 1, IN_WIDTH}, {0, 1, 0}, {1, -1, 0}},
+    {{0, 1, 0}, {0, 1, IN_HEIGHT}, {1, -1, 0}},
+    {{0, 1, IN_WIDTH}, {0, 1, IN_HEIGHT}, {1, -1, 0}},
+    {{0, 1, 0}, {0, 1, 0}, {1, 0, 0}},
+    {{0, 1, IN_WIDTH}, {0, 1, 0}, {1, 0, 0}},
+    {{0, 1, 0}, {0, 1, IN_HEIGHT}, {1, 0, 0}},
+    {{0, 1, IN_WIDTH}, {0, 1, IN_HEIGHT}, {1, 0, 0}},
+    {{0, 1, 0}, {0, 1, 0}, {1, 1, 0}},
+    {{0, 1, IN_WIDTH}, {0, 1, 0}, {1, 1, 0}},
+    {{0, 1, 0}, {0, 1, IN_HEIGHT}, {1, 1, 0}},
+    {{0, 1, IN_WIDTH}, {0, 1, IN_HEIGHT}, {1, 1, 0}},
+};
+
+// createTexture:texture_size,default_value_and_smallest_size: one texel
+// of every uncompressed format is valid, and of a compressed one only a
+// whole block, with the height and layers left at 1 or given. The 1D
+// cases are counted.
+static void TestSmallestSizes(void)
+{
+    char name[160];
+    for (Dimension d = DIMENSION_DEFAULT; d <= DIMENSION_3D; ++d)
+    {
+        for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+        {
+            mrhiExtent3d block = BlockOf(format);
+            bool compressed = format >= mrhi_formatBc1RgbaUnorm;
+            // The CTS's sizes [1], [width], [1, 1], [width, height],
+            // [1, 1, 1] and [width, height, 1], in blocks; the first
+            // three of an uncompressed format.
+            const mrhiExtent3d sizes[] = {
+                {1, 1, 1}, {block.width, 1, 1}, {1, 1, 1}, block, {1, 1, 1}, block,
+            };
+            for (uint32_t i = 0; i < (compressed ? 6u : 3u) && Runs(d, format); ++i)
+            {
+                if (d == DIMENSION_1D)
+                {
+                    ++s_inexpressible;
+                    continue;
+                }
+                mrhiExtent3d size = sizes[i];
+                snprintf(name, sizeof(name),
+                         "createTexture:texture_size,default_value_and_smallest_size %s, format "
+                         "%d, %ux%u",
+                         s_dimensions[d], (int)format, size.width, size.height);
+                Expect(name, CreateTexture(d, format, size, 1, mrhi_textureSampled),
+                       !compressed || i == 3 || i == 5);
+            }
+        }
+    }
+}
+
+// A case of texture_size at a limit: success within the device's
+// limits, mrhi_errorCapacity past one, and a validation error for a
+// size out of whole blocks first.
+static void ExpectSize(const char* name, Dimension dimension, mrhiFormat format, mrhiExtent3d size,
+                       const mrhiLimits* limits)
+{
+    mrhiExtent3d block = BlockOf(format);
+    bool aligned = size.width % block.width == 0 && size.height % block.height == 0;
+    bool within = dimension == DIMENSION_3D ? size.width <= limits->textureDimension3d &&
+                                                  size.height <= limits->textureDimension3d &&
+                                                  size.depthOrLayers <= limits->textureDimension3d
+                                            : size.width <= limits->textureDimension2d &&
+                                                  size.height <= limits->textureDimension2d &&
+                                                  size.depthOrLayers <= limits->textureArrayLayers;
+    mrhiResult status = CreateTexture(dimension, format, size, 1, mrhi_textureSampled);
+    if (!aligned)
+    {
+        Expect(name, status, false);
+        return;
+    }
+    ExpectPastLimit(name, status, within);
+}
+
+// createTexture:texture_size,1d_texture, 2d_texture and 3d_texture:
+// each of a size's values one under, at and past its limit, in whole
+// blocks for a compressed format and a texel or a block off them. The
+// 1D sizes are counted, and a compressed 3D texture is not run.
+static void TestLimitSizes(void)
+{
+    mrhiLimits limits = {0};
+    CHECK(mrhiDevice_GetLimits(s_device, &limits) == mrhi_success, "the limits");
+    // The 1D test's regular formats, three widths, two heights and two
+    // layer counts.
+    s_inexpressible += (uint32_t)(mrhi_formatDepth32Float - RGBA8) * 3 * 2 * 2;
+    char name[192];
+    for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+    {
+        mrhiExtent3d block = BlockOf(format);
+        bool compressed = format >= mrhi_formatBc1RgbaUnorm;
+        const uint32_t base2d[3] = {RoundDown(limits.textureDimension2d, block.width),
+                                    RoundDown(limits.textureDimension2d, block.height),
+                                    limits.textureArrayLayers};
+        const Variant(*variants)[3] = compressed ? s_blockVariants : s_sizeVariants;
+        uint32_t variantCount = compressed ? 28 : 9;
+        for (uint32_t d = 0; d < 2; ++d)
+        {
+            Dimension dimension = d == 0 ? DIMENSION_DEFAULT : DIMENSION_2D;
+            for (uint32_t v = 0; v < variantCount; ++v)
+            {
+                mrhiExtent3d size = {Varied(base2d[0], variants[v][0], block),
+                                     Varied(base2d[1], variants[v][1], block),
+                                     Varied(base2d[2], variants[v][2], block)};
+                snprintf(name, sizeof(name),
+                         "createTexture:texture_size,2d_texture %s, format %d, %ux%ux%u",
+                         s_dimensions[dimension], (int)format, size.width, size.height,
+                         size.depthOrLayers);
+                ExpectSize(name, dimension, format, size, &limits);
+            }
+        }
+        for (uint32_t v = 0; v < 9 && Runs(DIMENSION_3D, format); ++v)
+        {
+            uint32_t most = limits.textureDimension3d;
+            mrhiExtent3d size = {Varied(most, s_sizeVariants[v][0], block),
+                                 Varied(most, s_sizeVariants[v][1], block),
+                                 Varied(most, s_sizeVariants[v][2], block)};
+            snprintf(name, sizeof(name),
+                     "createTexture:texture_size,3d_texture format %d, %ux%ux%u", (int)format,
+                     size.width, size.height, size.depthOrLayers);
+            ExpectSize(name, DIMENSION_3D, format, size, &limits);
+        }
+    }
+}
+
 // The color renderable formats, with WebGPU's render target pixel byte
 // cost and component alignment of each.
 static const struct
@@ -3066,6 +3247,9 @@ int main(void)
     // past a device limit is one a device asking for more would take.
     s_adapter.limits.workgroupsPerDimension = UINT32_MAX;
     s_adapter.limits.vertexBuffers = 16;
+    s_adapter.limits.textureDimension2d = 16384;
+    s_adapter.limits.textureDimension3d = 4096;
+    s_adapter.limits.textureArrayLayers = 2048;
     // r32float multisampled, as WebGPU allows and many GPUs report, so that
     // a format that multisamples without resolving is there to resolve.
     s_adapter.limitedFormat = mrhi_formatR32Float;
@@ -3107,9 +3291,11 @@ int main(void)
     TestTextureUsages();
     TestUsageBits();
     TestViewFormatLists();
+    TestSmallestSizes();
+    TestLimitSizes();
     TestColorBytes();
     TestQueries();
-    CHECK(s_differs == 879 && s_inexpressible == 1683, "the pass and query cases set aside");
+    CHECK(s_differs == 879 && s_inexpressible == 1923, "the pass and query cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
