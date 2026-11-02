@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.23.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.23.0...v0.23.1) (2026-11-02)
+
+
+### Fixed
+
+* **query:** take a query set of 0 queries, as WebGPU does ([#407](https://github.com/Rawframe-Project/maul-rhi/issues/407)) ([c29330d](https://github.com/Rawframe-Project/maul-rhi/commit/c29330da5d9b8b606974c4fb91b6ee1e0f0866a7)), closes [#406](https://github.com/Rawframe-Project/maul-rhi/issues/406)
+
 ## [0.23.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.22.0...v0.23.0) (2026-11-02)
 
 ### Changed
