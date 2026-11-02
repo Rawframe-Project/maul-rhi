@@ -5,6 +5,33 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.22.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.21.0...v0.22.0) (2026-11-02)
+
+### Changed
+
+- **Breaking:** `mrhiCreateTexture` takes a `mrhi_textureCubeArray`
+  texture of any count of six or more square layers, as WebGPU puts the
+  sixes on the view, not the texture. Its views still take 6 layers for
+  a cube and a multiple of 6 for a cube array, within the texture, so a
+  7-layer texture takes a cube of any six layers in a row. Before, such
+  a texture was refused unless its layers were a multiple of 6, with
+  `mrhi_errorInvalid`, counted as `mrhi_diagnosticTextureSize`. On
+  Metal, a cube array whose layers are not a multiple of 6 is a 2D
+  array texture viewed as cubes. Drivers built outside the tree must be
+  rebuilt for SPI version 17, and may be handed such a texture; the
+  mustpass list is `conformance/mustpass/spi-17.txt`.
+  `contract_version` rises to 33.
+  ([#397](https://github.com/Rawframe-Project/maul-rhi/pull/397))
+- **Breaking:** `mrhiCreateSampler` takes any `maxAnisotropy` of 1 or
+  more, with every filter linear above 1, as WebGPU's `createSampler`
+  does. The drivers clamp it to what the device takes: D3D12 and Metal
+  to 16, Vulkan to the device's `maxSamplerAnisotropy`, and WebGPU
+  leaves it to the browser. Before, a value above 16 was refused on
+  every driver with `mrhi_errorInvalid`, counted as
+  `mrhi_diagnosticSamplerDef`. Drivers built outside the tree may be
+  handed such a value and must clamp it.
+  ([#400](https://github.com/Rawframe-Project/maul-rhi/pull/400))
+
 ## [0.21.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.20.0...v0.21.0) (2026-11-02)
 
 ### Changed
