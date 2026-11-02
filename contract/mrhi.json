@@ -572,7 +572,7 @@
             {
               "name": "diagnostic_sampler_def",
               "value": 62,
-              "doc": "A sampler def with an unknown filter, address mode or compare function, a negative, infinite or reversed level of detail range, or anisotropy outside 1 to 16 or above 1 without linear filtering."
+              "doc": "A sampler def with an unknown filter, address mode or compare function, a negative, infinite or reversed level of detail range, or anisotropy of 0 or above 1 without linear filtering."
             },
             {
               "name": "diagnostic_buffer_size",

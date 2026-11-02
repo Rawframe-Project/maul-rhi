@@ -382,7 +382,7 @@ extern "C"
         mrhi_diagnosticStatisticsQuery = 60,
         // A sampler def with an unknown filter, address mode or compare
         // function, a negative, infinite or reversed level of detail range, or
-        // anisotropy outside 1 to 16 or above 1 without linear filtering.
+        // anisotropy of 0 or above 1 without linear filtering.
         mrhi_diagnosticSamplerDef = 62,
         // A buffer size of zero or not a multiple of 4.
         mrhi_diagnosticBufferSize = 63,
