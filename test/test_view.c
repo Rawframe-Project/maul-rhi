@@ -112,6 +112,18 @@ static void TestKinds(void)
           "7 layers of cubes");
     CHECK(Make(Range(Def(cubes, mrhi_textureCube), 0, 1, 0, 12)) == mrhi_errorInvalid,
           "a cube of 12 layers");
+    // WebGPU puts the sixes on the view, so a texture of 7 layers takes a
+    // cube of any six in a row.
+    mrhiTextureId seven =
+        MakeTexture(s_device, mrhi_textureCubeArray, mrhi_formatRgba8Unorm, 7, 1, kSampled);
+    CHECK(Make(Range(Def(seven, mrhi_textureCube), 0, 1, 1, 6)) == mrhi_success,
+          "a cube of layers 1 to 6 of 7");
+    CHECK(Make(Range(Def(seven, mrhi_textureCubeArray), 0, 1, 0, 6)) == mrhi_success,
+          "an array of the first six of 7");
+    CHECK(Make(Range(Def(seven, mrhi_textureCube), 0, 1, 2, 6)) == mrhi_errorInvalid,
+          "a cube past the last of 7 layers");
+    CHECK(Make(Def(seven, mrhi_textureCubeArray)) == mrhi_errorInvalid, "an array of all 7 layers");
+    CHECK(Make(Def(seven, mrhi_texture2dArray)) == mrhi_success, "all 7 as a 2D array");
     mrhiTextureId volume =
         MakeTexture(s_device, mrhi_texture3d, mrhi_formatRgba8Unorm, 16, 1, kSampled);
     CHECK(Make(Def(volume, mrhi_texture3d)) == mrhi_success, "3D");

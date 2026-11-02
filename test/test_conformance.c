@@ -398,6 +398,19 @@ static void CheckObjects(mrhiDevice* device, bool timestamps)
     (void)MakeView(device, array, mrhi_texture2dArray, mrhi_aspectAll);
     mrhiTextureId cubes = MakeTexture(device, mrhi_textureCubeArray, mrhi_formatRgba8Unorm, 12);
     (void)MakeView(device, cubes, mrhi_textureCubeArray, mrhi_aspectAll);
+    // A cube array of layers out of sixes, seen as a cube and an array of
+    // one cube from its second layer, and as a 2D array of all of them.
+    mrhiTextureId seven = MakeTexture(device, mrhi_textureCubeArray, mrhi_formatRgba8Unorm, 7);
+    for (mrhiTextureKind kind = mrhi_texture2dArray; kind <= mrhi_textureCubeArray; ++kind)
+    {
+        mrhiViewDef def = mrhiDefaultViewDef();
+        def.texture = seven;
+        def.kind = kind;
+        def.baseLayer = kind == mrhi_texture2dArray ? 0 : 1;
+        def.layerCount = kind == mrhi_texture2dArray ? 7 : 6;
+        mrhiViewId view = {0};
+        CHECK(mrhiCreateView(device, &def, &view) == mrhi_success, "a view of 7 layers");
+    }
     (void)MakeView(device, MakeVolume(device), mrhi_texture3d, mrhi_aspectAll);
     mrhiQuerySetId occlusion = MakeQuerySet(device, mrhi_queryOcclusion, 8);
     CHECK(mrhiDestroyQuerySet(device, occlusion) == mrhi_success, "a query set destroyed");

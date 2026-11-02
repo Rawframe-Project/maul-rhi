@@ -66,7 +66,8 @@ static bool IsShapeValid(const mrhiTextureDef* def)
         layers = square && def->depthOrLayers == 6;
         break;
     case mrhi_textureCubeArray:
-        layers = square && def->depthOrLayers % 6 == 0;
+        // Any count of six or more, as WebGPU puts the sixes on the view.
+        layers = square && def->depthOrLayers >= 6;
         break;
     case mrhi_texture3d:
         // WebGPU makes no 3D texture of a depth or stencil format.

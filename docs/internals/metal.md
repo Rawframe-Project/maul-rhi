@@ -22,6 +22,7 @@ Buffers, textures, views, samplers and query sets are Metal objects whose retain
 
 - Buffers and textures live in private memory; a transient render target is memoryless on Apple family GPUs.
 - The depth and stencil format is `Depth32Float_Stencil8`, whose stencil a view sees as `X32_Stencil8`.
+- A cube array texture whose layers are not a multiple of 6 is a `MTLTextureType2DArray`, since a `CubeArray` texture counts its layers in cubes. Its views are still cubes and cube arrays: [`newTextureViewWithPixelFormat:textureType:levels:slices:`](https://developer.apple.com/documentation/metal/mtltexture/newtextureviewwithpixelformat:texturetype:levels:slices:) casts a 2D array to either.
 - An occlusion query set is a buffer of 8 bytes per query, the render passes' visibility results.
 - Samplers are made to sit in argument buffers.
 - A resource's memory is Metal's heap size and alignment for it.

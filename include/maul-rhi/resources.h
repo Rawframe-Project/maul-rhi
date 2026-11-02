@@ -254,7 +254,9 @@ extern "C"
         mrhi_texture2dArray = 1,
         // Six square 2D images, one per cube face.
         mrhi_textureCube = 2,
-        // An array of cubes, six layers each.
+        // An array of cubes, six layers each. A texture of this kind has six or
+        // more square layers, and its views take any six of them in a row as a
+        // cube.
         mrhi_textureCubeArray = 3,
         // A volume, of a format neither compressed nor depth or stencil.
         mrhi_texture3d = 4,
@@ -315,8 +317,8 @@ extern "C"
         // Texels down; a multiple of the format's block height; equal to the
         // width for cubes.
         uint32_t height;
-        // The depth of a 3D texture, else its layers: 1 for 2D, 6 for a cube, a
-        // multiple of 6 for a cube array.
+        // The depth of a 3D texture, else its layers: 1 for 2D, 6 for a cube, 6
+        // or more for a cube array.
         uint32_t depthOrLayers;
         // At least 1, at most a full chain.
         uint32_t mipLevels;
