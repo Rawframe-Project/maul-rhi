@@ -8034,7 +8034,7 @@
             {
               "name": "max_anisotropy",
               "type": "uint16",
-              "doc": "1 to 16; above 1, every filter must be linear.",
+              "doc": "At least 1; above 1, every filter must be linear. A driver clamps it to what the device takes, as WebGPU does.",
               "mapping": {
                 "vulkan": {
                   "class": "restricted",
@@ -8042,11 +8042,11 @@
                 },
                 "d3d12": {
                   "class": "direct",
-                  "note": "MaxAnisotropy with an anisotropic filter"
+                  "note": "MaxAnisotropy with an anisotropic filter, clamped to 16"
                 },
                 "metal": {
                   "class": "direct",
-                  "note": "maxAnisotropy"
+                  "note": "maxAnisotropy, clamped to 16"
                 },
                 "web_gpu": {
                   "class": "direct",

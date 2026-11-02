@@ -3328,6 +3328,55 @@ static void TestViewUsageFormats(void)
     }
 }
 
+// A sampler of the def: its refusal, or success, the sampler destroyed.
+static mrhiResult MakeSampler(const mrhiSamplerDef* def)
+{
+    mrhiSamplerId sampler = {0};
+    mrhiResult status = mrhiCreateSampler(s_device, def, &sampler);
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiDestroySampler(s_device, sampler) == mrhi_success, "the sampler");
+    }
+    return status;
+}
+
+// createSampler:lodMinAndMaxClamp and createSampler:maxAnisotropy: each
+// pair of clamps, valid when neither is below 0 nor the first above the
+// second; and anisotropy from -1 to 1024 with linear filters, then 1
+// with each filter nearest in turn, valid from 1 and, above 1, with
+// every filter linear. WebIDL's [Clamp] makes the CTS's -1 a 0, and its
+// absent value is 1.
+static void TestSamplers(void)
+{
+    static const float clamps[] = {-4e-30f, -1.0f, 0.0f, 0.5f, 1.0f, 10.0f, 4e30f};
+    char name[128];
+    for (size_t i = 0; i < 7; ++i)
+    {
+        for (size_t j = 0; j < 7; ++j)
+        {
+            mrhiSamplerDef def = mrhiDefaultSamplerDef();
+            def.lodMin = clamps[i];
+            def.lodMax = clamps[j];
+            snprintf(name, sizeof(name), "createSampler:lodMinAndMaxClamp %g, %g",
+                     (double)clamps[i], (double)clamps[j]);
+            Expect(name, MakeSampler(&def), clamps[i] >= 0.0f && clamps[j] >= clamps[i]);
+        }
+    }
+    static const uint16_t anisotropies[] = {0, 1, 0, 1, 2, 4, 7, 16, 32, 33, 1024};
+    for (size_t i = 0; i < sizeof(anisotropies) / sizeof(anisotropies[0]) + 3; ++i)
+    {
+        size_t nearest = i < 11 ? 3 : i - 11;
+        mrhiSamplerDef def = mrhiDefaultSamplerDef();
+        def.minFilter = nearest == 0 ? mrhi_filterNearest : mrhi_filterLinear;
+        def.magFilter = nearest == 1 ? mrhi_filterNearest : mrhi_filterLinear;
+        def.mipFilter = nearest == 2 ? mrhi_filterNearest : mrhi_filterLinear;
+        def.maxAnisotropy = i < 11 ? anisotropies[i] : 1;
+        snprintf(name, sizeof(name), "createSampler:maxAnisotropy %u, nearest filter %zu",
+                 (unsigned)def.maxAnisotropy, nearest);
+        Expect(name, MakeSampler(&def), def.maxAnisotropy >= 1);
+    }
+}
+
 // The color renderable formats, with WebGPU's render target pixel byte
 // cost and component alignment of each.
 static const struct
@@ -3782,6 +3831,7 @@ int main(void)
     TestViewStates();
     TestViewUsageSubsets();
     TestViewUsageFormats();
+    TestSamplers();
     TestColorBytes();
     TestQueries();
     CHECK(s_differs == 880 && s_inexpressible == 2068, "the pass and query cases set aside");

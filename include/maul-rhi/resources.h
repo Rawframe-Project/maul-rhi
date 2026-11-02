@@ -104,7 +104,8 @@ extern "C"
         float lodMin;
         // The highest level of detail sampled, finite and at least lodMin.
         float lodMax;
-        // 1 to 16; above 1, every filter must be linear.
+        // At least 1; above 1, every filter must be linear. A driver clamps it
+        // to what the device takes, as WebGPU does.
         uint16_t maxAnisotropy;
         // A comparison for shadow maps, or mrhi_compareNone.
         mrhiCompareFunction compare;

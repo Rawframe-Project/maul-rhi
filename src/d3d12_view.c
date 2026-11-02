@@ -171,7 +171,8 @@ mrhiResult mrhiD3d12CreateSampler(mrhiD3d12Objects* objects, const mrhiSamplerDe
         .AddressU = mrhiD3d12Address(def->addressU),
         .AddressV = mrhiD3d12Address(def->addressV),
         .AddressW = mrhiD3d12Address(def->addressW),
-        .MaxAnisotropy = def->maxAnisotropy,
+        .MaxAnisotropy = def->maxAnisotropy < D3D12_MAX_MAXANISOTROPY ? def->maxAnisotropy
+                                                                      : D3D12_MAX_MAXANISOTROPY,
         .ComparisonFunc = mrhiD3d12Compare(def->compare),
         .MinLOD = def->lodMin,
         .MaxLOD = def->lodMax,

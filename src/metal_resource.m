@@ -168,7 +168,8 @@ mrhiResult mrhiMetalCreateSampler(id<MTLDevice> device, const mrhiSamplerDef* de
         descriptor.rAddressMode = mrhiMetalAddress(def->addressW);
         descriptor.lodMinClamp = def->lodMin;
         descriptor.lodMaxClamp = def->lodMax;
-        descriptor.maxAnisotropy = def->maxAnisotropy;
+        // Metal takes 1 to 16.
+        descriptor.maxAnisotropy = def->maxAnisotropy < 16 ? def->maxAnisotropy : 16;
         if (def->compare != mrhi_compareNone)
         {
             descriptor.compareFunction = mrhiMetalCompare(def->compare);
