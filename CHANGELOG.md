@@ -7,14 +7,16 @@ may change the API, the ABI and every data format.
 
 ## [0.24.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.23.1...v0.24.0) (2026-11-02)
 
+### Changed
 
-### ⚠ BREAKING CHANGES
-
-* **graph:** a depth target whose format has no stencil now takes only keep and keep for its stencil operations, as WebGPU gives such a target none; others are refused with mrhi_errorInvalid.
-
-### Fixed
-
-* **graph:** refuse stencil operations on a depth target without stencil ([#412](https://github.com/Rawframe-Project/maul-rhi/issues/412)) ([25e87b8](https://github.com/Rawframe-Project/maul-rhi/commit/25e87b8268ae2af7c7686f3cd287145c7ca5337e)), closes [#410](https://github.com/Rawframe-Project/maul-rhi/issues/410)
+- **Breaking:** `mrhiAddPass` refuses, with `mrhi_errorInvalid`, a depth
+  target whose format has no stencil, such as
+  `mrhi_formatDepth32Float`, when its stencil operations are not keep
+  and keep, as WebGPU gives such a target no stencil operations. Before,
+  they were accepted and ignored on every driver. Keep and keep, the
+  defaults, stand for none given. Drivers built outside the tree see no
+  change, and the SPI stays 18. `contract_version` rises to 36.
+  ([#412](https://github.com/Rawframe-Project/maul-rhi/pull/412))
 
 ## [0.23.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.23.0...v0.23.1) (2026-11-02)
 
