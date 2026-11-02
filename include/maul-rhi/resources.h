@@ -549,7 +549,8 @@ extern "C"
         size_t labelLength;
         // What its queries measure.
         mrhiQueryKind kind;
-        // Its queries, 1 to MRHI_MAX_QUERY_SET_QUERIES.
+        // Its queries, any count to MRHI_MAX_QUERY_SET_QUERIES, 0 included, as
+        // WebGPU's.
         uint32_t count;
     } mrhiQuerySetDef;
 
@@ -566,13 +567,12 @@ extern "C"
     /// @param def     The query set to make.
     /// @param setOut  Receives the query set; the null id on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
-    /// without its cookie, a label that is not UTF-8 without NUL, an unknown
-    /// type, or a count of 0; `mrhi_errorLimit` for a count past
-    /// MRHI_MAX_QUERY_SET_QUERIES or a label past MRHI_MAX_LABEL_BYTES;
-    /// `mrhi_errorState` for a device that is not ready;
-    /// `mrhi_errorUnsupported` for a critical extension the library does not
-    /// know, timestamps without the timestamp_query feature, or pipeline
-    /// statistics without the pipeline_statistics_query feature;
+    /// without its cookie, a label that is not UTF-8 without NUL, or an unknown
+    /// type; `mrhi_errorLimit` for a count past MRHI_MAX_QUERY_SET_QUERIES or a
+    /// label past MRHI_MAX_LABEL_BYTES; `mrhi_errorState` for a device that is
+    /// not ready; `mrhi_errorUnsupported` for a critical extension the library
+    /// does not know, timestamps without the timestamp_query feature, or
+    /// pipeline statistics without the pipeline_statistics_query feature;
     /// `mrhi_errorCapacity` when the device's querySets budget is reached or
     /// its queries budget lacks a run of count queries; `mrhi_errorBusy` for a
     /// call from inside the device's allocator.

@@ -78,7 +78,7 @@ mrhiResult mrhiCreateQuerySet(mrhiDevice* device, const mrhiQuerySetDef* def,
     {
         return status;
     }
-    if ((uint32_t)def->kind > mrhi_queryPipelineStatistics || def->count == 0)
+    if ((uint32_t)def->kind > mrhi_queryPipelineStatistics)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticQuerySetDef);
     }
@@ -108,6 +108,9 @@ mrhiResult mrhiCreateQuerySet(mrhiDevice* device, const mrhiQuerySetDef* def,
     uint64_t handle = 0;
     mrhiQuerySetDef driverDef = *def;
     mrhiDropLabel(&driverDef.label, &driverDef.labelLength);
+    // No native API makes an empty set: a set of 0 queries is one of 1
+    // that no check lets a pass write or resolve.
+    driverDef.count = def->count == 0 ? 1 : def->count;
     status = mrhiDriverStatus(
         device, device->driver.vtable->createQuerySet(device->driver.self, &driverDef, &handle));
     if (status != mrhi_success)

@@ -58,9 +58,7 @@ static void TestInvalidDefs(void)
 {
     mrhiDevice* device = Open(4, 8192, false, true);
     mrhiQuerySetId set;
-    mrhiQuerySetDef def = Def(mrhi_queryOcclusion, 0);
-    CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorInvalid, "no queries");
-    def.count = MRHI_MAX_QUERY_SET_QUERIES;
+    mrhiQuerySetDef def = Def(mrhi_queryOcclusion, MRHI_MAX_QUERY_SET_QUERIES);
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_success, "at the bound");
     def.count = MRHI_MAX_QUERY_SET_QUERIES + 1;
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorLimit, "past the bound");
@@ -76,7 +74,7 @@ static void TestInvalidDefs(void)
     CHECK(mrhiCreateQuerySet(device, nullptr, &set) == mrhi_errorInvalid, "no def");
     CHECK(mrhiCreateQuerySet(device, &def, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiCreateQuerySet(nullptr, &def, &set) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiDevice_GetMisuse(device) == 7, "each counted on the device");
+    CHECK(mrhiDevice_GetMisuse(device) == 6, "each counted on the device");
     def = Def(mrhi_queryTimestamp, 1);
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorUnsupported,
           "timestamps without the feature");
@@ -91,7 +89,7 @@ static void TestInvalidDefs(void)
     def.labelLength = 9;
     def.next = nullptr;
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_success, "a labeled set");
-    CHECK(mrhiDevice_GetMisuse(device) == 7, "neither counted");
+    CHECK(mrhiDevice_GetMisuse(device) == 6, "neither counted");
     Close(device);
 }
 
@@ -184,6 +182,30 @@ static void TestNoQueries(void)
     Close(device);
     device = Open(0, 1, false, true);
     CHECK(mrhiCreateQuerySet(device, &def, &set) == mrhi_errorCapacity, "queries but no sets");
+    Close(device);
+}
+
+// Sets of no queries, as WebGPU's: each holds no run of the device's
+// queries, and the driver is handed a set of one, which the test driver
+// checks.
+static void TestEmptySets(void)
+{
+    mrhiDevice* device = Open(3, 1, true, true);
+    mrhiQuerySetDef one = mrhiDefaultQuerySetDef();
+    mrhiQuerySetDef none = Def(mrhi_queryOcclusion, 0);
+    mrhiQuerySetDef noTimes = Def(mrhi_queryTimestamp, 0);
+    mrhiQuerySetId a;
+    mrhiQuerySetId b;
+    mrhiQuerySetId c;
+    CHECK(mrhiCreateQuerySet(device, &one, &a) == mrhi_success, "the only query held");
+    CHECK(mrhiCreateQuerySet(device, &none, &b) == mrhi_success &&
+              mrhiCreateQuerySet(device, &noTimes, &c) == mrhi_success,
+          "occlusion and timestamp sets of none, still made");
+    CHECK(mrhiCreateQuerySet(device, &none, &c) == mrhi_errorCapacity, "the set limit");
+    CHECK(mrhiDestroyQuerySet(device, a) == mrhi_success &&
+              mrhiCreateQuerySet(device, &one, &a) == mrhi_success,
+          "the query freed and held again");
+    CHECK(mrhiDevice_GetMisuse(device) == 0, "no misuse");
     Close(device);
 }
 
@@ -491,6 +513,38 @@ static void TestTimestamps(void)
     def = TimedDef(set, 0, 1);
     CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success, "written again in the next frame");
     Drop();
+    Close(s_device);
+}
+
+// No pass writes or resolves a query of a set of none, and a frame
+// naming one as its occlusion set is walked by the driver.
+static void TestEmptySetsInFrames(void)
+{
+    OpenFrames(1u << 20);
+    mrhiQuerySetId empty = MakeSet(mrhi_queryOcclusion, 0);
+    mrhiQuerySetId times = MakeSet(mrhi_queryTimestamp, 0);
+    BeginFrame();
+    mrhiPassDef def = TimedDef(times, 0, MRHI_NO_QUERY);
+    mrhiPassId pass;
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "a start past the set");
+    def = TimedDef(times, MRHI_NO_QUERY, 0);
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_errorInvalid, "an end past it");
+    Drop();
+    Frame(empty);
+    CHECK(mrhiPass_BeginOcclusionQuery(s_device, s_render, 0) == mrhi_errorInvalid,
+          "an occlusion query past the set");
+    CHECK(mrhiPass_ResolveQueries(s_device, s_compute, empty, 0, 0, s_r, 0) == mrhi_errorInvalid,
+          "a first query at its end");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 4, "each counted");
+    mrhiRequestId token = {0};
+    CHECK(mrhiPass_End(s_device, s_render) == mrhi_success &&
+              mrhiPass_End(s_device, s_compute) == mrhi_success &&
+              mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success &&
+              mrhiRequest_WaitFrame(s_device, token, 1) == mrhi_success,
+          "the frame naming it submitted and finished");
+    CHECK(mrhiDestroyQuerySet(s_device, empty) == mrhi_success &&
+              mrhiDestroyQuerySet(s_device, times) == mrhi_success,
+          "both destroyed");
     Close(s_device);
 }
 
@@ -853,12 +907,14 @@ int main(void)
     TestStateAndLimits();
     TestRunOrder();
     TestNoQueries();
+    TestEmptySets();
     TestDriverFailure();
     TestPassSets();
     TestOcclusion();
     TestSetsApart();
     TestOcclusionCapacity();
     TestTimestamps();
+    TestEmptySetsInFrames();
     TestPeriod();
     TestResolveAccess();
     TestResolve();

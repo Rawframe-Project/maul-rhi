@@ -394,6 +394,8 @@ static void DestroyView(void* self, uint64_t handle)
 static mrhiResult CreateQuerySet(void* self, const mrhiQuerySetDef* def, uint64_t* handleOut)
 {
     TestDevice* device = self;
+    // The APIs make no empty set, so the core hands at least one query.
+    MRHI_ASSERT(def->count > 0 && def->count <= MRHI_MAX_QUERY_SET_QUERIES);
     Name(device, def->label, def->labelLength);
     mrhiResult status = MakeObject(device, handleOut);
     device->querySets += status == mrhi_success ? 1 : 0;

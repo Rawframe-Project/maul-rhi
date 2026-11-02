@@ -97,7 +97,7 @@ typedef struct mrhiHeapSlot
 
 // A query set as its device keeps it: its driver handle, its kind, and
 // the run of the device's query marks it holds; a count of 0 for a free
-// slot.
+// slot or a set of no queries.
 typedef struct mrhiQuerySetSlot
 {
     uint64_t handle;

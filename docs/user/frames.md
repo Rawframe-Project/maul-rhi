@@ -107,7 +107,7 @@ A full command arena, staging or ring refuses the call with `mrhi_errorCapacity`
 
 ## Queries
 
-Query sets hold occlusion results, timestamps or pipeline statistics, at most 4096 queries each.
+Query sets hold occlusion results, timestamps or pipeline statistics, at most 4096 queries each. A set of 0 queries is made, as WebGPU's is, though no pass writes or resolves a query of it.
 
 - **Occlusion:** a render pass names its occlusion set; `mrhiPass_BeginOcclusionQuery` and `mrhiPass_EndOcclusionQuery` bracket draws, one query at a time. A nonzero result means some sample passed.
 - **Timestamps** (`timestampQuery`): a pass names its timestamp set and the queries written at its start and end. Values are ticks; `mrhiDevice_GetTimestampPeriod` gives nanoseconds per tick. Timestamps are written at pass boundaries only, the one place WebGPU allows, by a pass of any class. A pass that declares a query resolve access runs after every timed pass before it, and a timed pass after every such pass before it, whatever their classes and queues, so a resolve reads the times of the passes before it in the frame's order and zero for the others. A pass's end is never before its start, but two passes' times are not ordered against each other, even when one follows the other: a later pass may start, by its time, before an earlier one ends.
