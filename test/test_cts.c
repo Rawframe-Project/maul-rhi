@@ -4257,6 +4257,148 @@ static void TestQuerySetDestroys(void)
     }
 }
 
+// A queue,writeBuffer case: bytes written to a buffer in a transfer pass
+// declaring it with the copy destination access; the first refusal, from
+// the import to the write, or success.
+static mrhiResult WriteBytes(mrhiBufferId buffer, uint64_t offset, const uint8_t* bytes,
+                             uint64_t size)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success, "a frame");
+    mrhiResourceId destination = {0};
+    mrhiResult status = mrhiImportBuffer(s_device, buffer, &destination);
+    const mrhiAccess access = Whole(destination, mrhi_accessCopyDestination);
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.passClass = mrhi_passTransfer;
+    def.neverCull = true;
+    def.accesses = &access;
+    def.accessCount = 1;
+    mrhiPassId pass = {0};
+    status = status == mrhi_success ? mrhiAddPass(s_device, &def, &pass) : status;
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+                  mrhiPass_Begin(s_device, pass) == mrhi_success,
+              "the pass begun");
+        status = mrhiPass_WriteBuffer(s_device, pass, destination, offset, bytes, size);
+    }
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
+    return status;
+}
+
+// A writeBuffer:ranges call: the array's elements, the buffer offset in
+// bytes, past the buffer's end when fromEnd, then the data offset and
+// size in elements, the size ALL for the rest of the array; and the
+// CTS's outcome. A size past the array throws in JavaScript, where C
+// passes a pointer and a size, so those calls are counted. A size not a
+// multiple of 4 throws too, which the library refuses.
+#define ALL UINT32_MAX
+
+typedef enum WriteOutcome
+{
+    WRITTEN,
+    REFUSED,
+    PAST_ARRAY,
+} WriteOutcome;
+
+typedef struct WriteRange
+{
+    uint32_t elements;
+    uint64_t offset;
+    bool fromEnd;
+    uint32_t dataOffset;
+    uint32_t size;
+    WriteOutcome outcome;
+    // Run only for elements of fewer than 4 bytes.
+    bool small;
+} WriteRange;
+
+static const WriteRange s_writeRanges[] = {
+    {15, 0, false, 0, ALL, REFUSED, true},    {15, 0, false, 3, ALL, WRITTEN, true},
+    {16, 0, false, 3, ALL, REFUSED, true},    {8, 0, false, 0, 7, REFUSED, true},
+    {8, 0, false, 0, ALL, WRITTEN, false},    {16, 0, false, 0, ALL, WRITTEN, false},
+    {32, 0, false, 0, ALL, REFUSED, false},   {8, 8, false, 0, ALL, WRITTEN, false},
+    {16, 8, false, 0, ALL, REFUSED, false},   {8, 3, false, 0, ALL, REFUSED, false},
+    {8, 0, false, 4, ALL, WRITTEN, false},    {16, 0, false, 4, ALL, WRITTEN, false},
+    {32, 0, false, 4, ALL, REFUSED, false},   {32, 0, false, 16, ALL, WRITTEN, false},
+    {8, 0, false, 4, 4, WRITTEN, false},      {8, 0, false, 0, 16, PAST_ARRAY, false},
+    {8, 0, false, 4, 8, PAST_ARRAY, false},   {8, 0, false, 3, 4, WRITTEN, false},
+    {8, 0, true, 0, 0, WRITTEN, false},       {8, 4, true, 0, 0, REFUSED, false},
+    {8, 0, false, 8, 0, WRITTEN, false},      {8, 0, false, 9, 0, PAST_ARRAY, false},
+    {8, 0, false, 9, ALL, PAST_ARRAY, false}, {8, 0, false, 0, 8, WRITTEN, false},
+    {8, 0, false, 0, 12, PAST_ARRAY, false},
+};
+
+// queue,writeBuffer: ranges, of an ArrayBuffer and of each typed array
+// but Float16Array, which the CTS skips, into a buffer of 16 elements;
+// usages; buffer_state, whose invalid buffer has a map usage and is
+// counted; and buffer,device_mismatch, whose mismatched case is counted,
+// as the library's ids name no device.
+static void TestWriteBuffers(void)
+{
+    static const struct
+    {
+        const char* name;
+        uint32_t bytes;
+    } arrays[] = {
+        {"ArrayBuffer", 1},  {"Uint8Array", 1},   {"Uint8ClampedArray", 1}, {"Uint16Array", 2},
+        {"Uint32Array", 4},  {"Int8Array", 1},    {"Int16Array", 2},        {"Int32Array", 4},
+        {"Float32Array", 4}, {"Float64Array", 8}, {"BigInt64Array", 8},     {"BigUint64Array", 8},
+    };
+    static const uint8_t data[32 * 8] = {0};
+    char name[128];
+    for (size_t a = 0; a < sizeof(arrays) / sizeof(arrays[0]); ++a)
+    {
+        uint32_t element = arrays[a].bytes;
+        mrhiBufferId buffer = MakeBuffer(16 * element, COPY_DST);
+        for (size_t i = 0; i < sizeof(s_writeRanges) / sizeof(s_writeRanges[0]); ++i)
+        {
+            const WriteRange* r = &s_writeRanges[i];
+            if (r->small && element >= 4)
+            {
+                continue;
+            }
+            if (r->outcome == PAST_ARRAY)
+            {
+                ++s_inexpressible;
+                continue;
+            }
+            uint32_t size = r->size == ALL ? r->elements - r->dataOffset : r->size;
+            uint64_t offset = r->offset + (r->fromEnd ? 16 * element : 0);
+            snprintf(name, sizeof(name), "writeBuffer:ranges %s %u at %llu, %u from %u",
+                     arrays[a].name, r->elements, (unsigned long long)offset, size, r->dataOffset);
+            Expect(name,
+                   WriteBytes(buffer, offset, data + (size_t)r->dataOffset * element,
+                              (uint64_t)size * element),
+                   r->outcome == WRITTEN);
+        }
+        CHECK(mrhiDestroyBuffer(s_device, buffer) == mrhi_success, "the buffer");
+    }
+    static const struct
+    {
+        mrhiBufferUsage usage;
+        bool written;
+    } usages[] = {
+        {COPY_DST, true},
+        {mrhi_bufferStorage, false},
+        {mrhi_bufferStorage | COPY_SRC, false},
+        {mrhi_bufferStorage | COPY_DST, true},
+    };
+    for (size_t i = 0; i < 4; ++i)
+    {
+        mrhiBufferId buffer = MakeBuffer(16, usages[i].usage);
+        snprintf(name, sizeof(name), "writeBuffer:usages 0x%x", (unsigned)usages[i].usage);
+        Expect(name, WriteBytes(buffer, 0, data, 16), usages[i].written);
+        CHECK(mrhiDestroyBuffer(s_device, buffer) == mrhi_success, "the buffer");
+    }
+    mrhiBufferId buffer = MakeBuffer(16, COPY_DST);
+    Expect("writeBuffer:buffer_state valid", WriteBytes(buffer, 0, data, 16), true);
+    Expect("writeBuffer:buffer,device_mismatch same", WriteBytes(buffer, 0, data, 16), true);
+    CHECK(mrhiDestroyBuffer(s_device, buffer) == mrhi_success, "the buffer");
+    ExpectStale("writeBuffer:buffer_state destroyed", WriteBytes(buffer, 0, data, 16));
+    s_inexpressible += 2;
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -4337,6 +4479,8 @@ int main(void)
     TestDestroyedTargets();
     TestQuerySetDestroys();
     CHECK(s_differs == 2064 && s_inexpressible == 7079, "the destroy cases set aside");
+    TestWriteBuffers();
+    CHECK(s_differs == 2064 && s_inexpressible == 7141, "the write cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
