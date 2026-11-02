@@ -760,7 +760,8 @@ static mrhiResult Transfer(Method method, const Block* block, mrhiTextureKind ki
 // than run: required_bytes_in_copy's data one byte short of a buffer's
 // need that is a multiple of 4, and bound_on_offset's offset past
 // data of 0 bytes, in copies with a buffer; indirect_offset_oob's
-// buffers 1 byte short of the arguments; createTexture's 1D textures.
+// buffers 1 byte short of the arguments; createTexture's and
+// createView's 1D textures and views.
 static uint32_t s_inexpressible;
 
 // Counts the cases Maul RHI decides otherwise than the CTS: from its
@@ -770,8 +771,9 @@ static uint32_t s_inexpressible;
 // - a rowsPerImage of 0 for a copy of one layer with rows, which the CTS
 //   refuses as fewer than the rows and Maul RHI takes as absent;
 // setIndexBuffer's ranges of part of an index, which Maul RHI refuses
-// (see TestVertexIndexBuffers); and an occlusion query written in a
-// second pass of the frame (see TestQueries).
+// (see TestVertexIndexBuffers); an occlusion query written in a second
+// pass of the frame (see TestQueries); and a view of a destroyed texture
+// (see TestViewStates).
 static uint32_t s_differs;
 
 // The outcome Maul RHI owes a transfer case. Its layout value 0 is an
@@ -2847,6 +2849,485 @@ static void TestLimitSizes(void)
     }
 }
 
+// The CTS's view dimensions, and an absent one.
+typedef enum ViewDimension
+{
+    VIEW_ABSENT,
+    VIEW_1D,
+    VIEW_2D,
+    VIEW_2D_ARRAY,
+    VIEW_CUBE,
+    VIEW_CUBE_ARRAY,
+    VIEW_3D,
+} ViewDimension;
+
+static const char* const s_viewDimensions[] = {"absent", "1d",         "2d", "2d-array",
+                                               "cube",   "cube-array", "3d"};
+
+// A CTS texture as the library's, made: a 2D one of square layers in
+// sixes is a cube array, which takes every view a WebGPU 2D texture
+// takes, and any other of several layers a 2D array.
+static mrhiTextureId MakeViewed(Dimension dimension, mrhiFormat format, mrhiExtent3d size,
+                                uint32_t mips, mrhiTextureUsage usage, mrhiFormat viewFormat)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    bool cubes = size.width == size.height && size.depthOrLayers % 6 == 0;
+    def.kind = dimension == DIMENSION_3D ? mrhi_texture3d
+               : size.depthOrLayers == 1 ? mrhi_texture2d
+               : cubes                   ? mrhi_textureCubeArray
+                                         : mrhi_texture2dArray;
+    def.format = format;
+    def.width = size.width;
+    def.height = size.height;
+    def.depthOrLayers = size.depthOrLayers;
+    def.mipLevels = mips;
+    def.usage = usage;
+    def.viewFormats[0] = viewFormat;
+    mrhiTextureId texture = {0};
+    CHECK(mrhiCreateTexture(s_device, &def, &texture) == mrhi_success, "the viewed texture");
+    return texture;
+}
+
+// A view of the texture: its refusal, or success, the view destroyed.
+static mrhiResult MakeView(const mrhiViewDef* def)
+{
+    mrhiViewId view = {0};
+    mrhiResult status = mrhiCreateView(s_device, def, &view);
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiDestroyView(s_device, view) == mrhi_success, "the view");
+    }
+    return status;
+}
+
+// createView:format: a texture of every format seen as every format or
+// none, with the view format listed or not; a format that differs only
+// in sRGB is listed only where it may be. Valid without a view format,
+// with the texture's own, or with a listed one.
+static void TestViewFormats(void)
+{
+    char name[160];
+    for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+    {
+        for (mrhiFormat view = mrhi_formatNone; view <= LAST_FORMAT; ++view)
+        {
+            for (uint32_t listed = 0; listed < 2; ++listed)
+            {
+                bool compatible = view == mrhi_formatNone || Linear(format) == Linear(view);
+                mrhiFormat list = listed != 0 && compatible ? view : mrhi_formatNone;
+                mrhiTextureId texture =
+                    MakeViewed(DIMENSION_2D, format, BlockOf(format), 1, mrhi_textureSampled, list);
+                mrhiViewDef def = mrhiDefaultViewDef();
+                def.texture = texture;
+                def.format = view;
+                snprintf(name, sizeof(name), "createView:format format %d, view format %d, %s",
+                         (int)format, (int)view, listed != 0 ? "listed" : "not listed");
+                Expect(name, MakeView(&def),
+                       view == mrhi_formatNone || view == format || (compatible && listed != 0));
+                CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "the texture");
+            }
+        }
+    }
+}
+
+// createView:aspect: a texture of every format seen with each aspect:
+// all on any, depth only on a depth format and stencil only on a
+// stencil one.
+static void TestViewAspects(void)
+{
+    char name[128];
+    for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+    {
+        mrhiTextureId texture =
+            MakeViewed(DIMENSION_2D, format, BlockOf(format), 1, mrhi_textureSampled, 0);
+        for (mrhiTextureAspect aspect = mrhi_aspectAll; aspect <= mrhi_aspectStencilOnly; ++aspect)
+        {
+            mrhiViewDef def = mrhiDefaultViewDef();
+            def.texture = texture;
+            def.aspect = aspect;
+            snprintf(name, sizeof(name), "createView:aspect format %d, aspect %d", (int)format,
+                     (int)aspect);
+            bool depth = format == mrhi_formatDepth32Float || format == DEPTH;
+            Expect(name, MakeView(&def),
+                   aspect == mrhi_aspectAll || (aspect == mrhi_aspectDepthOnly && depth) ||
+                       (aspect == mrhi_aspectStencilOnly && format == DEPTH));
+        }
+        CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "the texture");
+    }
+}
+
+// A CTS view of layers and mips: its dimension and its first layer,
+// layer count, first mip and mip count, each of them ABSENT or given.
+typedef struct ViewRange
+{
+    ViewDimension dimension;
+    int64_t baseLayer;
+    int64_t layerCount;
+    int64_t baseMip;
+    int64_t mipCount;
+} ViewRange;
+
+// The view's dimension once resolved, as reifyTextureViewDescriptor
+// does: an absent one is the texture's, a 2D array for a 2D texture of
+// several layers.
+static ViewDimension Resolved(Dimension texture, uint32_t layers, ViewDimension view)
+{
+    if (view != VIEW_ABSENT)
+    {
+        return view;
+    }
+    return texture == DIMENSION_1D   ? VIEW_1D
+           : texture == DIMENSION_3D ? VIEW_3D
+           : layers > 1              ? VIEW_2D_ARRAY
+                                     : VIEW_2D;
+}
+
+// The CTS's validateCreateViewLayersLevels, that the view's dimension
+// fits the texture's, and that a cube is square: counts resolved as the
+// CTS does, at least one mip and layer within the texture's, one layer
+// for 2D and 3D, six for a cube and a multiple of six for a cube array.
+static bool IsViewValid(Dimension texture, mrhiExtent3d size, uint32_t levels, ViewRange range)
+{
+    ViewDimension dimension = Resolved(texture, size.depthOrLayers, range.dimension);
+    int64_t layers = texture == DIMENSION_3D ? 1 : size.depthOrLayers;
+    int64_t baseMip = range.baseMip == ABSENT ? 0 : range.baseMip;
+    int64_t mips = range.mipCount == ABSENT ? levels - baseMip : range.mipCount;
+    int64_t baseLayer = range.baseLayer == ABSENT ? 0 : range.baseLayer;
+    int64_t count = range.layerCount;
+    if (count == ABSENT)
+    {
+        bool arrays = dimension == VIEW_2D_ARRAY || dimension == VIEW_CUBE_ARRAY;
+        count = arrays ? size.depthOrLayers - baseLayer : dimension == VIEW_CUBE ? 6 : 1;
+    }
+    bool fits = texture == DIMENSION_3D ? dimension == VIEW_3D
+                                        : dimension != VIEW_3D && dimension != VIEW_1D;
+    bool cube = dimension == VIEW_CUBE || dimension == VIEW_CUBE_ARRAY;
+    fits = fits && (!cube || size.width == size.height);
+    bool shaped = dimension == VIEW_CUBE         ? count == 6
+                  : dimension == VIEW_CUBE_ARRAY ? count % 6 == 0
+                  : dimension == VIEW_2D_ARRAY   ? true
+                                                 : count == 1;
+    return fits && shaped && mips > 0 && baseMip < levels && baseMip + mips <= levels &&
+           count > 0 && baseLayer < layers && baseLayer + count <= layers;
+}
+
+// The case as a library view of the texture: its resolved kind, a
+// first layer or mip of 0 where absent, and an absent count as
+// MRHI_REMAINING, or the count the CTS resolves for 2D, 3D and a cube.
+static mrhiResult MakeRangeView(mrhiTextureId texture, Dimension dimension, uint32_t layers,
+                                ViewRange range)
+{
+    static const mrhiTextureKind kinds[] = {
+        mrhi_texture2d,   mrhi_texture2d,        mrhi_texture2d, mrhi_texture2dArray,
+        mrhi_textureCube, mrhi_textureCubeArray, mrhi_texture3d,
+    };
+    ViewDimension resolved = Resolved(dimension, layers, range.dimension);
+    mrhiViewDef def = mrhiDefaultViewDef();
+    def.texture = texture;
+    def.kind = kinds[resolved];
+    def.baseLayer = range.baseLayer == ABSENT ? 0 : (uint32_t)range.baseLayer;
+    def.baseMip = range.baseMip == ABSENT ? 0 : (uint32_t)range.baseMip;
+    def.mipCount = range.mipCount == ABSENT ? MRHI_REMAINING : (uint32_t)range.mipCount;
+    bool arrays = resolved == VIEW_2D_ARRAY || resolved == VIEW_CUBE_ARRAY;
+    def.layerCount = range.layerCount != ABSENT ? (uint32_t)range.layerCount
+                     : arrays                   ? MRHI_REMAINING
+                     : resolved == VIEW_CUBE    ? 6
+                                                : 1;
+    return MakeView(&def);
+}
+
+// The view dimensions the CTS gives a texture dimension, an absent one
+// first: 1D only for 1D and 3D only for 3D.
+static uint32_t ViewDimensionsOf(Dimension dimension, ViewDimension out[5])
+{
+    out[0] = VIEW_ABSENT;
+    if (dimension != DIMENSION_2D)
+    {
+        out[1] = dimension == DIMENSION_1D ? VIEW_1D : VIEW_3D;
+        return 2;
+    }
+    out[1] = VIEW_2D;
+    out[2] = VIEW_2D_ARRAY;
+    out[3] = VIEW_CUBE;
+    out[4] = VIEW_CUBE_ARRAY;
+    return 5;
+}
+
+// The CTS's set of first values: absent, 0, 1, 5, 6, 7 and around the
+// total, each once.
+static uint32_t Firsts(int64_t total, int64_t out[9])
+{
+    const int64_t candidates[] = {ABSENT, 0, 1, 5, 6, 7, total - 1, total, total + 1};
+    uint32_t count = 0;
+    for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i)
+    {
+        bool seen = false;
+        for (uint32_t j = 0; j < count; ++j)
+        {
+            seen = seen || out[j] == candidates[i];
+        }
+        if (!seen)
+        {
+            out[count++] = candidates[i];
+        }
+    }
+    return count;
+}
+
+// The CTS's counts after a first value: absent, and each count ending
+// at one of the first values but absent, from the first on.
+static uint32_t Counts(int64_t total, int64_t first, int64_t out[10])
+{
+    int64_t lasts[9];
+    uint32_t lastCount = Firsts(total, lasts);
+    int64_t base = first == ABSENT ? 0 : first;
+    uint32_t count = 0;
+    out[count++] = ABSENT;
+    for (uint32_t i = 1; i < lastCount; ++i)
+    {
+        if (base <= lasts[i])
+        {
+            out[count++] = lasts[i] - base;
+        }
+    }
+    return count;
+}
+
+// One range case: the view of a texture made for it, against the
+// CTS's outcome, or counted when the texture or view is 1D.
+static void ExpectRange(const char* test, Dimension dimension, mrhiExtent3d size, uint32_t levels,
+                        ViewRange range)
+{
+    if (dimension == DIMENSION_1D)
+    {
+        ++s_inexpressible;
+        return;
+    }
+    char name[192];
+    snprintf(name, sizeof(name),
+             "createView:%s %s %ux%ux%u of %u mips, view %s, layers %lld+%lld, mips %lld+%lld",
+             test, s_dimensions[dimension], size.width, size.height, size.depthOrLayers, levels,
+             s_viewDimensions[range.dimension], (long long)range.baseLayer,
+             (long long)range.layerCount, (long long)range.baseMip, (long long)range.mipCount);
+    mrhiTextureId texture =
+        MakeViewed(dimension, RGBA8, size, levels, mrhi_textureSampled, mrhi_formatNone);
+    Expect(name, MakeRangeView(texture, dimension, size.depthOrLayers, range),
+           IsViewValid(dimension, size, levels, range));
+    CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "the texture");
+}
+
+// createView:array_layers: an rgba8unorm texture 32 texels wide in each
+// dimension, 2D of 1, 6 or 18 layers, of 1 or 6 mips (1D only 1), seen
+// with each view dimension it takes from each first layer and count
+// the CTS tries.
+static void TestViewLayers(void)
+{
+    for (Dimension d = DIMENSION_1D; d <= DIMENSION_3D; ++d)
+    {
+        ViewDimension views[5];
+        uint32_t viewCount = ViewDimensionsOf(d, views);
+        static const uint32_t layerSets[] = {1, 6, 18};
+        for (uint32_t l = 0; l < (d == DIMENSION_2D ? 3u : 1u); ++l)
+        {
+            mrhiExtent3d size = {32, d == DIMENSION_1D ? 1u : 32u,
+                                 d == DIMENSION_3D ? 32u : layerSets[l]};
+            for (uint32_t levels = 1; levels <= 6; levels += d == DIMENSION_1D ? 6 : 5)
+            {
+                int64_t firsts[9];
+                uint32_t firstCount = Firsts(layerSets[l], firsts);
+                for (uint32_t v = 0; v < viewCount; ++v)
+                {
+                    for (uint32_t f = 0; f < firstCount; ++f)
+                    {
+                        int64_t counts[10];
+                        uint32_t countCount = Counts(layerSets[l], firsts[f], counts);
+                        for (uint32_t c = 0; c < countCount; ++c)
+                        {
+                            ViewRange range = {views[v], firsts[f], counts[c], ABSENT, ABSENT};
+                            ExpectRange("array_layers", d, size, levels, range);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// createView:mip_levels: an rgba8unorm texture of 1, 4 or 6 mips (1D
+// only 1), 32 texels in 1D, 32x32x32 in 3D and 32x32 of 18 layers in
+// 2D, seen with each view dimension it takes from each first mip and
+// count the CTS tries.
+static void TestViewMips(void)
+{
+    static const uint32_t levelSets[] = {1, 4, 6};
+    for (Dimension d = DIMENSION_1D; d <= DIMENSION_3D; ++d)
+    {
+        ViewDimension views[5];
+        uint32_t viewCount = ViewDimensionsOf(d, views);
+        mrhiExtent3d size = d == DIMENSION_1D   ? (mrhiExtent3d){32, 1, 1}
+                            : d == DIMENSION_3D ? (mrhiExtent3d){32, 32, 32}
+                                                : (mrhiExtent3d){32, 32, 18};
+        for (uint32_t l = 0; l < (d == DIMENSION_1D ? 1u : 3u); ++l)
+        {
+            int64_t firsts[9];
+            uint32_t firstCount = Firsts(levelSets[l], firsts);
+            for (uint32_t v = 0; v < viewCount; ++v)
+            {
+                for (uint32_t f = 0; f < firstCount; ++f)
+                {
+                    int64_t counts[10];
+                    uint32_t countCount = Counts(levelSets[l], firsts[f], counts);
+                    for (uint32_t c = 0; c < countCount; ++c)
+                    {
+                        ViewRange range = {views[v], ABSENT, ABSENT, firsts[f], counts[c]};
+                        ExpectRange("mip_levels", d, size, levelSets[l], range);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// createView:dimension and createView:cube_faces_square: a 2D texture
+// of 4x4 and 6 layers or a 3D one of 4x4x6 seen with each view
+// dimension, which must be of the texture's dimension; and textures of
+// 6 layers, square or not, seen as 2D, a cube or a cube array, which
+// must be square. The 1D textures and views are counted.
+static void TestViewDimensionCases(void)
+{
+    for (Dimension d = DIMENSION_1D; d <= DIMENSION_3D; ++d)
+    {
+        for (ViewDimension v = VIEW_ABSENT; v <= VIEW_3D; ++v)
+        {
+            if (v == VIEW_1D)
+            {
+                ++s_inexpressible;
+                continue;
+            }
+            mrhiExtent3d size = {4, d == DIMENSION_1D ? 1u : 4u, d == DIMENSION_1D ? 1u : 6u};
+            ExpectRange("dimension", d, size, 1, (ViewRange){v, ABSENT, ABSENT, ABSENT, ABSENT});
+        }
+    }
+    static const mrhiExtent3d sizes[] = {{4, 4, 6}, {5, 5, 6}, {4, 5, 6}, {4, 8, 6}, {8, 4, 6}};
+    static const ViewDimension views[] = {VIEW_2D, VIEW_CUBE, VIEW_CUBE_ARRAY};
+    for (size_t v = 0; v < 3; ++v)
+    {
+        for (size_t i = 0; i < sizeof(sizes) / sizeof(sizes[0]); ++i)
+        {
+            bool square = sizes[i].width == sizes[i].height;
+            ViewRange range = {views[v], ABSENT, ABSENT, ABSENT, ABSENT};
+            CHECK(IsViewValid(DIMENSION_2D, sizes[i], 1, range) == (v == 0 || square),
+                  "createView:cube_faces_square's outcome");
+            ExpectRange("cube_faces_square", DIMENSION_2D, sizes[i], 1, range);
+        }
+    }
+}
+
+// createView:texture_state: a view of a valid texture is valid, and of
+// an invalid one refused. The library makes no invalid texture: a
+// refused def gives the zero id, which is stale. A destroyed texture's
+// id is stale too, where WebGPU still views a destroyed texture, so
+// that case differs.
+static void TestViewStates(void)
+{
+    mrhiTextureId texture =
+        MakeViewed(DIMENSION_2D, RGBA8, (mrhiExtent3d){1, 1, 1}, 1, mrhi_textureSampled, 0);
+    mrhiViewDef def = mrhiDefaultViewDef();
+    def.texture = texture;
+    Expect("createView:texture_state valid", MakeView(&def), true);
+    CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "the texture");
+    CHECK(MakeView(&def) == mrhi_errorStale, "createView:texture_state destroyed, stale");
+    s_differs += 1;
+    mrhiTextureDef invalid = mrhiDefaultTextureDef();
+    invalid.format = RGBA8;
+    mrhiTextureId none = {0};
+    CHECK(mrhiCreateTexture(s_device, &invalid, &none) == mrhi_errorInvalid && none.index1 == 0,
+          "an invalid texture");
+    def.texture = none;
+    CHECK(MakeView(&def) == mrhi_errorStale, "createView:texture_state invalid, stale");
+}
+
+// Whether a format takes a single usage on a device without optional
+// features, which the CTS's skips leave: storage, rendering, and the
+// others any format takes.
+static bool Takes(mrhiFormat format, mrhiTextureUsage usage)
+{
+    return usage == mrhi_textureStorage        ? Stores(format)
+           : usage == mrhi_textureRenderTarget ? Renders(format)
+                                               : true;
+}
+
+// createView:texture_view_usage: a texture of every format with each
+// usage it takes, seen with each usage: valid when the view's usage is
+// the texture's. Transient usages are left out, as the CTS does.
+static void TestViewUsageSubsets(void)
+{
+    char name[128];
+    for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+    {
+        for (uint32_t t = 0; t < 5; ++t)
+        {
+            mrhiTextureUsage usage = s_ctsUsages[t];
+            if (!Takes(format, usage))
+            {
+                continue;
+            }
+            mrhiTextureId texture = MakeViewed(DIMENSION_2D, format, BlockOf(format), 1, usage, 0);
+            for (uint32_t v = 0; v < 5; ++v)
+            {
+                mrhiViewDef def = mrhiDefaultViewDef();
+                def.texture = texture;
+                def.usage = s_ctsUsages[v];
+                snprintf(name, sizeof(name),
+                         "createView:texture_view_usage format %d, usage 0x%x, view usage 0x%x",
+                         (int)format, (unsigned)usage, (unsigned)def.usage);
+                Expect(name, MakeView(&def), v == t);
+            }
+            CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "the texture");
+        }
+    }
+}
+
+// createView:texture_view_usage_with_view_format: a texture of every
+// format with each usage it takes, listing a view format that differs
+// at most in sRGB, seen as that format with the usage given and
+// inherited. Valid when the view format takes the usage too, else
+// ungranted: rgba8unorm-srgb stores nothing.
+static void TestViewUsageFormats(void)
+{
+    char name[160];
+    for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+    {
+        for (mrhiFormat view = RGBA8; view <= LAST_FORMAT; ++view)
+        {
+            for (uint32_t u = 0; u < 5 && Linear(format) == Linear(view); ++u)
+            {
+                mrhiTextureUsage usage = s_ctsUsages[u];
+                if (!Takes(format, usage))
+                {
+                    continue;
+                }
+                mrhiTextureId texture =
+                    MakeViewed(DIMENSION_2D, format, BlockOf(format), 1, usage, view);
+                for (uint32_t inherited = 0; inherited < 2; ++inherited)
+                {
+                    mrhiViewDef def = mrhiDefaultViewDef();
+                    def.texture = texture;
+                    def.format = view;
+                    def.usage = inherited != 0 ? 0 : usage;
+                    snprintf(name, sizeof(name),
+                             "createView:texture_view_usage_with_view_format format %d, view "
+                             "format %d, usage 0x%x%s",
+                             (int)format, (int)view, (unsigned)usage,
+                             inherited != 0 ? ", inherited" : "");
+                    ExpectUngranted(name, MakeView(&def), Takes(view, usage));
+                }
+                CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "the texture");
+            }
+        }
+    }
+}
+
 // The color renderable formats, with WebGPU's render target pixel byte
 // cost and component alignment of each.
 static const struct
@@ -3293,9 +3774,17 @@ int main(void)
     TestViewFormatLists();
     TestSmallestSizes();
     TestLimitSizes();
+    TestViewFormats();
+    TestViewAspects();
+    TestViewLayers();
+    TestViewMips();
+    TestViewDimensionCases();
+    TestViewStates();
+    TestViewUsageSubsets();
+    TestViewUsageFormats();
     TestColorBytes();
     TestQueries();
-    CHECK(s_differs == 879 && s_inexpressible == 1923, "the pass and query cases set aside");
+    CHECK(s_differs == 880 && s_inexpressible == 2068, "the pass and query cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
