@@ -428,6 +428,9 @@ static void CheckObjects(mrhiDevice* device, bool timestamps)
     def.compare = mrhi_compareLess;
     mrhiSamplerId sampler = {0};
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_success, "a sampler");
+    // Past what any device takes, which the driver clamps.
+    def.maxAnisotropy = 1024;
+    CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_success, "a sampler of 1024");
 }
 
 // A frame whose transients take memory the driver measures: a target

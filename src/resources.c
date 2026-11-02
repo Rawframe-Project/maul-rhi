@@ -48,8 +48,9 @@ static bool IsSamplerDefValid(const mrhiSamplerDef* def)
     bool lod = def->lodMin >= 0.0f && def->lodMax >= def->lodMin && isfinite(def->lodMax);
     bool linear = def->magFilter == mrhi_filterLinear && def->minFilter == mrhi_filterLinear &&
                   def->mipFilter == mrhi_filterLinear;
-    bool anisotropy =
-        def->maxAnisotropy >= 1 && def->maxAnisotropy <= 16 && (def->maxAnisotropy == 1 || linear);
+    // Any anisotropy of 1 or more, as WebGPU's, which the drivers clamp to
+    // what the device takes.
+    bool anisotropy = def->maxAnisotropy >= 1 && (def->maxAnisotropy == 1 || linear);
     return filters && address && lod && anisotropy && (uint32_t)def->compare <= mrhi_compareAlways;
 }
 

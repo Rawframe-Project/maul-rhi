@@ -35,6 +35,18 @@ static void TestMakeAndDestroy(void)
     def.maxAnisotropy = 16;
     def.compare = mrhi_compareGreater;
     CHECK(mrhiCreateSampler(device, &def, &b) == mrhi_success, "an anisotropic comparison");
+    // WebGPU takes any anisotropy of 1 or more, clamped to what the device
+    // takes.
+    mrhiSamplerDef steep = def;
+    steep.maxAnisotropy = 17;
+    mrhiSamplerId d = {0};
+    CHECK(mrhiCreateSampler(device, &steep, &d) == mrhi_success &&
+              mrhiDestroySampler(device, d) == mrhi_success,
+          "anisotropy 17");
+    steep.maxAnisotropy = UINT16_MAX;
+    CHECK(mrhiCreateSampler(device, &steep, &d) == mrhi_success &&
+              mrhiDestroySampler(device, d) == mrhi_success,
+          "the most anisotropy");
     mrhiSamplerDef last = mrhiDefaultSamplerDef();
     last.addressU = mrhi_addressMirrorRepeat;
     last.addressV = mrhi_addressMirrorRepeat;
@@ -61,8 +73,6 @@ static void TestInvalidDefs(void)
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorInvalid, "anisotropy, nearest");
     def = mrhiDefaultSamplerDef();
     def.magFilter = def.minFilter = def.mipFilter = mrhi_filterLinear;
-    def.maxAnisotropy = 17;
-    CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorInvalid, "anisotropy 17");
     def.maxAnisotropy = 0;
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorInvalid, "anisotropy 0");
     def = mrhiDefaultSamplerDef();
@@ -102,14 +112,14 @@ static void TestInvalidDefs(void)
     CHECK(mrhiCreateSampler(device, nullptr, &sampler) == mrhi_errorInvalid, "no def");
     CHECK(mrhiCreateSampler(device, &def, nullptr) == mrhi_errorInvalid, "no out");
     CHECK(mrhiCreateSampler(nullptr, &def, &sampler) == mrhi_errorInvalid, "no device");
-    CHECK(mrhiDevice_GetMisuse(device) == 15, "each counted on the device");
+    CHECK(mrhiDevice_GetMisuse(device) == 14, "each counted on the device");
     mrhiChain critical = {.next = nullptr, .type = 0x7000u};
     def.next = &critical;
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorUnsupported, "an extension");
     mrhiChain untyped = {.next = nullptr, .type = mrhi_structNone};
     def.next = &untyped;
     CHECK(mrhiCreateSampler(device, &def, &sampler) == mrhi_errorInvalid, "an untyped node");
-    CHECK(mrhiDevice_GetMisuse(device) == 16, "the untyped node counted");
+    CHECK(mrhiDevice_GetMisuse(device) == 15, "the untyped node counted");
     Close(device);
 }
 
