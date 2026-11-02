@@ -7,14 +7,19 @@ may change the API, the ABI and every data format.
 
 ## [0.23.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.22.0...v0.23.0) (2026-11-02)
 
+### Changed
 
-### ⚠ BREAKING CHANGES
-
-* **resources:** drivers built outside the tree must be rebuilt for SPI version 18; a buffer may now have any size, 0 included, and mrhi_diagnosticBufferSize is removed.
-
-### Fixed
-
-* **resources:** take a buffer of any size, as WebGPU does ([#404](https://github.com/Rawframe-Project/maul-rhi/issues/404)) ([afbbe76](https://github.com/Rawframe-Project/maul-rhi/commit/afbbe76829d562d3ef6a2bf660483bca517dfa9c)), closes [#403](https://github.com/Rawframe-Project/maul-rhi/issues/403)
+- **Breaking:** `mrhiCreateBuffer` and `mrhiDeclareBuffer` take a buffer
+  of any size up to the device's `bufferBytes`, 0 and sizes not a
+  multiple of 4 included, as WebGPU's `createBuffer` does. Copies,
+  clears, reads, writes and binding ranges still keep to multiples of 4,
+  checked against the program's size. Before, such a buffer was refused
+  on every driver with `mrhi_errorInvalid`, counted as
+  `mrhi_diagnosticBufferSize`, which is removed. Drivers built outside
+  the tree must be rebuilt for SPI version 18; they are still handed
+  buffers in whole fours of at least 4. The mustpass list is
+  `conformance/mustpass/spi-18.txt`. `contract_version` rises to 34.
+  ([#404](https://github.com/Rawframe-Project/maul-rhi/pull/404))
 
 ## [0.22.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.21.0...v0.22.0) (2026-11-02)
 
