@@ -512,6 +512,17 @@ static void TestTargets(void)
     def.depthTarget.stencilLoad = mrhi_loadClear;
     def.depthTarget.stencilStore = 2;
     CHECK(Add(def) == mrhi_errorInvalid, "an unknown stencil store");
+    // A format without stencil takes no stencil operations, as WebGPU's:
+    // only keep and keep, which stand for none given.
+    def.depthTarget.stencilStore = mrhi_storeKeep;
+    CHECK(Add(def) == mrhi_errorInvalid, "a stencil cleared on a format without one");
+    def.depthTarget.stencilLoad = mrhi_loadDiscard;
+    CHECK(Add(def) == mrhi_errorInvalid, "a stencil load discarding on a format without one");
+    def.depthTarget.stencilLoad = mrhi_loadKeep;
+    def.depthTarget.stencilStore = mrhi_storeDiscard;
+    CHECK(Add(def) == mrhi_errorInvalid, "a stencil discarded on a format without one");
+    def.depthTarget.stencilStore = mrhi_storeKeep;
+    CHECK(Add(def) == mrhi_success, "no stencil operations given");
     def = mrhiDefaultPassDef();
     def.depthTarget =
         (mrhiDepthTarget){.resource = depth, .depthStore = mrhi_storeDiscard, .readOnly = true};

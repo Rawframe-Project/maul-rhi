@@ -492,9 +492,10 @@ extern "C"
         mrhiStoreOp depthStore;
         // The depth clear value, for mrhi_loadClear: from 0 to 1.
         float clearDepth;
-        // What its stencil holds, when the format has one.
+        // What its stencil holds; keep for a format without stencil, as WebGPU
+        // gives such a target no stencil operations.
         mrhiLoadOp stencilLoad;
-        // What its stencil keeps, when the format has one.
+        // What its stencil keeps; keep for a format without stencil.
         mrhiStoreOp stencilStore;
         // The stencil clear value.
         uint32_t clearStencil;
@@ -586,19 +587,20 @@ extern "C"
     /// other resource type, a range outside the texture, a use an imported
     /// object was not made with, a target that does not render or depth-test, a
     /// target of a transient texture that is not cleared and discarded (stencil
-    /// too) or that resolves into one, a use of a sealed resource other than
-    /// the reads its sealed state allows), targets of different sizes or sample
-    /// counts, views past one on a native pass or one without targets, targets
-    /// without a layer for each view or of a 3D texture with views past one, a
-    /// resolve that does not match, of a format WebGPU does not resolve (32-bit
-    /// floats and integers) or into a 3D texture, a subresource written and
-    /// used otherwise in the pass, an access the class does not allow, a
-    /// declared resource read before any pass wrote it, an occlusion query set
-    /// that is not one or is named by a pass without targets, or timestamps of
-    /// a set that is not a timestamp set, without a set, with neither query,
-    /// with both the same, or with a query past the set's count or already
-    /// written in this frame; `mrhi_errorLimit` for more than
-    /// MRHI_MAX_COLOR_TARGETS color targets, a native pass past
+    /// too) or that resolves into one, a depth target whose format has no
+    /// stencil with stencil operations other than keep, a use of a sealed
+    /// resource other than the reads its sealed state allows), targets of
+    /// different sizes or sample counts, views past one on a native pass or one
+    /// without targets, targets without a layer for each view or of a 3D
+    /// texture with views past one, a resolve that does not match, of a format
+    /// WebGPU does not resolve (32-bit floats and integers) or into a 3D
+    /// texture, a subresource written and used otherwise in the pass, an access
+    /// the class does not allow, a declared resource read before any pass wrote
+    /// it, an occlusion query set that is not one or is named by a pass without
+    /// targets, or timestamps of a set that is not a timestamp set, without a
+    /// set, with neither query, with both the same, or with a query past the
+    /// set's count or already written in this frame; `mrhi_errorLimit` for more
+    /// than MRHI_MAX_COLOR_TARGETS color targets, a native pass past
     /// MRHI_MAX_NATIVE_PASSES in the frame or a label past
     /// MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for a resource of another frame,
     /// an imported object destroyed since, or a query set or heap the device no
