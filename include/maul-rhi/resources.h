@@ -194,7 +194,9 @@ extern "C"
         const char* label;
         // The label's bytes.
         size_t labelLength;
-        // Bytes, a multiple of 4, at most the device's bufferBytes limit.
+        // Bytes, any count to the device's bufferBytes limit, 0 included, as
+        // WebGPU's. A copy, clear or binding range of it still keeps to
+        // multiples of 4.
         uint64_t size;
         // Its uses, at least one.
         mrhiBufferUsage usage;
@@ -217,11 +219,11 @@ extern "C"
     /// @param def        The buffer to make.
     /// @param bufferOut  Receives the buffer; the null id on any failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
-    /// without its cookie, a label that is not UTF-8 without NUL, a size of 0
-    /// or not a multiple of 4, or no usage or an unknown one; `mrhi_errorLimit`
-    /// for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a
-    /// size past the adapter's bufferBytes limit or a critical extension the
-    /// library does not know; `mrhi_errorState` for a device that is not ready;
+    /// without its cookie, a label that is not UTF-8 without NUL, or no usage
+    /// or an unknown one; `mrhi_errorLimit` for a label past
+    /// MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the
+    /// adapter's bufferBytes limit or a critical extension the library does not
+    /// know; `mrhi_errorState` for a device that is not ready;
     /// `mrhi_errorCapacity` for a size past the device's bufferBytes limit
     /// within the adapter's, or when the device's buffer limit is reached;
     /// `mrhi_errorPlatform` when the driver fails; `mrhi_errorBusy` for a call

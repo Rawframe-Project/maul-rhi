@@ -688,6 +688,14 @@ mrhiResult mrhiCheckTextureShape(mrhiDevice* device, const mrhiTextureDef* def, 
 // cookie, chain and label, and size): success, or the refusal.
 mrhiResult mrhiCheckBufferShape(mrhiDevice* device, const mrhiBufferDef* def);
 
+// The bytes a driver makes for a buffer of a size: at least 4, in whole
+// fours, as the APIs make no empty buffer and clear and copy in fours.
+// The program's size stays the one its ranges are checked against.
+static inline uint64_t mrhiBufferAllocation(uint64_t size)
+{
+    return size == 0 ? 4 : (size + 3) / 4 * 4;
+}
+
 // Checks a texture def's usages, and that its format takes them and its
 // sample count on the device: success, or the refusal.
 mrhiResult mrhiCheckTextureUsage(mrhiDevice* device, const mrhiTextureDef* def);

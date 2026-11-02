@@ -65,8 +65,6 @@ static void TestDeclare(void)
     CHECK(mrhiDeclareTexture(s_device, &texture, &a) == mrhi_errorInvalid, "no cookie");
     buffer.usage = mrhi_bufferVertex;
     CHECK(mrhiDeclareBuffer(s_device, &buffer, &b) == mrhi_errorInvalid, "a buffer usage");
-    buffer = Buffer(6);
-    CHECK(mrhiDeclareBuffer(s_device, &buffer, &b) == mrhi_errorInvalid, "not a multiple of 4");
     buffer = Buffer(mrhiDefaultLimits().bufferBytes + 4);
     CHECK(mrhiDeclareBuffer(s_device, &buffer, &b) == mrhi_errorUnsupported, "too large");
     CHECK(mrhiDeclareTexture(nullptr, &texture, &a) == mrhi_errorInvalid, "no device");
@@ -240,7 +238,7 @@ int main(void)
     TestImport();
     TestLimit();
     s_instance = instance;
-    CHECK(mrhiDevice_GetMisuse(s_device) == 12, "each invalid call counted");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 11, "each invalid call counted");
     Close(s_device);
     return s_failures == 0 ? 0 : 1;
 }

@@ -218,14 +218,14 @@ extern "C"
     /// @param resourceOut  Receives the frame's id for it; the null id on any
     ///                     failure.
     /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def
-    /// without its cookie, a label that is not UTF-8 without NUL, a usage other
-    /// than 0, or a size that is zero or not a multiple of 4; `mrhi_errorLimit`
-    /// for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a
-    /// size past the adapter's bufferBytes, or a critical extension the library
-    /// does not know; `mrhi_errorState` for a device without an open frame;
-    /// `mrhi_errorCapacity` for a size past the device's bufferBytes within the
-    /// adapter's, or when the device's frameResources budget is reached;
-    /// `mrhi_errorBusy` for a call from inside the device's allocator.
+    /// without its cookie, a label that is not UTF-8 without NUL, or a usage
+    /// other than 0; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES;
+    /// `mrhi_errorUnsupported` for a size past the adapter's bufferBytes, or a
+    /// critical extension the library does not know; `mrhi_errorState` for a
+    /// device without an open frame; `mrhi_errorCapacity` for a size past the
+    /// device's bufferBytes within the adapter's, or when the device's
+    /// frameResources budget is reached; `mrhi_errorBusy` for a call from
+    /// inside the device's allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiDeclareBuffer(mrhiDevice* device,

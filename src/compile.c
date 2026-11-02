@@ -134,7 +134,7 @@ static void RecordZeroes(mrhiDevice* device)
         record[0] = (mrhiCommand){
             .type = texture ? mrhiCommandClearTexture : mrhiCommandClearBuffer,
             .a = object,
-            .d = texture ? 0 : device->frameResources[object - 1].size,
+            .d = texture ? 0 : mrhiBufferAllocation(device->frameResources[object - 1].size),
         };
     }
     device->frameChunkLimit = device->frameProgramChunks +

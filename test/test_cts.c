@@ -539,13 +539,6 @@ static Need DataBytes(Method method, const Block* block, uint64_t offset, int64_
     return (Need){offset + required, valid};
 }
 
-// What a transfer case comes to: the library's outcome, or none where
-// Maul RHI cannot express its data. The CTS's buffers take any size,
-// Maul RHI's a positive multiple of 4: a case runs with its size rounded
-// up when the copy's need does not fall between the two, which keeps
-// its outcome.
-#define INEXPRESSIBLE ((mrhiResult)1000)
-
 static uint8_t s_data[4u << 20];
 
 // A transfer case in a frame: a texture of the block's format, its
@@ -573,18 +566,6 @@ typedef struct TransferCase
 static mrhiResult RunTransfer(const TransferCase* c)
 {
     uint64_t dataSize = c->dataSize;
-    if (c->method != WRITE_TEXTURE && (dataSize == 0 || dataSize % 4 != 0))
-    {
-        uint64_t rounded = dataSize == 0 ? 4 : (dataSize + 3) / 4 * 4;
-        Need need =
-            DataBytes(c->method, c->block, c->offset, c->bytesPerRow == 0 ? ABSENT : c->bytesPerRow,
-                      c->rowsPerImage == 0 ? ABSENT : c->rowsPerImage, c->size);
-        if (need.valid && dataSize < need.bytes && need.bytes <= rounded)
-        {
-            return INEXPRESSIBLE;
-        }
-        dataSize = rounded;
-    }
     mrhiTextureId texture = {0};
     mrhiResult status = mrhiCreateTexture(s_device, &c->texture, &texture);
     if (status != mrhi_success)
@@ -757,11 +738,8 @@ static mrhiResult Transfer(Method method, const Block* block, mrhiTextureKind ki
 }
 
 // Counts the cases Maul RHI cannot express, which are counted rather
-// than run: required_bytes_in_copy's data one byte short of a buffer's
-// need that is a multiple of 4, and bound_on_offset's offset past
-// data of 0 bytes, in copies with a buffer; indirect_offset_oob's
-// buffers 1 byte short of the arguments; createTexture's and
-// createView's 1D textures and views.
+// than run: createTexture's and createView's 1D textures and views, and
+// createBuffer's mapping, which Maul RHI does without.
 static uint32_t s_inexpressible;
 
 // Counts the cases Maul RHI decides otherwise than the CTS: from its
@@ -799,16 +777,6 @@ static bool Owed(Method method, const Block* block, uint64_t offset, int64_t byt
 static uint32_t Value(int64_t value)
 {
     return value == ABSENT ? 0 : (uint32_t)value;
-}
-
-static void ExpectTransfer(const char* test, mrhiResult result, bool succeeds)
-{
-    if (result == INEXPRESSIBLE)
-    {
-        ++s_inexpressible;
-        return;
-    }
-    Expect(test, result, succeeds);
 }
 
 // The CTS's createAlignedTexture: the copy's size, at least one texel,
@@ -860,13 +828,12 @@ static void TestLayouts(void)
                                  "layout_related:bound_on_rows_per_image %s %s rpi=%lld h=%u d=%u",
                                  s_methods[m], shapes[s].volume ? "3d" : "2d",
                                  (long long)imageRows[r], rows, depth);
-                        ExpectTransfer(name,
-                                       Transfer(method, rgba8,
-                                                KindOf(shapes[s].volume, shapes[s].layers),
-                                                (mrhiExtent3d){4, 4, shapes[s].layers}, 0, 1024,
-                                                Value(imageRows[r]), need.bytes, size),
-                                       Owed(method, rgba8, 0, 1024, imageRows[r], need.bytes, size,
-                                            true, need.valid));
+                        Expect(name,
+                               Transfer(method, rgba8, KindOf(shapes[s].volume, shapes[s].layers),
+                                        (mrhiExtent3d){4, 4, shapes[s].layers}, 0, 1024,
+                                        Value(imageRows[r]), need.bytes, size),
+                               Owed(method, rgba8, 0, 1024, imageRows[r], need.bytes, size, true,
+                                    need.valid));
                     }
                 }
             }
@@ -876,11 +843,10 @@ static void TestLayouts(void)
         {
             snprintf(name, sizeof(name), "layout_related:copy_end_overflows_u64 %s d=%u",
                      s_methods[m], depth);
-            ExpectTransfer(name,
-                           Transfer(method, rgba8, KindOf(false, depth),
-                                    (mrhiExtent3d){1, 1, depth}, 0, 1u << 31, 1u << 31, 10000,
-                                    (mrhiExtent3d){1, 1, depth}),
-                           depth == 1);
+            Expect(name,
+                   Transfer(method, rgba8, KindOf(false, depth), (mrhiExtent3d){1, 1, depth}, 0,
+                            1u << 31, 1u << 31, 10000, (mrhiExtent3d){1, 1, depth}),
+                   depth == 1);
         }
         // bound_on_offset: an empty copy, whose offset still may not pass
         // the data.
@@ -890,11 +856,11 @@ static void TestLayouts(void)
             {
                 snprintf(name, sizeof(name), "layout_related:bound_on_offset %s %llu,%llu",
                          s_methods[m], (unsigned long long)offset, (unsigned long long)data);
-                ExpectTransfer(name,
-                               Transfer(method, rgba8, mrhi_texture2d, (mrhiExtent3d){4, 4, 1},
-                                        offset, 0, 0, data, (mrhiExtent3d){0, 0, 0}),
-                               Owed(method, rgba8, offset, 0, ABSENT, data, (mrhiExtent3d){0, 0, 0},
-                                    true, offset <= data));
+                Expect(name,
+                       Transfer(method, rgba8, mrhi_texture2d, (mrhiExtent3d){4, 4, 1}, offset, 0,
+                                0, data, (mrhiExtent3d){0, 0, 0}),
+                       Owed(method, rgba8, offset, 0, ABSENT, data, (mrhiExtent3d){0, 0, 0}, true,
+                            offset <= data));
             }
         }
         for (size_t f = 0; f < sizeof(s_blocks) / sizeof(s_blocks[0]); ++f)
@@ -910,7 +876,7 @@ static void TestLayouts(void)
                 }
                 snprintf(name, sizeof(name), "layout_related:rows_per_image_alignment %s f=%zu %u",
                          s_methods[m], f, rows);
-                ExpectTransfer(
+                Expect(
                     name,
                     Transfer(method, block, mrhi_texture2d, one, 0, 256, rows, block->bytes, one),
                     true);
@@ -924,10 +890,10 @@ static void TestLayouts(void)
                 }
                 snprintf(name, sizeof(name), "layout_related:offset_alignment %s f=%zu %u",
                          s_methods[m], f, offset);
-                ExpectTransfer(name,
-                               Transfer(method, block, mrhi_texture2d, one, offset, 256, 0,
-                                        offset + block->bytes, one),
-                               method == WRITE_TEXTURE || offset % block->bytes == 0);
+                Expect(name,
+                       Transfer(method, block, mrhi_texture2d, one, offset, 256, 0,
+                                offset + block->bytes, one),
+                       method == WRITE_TEXTURE || offset % block->bytes == 0);
             }
             // bound_on_bytes_per_row.
             for (uint32_t rows = 1; rows <= 2; ++rows)
@@ -958,13 +924,12 @@ static void TestLayouts(void)
                             name, sizeof(name),
                             "layout_related:bound_on_bytes_per_row %s f=%zu h=%u d=%u case=%zu",
                             s_methods[m], f, rows, depth, c);
-                        ExpectTransfer(name,
-                                       Transfer(method, block, KindOf(false, depth),
-                                                (mrhiExtent3d){rows_[c].width * block->width,
-                                                               rows * block->height, depth},
-                                                0, Value(rows_[c].bytesPerRow), rows, need.bytes,
-                                                size),
-                                       rows_[c].succeeds);
+                        Expect(name,
+                               Transfer(method, block, KindOf(false, depth),
+                                        (mrhiExtent3d){rows_[c].width * block->width,
+                                                       rows * block->height, depth},
+                                        0, Value(rows_[c].bytesPerRow), rows, need.bytes, size),
+                               rows_[c].succeeds);
                     }
                 }
             }
@@ -997,23 +962,22 @@ static void TestLayouts(void)
                                  "layout_related:required_bytes_in_copy %s f=%zu %s pad=%zu "
                                  "copy=%zu",
                                  s_methods[m], f, volume ? "3d" : "2d", p, c);
-                        ExpectTransfer(name,
-                                       Transfer(method, block, kind, textureSize, offset,
-                                                bytesPerRow, rowsPerImage, need.bytes, size),
-                                       Owed(method, block, offset, bytesPerRow, rowsPerImage,
-                                            need.bytes, size, true, true));
+                        Expect(name,
+                               Transfer(method, block, kind, textureSize, offset, bytesPerRow,
+                                        rowsPerImage, need.bytes, size),
+                               Owed(method, block, offset, bytesPerRow, rowsPerImage, need.bytes,
+                                    size, true, true));
                         if (need.bytes > 0)
                         {
                             snprintf(name, sizeof(name),
                                      "layout_related:required_bytes_in_copy %s f=%zu %s pad=%zu "
                                      "copy=%zu short",
                                      s_methods[m], f, volume ? "3d" : "2d", p, c);
-                            ExpectTransfer(name,
-                                           Transfer(method, block, kind, textureSize, offset,
-                                                    bytesPerRow, rowsPerImage, need.bytes - 1,
-                                                    size),
-                                           Owed(method, block, offset, bytesPerRow, rowsPerImage,
-                                                need.bytes - 1, size, true, false));
+                            Expect(name,
+                                   Transfer(method, block, kind, textureSize, offset, bytesPerRow,
+                                            rowsPerImage, need.bytes - 1, size),
+                                   Owed(method, block, offset, bytesPerRow, rowsPerImage,
+                                        need.bytes - 1, size, true, false));
                         }
                     }
                 }
@@ -1132,25 +1096,11 @@ static void EndCase(mrhiBufferId buffer)
           "dropped");
 }
 
-// The size a case's buffer is made with: the CTS's size rounded up to a
-// positive multiple of 4, or 0 when the need of the call (from its
-// offset) falls between the two, which changes the outcome.
-static uint64_t Rounded(uint64_t size, uint64_t need)
-{
-    uint64_t rounded = size == 0 ? 4 : (size + 3) / 4 * 4;
-    return size < need && need <= rounded ? 0 : rounded;
-}
-
 // An indirect draw in a render pass of a buffer of the size and usage,
 // indexed or not, with the index buffer set when indexed.
 static mrhiResult DrawIndirect(uint64_t size, mrhiBufferUsage usage, bool indexed, uint64_t offset)
 {
-    uint64_t rounded = Rounded(size, offset + (indexed ? 20 : 16));
-    if (rounded == 0)
-    {
-        return INEXPRESSIBLE;
-    }
-    mrhiBufferId buffer = MakeBuffer(rounded, usage);
+    mrhiBufferId buffer = MakeBuffer(size, usage);
     CasePass c = {0};
     mrhiResult status = BeginCase(buffer, mrhi_accessIndirect, true, &c);
     if (status == mrhi_success && indexed)
@@ -1249,8 +1199,7 @@ static void TestIndirectDraws(void)
         {
             snprintf(name, sizeof(name), "indirect_draw:indirect_offset_alignment indexed=%d %llu",
                      indexed, (unsigned long long)offset);
-            ExpectTransfer(name, DrawIndirect(256, mrhi_bufferIndirect, indexed, offset),
-                           offset % 4 == 0);
+            Expect(name, DrawIndirect(256, mrhi_bufferIndirect, indexed, offset), offset % 4 == 0);
         }
         const struct
         {
@@ -1268,9 +1217,9 @@ static void TestIndirectDraws(void)
             snprintf(name, sizeof(name), "indirect_draw:indirect_offset_oob indexed=%d %llu,%llu",
                      indexed, (unsigned long long)bounds[i].offset,
                      (unsigned long long)bounds[i].size);
-            ExpectTransfer(
-                name, DrawIndirect(bounds[i].size, mrhi_bufferIndirect, indexed, bounds[i].offset),
-                bounds[i].valid);
+            Expect(name,
+                   DrawIndirect(bounds[i].size, mrhi_bufferIndirect, indexed, bounds[i].offset),
+                   bounds[i].valid);
         }
         static const mrhiBufferUsage usages[] = {mrhi_bufferIndirect, mrhi_bufferCopyDestination,
                                                  mrhi_bufferCopyDestination | mrhi_bufferIndirect};
@@ -1512,7 +1461,7 @@ static void TestTextureRelated(void)
                     snprintf(name, sizeof(name), "texture_related:usage %s %s layers=%u %#x",
                              s_methods[m], shapes[s].volume ? "3d" : "2d", shapes[s].layers,
                              (unsigned)usage);
-                    ExpectTransfer(name, RunTransfer(&c), (usage & needed) != 0);
+                    Expect(name, RunTransfer(&c), (usage & needed) != 0);
                 }
             }
         }
@@ -1530,7 +1479,7 @@ static void TestTextureRelated(void)
             c.texture.usage |= mrhi_textureSampled | mrhi_textureRenderTarget;
             snprintf(name, sizeof(name), "texture_related:sample_count %s %u", s_methods[m],
                      samples);
-            ExpectTransfer(name, RunTransfer(&c), samples == 1);
+            Expect(name, RunTransfer(&c), samples == 1);
         }
         // mip_level.
         static const uint32_t mipCounts[] = {1, 3, 5};
@@ -1555,7 +1504,7 @@ static void TestTextureRelated(void)
                              "texture_related:mip_level %s %s layers=%u mips=%u mip=%u",
                              s_methods[m], shapes[s].volume ? "3d" : "2d", shapes[s].layers,
                              mipCounts[n], mips[l]);
-                    ExpectTransfer(name, RunTransfer(&c), mips[l] < mipCounts[n]);
+                    Expect(name, RunTransfer(&c), mips[l] < mipCounts[n]);
                 }
             }
         }
@@ -1598,8 +1547,8 @@ static void TestTextureRelated(void)
                             "texture_related:origin_alignment %s f=%zu %s layers=%u axis=%d %u",
                             s_methods[m], f, shapes[s].volume ? "3d" : "2d", shapes[s].layers, axis,
                             values[v]);
-                        ExpectTransfer(name, RunTransfer(&c),
-                                       Owed(method, block, 0, 0, 0, 1, size, rest, rest));
+                        Expect(name, RunTransfer(&c),
+                               Owed(method, block, 0, 0, 0, 1, size, rest, rest));
                     }
                 }
             }
@@ -1635,7 +1584,7 @@ static void TestTextureRelated(void)
                         snprintf(name, sizeof(name),
                                  "texture_related:size_alignment %s f=%zu %s axis=%d %u",
                                  s_methods[m], f, volume ? "3d" : "2d", axis, values[v]);
-                        ExpectTransfer(
+                        Expect(
                             name, RunTransfer(&c),
                             Owed(method, block, 0, bytesPerRow, rowsPerImage, 1, size, rest, rest));
                     }
@@ -1683,9 +1632,9 @@ static void TestTextureRelated(void)
                                          "axis=%d",
                                          s_methods[m], volume ? "3d" : "2d", origin, extent, total,
                                          mip, axis);
-                                ExpectTransfer(name, RunTransfer(&c),
-                                               Owed(method, rgba8, 0, bytesPerRow, copy[1], 1, size,
-                                                    rest, rest));
+                                Expect(name, RunTransfer(&c),
+                                       Owed(method, rgba8, 0, bytesPerRow, copy[1], 1, size, rest,
+                                            rest));
                             }
                         }
                     }
@@ -3377,6 +3326,100 @@ static void TestSamplers(void)
     }
 }
 
+// A buffer of the size and usages: its refusal, or success, the buffer
+// destroyed.
+static mrhiResult TryBuffer(uint64_t size, mrhiBufferUsage usage)
+{
+    mrhiBufferDef def = mrhiDefaultBufferDef();
+    def.size = size;
+    def.usage = usage;
+    mrhiBufferId buffer = {0};
+    mrhiResult status = mrhiCreateBuffer(s_device, &def, &buffer);
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiDestroyBuffer(s_device, buffer) == mrhi_success, "the buffer");
+    }
+    return status;
+}
+
+// The CTS's buffer usages, in its order, as the library's: MAP_READ and
+// MAP_WRITE have none, as the library maps no buffer.
+static const mrhiBufferUsage s_ctsBufferUsages[] = {
+    0,
+    0,
+    mrhi_bufferCopySource,
+    mrhi_bufferCopyDestination,
+    mrhi_bufferIndex,
+    mrhi_bufferVertex,
+    mrhi_bufferUniform,
+    mrhi_bufferStorage,
+    mrhi_bufferIndirect,
+    mrhi_bufferQueryResolve,
+};
+
+// createBuffer: size, limit, usage, new_usages and
+// createBuffer_invalid_and_oom. A buffer takes any size up to the
+// device's limit, past which it is mrhi_errorCapacity, and any usages
+// but none or an unknown bit. The library maps no buffer, so a case
+// mapped at creation or with a map usage is counted.
+static void TestBuffers(void)
+{
+    char name[96];
+    for (uint64_t size = 0; size <= 8; size += 2)
+    {
+        snprintf(name, sizeof(name), "createBuffer:size %llu", (unsigned long long)size);
+        Expect(name, TryBuffer(size, mrhi_bufferCopySource), true);
+        ++s_inexpressible;
+    }
+    mrhiLimits limits = {0};
+    CHECK(mrhiDevice_GetLimits(s_device, &limits) == mrhi_success, "the limits");
+    for (uint64_t size = limits.bufferBytes - 1; size <= limits.bufferBytes + 1; ++size)
+    {
+        snprintf(name, sizeof(name), "createBuffer:limit %llu", (unsigned long long)size);
+        ExpectPastLimit(name, TryBuffer(size, mrhi_bufferCopySource), size <= limits.bufferBytes);
+    }
+    // The CTS's usages with none first and its bogus bit last.
+    mrhiBufferUsage usages[12] = {0};
+    for (uint32_t i = 0; i < 10; ++i)
+    {
+        usages[i + 1] = s_ctsBufferUsages[i];
+    }
+    usages[11] = 0x40000000u;
+    for (uint32_t i = 0; i < 12; ++i)
+    {
+        for (uint32_t j = i; j < 12; ++j)
+        {
+            // Mapped at creation, and with MAP_READ or MAP_WRITE, counted.
+            bool maps = i == 1 || i == 2 || j == 1 || j == 2;
+            s_inexpressible += maps ? 2 : 1;
+            if (maps)
+            {
+                continue;
+            }
+            mrhiBufferUsage usage = usages[i] | usages[j];
+            snprintf(name, sizeof(name), "createBuffer:usage 0x%x", (unsigned)usage);
+            Expect(name, TryBuffer(8, usage), usage != 0 && (usage & 0x40000000u) == 0);
+        }
+    }
+    for (uint32_t i = 0; i < 10; ++i)
+    {
+        snprintf(name, sizeof(name), "createBuffer:new_usages 0x%x",
+                 (unsigned)s_ctsBufferUsages[i]);
+        if (s_ctsBufferUsages[i] == 0)
+        {
+            ++s_inexpressible;
+            continue;
+        }
+        Expect(name, TryBuffer(16, s_ctsBufferUsages[i]), true);
+    }
+    Expect("createBuffer:createBuffer_invalid_and_oom uniform", TryBuffer(16, mrhi_bufferUniform),
+           true);
+    Expect("createBuffer:createBuffer_invalid_and_oom storage", TryBuffer(16, mrhi_bufferStorage),
+           true);
+    // Its six cases with a map usage.
+    s_inexpressible += 6;
+}
+
 // The color renderable formats, with WebGPU's render target pixel byte
 // cost and component alignment of each.
 static const struct
@@ -3780,6 +3823,7 @@ int main(void)
     s_adapter.limits.textureDimension2d = 16384;
     s_adapter.limits.textureDimension3d = 4096;
     s_adapter.limits.textureArrayLayers = 2048;
+    s_adapter.limits.bufferBytes = 2 * mrhiDefaultLimits().bufferBytes;
     // r32float multisampled, as WebGPU allows and many GPUs report, so that
     // a format that multisamples without resolving is there to resolve.
     s_adapter.limitedFormat = mrhi_formatR32Float;
@@ -3798,15 +3842,15 @@ int main(void)
     TestTextureCopies();
     TestLayouts();
     // The counts are pinned so that a change of either is seen.
-    CHECK(s_differs == 192 && s_inexpressible == 962, "the layout cases set aside");
+    CHECK(s_differs == 192 && s_inexpressible == 0, "the layout cases set aside");
     TestTextureRelated();
-    CHECK(s_differs == 876 && s_inexpressible == 962, "the texture copy cases set aside");
+    CHECK(s_differs == 876 && s_inexpressible == 0, "the texture copy cases set aside");
     MakePipelines();
     TestIndirectDraws();
-    CHECK(s_differs == 876 && s_inexpressible == 966, "the indirect draw cases set aside");
+    CHECK(s_differs == 876 && s_inexpressible == 0, "the indirect draw cases set aside");
     TestDispatches();
     TestVertexIndexBuffers();
-    CHECK(s_differs == 878 && s_inexpressible == 966, "the draw cases set aside");
+    CHECK(s_differs == 878 && s_inexpressible == 0, "the draw cases set aside");
     TestRenderPasses();
     TestTransientTargets();
     TestViewUsages();
@@ -3832,9 +3876,10 @@ int main(void)
     TestViewUsageSubsets();
     TestViewUsageFormats();
     TestSamplers();
+    TestBuffers();
     TestColorBytes();
     TestQueries();
-    CHECK(s_differs == 880 && s_inexpressible == 2068, "the pass and query cases set aside");
+    CHECK(s_differs == 880 && s_inexpressible == 1216, "the pass and query cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;

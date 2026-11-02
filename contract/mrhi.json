@@ -575,11 +575,6 @@
               "doc": "A sampler def with an unknown filter, address mode or compare function, a negative, infinite or reversed level of detail range, or anisotropy of 0 or above 1 without linear filtering."
             },
             {
-              "name": "diagnostic_buffer_size",
-              "value": 63,
-              "doc": "A buffer size of zero or not a multiple of 4."
-            },
-            {
               "name": "diagnostic_buffer_usage",
               "value": 64,
               "doc": "A buffer def with no usage, or an unknown one."
@@ -8442,7 +8437,7 @@
             {
               "name": "size",
               "type": "uint64",
-              "doc": "Bytes, a multiple of 4, at most the device's bufferBytes limit.",
+              "doc": "Bytes, any count to the device's bufferBytes limit, 0 included, as WebGPU's. A copy, clear or binding range of it still keeps to multiples of 4.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -8507,7 +8502,7 @@
           "doc": "Makes a buffer on a ready device. It reads as zeros until the frame graph writes it: the first frame that imports it clears it whole, in a pass of the library's own that takes nothing from the frame's budgets, so the program's first use of it sees zeros. Passes that do not use it may run beside that clear.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a size of 0 or not a multiple of 4, or no usage or an unknown one; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the adapter's bufferBytes limit or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` for a size past the device's bufferBytes limit within the adapter's, or when the device's buffer limit is reached; `mrhi_errorPlatform` when the driver fails; `mrhi_errorBusy` for a call from inside the device's allocator."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, or no usage or an unknown one; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the adapter's bufferBytes limit or a critical extension the library does not know; `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity` for a size past the device's bufferBytes limit within the adapter's, or when the device's buffer limit is reached; `mrhi_errorPlatform` when the driver fails; `mrhi_errorBusy` for a call from inside the device's allocator."
           },
           "args": [
             {
@@ -12355,7 +12350,7 @@
           "doc": "Declares a buffer the open frame's graph makes, aliases and ends with the frame. Its usages are derived from the passes that use it. A pass may read it only after an earlier pass wrote it; bytes no pass wrote, beside a write to part of it, are undefined and differ by backend.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, a usage other than 0, or a size that is zero or not a multiple of 4; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the adapter's bufferBytes, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` for a size past the device's bufferBytes within the adapter's, or when the device's frameResources budget is reached; `mrhi_errorBusy` for a call from inside the device's allocator."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL argument, a def without its cookie, a label that is not UTF-8 without NUL, or a usage other than 0; `mrhi_errorLimit` for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorUnsupported` for a size past the adapter's bufferBytes, or a critical extension the library does not know; `mrhi_errorState` for a device without an open frame; `mrhi_errorCapacity` for a size past the device's bufferBytes within the adapter's, or when the device's frameResources budget is reached; `mrhi_errorBusy` for a call from inside the device's allocator."
           },
           "args": [
             {
@@ -22732,5 +22727,5 @@
       ]
     }
   ],
-  "contract_version": 33
+  "contract_version": 34
 }

@@ -47,7 +47,7 @@ static void Measure(const mrhiDevice* device, const mrhiFrameResource* resource,
         return;
     }
     mrhiBufferDef def = mrhiDefaultBufferDef();
-    def.size = resource->size;
+    def.size = mrhiBufferAllocation(resource->size);
     def.usage = resource->usage;
     device->driver.vtable->bufferMemory(device->driver.self, &def, bytesOut, alignmentOut);
 }
