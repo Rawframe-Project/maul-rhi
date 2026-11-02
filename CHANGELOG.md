@@ -5,6 +5,18 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.23.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.23.0...v0.23.1) (2026-11-02)
+
+### Fixed
+
+- `mrhiCreateQuerySet` takes a query set of 0 queries, as WebGPU's
+  `createQuerySet` does. Before, it was refused on every driver with
+  `mrhi_errorInvalid`, counted as `mrhi_diagnosticQuerySetDef`. No pass
+  writes or resolves a query of such a set. It holds none of the
+  device's `queries` budget, and drivers are still handed a set of at
+  least one query. `contract_version` rises to 35.
+  ([#407](https://github.com/Rawframe-Project/maul-rhi/pull/407))
+
 ## [0.23.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.22.0...v0.23.0) (2026-11-02)
 
 ### Changed
