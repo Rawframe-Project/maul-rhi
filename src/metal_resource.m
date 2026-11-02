@@ -83,8 +83,13 @@ static MTLTextureDescriptor* Describe(const mrhiTextureDef* def)
 {
     MTLTextureDescriptor* descriptor = [[[MTLTextureDescriptor alloc] init] autorelease];
     bool volume = def->kind == mrhi_texture3d;
-    bool cube = def->kind == mrhi_textureCube || def->kind == mrhi_textureCubeArray;
-    descriptor.textureType = mrhiMetalTextureType(def->kind, def->sampleCount);
+    // A cube array of layers out of sixes is a 2D array, which Metal
+    // views as cubes and cube arrays too.
+    bool cube = def->kind == mrhi_textureCube ||
+                (def->kind == mrhi_textureCubeArray && def->depthOrLayers % 6 == 0);
+    mrhiTextureKind kind =
+        def->kind == mrhi_textureCubeArray && !cube ? mrhi_texture2dArray : def->kind;
+    descriptor.textureType = mrhiMetalTextureType(kind, def->sampleCount);
     descriptor.pixelFormat = mrhiMetalFormat(def->format);
     descriptor.width = def->width;
     descriptor.height = def->height;

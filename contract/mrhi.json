@@ -8674,23 +8674,23 @@
             {
               "name": "texture_cube_array",
               "value": 3,
-              "doc": "An array of cubes, six layers each.",
+              "doc": "An array of cubes, six layers each. A texture of this kind has six or more square layers, and its views take any six of them in a row as a cube.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
-                  "note": "CUBE_COMPATIBLE with 6n layers, a cube array view"
+                  "note": "CUBE_COMPATIBLE with 6 or more layers, a cube array view"
                 },
                 "d3d12": {
                   "class": "direct",
-                  "note": "TEXTURE2D with 6n array slices, a TextureCubeArray view"
+                  "note": "TEXTURE2D with 6 or more array slices, a TextureCubeArray view"
                 },
                 "metal": {
                   "class": "direct",
-                  "note": "MTLTextureTypeCubeArray"
+                  "note": "MTLTextureTypeCubeArray, or MTLTextureType2DArray viewed as cubes when its layers are not a multiple of 6"
                 },
                 "web_gpu": {
                   "class": "direct",
-                  "note": "2d with 6n layers, a cube-array view"
+                  "note": "2d with 6 or more layers, a cube-array view"
                 }
               }
             },
@@ -9026,7 +9026,7 @@
             {
               "name": "depth_or_layers",
               "type": "uint32",
-              "doc": "The depth of a 3D texture, else its layers: 1 for 2D, 6 for a cube, a multiple of 6 for a cube array.",
+              "doc": "The depth of a 3D texture, else its layers: 1 for 2D, 6 for a cube, 6 or more for a cube array.",
               "mapping": {
                 "vulkan": {
                   "class": "direct",
@@ -22732,5 +22732,5 @@
       ]
     }
   ],
-  "contract_version": 32
+  "contract_version": 33
 }

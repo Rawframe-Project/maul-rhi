@@ -66,8 +66,14 @@ static void TestKinds(void)
               mrhi_errorInvalid,
           "a cube of 5 layers");
     CHECK(Make(Def(mrhi_textureCubeArray, mrhi_formatRgba8Unorm, 64, 64, 7, kSampled)) ==
+              mrhi_success,
+          "a cube array of 7 layers, its sixes on its views");
+    CHECK(Make(Def(mrhi_textureCubeArray, mrhi_formatRgba8Unorm, 64, 64, 5, kSampled)) ==
               mrhi_errorInvalid,
-          "a cube array of 7 layers");
+          "a cube array of 5 layers");
+    CHECK(Make(Def(mrhi_textureCubeArray, mrhi_formatRgba8Unorm, 64, 32, 7, kSampled)) ==
+              mrhi_errorInvalid,
+          "a cube array that is not square");
     CHECK(Make(Def(mrhi_texture2d, mrhi_formatRgba8Unorm, 64, 64, 2, kSampled)) ==
               mrhi_errorInvalid,
           "2D with 2 layers");
