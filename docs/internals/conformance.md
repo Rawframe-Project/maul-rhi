@@ -26,12 +26,13 @@ Without an outside driver, a Linux build hands the suite its own Vulkan driver t
 
 The core refuses on every driver what breaks WebGPU's rules, and the WebGPU conformance test suite (CTS) states those rules as small tables of calls and outcomes, maintained with the specification. The CTS itself tests a WebGPU implementation, which the library only uses, so it is not run against the library. Instead `test/test_cts.c` translates the CTS validation cases that have Maul RHI counterparts into a table-driven test on the test driver: each case names its CTS test, the call it becomes and the outcome the CTS expects. The CTS revision is pinned in the file, whose header carries the CTS's BSD-3-Clause notice for the translated cases.
 
-A case the library decides otherwise is listed in the test with its reason. Four rules differ, each on purpose:
+A case the library decides otherwise is listed in the test with its reason. Five rules differ, each on purpose:
 
 - A layout's `bytesPerRow` or `rowsPerImage` of 0 means absent, where WebGPU's 0 is a value; the WebGPU driver passes it as undefined.
 - An index range is whole indices; WebGPU takes any bytes.
 - A query is written at most once a frame, where WebGPU allows once a pass, so Vulkan never meets a query written twice between resets.
 - A destroyed texture has no views: destroying it frees its id and destroys its views, so a view of that id is refused as stale, where WebGPU still views a destroyed texture.
+- A buffer or texture destroyed after a frame imported it is still what that frame runs on, as the library keeps what a frame uses until the frame has finished; WebGPU fails the submit instead. One destroyed before the import is refused as stale, as WebGPU refuses it.
 
 Cases the library cannot express are counted, not run: 1D textures and views, which the library does not have, and a buffer mapped at creation or with a map usage, as the library maps no buffer. A buffer takes any size, 0 included, as WebGPU's, so every copy case runs with the CTS's own data size. Both counts are pinned in the test, so a change in either is seen. Translating the copy cases found one real difference: WebGPU allows empty copies, which Vulkan refuses, so empty copies, writes and reads now record nothing.
 

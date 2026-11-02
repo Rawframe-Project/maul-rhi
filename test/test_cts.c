@@ -3834,6 +3834,309 @@ static void TestQueries(void)
            Occlusion(1, twice, 2, 2), false);
 }
 
+// A destroy the CTS expects to raise no error, of a live object, one
+// destroyed already, or one a refused def left. The library's ids are
+// generational: destroying an ended one, or the zero id a refused def
+// gives, is mrhi_errorStale, which changes nothing and counts no misuse,
+// as WebGPU's destroy of a destroyed or invalid object raises nothing.
+static void ExpectDestroy(const char* test, mrhiResult result, bool ended, uint64_t misuse)
+{
+    if (result != (ended ? mrhi_errorStale : mrhi_success) ||
+        mrhiDevice_GetMisuse(s_device) != misuse)
+    {
+        printf("FAIL: %s: %d, the CTS expects no error\n", test, (int)result);
+        ++s_failures;
+    }
+}
+
+// Reports a case the CTS refuses for a destroyed object. Its id has
+// ended, so the library refuses it as mrhi_errorStale.
+static void ExpectStale(const char* test, mrhiResult result)
+{
+    if (result != mrhi_errorStale)
+    {
+        printf("FAIL: %s: %d, the CTS expects a validation error\n", test, (int)result);
+        ++s_failures;
+    }
+}
+
+// buffer,destroy: all_usages, error_buffer, twice and while_mapped. The
+// library maps no buffer, so a case with a map usage, mapped at
+// creation or mapped is counted; the CTS's error buffer is one, as a
+// map usage makes it invalid.
+static void TestBufferDestroys(void)
+{
+    char name[64];
+    for (uint32_t i = 0; i < 10; ++i)
+    {
+        if (s_ctsBufferUsages[i] == 0)
+        {
+            ++s_inexpressible;
+            continue;
+        }
+        mrhiBufferId buffer = MakeBuffer(4, s_ctsBufferUsages[i]);
+        snprintf(name, sizeof(name), "buffer,destroy:all_usages 0x%x",
+                 (unsigned)s_ctsBufferUsages[i]);
+        ExpectDestroy(name, mrhiDestroyBuffer(s_device, buffer), false,
+                      mrhiDevice_GetMisuse(s_device));
+    }
+    s_inexpressible += 1;
+    // twice: not mapped at creation, of COPY_SRC; the rest map.
+    mrhiBufferId buffer = MakeBuffer(4, mrhi_bufferCopySource);
+    uint64_t misuse = mrhiDevice_GetMisuse(s_device);
+    ExpectDestroy("buffer,destroy:twice first", mrhiDestroyBuffer(s_device, buffer), false, misuse);
+    ExpectDestroy("buffer,destroy:twice second", mrhiDestroyBuffer(s_device, buffer), true, misuse);
+    s_inexpressible += 5 + 14;
+}
+
+// texture,destroy: base, twice and invalid_texture, whose width is one
+// past the device's maxTextureDimension2D.
+static void TestTextureDestroys(void)
+{
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = RGBA8;
+    def.width = 16;
+    def.height = 16;
+    def.usage = mrhi_textureSampled;
+    for (uint32_t times = 1; times <= 2; ++times)
+    {
+        mrhiTextureId texture = {0};
+        CHECK(mrhiCreateTexture(s_device, &def, &texture) == mrhi_success, "a sampled texture");
+        uint64_t misuse = mrhiDevice_GetMisuse(s_device);
+        for (uint32_t i = 0; i < times; ++i)
+        {
+            ExpectDestroy(times == 1 ? "texture,destroy:base" : "texture,destroy:twice",
+                          mrhiDestroyTexture(s_device, texture), i == 1, misuse);
+        }
+    }
+    mrhiLimits limits = {0};
+    CHECK(mrhiDevice_GetLimits(s_device, &limits) == mrhi_success, "the limits");
+    def.width = limits.textureDimension2d + 1;
+    def.height = 1;
+    mrhiTextureId invalid = {0};
+    CHECK(mrhiCreateTexture(s_device, &def, &invalid) != mrhi_success && invalid.index1 == 0,
+          "an invalid texture");
+    ExpectDestroy("texture,destroy:invalid_texture", mrhiDestroyTexture(s_device, invalid), true,
+                  mrhiDevice_GetMisuse(s_device));
+}
+
+// When a destroy case destroys its texture or query set: never, before
+// the frame names it, or after its pass is added and before the submit.
+typedef enum Destroyed
+{
+    KEPT,
+    BEFORE,
+    AFTER,
+} Destroyed;
+
+// texture,destroy:submit_a_destroyed_texture_as_attachment: a frame of
+// a render pass clearing a color target and a depth or stencil target,
+// each destroyed as given; the first refusal, from the imports to the
+// submit, or success once the frame has finished.
+static mrhiResult SubmitTargets(mrhiFormat depthFormat, Destroyed color, Destroyed depth)
+{
+    const mrhiTextureUsage usage = mrhi_textureRenderTarget | mrhi_textureCopyDestination;
+    const Attachment defs[2] = {{.format = RGBA8, .usage = usage},
+                                {.format = depthFormat, .usage = usage}};
+    const Destroyed states[2] = {color, depth};
+    mrhiTextureId textures[2] = {MakeAttachment(&defs[0]), MakeAttachment(&defs[1])};
+    for (size_t i = 0; i < 2; ++i)
+    {
+        CHECK(states[i] != BEFORE || mrhiDestroyTexture(s_device, textures[i]) == mrhi_success,
+              "destroyed before");
+    }
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success, "a frame");
+    mrhiResourceId targets[2] = {0};
+    mrhiResult status = mrhi_success;
+    for (size_t i = 0; i < 2 && status == mrhi_success; ++i)
+    {
+        status = mrhiImportTexture(s_device, textures[i], &targets[i]);
+    }
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    def.colorTargets[0] = (mrhiColorTarget){
+        .resource = targets[0],
+        .load = mrhi_loadClear,
+        .store = mrhi_storeKeep,
+    };
+    def.colorTargetCount = 1;
+    def.depthTarget.resource = targets[1];
+    def.depthTarget.depthLoad = mrhi_loadClear;
+    def.depthTarget.depthStore = mrhi_storeDiscard;
+    def.depthTarget.stencilLoad = mrhi_loadClear;
+    def.depthTarget.stencilStore = mrhi_storeDiscard;
+    mrhiPassId pass = {0};
+    status = status == mrhi_success ? mrhiAddPass(s_device, &def, &pass) : status;
+    for (size_t i = 0; i < 2; ++i)
+    {
+        CHECK(states[i] != AFTER || mrhiDestroyTexture(s_device, textures[i]) == mrhi_success,
+              "destroyed after");
+    }
+    if (status != mrhi_success)
+    {
+        CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
+    }
+    else
+    {
+        mrhiRequestId token = {0};
+        status = mrhiDevice_CompileFrame(s_device);
+        CHECK(status != mrhi_success || (mrhiPass_Begin(s_device, pass) == mrhi_success &&
+                                         mrhiPass_End(s_device, pass) == mrhi_success &&
+                                         mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success &&
+                                         mrhiRequest_WaitFrame(s_device, token, 1) == mrhi_success),
+              "submitted and finished");
+    }
+    for (size_t i = 0; i < 2; ++i)
+    {
+        CHECK(states[i] != KEPT || mrhiDestroyTexture(s_device, textures[i]) == mrhi_success,
+              "destroyed");
+    }
+    return status;
+}
+
+// The CTS's aspects become the library's formats: depth24plus-stencil8
+// and stencil8 its depth-stencil format, which is its only one with
+// stencil, and depth32float its own. A target destroyed before the frame
+// imports it is refused as stale. One destroyed after its pass is added
+// is still what the frame runs on, as the library keeps what a frame
+// imported until that frame has finished, where WebGPU fails the submit:
+// those cases differ.
+static void TestDestroyedTargets(void)
+{
+    static const char* const aspects[] = {"all", "depth-only", "stencil-only"};
+    static const mrhiFormat formats[] = {DEPTH, mrhi_formatDepth32Float, DEPTH};
+    static const char* const states[] = {"valid", "destroyedBeforeEncode", "destroyedAfterEncode"};
+    char name[160];
+    for (size_t a = 0; a < 3; ++a)
+    {
+        for (uint32_t color = KEPT; color <= AFTER; ++color)
+        {
+            for (uint32_t depth = KEPT; depth <= AFTER; ++depth)
+            {
+                snprintf(name, sizeof(name),
+                         "texture,destroy:submit_a_destroyed_texture_as_attachment %s,%s,%s",
+                         aspects[a], states[color], states[depth]);
+                mrhiResult status = SubmitTargets(formats[a], color, depth);
+                if (color == BEFORE || depth == BEFORE)
+                {
+                    ExpectStale(name, status);
+                    continue;
+                }
+                Expect(name, status, true);
+                s_differs += color == AFTER || depth == AFTER ? 1 : 0;
+            }
+        }
+    }
+}
+
+// How a queue,destroyed,query_set case uses its set.
+typedef enum QueryUse
+{
+    OCCLUSION_BEGUN,
+    OCCLUSION_UNUSED,
+    TIMESTAMP_COMPUTE,
+    TIMESTAMP_RENDER,
+    RESOLVED,
+} QueryUse;
+
+// A queue,destroyed,query_set case: a set of the CTS's two queries,
+// destroyed before the frame or not, used by one pass; the first
+// refusal, from the pass to the submit, or success once the frame has
+// finished. A compute pass is one of the graphics class without targets.
+static mrhiResult UseQuerySet(QueryUse use, bool destroyed)
+{
+    bool timestamps = use == TIMESTAMP_COMPUTE || use == TIMESTAMP_RENDER;
+    mrhiQuerySetId set = MakeQuerySet(timestamps ? mrhi_queryTimestamp : mrhi_queryOcclusion, 2);
+    CHECK(!destroyed || mrhiDestroyQuerySet(s_device, set) == mrhi_success, "destroyed");
+    mrhiBufferId buffer = MakeBuffer(8, mrhi_bufferQueryResolve);
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId target = {0};
+    mrhiResourceId results = {0};
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportTexture(s_device, s_target, &target) == mrhi_success &&
+              mrhiImportBuffer(s_device, buffer, &results) == mrhi_success,
+          "a frame of the target and the buffer");
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    if (use != TIMESTAMP_COMPUTE && use != RESOLVED)
+    {
+        def.colorTargets[0] = (mrhiColorTarget){.resource = target, .load = mrhi_loadKeep};
+        def.colorTargetCount = 1;
+    }
+    if (timestamps)
+    {
+        def.timestampQuerySet = set;
+        def.timestampBegin = 0;
+    }
+    else if (use != RESOLVED)
+    {
+        def.occlusionQuerySet = set;
+    }
+    const mrhiAccess access = {.resource = results, .kind = mrhi_accessQueryResolve};
+    def.accesses = use == RESOLVED ? &access : nullptr;
+    def.accessCount = use == RESOLVED ? 1 : 0;
+    mrhiPassId pass = {0};
+    mrhiResult status = mrhiAddPass(s_device, &def, &pass);
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+                  mrhiPass_Begin(s_device, pass) == mrhi_success,
+              "the pass begun");
+        if (use == OCCLUSION_BEGUN)
+        {
+            status = mrhiPass_BeginOcclusionQuery(s_device, pass, 0);
+            status = status == mrhi_success ? mrhiPass_EndOcclusionQuery(s_device, pass) : status;
+        }
+        if (use == RESOLVED)
+        {
+            status = mrhiPass_ResolveQueries(s_device, pass, set, 0, 1, results, 0);
+        }
+    }
+    mrhiRequestId token = {0};
+    CHECK(status == mrhi_success ? mrhiPass_End(s_device, pass) == mrhi_success &&
+                                       mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success &&
+                                       mrhiRequest_WaitFrame(s_device, token, 1) == mrhi_success
+                                 : mrhiDevice_DropFrame(s_device) == mrhi_success,
+          "submitted and finished, or dropped");
+    CHECK((destroyed || mrhiDestroyQuerySet(s_device, set) == mrhi_success) &&
+              mrhiDestroyBuffer(s_device, buffer) == mrhi_success,
+          "the set and buffer destroyed");
+    return status;
+}
+
+// query_set,destroy: twice and invalid_queryset, of kMaxQueryCount + 1
+// queries; and queue,destroyed,query_set: beginOcclusionQuery,
+// unusedOcclusionQuery, timestamps, of a compute and a render pass, and
+// resolveQuerySet, each of a valid and a destroyed set.
+static void TestQuerySetDestroys(void)
+{
+    mrhiQuerySetId set = MakeQuerySet(mrhi_queryOcclusion, 1);
+    uint64_t misuse = mrhiDevice_GetMisuse(s_device);
+    ExpectDestroy("query_set,destroy:twice first", mrhiDestroyQuerySet(s_device, set), false,
+                  misuse);
+    ExpectDestroy("query_set,destroy:twice second", mrhiDestroyQuerySet(s_device, set), true,
+                  misuse);
+    mrhiQuerySetDef def = mrhiDefaultQuerySetDef();
+    def.count = 4097;
+    mrhiQuerySetId invalid = {0};
+    CHECK(mrhiCreateQuerySet(s_device, &def, &invalid) == mrhi_errorLimit && invalid.index1 == 0,
+          "an invalid query set");
+    ExpectDestroy("query_set,destroy:invalid_queryset", mrhiDestroyQuerySet(s_device, invalid),
+                  true, mrhiDevice_GetMisuse(s_device));
+    static const char* const uses[] = {"beginOcclusionQuery", "unusedOcclusionQuery",
+                                       "timestamps compute", "timestamps render",
+                                       "resolveQuerySet"};
+    char name[96];
+    for (uint32_t use = OCCLUSION_BEGUN; use <= RESOLVED; ++use)
+    {
+        snprintf(name, sizeof(name), "queue,destroyed,query_set:%s valid", uses[use]);
+        Expect(name, UseQuerySet(use, false), true);
+        snprintf(name, sizeof(name), "queue,destroyed,query_set:%s destroyed", uses[use]);
+        ExpectStale(name, UseQuerySet(use, true));
+    }
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -3908,6 +4211,11 @@ int main(void)
     TestQuerySets();
     TestQueries();
     CHECK(s_differs == 880 && s_inexpressible == 1216, "the pass and query cases set aside");
+    TestBufferDestroys();
+    TestTextureDestroys();
+    TestDestroyedTargets();
+    TestQuerySetDestroys();
+    CHECK(s_differs == 889 && s_inexpressible == 1238, "the destroy cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
