@@ -5,6 +5,17 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.23.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.22.0...v0.23.0) (2026-11-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* **resources:** drivers built outside the tree must be rebuilt for SPI version 18; a buffer may now have any size, 0 included, and mrhi_diagnosticBufferSize is removed.
+
+### Fixed
+
+* **resources:** take a buffer of any size, as WebGPU does ([#404](https://github.com/Rawframe-Project/maul-rhi/issues/404)) ([afbbe76](https://github.com/Rawframe-Project/maul-rhi/commit/afbbe76829d562d3ef6a2bf660483bca517dfa9c)), closes [#403](https://github.com/Rawframe-Project/maul-rhi/issues/403)
+
 ## [0.22.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.21.0...v0.22.0) (2026-11-02)
 
 ### Changed
