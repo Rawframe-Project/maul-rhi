@@ -372,7 +372,7 @@ mrhiResult mrhiPass_SetRootBlock(mrhiDevice* device, mrhiPassId id, uint32_t off
     {
         return mrhi_errorInvalid;
     }
-    if (bytes == nullptr)
+    if (bytes == nullptr && size > 0)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticNullArgument);
     }
@@ -382,7 +382,7 @@ mrhiResult mrhiPass_SetRootBlock(mrhiDevice* device, mrhiPassId id, uint32_t off
     {
         return status;
     }
-    if (mrhiWorkOf(pass) == mrhiWorkTransfer || offset % 4 != 0 || size % 4 != 0 || size == 0)
+    if (mrhiWorkOf(pass) == mrhiWorkTransfer || offset % 4 != 0 || size % 4 != 0)
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticRootBlock);
     }
@@ -396,6 +396,13 @@ mrhiResult mrhiPass_SetRootBlock(mrhiDevice* device, mrhiPassId id, uint32_t off
     if (status != mrhi_success)
     {
         return status;
+    }
+    // An empty write is valid, as WebGPU's setImmediates of no bytes, and
+    // records nothing; drivers never see it. A pass that found the
+    // frame's commands full refuses it too, as every write after.
+    if (size == 0)
+    {
+        return pass->overflow != 0 ? mrhiDeviceFull(device, pass->overflow) : mrhi_success;
     }
     // Within the root block, the size fits 32 bits.
     mrhiCommand command = {.type = mrhiCommandRootBlock, .a = offset, .b = (uint32_t)size};

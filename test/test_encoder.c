@@ -674,14 +674,25 @@ static void TestRootBlock(void)
               mrhiPass_SetRootBlock(s_device, s_render, 0, bytes, (size_t)UINT32_MAX + 5) ==
                   mrhi_errorUnsupported,
           "a size past 32 bits");
+    // An empty write takes WebGPU's checks of its offset, and records
+    // nothing.
+    CHECK(mrhiPass_SetRootBlock(s_device, s_render, 0, bytes, 0) == mrhi_success &&
+              mrhiPass_SetRootBlock(s_device, s_render, 64, bytes, 0) == mrhi_success &&
+              mrhiPass_SetRootBlock(s_device, s_render, 0, nullptr, 0) == mrhi_success &&
+              Nth(s_render, 2) == nullptr,
+          "empty, up to the device's root block, recording nothing");
+    CHECK(mrhiPass_SetRootBlock(s_device, s_render, 68, bytes, 0) == mrhi_errorCapacity &&
+              mrhiPass_SetRootBlock(s_device, s_render, 132, bytes, 0) == mrhi_errorUnsupported,
+          "empty past the device's and the adapter's root block");
     CHECK(mrhiDevice_GetMisuse(s_device) == 0, "not misuse");
     CHECK(mrhiPass_SetRootBlock(s_device, s_render, 2, bytes, 4) == mrhi_errorInvalid &&
               mrhiPass_SetRootBlock(s_device, s_render, 0, bytes, 6) == mrhi_errorInvalid &&
-              mrhiPass_SetRootBlock(s_device, s_render, 0, bytes, 0) == mrhi_errorInvalid &&
+              mrhiPass_SetRootBlock(s_device, s_render, 2, bytes, 0) == mrhi_errorInvalid &&
               mrhiPass_SetRootBlock(s_device, s_copy, 0, bytes, 4) == mrhi_errorInvalid &&
+              mrhiPass_SetRootBlock(s_device, s_copy, 0, bytes, 0) == mrhi_errorInvalid &&
               mrhiPass_SetRootBlock(s_device, s_render, 0, nullptr, 4) == mrhi_errorInvalid,
-          "unaligned, empty, in a transfer pass, or without bytes");
-    CHECK(mrhiDevice_GetMisuse(s_device) == 5, "each counted");
+          "unaligned, empty and unaligned, in a transfer pass, empty there, or without bytes");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 6, "each counted");
     CHECK(mrhiPass_SetRootBlock(nullptr, s_render, 0, bytes, 4) == mrhi_errorInvalid, "no device");
     CHECK(mrhiPass_SetRootBlock(s_device, s_depth, 0, bytes, 4) == mrhi_errorState, "not begun");
     CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
@@ -772,6 +783,8 @@ static void TestArena(void)
           "three records past its chunk, and no third chunk");
     CHECK(mrhiPass_SetStencilReference(s_device, s_render, 0) == mrhi_errorCapacity,
           "nothing after, though a record would fit");
+    CHECK(mrhiPass_SetRootBlock(s_device, s_render, 0, bytes, 0) == mrhi_errorCapacity,
+          "nor an empty write");
     CHECK(Nth(s_render, perChunk - 2) == nullptr, "nothing recorded");
     // The dispatch pass's chunk holds a record: 63 more root blocks of a
     // record each and their payload fill it.
