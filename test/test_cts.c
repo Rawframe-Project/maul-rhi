@@ -6287,6 +6287,434 @@ static void TestDrawIndexBuffers(void)
     CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
 }
 
+// A buffer a vertex buffer case binds: one of its buffers, from a byte
+// for bytes, or none.
+typedef struct VertexBind
+{
+    int32_t buffer;
+    uint64_t offset;
+    uint64_t size;
+} VertexBind;
+
+#define NO_BIND ((VertexBind){-1, 0, 0})
+
+// A vertex buffer case: its buffers' bytes, what it binds to vertex
+// slots 1 and 7 and as a uint16 index buffer, and a draw of the CTS's
+// draw types, whose counts and firsts are of indices for an indexed
+// draw. holes sets slots 0 and 2 to 6 to no bytes of its first buffer,
+// for a pipeline that reads all eight.
+typedef struct VertexFrame
+{
+    mrhiGraphicsPipelineId pipeline;
+    uint64_t bytes[3];
+    uint32_t bufferCount;
+    VertexBind slots[2];
+    VertexBind index;
+    bool holes;
+    uint32_t type;
+    uint32_t count;
+    uint32_t instanceCount;
+    uint32_t first;
+    int32_t baseVertex;
+    uint32_t firstInstance;
+} VertexFrame;
+
+static const char* const s_drawTypes[] = {"draw", "drawIndexed", "drawIndirect",
+                                          "drawIndexedIndirect"};
+
+static mrhiResult SetVertexBind(mrhiPassId pass, const mrhiResourceId* resources, uint32_t slot,
+                                VertexBind bind)
+{
+    return bind.buffer < 0 ? mrhi_success
+                           : mrhiPass_SetVertexBuffer(s_device, pass, slot, resources[bind.buffer],
+                                                      bind.offset, bind.size);
+}
+
+// The binds and the draw, with the pipeline set before or after the
+// binds: the first refusal, or success.
+static mrhiResult RunVertexSteps(const VertexFrame* f, mrhiPassId pass,
+                                 const mrhiResourceId* resources, bool pipelineFirst)
+{
+    mrhiResult status =
+        pipelineFirst ? mrhiPass_SetGraphicsPipeline(s_device, pass, f->pipeline) : mrhi_success;
+    if (status == mrhi_success && f->index.buffer >= 0)
+    {
+        status = mrhiPass_SetIndexBuffer(s_device, pass, resources[f->index.buffer],
+                                         mrhi_indexUint16, f->index.offset, f->index.size);
+    }
+    for (uint32_t slot = 0; slot < 8 && status == mrhi_success; ++slot)
+    {
+        VertexBind hole = f->holes ? (VertexBind){0, 0, 0} : NO_BIND;
+        status = SetVertexBind(pass, resources, slot,
+                               slot == 1   ? f->slots[0]
+                               : slot == 7 ? f->slots[1]
+                                           : hole);
+    }
+    if (status == mrhi_success && !pipelineFirst)
+    {
+        status = mrhiPass_SetGraphicsPipeline(s_device, pass, f->pipeline);
+    }
+    mrhiResourceId indirect = resources[f->bufferCount];
+    if (status == mrhi_success)
+    {
+        status = f->type == 0 ? mrhiPass_Draw(s_device, pass, f->count, f->instanceCount, f->first,
+                                              f->firstInstance)
+                 : f->type == 1 ? mrhiPass_DrawIndexed(s_device, pass, f->count, f->instanceCount,
+                                                       f->first, f->baseVertex, f->firstInstance)
+                 : f->type == 2 ? mrhiPass_DrawIndirect(s_device, pass, indirect, 0)
+                                : mrhiPass_DrawIndexedIndirect(s_device, pass, indirect, 0);
+    }
+    return status == mrhi_success ? mrhiPass_End(s_device, pass) : status;
+}
+
+// The case in a render pass of the suite's target, cleared, declaring
+// each buffer with the vertex and index accesses and a 20-byte indirect
+// buffer: the first refusal, or success.
+static mrhiResult RunVertexCase(const VertexFrame* f, bool pipelineFirst)
+{
+    mrhiBufferId buffers[4] = {0};
+    mrhiResourceId resources[4] = {0};
+    mrhiAccess accesses[7] = {0};
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiPassDef def = mrhiDefaultPassDef();
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportTexture(s_device, s_target, &def.colorTargets[0].resource) == mrhi_success,
+          "a frame");
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < f->bufferCount; ++i)
+    {
+        buffers[i] = MakeBuffer(f->bytes[i], mrhi_bufferVertex | mrhi_bufferIndex);
+        CHECK(mrhiImportBuffer(s_device, buffers[i], &resources[i]) == mrhi_success, "a buffer");
+        accesses[count++] = Whole(resources[i], mrhi_accessVertex);
+        accesses[count++] = Whole(resources[i], mrhi_accessIndex);
+    }
+    buffers[f->bufferCount] = MakeBuffer(20, mrhi_bufferIndirect);
+    CHECK(mrhiImportBuffer(s_device, buffers[f->bufferCount], &resources[f->bufferCount]) ==
+              mrhi_success,
+          "the indirect buffer");
+    accesses[count++] = Whole(resources[f->bufferCount], mrhi_accessIndirect);
+    def.neverCull = true;
+    def.accesses = accesses;
+    def.accessCount = count;
+    def.colorTargets[0].load = mrhi_loadClear;
+    def.colorTargetCount = 1;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success &&
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, pass) == mrhi_success,
+          "the pass begun");
+    mrhiResult status = RunVertexSteps(f, pass, resources, pipelineFirst);
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
+    for (uint32_t i = 0; i <= f->bufferCount; ++i)
+    {
+        CHECK(mrhiDestroyBuffer(s_device, buffers[i]) == mrhi_success, "a buffer destroyed");
+    }
+    return status;
+}
+
+// The CTS's makeTestPipelineWithVertexAndInstanceBuffer: buffers 1 and
+// 7 of the stride, stepping by vertex and by instance, each with one
+// attribute of the format at the offset, at locations 2 and 6. Maul
+// RHI's pipelines have no unused buffer, so buffers 0 and 2 to 6 have
+// no attributes and a stride of 0, and every case binds them.
+static mrhiGraphicsPipelineId MakeVertexPipeline(mrhiShaderId shader, uint32_t stride,
+                                                 mrhiVertexFormat format, uint32_t offset)
+{
+    mrhiVertexBufferLayout buffers[8] = {0};
+    buffers[1] = (mrhiVertexBufferLayout){stride, mrhi_stepVertex};
+    buffers[7] = (mrhiVertexBufferLayout){stride, mrhi_stepInstance};
+    const mrhiVertexAttribute attributes[2] = {{1, 2, format, offset}, {7, 6, format, offset}};
+    mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+    def.shader = shader;
+    def.vertexEntry = "vs";
+    def.vertexEntryLength = 2;
+    def.fragmentEntry = "fs";
+    def.fragmentEntryLength = 2;
+    def.vertexBuffers = buffers;
+    def.vertexBufferCount = 8;
+    def.vertexAttributes = attributes;
+    def.vertexAttributeCount = 2;
+    def.colorTargets[0].format = mrhi_formatRgba8Unorm;
+    def.colorTargetCount = 1;
+    mrhiGraphicsPipelineId pipeline = {0};
+    mrhiRequestId request;
+    CHECK(mrhiCreateGraphicsPipeline(s_device, &def, &pipeline, &request) == mrhi_success,
+          "a vertex pipeline");
+    Answered();
+    return pipeline;
+}
+
+static const char* const s_bools[] = {"false", "true"};
+
+// The CTS's kDefaultParameterForDraw with its indexed or non-indexed
+// defaults: 100 of each count and first, and a base vertex of 100.
+static void DefaultDraw(VertexFrame* f, uint32_t type)
+{
+    f->type = type;
+    f->count = 100;
+    f->instanceCount = 100;
+    f->first = 100;
+    f->baseVertex = 100;
+    f->firstInstance = 100;
+}
+
+// draw:unused_buffer_bound: a small buffer bound to vertex slots 1 and
+// 7 or as the index buffer of a pipeline that reads none of them, and
+// an index buffer of 200 uint16 indices for an indexed draw. Maul RHI
+// takes an index range in whole indices, as in setIndexBuffer's cases,
+// so the 16 cases of a 1-byte index range differ.
+static void TestUnusedBufferBound(void)
+{
+    char name[160];
+    for (uint32_t bits = 0; bits < 8; ++bits)
+    {
+        bool smallIndex = (bits & 4) != 0;
+        for (uint32_t type = 0; type < 4; ++type)
+        {
+            bool indexed = type == 1 || type == 3;
+            for (uint32_t c = 0; c < 4 && !(smallIndex && indexed); ++c)
+            {
+                uint64_t offset = (c & 2) * 2;
+                uint64_t size = c & 1;
+                VertexBind small = {0, offset, size};
+                VertexFrame f = {
+                    .pipeline = s_graphics,
+                    .bytes = {offset + size, 400},
+                    .bufferCount = 2,
+                    .slots = {(bits & 2) != 0 ? small : NO_BIND, (bits & 1) != 0 ? small : NO_BIND},
+                    .index = indexed      ? (VertexBind){1, 0, 400}
+                             : smallIndex ? small
+                                          : NO_BIND,
+                };
+                DefaultDraw(&f, type);
+                bool differs = smallIndex && size == 1;
+                s_differs += differs ? 1 : 0;
+                for (uint32_t first = 0; first < 2; ++first)
+                {
+                    snprintf(
+                        name, sizeof(name), "draw:unused_buffer_bound %s, %s, %s, %s, %u, %u, %s",
+                        s_bools[smallIndex], s_bools[(bits & 2) != 0], s_bools[bits & 1],
+                        s_drawTypes[type], (unsigned)offset, (unsigned)size, s_setOrders[first]);
+                    Expect(name, RunVertexCase(&f, first == 1), !differs);
+                }
+            }
+        }
+    }
+}
+
+// The CTS's vertex_buffer_OOB pipelines: a stride of zero, exactly the
+// attribute's reach, or 20 bytes more, rounded up to 4; an attribute
+// offset of 0, 1, 2 or 7 times the lesser of 4 and the format's size.
+typedef struct OobLayout
+{
+    uint32_t stride;
+    uint32_t lastStride;
+} OobLayout;
+
+static const char* const s_boundSizes[] = {"exact", "zero", "oneTooSmall"};
+static const char* const s_arrayStrides[] = {"zero", "exact", "oversize"};
+
+static OobLayout OobLayoutOf(uint32_t strideState, uint32_t factor, uint32_t formatBytes)
+{
+    uint32_t lastStride = factor * (formatBytes < 4 ? formatBytes : 4) + formatBytes;
+    uint32_t stride = strideState == 0 ? 0 : lastStride + (strideState == 2 ? 20 : 0);
+    return (OobLayout){(stride + 3) & ~3u, lastStride};
+}
+
+// The bytes a case binds for a buffer read for count elements: the
+// CTS's required size, none, or one byte less.
+static uint64_t BoundBytes(OobLayout layout, uint32_t state, uint64_t count)
+{
+    uint64_t required =
+        count > 0 ? layout.stride * (count - 1) + layout.lastStride : layout.lastStride;
+    return state == 0 ? required : state == 1 ? 0 : required - 1;
+}
+
+// A vertex_buffer_OOB case's firsts and counts of vertices or of
+// instances: one set for a zero stride count, four otherwise.
+static const uint32_t s_oobCounts[5][2] = {
+    {0, 0}, {0, 1}, {0, 10000}, {10000, 0}, {10000, 10000},
+};
+
+// One vertex_buffer_OOB case: its vertex and instance buffers bound
+// from byte 200 for their bound sizes, and a 200-index buffer for an
+// indexed draw, whose base vertex is the first vertex. Only a draw
+// checks its vertex-step buffer, and only a direct draw its
+// instance-step buffer; neither is checked for a zero stride count.
+static void RunOobCase(const char* prefix, const VertexFrame* base, OobLayout layout,
+                       const uint32_t states[2], const uint32_t* v, const uint32_t* i)
+{
+    char name[224];
+    uint64_t vertexBytes = BoundBytes(layout, states[0], (uint64_t)v[0] + v[1]);
+    uint64_t instanceBytes = BoundBytes(layout, states[1], (uint64_t)i[0] + i[1]);
+    VertexFrame f = *base;
+    f.bytes[0] = 200 + vertexBytes;
+    f.bytes[1] = 200 + instanceBytes;
+    f.slots[0] = (VertexBind){0, 200, vertexBytes};
+    f.slots[1] = (VertexBind){1, 200, instanceBytes};
+    bool indexed = f.type == 1 || f.type == 3;
+    f.index = indexed ? (VertexBind){2, 0, 400} : NO_BIND;
+    f.count = indexed ? 100 : v[1];
+    f.first = indexed ? 100 : v[0];
+    f.baseVertex = (int32_t)v[0];
+    f.instanceCount = i[1];
+    f.firstInstance = i[0];
+    bool vertexOob = states[0] != 0 && f.type == 0 && v[0] + v[1] > 0;
+    bool instanceOob = states[1] != 0 && f.type <= 1 && i[0] + i[1] > 0;
+    for (uint32_t first = 0; first < 2; ++first)
+    {
+        snprintf(name, sizeof(name), "%s, %u, %u, %u, %u, %s", prefix, v[0], v[1], i[0], i[1],
+                 s_setOrders[first]);
+        Expect(name, RunVertexCase(&f, first == 1), !vertexOob && !instanceOob);
+    }
+}
+
+// The subcases of one vertex_buffer_OOB pipeline and draw type: each
+// set of vertex and instance firsts and counts but both counts 10000.
+static void RunOobSubcases(const char* prefix, const VertexFrame* base, OobLayout layout,
+                           const uint32_t states[2], bool vertexZero, bool instanceZero)
+{
+    for (uint32_t vs = vertexZero ? 0 : 1; vs < (vertexZero ? 1u : 5u); ++vs)
+    {
+        for (uint32_t is = instanceZero ? 0 : 1; is < (instanceZero ? 1u : 5u); ++is)
+        {
+            if (s_oobCounts[vs][1] != 10000 || s_oobCounts[is][1] != 10000)
+            {
+                RunOobCase(prefix, base, layout, states, s_oobCounts[vs], s_oobCounts[is]);
+            }
+        }
+    }
+}
+
+// draw:vertex_buffer_OOB: a pipeline of each stride, attribute offset
+// and format, its vertex and instance buffers bound for exactly what a
+// draw reads, for nothing, or for one byte less, in each draw type.
+static void TestVertexBufferOob(mrhiShaderId shader)
+{
+    static const uint32_t states[5][2] = {{0, 0}, {1, 0}, {2, 0}, {0, 1}, {0, 2}};
+    static const uint32_t factors[4] = {0, 1, 2, 7};
+    static const struct
+    {
+        mrhiVertexFormat format;
+        uint32_t bytes;
+        const char* name;
+    } formats[3] = {{mrhi_vertexSnorm8x2, 2, "snorm8x2"},
+                    {mrhi_vertexFloat32, 4, "float32"},
+                    {mrhi_vertexFloat16x4, 8, "float16x4"}};
+    mrhiGraphicsPipelineId pipelines[36] = {0};
+    for (uint32_t p = 0; p < 36; ++p)
+    {
+        uint32_t bytes = formats[p % 3].bytes;
+        OobLayout layout = OobLayoutOf(p / 12, factors[p / 3 % 4], bytes);
+        pipelines[p] = MakeVertexPipeline(shader, layout.stride, formats[p % 3].format,
+                                          layout.lastStride - bytes);
+    }
+    char prefix[160];
+    for (uint32_t type = 0; type < 4; ++type)
+    {
+        for (uint32_t c = 0; c < 5 * 144; ++c)
+        {
+            uint32_t sizes = c / 144;
+            uint32_t p = c / 48 % 3 * 12 + c % 12;
+            bool vertexZero = (c / 24 & 1) != 0;
+            bool instanceZero = (c / 12 & 1) != 0;
+            OobLayout layout = OobLayoutOf(p / 12, factors[p / 3 % 4], formats[p % 3].bytes);
+            VertexFrame base = {.pipeline = pipelines[p],
+                                .bytes = {0, 0, 400},
+                                .bufferCount = 3,
+                                .holes = true,
+                                .type = type};
+            snprintf(prefix, sizeof(prefix),
+                     "draw:vertex_buffer_OOB %s, %s, %s, %s, %s, %s, %u, 200, %s",
+                     s_drawTypes[type], s_boundSizes[states[sizes][0]],
+                     s_boundSizes[states[sizes][1]], s_arrayStrides[p / 12], s_bools[vertexZero],
+                     s_bools[instanceZero], factors[p / 3 % 4], formats[p % 3].name);
+            RunOobSubcases(prefix, &base, layout, states[sizes], vertexZero, instanceZero);
+        }
+    }
+    for (uint32_t p = 0; p < 36; ++p)
+    {
+        CHECK(mrhiDestroyGraphicsPipeline(s_device, pipelines[p]) == mrhi_success,
+              "a vertex pipeline destroyed");
+    }
+}
+
+// The CTS's calcSetBufferOffset: a factor, in halves, of the bound
+// size, rounded up to a byte and then to a multiple of 4.
+static uint64_t HalfOffset(uint64_t size, uint32_t halves)
+{
+    uint64_t offset = (size * halves + 1) / 2;
+    return (offset + 3) & ~(uint64_t)3;
+}
+
+// draw:buffer_binding_overlap: one buffer bound to vertex slots 1 and
+// 7 and as the uint16 index buffer, each from an offset factor of its
+// bound size, for the default draws over float32x4 attributes. Every
+// case succeeds.
+static void TestBufferBindingOverlap(mrhiShaderId shader)
+{
+    static const char* const factors[] = {"0", "0.5", "1", "1.5", "2"};
+    mrhiGraphicsPipelineId pipelines[3] = {0};
+    for (uint32_t s = 0; s < 3; ++s)
+    {
+        pipelines[s] =
+            MakeVertexPipeline(shader, OobLayoutOf(s, 0, 16).stride, mrhi_vertexFloat32x4, 0);
+    }
+    char name[160];
+    for (uint32_t type = 0; type < 4; ++type)
+    {
+        for (uint32_t c = 0; c < 125 * 3; ++c)
+        {
+            uint32_t v = c / 75;
+            uint32_t i = c / 15 % 5;
+            uint32_t x = c / 3 % 5;
+            uint64_t bound = BoundBytes(OobLayoutOf(c % 3, 0, 16), 0, 200);
+            VertexBind slots[2] = {{0, HalfOffset(bound, v), bound},
+                                   {0, HalfOffset(bound, i), bound}};
+            VertexBind index = {0, HalfOffset(400, x), 400};
+            uint64_t bytes = slots[0].offset > slots[1].offset ? slots[0].offset : slots[1].offset;
+            bytes = bytes + bound > index.offset + 400 ? bytes + bound : index.offset + 400;
+            VertexFrame f = {.pipeline = pipelines[c % 3],
+                             .bytes = {bytes},
+                             .bufferCount = 1,
+                             .slots = {slots[0], slots[1]},
+                             .index = index,
+                             .holes = true};
+            DefaultDraw(&f, type);
+            for (uint32_t first = 0; first < 2; ++first)
+            {
+                snprintf(name, sizeof(name), "draw:buffer_binding_overlap %s, %s, %s, %s, %s, %s",
+                         s_drawTypes[type], factors[v], factors[i], factors[x],
+                         s_arrayStrides[c % 3], s_setOrders[first]);
+                Expect(name, RunVertexCase(&f, first == 1), true);
+            }
+        }
+    }
+    for (uint32_t s = 0; s < 3; ++s)
+    {
+        CHECK(mrhiDestroyGraphicsPipeline(s_device, pipelines[s]) == mrhi_success,
+              "a vertex pipeline destroyed");
+    }
+}
+
+// api,validation,encoding,cmds,render,draw: its vertex buffer tests,
+// run as its index buffer tests are. last_buffer_setting_take_account
+// is unimplemented in the CTS. max_draw_count's 44 cases have no
+// counterpart: a pass def has no maxDrawCount to refuse draws past.
+static void TestDrawVertexBuffers(void)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    TestUnusedBufferBound();
+    TestVertexBufferOob(shader);
+    TestBufferBindingOverlap(shader);
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
+    s_inexpressible += 44;
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -6395,6 +6823,8 @@ int main(void)
     CHECK(s_differs == 2104 && s_inexpressible == 8347, "the beginComputePass cases set aside");
     TestDrawIndexBuffers();
     CHECK(s_differs == 2104 && s_inexpressible == 8347, "the draw index buffer cases set aside");
+    TestDrawVertexBuffers();
+    CHECK(s_differs == 2120 && s_inexpressible == 8391, "the draw vertex buffer cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
