@@ -5513,6 +5513,169 @@ static void TestScissors(void)
     }
 }
 
+// The CTS's encoder types the library has, as passes: the command
+// encoder's commands are a transfer pass's, and a compute pass is one of
+// the graphics class without targets.
+typedef enum DebugEncoder
+{
+    DEBUG_COMMANDS,
+    DEBUG_COMPUTE,
+    DEBUG_RENDER,
+} DebugEncoder;
+
+static const char* const s_debugEncoders[] = {"non-pass", "compute pass", "render pass"};
+
+// A debug case: its pushes, of the label or, when none, of each push's
+// index, a marker when it has one, and its pops.
+typedef struct DebugCase
+{
+    DebugEncoder encoder;
+    uint32_t pushes;
+    const char* group;
+    size_t groupLength;
+    const char* marker;
+    size_t markerLength;
+    uint32_t pops;
+} DebugCase;
+
+// The case in a pass of its encoder, a render pass with one 16x16
+// rgba8unorm target cleared, ended after its calls: the first refusal,
+// or success.
+static mrhiResult RunDebug(const DebugCase* c)
+{
+    bool render = c->encoder == DEBUG_RENDER;
+    mrhiTextureId texture =
+        render ? MakeAttachment(&(Attachment){.format = RGBA8}) : (mrhiTextureId){0};
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    def.passClass = c->encoder == DEBUG_COMMANDS ? mrhi_passTransfer : mrhi_passGraphics;
+    def.colorTargets[0].load = mrhi_loadClear;
+    def.colorTargetCount = render ? 1 : 0;
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
+              (!render ||
+               mrhiImportTexture(s_device, texture, &def.colorTargets[0].resource) == mrhi_success),
+          "a frame");
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success &&
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, pass) == mrhi_success,
+          "the pass begun");
+    mrhiResult status = mrhi_success;
+    for (uint32_t i = 0; i < c->pushes && status == mrhi_success; ++i)
+    {
+        const char index = (char)('0' + i);
+        status = c->group != nullptr
+                     ? mrhiPass_PushDebugGroup(s_device, pass, c->group, c->groupLength)
+                     : mrhiPass_PushDebugGroup(s_device, pass, &index, 1);
+    }
+    if (status == mrhi_success && c->marker != nullptr)
+    {
+        status = mrhiPass_InsertDebugMarker(s_device, pass, c->marker, c->markerLength);
+    }
+    for (uint32_t i = 0; i < c->pops && status == mrhi_success; ++i)
+    {
+        status = mrhiPass_PopDebugGroup(s_device, pass);
+    }
+    status = status == mrhi_success ? mrhiPass_End(s_device, pass) : status;
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
+              (!render || mrhiDestroyTexture(s_device, texture) == mrhi_success),
+          "dropped");
+    return status;
+}
+
+// A label of the CTS's, as its UTF-8 bytes, and whether the library
+// takes it: 1 to MRHI_MAX_LABEL_BYTES bytes without NUL, where WebGPU
+// takes any string.
+typedef struct DebugLabel
+{
+    const char* name;
+    const char* bytes;
+    size_t length;
+    bool taken;
+} DebugLabel;
+
+#define DEBUG_LABEL(name, bytes, taken) {name, bytes, sizeof(bytes) - 1, taken}
+
+static const DebugLabel s_groupLabels[] = {
+    DEBUG_LABEL("empty", "", false),
+    DEBUG_LABEL("group", "group", true),
+    DEBUG_LABEL("null\\0in\\0group\\0label", "null\0in\0group\0label", false),
+    DEBUG_LABEL("\\0null at beginning", "\0null at beginning", false),
+    DEBUG_LABEL("sun and pointing up", "\xF0\x9F\x8C\x9E\xF0\x9F\x91\x86", true),
+};
+
+static const DebugLabel s_markerLabels[] = {
+    DEBUG_LABEL("empty", "", false),
+    DEBUG_LABEL("marker", "marker", true),
+    DEBUG_LABEL("null\\0in\\0marker", "null\0in\0marker", false),
+    DEBUG_LABEL("\\0null at beginning", "\0null at beginning", false),
+    DEBUG_LABEL("sun and pointing up", "\xF0\x9F\x8C\x9E\xF0\x9F\x91\x86", true),
+};
+
+// Expects a label case's outcome: the CTS's success for a label the
+// library takes, else the library's refusal, which differs.
+static void ExpectLabel(const char* test, mrhiResult result, const DebugLabel* label)
+{
+    Expect(test, result, label->taken);
+    s_differs += label->taken ? 0 : 1;
+}
+
+// encoding,cmds,debug: debug_group_balanced, debug_group and
+// debug_marker, in each pass the CTS's encoder types become; the render
+// bundle's cases are counted, as the library has no bundles. And
+// debugMarker: push_pop_call_count_unbalance of the command encoder and
+// of a compute and a render pass, around a marker.
+static void TestDebugGroups(void)
+{
+    char name[160];
+    for (DebugEncoder e = DEBUG_COMMANDS; e <= DEBUG_RENDER; ++e)
+    {
+        for (uint32_t pushes = 0; pushes <= 2; ++pushes)
+        {
+            for (uint32_t pops = 0; pops <= 2; ++pops)
+            {
+                const DebugCase c = {.encoder = e, .pushes = pushes, .pops = pops};
+                snprintf(name, sizeof(name), "debug:debug_group_balanced %s, %u pushes, %u pops",
+                         s_debugEncoders[e], pushes, pops);
+                Expect(name, RunDebug(&c), pushes == pops);
+            }
+        }
+        for (size_t l = 0; l < 5; ++l)
+        {
+            const DebugLabel* g = &s_groupLabels[l];
+            const DebugCase group = {
+                .encoder = e, .pushes = 1, .group = g->bytes, .groupLength = g->length, .pops = 1};
+            snprintf(name, sizeof(name), "debug:debug_group %s, %s", s_debugEncoders[e], g->name);
+            ExpectLabel(name, RunDebug(&group), g);
+            const DebugLabel* m = &s_markerLabels[l];
+            const DebugCase marker = {.encoder = e, .marker = m->bytes, .markerLength = m->length};
+            snprintf(name, sizeof(name), "debug:debug_marker %s, %s", s_debugEncoders[e], m->name);
+            ExpectLabel(name, RunDebug(&marker), m);
+        }
+        for (uint32_t pushes = 1; pushes <= 3; ++pushes)
+        {
+            for (uint32_t pops = 1; pops <= 3; ++pops)
+            {
+                const DebugCase c = {.encoder = e,
+                                     .pushes = pushes,
+                                     .group = "EventStart",
+                                     .groupLength = 10,
+                                     .marker = "Marker",
+                                     .markerLength = 6,
+                                     .pops = pops};
+                snprintf(name, sizeof(name), "debugMarker:push_pop_call_count_unbalance,%s %u, %u",
+                         e == DEBUG_COMMANDS  ? "command_encoder"
+                         : e == DEBUG_COMPUTE ? "render_compute_pass compute"
+                                              : "render_compute_pass render",
+                         pushes, pops);
+                Expect(name, RunDebug(&c), pushes == pops);
+            }
+        }
+    }
+    s_inexpressible += 9 + 5 + 5;
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -5609,6 +5772,8 @@ int main(void)
     TestViewports();
     TestScissors();
     CHECK(s_differs == 2086 && s_inexpressible == 8322, "the dynamic state cases set aside");
+    TestDebugGroups();
+    CHECK(s_differs == 2104 && s_inexpressible == 8341, "the debug group cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
