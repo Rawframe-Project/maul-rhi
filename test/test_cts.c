@@ -6064,6 +6064,229 @@ static void TestBeginComputePass(void)
     s_inexpressible += 1;
 }
 
+// A step of an indexed draw case: a pipeline set, an index buffer set
+// in a format, or an indexed draw of a count of indices.
+typedef enum DrawStep
+{
+    STEP_PIPELINE,
+    STEP_INDEX,
+    STEP_DRAW,
+} DrawStep;
+
+typedef struct DrawOp
+{
+    DrawStep step;
+    uint32_t value;
+} DrawOp;
+
+// An indexed draw case's frame: an index buffer of its bytes, bound
+// from 0 for bound bytes, and a 20-byte indirect buffer.
+typedef struct IndexedFrame
+{
+    const mrhiGraphicsPipelineId* pipelines;
+    uint64_t bytes;
+    uint64_t bound;
+    bool indirect;
+} IndexedFrame;
+
+// The steps in a render pass of one 16x16 rgba8unorm target, cleared,
+// declaring both buffers: the first refusal, or success.
+static mrhiResult RunIndexedSteps(const IndexedFrame* f, const DrawOp* ops, uint32_t count)
+{
+    mrhiBufferId buffers[2] = {MakeBuffer(f->bytes, mrhi_bufferIndex),
+                               MakeBuffer(20, mrhi_bufferIndirect)};
+    mrhiTextureId texture = MakeAttachment(&(Attachment){.format = RGBA8});
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId resources[2] = {0};
+    mrhiPassDef def = mrhiDefaultPassDef();
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportBuffer(s_device, buffers[0], &resources[0]) == mrhi_success &&
+              mrhiImportBuffer(s_device, buffers[1], &resources[1]) == mrhi_success &&
+              mrhiImportTexture(s_device, texture, &def.colorTargets[0].resource) == mrhi_success,
+          "a frame");
+    const mrhiAccess accesses[2] = {Whole(resources[0], mrhi_accessIndex),
+                                    Whole(resources[1], mrhi_accessIndirect)};
+    def.neverCull = true;
+    def.accesses = accesses;
+    def.accessCount = 2;
+    def.colorTargets[0].load = mrhi_loadClear;
+    def.colorTargetCount = 1;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success &&
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, pass) == mrhi_success,
+          "the pass begun");
+    mrhiResult status = mrhi_success;
+    for (uint32_t i = 0; i < count && status == mrhi_success; ++i)
+    {
+        uint32_t value = ops[i].value;
+        status = ops[i].step == STEP_PIPELINE
+                     ? mrhiPass_SetGraphicsPipeline(s_device, pass, f->pipelines[value])
+                 : ops[i].step == STEP_INDEX
+                     ? mrhiPass_SetIndexBuffer(s_device, pass, resources[0], (mrhiIndexFormat)value,
+                                               0, f->bound)
+                 : f->indirect ? mrhiPass_DrawIndexedIndirect(s_device, pass, resources[1], 0)
+                               : mrhiPass_DrawIndexed(s_device, pass, value, 1, 0, 0, 0);
+    }
+    status = status == mrhi_success ? mrhiPass_End(s_device, pass) : status;
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
+              mrhiDestroyTexture(s_device, texture) == mrhi_success &&
+              mrhiDestroyBuffer(s_device, buffers[0]) == mrhi_success &&
+              mrhiDestroyBuffer(s_device, buffers[1]) == mrhi_success,
+          "dropped");
+    return status;
+}
+
+// The noop pipeline of a topology and strip index format.
+static mrhiGraphicsPipelineId
+MakeTopologyPipeline(mrhiShaderId shader, mrhiPrimitiveTopology topology, mrhiIndexFormat strip)
+{
+    mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+    def.shader = shader;
+    def.vertexEntry = "vs";
+    def.vertexEntryLength = 2;
+    def.fragmentEntry = "fs";
+    def.fragmentEntryLength = 2;
+    def.colorTargets[0].format = mrhi_formatRgba8Unorm;
+    def.colorTargetCount = 1;
+    def.topology = topology;
+    def.stripIndexFormat = strip;
+    mrhiGraphicsPipelineId pipeline = {0};
+    mrhiRequestId request;
+    CHECK(mrhiCreateGraphicsPipeline(s_device, &def, &pipeline, &request) == mrhi_success,
+          "a topology pipeline");
+    Answered();
+    return pipeline;
+}
+
+static const char* const s_indexFormats[] = {"undefined", "uint16", "uint32"};
+static const char* const s_indexedDraws[] = {"drawIndexed", "drawIndexedIndirect"};
+static const char* const s_setOrders[] = {"buffer first", "pipeline first"};
+
+// draw:index_buffer_format: a pipeline of each topology, with each
+// strip index format for a strip and none otherwise, and a 16-byte
+// index buffer of each format, set in both orders before a draw of 3
+// indices, direct and indirect. A strip whose format differs from the
+// buffer's is refused as mrhi_errorState.
+static void TestIndexBufferFormats(const mrhiGraphicsPipelineId pipelines[9])
+{
+    static const char* const topologies[] = {"point-list", "line-list", "line-strip",
+                                             "triangle-list", "triangle-strip"};
+    char name[160];
+    uint32_t made = 0;
+    for (uint32_t topology = 0; topology < 5; ++topology)
+    {
+        bool isStrip = topology == mrhi_topologyLineStrip || topology == mrhi_topologyTriangleStrip;
+        for (uint32_t strip = 0; strip < (isStrip ? 3u : 1u); ++strip, ++made)
+        {
+            for (uint32_t format = 1; format <= 2; ++format)
+            {
+                for (uint32_t d = 0; d < 2; ++d)
+                {
+                    const IndexedFrame f = {pipelines, 16, MRHI_WHOLE_SIZE, d == 1};
+                    for (uint32_t first = 0; first < 2; ++first)
+                    {
+                        const DrawOp ops[3] = {
+                            {first ? STEP_PIPELINE : STEP_INDEX, first ? made : format},
+                            {first ? STEP_INDEX : STEP_PIPELINE, first ? format : made},
+                            {STEP_DRAW, 3}};
+                        snprintf(name, sizeof(name), "draw:index_buffer_format %s, %s, %s, %s, %s",
+                                 topologies[topology], s_indexFormats[strip],
+                                 s_indexFormats[format], s_indexedDraws[d], s_setOrders[first]);
+                        ExpectState(name, RunIndexedSteps(&f, ops, 3), !isStrip || strip == format);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// draw:index_buffer_format_dirtying and index_buffer_OOB. Pipelines 8
+// and 7 are the triangle strips of uint32 and uint16 strip indices;
+// pipeline 5 is the triangle list. An indirect draw's indices are not
+// checked on the CPU, as the CTS's.
+static void TestIndexBufferDirtying(const mrhiGraphicsPipelineId pipelines[9])
+{
+    static const char* const dirties[] = {"pipeline", "indexBuffer", "neither"};
+    char name[160];
+    for (uint32_t dirty = 0; dirty < 3; ++dirty)
+    {
+        for (uint32_t d = 0; d < 2; ++d)
+        {
+            const IndexedFrame f = {pipelines, 16, MRHI_WHOLE_SIZE, d == 1};
+            const DrawOp ops[5] = {{STEP_PIPELINE, 8},
+                                   {STEP_INDEX, mrhi_indexUint32},
+                                   {STEP_DRAW, 3},
+                                   dirty == 0   ? (DrawOp){STEP_PIPELINE, 7}
+                                   : dirty == 1 ? (DrawOp){STEP_INDEX, mrhi_indexUint16}
+                                                : (DrawOp){STEP_DRAW, 3},
+                                   {STEP_DRAW, 3}};
+            snprintf(name, sizeof(name), "draw:index_buffer_format_dirtying %s, %s", dirties[dirty],
+                     s_indexedDraws[d]);
+            ExpectState(name, RunIndexedSteps(&f, ops, dirty == 2 ? 4 : 5), dirty == 2);
+        }
+    }
+    for (uint32_t elements = 10; elements <= 100; elements += 90)
+    {
+        for (uint32_t count = 10; count <= 11; ++count)
+        {
+            for (uint32_t d = 0; d < 2; ++d)
+            {
+                for (uint32_t format = 1; format <= 2; ++format)
+                {
+                    uint32_t width = format * 2;
+                    const IndexedFrame f = {pipelines, elements * width, 10 * width, d == 1};
+                    for (uint32_t first = 0; first < 2; ++first)
+                    {
+                        const DrawOp ops[3] = {
+                            {first ? STEP_PIPELINE : STEP_INDEX, first ? 5 : format},
+                            {first ? STEP_INDEX : STEP_PIPELINE, first ? format : 5},
+                            {STEP_DRAW, count}};
+                        snprintf(name, sizeof(name), "draw:index_buffer_OOB %u, 10, %u, %s, %s, %s",
+                                 elements, count, s_indexedDraws[d], s_indexFormats[format],
+                                 s_setOrders[first]);
+                        Expect(name, RunIndexedSteps(&f, ops, 3), count <= 10 || d == 1);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// api,validation,encoding,cmds,render,draw: its index buffer tests.
+// Each case runs in a render pass, in both orders of setPipeline and
+// setIndexBuffer where the CTS sets both; the CTS's render bundle half
+// of each case is not run, since the library has no bundles. The
+// indirect buffer reads as zeros where the CTS writes the draw's
+// arguments, which no case's outcome reads.
+static void TestDrawIndexBuffers(void)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    mrhiGraphicsPipelineId pipelines[9] = {0};
+    uint32_t made = 0;
+    for (uint32_t topology = 0; topology < 5; ++topology)
+    {
+        bool isStrip = topology == mrhi_topologyLineStrip || topology == mrhi_topologyTriangleStrip;
+        for (uint32_t strip = 0; strip < (isStrip ? 3u : 1u); ++strip)
+        {
+            pipelines[made++] = MakeTopologyPipeline(shader, (mrhiPrimitiveTopology)topology,
+                                                     (mrhiIndexFormat)strip);
+        }
+    }
+    TestIndexBufferFormats(pipelines);
+    TestIndexBufferDirtying(pipelines);
+    for (uint32_t i = 0; i < 9; ++i)
+    {
+        CHECK(mrhiDestroyGraphicsPipeline(s_device, pipelines[i]) == mrhi_success,
+              "a topology pipeline destroyed");
+    }
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -6170,6 +6393,8 @@ int main(void)
     CHECK(s_differs == 2104 && s_inexpressible == 8346, "the index access cases set aside");
     TestBeginComputePass();
     CHECK(s_differs == 2104 && s_inexpressible == 8347, "the beginComputePass cases set aside");
+    TestDrawIndexBuffers();
+    CHECK(s_differs == 2104 && s_inexpressible == 8347, "the draw index buffer cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
