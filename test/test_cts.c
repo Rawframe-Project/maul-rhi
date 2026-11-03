@@ -5278,6 +5278,241 @@ static void TestWriteTextures(void)
     s_inexpressible += 1;
 }
 
+// What a dynamic_state case sets.
+typedef enum DynamicState
+{
+    SET_VIEWPORT,
+    SET_SCISSOR,
+    SET_BLEND_CONSTANT,
+    SET_STENCIL_REFERENCE,
+} DynamicState;
+
+// A dynamic_state case: the state and its value, set in a pass of one
+// rgba8unorm target of the size, kept and stored, as the CTS's pass.
+typedef struct DynamicCase
+{
+    DynamicState state;
+    uint32_t width;
+    uint32_t height;
+    mrhiViewport viewport;
+    mrhiScissorRect scissor;
+    mrhiColor color;
+    uint32_t reference;
+} DynamicCase;
+
+// The case's setter's refusal, or success.
+static mrhiResult SetDynamicState(const DynamicCase* c)
+{
+    mrhiTextureDef target = mrhiDefaultTextureDef();
+    target.format = RGBA8;
+    target.width = c->width;
+    target.height = c->height;
+    target.usage = mrhi_textureRenderTarget;
+    mrhiTextureId texture = {0};
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId resource = {0};
+    CHECK(mrhiCreateTexture(s_device, &target, &texture) == mrhi_success &&
+              mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportTexture(s_device, texture, &resource) == mrhi_success,
+          "a frame of the target");
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    def.colorTargets[0] = (mrhiColorTarget){.resource = resource};
+    def.colorTargetCount = 1;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success &&
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, pass) == mrhi_success,
+          "the pass begun");
+    mrhiResult status = mrhi_success;
+    switch (c->state)
+    {
+    case SET_VIEWPORT:
+        status = mrhiPass_SetViewport(s_device, pass, &c->viewport);
+        break;
+    case SET_SCISSOR:
+        status = mrhiPass_SetScissor(s_device, pass, &c->scissor);
+        break;
+    case SET_BLEND_CONSTANT:
+        status = mrhiPass_SetBlendConstant(s_device, pass, &c->color);
+        break;
+    case SET_STENCIL_REFERENCE:
+        status = mrhiPass_SetStencilReference(s_device, pass, c->reference);
+        break;
+    }
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
+              mrhiDestroyTexture(s_device, texture) == mrhi_success,
+          "dropped");
+    return status;
+}
+
+// A viewport case of a 1x1 target: the viewport's rectangle and depths.
+static mrhiResult SetViewport(float x, float y, float width, float height, float minDepth,
+                              float maxDepth)
+{
+    const DynamicCase c = {
+        .state = SET_VIEWPORT,
+        .width = 1,
+        .height = 1,
+        .viewport = {x, y, width, height, minDepth, maxDepth},
+    };
+    return SetDynamicState(&c);
+}
+
+// A step of a setViewport,xy_rect_contained_in_bounds row to the next
+// float below or above, as the CTS's nextAfterF32 takes.
+#define STEP_DOWN 9
+#define STEP_UP   10
+
+// A setViewport,xy_rect_contained_in_bounds row: the edge in maximum
+// viewport sizes, the edge's and the size's steps, and the outcome.
+typedef struct BoundsRow
+{
+    int8_t om;
+    int8_t od;
+    int8_t sd;
+    bool success;
+} BoundsRow;
+
+static const BoundsRow s_boundsRows[] = {
+    {0, 0, 0, true},        {-1, 0, 0, true},  {-2, 0, 0, true},         {1, -1, 0, true},
+    {0, -1, 0, true},       {0, 1, 0, true},   {1, 0, -1, true},         {-2, -1, 0, false},
+    {1, 0, 0, false},       {1, 1, -1, false}, {1, STEP_DOWN, 0, false}, {0, 0, 1, false},
+    {0, 0, STEP_UP, false},
+};
+
+// A value moved by a row's step: a whole number, or the next float of
+// a positive value, by its bits, as the tests link no math library.
+static float Stepped(float value, int8_t step)
+{
+    union
+    {
+        float value;
+        uint32_t bits;
+    } next = {value};
+    next.bits += step == STEP_UP ? 1u : UINT32_MAX;
+    return step == STEP_DOWN || step == STEP_UP ? next.value : value + (float)step;
+}
+
+// A step as the CTS's rows name it.
+static const char* StepName(int8_t step)
+{
+    static const char* const names[] = {"-1", "0", "1"};
+    return step == STEP_DOWN ? "negative" : step == STEP_UP ? "positive" : names[step + 1];
+}
+
+// encoding,cmds,render,dynamic_state: setViewport's cases on a 1x1
+// target, but exceeds_attachment_size's on targets of 3 and 1024. The
+// maximum viewport is the device's maxTextureDimension2D: a viewport
+// past it is mrhi_errorCapacity, as the adapter's is above it.
+static void TestViewports(void)
+{
+    char name[128];
+    static const float sizes[][4] = {
+        {0, 0, 0, 0}, {0, 0, -1, 0}, {0, 0, 0, -1}, {1, 0, -1, 0}, {0, 1, 0, -1}};
+    for (size_t i = 0; i < 5; ++i)
+    {
+        const float* s = sizes[i];
+        snprintf(name, sizeof(name), "setViewport,width_height_nonnegative %g, %g, %g, %g",
+                 (double)s[0], (double)s[1], (double)s[2], (double)s[3]);
+        Expect(name, SetViewport(s[0], s[1], s[2], s[3], 0, 1), s[2] >= 0 && s[3] >= 0);
+    }
+    for (uint32_t size = 3; size <= 1024; size += 1021)
+    {
+        const DynamicCase c = {
+            .state = SET_VIEWPORT,
+            .width = size,
+            .height = size,
+            .viewport = {0, 0, (float)size + 1, (float)size + 1, 0, 1},
+        };
+        snprintf(name, sizeof(name), "setViewport,exceeds_attachment_size %u", size);
+        Expect(name, SetDynamicState(&c), true);
+    }
+    mrhiLimits limits = {0};
+    CHECK(mrhiDevice_GetLimits(s_device, &limits) == mrhi_success, "the limits");
+    float max = (float)limits.textureDimension2d;
+    for (size_t d = 0; d < 2; ++d)
+    {
+        for (size_t i = 0; i < sizeof(s_boundsRows) / sizeof(s_boundsRows[0]); ++i)
+        {
+            const BoundsRow* r = &s_boundsRows[i];
+            float xy[2] = {0, 0};
+            float wh[2] = {max, max};
+            xy[d] = Stepped(max * r->om, r->od);
+            wh[d] = Stepped(wh[d], r->sd);
+            snprintf(name, sizeof(name),
+                     "setViewport,xy_rect_contained_in_bounds %zu, om %d, od %s, sd %s", d, r->om,
+                     StepName(r->od), StepName(r->sd));
+            ExpectPastLimit(name, SetViewport(xy[0], xy[1], wh[0], wh[1], 0, 1), r->success);
+        }
+    }
+    static const float depths[][2] = {{0, 1},       {-0.0f, -0.0f}, {1, 1},
+                                      {0.3f, 0.7f}, {0.7f, 0.7f},   {0.3f, 0.3f},
+                                      {-0.1f, 1},   {0, 1.1f},      {0.5f, 0.49999f}};
+    for (size_t i = 0; i < 9; ++i)
+    {
+        float lo = depths[i][0];
+        float hi = depths[i][1];
+        snprintf(name, sizeof(name), "setViewport,depth_rangeAndOrder %g, %g", (double)lo,
+                 (double)hi);
+        Expect(name, SetViewport(0, 0, 1, 1, lo, hi),
+               0 <= lo && lo <= 1 && 0 <= hi && hi <= 1 && lo <= hi);
+    }
+}
+
+// dynamic_state's setScissorRect, setBlendConstant and setStencilReference
+// cases. A negative scissor is a TypeError in JavaScript, where the
+// library's edges and sizes are unsigned: those four cases are counted.
+// xy_rect_contained_in_attachment's heights are the attachment's width
+// and a step, as the CTS writes them.
+static void TestScissors(void)
+{
+    char name[128];
+    DynamicCase c = {.state = SET_SCISSOR, .width = 1, .height = 1};
+    Expect("setScissorRect,x_y_width_height_nonnegative 0, 0, 0, 0", SetDynamicState(&c), true);
+    s_inexpressible += 4;
+    static const uint32_t attachments[][2] = {{3, 5}, {5, 3}, {1024, 1}, {1, 1024}};
+    static const int32_t steps[][4] = {{0, 0, 0, 0},  {1, 0, -1, 0}, {0, 1, 0, -1},
+                                       {0, 0, -1, 0}, {0, 0, 0, -1}, {1, 0, 0, 0},
+                                       {0, 1, 0, 0},  {0, 0, 1, 0},  {0, 0, 0, 1}};
+    for (size_t a = 0; a < 4; ++a)
+    {
+        for (size_t i = 0; i < 9; ++i)
+        {
+            const int32_t* s = steps[i];
+            c.width = attachments[a][0];
+            c.height = attachments[a][1];
+            c.scissor = (mrhiScissorRect){(uint32_t)s[0], (uint32_t)s[1],
+                                          (uint32_t)((int32_t)c.width + s[2]),
+                                          (uint32_t)((int32_t)c.width + s[3])};
+            snprintf(name, sizeof(name),
+                     "setScissorRect,xy_rect_contained_in_attachment %ux%u, %d, %d, %d, %d",
+                     c.width, c.height, s[0], s[1], s[2], s[3]);
+            Expect(name, SetDynamicState(&c),
+                   c.scissor.x + c.scissor.width <= c.width &&
+                       c.scissor.y + c.scissor.height <= c.height);
+        }
+    }
+    static const double colors[][4] = {
+        {1, 1, 1, 1}, {-1, -1, -1, -1}, {9007199254740991.0, -9007199254740991.0, -0.0, 100000}};
+    c = (DynamicCase){.state = SET_BLEND_CONSTANT, .width = 1, .height = 1};
+    for (size_t i = 0; i < 3; ++i)
+    {
+        c.color = (mrhiColor){(float)colors[i][0], (float)colors[i][1], (float)colors[i][2],
+                              (float)colors[i][3]};
+        snprintf(name, sizeof(name), "setBlendConstant %zu", i);
+        Expect(name, SetDynamicState(&c), true);
+    }
+    static const uint32_t references[] = {1, 0, 1000, 0xffffffffu};
+    c = (DynamicCase){.state = SET_STENCIL_REFERENCE, .width = 1, .height = 1};
+    for (size_t i = 0; i < 4; ++i)
+    {
+        c.reference = references[i];
+        snprintf(name, sizeof(name), "setStencilReference %u", references[i]);
+        Expect(name, SetDynamicState(&c), true);
+    }
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -5371,6 +5606,9 @@ int main(void)
     CHECK(s_differs == 2086 && s_inexpressible == 8317, "the buffer texture copy cases set aside");
     TestWriteTextures();
     CHECK(s_differs == 2086 && s_inexpressible == 8318, "the writeTexture cases set aside");
+    TestViewports();
+    TestScissors();
+    CHECK(s_differs == 2086 && s_inexpressible == 8322, "the dynamic state cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
