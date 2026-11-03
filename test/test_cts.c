@@ -750,8 +750,10 @@ static uint32_t s_inexpressible;
 //   refuses as fewer than the rows and Maul RHI takes as absent;
 // setIndexBuffer's ranges of part of an index, which Maul RHI refuses
 // (see TestVertexIndexBuffers); an occlusion query written in a second
-// pass of the frame (see TestQueries); and a view of a destroyed texture
-// (see TestViewStates).
+// pass of the frame (see TestQueries); a view of a destroyed texture
+// (see TestViewStates); a depth target's operations and read-only flags
+// (see TestDepthOps); and a buffer or texture destroyed after a frame
+// has used it (see TestDestroyedTargets and TestQueueDestroys).
 static uint32_t s_differs;
 
 // The outcome Maul RHI owes a transfer case. Its layout value 0 is an
@@ -4399,6 +4401,339 @@ static void TestWriteBuffers(void)
     s_inexpressible += 2;
 }
 
+// What a queue,destroyed case encodes with its objects, in one pass.
+typedef enum DestroyedUse
+{
+    WRITTEN_BUFFER,
+    WRITTEN_TEXTURE,
+    COPIED_BUFFERS,
+    COPIED_TO_TEXTURE,
+    COPIED_TO_BUFFER,
+    COPIED_TEXTURES,
+    BOUND_COMPUTE,
+    BOUND_RENDER,
+    VERTEX_BUFFER,
+    INDEX_BUFFER,
+    RESOLVED_QUERY,
+    ATTACHED,
+} DestroyedUse;
+
+// An object of a queue,destroyed case: a buffer, or a 1x1 texture of
+// the format and samples, of the usage, which the case's pass declares
+// with the access, or as a target for beginRenderPass.
+typedef struct UsedObject
+{
+    bool texture;
+    uint32_t usage;
+    mrhiAccessKind kind;
+    mrhiFormat format;
+    uint32_t samples;
+} UsedObject;
+
+// The objects the cases use.
+typedef enum Used
+{
+    UNUSED,
+    BUFFER_FROM,
+    BUFFER_TO,
+    TEXTURE_FROM,
+    TEXTURE_TO,
+    UNIFORM,
+    VERTICES,
+    INDICES,
+    RESULTS,
+    SAMPLED,
+    STORED,
+    COLOR_TARGET,
+    RESOLVE_TARGET,
+    DEPTH_TARGET,
+} Used;
+
+#define BINDABLE (mrhi_textureSampled | mrhi_textureStorage)
+#define TARGET   mrhi_textureRenderTarget
+
+static const UsedObject s_used[] = {
+    [BUFFER_FROM] = {false, COPY_SRC, mrhi_accessCopySource, mrhi_formatNone, 0},
+    [BUFFER_TO] = {false, COPY_DST, mrhi_accessCopyDestination, mrhi_formatNone, 0},
+    [TEXTURE_FROM] = {true, TEX_SRC, mrhi_accessCopySource, RGBA8, 1},
+    [TEXTURE_TO] = {true, TEX_DST, mrhi_accessCopyDestination, RGBA8, 1},
+    [UNIFORM] = {false, mrhi_bufferUniform, mrhi_accessUniform, mrhi_formatNone, 0},
+    [VERTICES] = {false, mrhi_bufferVertex, mrhi_accessVertex, mrhi_formatNone, 0},
+    [INDICES] = {false, mrhi_bufferIndex, mrhi_accessIndex, mrhi_formatNone, 0},
+    [RESULTS] = {false, mrhi_bufferQueryResolve, mrhi_accessQueryResolve, mrhi_formatNone, 0},
+    [SAMPLED] = {true, BINDABLE, mrhi_accessSampled, RGBA8, 1},
+    [STORED] = {true, BINDABLE, mrhi_accessStorageWrite, RGBA8, 1},
+    [COLOR_TARGET] = {true, TARGET, mrhi_accessSampled, RGBA8, 4},
+    [RESOLVE_TARGET] = {true, TARGET, mrhi_accessSampled, RGBA8, 1},
+    [DEPTH_TARGET] = {true, TARGET, mrhi_accessSampled, mrhi_formatDepth32Float, 4},
+};
+
+// A queue,destroyed case: its test, the values of its other parameters,
+// its use, the objects its destroyed value of true names, and its
+// objects.
+typedef struct DestroyedCase
+{
+    const char* test;
+    const char* rest;
+    DestroyedUse use;
+    uint32_t destroyed;
+    Used objects[3];
+} DestroyedCase;
+
+static const DestroyedCase s_destroyedCases[] = {
+    {"buffer:writeBuffer", "", WRITTEN_BUFFER, 1, {BUFFER_TO}},
+    {"buffer:copyBufferToBuffer", "", COPIED_BUFFERS, 0, {BUFFER_FROM, BUFFER_TO}},
+    {"buffer:copyBufferToTexture", "", COPIED_TO_TEXTURE, 1, {BUFFER_FROM, TEXTURE_TO}},
+    {"buffer:copyTextureToBuffer", "", COPIED_TO_BUFFER, 2, {TEXTURE_FROM, BUFFER_TO}},
+    {"buffer:setBindGroup", ",compute pass", BOUND_COMPUTE, 1, {UNIFORM}},
+    {"buffer:setBindGroup", ",render pass", BOUND_RENDER, 1, {UNIFORM}},
+    {"buffer:setVertexBuffer", ",render pass", VERTEX_BUFFER, 1, {VERTICES}},
+    {"buffer:setIndexBuffer", ",render pass", INDEX_BUFFER, 1, {INDICES}},
+    {"buffer:resolveQuerySet", "", RESOLVED_QUERY, 1, {RESULTS}},
+    {"texture:writeTexture", "", WRITTEN_TEXTURE, 1, {TEXTURE_TO}},
+    {"texture:copyTextureToTexture", "", COPIED_TEXTURES, 0, {TEXTURE_FROM, TEXTURE_TO}},
+    {"texture:copyBufferToTexture", "", COPIED_TO_TEXTURE, 2, {BUFFER_FROM, TEXTURE_TO}},
+    {"texture:copyTextureToBuffer", "", COPIED_TO_BUFFER, 1, {TEXTURE_FROM, BUFFER_TO}},
+    {"texture:setBindGroup", ",compute pass,texture", BOUND_COMPUTE, 1, {SAMPLED}},
+    {"texture:setBindGroup", ",compute pass,storageTexture", BOUND_COMPUTE, 1, {STORED}},
+    {"texture:setBindGroup", ",render pass,texture", BOUND_RENDER, 1, {SAMPLED}},
+    {"texture:setBindGroup", ",render pass,storageTexture", BOUND_RENDER, 1, {STORED}},
+    {"texture:beginRenderPass", "", ATTACHED, 0, {COLOR_TARGET, RESOLVE_TARGET, DEPTH_TARGET}},
+};
+
+// The case's objects.
+static uint32_t UsedCount(const DestroyedCase* c)
+{
+    uint32_t count = 0;
+    while (count < 3 && c->objects[count] != UNUSED)
+    {
+        ++count;
+    }
+    return count;
+}
+
+// The CTS's values of what a case destroys, each with the objects it
+// names: none or src, dst or both of a copy's two, none or one of
+// beginRenderPass's attachments, or false and true.
+static uint32_t DestroyedValues(const DestroyedCase* c, const char* const** valuesOut,
+                                uint32_t masksOut[4])
+{
+    static const char* const bools[] = {"false", "true"};
+    static const char* const sides[] = {"none", "src", "dst", "both"};
+    static const char* const targets[] = {"none", "colorAttachment", "resolveAttachment",
+                                          "depthStencilAttachment"};
+    if (c->use == COPIED_BUFFERS || c->use == COPIED_TEXTURES || c->use == ATTACHED)
+    {
+        bool copy = c->use != ATTACHED;
+        *valuesOut = copy ? sides : targets;
+        for (uint32_t v = 0; v < 4; ++v)
+        {
+            masksOut[v] = copy ? v : (v == 0 ? 0 : 1u << (v - 1));
+        }
+        return 4;
+    }
+    *valuesOut = bools;
+    masksOut[0] = 0;
+    masksOut[1] = c->destroyed;
+    return 2;
+}
+
+// Destroys the case's objects the mask names.
+static void DestroyUsed(const DestroyedCase* c, uint32_t mask, const mrhiBufferId* buffers,
+                        const mrhiTextureId* textures)
+{
+    for (uint32_t i = 0; i < UsedCount(c); ++i)
+    {
+        CHECK((mask & (1u << i)) == 0 ||
+                  (s_used[c->objects[i]].texture
+                       ? mrhiDestroyTexture(s_device, textures[i])
+                       : mrhiDestroyBuffer(s_device, buffers[i])) == mrhi_success,
+              "destroyed");
+    }
+}
+
+// The case's pass: a transfer pass for a write or a copy, the
+// attachments for beginRenderPass, a pass of the CTS's target for a
+// render pass, and one of the graphics class without targets for a
+// compute pass or a resolve; each object declared with its access.
+static mrhiPassDef UsePass(const DestroyedCase* c, const mrhiResourceId* resources,
+                           mrhiResourceId target, mrhiAccess* accesses)
+{
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    if (c->use == ATTACHED)
+    {
+        def.colorTargets[0] = (mrhiColorTarget){
+            .resource = resources[0],
+            .resolve = resources[1],
+            .load = mrhi_loadClear,
+            .store = mrhi_storeKeep,
+        };
+        def.colorTargetCount = 1;
+        def.depthTarget.resource = resources[2];
+        def.depthTarget.depthLoad = mrhi_loadClear;
+        def.depthTarget.depthStore = mrhi_storeKeep;
+        def.depthTarget.clearDepth = 0.0f;
+        return def;
+    }
+    for (uint32_t i = 0; i < UsedCount(c); ++i)
+    {
+        accesses[i] = Whole(resources[i], s_used[c->objects[i]].kind);
+    }
+    def.accesses = accesses;
+    def.accessCount = UsedCount(c);
+    def.passClass = c->use <= COPIED_TEXTURES ? mrhi_passTransfer : mrhi_passGraphics;
+    if (target.index1 != 0)
+    {
+        def.colorTargets[0] = (mrhiColorTarget){.resource = target, .load = mrhi_loadClear};
+        def.colorTargetCount = 1;
+    }
+    return def;
+}
+
+// Records the case's command in its begun pass: nothing for a binding
+// or the attachments, which the pass declares; its refusal, or success.
+static mrhiResult RecordUse(const DestroyedCase* c, mrhiPassId pass, const mrhiResourceId* r,
+                            mrhiQuerySetId set)
+{
+    static const uint8_t bytes[4] = {0};
+    const mrhiExtent3d one = {1, 1, 1};
+    const mrhiTextureCopy first = {.resource = r[0]};
+    const mrhiTextureCopy second = {.resource = r[1]};
+    const mrhiBufferCopy from = {.resource = r[0]};
+    const mrhiBufferCopy to = {.resource = r[1]};
+    const mrhiTexelLayout layout = {.bytesPerRow = 4};
+    bool drawn = c->use == VERTEX_BUFFER || c->use == INDEX_BUFFER;
+    CHECK(!drawn || mrhiPass_SetGraphicsPipeline(s_device, pass, s_graphics) == mrhi_success,
+          "the pipeline");
+    switch (c->use)
+    {
+    case WRITTEN_BUFFER:
+        return mrhiPass_WriteBuffer(s_device, pass, r[0], 0, bytes, sizeof(bytes));
+    case WRITTEN_TEXTURE:
+        return mrhiPass_WriteTexture(s_device, pass, &first, bytes, sizeof(bytes), &layout, &one);
+    case COPIED_BUFFERS:
+        return mrhiPass_CopyBuffer(s_device, pass, r[0], 0, r[1], 0, 4);
+    case COPIED_TO_TEXTURE:
+        return mrhiPass_CopyBufferToTexture(s_device, pass, &from, &second, &one);
+    case COPIED_TO_BUFFER:
+        return mrhiPass_CopyTextureToBuffer(s_device, pass, &first, &to, &one);
+    case COPIED_TEXTURES:
+        return mrhiPass_CopyTexture(s_device, pass, &first, &second, &one);
+    case VERTEX_BUFFER:
+        return mrhiPass_SetVertexBuffer(s_device, pass, 0, r[0], 0, MRHI_WHOLE_SIZE);
+    case INDEX_BUFFER:
+        return mrhiPass_SetIndexBuffer(s_device, pass, r[0], mrhi_indexUint16, 0, MRHI_WHOLE_SIZE);
+    case RESOLVED_QUERY:
+        return mrhiPass_ResolveQueries(s_device, pass, set, 0, 1, r[0], 0);
+    default:
+        return mrhi_success;
+    }
+}
+
+// A queue,destroyed case in a frame, the objects of the mask destroyed
+// before the frame for a write, whose CTS case destroys before the
+// call, and once the pass is recorded and before the submit for the
+// rest, whose CTS case destroys after encoding; the first refusal, from
+// the imports to the submit, or success once the frame has finished. A buffer has the
+// CTS's 4 bytes, 8 for a resolve of its one query.
+static mrhiResult UseDestroyed(const DestroyedCase* c, uint32_t mask)
+{
+    bool before = c->use == WRITTEN_BUFFER || c->use == WRITTEN_TEXTURE;
+    mrhiBufferId buffers[3] = {0};
+    mrhiTextureId textures[3] = {0};
+    for (uint32_t i = 0; i < UsedCount(c); ++i)
+    {
+        const UsedObject* o = &s_used[c->objects[i]];
+        if (o->texture)
+        {
+            textures[i] = MakeAttachment(&(Attachment){
+                .format = o->format, .size = 1, .samples = o->samples, .usage = o->usage});
+        }
+        else
+        {
+            buffers[i] = MakeBuffer(c->use == RESOLVED_QUERY ? 8 : 4, o->usage);
+        }
+    }
+    mrhiQuerySetId set = {0};
+    set = c->use == RESOLVED_QUERY ? MakeQuerySet(mrhi_queryOcclusion, 1) : set;
+    DestroyUsed(c, before ? mask : 0, buffers, textures);
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success, "a frame");
+    mrhiResourceId resources[3] = {0};
+    mrhiResult status = mrhi_success;
+    for (uint32_t i = 0; i < UsedCount(c) && status == mrhi_success; ++i)
+    {
+        status = s_used[c->objects[i]].texture
+                     ? mrhiImportTexture(s_device, textures[i], &resources[i])
+                     : mrhiImportBuffer(s_device, buffers[i], &resources[i]);
+    }
+    mrhiResourceId target = {0};
+    bool render = c->use == BOUND_RENDER || c->use == VERTEX_BUFFER || c->use == INDEX_BUFFER;
+    CHECK(!render || mrhiImportTexture(s_device, s_target, &target) == mrhi_success, "the target");
+    mrhiAccess accesses[3] = {0};
+    mrhiPassDef def = UsePass(c, resources, target, accesses);
+    mrhiPassId pass = {0};
+    status = status == mrhi_success ? mrhiAddPass(s_device, &def, &pass) : status;
+    status = status == mrhi_success ? mrhiDevice_CompileFrame(s_device) : status;
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiPass_Begin(s_device, pass) == mrhi_success, "the pass begun");
+        status = RecordUse(c, pass, resources, set);
+        CHECK(status != mrhi_success || mrhiPass_End(s_device, pass) == mrhi_success,
+              "the pass ended");
+    }
+    DestroyUsed(c, before ? 0 : mask, buffers, textures);
+    mrhiRequestId token = {0};
+    if (status == mrhi_success)
+    {
+        status = mrhiDevice_SubmitFrame(s_device, &token);
+        CHECK(status != mrhi_success || mrhiRequest_WaitFrame(s_device, token, 1) == mrhi_success,
+              "finished");
+    }
+    else
+    {
+        CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
+    }
+    DestroyUsed(c, ~mask & ((1u << UsedCount(c)) - 1), buffers, textures);
+    CHECK(c->use != RESOLVED_QUERY || mrhiDestroyQuerySet(s_device, set) == mrhi_success,
+          "the set");
+    return status;
+}
+
+// queue,destroyed,buffer and queue,destroyed,texture. A write's object,
+// destroyed before the call, is refused as stale, as WebGPU refuses it.
+// The rest destroy after encoding, which is once the pass is recorded
+// here: the frame still runs on what it imported, where WebGPU fails
+// the submit, so those cases differ. A setBindGroup case declares its
+// object with the binding's access, which is what a frame keeps; its
+// table is not set, as a table is set only for a pipeline that reads
+// it. The render bundle cases are counted, as the library has none.
+static void TestQueueDestroys(void)
+{
+    char name[160];
+    for (size_t i = 0; i < sizeof(s_destroyedCases) / sizeof(s_destroyedCases[0]); ++i)
+    {
+        const DestroyedCase* c = &s_destroyedCases[i];
+        const char* const* values = nullptr;
+        uint32_t masks[4] = {0};
+        uint32_t count = DestroyedValues(c, &values, masks);
+        for (uint32_t v = 0; v < count; ++v)
+        {
+            snprintf(name, sizeof(name), "queue,destroyed,%s %s%s", c->test, values[v], c->rest);
+            mrhiResult status = UseDestroyed(c, masks[v]);
+            if (masks[v] != 0 && (c->use == WRITTEN_BUFFER || c->use == WRITTEN_TEXTURE))
+            {
+                ExpectStale(name, status);
+                continue;
+            }
+            Expect(name, status, true);
+            s_differs += masks[v] != 0 ? 1 : 0;
+        }
+    }
+    s_inexpressible += 2 + 2 + 2 + 4;
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -4481,6 +4816,8 @@ int main(void)
     CHECK(s_differs == 2064 && s_inexpressible == 7079, "the destroy cases set aside");
     TestWriteBuffers();
     CHECK(s_differs == 2064 && s_inexpressible == 7141, "the write cases set aside");
+    TestQueueDestroys();
+    CHECK(s_differs == 2086 && s_inexpressible == 7151, "the queue destroy cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
