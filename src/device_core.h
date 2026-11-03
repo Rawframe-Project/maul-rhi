@@ -415,9 +415,11 @@ typedef struct mrhiPipelineSlot
     // passes naming one.
     mrhiShaderHeapUses heapUses;
     // A graphics pipeline's targets, its vertex buffers (their facts in
-    // the device's pipelineVertex), and its strip index format.
+    // the device's pipelineVertex), whether it draws strips, and its strip
+    // index format.
     mrhiRenderLayout layout;
     uint32_t vertexBufferCount;
+    bool strip;
     mrhiIndexFormat stripIndexFormat;
 } mrhiPipelineSlot;
 

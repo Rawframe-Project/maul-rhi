@@ -662,6 +662,8 @@ mrhiResult mrhiCreateGraphicsPipeline(mrhiDevice* device, const mrhiGraphicsPipe
     mrhiPipelineSlot* slot = &device->pipelineSlots[index1 - 1];
     slot->layout = LayoutOf(def);
     slot->vertexBufferCount = def->vertexBufferCount;
+    slot->strip =
+        def->topology == mrhi_topologyLineStrip || def->topology == mrhi_topologyTriangleStrip;
     slot->stripIndexFormat = def->stripIndexFormat;
     KeepVertexFacts(device, index1, def);
     slot->entries[0] = (uint32_t)(stages.vertex - reflection->entries);
