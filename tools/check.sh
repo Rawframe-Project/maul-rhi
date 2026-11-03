@@ -114,7 +114,9 @@ tidy_sources() { # files
 
 # clang-tidy on the files given, as CI's checks job runs it: on the Release
 # preset, where the assertions compile out, and with them live. Each hides
-# findings the other shows.
+# findings the other shows. Run from the root, clang-tidy ignores the
+# tree's HeaderFilterRegex and drops every header's findings: the filter,
+# anchored at the checkout, keeps the headers fetched under out/ out.
 tidy() { # files
     local build f
     for build in Release Debug; do
@@ -122,7 +124,8 @@ tidy() { # files
         configure "tidy-$build" --preset linux-clang-20 -DCMAKE_BUILD_TYPE=$build \
             -DMAUL_RHI_LABELS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
         for f in "$@"; do
-            clang-tidy-20 -p "$out/check-tidy-$build" --quiet --warnings-as-errors='*' "$f" 2>/dev/null
+            clang-tidy-20 -p "$out/check-tidy-$build" --quiet --warnings-as-errors='*' \
+                --header-filter="^$root/(src|include)/" "$f" 2>/dev/null
         done
     done
 }

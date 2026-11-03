@@ -131,22 +131,28 @@ jobs:
       # cells. The native ones twice: on the Release preset, where the
       # assertions compile out and the analyzer follows the paths they
       # would stop, and with them live, whose branches count toward a
-      # function's complexity. Each hides findings the other shows.
+      # function's complexity. Each hides findings the other shows. Run
+      # from the root, clang-tidy ignores the tree's HeaderFilterRegex and
+      # drops every header's findings; the filter, anchored at the
+      # checkout, keeps the headers fetched under out/ out.
       - name: clang-tidy, assertions compiled out
         run: |
           cmake --preset linux-clang-20 -B out/tidy -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DMAUL_RHI_LABELS=ON >/dev/null
           cmake --preset web-wasi -B out/tidy-web -DCMAKE_EXPORT_COMPILE_COMMANDS=ON >/dev/null
           grep -L '"web_js.h"' src/*.c | grep -v d3d12 |
-            xargs -P 4 -n 1 clang-tidy-20 -p out/tidy --quiet --warnings-as-errors='*'
+            xargs -P 4 -n 1 clang-tidy-20 -p out/tidy --quiet --warnings-as-errors='*' \
+              --header-filter="^$PWD/(src|include)/"
           grep -l '"web_js.h"' src/*.c |
-            xargs -P 4 -n 1 clang-tidy-20 -p out/tidy-web --quiet --warnings-as-errors='*'
+            xargs -P 4 -n 1 clang-tidy-20 -p out/tidy-web --quiet --warnings-as-errors='*' \
+              --header-filter="^$PWD/(src|include)/"
       - name: clang-tidy, assertions live
         run: |
           cmake --preset linux-clang-20 -B out/tidy-asserts -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DMAUL_RHI_LABELS=ON >/dev/null
           grep -L '"web_js.h"' src/*.c | grep -v d3d12 |
-            xargs -P 4 -n 1 clang-tidy-20 -p out/tidy-asserts --quiet --warnings-as-errors='*'
+            xargs -P 4 -n 1 clang-tidy-20 -p out/tidy-asserts --quiet --warnings-as-errors='*' \
+              --header-filter="^$PWD/(src|include)/"
       - name: Every test labelled
         run: python3 tools/check_test_hygiene.py --ctest out/tidy --ctest out/tidy-web
 
