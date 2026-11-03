@@ -4880,6 +4880,318 @@ static void TestBytesPerRowAlignments(void)
     }
 }
 
+// The CTS's depth-stencil formats, the library's counterpart or none,
+// and the aspects a copy with a buffer takes as bits of all (1),
+// depth-only (2) and stencil-only (4), from a buffer, which a write
+// follows, and to one; and the bytes of its depth and its stencil.
+typedef struct DepthCopy
+{
+    const char* name;
+    mrhiFormat format;
+    uint8_t fromBuffer;
+    uint8_t toBuffer;
+    uint8_t bytes[2];
+} DepthCopy;
+
+static const DepthCopy s_depthCopies[] = {
+    {"stencil8", mrhi_formatNone, 1 | 4, 1 | 4, {0, 1}},
+    {"depth16unorm", mrhi_formatNone, 1 | 2, 1 | 2, {2, 0}},
+    {"depth24plus", mrhi_formatNone, 0, 0, {0, 0}},
+    {"depth24plus-stencil8", DEPTH, 4, 4, {0, 1}},
+    {"depth32float", mrhi_formatDepth32Float, 0, 1 | 2, {4, 0}},
+    {"depth32float-stencil8", mrhi_formatNone, 4, 2 | 4, {4, 1}},
+};
+
+static const char* const s_aspects[] = {"all", "depth-only", "stencil-only"};
+
+// Whether a method copies an aspect of a depth-stencil format.
+static bool CopiesAspect(const DepthCopy* d, Method method, mrhiTextureAspect aspect)
+{
+    uint8_t aspects = method == TEXTURE_TO_BUFFER ? d->toBuffer : d->fromBuffer;
+    return ((aspects >> aspect) & 1) != 0;
+}
+
+// A transfer case of an aspect of a depth-stencil texture of a size.
+static TransferCase DepthCase(Method method, mrhiFormat format, mrhiTextureAspect aspect,
+                              mrhiExtent3d size)
+{
+    const Block block = {format, 4, 1, 1, false};
+    return (TransferCase){
+        .method = method,
+        .texture = CopyTexture(&block, KindOf(false, size.depthOrLayers), size),
+        .at = {.aspect = aspect},
+        .size = size,
+    };
+}
+
+// The CTS's bytesPerRow of an aspect's rows of a width, and the bytes a
+// copy of its rows and layers needs.
+static uint32_t AspectRow(Method method, uint32_t bytes, uint32_t width)
+{
+    uint32_t alignment = method == WRITE_TEXTURE ? 1 : 256;
+    return (bytes * width + alignment - 1) / alignment * alignment;
+}
+
+static uint64_t AspectBytes(Method method, uint32_t bytes, mrhiExtent3d size)
+{
+    return (uint64_t)AspectRow(method, bytes, size.width) * (size.height * size.depthOrLayers - 1) +
+           (bytes * size.width + 3) / 4 * 4;
+}
+
+// buffer_texture_copies:depth_stencil_format,copy_usage_and_aspect,
+// copy_buffer_size and copy_buffer_offset, over the CTS's depth-stencil
+// formats: each aspect a 1x1 texture copies, the bytes a copy of an
+// aspect needs, enough and 4 fewer, and a copy's offset, which only a
+// write takes unaligned. The library has depth32float, and
+// depth24plus-stencil8 as its depth-stencil format; the other four are
+// counted.
+static void TestDepthCopies(void)
+{
+    char name[160];
+    static const mrhiExtent3d sizes[] = {{8, 1, 1}, {4, 4, 1}, {4, 4, 3}};
+    static const uint32_t offsets[] = {1, 2, 4, 6, 8};
+    for (size_t f = 0; f < sizeof(s_depthCopies) / sizeof(s_depthCopies[0]); ++f)
+    {
+        const DepthCopy* d = &s_depthCopies[f];
+        for (Method m = WRITE_TEXTURE; m <= TEXTURE_TO_BUFFER; ++m)
+        {
+            for (mrhiTextureAspect a = mrhi_aspectAll; a <= mrhi_aspectStencilOnly; ++a)
+            {
+                bool copies = CopiesAspect(d, m, a);
+                if (d->format == mrhi_formatNone)
+                {
+                    s_inexpressible += 1 + (copies && a != mrhi_aspectAll ? 3 * 2 + 5 : 0);
+                    continue;
+                }
+                TransferCase c = DepthCase(m, d->format, a, (mrhiExtent3d){1, 1, 1});
+                c.dataSize = 32;
+                snprintf(name, sizeof(name),
+                         "buffer_texture_copies:depth_stencil_format,copy_usage_and_aspect %s %s "
+                         "%s",
+                         d->name, s_aspects[a], s_methods[m]);
+                Expect(name, RunTransfer(&c), copies);
+                if (!copies || a == mrhi_aspectAll)
+                {
+                    continue;
+                }
+                uint32_t bytes = d->bytes[a - 1];
+                for (size_t s = 0; s < 3; ++s)
+                {
+                    c = DepthCase(m, d->format, a, sizes[s]);
+                    c.bytesPerRow = AspectRow(m, bytes, sizes[s].width);
+                    c.rowsPerImage = sizes[s].height;
+                    for (uint32_t fewer = 0; fewer <= 4; fewer += 4)
+                    {
+                        c.dataSize = AspectBytes(m, bytes, sizes[s]) - fewer;
+                        snprintf(name, sizeof(name),
+                                 "buffer_texture_copies:depth_stencil_format,copy_buffer_size %s "
+                                 "%s %s %ux%ux%u, %s",
+                                 d->name, s_aspects[a], s_methods[m], sizes[s].width,
+                                 sizes[s].height, sizes[s].depthOrLayers,
+                                 fewer == 0 ? "enough" : "smaller");
+                        Expect(name, RunTransfer(&c), fewer == 0);
+                    }
+                }
+                for (size_t o = 0; o < 5; ++o)
+                {
+                    const mrhiExtent3d size = {4, 4, 1};
+                    c = DepthCase(m, d->format, a, size);
+                    c.offset = offsets[o];
+                    c.bytesPerRow = AspectRow(m, bytes, size.width);
+                    c.rowsPerImage = size.height;
+                    uint64_t need = AspectBytes(m, bytes, size) + offsets[o];
+                    c.dataSize = m == WRITE_TEXTURE ? need : (need + 3) / 4 * 4;
+                    snprintf(name, sizeof(name),
+                             "buffer_texture_copies:depth_stencil_format,copy_buffer_offset %s "
+                             "%s %s %u",
+                             d->name, s_aspects[a], s_methods[m], offsets[o]);
+                    Expect(name, RunTransfer(&c), m == WRITE_TEXTURE || offsets[o] % 4 == 0);
+                }
+            }
+        }
+    }
+}
+
+// buffer_texture_copies:sample_count, texture_buffer_usages and
+// device_mismatch: a copy between a buffer and a bgra8unorm texture of
+// 1 or 4 samples, and between one of each single usage the CTS gives,
+// but transient attachment, which it leaves out. The map usages and a
+// buffer or texture of another device are counted.
+static void TestCopyUsages(void)
+{
+    char name[160];
+    static const mrhiTextureUsage textureUsages[] = {
+        mrhi_textureCopySource, mrhi_textureCopyDestination, mrhi_textureSampled,
+        mrhi_textureStorage, mrhi_textureRenderTarget};
+    const Block bgra8 = {mrhi_formatBgra8Unorm, 4, 1, 1, false};
+    for (Method m = BUFFER_TO_TEXTURE; m <= TEXTURE_TO_BUFFER; ++m)
+    {
+        for (uint32_t samples = 1; samples <= 4; samples += 3)
+        {
+            TransferCase c = {
+                .method = m,
+                .texture = CopyTexture(&bgra8, mrhi_texture2d, (mrhiExtent3d){16, 1, 1}),
+                .dataSize = 64,
+                .size = {16, 1, 1},
+            };
+            c.texture.sampleCount = samples;
+            c.texture.usage |= samples > 1 ? mrhi_textureRenderTarget : 0;
+            snprintf(name, sizeof(name), "buffer_texture_copies:sample_count %s %u", s_methods[m],
+                     samples);
+            Expect(name, RunTransfer(&c), samples == 1);
+        }
+        mrhiTextureUsage textureNeeds =
+            m == BUFFER_TO_TEXTURE ? mrhi_textureCopyDestination : mrhi_textureCopySource;
+        mrhiBufferUsage bufferNeeds = m == BUFFER_TO_TEXTURE ? COPY_SRC : COPY_DST;
+        for (size_t t = 0; t < 5; ++t)
+        {
+            // MAP_READ and MAP_WRITE, then the library's usages.
+            s_inexpressible += textureUsages[t] == textureNeeds ? 2 : 0;
+            for (size_t b = 0; b < sizeof(s_usages) / sizeof(s_usages[0]); ++b)
+            {
+                bool textureValid = textureUsages[t] == textureNeeds;
+                bool bufferValid = s_usages[b] == bufferNeeds;
+                if (!textureValid && !bufferValid)
+                {
+                    continue;
+                }
+                TransferCase c = {
+                    .method = m,
+                    .block = &s_blocks[2],
+                    .texture = CopyTexture(&s_blocks[2], mrhi_texture2d, (mrhiExtent3d){16, 16, 1}),
+                    .dataSize = 32,
+                    .size = {1, 1, 1},
+                    .bufferUsage = s_usages[b],
+                };
+                c.texture.usage = textureUsages[t];
+                snprintf(name, sizeof(name),
+                         "buffer_texture_copies:texture_buffer_usages %s texture %#x, buffer %#x",
+                         s_methods[m], (unsigned)textureUsages[t], (unsigned)s_usages[b]);
+                Expect(name, RunTransfer(&c), textureValid && bufferValid);
+            }
+        }
+        TransferCase c = {
+            .method = m,
+            .block = &s_blocks[2],
+            .texture = CopyTexture(&s_blocks[2], mrhi_texture2d, (mrhiExtent3d){1, 1, 1}),
+            .dataSize = 32,
+            .size = {1, 1, 1},
+        };
+        snprintf(name, sizeof(name), "buffer_texture_copies:device_mismatch %s neither",
+                 s_methods[m]);
+        Expect(name, RunTransfer(&c), true);
+        s_inexpressible += 2;
+    }
+}
+
+// An offset_and_bytesPerRow row: the origin, the copy's size and the
+// offset in half blocks, and the alignment of the texture's row bytes.
+typedef struct OffsetRow
+{
+    uint32_t x;
+    uint32_t y;
+    uint32_t width;
+    uint32_t height;
+    uint32_t offset;
+    uint32_t alignment;
+} OffsetRow;
+
+static const OffsetRow s_offsetRows[] = {
+    {2, 2, 128, 4, 2, 256}, {0, 0, 128, 4, 3, 256}, {0, 0, 128, 4, 0, 128}, {0, 0, 128, 4, 0, 384},
+    {3, 0, 128, 4, 0, 256}, {0, 3, 128, 4, 0, 256}, {0, 0, 129, 4, 0, 256}, {0, 0, 128, 5, 0, 256},
+};
+
+// Half blocks of a size, rounded up as the CTS's Math.ceil does.
+static uint32_t Halves(uint32_t halves, uint32_t size)
+{
+    return (halves * size + 1) / 2;
+}
+
+// The CTS's case of a row on a format in 2D or 3D, and whether it
+// succeeds: an offset of whole blocks, a bytesPerRow multiple of 256,
+// and an origin and size of whole blocks.
+static TransferCase OffsetCase(Method method, const Block* block, bool volume, const OffsetRow* r,
+                               bool* successOut)
+{
+    uint32_t widthBlocks = (r->x + 1) / 2 + (r->width + 1) / 2;
+    uint32_t heightBlocks = (r->y + 1) / 2 + (r->height + 1) / 2;
+    uint32_t rowBytes = block->bytes * widthBlocks;
+    uint32_t rows = (r->height + 1) / 2;
+    uint32_t offset = Halves(r->offset, block->bytes);
+    uint32_t bytesPerRow = (rowBytes + r->alignment - 1) / r->alignment * r->alignment;
+    TransferCase c = {
+        .method = method,
+        .block = block,
+        .texture = CopyTexture(
+            block, volume ? mrhi_texture3d : mrhi_texture2d,
+            (mrhiExtent3d){widthBlocks * block->width, heightBlocks * block->height, 1}),
+        .at = {.x = Halves(r->x, block->width), .y = Halves(r->y, block->height)},
+        .offset = offset,
+        .bytesPerRow = bytesPerRow,
+        .dataSize = offset + (uint64_t)(rows - 1) * bytesPerRow + rowBytes,
+        .size = {Halves(r->width, block->width), Halves(r->height, block->height), 1},
+        .bufferUsage = method == BUFFER_TO_TEXTURE ? COPY_SRC : COPY_DST,
+    };
+    c.texture.usage =
+        method == BUFFER_TO_TEXTURE ? mrhi_textureCopyDestination : mrhi_textureCopySource;
+    *successOut = offset % block->bytes == 0 && bytesPerRow % 256 == 0 &&
+                  c.at.x % block->width == 0 && c.at.y % block->height == 0 &&
+                  c.size.width % block->width == 0 && c.size.height % block->height == 0;
+    return c;
+}
+
+// buffer_texture_copies:offset_and_bytesPerRow, over the library's color
+// formats. Its fractional offsets and sizes are of one-byte formats
+// only. The 1D cases are counted, and so are the BC and ASTC ones in
+// 3D, which the CTS's device takes with its sliced 3D features and the
+// library does not have; ETC2 in 3D is filtered out.
+static void TestOffsetRows(void)
+{
+    char name[160];
+    for (Method m = BUFFER_TO_TEXTURE; m <= TEXTURE_TO_BUFFER; ++m)
+    {
+        for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+        {
+            if (format == mrhi_formatDepth32Float || format == DEPTH)
+            {
+                continue;
+            }
+            mrhiExtent3d extent = BlockOf(format);
+            const Block block = {format, BytesOf(format), extent.width, extent.height,
+                                 extent.width > 1};
+            bool etc2 = format >= mrhi_formatEtc2Rgb8Unorm && format < mrhi_formatAstc4x4Unorm;
+            for (Dimension d = DIMENSION_1D; d <= DIMENSION_3D; ++d)
+            {
+                if ((d == DIMENSION_1D && block.compressed) || (d == DIMENSION_3D && etc2))
+                {
+                    continue;
+                }
+                for (size_t i = 0; i < sizeof(s_offsetRows) / sizeof(s_offsetRows[0]); ++i)
+                {
+                    const OffsetRow* r = &s_offsetRows[i];
+                    bool fractional = r->offset % 2 != 0 || r->width % 2 != 0 || r->height % 2 != 0;
+                    if ((fractional && block.bytes > 1) || (d == DIMENSION_1D && r->y > 0))
+                    {
+                        continue;
+                    }
+                    if (d == DIMENSION_1D || (d == DIMENSION_3D && block.compressed))
+                    {
+                        ++s_inexpressible;
+                        continue;
+                    }
+                    bool success = false;
+                    TransferCase c = OffsetCase(m, &block, d == DIMENSION_3D, r, &success);
+                    snprintf(name, sizeof(name),
+                             "buffer_texture_copies:offset_and_bytesPerRow %s format %d, %s, row "
+                             "%zu",
+                             s_methods[m], (int)format, s_dimensions[d], i);
+                    Expect(name, RunTransfer(&c), success);
+                }
+            }
+        }
+    }
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -4967,6 +5279,10 @@ int main(void)
     TestCopyBuffers();
     TestBytesPerRowAlignments();
     CHECK(s_differs == 2086 && s_inexpressible == 7641, "the buffer copy cases set aside");
+    TestDepthCopies();
+    TestCopyUsages();
+    TestOffsetRows();
+    CHECK(s_differs == 2086 && s_inexpressible == 8317, "the buffer texture copy cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
