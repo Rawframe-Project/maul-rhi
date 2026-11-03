@@ -4862,7 +4862,8 @@ static void TestBytesPerRowAlignments(void)
                         };
                         bool success = m == WRITE_TEXTURE || (perRow == ABSENT && rows <= 1) ||
                                        (perRow > 0 && perRow % 256 == 0);
-                        char perRowName[16] = "undefined";
+                        // The widest %lld, 20 characters, and the NUL.
+                        char perRowName[21] = "undefined";
                         if (perRow != ABSENT)
                         {
                             snprintf(perRowName, sizeof(perRowName), "%lld", (long long)perRow);
