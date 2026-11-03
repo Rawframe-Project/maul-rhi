@@ -145,6 +145,15 @@ mrhiResult mrhiPass_SetIndexBuffer(mrhiDevice* device, mrhiPassId id, mrhiResour
     return mrhi_success;
 }
 
+// Whether the pass's index buffer suits the pipeline, as WebGPU's
+// indexed draws: one of any width for a list, and one of its strip index
+// format for a strip, which a strip without one has not.
+static bool IndicesFit(const mrhiFramePass* pass, const mrhiPipelineSlot* slot)
+{
+    return pass->indexFormat != mrhi_indexNone &&
+           (!slot->strip || slot->stripIndexFormat == pass->indexFormat);
+}
+
 // The pass's pipeline, of a kind, with every table its reflection reads
 // set under a container of the same digest: or NULL with the refusal.
 static const mrhiPipelineSlot* ReadyToRun(const mrhiDevice* device, const mrhiFramePass* pass,
@@ -305,8 +314,7 @@ mrhiResult mrhiPass_DrawIndexed(mrhiDevice* device, mrhiPassId id, uint32_t inde
     {
         return status;
     }
-    if (pass->indexFormat == mrhi_indexNone ||
-        (slot->stripIndexFormat != mrhi_indexNone && slot->stripIndexFormat != pass->indexFormat))
+    if (!IndicesFit(pass, slot))
     {
         return mrhi_errorState;
     }
@@ -410,9 +418,7 @@ static mrhiFramePass* IndirectPass(mrhiDevice* device, mrhiPassId id, bool index
     {
         return nullptr;
     }
-    if (indexed &&
-        (pass->indexFormat == mrhi_indexNone ||
-         (slot->stripIndexFormat != mrhi_indexNone && slot->stripIndexFormat != pass->indexFormat)))
+    if (indexed && !IndicesFit(pass, slot))
     {
         *statusOut = mrhi_errorState;
         return nullptr;

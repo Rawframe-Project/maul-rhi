@@ -492,6 +492,24 @@ static void TestIndices(void)
               mrhiPass_DrawIndexed(s_device, s_render, 3, 1, 0, 0, 0) == mrhi_success,
           "any width for a list");
     Drop();
+    // A strip without a strip index format takes no indices, as WebGPU's
+    // undefined stripIndexFormat equals no index format.
+    def.stripIndexFormat = mrhi_indexNone;
+    mrhiGraphicsPipelineId unformatted = Graphics(&def);
+    Frame();
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, unformatted) == mrhi_success,
+          "a strip without a format");
+    SetVertices();
+    CHECK(mrhiPass_Draw(s_device, s_render, 3, 1, 0, 0) == mrhi_success, "drawn without indices");
+    for (uint32_t width = mrhi_indexUint16; width <= mrhi_indexUint32; ++width)
+    {
+        CHECK(mrhiPass_SetIndexBuffer(s_device, s_render, s_x, (mrhiIndexFormat)width, 0,
+                                      MRHI_WHOLE_SIZE) == mrhi_success &&
+                  mrhiPass_DrawIndexed(s_device, s_render, 3, 1, 0, 0, 0) == mrhi_errorState &&
+                  mrhiPass_DrawIndexedIndirect(s_device, s_render, s_a, 0) == mrhi_errorState,
+              "no width for a strip without a format");
+    }
+    Drop();
     CloseDevice();
 }
 
