@@ -541,10 +541,20 @@ static Need DataBytes(Method method, const Block* block, uint64_t offset, int64_
 
 static uint8_t s_data[4u << 20];
 
+// What became of a case's texture before the frame: nothing, destroyed,
+// or never made, as the CTS's invalid texture, whose id is the zero id
+// a refused def gives.
+typedef enum TextureState
+{
+    TEXTURE_VALID,
+    TEXTURE_DESTROYED,
+    TEXTURE_INVALID,
+} TextureState;
+
 // A transfer case: the method, the texture's block facts and def, the
 // texel copy's origin and mip, the layout, the data's size and the
-// copy's size; and the buffer's usages, both copy usages when none,
-// and whether it is destroyed before the frame.
+// copy's size; the buffer's usages, both copy usages when none, and
+// whether it is destroyed before the frame; and the texture's state.
 typedef struct TransferCase
 {
     Method method;
@@ -558,20 +568,26 @@ typedef struct TransferCase
     mrhiExtent3d size;
     mrhiBufferUsage bufferUsage;
     bool destroyed;
+    TextureState textureState;
 } TransferCase;
 
 // The case in a frame: its texture, its buffer or bytes of the data's
 // size, a transfer pass declaring both, and the copy; the first refusal,
-// of the texture, the buffer's import, the pass or the copy, or success.
+// of the texture, the imports, the pass or the copy, or success.
 static mrhiResult RunTransfer(const TransferCase* c)
 {
     uint64_t dataSize = c->dataSize;
     mrhiTextureId texture = {0};
-    mrhiResult status = mrhiCreateTexture(s_device, &c->texture, &texture);
+    mrhiResult status = c->textureState == TEXTURE_INVALID
+                            ? mrhi_success
+                            : mrhiCreateTexture(s_device, &c->texture, &texture);
     if (status != mrhi_success)
     {
         return status;
     }
+    CHECK(c->textureState != TEXTURE_DESTROYED ||
+              mrhiDestroyTexture(s_device, texture) == mrhi_success,
+          "the texture destroyed");
     mrhiBufferId buffer = {0};
     if (c->method != WRITE_TEXTURE)
     {
@@ -582,10 +598,11 @@ static mrhiResult RunTransfer(const TransferCase* c)
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiTextureCopy at = c->at;
     mrhiResourceId b = {0};
-    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
-              mrhiImportTexture(s_device, texture, &at.resource) == mrhi_success,
-          "a frame of the texture");
-    status = c->method == WRITE_TEXTURE ? mrhi_success : mrhiImportBuffer(s_device, buffer, &b);
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success, "a frame");
+    status = mrhiImportTexture(s_device, texture, &at.resource);
+    status = status != mrhi_success || c->method == WRITE_TEXTURE
+                 ? status
+                 : mrhiImportBuffer(s_device, buffer, &b);
     bool intoTexture = c->method != TEXTURE_TO_BUFFER;
     const mrhiAccess accesses[2] = {
         Whole(at.resource, intoTexture ? mrhi_accessCopyDestination : mrhi_accessCopySource),
@@ -623,7 +640,8 @@ static mrhiResult RunTransfer(const TransferCase* c)
         }
     }
     CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
-              mrhiDestroyTexture(s_device, texture) == mrhi_success &&
+              (c->textureState != TEXTURE_VALID ||
+               mrhiDestroyTexture(s_device, texture) == mrhi_success) &&
               (c->method == WRITE_TEXTURE || c->destroyed ||
                mrhiDestroyBuffer(s_device, buffer) == mrhi_success),
           "dropped");
@@ -5192,6 +5210,74 @@ static void TestOffsetRows(void)
     }
 }
 
+// queue,writeTexture: texture_state, usages, sample_count and
+// texture,device_mismatch write 16 bytes into one texel. A destroyed or
+// invalid texture is refused as stale at its import, where WebGPU
+// refuses the write; the mismatched texture is counted, as the
+// library's ids name no device.
+static void TestWriteTextures(void)
+{
+    char name[96];
+    static const char* const states[] = {"valid", "destroyed", "invalid"};
+    for (TextureState s = TEXTURE_VALID; s <= TEXTURE_INVALID; ++s)
+    {
+        TransferCase c = {
+            .method = WRITE_TEXTURE,
+            .block = &s_blocks[2],
+            .texture = CopyTexture(&s_blocks[2], mrhi_texture2d, (mrhiExtent3d){1, 1, 1}),
+            .dataSize = 16,
+            .size = {1, 1, 1},
+            .textureState = s,
+        };
+        c.texture.usage |= mrhi_textureSampled | mrhi_textureStorage | mrhi_textureRenderTarget;
+        snprintf(name, sizeof(name), "writeTexture:texture_state %s", states[s]);
+        if (s == TEXTURE_VALID)
+        {
+            Expect(name, RunTransfer(&c), true);
+        }
+        else
+        {
+            ExpectStale(name, RunTransfer(&c));
+        }
+    }
+    static const mrhiTextureUsage usages[] = {mrhi_textureCopyDestination, mrhi_textureStorage,
+                                              mrhi_textureStorage | mrhi_textureCopySource,
+                                              mrhi_textureStorage | mrhi_textureCopyDestination};
+    for (size_t u = 0; u < 4; ++u)
+    {
+        TransferCase c = {
+            .method = WRITE_TEXTURE,
+            .block = &s_blocks[2],
+            .texture = CopyTexture(&s_blocks[2], mrhi_texture2d, (mrhiExtent3d){16, 16, 1}),
+            .dataSize = 16,
+            .size = {1, 1, 1},
+        };
+        c.texture.usage = usages[u];
+        snprintf(name, sizeof(name), "writeTexture:usages %#x", (unsigned)usages[u]);
+        Expect(name, RunTransfer(&c), (usages[u] & mrhi_textureCopyDestination) != 0);
+    }
+    const Block bgra8 = {mrhi_formatBgra8Unorm, 4, 1, 1, false};
+    for (uint32_t samples = 1; samples <= 4; samples += 3)
+    {
+        TransferCase c = {
+            .method = WRITE_TEXTURE,
+            .block = &bgra8,
+            .texture = CopyTexture(&bgra8, mrhi_texture2d, (mrhiExtent3d){16, 16, 1}),
+            .dataSize = 16,
+            .size = {1, 1, 1},
+        };
+        c.texture.usage = mrhi_textureCopyDestination | mrhi_textureRenderTarget;
+        c.texture.sampleCount = samples;
+        snprintf(name, sizeof(name), "writeTexture:sample_count %u", samples);
+        Expect(name, RunTransfer(&c), samples == 1);
+        if (samples == 1)
+        {
+            Expect("writeTexture:texture,device_mismatch false", RunTransfer(&c), true);
+        }
+    }
+    s_inexpressible += 1;
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -5283,6 +5369,8 @@ int main(void)
     TestCopyUsages();
     TestOffsetRows();
     CHECK(s_differs == 2086 && s_inexpressible == 8317, "the buffer texture copy cases set aside");
+    TestWriteTextures();
+    CHECK(s_differs == 2086 && s_inexpressible == 8318, "the writeTexture cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
