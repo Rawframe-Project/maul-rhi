@@ -5990,6 +5990,80 @@ static void TestIndexAccess(void)
           "the strip pipeline destroyed");
 }
 
+// A compute pass, one of the graphics class without targets, writing
+// timestamps into the set at its begin and end queries, MRHI_NO_QUERY
+// for none, ended: the first refusal, or success.
+static mrhiResult RunComputeTimestamps(mrhiQuerySetId set, uint32_t begin, uint32_t end)
+{
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success, "a frame");
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    def.timestampQuerySet = set;
+    def.timestampBegin = begin;
+    def.timestampEnd = end;
+    mrhiPassId pass = {0};
+    mrhiResult status = mrhiAddPass(s_device, &def, &pass);
+    if (status == mrhi_success)
+    {
+        CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+                  mrhiPass_Begin(s_device, pass) == mrhi_success,
+              "the pass begun");
+        status = mrhiPass_End(s_device, pass);
+    }
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
+    return status;
+}
+
+// api,validation,encoding,beginComputePass. The CTS's undefined query
+// index is MRHI_NO_QUERY. Its invalid set is one of kMaxQueryCount + 1
+// queries, whose creation the library refuses, leaving the null id,
+// which a pass naming it with a query refuses as invalid: a pass's
+// timestamps need a set. The mismatched device's case is counted.
+static void TestBeginComputePass(void)
+{
+    static const char* const kinds[] = {"occlusion", "timestamp"};
+    char name[128];
+    for (uint32_t k = 0; k < 2; ++k)
+    {
+        mrhiQuerySetId set = MakeQuerySet(k == 0 ? mrhi_queryOcclusion : mrhi_queryTimestamp, 2);
+        snprintf(name, sizeof(name), "beginComputePass:timestampWrites,query_set_type %s",
+                 kinds[k]);
+        Expect(name, RunComputeTimestamps(set, 0, 1), k == 1);
+        CHECK(mrhiDestroyQuerySet(s_device, set) == mrhi_success, "the set destroyed");
+    }
+    mrhiQuerySetId valid = MakeQuerySet(mrhi_queryTimestamp, 1);
+    Expect("beginComputePass:timestampWrites,invalid_query_set valid",
+           RunComputeTimestamps(valid, 0, MRHI_NO_QUERY), true);
+    mrhiQuerySetDef def = mrhiDefaultQuerySetDef();
+    def.kind = mrhi_queryTimestamp;
+    def.count = 4097;
+    mrhiQuerySetId invalid = {0};
+    CHECK(mrhiCreateQuerySet(s_device, &def, &invalid) == mrhi_errorLimit && invalid.index1 == 0,
+          "an invalid query set");
+    Expect("beginComputePass:timestampWrites,invalid_query_set invalid",
+           RunComputeTimestamps(invalid, 0, MRHI_NO_QUERY), false);
+    mrhiQuerySetId two = MakeQuerySet(mrhi_queryTimestamp, 2);
+    static const uint32_t indices[5] = {MRHI_NO_QUERY, 0, 1, 2, 3};
+    static const char* const names[5] = {"undefined", "0", "1", "2", "3"};
+    for (uint32_t b = 0; b < 5; ++b)
+    {
+        for (uint32_t e = 0; e < 5; ++e)
+        {
+            snprintf(name, sizeof(name), "beginComputePass:timestampWrites,query_index %s, %s",
+                     names[b], names[e]);
+            bool taken = b != e && (b == 0 || indices[b] < 2) && (e == 0 || indices[e] < 2);
+            Expect(name, RunComputeTimestamps(two, indices[b], indices[e]), taken);
+        }
+    }
+    Expect("beginComputePass:timestamp_query_set,device_mismatch false",
+           RunComputeTimestamps(valid, 0, MRHI_NO_QUERY), true);
+    CHECK(mrhiDestroyQuerySet(s_device, valid) == mrhi_success &&
+              mrhiDestroyQuerySet(s_device, two) == mrhi_success,
+          "the sets destroyed");
+    s_inexpressible += 1;
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -6094,6 +6168,8 @@ int main(void)
     CHECK(s_differs == 2104 && s_inexpressible == 8346, "the state tracking cases set aside");
     TestIndexAccess();
     CHECK(s_differs == 2104 && s_inexpressible == 8346, "the index access cases set aside");
+    TestBeginComputePass();
+    CHECK(s_differs == 2104 && s_inexpressible == 8347, "the beginComputePass cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
