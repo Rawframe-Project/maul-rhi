@@ -541,12 +541,10 @@ static Need DataBytes(Method method, const Block* block, uint64_t offset, int64_
 
 static uint8_t s_data[4u << 20];
 
-// A transfer case in a frame: a texture of the block's format, its
-// buffer or bytes of dataSize, a transfer pass declaring both, and the
-// copy at the texture's origin.
 // A transfer case: the method, the texture's block facts and def, the
 // texel copy's origin and mip, the layout, the data's size and the
-// copy's size.
+// copy's size; and the buffer's usages, both copy usages when none,
+// and whether it is destroyed before the frame.
 typedef struct TransferCase
 {
     Method method;
@@ -558,11 +556,13 @@ typedef struct TransferCase
     uint32_t rowsPerImage;
     uint64_t dataSize;
     mrhiExtent3d size;
+    mrhiBufferUsage bufferUsage;
+    bool destroyed;
 } TransferCase;
 
 // The case in a frame: its texture, its buffer or bytes of the data's
 // size, a transfer pass declaring both, and the copy; the first refusal,
-// of the texture, the pass or the copy, or success.
+// of the texture, the buffer's import, the pass or the copy, or success.
 static mrhiResult RunTransfer(const TransferCase* c)
 {
     uint64_t dataSize = c->dataSize;
@@ -575,16 +575,17 @@ static mrhiResult RunTransfer(const TransferCase* c)
     mrhiBufferId buffer = {0};
     if (c->method != WRITE_TEXTURE)
     {
-        buffer = MakeBuffer(dataSize, mrhi_bufferCopySource | mrhi_bufferCopyDestination);
+        buffer = MakeBuffer(dataSize, c->bufferUsage != 0 ? c->bufferUsage : COPY_SRC | COPY_DST);
+        CHECK(!c->destroyed || mrhiDestroyBuffer(s_device, buffer) == mrhi_success,
+              "the buffer destroyed");
     }
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     mrhiTextureCopy at = c->at;
     mrhiResourceId b = {0};
-    CHECK(
-        mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
-            mrhiImportTexture(s_device, texture, &at.resource) == mrhi_success &&
-            (c->method == WRITE_TEXTURE || mrhiImportBuffer(s_device, buffer, &b) == mrhi_success),
-        "a frame of them");
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportTexture(s_device, texture, &at.resource) == mrhi_success,
+          "a frame of the texture");
+    status = c->method == WRITE_TEXTURE ? mrhi_success : mrhiImportBuffer(s_device, buffer, &b);
     bool intoTexture = c->method != TEXTURE_TO_BUFFER;
     const mrhiAccess accesses[2] = {
         Whole(at.resource, intoTexture ? mrhi_accessCopyDestination : mrhi_accessCopySource),
@@ -595,7 +596,7 @@ static mrhiResult RunTransfer(const TransferCase* c)
     def.accesses = accesses;
     def.accessCount = c->method == WRITE_TEXTURE ? 1 : 2;
     mrhiPassId pass = {0};
-    status = mrhiAddPass(s_device, &def, &pass);
+    status = status == mrhi_success ? mrhiAddPass(s_device, &def, &pass) : status;
     if (status == mrhi_success)
     {
         CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success &&
@@ -623,7 +624,8 @@ static mrhiResult RunTransfer(const TransferCase* c)
     }
     CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
               mrhiDestroyTexture(s_device, texture) == mrhi_success &&
-              (c->method == WRITE_TEXTURE || mrhiDestroyBuffer(s_device, buffer) == mrhi_success),
+              (c->method == WRITE_TEXTURE || c->destroyed ||
+               mrhiDestroyBuffer(s_device, buffer) == mrhi_success),
           "dropped");
     return status;
 }
@@ -4734,6 +4736,150 @@ static void TestQueueDestroys(void)
     s_inexpressible += 2 + 2 + 2 + 4;
 }
 
+// WebGPU's bytes per texel block of a format, as the CTS's tables give
+// them; 0 for the depth-stencil format, which the CTS's sized formats
+// leave out.
+static uint32_t BytesOf(mrhiFormat format)
+{
+    static const uint8_t bytes[LAST_FORMAT + 1] = {
+        [mrhi_formatR8Unorm] = 1,         [mrhi_formatRg8Unorm] = 2,
+        [mrhi_formatR16Float] = 2,        [mrhi_formatRg16Float] = 4,
+        [mrhi_formatRgba16Float] = 8,     [mrhi_formatR32Float] = 4,
+        [mrhi_formatRg32Float] = 8,       [mrhi_formatRgba32Float] = 16,
+        [mrhi_formatR32Uint] = 4,         [mrhi_formatR32Sint] = 4,
+        [mrhi_formatRgb10a2Unorm] = 4,    [mrhi_formatRg11b10Ufloat] = 4,
+        [mrhi_formatDepth32Float] = 4,    [mrhi_formatDepthStencil] = 0,
+        [mrhi_formatBc1RgbaUnorm] = 8,    [mrhi_formatBc1RgbaUnormSrgb] = 8,
+        [mrhi_formatBc4RUnorm] = 8,       [mrhi_formatBc4RSnorm] = 8,
+        [mrhi_formatEtc2Rgb8Unorm] = 8,   [mrhi_formatEtc2Rgb8UnormSrgb] = 8,
+        [mrhi_formatEtc2Rgb8a1Unorm] = 8, [mrhi_formatEtc2Rgb8a1UnormSrgb] = 8,
+        [mrhi_formatEacR11Unorm] = 8,     [mrhi_formatEacR11Snorm] = 8,
+    };
+    if (format <= mrhi_formatBgra8UnormSrgb)
+    {
+        return 4;
+    }
+    if (format >= mrhi_formatBc1RgbaUnorm && bytes[format] == 0)
+    {
+        return 16;
+    }
+    return bytes[format];
+}
+
+// api,validation,image_copy,buffer_related: buffer_state, usage and
+// buffer,device_mismatch copy nothing between a buffer and a 2x2 rgba8
+// texture. The invalid buffer has a map usage and the mismatched one
+// another device, which the library's ids do not name: those cases are
+// counted. A destroyed buffer is refused as stale at its import, where
+// WebGPU fails the submit.
+static void TestCopyBuffers(void)
+{
+    char name[128];
+    static const mrhiBufferUsage usages[] = {COPY_SRC | mrhi_bufferUniform,
+                                             COPY_DST | mrhi_bufferUniform, COPY_SRC | COPY_DST};
+    for (Method m = BUFFER_TO_TEXTURE; m <= TEXTURE_TO_BUFFER; ++m)
+    {
+        TransferCase c = {
+            .method = m,
+            .block = &s_blocks[2],
+            .texture = CopyTexture(&s_blocks[2], mrhi_texture2d, (mrhiExtent3d){2, 2, 1}),
+            .dataSize = 16,
+        };
+        snprintf(name, sizeof(name), "buffer_related:buffer_state %s valid", s_methods[m]);
+        Expect(name, RunTransfer(&c), true);
+        snprintf(name, sizeof(name), "buffer_related:buffer,device_mismatch %s false",
+                 s_methods[m]);
+        Expect(name, RunTransfer(&c), true);
+        for (size_t u = 0; u < 3; ++u)
+        {
+            c.bufferUsage = usages[u];
+            snprintf(name, sizeof(name), "buffer_related:usage %s %#x", s_methods[m],
+                     (unsigned)usages[u]);
+            Expect(name, RunTransfer(&c),
+                   (usages[u] & (m == BUFFER_TO_TEXTURE ? COPY_SRC : COPY_DST)) != 0);
+        }
+        c.bufferUsage = 0;
+        c.destroyed = true;
+        snprintf(name, sizeof(name), "buffer_related:buffer_state %s destroyed", s_methods[m]);
+        ExpectStale(name, RunTransfer(&c));
+        s_inexpressible += 2;
+    }
+}
+
+// buffer_related:bytes_per_row_alignment, over the library's sized
+// formats: one block across and up to three rows of blocks, with a
+// bytesPerRow absent or at least a block's bytes. A copy with a buffer
+// needs it a multiple of 256 unless absent from a copy of one row; a
+// write does not. depth32float copies only to a buffer, whole. The 1D
+// cases are counted, and those the CTS filters or skips are not run.
+static void TestBytesPerRowAlignments(void)
+{
+    char name[160];
+    static const int64_t values[] = {ABSENT, 0, 1, 255, 256, 257, 512};
+    for (Method m = WRITE_TEXTURE; m <= TEXTURE_TO_BUFFER; ++m)
+    {
+        for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+        {
+            bool depth = format == mrhi_formatDepth32Float;
+            uint32_t bytes = BytesOf(format);
+            if (bytes == 0 || (depth && m != TEXTURE_TO_BUFFER))
+            {
+                continue;
+            }
+            mrhiExtent3d block = BlockOf(format);
+            const Block facts = {format, bytes, block.width, block.height, block.width > 1};
+            for (Dimension d = DIMENSION_1D; d <= DIMENSION_3D; ++d)
+            {
+                if (!Runs(d, format))
+                {
+                    continue;
+                }
+                for (size_t v = 0; v < sizeof(values) / sizeof(values[0]); ++v)
+                {
+                    for (uint32_t rows = 0; rows <= 3; ++rows)
+                    {
+                        int64_t perRow = values[v];
+                        uint32_t textureRows = rows > 0 ? rows : 1;
+                        if ((d == DIMENSION_1D && rows > 1) || (depth && rows != textureRows) ||
+                            (perRow == ABSENT ? rows > 1 : perRow < bytes))
+                        {
+                            continue;
+                        }
+                        if (d == DIMENSION_1D)
+                        {
+                            ++s_inexpressible;
+                            continue;
+                        }
+                        TransferCase c = {
+                            .method = m,
+                            .block = &facts,
+                            .texture = CopyTexture(
+                                &facts, d == DIMENSION_3D ? mrhi_texture3d : mrhi_texture2d,
+                                (mrhiExtent3d){block.width, textureRows * block.height, 1}),
+                            .bytesPerRow = Value(perRow),
+                            .dataSize = 512 * 8 * 16,
+                            .size = {block.width, rows * block.height, 1},
+                        };
+                        bool success = m == WRITE_TEXTURE || (perRow == ABSENT && rows <= 1) ||
+                                       (perRow > 0 && perRow % 256 == 0);
+                        // The widest %lld, 20 characters, and the NUL.
+                        char perRowName[21] = "undefined";
+                        if (perRow != ABSENT)
+                        {
+                            snprintf(perRowName, sizeof(perRowName), "%lld", (long long)perRow);
+                        }
+                        snprintf(name, sizeof(name),
+                                 "buffer_related:bytes_per_row_alignment %s format %d, %s, "
+                                 "bytesPerRow=%s, copyHeightInBlocks=%u",
+                                 s_methods[m], (int)format, s_dimensions[d], perRowName, rows);
+                        Expect(name, RunTransfer(&c), success);
+                    }
+                }
+            }
+        }
+    }
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -4818,6 +4964,9 @@ int main(void)
     CHECK(s_differs == 2064 && s_inexpressible == 7141, "the write cases set aside");
     TestQueueDestroys();
     CHECK(s_differs == 2086 && s_inexpressible == 7151, "the queue destroy cases set aside");
+    TestCopyBuffers();
+    TestBytesPerRowAlignments();
+    CHECK(s_differs == 2086 && s_inexpressible == 7641, "the buffer copy cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
