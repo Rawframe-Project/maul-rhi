@@ -8,10 +8,11 @@
 #                            source rules, the contract's generated files,
 #                            formatting, the documentation checks,
 #                            clang-tidy in Release and in Debug on the
-#                            changed sources, and the linux-clang-20-asan
-#                            preset's tests without the integration label
-#                            (the test driver, no GPU). Under two minutes;
-#                            run it before every push.
+#                            changed sources (on all of them when a header
+#                            changed), and the linux-clang-20-asan preset's
+#                            tests without the integration label (the test
+#                            driver, no GPU). Under two minutes; run it
+#                            before every push.
 #   tools/check.sh pr        what the pull request check runs on Linux:
 #                            every check, clang-tidy, the linux-clang-20-asan
 #                            and linux-gcc-14 presets with their integration
@@ -114,18 +115,18 @@ tidy_sources() { # files
 
 # clang-tidy on the files given, as CI's checks job runs it: on the Release
 # preset, where the assertions compile out, and with them live. Each hides
-# findings the other shows. Run from the root, clang-tidy ignores the
-# tree's HeaderFilterRegex and drops every header's findings: the filter,
-# anchored at the checkout, keeps the headers fetched under out/ out.
+# findings the other shows. Each call names the library's headers:
+# tools/tidy_filter.sh says why.
 tidy() { # files
-    local build f
+    local build f filter
     for build in Release Debug; do
         step "clang-tidy, $build, on $# files"
         configure "tidy-$build" --preset linux-clang-20 -DCMAKE_BUILD_TYPE=$build \
             -DMAUL_RHI_LABELS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+        filter=$(tools/tidy_filter.sh "$out/check-tidy-$build")
         for f in "$@"; do
             clang-tidy-20 -p "$out/check-tidy-$build" --quiet --warnings-as-errors='*' \
-                --header-filter="^$root/(src|include)/" "$f" 2>/dev/null
+                --header-filter="$filter" "$f" 2>/dev/null
         done
     done
 }
@@ -150,10 +151,13 @@ if [ "$tier" = changed ]; then
         step "clang-format on ${#present[@]} changed files"
         clang-format --dry-run -Werror "${present[@]}"
     fi
-    # The pr tier's set: src/*.c, not src/generated/.
+    # The pr tier's set: src/*.c, not src/generated/. A changed header of
+    # the library's reaches sources that did not change, so it takes
+    # them all.
     sources=()
     for f in "${present[@]+"${present[@]}"}"; do
         [[ $f == src/*.c && $f != src/*/* ]] && sources+=("$f")
+        [[ $f == src/*.h || $f == include/*.h ]] && sources=(src/*.c) && break
     done
     mapfile -t sources < <(tidy_sources "${sources[@]+"${sources[@]}"}")
     if [ ${#sources[@]} -gt 0 ]; then
