@@ -5883,6 +5883,113 @@ static void TestStateTracking(void)
           "the vertex pipelines destroyed");
 }
 
+// An indexed draw of the case in a render pass of one 1x1 rgba8unorm
+// target, cleared, with a uint32 index buffer of the bytes given: the
+// first refusal, or success.
+static mrhiResult RunIndexAccess(mrhiGraphicsPipelineId pipeline, uint64_t bytes,
+                                 uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex)
+{
+    mrhiBufferId buffer = MakeBuffer(bytes, mrhi_bufferIndex);
+    mrhiTextureId texture = MakeAttachment(&(Attachment){.format = RGBA8, .size = 1});
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId indices = {0};
+    mrhiPassDef def = mrhiDefaultPassDef();
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportBuffer(s_device, buffer, &indices) == mrhi_success &&
+              mrhiImportTexture(s_device, texture, &def.colorTargets[0].resource) == mrhi_success,
+          "a frame");
+    const mrhiAccess access = Whole(indices, mrhi_accessIndex);
+    def.neverCull = true;
+    def.accesses = &access;
+    def.accessCount = 1;
+    def.colorTargets[0].load = mrhi_loadClear;
+    def.colorTargetCount = 1;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success &&
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, pass) == mrhi_success &&
+              mrhiPass_SetGraphicsPipeline(s_device, pass, pipeline) == mrhi_success &&
+              mrhiPass_SetIndexBuffer(s_device, pass, indices, mrhi_indexUint32, 0,
+                                      MRHI_WHOLE_SIZE) == mrhi_success,
+          "the pass begun");
+    mrhiResult status =
+        mrhiPass_DrawIndexed(s_device, pass, indexCount, instanceCount, firstIndex, 0, 0);
+    status = status == mrhi_success ? mrhiPass_End(s_device, pass) : status;
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
+              mrhiDestroyTexture(s_device, texture) == mrhi_success &&
+              mrhiDestroyBuffer(s_device, buffer) == mrhi_success,
+          "dropped");
+    return status;
+}
+
+// api,validation,encoding,cmds,index_access. The pipeline is the noop
+// one as a triangle strip of uint32 strip indices, as the CTS's. The
+// index buffer holds 6 uint32 indices, or none; the library's new
+// buffer reads as zeros where the CTS writes 0, 1, 2, 3, 1, 2, which no
+// case's outcome reads.
+static void TestIndexAccess(void)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+    def.shader = shader;
+    def.vertexEntry = "vs";
+    def.vertexEntryLength = 2;
+    def.fragmentEntry = "fs";
+    def.fragmentEntryLength = 2;
+    def.colorTargets[0].format = mrhi_formatRgba8Unorm;
+    def.colorTargetCount = 1;
+    def.topology = mrhi_topologyTriangleStrip;
+    def.stripIndexFormat = mrhi_indexUint32;
+    mrhiGraphicsPipelineId strip = {0};
+    mrhiRequestId request;
+    CHECK(mrhiCreateGraphicsPipeline(s_device, &def, &strip, &request) == mrhi_success,
+          "the strip pipeline");
+    Answered();
+    static const uint32_t bounds[13][2] = {
+        {6, 0},
+        {5, 1},
+        {1, 5},
+        {0, 6},
+        {0, 7},
+        {7, 0},
+        {6, 1},
+        {1, 6},
+        {6, 10000},
+        {10000, 0},
+        {UINT32_MAX, UINT32_MAX},
+        {UINT32_MAX, 2},
+        {2, UINT32_MAX},
+    };
+    static const uint32_t empty[4][2] = {{3, 1}, {0, 1}, {3, 0}, {0, 0}};
+    static const uint32_t instances[2] = {1, 10000};
+    char name[160];
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        for (size_t b = 0; b < 13; ++b)
+        {
+            snprintf(name, sizeof(name), "index_access:out_of_bounds %u, %u, %u", bounds[b][0],
+                     bounds[b][1], instances[i]);
+            Expect(name, RunIndexAccess(strip, 24, bounds[b][0], instances[i], bounds[b][1]),
+                   (uint64_t)bounds[b][0] + bounds[b][1] <= 6);
+        }
+        for (size_t e = 0; e < 4; ++e)
+        {
+            snprintf(name, sizeof(name),
+                     "index_access:out_of_bounds_zero_sized_index_buffer %u, %u, %u", empty[e][0],
+                     empty[e][1], instances[i]);
+            Expect(name, RunIndexAccess(strip, 0, empty[e][0], instances[i], empty[e][1]),
+                   empty[e][0] + empty[e][1] == 0);
+        }
+    }
+    CHECK(mrhiDestroyGraphicsPipeline(s_device, strip) == mrhi_success &&
+              mrhiDestroyShader(s_device, shader) == mrhi_success,
+          "the strip pipeline destroyed");
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -5985,6 +6092,8 @@ int main(void)
     CHECK(s_differs == 2104 && s_inexpressible == 8346, "the setPipeline cases set aside");
     TestStateTracking();
     CHECK(s_differs == 2104 && s_inexpressible == 8346, "the state tracking cases set aside");
+    TestIndexAccess();
+    CHECK(s_differs == 2104 && s_inexpressible == 8346, "the index access cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
