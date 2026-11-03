@@ -5676,6 +5676,61 @@ static void TestDebugGroups(void)
     s_inexpressible += 9 + 5 + 5;
 }
 
+// The pipeline set in a render pass of one 16x16 rgba8unorm target,
+// cleared, ended after it: the first refusal, or success.
+static mrhiResult RunSetPipeline(mrhiGraphicsPipelineId pipeline)
+{
+    mrhiTextureId texture = MakeAttachment(&(Attachment){.format = RGBA8});
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiPassDef def = mrhiDefaultPassDef();
+    def.neverCull = true;
+    def.colorTargets[0].load = mrhi_loadClear;
+    def.colorTargetCount = 1;
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportTexture(s_device, texture, &def.colorTargets[0].resource) == mrhi_success,
+          "a frame");
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success &&
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, pass) == mrhi_success,
+          "the pass begun");
+    mrhiResult status = mrhiPass_SetGraphicsPipeline(s_device, pass, pipeline);
+    status = status == mrhi_success ? mrhiPass_End(s_device, pass) : status;
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
+              mrhiDestroyTexture(s_device, texture) == mrhi_success,
+          "dropped");
+    return status;
+}
+
+// setPipeline.spec.ts. The valid pipeline, and the one of device_mismatch
+// on the same device, is the noop pipeline of one rgba8unorm target, as
+// the CTS's. The invalid one is the CTS's error pipeline: its creation,
+// with an empty vertex entry, is refused and leaves the null id, which
+// setting refuses as stale. The render bundle's 4 cases and the
+// mismatched device's are counted.
+static void TestSetPipeline(void)
+{
+    Expect("setPipeline:invalid_pipeline render pass, valid", RunSetPipeline(s_graphics), true);
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    mrhiGraphicsPipelineDef error = mrhiDefaultGraphicsPipelineDef();
+    error.shader = shader;
+    error.vertexEntry = "";
+    error.vertexEntryLength = 0;
+    mrhiGraphicsPipelineId invalid = {0};
+    mrhiRequestId request;
+    CHECK(mrhiCreateGraphicsPipeline(s_device, &error, &invalid, &request) != mrhi_success &&
+              invalid.index1 == 0 && mrhiDestroyShader(s_device, shader) == mrhi_success,
+          "the error pipeline refused");
+    ExpectStale("setPipeline:invalid_pipeline render pass, invalid", RunSetPipeline(invalid));
+    Expect("setPipeline:pipeline,device_mismatch render pass, false", RunSetPipeline(s_graphics),
+           true);
+    s_inexpressible += 2 + 3;
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -5774,6 +5829,8 @@ int main(void)
     CHECK(s_differs == 2086 && s_inexpressible == 8322, "the dynamic state cases set aside");
     TestDebugGroups();
     CHECK(s_differs == 2104 && s_inexpressible == 8341, "the debug group cases set aside");
+    TestSetPipeline();
+    CHECK(s_differs == 2104 && s_inexpressible == 8346, "the setPipeline cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
