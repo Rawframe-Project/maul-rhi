@@ -5,6 +5,17 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.25.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.24.0...v0.25.0) (2026-11-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **encoder:** an indexed draw (`mrhiPass_DrawIndexed`, `mrhiPass_DrawIndexedIndirect` and `mrhiPass_DrawIndexedIndirectCount`) with a strip pipeline whose `stripIndexFormat` is `mrhi_indexNone` is now refused as `mrhi_errorState`, as WebGPU refuses it. Give such a pipeline the strip index format of its index buffer.
+
+### Fixed
+
+* **encoder:** refuse indexed strips without a strip index format ([#438](https://github.com/Rawframe-Project/maul-rhi/issues/438)) ([bfb2342](https://github.com/Rawframe-Project/maul-rhi/commit/bfb2342be7a375ec85e0349890e804607005db5d)), closes [#437](https://github.com/Rawframe-Project/maul-rhi/issues/437)
+
 ## [0.24.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.23.1...v0.24.0) (2026-11-02)
 
 ### Changed
