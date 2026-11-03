@@ -44,6 +44,7 @@
 #include "maul-rhi/pipeline.h"
 #include "maul-rhi/resources.h"
 #include "maul-rhi/shader.h"
+#include "shaders/instanced_container.h"
 #include "shaders/noop_container.h"
 
 #include <math.h>
@@ -5731,6 +5732,157 @@ static void TestSetPipeline(void)
     s_inexpressible += 2 + 3;
 }
 
+// Reports a draw the library refuses as mrhi_errorState: a draw before
+// the vertex buffers its pipeline reads are set, where the CTS expects
+// a validation error.
+static void ExpectState(const char* test, mrhiResult result, bool succeeds)
+{
+    if (result != (succeeds ? mrhi_success : mrhi_errorState))
+    {
+        printf("FAIL: %s: %d, the CTS expects %s\n", test, (int)result,
+               succeeds ? "success" : "a validation error");
+        ++s_failures;
+    }
+}
+
+// A draw of 3 vertices with one of the two pipelines, after setting the
+// pass's first buffers vertex buffers.
+typedef struct TrackingDraw
+{
+    uint32_t pipeline;
+    uint32_t buffers;
+} TrackingDraw;
+
+typedef struct TrackingPass
+{
+    uint32_t drawCount;
+    TrackingDraw draws[2];
+} TrackingPass;
+
+// The passes in one frame, each with one 16x16 rgba8unorm target,
+// cleared, and two 256-byte vertex buffers: the first refusal, or
+// success.
+static mrhiResult RunTracking(const mrhiGraphicsPipelineId pipelines[2], const TrackingPass* passes,
+                              uint32_t passCount)
+{
+    mrhiBufferId buffers[2] = {MakeBuffer(256, mrhi_bufferVertex),
+                               MakeBuffer(256, mrhi_bufferVertex)};
+    mrhiTextureId textures[2] = {0};
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiResourceId vertices[2] = {0};
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success &&
+              mrhiImportBuffer(s_device, buffers[0], &vertices[0]) == mrhi_success &&
+              mrhiImportBuffer(s_device, buffers[1], &vertices[1]) == mrhi_success,
+          "a frame");
+    const mrhiAccess accesses[2] = {Whole(vertices[0], mrhi_accessVertex),
+                                    Whole(vertices[1], mrhi_accessVertex)};
+    mrhiPassId ids[2] = {0};
+    for (uint32_t p = 0; p < passCount; ++p)
+    {
+        textures[p] = MakeAttachment(&(Attachment){.format = RGBA8});
+        mrhiPassDef def = mrhiDefaultPassDef();
+        def.neverCull = true;
+        def.accesses = accesses;
+        def.accessCount = 2;
+        def.colorTargets[0].load = mrhi_loadClear;
+        def.colorTargetCount = 1;
+        CHECK(mrhiImportTexture(s_device, textures[p], &def.colorTargets[0].resource) ==
+                      mrhi_success &&
+                  mrhiAddPass(s_device, &def, &ids[p]) == mrhi_success,
+              "a pass");
+    }
+    CHECK(mrhiDevice_CompileFrame(s_device) == mrhi_success, "compiled");
+    mrhiResult status = mrhi_success;
+    for (uint32_t p = 0; p < passCount && status == mrhi_success; ++p)
+    {
+        status = mrhiPass_Begin(s_device, ids[p]);
+        for (uint32_t d = 0; d < passes[p].drawCount && status == mrhi_success; ++d)
+        {
+            const TrackingDraw* draw = &passes[p].draws[d];
+            status = mrhiPass_SetGraphicsPipeline(s_device, ids[p], pipelines[draw->pipeline]);
+            for (uint32_t i = 0; i < draw->buffers && status == mrhi_success; ++i)
+            {
+                status =
+                    mrhiPass_SetVertexBuffer(s_device, ids[p], i, vertices[i], 0, MRHI_WHOLE_SIZE);
+            }
+            status = status == mrhi_success ? mrhiPass_Draw(s_device, ids[p], 3, 1, 0, 0) : status;
+        }
+        status = status == mrhi_success ? mrhiPass_End(s_device, ids[p]) : status;
+    }
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success &&
+              mrhiDestroyBuffer(s_device, buffers[0]) == mrhi_success &&
+              mrhiDestroyBuffer(s_device, buffers[1]) == mrhi_success,
+          "dropped");
+    for (uint32_t p = 0; p < passCount; ++p)
+    {
+        CHECK(mrhiDestroyTexture(s_device, textures[p]) == mrhi_success, "a target destroyed");
+    }
+    return status;
+}
+
+// api,validation,encoding,cmds,render,state_tracking: its
+// vertex_buffers_inherit_from_previous_pipeline and
+// vertex_buffers_do_not_inherit_between_render_passes. Its
+// all_needed_vertex_buffer_should_be_bound and
+// all_needed_index_buffer_should_be_bound are not ported: the CTS marks
+// them unimplemented, so they have no cases to translate or count.
+// The CTS's pipelines read one float32x3 attribute and two from one
+// per-vertex buffer 0 of a 12-byte stride, all at offset 0. The suite's
+// instanced container has two vertex inputs, so both pipelines here
+// read two such attributes. The vertex layout is the pipeline's, not
+// the container's, so both read buffer 0 alone, as in the CTS, and the
+// cases depend only on it. A draw without it is refused as
+// mrhi_errorState.
+static void TestStateTracking(void)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_instancedContainer;
+    shaderDef.byteCount = sizeof(s_instancedContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the instanced shader");
+    static const mrhiVertexBufferLayout buffer = {.stride = 12};
+    static const mrhiVertexAttribute attributes[2] = {
+        {.buffer = 0, .location = 0, .format = mrhi_vertexFloat32x3},
+        {.buffer = 0, .location = 1, .format = mrhi_vertexFloat32x3},
+    };
+    mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+    def.shader = shader;
+    def.vertexEntry = "vs";
+    def.vertexEntryLength = 2;
+    def.fragmentEntry = "fs";
+    def.fragmentEntryLength = 2;
+    def.colorTargets[0].format = mrhi_formatRgba8Unorm;
+    def.colorTargetCount = 1;
+    def.vertexBuffers = &buffer;
+    def.vertexBufferCount = 1;
+    def.vertexAttributes = attributes;
+    def.vertexAttributeCount = 2;
+    mrhiGraphicsPipelineId pipelines[2] = {0};
+    mrhiRequestId request;
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        CHECK(mrhiCreateGraphicsPipeline(s_device, &def, &pipelines[i], &request) == mrhi_success,
+              "a vertex pipeline");
+        Answered();
+    }
+    const TrackingPass unset = {1, {{0, 0}}};
+    const TrackingPass inherited = {2, {{1, 2}, {0, 0}}};
+    const TrackingPass both = {1, {{1, 2}}};
+    const TrackingPass reset[2][2] = {{both, {1, {{0, 1}}}}, {both, unset}};
+    ExpectState("state_tracking:vertex_buffers_inherit_from_previous_pipeline, not set",
+                RunTracking(pipelines, &unset, 1), false);
+    ExpectState("state_tracking:vertex_buffers_inherit_from_previous_pipeline, inherited",
+                RunTracking(pipelines, &inherited, 1), true);
+    ExpectState("state_tracking:vertex_buffers_do_not_inherit_between_render_passes, set in each",
+                RunTracking(pipelines, reset[0], 2), true);
+    ExpectState("state_tracking:vertex_buffers_do_not_inherit_between_render_passes, not inherited",
+                RunTracking(pipelines, reset[1], 2), false);
+    CHECK(mrhiDestroyGraphicsPipeline(s_device, pipelines[0]) == mrhi_success &&
+              mrhiDestroyGraphicsPipeline(s_device, pipelines[1]) == mrhi_success &&
+              mrhiDestroyShader(s_device, shader) == mrhi_success,
+          "the vertex pipelines destroyed");
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -5831,6 +5983,8 @@ int main(void)
     CHECK(s_differs == 2104 && s_inexpressible == 8341, "the debug group cases set aside");
     TestSetPipeline();
     CHECK(s_differs == 2104 && s_inexpressible == 8346, "the setPipeline cases set aside");
+    TestStateTracking();
+    CHECK(s_differs == 2104 && s_inexpressible == 8346, "the state tracking cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
