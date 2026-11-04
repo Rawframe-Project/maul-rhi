@@ -5,6 +5,22 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.26.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.25.0...v0.26.0) (2026-11-04)
+
+### Changed
+
+- **Breaking:** `mrhiPass_SetRootBlock` takes a write of no bytes at an
+  offset that is a multiple of 4 within the device's root block, as
+  WebGPU's `setImmediates` does, and records nothing for it. Its bytes
+  may then be NULL. Before, such a write was refused with
+  `mrhi_errorInvalid`, counted as `mrhi_diagnosticRootBlock`. An empty
+  write is still refused at an offset that is not a multiple of 4, past
+  the root block, in a transfer pass, or in a pass that found the
+  frame's commands full. Drivers built outside the tree see no change,
+  since no driver receives an empty write, and the SPI stays 18.
+  `contract_version` rises to 37.
+  ([#448](https://github.com/Rawframe-Project/maul-rhi/pull/448))
+
 ## [0.25.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.24.0...v0.25.0) (2026-11-03)
 
 ### Changed
