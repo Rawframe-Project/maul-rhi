@@ -1022,12 +1022,32 @@ static mrhiTextureId s_target;
 static mrhiBufferId s_index;
 static mrhiLimits s_limits;
 
-static void Answered(void)
+// Takes the device's next record, which must answer the request with
+// success, as a record of the kind.
+static void TakeAnswer(mrhiDeviceNotificationKind kind, mrhiRequestId request, const char* what)
 {
     mrhiDeviceNotification record;
-    CHECK(mrhiDevice_TakeNotification(s_device, &record) == mrhi_success &&
-              record.outcome == mrhi_success,
-          "a pipeline ready");
+    CHECK(mrhiDevice_TakeNotification(s_device, &record) == mrhi_success && record.kind == kind &&
+              record.request.index1 == request.index1 &&
+              record.request.generation == request.generation && record.outcome == mrhi_success,
+          what);
+}
+
+static void Answered(mrhiRequestId request)
+{
+    TakeAnswer(mrhi_devicePipelineReady, request, "a pipeline ready");
+}
+
+// Whether a submitted frame finished, taking its record: a later answer
+// taken is then the one it waits for.
+static bool Finished(mrhiRequestId token)
+{
+    if (mrhiRequest_WaitFrame(s_device, token, 1) != mrhi_success)
+    {
+        return false;
+    }
+    TakeAnswer(mrhi_deviceFrameDone, token, "a frame done");
+    return true;
 }
 
 static void MakePipelines(void)
@@ -1048,14 +1068,14 @@ static void MakePipelines(void)
     mrhiRequestId request;
     CHECK(mrhiCreateGraphicsPipeline(s_device, &graphics, &s_graphics, &request) == mrhi_success,
           "the graphics pipeline");
-    Answered();
+    Answered(request);
     mrhiComputePipelineDef compute = mrhiDefaultComputePipelineDef();
     compute.shader = shader;
     compute.entry = "cs";
     compute.entryLength = 2;
     CHECK(mrhiCreateComputePipeline(s_device, &compute, &s_compute, &request) == mrhi_success,
           "the compute pipeline");
-    Answered();
+    Answered(request);
     CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the shader destroyed");
     mrhiTextureDef target = mrhiDefaultTextureDef();
     target.format = mrhi_formatRgba8Unorm;
@@ -4118,10 +4138,10 @@ static mrhiResult SubmitTargets(mrhiFormat depthFormat, Destroyed color, Destroy
     {
         mrhiRequestId token = {0};
         status = mrhiDevice_CompileFrame(s_device);
-        CHECK(status != mrhi_success || (mrhiPass_Begin(s_device, pass) == mrhi_success &&
-                                         mrhiPass_End(s_device, pass) == mrhi_success &&
-                                         mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success &&
-                                         mrhiRequest_WaitFrame(s_device, token, 1) == mrhi_success),
+        CHECK(status != mrhi_success ||
+                  (mrhiPass_Begin(s_device, pass) == mrhi_success &&
+                   mrhiPass_End(s_device, pass) == mrhi_success &&
+                   mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success && Finished(token)),
               "submitted and finished");
     }
     for (size_t i = 0; i < 2; ++i)
@@ -4237,10 +4257,10 @@ static mrhiResult UseQuerySet(QueryUse use, bool destroyed)
         }
     }
     mrhiRequestId token = {0};
-    CHECK(status == mrhi_success ? mrhiPass_End(s_device, pass) == mrhi_success &&
-                                       mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success &&
-                                       mrhiRequest_WaitFrame(s_device, token, 1) == mrhi_success
-                                 : mrhiDevice_DropFrame(s_device) == mrhi_success,
+    CHECK(status == mrhi_success
+              ? mrhiPass_End(s_device, pass) == mrhi_success &&
+                    mrhiDevice_SubmitFrame(s_device, &token) == mrhi_success && Finished(token)
+              : mrhiDevice_DropFrame(s_device) == mrhi_success,
           "submitted and finished, or dropped");
     CHECK((destroyed || mrhiDestroyQuerySet(s_device, set) == mrhi_success) &&
               mrhiDestroyBuffer(s_device, buffer) == mrhi_success,
@@ -4709,8 +4729,7 @@ static mrhiResult UseDestroyed(const DestroyedCase* c, uint32_t mask)
     if (status == mrhi_success)
     {
         status = mrhiDevice_SubmitFrame(s_device, &token);
-        CHECK(status != mrhi_success || mrhiRequest_WaitFrame(s_device, token, 1) == mrhi_success,
-              "finished");
+        CHECK(status != mrhi_success || Finished(token), "finished");
     }
     else
     {
@@ -5863,7 +5882,7 @@ static void TestStateTracking(void)
     {
         CHECK(mrhiCreateGraphicsPipeline(s_device, &def, &pipelines[i], &request) == mrhi_success,
               "a vertex pipeline");
-        Answered();
+        Answered(request);
     }
     const TrackingPass unset = {1, {{0, 0}}};
     const TrackingPass inherited = {2, {{1, 2}, {0, 0}}};
@@ -5948,7 +5967,7 @@ static void TestIndexAccess(void)
     mrhiRequestId request;
     CHECK(mrhiCreateGraphicsPipeline(s_device, &def, &strip, &request) == mrhi_success,
           "the strip pipeline");
-    Answered();
+    Answered(request);
     static const uint32_t bounds[13][2] = {
         {6, 0},
         {5, 1},
@@ -6155,7 +6174,7 @@ MakeTopologyPipeline(mrhiShaderId shader, mrhiPrimitiveTopology topology, mrhiIn
     mrhiRequestId request;
     CHECK(mrhiCreateGraphicsPipeline(s_device, &def, &pipeline, &request) == mrhi_success,
           "a topology pipeline");
-    Answered();
+    Answered(request);
     return pipeline;
 }
 
@@ -6440,7 +6459,7 @@ static mrhiGraphicsPipelineId MakeVertexPipeline(mrhiShaderId shader, uint32_t s
     mrhiRequestId request;
     CHECK(mrhiCreateGraphicsPipeline(s_device, &def, &pipeline, &request) == mrhi_success,
           "a vertex pipeline");
-    Answered();
+    Answered(request);
     return pipeline;
 }
 
@@ -6736,7 +6755,7 @@ static mrhiResult MakePrimitivePipeline(mrhiShaderId shader, mrhiPrimitiveTopolo
     mrhiResult status = mrhiCreateGraphicsPipeline(s_device, &def, &pipeline, &request);
     if (status == mrhi_success)
     {
-        Answered();
+        Answered(request);
         CHECK(mrhiDestroyGraphicsPipeline(s_device, pipeline) == mrhi_success,
               "a primitive pipeline destroyed");
     }
@@ -6970,7 +6989,7 @@ static mrhiResult MakeMultisamplePipeline(mrhiShaderId shader, uint32_t count, b
     mrhiResult status = mrhiCreateGraphicsPipeline(s_device, &def, &pipeline, &request);
     if (status == mrhi_success)
     {
-        Answered();
+        Answered(request);
         CHECK(mrhiDestroyGraphicsPipeline(s_device, pipeline) == mrhi_success,
               "a multisample pipeline destroyed");
     }
