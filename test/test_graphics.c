@@ -721,11 +721,11 @@ static void TestDualSource(void)
     def.colorTargets[1].format = mrhi_formatRgba8Unorm;
     def.colorTargets[1].writeMask = 0;
     def.colorTargetCount = 2;
-    CHECK(Made(device, &def) == mrhi_errorUnsupported, "beside a second color target");
+    CHECK(Made(device, &def) == mrhi_errorInvalid, "beside a second color target");
     plain.colorTargetCount = 2;
     plain.colorTargets[1].format = mrhi_formatRgba8Unorm;
     plain.colorTargets[1].writeMask = 0;
-    CHECK(Made(device, &plain) == mrhi_errorUnsupported,
+    CHECK(Made(device, &plain) == mrhi_errorInvalid,
           "the second source alone as a factor, beside a second target");
     Close(device);
     // Blending by the second source's alpha needs outputs with alpha.
