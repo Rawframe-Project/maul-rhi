@@ -8431,8 +8431,9 @@ static void TestShaderModules(void)
     CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
     shaderDef.byteCount = sizeof(s_noopContainer) / 2;
     mrhiShaderId invalid = {0};
-    CHECK(mrhiCreateShader(s_device, &shaderDef, &invalid) != mrhi_success && invalid.index1 == 0,
-          "the cut container refused");
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &invalid) == mrhi_errorFormat &&
+              invalid.index1 == 0,
+          "the cut container refused as malformed");
     mrhiGraphicsPipelineDef def = OneTarget(mrhi_formatRgba8Unorm);
     static const char* const stages[] = {"vertex", "fragment"};
     char name[128];
