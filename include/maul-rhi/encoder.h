@@ -885,16 +885,18 @@ extern "C"
                                                                 void* bytesOut, size_t capacity,
                                                                 size_t* sizeOut);
 
-    /// Writes bytes of the root block later draws or dispatches read.
+    /// Writes bytes of the root block later draws or dispatches read. An empty
+    /// write records nothing.
     ///
     /// @param device  The device.
     /// @param pass    The pass, recording.
     /// @param offset  Where the bytes go in the root block, a multiple of 4.
-    /// @param bytes   The bytes. Only read during the call.
-    /// @param size    How many, a multiple of 4 and at least 4, ending within
-    ///                the device's root block.
-    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or bytes,
-    /// a pass that copies, or an unaligned or empty write;
+    /// @param bytes   The bytes; NULL when size is 0. Only read during the
+    ///                call.
+    /// @param size    How many, a multiple of 4, ending within the device's
+    ///                root block.
+    /// @return `mrhi_success`; `mrhi_errorInvalid` for a NULL device or bytes
+    /// with a size, a pass that copies, or an unaligned write;
     /// `mrhi_errorUnsupported` for a write past the adapter's root block;
     /// `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState`
     /// for a pass that is not recording; `mrhi_errorCapacity` for a write past

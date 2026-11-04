@@ -51,7 +51,7 @@ const char* mrhiGetDiagnosticText(mrhiDiagnosticCode code)
     case mrhi_diagnosticBindingResource:
         return "A binding whose resource does not fit its slot: its kind, usage, range, format or the access the pass declares.";
     case mrhi_diagnosticRootBlock:
-        return "A root block set in a transfer pass, empty, or at an offset or size not a multiple of 4.";
+        return "A root block set in a transfer pass, or at an offset or size not a multiple of 4.";
     case mrhi_diagnosticVertexBufferTooSmall:
         return "A draw reading vertices or instances past the end of a vertex buffer it uses.";
     case mrhi_diagnosticIndexBufferFormat:

@@ -306,8 +306,8 @@ extern "C"
         // A binding whose resource does not fit its slot: its kind, usage,
         // range, format or the access the pass declares.
         mrhi_diagnosticBindingResource = 22,
-        // A root block set in a transfer pass, empty, or at an offset or size
-        // not a multiple of 4.
+        // A root block set in a transfer pass, or at an offset or size not a
+        // multiple of 4.
         mrhi_diagnosticRootBlock = 23,
         // A draw reading vertices or instances past the end of a vertex buffer
         // it uses.

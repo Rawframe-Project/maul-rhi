@@ -442,7 +442,7 @@
             {
               "name": "diagnostic_root_block",
               "value": 23,
-              "doc": "A root block set in a transfer pass, empty, or at an offset or size not a multiple of 4."
+              "doc": "A root block set in a transfer pass, or at an offset or size not a multiple of 4."
             },
             {
               "name": "diagnostic_vertex_buffer_too_small",
@@ -21120,10 +21120,10 @@
           "kind": "function",
           "name": "pass_set_root_block",
           "object": "pass",
-          "doc": "Writes bytes of the root block later draws or dispatches read.",
+          "doc": "Writes bytes of the root block later draws or dispatches read. An empty write records nothing.",
           "returns": {
             "type": "result",
-            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or bytes, a pass that copies, or an unaligned or empty write; `mrhi_errorUnsupported` for a write past the adapter's root block; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` for a write past the device's root block within the adapter's, or when the frame's commands are full."
+            "doc": "`mrhi_success`; `mrhi_errorInvalid` for a NULL device or bytes with a size, a pass that copies, or an unaligned write; `mrhi_errorUnsupported` for a write past the adapter's root block; `mrhi_errorStale` for a pass of another frame or none; `mrhi_errorState` for a pass that is not recording; `mrhi_errorCapacity` for a write past the device's root block within the adapter's, or when the frame's commands are full."
           },
           "args": [
             {
@@ -21146,12 +21146,12 @@
               "name": "bytes",
               "type": "void",
               "pointer": "const",
-              "doc": "The bytes. Only read during the call."
+              "doc": "The bytes; NULL when size is 0. Only read during the call."
             },
             {
               "name": "size",
               "type": "size",
-              "doc": "How many, a multiple of 4 and at least 4, ending within the device's root block."
+              "doc": "How many, a multiple of 4, ending within the device's root block."
             }
           ],
           "thread_safety": {
@@ -22727,5 +22727,5 @@
       ]
     }
   ],
-  "contract_version": 36
+  "contract_version": 37
 }
