@@ -44,6 +44,7 @@
 #include "maul-rhi/pipeline.h"
 #include "maul-rhi/resources.h"
 #include "maul-rhi/shader.h"
+#include "shaders/dual_container.h"
 #include "shaders/instanced_container.h"
 #include "shaders/noop_container.h"
 
@@ -7372,12 +7373,27 @@ static const struct
 // and gives that one the stride.
 static void SetVertexBuffer(VertexState* s, uint32_t index, uint32_t stride)
 {
-    CHECK(index < sizeof(s->buffers) / sizeof(s->buffers[0]), "a buffer within the state");
+    if (index >= sizeof(s->buffers) / sizeof(s->buffers[0]))
+    {
+        CHECK(false, "a buffer within the state");
+        return;
+    }
     while (s->bufferCount <= index)
     {
         s->buffers[s->bufferCount++] = (mrhiVertexBufferLayout){0, mrhi_stepVertex};
     }
     s->buffers[index].stride = stride;
+}
+
+// Appends an attribute to the state, or reports that it has no room.
+static void PushAttribute(VertexState* s, mrhiVertexAttribute attribute)
+{
+    if (s->attributeCount >= sizeof(s->attributes) / sizeof(s->attributes[0]))
+    {
+        CHECK(false, "attributes within the state");
+        return;
+    }
+    s->attributes[s->attributeCount++] = attribute;
 }
 
 // The CTS's addTestAttributes on a buffer, the last the state's list
@@ -7387,8 +7403,11 @@ static void SetVertexBuffer(VertexState* s, uint32_t index, uint32_t stride)
 static void AddTestAttributes(VertexState* s, uint32_t buffer, const mrhiVertexAttribute* test,
                               bool atStart, uint32_t extra, uint32_t skip)
 {
-    CHECK(s->attributeCount + extra + 1 <= sizeof(s->attributes) / sizeof(s->attributes[0]),
-          "attributes within the state");
+    if (s->attributeCount + extra + 1 > sizeof(s->attributes) / sizeof(s->attributes[0]))
+    {
+        CHECK(false, "attributes within the state");
+        return;
+    }
     uint32_t location = 0;
     for (uint32_t added = 0; added < extra; ++location)
     {
@@ -7465,8 +7484,7 @@ static void TestVertexCountLimits(mrhiShaderId shader, const mrhiLimits* limits)
         }
         if (count > 0 && !lastEmpty)
         {
-            s.attributes[s.attributeCount++] =
-                (mrhiVertexAttribute){count - 1, 0, mrhi_vertexFloat32, 0};
+            PushAttribute(&s, (mrhiVertexAttribute){count - 1, 0, mrhi_vertexFloat32, 0});
         }
         snprintf(name, sizeof(name),
                  "vertex_state:max_vertex_buffer_limit %u buffers, lastEmpty %s", count,
@@ -7486,8 +7504,7 @@ static void TestVertexCountLimits(mrhiShaderId shader, const mrhiLimits* limits)
             SetVertexBuffer(&s, buffer, 0);
             for (; added < target; ++added)
             {
-                s.attributes[s.attributeCount++] =
-                    (mrhiVertexAttribute){buffer, added, mrhi_vertexFloat32, 0};
+                PushAttribute(&s, (mrhiVertexAttribute){buffer, added, mrhi_vertexFloat32, 0});
             }
         }
         snprintf(name, sizeof(name), "vertex_state:max_vertex_attribute_limit %u, %u a buffer",
@@ -7715,7 +7732,7 @@ static void TestVertexOverlaps(mrhiShaderId shader, const mrhiLimits* limits)
     SetVertexBuffer(&s, 0, 0);
     for (uint32_t i = 0; i < limits->vertexAttributes; ++i)
     {
-        s.attributes[s.attributeCount++] = (mrhiVertexAttribute){0, i, formats[i % 3], i * 4};
+        PushAttribute(&s, (mrhiVertexAttribute){0, i, formats[i % 3], i * 4});
     }
     Expect("vertex_state:many_attributes_overlapping", MakeVertexStatePipeline(shader, &s), true);
 }
@@ -7748,6 +7765,494 @@ static void TestVertexState(void)
     CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
 }
 
+// Reports a case whose outcome differs from the CTS's where the CTS's
+// validation error is one the shader's reflection decides, which the
+// library refuses as mrhi_errorFormat: a shader may come from content.
+static void ExpectMismatch(const char* test, mrhiResult result, bool succeeds)
+{
+    bool ok = result == (succeeds ? mrhi_success : mrhi_errorFormat);
+    if (!ok)
+    {
+        printf("FAIL: %s: %d, the CTS expects %s\n", test, (int)result,
+               succeeds ? "success" : "a validation error of the shader's outputs");
+        ++s_failures;
+    }
+}
+
+// The library's color formats the CTS may render to, in the library's
+// order, with the CTS's facts: components, the bytes a sample costs and
+// their alignment, and whether its type is an integer one. rg11b10ufloat
+// renders only with rg11b10ufloat-renderable, and the 32-bit floats
+// blend only with float32-blendable, features of the CTS's device that
+// the test device does not grant.
+typedef struct TargetFormat
+{
+    const char* name;
+    mrhiFormat format;
+    uint32_t components;
+    uint32_t cost;
+    uint32_t alignment;
+    bool integer;
+} TargetFormat;
+
+static const TargetFormat s_targetFormats[] = {
+    {"rgba8unorm", RGBA8, 4, 8, 1, false},
+    {"rgba8unorm-srgb", mrhi_formatRgba8UnormSrgb, 4, 8, 1, false},
+    {"bgra8unorm", mrhi_formatBgra8Unorm, 4, 8, 1, false},
+    {"bgra8unorm-srgb", mrhi_formatBgra8UnormSrgb, 4, 8, 1, false},
+    {"r8unorm", mrhi_formatR8Unorm, 1, 1, 1, false},
+    {"rg8unorm", mrhi_formatRg8Unorm, 2, 2, 1, false},
+    {"r16float", mrhi_formatR16Float, 1, 2, 2, false},
+    {"rg16float", mrhi_formatRg16Float, 2, 4, 2, false},
+    {"rgba16float", mrhi_formatRgba16Float, 4, 8, 2, false},
+    {"r32float", mrhi_formatR32Float, 1, 4, 4, false},
+    {"rg32float", mrhi_formatRg32Float, 2, 8, 4, false},
+    {"rgba32float", mrhi_formatRgba32Float, 4, 16, 4, false},
+    {"r32uint", mrhi_formatR32Uint, 1, 4, 4, true},
+    {"r32sint", mrhi_formatR32Sint, 1, 4, 4, true},
+    {"rgb10a2unorm", mrhi_formatRgb10a2Unorm, 4, 8, 4, false},
+    {"rg11b10ufloat", mrhi_formatRg11b10Ufloat, 3, 8, 4, false},
+};
+
+#define TARGET_FORMATS (sizeof(s_targetFormats) / sizeof(s_targetFormats[0]))
+
+// Whether the CTS's device blends a format through a feature the test
+// device does not grant.
+static bool BlendsUngranted(mrhiFormat format)
+{
+    return format == mrhi_formatRg11b10Ufloat || format == mrhi_formatR32Float ||
+           format == mrhi_formatRg32Float || format == mrhi_formatRgba32Float;
+}
+
+static const char* const s_blendFactors[] = {
+    "zero",
+    "one",
+    "src",
+    "one-minus-src",
+    "src-alpha",
+    "one-minus-src-alpha",
+    "dst",
+    "one-minus-dst",
+    "dst-alpha",
+    "one-minus-dst-alpha",
+    "src-alpha-saturated",
+    "constant",
+    "one-minus-constant",
+    "src1",
+    "one-minus-src1",
+    "src1-alpha",
+    "one-minus-src1-alpha",
+};
+
+static const char* const s_blendOperations[] = {"add", "subtract", "reverse-subtract", "min",
+                                                "max"};
+
+// The CTS's GPUColorWrite.ALL.
+#define WRITE_ALL (mrhi_writeRed | mrhi_writeGreen | mrhi_writeBlue | mrhi_writeAlpha)
+
+// Whether a blend factor reads the second source, as the CTS's
+// IsDualSourceBlendingFactor.
+static bool IsSecondSource(mrhiBlendFactor factor)
+{
+    return factor >= mrhi_blendSrc1;
+}
+
+// A pipeline of the CTS's getDescriptor for fragment_state: the noop
+// container's entries, or the dual container's, whose fragment entry
+// has a second source, with the def's targets and depth state: the
+// refusal, or success, destroying it.
+static mrhiResult MakeFragmentPipeline(mrhiShaderId shader, const mrhiGraphicsPipelineDef* state)
+{
+    mrhiGraphicsPipelineDef def = *state;
+    def.shader = shader;
+    def.vertexEntry = "vs";
+    def.vertexEntryLength = 2;
+    def.fragmentEntry = "fs";
+    def.fragmentEntryLength = 2;
+    mrhiGraphicsPipelineId pipeline = {0};
+    mrhiRequestId request;
+    mrhiResult status = mrhiCreateGraphicsPipeline(s_device, &def, &pipeline, &request);
+    if (status == mrhi_success)
+    {
+        Answered(request);
+        CHECK(mrhiDestroyGraphicsPipeline(s_device, pipeline) == mrhi_success,
+              "a fragment pipeline destroyed");
+    }
+    return status;
+}
+
+// A def of one color target of the format, written whole.
+static mrhiGraphicsPipelineDef OneTarget(mrhiFormat format)
+{
+    mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+    def.colorTargets[0].format = format;
+    def.colorTargetCount = 1;
+    return def;
+}
+
+// color_target_exists, targets_format_is_color_format, targets_write_mask
+// and limits,maxColorAttachments. A depth format is no color format: the
+// library's two run, and the CTS's four others are counted. Its f32
+// output is the noop container's; its u32 and i32 outputs need
+// containers the suite lacks. maxColorAttachments' depth24plus becomes
+// the library's depth-stencil format, and one target past
+// MRHI_MAX_COLOR_TARGETS is refused unread.
+static void TestColorTargets(mrhiShaderId shader)
+{
+    char name[160];
+    static const mrhiColorWrites masks[] = {0, 0xf, 0x10, 0x80000001};
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        mrhiGraphicsPipelineDef def = OneTarget(RGBA8);
+        snprintf(name, sizeof(name), "fragment_state:color_target_exists %s, one", s_bools[a]);
+        Expect(name, MakeFragmentPipeline(shader, &def), true);
+        def.colorTargetCount = 0;
+        snprintf(name, sizeof(name), "fragment_state:color_target_exists %s, none", s_bools[a]);
+        Expect(name, MakeFragmentPipeline(shader, &def), false);
+        const mrhiFormat formats[] = {RGBA8, mrhi_formatDepth32Float, DEPTH};
+        for (size_t f = 0; f < 3; ++f)
+        {
+            def = OneTarget(formats[f]);
+            snprintf(name, sizeof(name),
+                     "fragment_state:targets_format_is_color_format format %d, %s, f32",
+                     (int)formats[f], s_bools[a]);
+            Expect(name, MakeFragmentPipeline(shader, &def), formats[f] == RGBA8);
+        }
+        s_inexpressible += 4;
+        for (size_t m = 0; m < sizeof(masks) / sizeof(masks[0]); ++m)
+        {
+            def = OneTarget(RGBA8);
+            def.colorTargets[0].writeMask = masks[m];
+            snprintf(name, sizeof(name), "fragment_state:targets_write_mask %s, 0x%x", s_bools[a],
+                     (unsigned)masks[m]);
+            Expect(name, MakeFragmentPipeline(shader, &def), masks[m] < 16);
+        }
+        for (uint32_t count = MRHI_MAX_COLOR_TARGETS; count <= MRHI_MAX_COLOR_TARGETS + 1; ++count)
+        {
+            def = mrhiDefaultGraphicsPipelineDef();
+            for (uint32_t i = 0; i < MRHI_MAX_COLOR_TARGETS; ++i)
+            {
+                def.colorTargets[i].format = mrhi_formatRg8Unorm;
+                def.colorTargets[i].writeMask = 0;
+            }
+            def.colorTargetCount = count;
+            def.depthStencilFormat = DEPTH;
+            def.depthWrite = true;
+            snprintf(name, sizeof(name), "fragment_state:limits,maxColorAttachments %s, %u",
+                     s_bools[a], count);
+            Expect(name, MakeFragmentPipeline(shader, &def), count <= MRHI_MAX_COLOR_TARGETS);
+        }
+    }
+}
+
+// targets_format_renderable over the library's color formats, and
+// targets_format_filterable over those it may render to, with blending
+// or not. Their integer formats need u32 and i32 outputs, which the
+// suite's containers lack, so they are not run. A compressed format
+// renders nowhere.
+static void TestTargetFormats(mrhiShaderId shader)
+{
+    char name[160];
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+        {
+            if (!IsColor(format) && format < mrhi_formatBc1RgbaUnorm)
+            {
+                continue;
+            }
+            if (format == mrhi_formatR32Uint || format == mrhi_formatR32Sint)
+            {
+                continue;
+            }
+            mrhiGraphicsPipelineDef def = OneTarget(format);
+            snprintf(name, sizeof(name), "fragment_state:targets_format_renderable %s, format %d",
+                     s_bools[a], (int)format);
+            mrhiResult status = MakeFragmentPipeline(shader, &def);
+            if (format == mrhi_formatRg11b10Ufloat)
+            {
+                ExpectUngranted(name, status, false);
+            }
+            else
+            {
+                Expect(name, status, format < mrhi_formatBc1RgbaUnorm);
+            }
+        }
+        for (size_t f = 0; f < TARGET_FORMATS; ++f)
+        {
+            for (uint32_t blend = 0; blend < 2 && !s_targetFormats[f].integer; ++blend)
+            {
+                mrhiGraphicsPipelineDef def = OneTarget(s_targetFormats[f].format);
+                def.colorTargets[0].blend = blend == 1;
+                snprintf(name, sizeof(name), "fragment_state:targets_format_filterable %s, %s, %s",
+                         s_bools[a], s_targetFormats[f].name, s_bools[blend]);
+                mrhiResult status = MakeFragmentPipeline(shader, &def);
+                bool ungranted = s_targetFormats[f].format == mrhi_formatRg11b10Ufloat ||
+                                 (blend == 1 && BlendsUngranted(s_targetFormats[f].format));
+                if (ungranted)
+                {
+                    ExpectUngranted(name, status, false);
+                }
+                else
+                {
+                    Expect(name, status, true);
+                }
+            }
+        }
+    }
+}
+
+// A def of targets of the formats, written by none, and the CTS's
+// computeBytesPerSampleFromFormats for them.
+static mrhiGraphicsPipelineDef UnwrittenTargets(const TargetFormat* const* formats, uint32_t count,
+                                                uint32_t* bytesOut)
+{
+    mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+    uint32_t bytes = 0;
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        def.colorTargets[i].format = formats[i]->format;
+        def.colorTargets[i].writeMask = 0;
+        uint32_t alignment = formats[i]->alignment;
+        bytes = (bytes + alignment - 1) / alignment * alignment + formats[i]->cost;
+    }
+    def.colorTargetCount = count;
+    *bytesOut = bytes;
+    return def;
+}
+
+// limits,maxColorAttachmentBytesPerSample,aligned and unaligned: 1 to 8
+// targets of one format, and the CTS's two orders of five, against the
+// device's colorBytesPerSample; the adapter's is above it, so a case
+// past it is mrhi_errorCapacity.
+static void TestTargetBytes(mrhiShaderId shader)
+{
+    mrhiLimits limits = {0};
+    CHECK(mrhiDevice_GetLimits(s_device, &limits) == mrhi_success, "the limits");
+    char name[160];
+    for (size_t f = 0; f < TARGET_FORMATS; ++f)
+    {
+        const TargetFormat* format = &s_targetFormats[f];
+        for (uint32_t count = 1; count <= MRHI_MAX_COLOR_TARGETS && !format->integer; ++count)
+        {
+            const TargetFormat* formats[MRHI_MAX_COLOR_TARGETS];
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                formats[i] = format;
+            }
+            uint32_t bytes = 0;
+            mrhiGraphicsPipelineDef def = UnwrittenTargets(formats, count, &bytes);
+            for (uint32_t a = 0; a < 2; ++a)
+            {
+                snprintf(
+                    name, sizeof(name),
+                    "fragment_state:limits,maxColorAttachmentBytesPerSample,aligned %s, %u, %s",
+                    format->name, count, s_bools[a]);
+                mrhiResult status = MakeFragmentPipeline(shader, &def);
+                if (format->format == mrhi_formatRg11b10Ufloat)
+                {
+                    ExpectUngranted(name, status, false);
+                }
+                else
+                {
+                    ExpectPastLimit(name, status, bytes <= limits.colorBytesPerSample);
+                }
+            }
+        }
+    }
+    const TargetFormat* r8 = &s_targetFormats[4];
+    const TargetFormat* rgba8 = &s_targetFormats[0];
+    const TargetFormat* r32 = &s_targetFormats[9];
+    const TargetFormat* rgba32 = &s_targetFormats[11];
+    const TargetFormat* const orders[2][5] = {{r8, r32, rgba8, rgba32, r8},
+                                              {r32, rgba8, rgba32, r8, r8}};
+    for (uint32_t o = 0; o < 2; ++o)
+    {
+        uint32_t bytes = 0;
+        mrhiGraphicsPipelineDef def = UnwrittenTargets(orders[o], 5, &bytes);
+        for (uint32_t a = 0; a < 2; ++a)
+        {
+            snprintf(name, sizeof(name),
+                     "fragment_state:limits,maxColorAttachmentBytesPerSample,unaligned %s, %s",
+                     o == 0 ? "r8unorm first" : "r8unorm last", s_bools[a]);
+            ExpectPastLimit(name, MakeFragmentPipeline(shader, &def),
+                            bytes <= limits.colorBytesPerSample);
+        }
+    }
+}
+
+// The shader a blend's factors need: the dual container's for a factor
+// of the second source, else the noop container's.
+static mrhiShaderId BlendShader(mrhiShaderId noop, mrhiShaderId dual, const mrhiBlendComponent* a,
+                                const mrhiBlendComponent* b)
+{
+    bool second = IsSecondSource(a->srcFactor) || IsSecondSource(a->dstFactor) ||
+                  IsSecondSource(b->srcFactor) || IsSecondSource(b->dstFactor);
+    return second ? dual : noop;
+}
+
+// targets_blend: an rgba8unorm target whose color or alpha blends by
+// every pair of factors and every operation, the other component by
+// src-alpha and dst-alpha; min and max weigh by one only.
+static void TestTargetBlends(mrhiShaderId noop, mrhiShaderId dual)
+{
+    static const char* const components[] = {"color", "alpha"};
+    char name[192];
+    const mrhiBlendComponent other = {mrhi_blendSrcAlpha, mrhi_blendDstAlpha, mrhi_blendAdd};
+    for (uint32_t c = 0; c < 2 * 2 * 17 * 17 * 5; ++c)
+    {
+        uint32_t a = c / 2890;
+        uint32_t component = c / 1445 % 2;
+        mrhiBlendComponent tested = {(mrhiBlendFactor)(c / 85 % 17), (mrhiBlendFactor)(c / 5 % 17),
+                                     (mrhiBlendOperation)(c % 5)};
+        mrhiGraphicsPipelineDef def = OneTarget(RGBA8);
+        def.colorTargets[0].blend = true;
+        def.colorTargets[0].color = component == 0 ? tested : other;
+        def.colorTargets[0].alpha = component == 1 ? tested : other;
+        snprintf(name, sizeof(name), "fragment_state:targets_blend %s, %s, %s, %s, %s", s_bools[a],
+                 components[component], s_blendFactors[tested.srcFactor],
+                 s_blendFactors[tested.dstFactor], s_blendOperations[tested.operation]);
+        bool ones = tested.srcFactor == mrhi_blendOne && tested.dstFactor == mrhi_blendOne;
+        Expect(name, MakeFragmentPipeline(BlendShader(noop, dual, &tested, &tested), &def),
+               tested.operation < mrhi_blendMin || ones);
+    }
+}
+
+// pipeline_output_targets with the noop container's vec4<f32> output,
+// its depth24plus the library's depth-stencil format: no target, or one
+// of each format with each write mask, which takes the output when the
+// format is a float one with at most four components. Its other outputs,
+// and none, need containers the suite lacks. pipeline_output_targets,
+// blend with that output: each format and one factor of each kind
+// overridden, which a vec4 always meets.
+static void TestOutputTargets(mrhiShaderId noop, mrhiShaderId dual)
+{
+    static const mrhiColorWrites masks[] = {0, 0x1, 0x2, 0x4, 0x8};
+    static const char* const kinds[] = {"colorSrcFactor", "colorDstFactor", "alphaSrcFactor",
+                                        "alphaDstFactor"};
+    char name[192];
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+        def.depthStencilFormat = DEPTH;
+        snprintf(name, sizeof(name), "fragment_state:pipeline_output_targets %s, none, f32x4",
+                 s_bools[a]);
+        Expect(name, MakeFragmentPipeline(noop, &def), true);
+        for (size_t f = 0; f < TARGET_FORMATS * 5; ++f)
+        {
+            const TargetFormat* format = &s_targetFormats[f / 5];
+            def = OneTarget(format->format);
+            def.colorTargets[0].writeMask = masks[f % 5];
+            def.depthStencilFormat = DEPTH;
+            snprintf(name, sizeof(name),
+                     "fragment_state:pipeline_output_targets %s, %s, f32x4, writeMask 0x%x",
+                     s_bools[a], format->name, (unsigned)masks[f % 5]);
+            mrhiResult status = MakeFragmentPipeline(noop, &def);
+            if (format->format == mrhi_formatRg11b10Ufloat)
+            {
+                ExpectUngranted(name, status, false);
+            }
+            else
+            {
+                ExpectMismatch(name, status, !format->integer);
+            }
+        }
+        const mrhiFormat formats[] = {mrhi_formatR8Unorm, mrhi_formatRg8Unorm, RGBA8,
+                                      mrhi_formatBgra8Unorm};
+        static const char* const names[] = {"r8unorm", "rg8unorm", "rgba8unorm", "bgra8unorm"};
+        for (uint32_t c = 0; c < 4 * 4 * 17; ++c)
+        {
+            def = OneTarget(formats[c / 68]);
+            def.colorTargets[0].blend = true;
+            mrhiBlendComponent* component =
+                c / 17 % 4 < 2 ? &def.colorTargets[0].color : &def.colorTargets[0].alpha;
+            mrhiBlendFactor* factor =
+                c / 17 % 2 == 0 ? &component->srcFactor : &component->dstFactor;
+            *factor = (mrhiBlendFactor)(c % 17);
+            snprintf(name, sizeof(name),
+                     "fragment_state:pipeline_output_targets,blend %s, %s, 4, %s %s", s_bools[a],
+                     names[c / 68], kinds[c / 17 % 4], s_blendFactors[c % 17]);
+            mrhiShaderId shader =
+                BlendShader(noop, dual, &def.colorTargets[0].color, &def.colorTargets[0].alpha);
+            Expect(name, MakeFragmentPipeline(shader, &def), true);
+        }
+    }
+}
+
+// dual_source_blending,color_target_count and use_blend_src, on a device
+// with dualSourceBlending: a factor of the second source needs one color
+// target and a fragment entry with a second source, the dual
+// container's; without one it is the shader's mismatch.
+static void TestDualSourceBlending(mrhiShaderId noop, mrhiShaderId dual)
+{
+    static const char* const components[] = {"color", "alpha"};
+    char name[192];
+    const mrhiBlendComponent other = {mrhi_blendSrcAlpha, mrhi_blendDstAlpha, mrhi_blendAdd};
+    for (uint32_t c = 0; c < 4 * 2 * 2 * 2; ++c)
+    {
+        mrhiBlendFactor factor = (mrhiBlendFactor)(mrhi_blendSrc1 + c / 8);
+        uint32_t count = c / 4 % 2 + 1;
+        bool masked = c / 2 % 2 == 0;
+        uint32_t component = c % 2;
+        const mrhiBlendComponent tested = {factor, factor, mrhi_blendAdd};
+        mrhiGraphicsPipelineDef def = OneTarget(RGBA8);
+        def.colorTargets[0].blend = true;
+        def.colorTargets[0].color = component == 0 ? tested : other;
+        def.colorTargets[0].alpha = component == 1 ? tested : other;
+        def.colorTargets[1] =
+            (mrhiColorTargetState){RGBA8, true, other, other, masked ? 0 : WRITE_ALL};
+        def.colorTargetCount = count;
+        snprintf(name, sizeof(name),
+                 "fragment_state:dual_source_blending,color_target_count %s, %u, %s, %s",
+                 s_blendFactors[factor], count, s_bools[masked], components[component]);
+        Expect(name, MakeFragmentPipeline(dual, &def), count == 1);
+    }
+    for (uint32_t c = 0; c < 17 * 2 * 2 * 2; ++c)
+    {
+        mrhiBlendFactor factor = (mrhiBlendFactor)(c / 8);
+        bool second = c / 4 % 2 == 0;
+        mrhiColorWrites mask = c / 2 % 2 == 0 ? 0 : WRITE_ALL;
+        uint32_t component = c % 2;
+        const mrhiBlendComponent tested = {factor, factor, mrhi_blendAdd};
+        mrhiGraphicsPipelineDef def = OneTarget(RGBA8);
+        def.colorTargets[0].blend = true;
+        def.colorTargets[0].color = component == 0 ? tested : other;
+        def.colorTargets[0].alpha = component == 1 ? tested : other;
+        def.colorTargets[0].writeMask = mask;
+        snprintf(name, sizeof(name),
+                 "fragment_state:dual_source_blending,use_blend_src %s, %s, 0x%x, %s",
+                 s_blendFactors[factor], s_bools[second], (unsigned)mask, components[component]);
+        ExpectMismatch(name, MakeFragmentPipeline(second ? dual : noop, &def),
+                       !IsSecondSource(factor) || second);
+    }
+}
+
+// api,validation,render_pipeline,fragment_state: its cases whose
+// fragment output is the noop container's vec4<f32> at location 0, or
+// the dual container's two blend sources, on a device with
+// dualSourceBlending. Its isAsync cases make the pipeline the library's
+// one way, as primitive_state's.
+static void TestFragmentState(void)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId noop = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &noop) == mrhi_success, "the noop shader");
+    shaderDef.bytes = s_dualContainer;
+    shaderDef.byteCount = sizeof(s_dualContainer);
+    mrhiShaderId dual = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &dual) == mrhi_success, "the dual shader");
+    TestColorTargets(noop);
+    TestTargetFormats(noop);
+    TestTargetBytes(noop);
+    TestTargetBlends(noop, dual);
+    TestOutputTargets(noop, dual);
+    TestDualSourceBlending(noop, dual);
+    CHECK(mrhiDestroyShader(s_device, dual) == mrhi_success, "the dual shader destroyed");
+    CHECK(mrhiDestroyShader(s_device, noop) == mrhi_success, "the noop shader destroyed");
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -7778,6 +8283,8 @@ int main(void)
     s_adapter.limits.colorBytesPerSample = 128;
     // Timestamps, for the query sets of each of the CTS's types.
     s_adapter.features.timestampQuery = true;
+    // Dual-source blending, as the CTS's device has it.
+    s_adapter.features.dualSourceBlending = true;
     mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
     deviceDef.features = s_adapter.features;
     s_device = OpenWith(deviceDef, true);
@@ -7871,6 +8378,8 @@ int main(void)
     CHECK(s_differs == 2160 && s_inexpressible == 9439, "the depth_stencil_state cases set aside");
     TestVertexState();
     CHECK(s_differs == 2160 && s_inexpressible == 9943, "the vertex_state cases set aside");
+    TestFragmentState();
+    CHECK(s_differs == 2160 && s_inexpressible == 9951, "the fragment_state cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
