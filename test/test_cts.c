@@ -8253,6 +8253,84 @@ static void TestFragmentState(void)
     CHECK(mrhiDestroyShader(s_device, noop) == mrhi_success, "the noop shader destroyed");
 }
 
+// multisample_state's alpha-to-coverage cases whose fragment entry
+// writes vec4<f32> at location 0, as the noop container's does, at 4
+// samples:
+// - first_target_required with its target at location 0;
+// - sample_mask without the mask written;
+// - first_format_blendable_and_has_alpha on the library's float formats
+//   the CTS may render to, every one of which blends on the CTS's device.
+// WebGPU leaves a target format's multisampling to the textures a pass
+// is given, so the CTS's rg32float and rgba32float take 4 samples. The
+// library refuses a pipeline the device cannot multisample, so those
+// cases differ.
+static void TestAlphaToCoverageTargets(mrhiShaderId shader)
+{
+    char name[192];
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        for (uint32_t alpha = 0; alpha < 2; ++alpha)
+        {
+            mrhiGraphicsPipelineDef def = OneTarget(RGBA8);
+            def.sampleCount = 4;
+            def.alphaToCoverage = alpha == 1;
+            snprintf(name, sizeof(name),
+                     "multisample_state:alpha_to_coverage,first_target_required %s, %s, 0",
+                     s_bools[a], s_bools[alpha]);
+            Expect(name, MakeFragmentPipeline(shader, &def), true);
+            snprintf(name, sizeof(name),
+                     "multisample_state:alpha_to_coverage,sample_mask %s, %s, false", s_bools[a],
+                     s_bools[alpha]);
+            Expect(name, MakeFragmentPipeline(shader, &def), true);
+            for (size_t f = 0; f < TARGET_FORMATS; ++f)
+            {
+                const TargetFormat* format = &s_targetFormats[f];
+                if (format->integer)
+                {
+                    continue;
+                }
+                def = OneTarget(format->format);
+                def.sampleCount = 4;
+                def.alphaToCoverage = alpha == 1;
+                snprintf(name, sizeof(name),
+                         "multisample_state:alpha_to_coverage,first_format_blendable_and_has_alpha "
+                         "%s, %s, %s",
+                         s_bools[a], s_bools[alpha], format->name);
+                mrhiResult status = MakeFragmentPipeline(shader, &def);
+                bool valid = alpha == 0 || format->components == 4;
+                bool multisamples = format->format != mrhi_formatRg32Float &&
+                                    format->format != mrhi_formatRgba32Float;
+                if (valid && format->format == mrhi_formatRg11b10Ufloat)
+                {
+                    ExpectUngranted(name, status, false);
+                }
+                else if (valid && !multisamples)
+                {
+                    ExpectUngranted(name, status, false);
+                    ++s_differs;
+                }
+                else
+                {
+                    Expect(name, status, valid);
+                }
+            }
+        }
+    }
+}
+
+// The multisample_state cases on the noop container's vec4<f32> output
+// that need the fragment_state port's formats.
+static void TestMultisampleTargets(void)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    TestAlphaToCoverageTargets(shader);
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -8380,6 +8458,9 @@ int main(void)
     CHECK(s_differs == 2160 && s_inexpressible == 9943, "the vertex_state cases set aside");
     TestFragmentState();
     CHECK(s_differs == 2160 && s_inexpressible == 9951, "the fragment_state cases set aside");
+    TestMultisampleTargets();
+    CHECK(s_differs == 2166 && s_inexpressible == 9951,
+          "the multisample_state vec4<f32> cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
