@@ -1903,35 +1903,43 @@ static mrhiResult DepthOpsPass(mrhiFormat format, bool transient, bool readOnly,
     return status;
 }
 
+// The CTS's kDepthStencilFormats and their aspects. depth32float is the
+// library's, and depth24plus-stencil8 becomes its depth-stencil format;
+// the other four have no counterpart, mrhi_formatNone.
+typedef struct DepthStencilFormat
+{
+    const char* name;
+    mrhiFormat format;
+    bool depth;
+    bool stencil;
+} DepthStencilFormat;
+
+static const DepthStencilFormat s_depthStencilFormats[] = {
+    {"stencil8", mrhi_formatNone, false, true},
+    {"depth16unorm", mrhi_formatNone, true, false},
+    {"depth32float", mrhi_formatDepth32Float, true, false},
+    {"depth24plus", mrhi_formatNone, true, false},
+    {"depth24plus-stencil8", DEPTH, true, true},
+    {"depth32float-stencil8", mrhi_formatNone, true, true},
+};
+
+#define DEPTH_STENCIL_FORMATS (sizeof(s_depthStencilFormats) / sizeof(s_depthStencilFormats[0]))
+
 // render_pass_descriptor:depth_stencil_attachment,loadOp_storeOp_match_depthReadOnly_stencilReadOnly,
-// over the CTS's kDepthStencilFormats. depth32float is the library's,
-// and depth24plus-stencil8 becomes its depth-stencil format; the other
-// four have no counterpart and are counted. Each case runs as the C call
+// over the CTS's kDepthStencilFormats, whose four without a counterpart
+// are counted. Each case runs as the C call
 // Spelled finds, whose outcome is that of the CTS case it stands for;
 // where that differs from the case's own, as keep stands for none given,
 // the case differs. The library's read-only flag covers both aspects, so
 // a case whose aspects differ in it has no call and differs too.
 static void TestDepthOps(void)
 {
-    static const struct
-    {
-        const char* name;
-        mrhiFormat format;
-        bool depth;
-        bool stencil;
-    } formats[] = {
-        {"stencil8", mrhi_formatNone, false, true},
-        {"depth16unorm", mrhi_formatNone, true, false},
-        {"depth32float", mrhi_formatDepth32Float, true, false},
-        {"depth24plus", mrhi_formatNone, true, false},
-        {"depth24plus-stencil8", DEPTH, true, true},
-        {"depth32float-stencil8", mrhi_formatNone, true, true},
-    };
+    const DepthStencilFormat* formats = s_depthStencilFormats;
     static const char* const readOnlys[] = {"undefined", "true", "false"};
     static const char* const loads[] = {"undefined", "clear", "load"};
     static const char* const stores[] = {"undefined", "discard", "store"};
     char name[256];
-    for (size_t f = 0; f < sizeof(formats) / sizeof(formats[0]); ++f)
+    for (size_t f = 0; f < DEPTH_STENCIL_FORMATS; ++f)
     {
         for (uint32_t t = 0; t < 2; ++t)
         {
@@ -7052,6 +7060,280 @@ static void TestMultisampleState(void)
     CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
 }
 
+// A pipeline of the CTS's getDescriptor, the suite's noop pipeline,
+// with the depth-stencil and primitive state of a def: the refusal, or
+// success, destroying it.
+static mrhiResult MakeDepthStencilPipeline(mrhiShaderId shader,
+                                           const mrhiGraphicsPipelineDef* state)
+{
+    mrhiGraphicsPipelineDef def = *state;
+    def.shader = shader;
+    def.vertexEntry = "vs";
+    def.vertexEntryLength = 2;
+    def.fragmentEntry = "fs";
+    def.fragmentEntryLength = 2;
+    def.colorTargets[0].format = mrhi_formatRgba8Unorm;
+    def.colorTargetCount = 1;
+    mrhiGraphicsPipelineId pipeline = {0};
+    mrhiRequestId request;
+    mrhiResult status = mrhiCreateGraphicsPipeline(s_device, &def, &pipeline, &request);
+    if (status == mrhi_success)
+    {
+        Answered(request);
+        CHECK(mrhiDestroyGraphicsPipeline(s_device, pipeline) == mrhi_success,
+              "a depth-stencil pipeline destroyed");
+    }
+    return status;
+}
+
+static const char* const s_compareFunctions[] = {
+    "never", "less", "equal", "less-equal", "greater", "not-equal", "greater-equal", "always",
+};
+
+static const char* const s_stencilOperations[] = {
+    "keep",           "zero",           "replace", "invert", "increment-clamp", "decrement-clamp",
+    "increment-wrap", "decrement-wrap",
+};
+
+// depth_stencil_state:format: on each of the library's formats, as
+// createTexture's tests over every format run, a pipeline takes only a
+// depth or stencil one.
+static void TestDepthStencilFormat(mrhiShaderId shader)
+{
+    char name[128];
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        for (mrhiFormat format = RGBA8; format <= LAST_FORMAT; ++format)
+        {
+            mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+            def.depthStencilFormat = format;
+            snprintf(name, sizeof(name), "depth_stencil_state:format %s, format %d", s_bools[a],
+                     (int)format);
+            Expect(name, MakeDepthStencilPipeline(shader, &def),
+                   format == mrhi_formatDepth32Float || format == DEPTH);
+        }
+    }
+}
+
+// depthCompare_optional's outcome as the CTS works it out: compare 0 is
+// always and 1 undefined; write 0 false, 1 true and 2 undefined; zeroed
+// whether a face's depthFailOp is zero rather than keep.
+static bool CompareOptional(const DepthStencilFormat* format, uint32_t compare, uint32_t write,
+                            bool zeroed)
+{
+    bool succeeds = (write != 1 || format->depth) && (!zeroed || format->stencil);
+    if (format->depth && (write == 2 || ((write == 1 || zeroed) && compare == 1)))
+    {
+        succeeds = false;
+    }
+    return succeeds;
+}
+
+// depthCompare_optional and depthWriteEnabled_optional. The C def has no
+// undefined depthCompare or depthWriteEnabled: a case runs as the call
+// that gives always and false, whose outcome is that of the CTS case it
+// stands for, and differs where its own is not.
+static void TestDepthOptional(mrhiShaderId shader)
+{
+    static const char* const compares[] = {"always", "undefined"};
+    static const char* const writes[] = {"false", "true", "undefined"};
+    static const char* const ops[] = {"keep", "zero"};
+    char name[192];
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        for (size_t f = 0; f < DEPTH_STENCIL_FORMATS; ++f)
+        {
+            const DepthStencilFormat* format = &s_depthStencilFormats[f];
+            if (format->format == mrhi_formatNone)
+            {
+                s_inexpressible += 2 * 3 * 2 * 2 + 1;
+                continue;
+            }
+            for (uint32_t c = 0; c < 2 * 3 * 2 * 2; ++c)
+            {
+                uint32_t compare = c / 12;
+                uint32_t write = c / 4 % 3;
+                uint32_t front = c / 2 % 2;
+                uint32_t back = c % 2;
+                mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+                def.depthStencilFormat = format->format;
+                def.depthWrite = write == 1;
+                def.stencilFront.depthFailOp = front == 1 ? mrhi_stencilZero : mrhi_stencilKeep;
+                def.stencilBack.depthFailOp = back == 1 ? mrhi_stencilZero : mrhi_stencilKeep;
+                bool zeroed = front == 1 || back == 1;
+                bool valid = CompareOptional(format, 0, write == 1 ? 1 : 0, zeroed);
+                snprintf(name, sizeof(name),
+                         "depth_stencil_state:depthCompare_optional %s, %s, %s, %s, %s, %s",
+                         s_bools[a], format->name, compares[compare], writes[write], ops[front],
+                         ops[back]);
+                Expect(name, MakeDepthStencilPipeline(shader, &def), valid);
+                s_differs += valid != CompareOptional(format, compare, write, zeroed) ? 1 : 0;
+            }
+            mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+            def.depthStencilFormat = format->format;
+            snprintf(name, sizeof(name), "depth_stencil_state:depthWriteEnabled_optional %s, %s",
+                     s_bools[a], format->name);
+            Expect(name, MakeDepthStencilPipeline(shader, &def), true);
+            s_differs += format->depth ? 1 : 0;
+        }
+    }
+}
+
+// depth_test and depth_write: a depth test other than always, or a
+// depth write, needs a depth format.
+static void TestDepthAspect(mrhiShaderId shader, const DepthStencilFormat* format, uint32_t a)
+{
+    char name[160];
+    for (uint32_t c = 0; c < 8; ++c)
+    {
+        mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+        def.depthStencilFormat = format->format;
+        def.depthCompare = (mrhiCompareFunction)(mrhi_compareNever + c);
+        snprintf(name, sizeof(name), "depth_stencil_state:depth_test %s, %s, %s", s_bools[a],
+                 format->name, s_compareFunctions[c]);
+        Expect(name, MakeDepthStencilPipeline(shader, &def),
+               def.depthCompare == mrhi_compareAlways || format->depth);
+    }
+    for (uint32_t write = 0; write < 2; ++write)
+    {
+        mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+        def.depthStencilFormat = format->format;
+        def.depthWrite = write == 1;
+        snprintf(name, sizeof(name), "depth_stencil_state:depth_write %s, %s, %s", s_bools[a],
+                 format->name, s_bools[write]);
+        Expect(name, MakeDepthStencilPipeline(shader, &def), write == 0 || format->depth);
+    }
+}
+
+// stencil_test and stencil_write: a face's stencil test other than
+// always, or an operation other than keep, needs a stencil format. An
+// undefined compare or operation is always or keep, the default of both
+// WebGPU and the C def.
+static void TestStencilAspect(mrhiShaderId shader, const DepthStencilFormat* format, uint32_t a)
+{
+    static const char* const faces[] = {"front", "back"};
+    static const char* const opTypes[] = {"FailOp", "DepthFailOp", "PassOp"};
+    char name[160];
+    for (uint32_t face = 0; face < 2; ++face)
+    {
+        for (uint32_t c = 0; c < 9; ++c)
+        {
+            mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+            def.depthStencilFormat = format->format;
+            mrhiStencilFace* state = face == 0 ? &def.stencilFront : &def.stencilBack;
+            state->compare = c == 0 ? mrhi_compareAlways : (mrhiCompareFunction)c;
+            snprintf(name, sizeof(name), "depth_stencil_state:stencil_test %s, %s, %s, %s",
+                     s_bools[a], format->name, faces[face],
+                     c == 0 ? "undefined" : s_compareFunctions[c - 1]);
+            Expect(name, MakeDepthStencilPipeline(shader, &def),
+                   state->compare == mrhi_compareAlways || format->stencil);
+        }
+        for (uint32_t type = 0; type < 3; ++type)
+        {
+            for (uint32_t op = 0; op < 9; ++op)
+            {
+                mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+                def.depthStencilFormat = format->format;
+                mrhiStencilFace* state = face == 0 ? &def.stencilFront : &def.stencilBack;
+                mrhiStencilOperation* field = type == 0   ? &state->failOp
+                                              : type == 1 ? &state->depthFailOp
+                                                          : &state->passOp;
+                *field = op == 0 ? mrhi_stencilKeep : (mrhiStencilOperation)(op - 1);
+                snprintf(name, sizeof(name), "depth_stencil_state:stencil_write %s, %s, %s%s, %s",
+                         s_bools[a], format->name, faces[face], opTypes[type],
+                         op == 0 ? "undefined" : s_stencilOperations[op - 1]);
+                Expect(name, MakeDepthStencilPipeline(shader, &def),
+                       *field == mrhi_stencilKeep || format->stencil);
+            }
+        }
+    }
+}
+
+// depth_bias: a depth bias, by constant, slope or clamp, only for
+// triangles. Its depth24plus becomes the library's depth-stencil format.
+static void TestDepthBias(mrhiShaderId shader)
+{
+    static const char* const topologies[] = {"point-list", "line-list", "line-strip",
+                                             "triangle-list", "triangle-strip"};
+    static const char* const fields[] = {"depthBias", "depthBiasSlopeScale", "depthBiasClamp"};
+    char name[160];
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        for (uint32_t t = 0; t < 5; ++t)
+        {
+            for (uint32_t s = 0; s < 10; ++s)
+            {
+                mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+                def.topology = (mrhiPrimitiveTopology)t;
+                def.depthStencilFormat = DEPTH;
+                def.depthWrite = true;
+                def.depthCompare = mrhi_compareLessEqual;
+                int32_t value = s == 0 ? 0 : (int32_t)((s - 1) % 3) - 1;
+                if (s >= 1 && s <= 3)
+                {
+                    def.depthBias = value;
+                }
+                else if (s >= 4 && s <= 6)
+                {
+                    def.depthBiasSlopeScale = (float)value;
+                }
+                else if (s >= 7)
+                {
+                    def.depthBiasClamp = (float)value;
+                }
+                if (s == 0)
+                {
+                    snprintf(name, sizeof(name), "depth_stencil_state:depth_bias %s, %s, {}",
+                             s_bools[a], topologies[t]);
+                }
+                else
+                {
+                    snprintf(name, sizeof(name), "depth_stencil_state:depth_bias %s, %s, %s %d",
+                             s_bools[a], topologies[t], fields[(s - 1) / 3], (int)value);
+                }
+                bool triangles = def.topology == mrhi_topologyTriangleList ||
+                                 def.topology == mrhi_topologyTriangleStrip;
+                Expect(name, MakeDepthStencilPipeline(shader, &def), value == 0 || triangles);
+            }
+        }
+    }
+}
+
+// api,validation,render_pipeline,depth_stencil_state, on the suite's
+// noop container. Its isAsync cases make the pipeline the library's one
+// way, as primitive_state's. depth_write,frag_depth needs a fragment
+// entry that writes depth, which no committed container has, so its
+// cases are not counted: CheckDepthStencil already refuses that entry
+// without a depth format.
+static void TestDepthStencilState(void)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    TestDepthStencilFormat(shader);
+    TestDepthOptional(shader);
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        for (size_t f = 0; f < DEPTH_STENCIL_FORMATS; ++f)
+        {
+            const DepthStencilFormat* format = &s_depthStencilFormats[f];
+            if (format->format == mrhi_formatNone)
+            {
+                // depth_test's 8 compares, depth_write's 2, stencil_test's
+                // 2 faces of 9 and stencil_write's 6 face operations of 9.
+                s_inexpressible += 8 + 2 + 2 * 9 + 6 * 9;
+                continue;
+            }
+            TestDepthAspect(shader, format, a);
+            TestStencilAspect(shader, format, a);
+        }
+    }
+    TestDepthBias(shader);
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -7169,6 +7451,8 @@ int main(void)
     CHECK(s_differs == 2120 && s_inexpressible == 8583, "the setImmediates cases set aside");
     TestMultisampleState();
     CHECK(s_differs == 2120 && s_inexpressible == 8583, "the multisample_state cases set aside");
+    TestDepthStencilState();
+    CHECK(s_differs == 2160 && s_inexpressible == 9439, "the depth_stencil_state cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
