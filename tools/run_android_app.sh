@@ -13,6 +13,8 @@
 # The application's data is cleared before its environment is written:
 # install -r keeps it, so an earlier run whose uninstall was lost would
 # leave its files/out, whose result line would be read as this run's.
+# The environment write also removes files/out, since pm clear prints
+# "Failed" and still exits 0 on some Android versions.
 # Stopping and removing the application after the verdict cannot
 # change it.
 set -eu
@@ -32,12 +34,13 @@ again() {
 }
 
 variables=$(env | grep '^MAUL_RHI_[A-Z0-9_]*=' || true)
-# Writes the variables whole on each try, the file replaced. It runs
-# only through again, which shellcheck cannot follow.
+# Writes the variables whole on each try, the file replaced, and removes
+# any result an earlier run left. Only again calls it, which the
+# linter cannot follow.
 # shellcheck disable=SC2317
 write_environment() {
     { [ -z "$variables" ] || printf '%s\n' "$variables"; } |
-        "$adb" shell "run-as $package sh -c 'mkdir -p files && cat > files/environment'"
+        "$adb" shell "run-as $package sh -c 'mkdir -p files && rm -f files/out && cat > files/environment'"
 }
 
 again "$adb" install -r "$apk" > /dev/null
