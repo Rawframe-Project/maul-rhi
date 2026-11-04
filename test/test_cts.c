@@ -6715,6 +6715,82 @@ static void TestDrawVertexBuffers(void)
     s_inexpressible += 44;
 }
 
+// A pipeline of the CTS's getDescriptor, the suite's noop pipeline,
+// with a primitive state: the refusal, or success, destroying it.
+static mrhiResult MakePrimitivePipeline(mrhiShaderId shader, mrhiPrimitiveTopology topology,
+                                        mrhiIndexFormat strip, bool unclipped)
+{
+    mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+    def.shader = shader;
+    def.vertexEntry = "vs";
+    def.vertexEntryLength = 2;
+    def.fragmentEntry = "fs";
+    def.fragmentEntryLength = 2;
+    def.colorTargets[0].format = mrhi_formatRgba8Unorm;
+    def.colorTargetCount = 1;
+    def.topology = topology;
+    def.stripIndexFormat = strip;
+    def.unclippedDepth = unclipped;
+    mrhiGraphicsPipelineId pipeline = {0};
+    mrhiRequestId request;
+    mrhiResult status = mrhiCreateGraphicsPipeline(s_device, &def, &pipeline, &request);
+    if (status == mrhi_success)
+    {
+        Answered();
+        CHECK(mrhiDestroyGraphicsPipeline(s_device, pipeline) == mrhi_success,
+              "a primitive pipeline destroyed");
+    }
+    return status;
+}
+
+// api,validation,render_pipeline,primitive_state. Its isAsync cases
+// both make the pipeline the library's one way, refusing a def at the
+// call and answering the request later. An undefined topology is the
+// default triangle list, and an undefined strip index format
+// mrhi_indexNone. The test device has no unclippedDepth, the CTS's
+// depth-clip-control, so unclipped depth is refused for it.
+static void TestPrimitiveState(void)
+{
+    static const char* const asyncs[] = {"false", "true"};
+    static const char* const topologies[] = {"undefined",  "point-list",    "line-list",
+                                             "line-strip", "triangle-list", "triangle-strip"};
+    static const mrhiPrimitiveTopology kinds[] = {
+        mrhi_topologyTriangleList, mrhi_topologyPointList,    mrhi_topologyLineList,
+        mrhi_topologyLineStrip,    mrhi_topologyTriangleList, mrhi_topologyTriangleStrip};
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    char name[128];
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        for (uint32_t t = 0; t < 6; ++t)
+        {
+            bool strip =
+                kinds[t] == mrhi_topologyLineStrip || kinds[t] == mrhi_topologyTriangleStrip;
+            for (uint32_t format = 0; format < 3; ++format)
+            {
+                snprintf(name, sizeof(name), "primitive_state:strip_index_format %s, %s, %s",
+                         asyncs[a], topologies[t], s_indexFormats[format]);
+                Expect(name,
+                       MakePrimitivePipeline(shader, kinds[t], (mrhiIndexFormat)format, false),
+                       strip || format == mrhi_indexNone);
+            }
+        }
+        for (uint32_t unclipped = 0; unclipped < 2; ++unclipped)
+        {
+            snprintf(name, sizeof(name), "primitive_state:unclipped_depth %s, %s", asyncs[a],
+                     s_bools[unclipped]);
+            ExpectUngranted(name,
+                            MakePrimitivePipeline(shader, mrhi_topologyTriangleList, mrhi_indexNone,
+                                                  unclipped == 1),
+                            unclipped == 0);
+        }
+    }
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -6825,6 +6901,8 @@ int main(void)
     CHECK(s_differs == 2104 && s_inexpressible == 8347, "the draw index buffer cases set aside");
     TestDrawVertexBuffers();
     CHECK(s_differs == 2120 && s_inexpressible == 8391, "the draw vertex buffer cases set aside");
+    TestPrimitiveState();
+    CHECK(s_differs == 2120 && s_inexpressible == 8391, "the primitive_state cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
