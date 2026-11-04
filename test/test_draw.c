@@ -52,11 +52,14 @@ static void Unbound(void)
     s_sections[BINDINGS].size = 0;
 }
 
-static void Answered(void)
+// Takes the device's next record, which must be the request's ready
+// answer, with success.
+static void Answered(mrhiRequestId request)
 {
     mrhiDeviceNotification record;
     CHECK(mrhiDevice_TakeNotification(s_device, &record) == mrhi_success &&
-              record.outcome == mrhi_success,
+              record.kind == mrhi_devicePipelineReady && record.request.index1 == request.index1 &&
+              record.request.generation == request.generation && record.outcome == mrhi_success,
           "ready");
 }
 
@@ -91,7 +94,7 @@ static mrhiGraphicsPipelineId Graphics(const mrhiGraphicsPipelineDef* def)
     mrhiRequestId request;
     CHECK(mrhiCreateGraphicsPipeline(s_device, def, &pipeline, &request) == mrhi_success,
           "a graphics pipeline");
-    Answered();
+    Answered(request);
     return pipeline;
 }
 
@@ -115,7 +118,7 @@ static mrhiComputePipelineId MakeCompute(void)
     mrhiRequestId request;
     CHECK(mrhiCreateComputePipeline(s_device, &def, &pipeline, &request) == mrhi_success,
           "a compute pipeline");
-    Answered();
+    Answered(request);
     CHECK(mrhiDestroyShader(s_device, def.shader) == mrhi_success, "its shader destroyed");
     return pipeline;
 }
