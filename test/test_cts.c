@@ -7334,6 +7334,420 @@ static void TestDepthStencilState(void)
     CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
 }
 
+// A vertex state as the CTS's vertex_state tests build it: the buffers
+// up to the last one given, a hole a stride-0 buffer without
+// attributes, and their attributes in one list, each buffer's together.
+typedef struct VertexState
+{
+    mrhiVertexBufferLayout buffers[16];
+    uint32_t bufferCount;
+    mrhiVertexAttribute attributes[32];
+    uint32_t attributeCount;
+} VertexState;
+
+// The CTS's kVertexFormats in its order, with their byte sizes. The
+// library's formats follow the same order from mrhi_vertexUint8, and
+// the last, the packed snorm format, has no counterpart.
+static const struct
+{
+    const char* name;
+    uint32_t bytes;
+} s_vertexFormats[] = {
+    {"uint8", 1},         {"uint8x2", 2},         {"uint8x4", 4},    {"sint8", 1},
+    {"sint8x2", 2},       {"sint8x4", 4},         {"unorm8", 1},     {"unorm8x2", 2},
+    {"unorm8x4", 4},      {"snorm8", 1},          {"snorm8x2", 2},   {"snorm8x4", 4},
+    {"uint16", 2},        {"uint16x2", 4},        {"uint16x4", 8},   {"sint16", 2},
+    {"sint16x2", 4},      {"sint16x4", 8},        {"unorm16", 2},    {"unorm16x2", 4},
+    {"unorm16x4", 8},     {"snorm16", 2},         {"snorm16x2", 4},  {"snorm16x4", 8},
+    {"float16", 2},       {"float16x2", 4},       {"float16x4", 8},  {"float32", 4},
+    {"float32x2", 8},     {"float32x3", 12},      {"float32x4", 16}, {"uint32", 4},
+    {"uint32x2", 8},      {"uint32x3", 12},       {"uint32x4", 16},  {"sint32", 4},
+    {"sint32x2", 8},      {"sint32x3", 12},       {"sint32x4", 16},  {"unorm10-10-10-2", 4},
+    {"unorm8x4-bgra", 4}, {"snorm10-10-10-2", 4},
+};
+
+#define VERTEX_FORMATS (sizeof(s_vertexFormats) / sizeof(s_vertexFormats[0]))
+
+// Makes the state's buffers up to index, holes for those not yet given,
+// and gives that one the stride.
+static void SetVertexBuffer(VertexState* s, uint32_t index, uint32_t stride)
+{
+    CHECK(index < sizeof(s->buffers) / sizeof(s->buffers[0]), "a buffer within the state");
+    while (s->bufferCount <= index)
+    {
+        s->buffers[s->bufferCount++] = (mrhiVertexBufferLayout){0, mrhi_stepVertex};
+    }
+    s->buffers[index].stride = stride;
+}
+
+// The CTS's addTestAttributes on a buffer, the last the state's list
+// reached: extra float32 attributes at offset 0 on the lowest locations
+// the skip mask leaves, then the test attribute, if one is given, at
+// the start or the end of the buffer's attributes.
+static void AddTestAttributes(VertexState* s, uint32_t buffer, const mrhiVertexAttribute* test,
+                              bool atStart, uint32_t extra, uint32_t skip)
+{
+    CHECK(s->attributeCount + extra + 1 <= sizeof(s->attributes) / sizeof(s->attributes[0]),
+          "attributes within the state");
+    uint32_t location = 0;
+    for (uint32_t added = 0; added < extra; ++location)
+    {
+        if (location < 32 && (skip & (1u << location)) != 0)
+        {
+            continue;
+        }
+        s->attributes[s->attributeCount++] =
+            (mrhiVertexAttribute){buffer, location, mrhi_vertexFloat32, 0};
+        ++added;
+    }
+    if (test == nullptr)
+    {
+        return;
+    }
+    uint32_t at = s->attributeCount;
+    while (atStart && at > 0 && s->attributes[at - 1].buffer == buffer)
+    {
+        --at;
+    }
+    for (uint32_t i = s->attributeCount; i > at; --i)
+    {
+        s->attributes[i] = s->attributes[i - 1];
+    }
+    s->attributes[at] = *test;
+    s->attributes[at].buffer = buffer;
+    ++s->attributeCount;
+}
+
+// A pipeline of the CTS's vertex_state descriptor, the suite's noop
+// pipeline, whose vertex entry has no inputs, with the state's buffers
+// and attributes: the refusal, or success, destroying it.
+static mrhiResult MakeVertexStatePipeline(mrhiShaderId shader, const VertexState* s)
+{
+    mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+    def.shader = shader;
+    def.vertexEntry = "vs";
+    def.vertexEntryLength = 2;
+    def.fragmentEntry = "fs";
+    def.fragmentEntryLength = 2;
+    def.colorTargets[0].format = mrhi_formatRgba8Unorm;
+    def.colorTargetCount = 1;
+    def.vertexBuffers = s->bufferCount > 0 ? s->buffers : nullptr;
+    def.vertexBufferCount = s->bufferCount;
+    def.vertexAttributes = s->attributeCount > 0 ? s->attributes : nullptr;
+    def.vertexAttributeCount = s->attributeCount;
+    mrhiGraphicsPipelineId pipeline = {0};
+    mrhiRequestId request;
+    mrhiResult status = mrhiCreateGraphicsPipeline(s_device, &def, &pipeline, &request);
+    if (status == mrhi_success)
+    {
+        Answered(request);
+        CHECK(mrhiDestroyGraphicsPipeline(s_device, pipeline) == mrhi_success,
+              "a vertex state pipeline destroyed");
+    }
+    return status;
+}
+
+// max_vertex_buffer_limit and max_vertex_attribute_limit: 0, 1, the
+// limit and one past it of buffers, the last with an attribute or not,
+// and of attributes, spread 0, 1 or 4 to a buffer with the rest in the
+// last buffer the limit allows.
+static void TestVertexCountLimits(mrhiShaderId shader, const mrhiLimits* limits)
+{
+    char name[160];
+    for (uint32_t v = 0; v < 8; ++v)
+    {
+        uint32_t count = v / 2 < 2 ? v / 2 : limits->vertexBuffers + v / 2 - 2;
+        bool lastEmpty = v % 2 == 1;
+        VertexState s = {0};
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            SetVertexBuffer(&s, i, 0);
+        }
+        if (count > 0 && !lastEmpty)
+        {
+            s.attributes[s.attributeCount++] =
+                (mrhiVertexAttribute){count - 1, 0, mrhi_vertexFloat32, 0};
+        }
+        snprintf(name, sizeof(name),
+                 "vertex_state:max_vertex_buffer_limit %u buffers, lastEmpty %s", count,
+                 s_bools[lastEmpty]);
+        ExpectPastLimit(name, MakeVertexStatePipeline(shader, &s), count <= limits->vertexBuffers);
+    }
+    static const uint32_t perBuffer[] = {0, 1, 4};
+    for (uint32_t v = 0; v < 4 * 3; ++v)
+    {
+        uint32_t count = v / 3 < 2 ? v / 3 : limits->vertexAttributes + v / 3 - 2;
+        uint32_t per = perBuffer[v % 3];
+        VertexState s = {0};
+        for (uint32_t added = 0, buffer = 0; added < count; ++buffer)
+        {
+            uint32_t target = added + per < count ? added + per : count;
+            target = buffer == limits->vertexBuffers - 1 ? count : target;
+            SetVertexBuffer(&s, buffer, 0);
+            for (; added < target; ++added)
+            {
+                s.attributes[s.attributeCount++] =
+                    (mrhiVertexAttribute){buffer, added, mrhi_vertexFloat32, 0};
+            }
+        }
+        snprintf(name, sizeof(name), "vertex_state:max_vertex_attribute_limit %u, %u a buffer",
+                 count, per);
+        ExpectPastLimit(name, MakeVertexStatePipeline(shader, &s),
+                        count <= limits->vertexAttributes);
+    }
+}
+
+// The CTS's vertexBufferIndexVariant: the first and second buffer, and
+// the last the limit allows.
+static uint32_t VertexBufferIndex(const mrhiLimits* limits, uint32_t variant)
+{
+    return variant < 2 ? variant : limits->vertexBuffers - 1;
+}
+
+// max_vertex_buffer_array_stride_limit and
+// vertex_buffer_array_stride_limit_alignment: one buffer, the first,
+// the second or the last, of a stride under, at or past the limit, and
+// of one not a multiple of 4.
+static void TestVertexStrides(mrhiShaderId shader, const mrhiLimits* limits)
+{
+    char name[160];
+    uint32_t most = limits->vertexStride;
+    const uint32_t limited[] = {0, 4, 256, most - 4, most, most + 4};
+    const uint32_t aligned[] = {0, 1, 2, 4, most - 4, most - 2, most};
+    for (uint32_t b = 0; b < 3; ++b)
+    {
+        uint32_t index = VertexBufferIndex(limits, b);
+        for (size_t i = 0; i < sizeof(limited) / sizeof(limited[0]); ++i)
+        {
+            VertexState s = {0};
+            SetVertexBuffer(&s, index, limited[i]);
+            snprintf(name, sizeof(name),
+                     "vertex_state:max_vertex_buffer_array_stride_limit buffer %u, stride %u",
+                     index, limited[i]);
+            ExpectPastLimit(name, MakeVertexStatePipeline(shader, &s), limited[i] <= most);
+        }
+        for (size_t i = 0; i < sizeof(aligned) / sizeof(aligned[0]); ++i)
+        {
+            VertexState s = {0};
+            SetVertexBuffer(&s, index, aligned[i]);
+            snprintf(name, sizeof(name),
+                     "vertex_state:vertex_buffer_array_stride_limit_alignment buffer %u, stride %u",
+                     index, aligned[i]);
+            Expect(name, MakeVertexStatePipeline(shader, &s), aligned[i] % 4 == 0);
+        }
+    }
+}
+
+// vertex_attribute_shaderLocation_limit: a float32 attribute at
+// location 0, 1, the limit's last or the limit, among 0, 1 or all but
+// one of the other locations, in a buffer of stride 256.
+static void TestVertexLocationLimit(mrhiShaderId shader, const mrhiLimits* limits)
+{
+    char name[192];
+    uint32_t most = limits->vertexAttributes;
+    const uint32_t extras[] = {0, 1, most - 1};
+    const uint32_t locations[] = {0, 1, most - 1, most};
+    for (uint32_t c = 0; c < 3 * 3 * 2 * 4; ++c)
+    {
+        uint32_t index = VertexBufferIndex(limits, c / 24);
+        uint32_t extra = extras[c / 8 % 3];
+        bool atStart = c / 4 % 2 == 1;
+        uint32_t location = locations[c % 4];
+        VertexState s = {0};
+        SetVertexBuffer(&s, index, 256);
+        const mrhiVertexAttribute test = {index, location, mrhi_vertexFloat32, 0};
+        AddTestAttributes(&s, index, &test, atStart, extra, location < 32 ? 1u << location : 0);
+        snprintf(name, sizeof(name),
+                 "vertex_state:vertex_attribute_shaderLocation_limit buffer %u, %u extra, %s, "
+                 "location %u",
+                 index, extra, atStart ? "at start" : "at end", location);
+        ExpectPastLimit(name, MakeVertexStatePipeline(shader, &s), location < most);
+    }
+}
+
+// vertex_attribute_shaderLocation_unique: attributes A and B, in the
+// same buffer or two, each at the start or the end, at locations 0, 1, 7
+// or the limit's last, with 0 or 4 others beside A; only one location
+// apiece is valid.
+static void TestVertexLocationUnique(mrhiShaderId shader, const mrhiLimits* limits)
+{
+    char name[224];
+    const uint32_t locations[] = {0, 1, 7, limits->vertexAttributes - 1};
+    for (uint32_t c = 0; c < 3 * 3 * 2 * 2 * 4 * 4 * 2; ++c)
+    {
+        uint32_t indexA = VertexBufferIndex(limits, c / 384);
+        uint32_t indexB = VertexBufferIndex(limits, c / 128 % 3);
+        bool startA = c / 64 % 2 == 1;
+        bool startB = c / 32 % 2 == 1;
+        uint32_t locationA = locations[c / 8 % 4];
+        uint32_t locationB = locations[c / 2 % 4];
+        uint32_t extra = c % 2 == 1 ? 4 : 0;
+        VertexState s = {0};
+        SetVertexBuffer(&s, indexA, 256);
+        SetVertexBuffer(&s, indexB, 256);
+        const mrhiVertexAttribute a = {indexA, locationA, mrhi_vertexFloat32, 0};
+        const mrhiVertexAttribute b = {indexB, locationB, mrhi_vertexFloat32, 0};
+        AddTestAttributes(&s, indexA, &a, startA, extra, (1u << locationA) | (1u << locationB));
+        AddTestAttributes(&s, indexB, &b, startB, 0, 0);
+        snprintf(name, sizeof(name),
+                 "vertex_state:vertex_attribute_shaderLocation_unique A buffer %u, %s, location "
+                 "%u; B buffer %u, %s, location %u; %u extra",
+                 indexA, startA ? "at start" : "at end", locationA, indexB,
+                 startB ? "at start" : "at end", locationB, extra);
+        Expect(name, MakeVertexStatePipeline(shader, &s), locationA != locationB);
+    }
+}
+
+// One offset case of a format's attribute at location 0, in a buffer
+// of the stride, first, second or the limit's last, among 0, 1 or all
+// but one of the other locations, at the start or the end: run as the
+// CTS's subcases, each with the outcome given, past the stride limit
+// when past is set; or counted when the format has no counterpart.
+static void RunOffsetSubcases(mrhiShaderId shader, const mrhiLimits* limits, const char* test,
+                              uint32_t f, uint32_t stride, uint32_t offset, bool valid, bool past)
+{
+    char name[224];
+    const uint32_t extras[] = {0, 1, limits->vertexAttributes - 1};
+    for (uint32_t c = 0; c < 3 * 3 * 2; ++c)
+    {
+        if (f + 1 > mrhi_vertexUnorm8x4Bgra)
+        {
+            ++s_inexpressible;
+            continue;
+        }
+        uint32_t index = VertexBufferIndex(limits, c / 6);
+        uint32_t extra = extras[c / 2 % 3];
+        bool atStart = c % 2 == 1;
+        VertexState s = {0};
+        SetVertexBuffer(&s, index, stride);
+        const mrhiVertexAttribute attribute = {index, 0, (mrhiVertexFormat)(f + 1), offset};
+        AddTestAttributes(&s, index, &attribute, atStart, extra, 1u);
+        snprintf(name, sizeof(name),
+                 "vertex_state:%s %s, stride %u, offset %u, buffer %u, %u extra, %s", test,
+                 s_vertexFormats[f].name, stride, offset, index, extra,
+                 atStart ? "at start" : "at end");
+        mrhiResult status = MakeVertexStatePipeline(shader, &s);
+        if (past)
+        {
+            ExpectPastLimit(name, status, valid);
+        }
+        else
+        {
+            Expect(name, status, valid);
+        }
+    }
+}
+
+// vertex_attribute_offset_alignment: each format's attribute in a
+// buffer of stride 256 or the limit, at offsets near 0 and near the
+// stride's end, each (mult, add) pair once, as the CTS's
+// filterUniqueValueTestVariants keeps them. An offset is aligned to
+// the lesser of 4 and the format's size.
+static void TestVertexOffsetAlignment(mrhiShaderId shader, const mrhiLimits* limits)
+{
+    const uint32_t strides[] = {256, limits->vertexStride};
+    for (uint32_t f = 0; f < VERTEX_FORMATS; ++f)
+    {
+        int64_t size = s_vertexFormats[f].bytes;
+        const int64_t variants[9][2] = {
+            {0, 0},     {0, size / 2},         {0, size},      {0, 2},         {0, 4},
+            {1, -size}, {1, -size - size / 2}, {1, -size - 4}, {1, -size - 2},
+        };
+        for (uint32_t st = 0; st < 2; ++st)
+        {
+            for (uint32_t v = 0; v < 9; ++v)
+            {
+                bool seen = false;
+                for (uint32_t w = 0; w < v; ++w)
+                {
+                    seen = seen ||
+                           (variants[w][0] == variants[v][0] && variants[w][1] == variants[v][1]);
+                }
+                if (seen)
+                {
+                    continue;
+                }
+                uint32_t offset = (uint32_t)(strides[st] * variants[v][0] + variants[v][1]);
+                uint32_t alignment = size < 4 ? (uint32_t)size : 4;
+                RunOffsetSubcases(shader, limits, "vertex_attribute_offset_alignment", f,
+                                  strides[st], offset, offset % alignment == 0, false);
+            }
+        }
+    }
+}
+
+// vertex_attribute_contained_in_stride: each format's attribute in a
+// buffer of stride 0, 256, the limit's last multiple of 4 or the limit,
+// ending inside the stride, at its end or past it. A stride of 0 holds
+// an attribute ending within the stride limit, so one past it is past
+// a device limit.
+static void TestVertexContainedInStride(mrhiShaderId shader, const mrhiLimits* limits)
+{
+    uint32_t most = limits->vertexStride;
+    const uint32_t strides[] = {0, 256, most - 4, most};
+    for (uint32_t f = 0; f < VERTEX_FORMATS; ++f)
+    {
+        int64_t size = s_vertexFormats[f].bytes;
+        const int64_t variants[6][2] = {{0, 0},         {0, 4},    {1, -size},
+                                        {1, -size + 4}, {0, size}, {1, 0}};
+        for (uint32_t st = 0; st < 4; ++st)
+        {
+            int64_t base = strides[st] != 0 ? strides[st] : most;
+            for (uint32_t v = 0; v < (size != 4 ? 6u : 4u); ++v)
+            {
+                int64_t offset = base * variants[v][0] + variants[v][1];
+                RunOffsetSubcases(shader, limits, "vertex_attribute_contained_in_stride", f,
+                                  strides[st], (uint32_t)offset, offset + size <= base,
+                                  strides[st] == 0);
+            }
+        }
+    }
+}
+
+// many_attributes_overlapping: one attribute per location the limit
+// allows, each 4 bytes after the last and 16 bytes wide, in a buffer of
+// stride 0.
+static void TestVertexOverlaps(mrhiShaderId shader, const mrhiLimits* limits)
+{
+    static const mrhiVertexFormat formats[] = {mrhi_vertexFloat32x4, mrhi_vertexUint32x4,
+                                               mrhi_vertexSint32x4};
+    VertexState s = {0};
+    SetVertexBuffer(&s, 0, 0);
+    for (uint32_t i = 0; i < limits->vertexAttributes; ++i)
+    {
+        s.attributes[s.attributeCount++] = (mrhiVertexAttribute){0, i, formats[i % 3], i * 4};
+    }
+    Expect("vertex_state:many_attributes_overlapping", MakeVertexStatePipeline(shader, &s), true);
+}
+
+// api,validation,render_pipeline,vertex_state: its tests whose vertex
+// shader has no inputs, on the suite's noop container. The CTS's limits
+// are the device's; the adapter's are above them, so a case past one is
+// mrhi_errorCapacity. vertex_shader_input_location_limit,
+// vertex_shader_input_location_in_vertex_state and
+// vertex_shader_type_matches_attribute_format need vertex entries with
+// inputs, which no committed container has, so their cases are not
+// counted: CheckVertex already refuses a vertex input without an
+// attribute of its scalar class.
+static void TestVertexState(void)
+{
+    mrhiLimits limits = {0};
+    CHECK(mrhiDevice_GetLimits(s_device, &limits) == mrhi_success, "the limits");
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    TestVertexCountLimits(shader, &limits);
+    TestVertexStrides(shader, &limits);
+    TestVertexLocationLimit(shader, &limits);
+    TestVertexLocationUnique(shader, &limits);
+    TestVertexOffsetAlignment(shader, &limits);
+    TestVertexContainedInStride(shader, &limits);
+    TestVertexOverlaps(shader, &limits);
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -7345,6 +7759,8 @@ int main(void)
     // past a device limit is one a device asking for more would take.
     s_adapter.limits.workgroupsPerDimension = UINT32_MAX;
     s_adapter.limits.vertexBuffers = 16;
+    s_adapter.limits.vertexAttributes = 2 * mrhiDefaultLimits().vertexAttributes;
+    s_adapter.limits.vertexStride = 2 * mrhiDefaultLimits().vertexStride;
     s_adapter.limits.textureDimension2d = 16384;
     s_adapter.limits.textureDimension3d = 4096;
     s_adapter.limits.textureArrayLayers = 2048;
@@ -7453,6 +7869,8 @@ int main(void)
     CHECK(s_differs == 2120 && s_inexpressible == 8583, "the multisample_state cases set aside");
     TestDepthStencilState();
     CHECK(s_differs == 2160 && s_inexpressible == 9439, "the depth_stencil_state cases set aside");
+    TestVertexState();
+    CHECK(s_differs == 2160 && s_inexpressible == 9943, "the vertex_state cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
