@@ -8513,6 +8513,57 @@ static void TestFloat32Blendable(void)
     }
 }
 
+// texture/rg11b10ufloat_renderable, on a device granted
+// rg11b10ufloat-renderable: an rg11b10ufloat render target of 1 and 4
+// samples, a pass that clears one, a pass that resolves the 4-sample
+// one into the 1-sample one, and a pipeline that writes none of its
+// target. The library has no render bundle encoder: its case is
+// counted.
+static void TestRg11b10Renderable(void)
+{
+    s_adapter.features.rg11b10Renderable = true;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.features.rg11b10Renderable = true;
+    s_device = OpenWith(deviceDef, true);
+    static const uint32_t counts[] = {1, 4};
+    char name[128];
+    for (uint32_t c = 0; c < 2; ++c)
+    {
+        mrhiTextureDef def = mrhiDefaultTextureDef();
+        def.format = mrhi_formatRg11b10Ufloat;
+        def.width = 1;
+        def.height = 1;
+        def.sampleCount = counts[c];
+        def.usage = mrhi_textureRenderTarget;
+        mrhiTextureId texture = {0};
+        mrhiResult status = mrhiCreateTexture(s_device, &def, &texture);
+        snprintf(name, sizeof(name), "rg11b10ufloat_renderable:create_texture %u", counts[c]);
+        Expect(name, status, true);
+        if (status == mrhi_success)
+        {
+            CHECK(mrhiDestroyTexture(s_device, texture) == mrhi_success, "destroyed");
+        }
+    }
+    Attachment single = {.format = mrhi_formatRg11b10Ufloat, .size = 1};
+    Attachment multi = {.format = mrhi_formatRg11b10Ufloat, .size = 1, .samples = 4};
+    Expect("rg11b10ufloat_renderable:begin_render_pass_single_sampled",
+           RenderPass(&single, nullptr, 1, s_none), true);
+    Expect("rg11b10ufloat_renderable:begin_render_pass_msaa_and_resolve",
+           RenderPass(&multi, &single, 1, s_none), true);
+    ++s_inexpressible;
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    mrhiGraphicsPipelineDef pipeline = OneTarget(mrhi_formatRg11b10Ufloat);
+    pipeline.colorTargets[0].writeMask = 0;
+    Expect("rg11b10ufloat_renderable:create_render_pipeline",
+           MakeFragmentPipeline(shader, &pipeline), true);
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
+    Close(s_device);
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -8649,6 +8700,9 @@ int main(void)
     CHECK(s_differs == 2166 && s_inexpressible == 9963, "the shader_module cases set aside");
     Close(s_device);
     TestFloat32Blendable();
+    TestRg11b10Renderable();
+    CHECK(s_differs == 2166 && s_inexpressible == 9964,
+          "the rg11b10ufloat_renderable cases set aside");
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
 }

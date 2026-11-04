@@ -38,7 +38,8 @@ extern "C"
         bool textureCompressionAstc;
         // Filtering of 32-bit float textures.
         bool float32Filterable;
-        // Rendering to rg11b10ufloat.
+        // Rendering to rg11b10ufloat, blended or multisampled at 4 samples and
+        // resolved.
         bool rg11b10Renderable;
         // Blending with a second fragment output.
         bool dualSourceBlending;

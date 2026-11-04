@@ -91,7 +91,9 @@ static void TestFeaturesAdd(void)
               Caps(instance, adapter, mrhi_formatRgba32Float).filtering,
           "every 32-bit float filtered with the feature");
     CHECK(!Caps(instance, adapter, mrhi_formatR32Uint).filtering, "integers still not");
-    CHECK(Caps(instance, adapter, mrhi_formatRg11b10Ufloat).rendering, "rendered with it");
+    mrhiFormatCaps rg11b10 = Caps(instance, adapter, mrhi_formatRg11b10Ufloat);
+    CHECK(rg11b10.rendering && rg11b10.blending && rg11b10.sampleCounts == 5,
+          "rendered, blended and multisampled at 4 with it");
     CHECK(Caps(instance, adapter, mrhi_formatBc1RgbaUnormSrgb).sampling, "BC with it");
     CHECK(!Caps(instance, adapter, mrhi_formatAstc4x4Unorm).sampling,
           "no ASTC on D3D12, whatever the adapter says");

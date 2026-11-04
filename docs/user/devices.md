@@ -14,7 +14,7 @@ Every listed adapter meets a floor, which a program can rely on without asking: 
 
 Above the floor, each adapter reports:
 
-- **Optional features** (`mrhiAdapter_GetFeatures`, `mrhiFeatures`): timestamps, pipeline statistics, the BC, ETC2 and ASTC compressed formats, filterable 32-bit floats, rendering to `rg11b10ufloat`, dual-source blending, unclipped depth, 16-bit floats, subgroups and 64-bit integers in shaders, indirect draws with a first instance, counted multi-draw indirect, multiview, bindless heaps (`bindlessSampling`, `bindlessHeterogeneous`) and present timing.
+- **Optional features** (`mrhiAdapter_GetFeatures`, `mrhiFeatures`): timestamps, pipeline statistics, the BC, ETC2 and ASTC compressed formats, filterable 32-bit floats, rendering to `rg11b10ufloat` (blended, or multisampled at 4 samples and resolved), dual-source blending, unclipped depth, 16-bit floats, subgroups and 64-bit integers in shaders, indirect draws with a first instance, counted multi-draw indirect, multiview, bindless heaps (`bindlessSampling`, `bindlessHeterogeneous`) and present timing.
 - **Limits** (`mrhiAdapter_GetLimits`, `mrhiLimits`): texture sizes, binding counts per table and stage, buffer sizes and alignments, workgroup sizes, heap sizes, the root block's bytes, the views of a multiview pass and more. Alignments are powers of two and better lower; every other limit is better higher.
 - **Format capabilities** (`mrhiAdapter_GetFormatCaps`): whether a format samples, filters, renders, blends and serves as storage, and at which sample counts.
 
