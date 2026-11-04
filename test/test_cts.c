@@ -8416,6 +8416,63 @@ static void TestRenderPipelineMisc(void)
     CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
 }
 
+// float32_blendable:create_render_pipeline's cases of one format and
+// one device, the noop container's output written to one target of the
+// format, blended or not.
+static void RunFloat32Blends(const char* format, mrhiFormat target, bool enabled)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    char name[128];
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        for (uint32_t blend = 0; blend < 2; ++blend)
+        {
+            mrhiGraphicsPipelineDef def = OneTarget(target);
+            def.colorTargets[0].blend = blend == 1;
+            snprintf(name, sizeof(name), "float32_blendable:create_render_pipeline %s, %s, %s, %s",
+                     s_bools[a], s_bools[enabled], s_bools[blend], format);
+            ExpectUngranted(name, MakeFragmentPipeline(shader, &def), enabled || blend == 0);
+        }
+    }
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
+}
+
+// float32_blendable. The test adapter blends no 32-bit float format, as
+// a device without float32-blendable does. A device with the feature is
+// one whose adapter also grants blending for the format: the enabled
+// cases open one for each format, the others run on the adapter as it
+// is.
+static void TestFloat32Blendable(void)
+{
+    static const char* const names[] = {"r32float", "rg32float", "rgba32float"};
+    static const mrhiFormat formats[] = {mrhi_formatR32Float, mrhi_formatRg32Float,
+                                         mrhi_formatRgba32Float};
+    for (uint32_t f = 0; f < 3; ++f)
+    {
+        s_device = OpenWith(mrhiDefaultDeviceDef(), true);
+        RunFloat32Blends(names[f], formats[f], false);
+        mrhiAdapterId adapter = {0};
+        size_t count = 0;
+        mrhiFormatCaps caps = {0};
+        CHECK(mrhiInstance_GetAdapters(s_instance, &adapter, 1, &count) == mrhi_success &&
+                  mrhiAdapter_GetFormatCaps(s_instance, adapter, formats[f], &caps) ==
+                      mrhi_success &&
+                  !caps.blending,
+              "a 32-bit float format that does not blend");
+        Close(s_device);
+        s_adapter.limitedFormat = formats[f];
+        s_adapter.limitedCaps = caps;
+        s_adapter.limitedCaps.blending = true;
+        s_device = OpenWith(mrhiDefaultDeviceDef(), true);
+        RunFloat32Blends(names[f], formats[f], true);
+        Close(s_device);
+    }
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -8549,6 +8606,7 @@ int main(void)
     TestRenderPipelineMisc();
     CHECK(s_differs == 2166 && s_inexpressible == 9959, "the render pipeline misc cases set aside");
     Close(s_device);
+    TestFloat32Blendable();
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
 }
