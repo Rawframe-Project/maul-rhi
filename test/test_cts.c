@@ -6944,6 +6944,95 @@ static void TestSetImmediates(void)
     TestImmediateBounds();
 }
 
+// A pipeline of the CTS's getDescriptor, the suite's noop pipeline,
+// with a multisample state, and for a depth case a depth32float target
+// without depth writes, its fragment entry and color target left out
+// when noFragment: the refusal, or success, destroying it.
+static mrhiResult MakeMultisamplePipeline(mrhiShaderId shader, uint32_t count, bool alpha,
+                                          bool depth, bool noFragment)
+{
+    mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+    def.shader = shader;
+    def.vertexEntry = "vs";
+    def.vertexEntryLength = 2;
+    if (!noFragment)
+    {
+        def.fragmentEntry = "fs";
+        def.fragmentEntryLength = 2;
+        def.colorTargets[0].format = mrhi_formatRgba8Unorm;
+        def.colorTargetCount = 1;
+    }
+    def.depthStencilFormat = depth ? mrhi_formatDepth32Float : mrhi_formatNone;
+    def.sampleCount = count;
+    def.alphaToCoverage = alpha;
+    mrhiGraphicsPipelineId pipeline = {0};
+    mrhiRequestId request;
+    mrhiResult status = mrhiCreateGraphicsPipeline(s_device, &def, &pipeline, &request);
+    if (status == mrhi_success)
+    {
+        Answered();
+        CHECK(mrhiDestroyGraphicsPipeline(s_device, pipeline) == mrhi_success,
+              "a multisample pipeline destroyed");
+    }
+    return status;
+}
+
+// api,validation,render_pipeline,multisample_state: count,
+// alpha_to_coverage,count and alpha_to_coverage,fragment_stage_required,
+// which the suite's noop container expresses. Its isAsync cases make
+// the pipeline the library's one way, as primitive_state's. A count
+// other than 1 or 4 that is a power of two is a capability the test
+// device does not grant for rgba8unorm, mrhi_errorUnsupported; any
+// other is invalid.
+static void TestMultisampleState(void)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    static const char* const asyncs[] = {"false", "true"};
+    static const uint32_t counts[] = {0, 1, 2, 3, 4, 8, 16, 1024};
+    char name[128];
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        for (size_t c = 0; c < sizeof(counts) / sizeof(counts[0]); ++c)
+        {
+            uint32_t count = counts[c];
+            snprintf(name, sizeof(name), "multisample_state:count %s, %u", asyncs[a], count);
+            mrhiResult status = MakeMultisamplePipeline(shader, count, false, false, false);
+            bool power = count > 0 && count <= 16 && (count & (count - 1)) == 0;
+            if (power && count != 1 && count != 4)
+            {
+                ExpectUngranted(name, status, false);
+            }
+            else
+            {
+                Expect(name, status, count == 1 || count == 4);
+            }
+        }
+        for (uint32_t alpha = 0; alpha < 2; ++alpha)
+        {
+            for (uint32_t count = 1; count <= 4; count += 3)
+            {
+                snprintf(name, sizeof(name), "multisample_state:alpha_to_coverage,count %s, %s, %u",
+                         asyncs[a], s_bools[alpha], count);
+                Expect(name, MakeMultisamplePipeline(shader, count, alpha == 1, false, false),
+                       alpha == 0 || count == 4);
+            }
+            for (uint32_t none = 0; none < 2; ++none)
+            {
+                snprintf(name, sizeof(name),
+                         "multisample_state:alpha_to_coverage,fragment_stage_required %s, %s, %s",
+                         asyncs[a], s_bools[alpha], s_bools[none]);
+                Expect(name, MakeMultisamplePipeline(shader, 4, alpha == 1, true, none == 1),
+                       alpha == 0 || none == 0);
+            }
+        }
+    }
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -7059,6 +7148,8 @@ int main(void)
     CHECK(s_differs == 2120 && s_inexpressible == 8391, "the primitive_state cases set aside");
     TestSetImmediates();
     CHECK(s_differs == 2120 && s_inexpressible == 8583, "the setImmediates cases set aside");
+    TestMultisampleState();
+    CHECK(s_differs == 2120 && s_inexpressible == 8583, "the multisample_state cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
