@@ -7,14 +7,19 @@ may change the API, the ABI and every data format.
 
 ## [0.26.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.25.0...v0.26.0) (2026-11-04)
 
+### Changed
 
-### ⚠ BREAKING CHANGES
-
-* **encoder:** `mrhiPass_SetRootBlock` takes a write of no bytes at an offset that is a multiple of 4 within the device's root block, with NULL bytes allowed, and records nothing for it, as WebGPU's `setImmediates` does. Before, it was refused as `mrhi_errorInvalid`, counted as `mrhi_diagnosticRootBlock`.
-
-### Fixed
-
-* **encoder:** take an empty root block write, as WebGPU does ([#448](https://github.com/Rawframe-Project/maul-rhi/issues/448)) ([3ded5e9](https://github.com/Rawframe-Project/maul-rhi/commit/3ded5e9d61c1257b8acf372658c7c46af9b270a0)), closes [#446](https://github.com/Rawframe-Project/maul-rhi/issues/446)
+- **Breaking:** `mrhiPass_SetRootBlock` takes a write of no bytes at an
+  offset that is a multiple of 4 within the device's root block, as
+  WebGPU's `setImmediates` does, and records nothing for it. Its bytes
+  may then be NULL. Before, such a write was refused with
+  `mrhi_errorInvalid`, counted as `mrhi_diagnosticRootBlock`. An empty
+  write is still refused at an offset that is not a multiple of 4, past
+  the root block, in a transfer pass, or in a pass that found the
+  frame's commands full. Drivers built outside the tree see no change,
+  since no driver receives an empty write, and the SPI stays 18.
+  `contract_version` rises to 37.
+  ([#448](https://github.com/Rawframe-Project/maul-rhi/pull/448))
 
 ## [0.25.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.24.0...v0.25.0) (2026-11-03)
 
