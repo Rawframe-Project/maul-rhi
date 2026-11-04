@@ -497,14 +497,15 @@ extern "C"
     /// `mrhi_errorUnsupported` for vertex buffers, attributes, strides, inter-
     /// stage variables or color bytes past the adapter's limits, target formats
     /// the device cannot render, blend or multisample as asked, unclipped depth
-    /// without its feature, views past one without multiview or past the
-    /// adapter's limit, a critical extension the library does not know;
-    /// `mrhi_errorState` for a device that is not ready; `mrhi_errorCapacity`
-    /// for vertex buffers, attributes, strides, inter-stage variables, color
-    /// bytes or views past the device's limits within the adapter's, or when
-    /// the device's pipeline limit is reached or its queue has no room for the
-    /// answer; `mrhi_errorPlatform` when the driver refuses at once;
-    /// `mrhi_errorBusy` for a call from inside the device's allocator.
+    /// or dual-source blending without its feature, views past one without
+    /// multiview or past the adapter's limit, a critical extension the library
+    /// does not know; `mrhi_errorState` for a device that is not ready;
+    /// `mrhi_errorCapacity` for vertex buffers, attributes, strides, inter-
+    /// stage variables, color bytes or views past the device's limits within
+    /// the adapter's, or when the device's pipeline limit is reached or its
+    /// queue has no room for the answer; `mrhi_errorPlatform` when the driver
+    /// refuses at once; `mrhi_errorBusy` for a call from inside the device's
+    /// allocator.
     /// @par Thread safety
     /// Safe from any thread; the device is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult

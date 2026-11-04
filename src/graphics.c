@@ -404,8 +404,8 @@ static mrhiResult CheckTargets(mrhiDevice* device, const mrhiGraphicsPipelineDef
         }
     }
     status = Worse(status, Need(attached));
-    // Dual-source blending: the feature, one color target, and a second
-    // source at location 0.
+    // Dual-source blending: the feature, a capability; one color target,
+    // WebGPU's rule on every device; and a second source at location 0.
     bool second = false;
     for (uint32_t i = 0; i < def->colorTargetCount; ++i)
     {
@@ -413,8 +413,8 @@ static mrhiResult CheckTargets(mrhiDevice* device, const mrhiGraphicsPipelineDef
         second = second || (target->blend && (ReadsSecondSource(&target->color) ||
                                               ReadsSecondSource(&target->alpha)));
     }
-    status = Worse(status, Within(!second || (device->features.dualSourceBlending &&
-                                              def->colorTargetCount == 1)));
+    status = Worse(status, Need(!second || def->colorTargetCount == 1));
+    status = Worse(status, Within(!second || device->features.dualSourceBlending));
     status = Worse(status, Match(!second || HasSecondSource(stages)));
     return Worse(status, MRHI_DEVICE_LIMIT(device, colorBytesPerSample, bytes));
 }
