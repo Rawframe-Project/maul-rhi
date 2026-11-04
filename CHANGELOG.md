@@ -5,6 +5,21 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.27.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.26.0...v0.27.0) (2026-11-04)
+
+### Changed
+
+- **Breaking:** `mrhiCreateGraphicsPipeline` refuses a blend that reads
+  the second source beside more than one color target with
+  `mrhi_errorInvalid`, on every device, as WebGPU refuses it. Before, it
+  returned `mrhi_errorUnsupported` for that state when the fragment
+  entry had a second source, with or without `dualSourceBlending`, and
+  `mrhi_errorFormat` when the entry had none. Dual-source blending
+  without the feature, on one target, is still `mrhi_errorUnsupported`,
+  which the contract now names. Shader cooks and drivers see no change,
+  and the SPI is untouched. `contract_version` rises to 38.
+  ([#467](https://github.com/Rawframe-Project/maul-rhi/pull/467))
+
 ## [0.26.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.25.0...v0.26.0) (2026-11-04)
 
 ### Changed
