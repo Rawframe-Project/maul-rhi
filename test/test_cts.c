@@ -8331,6 +8331,91 @@ static void TestMultisampleTargets(void)
     CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
 }
 
+// A pipeline of the noop container's vertex entry alone, with the def's
+// depth state: the refusal, or success, destroying it.
+static mrhiResult MakeVertexOnlyPipeline(mrhiShaderId shader, const mrhiGraphicsPipelineDef* state)
+{
+    mrhiGraphicsPipelineDef def = *state;
+    def.shader = shader;
+    def.vertexEntry = "vs";
+    def.vertexEntryLength = 2;
+    def.fragmentEntry = nullptr;
+    def.fragmentEntryLength = 0;
+    def.colorTargetCount = 0;
+    mrhiGraphicsPipelineId pipeline = {0};
+    mrhiRequestId request;
+    mrhiResult status = mrhiCreateGraphicsPipeline(s_device, &def, &pipeline, &request);
+    if (status == mrhi_success)
+    {
+        Answered(request);
+        CHECK(mrhiDestroyGraphicsPipeline(s_device, pipeline) == mrhi_success,
+              "a vertex-only pipeline destroyed");
+    }
+    return status;
+}
+
+// api,validation,render_pipeline,misc. Its isAsync cases both make the
+// pipeline the library's one way. A pipeline without a fragment stage
+// has no targets, so vertex_state_only's hasColor leaves the def as it
+// is. Its depth24plus has no counterpart and is counted. The library has
+// no pipeline layout object: pipeline_layout,device_mismatch's same
+// device case is basic's pipeline, and the mismatched device's is
+// counted, as is external_texture, whose texture_external has no
+// counterpart. storage_texture,format needs containers the suite
+// lacks.
+static void TestRenderPipelineMisc(void)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    static const DepthStencilFormat formats[] = {
+        {"depth24plus", mrhi_formatNone, true, false},
+        {"depth24plus-stencil8", DEPTH, true, true},
+        {"depth32float", mrhi_formatDepth32Float, true, false},
+        {"", mrhi_formatNone, false, false},
+    };
+    mrhiGraphicsPipelineDef basic = OneTarget(mrhi_formatRgba8Unorm);
+    mrhiGraphicsPipelineDef none = mrhiDefaultGraphicsPipelineDef();
+    char name[128];
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        snprintf(name, sizeof(name), "misc:basic %s", s_bools[a]);
+        Expect(name, MakeFragmentPipeline(shader, &basic), true);
+        snprintf(name, sizeof(name), "misc:no_attachment %s", s_bools[a]);
+        Expect(name, MakeVertexOnlyPipeline(shader, &none), false);
+        snprintf(name, sizeof(name), "misc:pipeline_layout,device_mismatch %s, false",
+                 s_bools[1 - a]);
+        Expect(name, MakeFragmentPipeline(shader, &basic), true);
+        for (uint32_t f = 0; f < 4; ++f)
+        {
+            for (uint32_t color = 0; color < 2; ++color)
+            {
+                bool attached = formats[f].name[0] != '\0';
+                if (!attached && color == 0)
+                {
+                    continue;
+                }
+                if (attached && formats[f].format == mrhi_formatNone)
+                {
+                    ++s_inexpressible;
+                    continue;
+                }
+                mrhiGraphicsPipelineDef def = mrhiDefaultGraphicsPipelineDef();
+                def.depthStencilFormat = formats[f].format;
+                def.depthWrite = false;
+                def.depthCompare = mrhi_compareAlways;
+                snprintf(name, sizeof(name), "misc:vertex_state_only %s, %s, %s", s_bools[a],
+                         formats[f].name, s_bools[color]);
+                Expect(name, MakeVertexOnlyPipeline(shader, &def), attached);
+            }
+        }
+    }
+    s_inexpressible += 2 + 2;
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -8461,6 +8546,8 @@ int main(void)
     TestMultisampleTargets();
     CHECK(s_differs == 2166 && s_inexpressible == 9951,
           "the multisample_state vec4<f32> cases set aside");
+    TestRenderPipelineMisc();
+    CHECK(s_differs == 2166 && s_inexpressible == 9959, "the render pipeline misc cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
