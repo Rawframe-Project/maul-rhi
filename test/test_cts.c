@@ -6791,6 +6791,159 @@ static void TestPrimitiveState(void)
     CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
 }
 
+// Reports a case past a limit of the adapter's as well as the device's
+// whose outcome differs from the CTS's: mrhi_errorUnsupported, since no
+// device of the adapter could ask for it.
+static void ExpectPastAdapter(const char* test, mrhiResult result)
+{
+    if (result != mrhi_errorUnsupported)
+    {
+        printf("FAIL: %s: %d, the CTS expects a validation error past the adapter's limit\n", test,
+               (int)result);
+        ++s_failures;
+    }
+}
+
+// A root block write of size bytes at offset, in a compute pass or a
+// render pass of the suite's target, cleared, each of its own frame:
+// the refusal, or success.
+static mrhiResult WriteRootBlock(bool render, uint32_t offset, size_t size)
+{
+    static const uint8_t bytes[32] = {0};
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    mrhiPassDef def = mrhiDefaultPassDef();
+    CHECK(mrhiDevice_BeginFrame(s_device, &frame) == mrhi_success, "a frame");
+    def.neverCull = true;
+    if (render)
+    {
+        CHECK(mrhiImportTexture(s_device, s_target, &def.colorTargets[0].resource) == mrhi_success,
+              "the target");
+        def.colorTargets[0].load = mrhi_loadClear;
+        def.colorTargetCount = 1;
+    }
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(s_device, &def, &pass) == mrhi_success &&
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, pass) == mrhi_success,
+          "the pass begun");
+    mrhiResult status = mrhiPass_SetRootBlock(s_device, pass, offset, bytes, size);
+    status = status == mrhi_success ? mrhiPass_End(s_device, pass) : status;
+    CHECK(mrhiDevice_DropFrame(s_device) == mrhi_success, "dropped");
+    return status;
+}
+
+// The CTS's kTypedArrayBufferViewKeys but Float16Array, which its
+// setImmediates cases filter out, with each one's element bytes.
+static const struct
+{
+    const char* name;
+    uint32_t bytes;
+} s_typedArrays[] = {
+    {"Uint8Array", 1},   {"Uint8ClampedArray", 1}, {"Uint16Array", 2},    {"Uint32Array", 4},
+    {"Int8Array", 1},    {"Int16Array", 2},        {"Int32Array", 4},     {"Float32Array", 4},
+    {"Float64Array", 8}, {"BigInt64Array", 8},     {"BigUint64Array", 8},
+};
+
+#define TYPED_ARRAYS (sizeof(s_typedArrays) / sizeof(s_typedArrays[0]))
+
+static const char* const s_passTypes[] = {"compute pass", "render pass"};
+
+// setImmediates:alignment: 8 bytes at 4 or 6, or 10 bytes at 4 for the
+// arrays whose elements make 10. JavaScript throws on the 10, and the
+// library refuses it.
+static void TestImmediateAlignment(void)
+{
+    static const uint32_t ranges[3][2] = {{4, 8}, {6, 8}, {4, 10}};
+    char name[128];
+    for (uint32_t p = 0; p < 2; ++p)
+    {
+        for (size_t a = 0; a < TYPED_ARRAYS; ++a)
+        {
+            for (uint32_t r = 0; r < 3; ++r)
+            {
+                if (ranges[r][1] % s_typedArrays[a].bytes != 0)
+                {
+                    continue;
+                }
+                s_inexpressible += p == 0 ? 1 : 0;
+                snprintf(name, sizeof(name), "setImmediates:alignment %s, %s, %u, %u",
+                         s_passTypes[p], s_typedArrays[a].name, ranges[r][0], ranges[r][1]);
+                Expect(name, WriteRootBlock(p == 1, ranges[r][0], ranges[r][1]),
+                       ranges[r][0] % 4 == 0 && ranges[r][1] % 4 == 0);
+            }
+        }
+    }
+}
+
+// setImmediates:overflow: 4 elements, or none, at 0; 4 elements at
+// offsets that end past any root block; and data offsets past the
+// array, which JavaScript throws on and C, passing a pointer and a
+// size, cannot express.
+static void TestImmediateOverflow(void)
+{
+    static const uint32_t offsets[4] = {0, 0, (UINT32_C(1) << 31) - 8, UINT32_MAX - 7};
+    static const uint32_t counts[4] = {4, 0, 4, 4};
+    char name[128];
+    for (uint32_t p = 0; p < 2; ++p)
+    {
+        for (size_t a = 0; a < TYPED_ARRAYS; ++a)
+        {
+            // Its render bundle case, and its two cases past the array.
+            s_inexpressible += (p == 0 ? 6 : 0) + 2;
+            for (uint32_t c = 0; c < 4; ++c)
+            {
+                snprintf(name, sizeof(name), "setImmediates:overflow %s, %s, %u, 0, %u",
+                         s_passTypes[p], s_typedArrays[a].name, offsets[c], counts[c]);
+                mrhiResult status =
+                    WriteRootBlock(p == 1, offsets[c], (size_t)counts[c] * s_typedArrays[a].bytes);
+                if (c < 2)
+                {
+                    Expect(name, status, true);
+                }
+                else
+                {
+                    ExpectPastAdapter(name, status);
+                }
+            }
+        }
+    }
+}
+
+// setImmediates:out_of_bounds: 8 bytes, or one element of 8, ending at
+// the device's root block or 4 bytes past it. Its data length one
+// element short throws in JavaScript, which C cannot express.
+static void TestImmediateBounds(void)
+{
+    char name[128];
+    uint32_t most = s_limits.rootBlockBytes;
+    for (uint32_t p = 0; p < 2; ++p)
+    {
+        for (size_t a = 0; a < TYPED_ARRAYS; ++a)
+        {
+            // Its render bundle cases, and its case of a short array.
+            s_inexpressible += (p == 0 ? 3 : 0) + 1;
+            for (uint32_t delta = 0; delta <= 4; delta += 4)
+            {
+                snprintf(name, sizeof(name), "setImmediates:out_of_bounds %s, %s, %u, 0",
+                         s_passTypes[p], s_typedArrays[a].name, delta);
+                ExpectPastLimit(name, WriteRootBlock(p == 1, most - 8 + delta, 8), delta == 0);
+            }
+        }
+    }
+}
+
+// api,validation,encoding,cmds,setImmediates, whose setImmediates is
+// mrhiPass_SetRootBlock. Each case runs in a compute pass and a render
+// pass; its render bundle cases have no counterpart. The adapter's root
+// block is above the device's, so a write past the device's is one a
+// device asking for more would take.
+static void TestSetImmediates(void)
+{
+    TestImmediateAlignment();
+    TestImmediateOverflow();
+    TestImmediateBounds();
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -6806,6 +6959,7 @@ int main(void)
     s_adapter.limits.textureDimension3d = 4096;
     s_adapter.limits.textureArrayLayers = 2048;
     s_adapter.limits.bufferBytes = 2 * mrhiDefaultLimits().bufferBytes;
+    s_adapter.limits.rootBlockBytes = 2 * mrhiDefaultLimits().rootBlockBytes;
     // r32float multisampled, as WebGPU allows and many GPUs report, so that
     // a format that multisamples without resolving is there to resolve.
     s_adapter.limitedFormat = mrhi_formatR32Float;
@@ -6903,6 +7057,8 @@ int main(void)
     CHECK(s_differs == 2120 && s_inexpressible == 8391, "the draw vertex buffer cases set aside");
     TestPrimitiveState();
     CHECK(s_differs == 2120 && s_inexpressible == 8391, "the primitive_state cases set aside");
+    TestSetImmediates();
+    CHECK(s_differs == 2120 && s_inexpressible == 8583, "the setImmediates cases set aside");
     Close(s_device);
     TestBindGroupsPlusVertexBuffers();
     return s_failures == 0 ? 0 : 1;
