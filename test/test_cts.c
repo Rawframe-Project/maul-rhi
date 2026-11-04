@@ -8416,6 +8416,46 @@ static void TestRenderPipelineMisc(void)
     CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
 }
 
+// api,validation,render_pipeline,shader_module. A pipeline's two stages
+// are entries of one shader, the noop container's. The CTS's invalid
+// module is a container the library refuses, here one cut short, which
+// leaves the null id: a pipeline of it is refused as stale, whichever
+// stage the CTS's module was for. device_mismatch's same device case is
+// the noop pipeline, and its 4 cases of a mismatched device are counted.
+static void TestShaderModules(void)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_noopContainer;
+    shaderDef.byteCount = sizeof(s_noopContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the noop shader");
+    shaderDef.byteCount = sizeof(s_noopContainer) / 2;
+    mrhiShaderId invalid = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &invalid) == mrhi_errorFormat &&
+              invalid.index1 == 0,
+          "the cut container refused as malformed");
+    mrhiGraphicsPipelineDef def = OneTarget(mrhi_formatRgba8Unorm);
+    static const char* const stages[] = {"vertex", "fragment"};
+    char name[128];
+    for (uint32_t a = 0; a < 2; ++a)
+    {
+        snprintf(name, sizeof(name), "shader_module:device_mismatch %s, false, false",
+                 s_bools[1 - a]);
+        Expect(name, MakeFragmentPipeline(shader, &def), true);
+        for (uint32_t s = 0; s < 2; ++s)
+        {
+            snprintf(name, sizeof(name), "shader_module:invalid,%s %s, true", stages[s],
+                     s_bools[1 - a]);
+            Expect(name, MakeFragmentPipeline(shader, &def), true);
+            snprintf(name, sizeof(name), "shader_module:invalid,%s %s, false", stages[s],
+                     s_bools[1 - a]);
+            ExpectStale(name, MakeFragmentPipeline(invalid, &def));
+        }
+    }
+    s_inexpressible += 4;
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "the noop shader destroyed");
+}
+
 // float32_blendable:create_render_pipeline's cases of one format and
 // one device, the noop container's output written to one target of the
 // format, blended or not.
@@ -8605,6 +8645,8 @@ int main(void)
           "the multisample_state vec4<f32> cases set aside");
     TestRenderPipelineMisc();
     CHECK(s_differs == 2166 && s_inexpressible == 9959, "the render pipeline misc cases set aside");
+    TestShaderModules();
+    CHECK(s_differs == 2166 && s_inexpressible == 9963, "the shader_module cases set aside");
     Close(s_device);
     TestFloat32Blendable();
     TestBindGroupsPlusVertexBuffers();
