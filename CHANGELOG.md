@@ -5,6 +5,16 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.28.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.28.0...v0.28.1) (2026-11-05)
+
+
+### Fixed
+
+* **diagnostics:** refuse a copy side whose size passes 64 bits ([#499](https://github.com/Rawframe-Project/maul-rhi/issues/499)) ([330b585](https://github.com/Rawframe-Project/maul-rhi/commit/330b5850ef1ba993b32fab411590c852a1ebbb17)), closes [#496](https://github.com/Rawframe-Project/maul-rhi/issues/496)
+* **diagnostics:** stop the frame walk before it reads a refused range ([#495](https://github.com/Rawframe-Project/maul-rhi/issues/495)) ([cae2d51](https://github.com/Rawframe-Project/maul-rhi/commit/cae2d5113ae4c1edc13178c8e92d9c58366e8520)), closes [#494](https://github.com/Rawframe-Project/maul-rhi/issues/494)
+* **encoder:** refuse a texture readback whose ring bytes wrap ([#502](https://github.com/Rawframe-Project/maul-rhi/issues/502)) ([5bd4f9e](https://github.com/Rawframe-Project/maul-rhi/commit/5bd4f9eb9bb485090da6f74cec49f65ee37755df)), closes [#501](https://github.com/Rawframe-Project/maul-rhi/issues/501)
+* mark every internal bool function nodiscard and check it ([#498](https://github.com/Rawframe-Project/maul-rhi/issues/498)) ([ead3b5f](https://github.com/Rawframe-Project/maul-rhi/commit/ead3b5f30dc565ed96636e161f7447734744fa58)), closes [#493](https://github.com/Rawframe-Project/maul-rhi/issues/493)
+
 ## [0.28.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.27.0...v0.28.0) (2026-11-05)
 
 ### Changed
