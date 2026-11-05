@@ -1989,7 +1989,7 @@
             {
               "name": "rg11b10_renderable",
               "type": "bool",
-              "doc": "Rendering to rg11b10ufloat.",
+              "doc": "Rendering to rg11b10ufloat, blended or multisampled at 4 samples and resolved.",
               "mapping": {
                 "vulkan": {
                   "class": "restricted",
@@ -22727,5 +22727,5 @@
       ]
     }
   ],
-  "contract_version": 38
+  "contract_version": 39
 }
