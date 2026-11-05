@@ -767,6 +767,40 @@ static void TestWalkEdges(void)
     CHECK(WalkOne(&chunk, &pass) == 0, "a pass of the most color targets");
 }
 
+// The walk stops where a fault leaves later reads unsafe: an upload
+// whose source lies past the frame's staging, whose bytes the walk would
+// sum, and a pass of more color targets than their array holds.
+static void TestWalkStops(void)
+{
+    static const uint8_t staging[16];
+    static const mrhiDriverResource buffer = {
+        .kind = mrhiDriverDeviceBuffer, .handle = 1, .size = 256};
+    static mrhiCommandChunk chunk;
+    chunk = (mrhiCommandChunk){.count = 3};
+    chunk.commands[0] = (mrhiCommand){.type = mrhiCommandWriteBuffer, .payload = 2, .b = 64};
+    mrhiCommandBufferSide from = {.offset = sizeof(staging)};
+    mrhiCommandBufferSide to = {.object = 1};
+    memcpy(&chunk.commands[1], &from, sizeof(from));
+    memcpy(&chunk.commands[2], &to, sizeof(to));
+    mrhiDriverPass pass = {.id = {1, 1}, .firstChunk = 1};
+    mrhiDriverFrame frame = {
+        .resources = &buffer,
+        .resourceCount = 1,
+        .passes = &pass,
+        .passCount = 1,
+        .chunks = &chunk,
+        .chunkCount = 1,
+        .staging = staging,
+        .stagingBytes = sizeof(staging),
+    };
+    CHECK(mrhiWalkFrame(&frame, AnyHandle, nullptr, nullptr) == 1,
+          "an upload from past the staging");
+    pass = (mrhiDriverPass){.id = {1, 1}, .colorTargetCount = MRHI_MAX_COLOR_TARGETS + 1};
+    frame.chunkCount = 0;
+    CHECK(mrhiWalkFrame(&frame, AnyHandle, nullptr, nullptr) == 1,
+          "a pass of more color targets than their array");
+}
+
 // Kinds are int32_t, so a walk check against a kind's last value alone
 // would pass a negative one: a pass's class, an access's state and a
 // barrier's states of -1 or INT32_MIN are each a fault.
@@ -824,6 +858,7 @@ int main(void)
     TestInstanceRoom();
     TestWalk();
     TestWalkEdges();
+    TestWalkStops();
     TestWalkNegativeKinds();
     return s_failures == 0 ? 0 : 1;
 }

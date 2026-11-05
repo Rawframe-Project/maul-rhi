@@ -97,8 +97,12 @@ static void CheckCopy(Walk* walk, const mrhiCommand* command, bool fromBuffer, b
     if (upload)
     {
         uint64_t bytes = SideBytes(command, &from, !toBuffer);
-        WALK_CHECK(from.object == 0 && from.offset <= frame->stagingBytes &&
-                   bytes <= frame->stagingBytes - from.offset);
+        // The sum below reads the staging bytes the source names.
+        if (!Holds(walk, from.object == 0 && from.offset <= frame->stagingBytes &&
+                             bytes <= frame->stagingBytes - from.offset))
+        {
+            return;
+        }
         for (uint64_t i = 0; i < bytes; ++i)
         {
             walk->counts.uploadSum += frame->staging[from.offset + i];
@@ -225,8 +229,12 @@ static void WalkCommands(Walk* walk, const mrhiDriverPass* pass)
 static void WalkPass(Walk* walk, const mrhiDriverPass* pass)
 {
     const mrhiDriverFrame* frame = walk->frame;
+    // The targets below are read up to the count, inside their array.
+    if (!Holds(walk, pass->colorTargetCount <= MRHI_MAX_COLOR_TARGETS))
+    {
+        return;
+    }
     WALK_CHECK(pass->id.index1 != 0 && mrhiIsLabelValid(pass->label, pass->labelLength) &&
-               pass->colorTargetCount <= MRHI_MAX_COLOR_TARGETS &&
                (pass->colorTargetCount == 0 ||
                 pass->colorTargets[pass->colorTargetCount - 1].resource.index1 != 0));
     for (uint32_t i = 0; i < pass->colorTargetCount; ++i)
