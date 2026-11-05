@@ -668,6 +668,83 @@ static void TestFullArena(void)
     CloseDevice();
 }
 
+// Imports two textures into a transfer pass reading both, begun.
+static mrhiPassId ReadBoth(mrhiTextureId first, mrhiTextureId second, mrhiResourceId* resourcesOut)
+{
+    mrhiFrameDef frameDef = mrhiDefaultFrameDef();
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success &&
+              mrhiImportTexture(s_device, first, &resourcesOut[0]) == mrhi_success &&
+              mrhiImportTexture(s_device, second, &resourcesOut[1]) == mrhi_success,
+          "imported");
+    mrhiAccess accesses[2];
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        accesses[i] = (mrhiAccess){
+            .resource = resourcesOut[i],
+            .kind = mrhi_accessCopySource,
+            .range = {.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING},
+        };
+    }
+    mrhiPassDef passDef = mrhiDefaultPassDef();
+    passDef.passClass = mrhi_passTransfer;
+    passDef.neverCull = true;
+    passDef.accesses = accesses;
+    passDef.accessCount = 2;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(s_device, &passDef, &pass) == mrhi_success &&
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, pass) == mrhi_success,
+          "the pass begun");
+    return pass;
+}
+
+// A texture read whose ring bytes pass 64 bits does not fit the ring, on
+// rgba32float textures, a 2D one of 2^31 by 2^29 texels and a 3D one of
+// 2^31 by 2 by 2^28. Rows of 2^31 texels are 2^35 bytes, over 2^28 rows
+// 2^63; rows of 2^31 - 1 texels, 2^35 - 16 bytes, take a pitch of 2^35,
+// which over 2^29 rows is 2^64 bytes and wraps to 0, though the rows' own
+// bytes do not; and 2 rows of 2^31 texels over 2^28 slices are 2^64 bytes
+// too. The array layers keep their limit, which sizes the device's
+// tables, and the depth of a 3D texture does not.
+static void TestHugeTexture(void)
+{
+    s_adapter.limits.textureDimension2d = UINT32_MAX;
+    s_adapter.limits.textureDimension3d = UINT32_MAX;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.limits.textureDimension2d = UINT32_MAX;
+    deviceDef.limits.textureDimension3d = UINT32_MAX;
+    deviceDef.budgets.readbackBytes = 8192;
+    s_device = OpenWith(deviceDef, true);
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = mrhi_formatRgba32Float;
+    def.width = 1u << 31;
+    def.height = 1u << 29;
+    def.usage = mrhi_textureCopySource;
+    mrhiTextureId flat = {0};
+    CHECK(mrhiCreateTexture(s_device, &def, &flat) == mrhi_success, "a 2D texture of 2^60 texels");
+    def.kind = mrhi_texture3d;
+    def.height = 2;
+    def.depthOrLayers = 1u << 28;
+    mrhiTextureId deep = {0};
+    CHECK(mrhiCreateTexture(s_device, &def, &deep) == mrhi_success, "a 3D texture of 2^60 texels");
+    mrhiResourceId resources[2];
+    mrhiPassId pass = ReadBoth(flat, deep, resources);
+    mrhiTextureCopy source = {.resource = resources[0]};
+    mrhiRequestId request = {0};
+    CHECK(mrhiPass_ReadTexture(s_device, pass, &source, &(mrhiExtent3d){1u << 31, 1u << 28, 1},
+                               &request) == mrhi_errorCapacity,
+          "2^63 bytes past the ring");
+    CHECK(mrhiPass_ReadTexture(s_device, pass, &source,
+                               &(mrhiExtent3d){(1u << 31) - 1, 1u << 29, 1},
+                               &request) == mrhi_errorCapacity,
+          "a pitch of 2^35 over 2^29 rows, though it wraps to 0");
+    source.resource = resources[1];
+    CHECK(mrhiPass_ReadTexture(s_device, pass, &source, &(mrhiExtent3d){1u << 31, 2, 1u << 28},
+                               &request) == mrhi_errorCapacity,
+          "2 rows of 2^35 bytes over 2^28 slices");
+    CloseDevice();
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -683,5 +760,6 @@ int main(void)
     TestSubmitFailure();
     TestLimits();
     TestFullArena();
+    TestHugeTexture();
     return s_failures == 0 ? 0 : 1;
 }

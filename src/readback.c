@@ -246,14 +246,16 @@ mrhiResult mrhiPass_ReadTexture(mrhiDevice* device, mrhiPassId id, const mrhiTex
     uint64_t rows = size->height / block.height;
     uint64_t rowBytes = (uint64_t)(size->width / block.width) * facts.bytes;
     uint64_t pitch = (rowBytes + PITCH - 1) / PITCH * PITCH;
-    // Bytes past 64 bits are past any ring.
+    // Bytes past 64 bits are past any ring. A row's bytes can pass 32
+    // bits (2^32 texels of 16 bytes), so its pitch times the rows can
+    // pass 64 bits too. The tight bytes are no more than the ring's.
     uint64_t ringBytes = 0;
-    uint64_t tight = 0;
-    if (ckd_mul(&ringBytes, pitch * rows, (uint64_t)size->depthOrLayers) ||
-        ckd_mul(&tight, rowBytes * rows, (uint64_t)size->depthOrLayers))
+    if (ckd_mul(&ringBytes, pitch, rows) ||
+        ckd_mul(&ringBytes, ringBytes, (uint64_t)size->depthOrLayers))
     {
         ringBytes = UINT64_MAX;
     }
+    uint64_t tight = rowBytes * rows * size->depthOrLayers;
     mrhiReadback* readback =
         Reserve(device, ringBytes, tight, (uint32_t)pitch, (uint32_t)rowBytes, (uint32_t)rows);
     // An empty read is answered with no bytes, and copies nothing.
