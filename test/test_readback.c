@@ -705,7 +705,9 @@ static mrhiPassId ReadBoth(mrhiTextureId first, mrhiTextureId second, mrhiResour
 // which over 2^29 rows is 2^64 bytes and wraps to 0, though the rows' own
 // bytes do not; and 2 rows of 2^31 texels over 2^28 slices are 2^64 bytes
 // too. The array layers keep their limit, which sizes the device's
-// tables, and the depth of a 3D texture does not.
+// tables, and the depth of a 3D texture does not. And a guard: rows of
+// 2^28 texels, a pitch of 2^32, which the readback records cut to 32
+// bits, never fit a ring, whose budget is 32 bits.
 static void TestHugeTexture(void)
 {
     s_adapter.limits.textureDimension2d = UINT32_MAX;
@@ -738,6 +740,9 @@ static void TestHugeTexture(void)
                                &(mrhiExtent3d){(1u << 31) - 1, 1u << 29, 1},
                                &request) == mrhi_errorCapacity,
           "a pitch of 2^35 over 2^29 rows, though it wraps to 0");
+    CHECK(mrhiPass_ReadTexture(s_device, pass, &source, &(mrhiExtent3d){1u << 28, 2, 1},
+                               &request) == mrhi_errorCapacity,
+          "a pitch of 2^32");
     source.resource = resources[1];
     CHECK(mrhiPass_ReadTexture(s_device, pass, &source, &(mrhiExtent3d){1u << 31, 2, 1u << 28},
                                &request) == mrhi_errorCapacity,
