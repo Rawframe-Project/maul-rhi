@@ -668,6 +668,65 @@ static void TestFullArena(void)
     CloseDevice();
 }
 
+// A texture read whose ring bytes pass 64 bits does not fit the ring,
+// on an rgba32float array of 2^31 by 2^29 texels and 2^28 layers. Rows
+// of 2^31 texels are 2^35 bytes, over 2^28 rows 2^63; rows of 2^31 - 1
+// texels, 2^35 - 16 bytes, take a pitch of 2^35, which over 2^29 rows is
+// 2^64 bytes and wraps to 0, though the rows' own bytes do not; and 2
+// rows of 2^31 texels over 2^28 layers are 2^64 bytes too.
+static void TestHugeTexture(void)
+{
+    s_adapter.limits.textureDimension2d = UINT32_MAX;
+    s_adapter.limits.textureArrayLayers = UINT32_MAX;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.limits.textureDimension2d = UINT32_MAX;
+    deviceDef.limits.textureArrayLayers = UINT32_MAX;
+    deviceDef.budgets.readbackBytes = 8192;
+    s_device = OpenWith(deviceDef, true);
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.kind = mrhi_texture2dArray;
+    def.format = mrhi_formatRgba32Float;
+    def.width = 1u << 31;
+    def.height = 1u << 29;
+    def.depthOrLayers = 1u << 28;
+    def.usage = mrhi_textureCopySource;
+    mrhiTextureId texture = {0};
+    CHECK(mrhiCreateTexture(s_device, &def, &texture) == mrhi_success, "a texture of 2^88 texels");
+    mrhiFrameDef frameDef = mrhiDefaultFrameDef();
+    mrhiResourceId resource = {0};
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success &&
+              mrhiImportTexture(s_device, texture, &resource) == mrhi_success,
+          "imported");
+    mrhiAccess access = {
+        .resource = resource,
+        .kind = mrhi_accessCopySource,
+        .range = {.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING},
+    };
+    mrhiPassDef passDef = mrhiDefaultPassDef();
+    passDef.passClass = mrhi_passTransfer;
+    passDef.neverCull = true;
+    passDef.accesses = &access;
+    passDef.accessCount = 1;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(s_device, &passDef, &pass) == mrhi_success &&
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, pass) == mrhi_success,
+          "the pass begun");
+    mrhiTextureCopy source = {.resource = resource};
+    mrhiRequestId request = {0};
+    CHECK(mrhiPass_ReadTexture(s_device, pass, &source, &(mrhiExtent3d){1u << 31, 1u << 28, 1},
+                               &request) == mrhi_errorCapacity,
+          "2^63 bytes past the ring");
+    CHECK(mrhiPass_ReadTexture(s_device, pass, &source,
+                               &(mrhiExtent3d){(1u << 31) - 1, 1u << 29, 1},
+                               &request) == mrhi_errorCapacity,
+          "a pitch of 2^35 over 2^29 rows, though it wraps to 0");
+    CHECK(mrhiPass_ReadTexture(s_device, pass, &source, &(mrhiExtent3d){1u << 31, 2, 1u << 28},
+                               &request) == mrhi_errorCapacity,
+          "2 rows of 2^35 bytes over 2^28 layers");
+    CloseDevice();
+}
+
 int main(void)
 {
     ResetAdapter();
@@ -683,5 +742,6 @@ int main(void)
     TestSubmitFailure();
     TestLimits();
     TestFullArena();
+    TestHugeTexture();
     return s_failures == 0 ? 0 : 1;
 }
