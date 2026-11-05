@@ -57,14 +57,16 @@ extern "C"
         uint32_t surfaces;
         // Resources one frame declares and imports; 1024 by default.
         uint32_t frameResources;
-        // Passes one frame declares; 256 by default. The library's own pass,
-        // which zeroes new buffers, comes beside them.
+        // Passes one frame declares; 256 by default, at most UINT32_MAX - 1.
+        // The library's own pass, which zeroes new buffers, comes beside them.
         uint32_t framePasses;
         // Accesses and targets one frame's passes declare in all; 4096 by
-        // default.
+        // default, at most UINT32_MAX less frameResources. The library's use of
+        // each fresh resource it zeroes comes beside them.
         uint32_t frameAccesses;
-        // Barriers one frame's compile plans; 4096 by default. The barriers
-        // that follow the library's zeroing of new buffers come beside them.
+        // Barriers one frame's compile plans; 4096 by default, at most
+        // UINT32_MAX less frameResources. The barriers that follow the
+        // library's zeroing of new buffers come beside them.
         uint32_t frameBarriers;
         // Shader containers the device holds at once; 256 by default.
         uint32_t shaders;
@@ -148,14 +150,19 @@ extern "C"
     ///                    on any failure.
     /// @return `mrhi_success` with the device opening; `mrhi_errorInvalid` for
     /// a NULL argument, a def without its cookie, a label that is not UTF-8
-    /// without NUL, a zero budget, limits below the floor, an alignment that is
-    /// not a power of two or an allocator with one function; `mrhi_errorLimit`
-    /// for a label past MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for an adapter
-    /// the instance no longer has; `mrhi_errorUnsupported` for features or
-    /// limits beyond the adapter's, or a critical extension the library does
-    /// not know; `mrhi_errorCapacity` when the instance's queue has no room for
-    /// the answer or an allocator fails; `mrhi_errorBusy` for a call from
-    /// inside the instance's allocator.
+    /// without NUL, a zero budget, a framePasses budget past UINT32_MAX - 1, a
+    /// frameAccesses or frameBarriers budget past UINT32_MAX less
+    /// frameResources, limits below the floor, an alignment that is not a power
+    /// of two or an allocator with one function; `mrhi_errorLimit` for a label
+    /// past MRHI_MAX_LABEL_BYTES; `mrhi_errorStale` for an adapter the instance
+    /// no longer has; `mrhi_errorUnsupported` for features or limits beyond the
+    /// adapter's, or a critical extension the library does not know;
+    /// `mrhi_errorCapacity` when the instance's queue has no room for the
+    /// answer, when budgets and limits size the device's tables past what
+    /// size_t counts or the most parts the planner may cut one resource into
+    /// (from frameAccesses and the texture limits) past UINT32_MAX, or when an
+    /// allocator fails; `mrhi_errorBusy` for a call from inside the instance's
+    /// allocator.
     /// @par Thread safety
     /// Safe from any thread; the instance is used by one thread at a time.
     MRHI_NODISCARD MRHI_API mrhiResult mrhiCreateDevice(mrhiInstance* instance,
