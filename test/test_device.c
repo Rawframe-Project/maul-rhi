@@ -36,10 +36,9 @@ static mrhiTestDriverDef s_driver;
 // The allocator Create gives its instance.
 static mrhiAllocator s_instanceAllocator;
 
-// An instance with one adapter that grants 16-bit floats, 16384 texels
-// and 64-byte offset alignments; found, with its id in adapterOut.
-static mrhiInstance* Create(uint32_t notifications, mrhiResult openOutcome,
-                            mrhiAdapterId* adapterOut)
+// One adapter that grants 16-bit floats, 16384 texels and 64-byte offset
+// alignments.
+static void SetAdapter(mrhiResult openOutcome)
 {
     s_adapter = (mrhiTestAdapter){
         .info = {.driver = mrhi_driverTest, .kind = mrhi_adapterDiscrete},
@@ -55,6 +54,12 @@ static mrhiInstance* Create(uint32_t notifications, mrhiResult openOutcome,
         .adapters = &s_adapter,
         .adapterCount = 1,
     };
+}
+
+// An instance of the adapter as it stands; found, with its id in
+// adapterOut.
+static mrhiInstance* Find(uint32_t notifications, mrhiAdapterId* adapterOut)
+{
     mrhiInstanceDef def = mrhiDefaultInstanceDef();
     def.next = &s_driver.chain;
     def.limits.notifications = notifications;
@@ -70,6 +75,13 @@ static mrhiInstance* Create(uint32_t notifications, mrhiResult openOutcome,
     CHECK(mrhiInstance_GetAdapters(instance, adapterOut, 1, &count) == mrhi_success && count == 1,
           "one");
     return instance;
+}
+
+static mrhiInstance* Create(uint32_t notifications, mrhiResult openOutcome,
+                            mrhiAdapterId* adapterOut)
+{
+    SetAdapter(openOutcome);
+    return Find(notifications, adapterOut);
 }
 
 static mrhiDeviceDef Def(mrhiAdapterId adapter)
@@ -383,6 +395,97 @@ static void TestDeviceAllocatorAndMisuse(void)
     mrhiDestroyInstance(instance);
 }
 
+static int s_asked;
+
+// Refuses every block, counting the asks.
+static void* RefusingAlloc(size_t size, size_t alignment, void* context)
+{
+    (void)size;
+    (void)alignment;
+    (void)context;
+    ++s_asked;
+    return nullptr;
+}
+
+static void RefusingFree(void* memory, size_t size, size_t alignment, void* context)
+{
+    (void)memory;
+    (void)size;
+    (void)alignment;
+    (void)context;
+}
+
+// A device of the def on the refusing allocator: its status, with the
+// allocator's asks in s_asked.
+static mrhiResult CreateRefused(mrhiInstance* instance, mrhiDeviceDef def)
+{
+    def.allocator = (mrhiAllocator){RefusingAlloc, RefusingFree, nullptr};
+    s_asked = 0;
+    mrhiDevice* device = nullptr;
+    mrhiRequestId request;
+    return mrhiCreateDevice(instance, &def, &device, &request);
+}
+
+// A device whose frame counts pass 32 bits is refused rather than given
+// fewer than its budgets need, before its allocator is asked for a
+// block. Its accesses and the library's use of each fresh resource are
+// counted in 32 bits, as its barriers are: 2^32 - 1 accesses beside
+// 1024 resources are invalid, though 2^32 - 1025 are not. And, at 2^27
+// layers and the 14 mips of 8192 texels, a resource of 2^26 accesses
+// is cut into 2 times 14 by 2^27 boxes, twice over.
+static void TestCountsPast32Bits(void)
+{
+    SetAdapter(mrhi_success);
+    s_adapter.limits.textureArrayLayers = 1u << 27;
+    mrhiAdapterId adapter;
+    mrhiInstance* instance = Find(64, &adapter);
+    mrhiDeviceDef def = Def(adapter);
+    def.budgets.frameAccesses = UINT32_MAX;
+    CHECK(CreateRefused(instance, def) == mrhi_errorInvalid && s_asked == 0,
+          "accesses past 32 bits with the library's");
+    def.budgets.frameAccesses = UINT32_MAX - def.budgets.frameResources;
+    CHECK(CreateRefused(instance, def) == mrhi_errorCapacity,
+          "the most accesses, refused only for memory");
+    def = Def(adapter);
+    def.limits.textureArrayLayers = 1u << 27;
+    def.budgets.frameAccesses = 1u << 26;
+    CHECK(CreateRefused(instance, def) == mrhi_errorCapacity && s_asked == 0, "the boxes");
+    mrhiDestroyInstance(instance);
+}
+
+#if SIZE_MAX == UINT32_MAX
+// Where size_t is 32 bits, a device whose tables pass it is refused
+// before its allocator is asked for a block: no product of two budgets
+// wraps to a smaller table the device would then index past. On an
+// adapter of 2^16 vertex buffers: 2 frames of 2^31 staging bytes, and
+// 2^16 pipelines' and 2^16 passes' vertex buffers.
+static void TestLayoutPastSizeT(void)
+{
+    SetAdapter(mrhi_success);
+    s_adapter.limits.vertexBuffers = 1u << 16;
+    mrhiAdapterId adapter;
+    mrhiInstance* instance = Find(64, &adapter);
+    mrhiDeviceDef def = Def(adapter);
+    def.limits.framesInFlight = 2;
+    def.budgets.frameUploadBytes = 1u << 31;
+    CHECK(CreateRefused(instance, def) == mrhi_errorCapacity && s_asked == 0,
+          "the staging of 2^32 bytes");
+    def = Def(adapter);
+    def.limits.vertexBuffers = 1u << 16;
+    def.budgets.pipelines = 1u << 16;
+    CHECK(CreateRefused(instance, def) == mrhi_errorCapacity && s_asked == 0,
+          "the pipelines' vertex facts");
+    def = Def(adapter);
+    def.limits.vertexBuffers = 1u << 16;
+    def.budgets.pipelines = 1;
+    // With the library's own pass, 2^16.
+    def.budgets.framePasses = (1u << 16) - 1;
+    CHECK(CreateRefused(instance, def) == mrhi_errorCapacity && s_asked == 0,
+          "the passes' vertex buffer sizes");
+    mrhiDestroyInstance(instance);
+}
+#endif
+
 int main(void)
 {
     TestOpensLater();
@@ -395,5 +498,9 @@ int main(void)
     TestQueueRoom();
     TestInvalidDefs();
     TestDeviceAllocatorAndMisuse();
+    TestCountsPast32Bits();
+#if SIZE_MAX == UINT32_MAX
+    TestLayoutPastSizeT();
+#endif
     return s_failures == 0 ? 0 : 1;
 }
