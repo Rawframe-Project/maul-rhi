@@ -5,6 +5,18 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.29.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.28.1...v0.29.0) (2026-11-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **device:** mrhiCreateDevice refuses a frameAccesses budget past UINT32_MAX less frameResources with mrhi_errorInvalid, and, where size_t is 32 bits, budgets whose staging or vertex tables pass it with mrhi_errorCapacity; a def whose box count passes UINT32_MAX is refused with mrhi_errorCapacity on every build.
+
+### Fixed
+
+* **device:** refuse budgets whose tables or counts pass their width ([#509](https://github.com/Rawframe-Project/maul-rhi/issues/509)) ([579fd6f](https://github.com/Rawframe-Project/maul-rhi/commit/579fd6f8548f2b9910ef9f1db5001527cda4ee35)), closes [#508](https://github.com/Rawframe-Project/maul-rhi/issues/508)
+* **encoder:** refuse a draw whose vertex reach wraps past 64 bits ([#507](https://github.com/Rawframe-Project/maul-rhi/issues/507)) ([eb863b1](https://github.com/Rawframe-Project/maul-rhi/commit/eb863b165bf139c182571c9e18a34fb23ac0b897)), closes [#506](https://github.com/Rawframe-Project/maul-rhi/issues/506)
+
 ## [0.28.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.28.0...v0.28.1) (2026-11-05)
 
 ### Fixed
