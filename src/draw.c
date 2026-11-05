@@ -10,6 +10,7 @@
 
 #include "encoder_core.h"
 
+#include <stdckdint.h>
 #include <string.h>
 
 // A buffer of the open frame a pass declares with an access kind,
@@ -186,12 +187,16 @@ static const mrhiPipelineSlot* ReadyToRun(const mrhiDevice* device, const mrhiFr
 
 // Whether a vertex buffer of bytes holds count elements from first:
 // every element's stride but the last's, which needs only the bytes its
-// attributes reach.
+// attributes reach. Up to 2^33 elements at a stride of up to 2^32 bytes
+// can reach past 64 bits, and so past any buffer.
 MRHI_NODISCARD static bool Holds(const mrhiVertexFacts* facts, uint64_t bytes, uint32_t first,
                                  uint32_t count)
 {
     uint64_t elements = (uint64_t)first + count;
-    return elements == 0 || (elements - 1) * facts->stride + facts->lastStride <= bytes;
+    uint64_t reach = 0;
+    return elements == 0 ||
+           (!ckd_mul(&reach, elements - 1, (uint64_t)facts->stride) &&
+            !ckd_add(&reach, reach, (uint64_t)facts->lastStride) && reach <= bytes);
 }
 
 // Checks the pipeline's vertex buffers for a draw of vertices and

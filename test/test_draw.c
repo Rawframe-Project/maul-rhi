@@ -384,6 +384,39 @@ static void TestAttributeReach(void)
     CloseDevice();
 }
 
+// A vertex buffer of 2^32 bytes at a stride of 2^32 - 4, whose element's
+// attribute reaches 16 bytes, holds one vertex, not two. Vertices from
+// 2^32 - 1 reach past 64 bits: 2^32 + 5 of them reach (2^32 + 4) times
+// the stride, 2^64 - 16, and the attribute's 16 bytes take the sum to
+// 2^64, which wraps to 0; 2^32 + 6 take the product past 2^64, which
+// wraps to 2^32 - 20.
+static void TestHugeStride(void)
+{
+    s_adapter.limits.vertexStride = UINT32_MAX;
+    s_adapter.limits.bufferBytes = (uint64_t)1 << 32;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.limits.vertexStride = UINT32_MAX;
+    deviceDef.limits.bufferBytes = (uint64_t)1 << 32;
+    OpenLimited(deviceDef);
+    s_vertices = MakeBuffer((uint64_t)1 << 32, mrhi_bufferVertex);
+    Unbound();
+    mrhiGraphicsPipelineDef def = GraphicsDef(MakeShader());
+    s_layouts[0].stride = UINT32_MAX - 3;
+    s_attributes[0].offset = 4;
+    mrhiGraphicsPipelineId pipeline = Graphics(&def);
+    Frame();
+    CHECK(mrhiPass_SetGraphicsPipeline(s_device, s_render, pipeline) == mrhi_success, "set");
+    SetVertices();
+    CHECK(mrhiPass_Draw(s_device, s_render, 1, 1, 0, 0) == mrhi_success, "one vertex");
+    CHECK(mrhiPass_Draw(s_device, s_render, 2, 1, 0, 0) == mrhi_errorInvalid, "not two");
+    CHECK(mrhiPass_Draw(s_device, s_render, 6, 1, UINT32_MAX, 0) == mrhi_errorInvalid,
+          "a reach of 2^64, though it wraps to 0");
+    CHECK(mrhiPass_Draw(s_device, s_render, 7, 1, UINT32_MAX, 0) == mrhi_errorInvalid,
+          "a stride product past 2^64, though it wraps to 2^32 - 20");
+    Drop();
+    CloseDevice();
+}
+
 static void TestIndices(void)
 {
     Open();
@@ -1089,6 +1122,7 @@ int main(void)
     TestVertexBuffers();
     ResetAdapter();
     TestAttributeReach();
+    TestHugeStride();
     TestIndices();
     TestTables();
     ResetAdapter();
