@@ -69,11 +69,17 @@ static void CheckBindings(Walk* walk, const mrhiCommand* command)
 }
 
 // The bytes a buffer side of a copy covers: a buffer's bytes, or a
-// texture's rows at the side's pitch.
+// texture's rows at the side's pitch over its layers, UINT64_MAX, past
+// any range, when that count passes 64 bits.
 static uint64_t SideBytes(const mrhiCommand* command, const mrhiCommandBufferSide* side,
                           bool texture)
 {
-    return texture ? (uint64_t)side->bytesPerRow * side->rowsPerImage * command->d : command->b;
+    if (!texture)
+    {
+        return command->b;
+    }
+    uint64_t layer = (uint64_t)side->bytesPerRow * side->rowsPerImage;
+    return layer != 0 && command->d > UINT64_MAX / layer ? UINT64_MAX : layer * command->d;
 }
 
 // Checks a copy's two sides: each a frame resource of its type, or, for
