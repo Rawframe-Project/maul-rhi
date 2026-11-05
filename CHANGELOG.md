@@ -5,6 +5,32 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.28.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.27.0...v0.28.0) (2026-11-05)
+
+### Changed
+
+- **Breaking:** on a device with `rg11b10Renderable`, rg11b10ufloat
+  blends and takes 4 samples, as WebGPU's `rg11b10ufloat-renderable`
+  allows. `mrhiAdapter_GetFormatCaps` reports `blending` and 1 and 4
+  samples for it, `mrhiCreateTexture` makes a 4-sample rg11b10ufloat
+  texture, a pass resolves one, and `mrhiCreateGraphicsPipeline` takes
+  a blended rg11b10ufloat target. Before, the caps reported `blending`
+  false and `sampleCounts` 1, and those calls were refused with
+  `mrhi_errorUnsupported`. The WebGPU, Metal and D3D12 drivers and the
+  test driver change; the Vulkan driver reads the format's own
+  properties as before. A device without the feature is unchanged. The
+  SPI stays 18. `contract_version` rises to 39.
+  ([#491](https://github.com/Rawframe-Project/maul-rhi/pull/491))
+
+### Fixed
+
+- `MRHI_NODISCARD` is `[[nodiscard]]` in C under GCC 14's C23, which
+  reports `__STDC_VERSION__` as `202000L`, so a program built that way
+  now gets a warning when it drops a status. Before, the macro was
+  empty there. It now takes the attribute in any C dialect after C17
+  whose compiler has it; C17 and older dialects and C++ are unchanged.
+  ([#487](https://github.com/Rawframe-Project/maul-rhi/pull/487))
+
 ## [0.27.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.26.0...v0.27.0) (2026-11-04)
 
 ### Changed
