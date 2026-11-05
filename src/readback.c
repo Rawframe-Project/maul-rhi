@@ -95,6 +95,12 @@ MRHI_NODISCARD static bool TakeRing(mrhiDevice* device, uint64_t bytes, uint64_t
     return true;
 }
 
+// The ring holds fewer than 2^32 bytes, so a texture read's pitch or row
+// past 32 bits never fits it: Reserve refuses those before it keeps them
+// cut to 32 bits.
+static_assert(sizeof((mrhiDeviceBudgets){0}.readbackBytes) == sizeof(uint32_t),
+              "a ring smaller than 2^32 bytes");
+
 // Records a readback of ring bytes that the program takes as size bytes
 // of rows: its record, or NULL when the device lacks a record, the
 // bytes, or answer room for it and its frame, recorded as a refusal by

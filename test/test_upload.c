@@ -465,6 +465,54 @@ static void TestWholePitch(void)
     CloseDevice();
 }
 
+#if SIZE_MAX > UINT32_MAX
+// A guard: an upload's staged pitch, which its record cuts to 32 bits,
+// never fits a frame's staging, whose budget is 32 bits. Two r8 rows of
+// 2^32 - 1 texels take a pitch of 2^32. The layout names 2^33 - 2 bytes,
+// which only a size_t past 32 bits can count, and the write is refused
+// before any is read.
+static void TestHugePitch(void)
+{
+    s_adapter.limits.textureDimension2d = UINT32_MAX;
+    mrhiDeviceDef deviceDef = mrhiDefaultDeviceDef();
+    deviceDef.limits.textureDimension2d = UINT32_MAX;
+    s_device = OpenWith(deviceDef, true);
+    mrhiTextureDef def = mrhiDefaultTextureDef();
+    def.format = mrhi_formatR8Unorm;
+    def.width = UINT32_MAX;
+    def.height = 2;
+    def.usage = mrhi_textureCopyDestination;
+    mrhiTextureId texture = {0};
+    CHECK(mrhiCreateTexture(s_device, &def, &texture) == mrhi_success, "a texture");
+    mrhiFrameDef frameDef = mrhiDefaultFrameDef();
+    mrhiResourceId resource = {0};
+    CHECK(mrhiDevice_BeginFrame(s_device, &frameDef) == mrhi_success &&
+              mrhiImportTexture(s_device, texture, &resource) == mrhi_success,
+          "imported");
+    mrhiAccess access = {
+        .resource = resource,
+        .kind = mrhi_accessCopyDestination,
+        .range = {.mipCount = MRHI_REMAINING, .layerCount = MRHI_REMAINING},
+    };
+    mrhiPassDef passDef = mrhiDefaultPassDef();
+    passDef.passClass = mrhi_passTransfer;
+    passDef.neverCull = true;
+    passDef.accesses = &access;
+    passDef.accessCount = 1;
+    mrhiPassId pass = {0};
+    CHECK(mrhiAddPass(s_device, &passDef, &pass) == mrhi_success &&
+              mrhiDevice_CompileFrame(s_device) == mrhi_success &&
+              mrhiPass_Begin(s_device, pass) == mrhi_success,
+          "the pass begun");
+    mrhiTextureCopy destination = {.resource = resource};
+    mrhiTexelLayout layout = {.bytesPerRow = UINT32_MAX};
+    CHECK(mrhiPass_WriteTexture(s_device, pass, &destination, s_bytes, (size_t)UINT32_MAX * 2,
+                                &layout, &(mrhiExtent3d){UINT32_MAX, 2, 1}) == mrhi_errorCapacity,
+          "a pitch of 2^32");
+    CloseDevice();
+}
+#endif
+
 int main(void)
 {
     ResetAdapter();
@@ -474,5 +522,8 @@ int main(void)
     TestUnevenStaging();
     TestStagingInFlight();
     TestTextures();
+#if SIZE_MAX > UINT32_MAX
+    TestHugePitch();
+#endif
     return s_failures == 0 ? 0 : 1;
 }

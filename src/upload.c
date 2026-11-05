@@ -17,6 +17,12 @@
 #define PLACEMENT 512
 #define PITCH     256
 
+// A frame's staging holds fewer than 2^32 bytes, so a texture upload's
+// pitch past 32 bits never fits it: TakeStaging refuses it before its
+// record cuts the pitch to 32 bits.
+static_assert(sizeof((mrhiDeviceBudgets){0}.frameUploadBytes) == sizeof(uint32_t),
+              "a frame's staging smaller than 2^32 bytes");
+
 // Takes bytes of the open frame's staging at a placement boundary: a
 // pointer to them and their offset in the frame's region, or NULL when
 // the staging is full, which marks the pass as a full arena does and
