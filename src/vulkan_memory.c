@@ -12,12 +12,13 @@
 // The most bytes a block takes.
 #define BLOCK_BYTES (UINT64_C(64) << 20)
 
-void mrhiVulkanMemoryCounts(uint32_t objects, uint32_t* blocksOut, uint32_t* nodesOut)
+void mrhiVulkanMemoryCounts(mrhiLayout* layout, uint64_t objects, uint32_t* blocksOut,
+                            uint32_t* nodesOut)
 {
     // A block but a pool's last holds an allocation; a block's free range
     // and each allocation's used and split ranges take a node each.
-    *blocksOut = objects + 2 * VK_MAX_MEMORY_TYPES;
-    *nodesOut = 3 * objects + *blocksOut;
+    *blocksOut = mrhiLayoutPlus32(layout, objects, 2 * VK_MAX_MEMORY_TYPES);
+    *nodesOut = mrhiLayoutPlus32(layout, mrhiLayoutTimes32(layout, 3, objects), *blocksOut);
 }
 
 void mrhiVulkanMemoryInit(mrhiVulkanMemory* memory, const mrhiVulkanDevice* api, VkDevice device,

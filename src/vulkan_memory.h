@@ -11,6 +11,7 @@
 #ifndef MAUL_RHI_SRC_VULKAN_MEMORY_H
 #define MAUL_RHI_SRC_VULKAN_MEMORY_H
 
+#include "allocator.h"
 #include "tlsf.h"
 #include "vulkan_api.h"
 
@@ -59,8 +60,10 @@ typedef struct mrhiVulkanMemory
 } mrhiVulkanMemory;
 
 // The bookkeeping a device with room for objects buffers and textures
-// needs: blocks, and TLSF nodes.
-void mrhiVulkanMemoryCounts(uint32_t objects, uint32_t* blocksOut, uint32_t* nodesOut);
+// needs: blocks, and TLSF nodes, counted in 32 bits; counts past them
+// mark the layout as overflowing.
+void mrhiVulkanMemoryCounts(mrhiLayout* layout, uint64_t objects, uint32_t* blocksOut,
+                            uint32_t* nodesOut);
 
 // Sets up a device's memory over its arrays: pools for 2 *
 // VK_MAX_MEMORY_TYPES, blocks and nodes as mrhiVulkanMemoryCounts says.
