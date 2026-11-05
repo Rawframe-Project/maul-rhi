@@ -5,6 +5,31 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.28.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.28.0...v0.28.1) (2026-11-05)
+
+### Fixed
+
+- `mrhiPass_ReadTexture` refuses a texture read whose bytes in the
+  readback ring pass 64 bits with `mrhi_errorCapacity` and
+  `mrhi_diagnosticReadbackBytes`. Before, the row pitch times the rows
+  went unchecked and could wrap to 0, so such a read fit any ring and
+  was recorded with a ring share that did not describe the copy. Only a
+  device whose driver reports texture limits that large can make such a
+  texture: the test driver can, and so can a driver built outside the
+  tree; the native drivers' limits keep rows far below it.
+  ([#502](https://github.com/Rawframe-Project/maul-rhi/pull/502))
+- The test driver and the validation layer (`MAUL_RHI_VALIDATION`),
+  which walk every frame a driver is handed, stop the walk at two
+  faults that left later reads unsafe: an upload whose source lies past
+  the frame's staging, and a pass with more color targets than
+  `MRHI_MAX_COLOR_TARGETS`. Before, they counted the fault and then read
+  past the staging or past the pass's color targets.
+  ([#495](https://github.com/Rawframe-Project/maul-rhi/pull/495))
+- The same walk counts a fault for a texture copy whose staging or
+  readback ring side passes 64 bits. Before, its size wrapped, could
+  come out small or 0, and passed the range check, so the fault went
+  unreported. ([#499](https://github.com/Rawframe-Project/maul-rhi/pull/499))
+
 ## [0.28.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.27.0...v0.28.0) (2026-11-05)
 
 ### Changed
