@@ -487,7 +487,9 @@ if(MAUL_RHI_BUILD_TESTS)
         add_test(NAME conformance_app COMMAND ${PROJECT_SOURCE_DIR}/tools/run_android_app.sh
                  ${PROJECT_BINARY_DIR}/test_conformance_app.apk ${package})
         # The application always has a window, so its surface is required.
-        set_tests_properties(conformance_app PROPERTIES TIMEOUT 300
+        # The runner waits a minute for the system's broadcasts and four
+        # for the result.
+        set_tests_properties(conformance_app PROPERTIES TIMEOUT 420
                              ENVIRONMENT MAUL_RHI_REQUIRE_SURFACE=1)
     endif()
     maul_add_header_tests()
