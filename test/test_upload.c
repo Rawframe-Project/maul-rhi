@@ -465,10 +465,12 @@ static void TestWholePitch(void)
     CloseDevice();
 }
 
+#if SIZE_MAX > UINT32_MAX
 // A guard: an upload's staged pitch, which its record cuts to 32 bits,
 // never fits a frame's staging, whose budget is 32 bits. Two r8 rows of
-// 2^32 - 1 texels take a pitch of 2^32. The layout names 2^33 bytes, and
-// the write is refused before any is read.
+// 2^32 - 1 texels take a pitch of 2^32. The layout names 2^33 - 2 bytes,
+// which only a size_t past 32 bits can count, and the write is refused
+// before any is read.
 static void TestHugePitch(void)
 {
     s_adapter.limits.textureDimension2d = UINT32_MAX;
@@ -509,6 +511,7 @@ static void TestHugePitch(void)
           "a pitch of 2^32");
     CloseDevice();
 }
+#endif
 
 int main(void)
 {
@@ -519,6 +522,8 @@ int main(void)
     TestUnevenStaging();
     TestStagingInFlight();
     TestTextures();
+#if SIZE_MAX > UINT32_MAX
     TestHugePitch();
+#endif
     return s_failures == 0 ? 0 : 1;
 }
