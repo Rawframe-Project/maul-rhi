@@ -184,8 +184,10 @@ static uint32_t BitsOf(mrhiConstantType type, double value)
 
 // Fills a pipeline's constant words from the shader's defaults and the
 // values given: false when a fixed constant is given other bits.
-static bool Specialize(const mrhiD3d12Shader* shader, const mrhiReflection* reflection,
-                       const mrhiConstantValue* values, uint32_t count, uint32_t* words)
+MRHI_NODISCARD static bool Specialize(const mrhiD3d12Shader* shader,
+                                      const mrhiReflection* reflection,
+                                      const mrhiConstantValue* values, uint32_t count,
+                                      uint32_t* words)
 {
     if (shader->layout.constantWords > 0)
     {

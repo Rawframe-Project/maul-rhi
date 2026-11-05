@@ -98,8 +98,8 @@ typedef struct mrhiMetalLanes
 // Makes the async compute and transfer queues beside the device's, each
 // labelled as the device is with its lane's name after, and the events:
 // false when Metal makes one not, with those made released.
-bool mrhiMetalOpenLanes(mrhiMetalLanes* lanes, id<MTLDevice> device, id<MTLCommandQueue> queue,
-                        NSString* label);
+MRHI_NODISCARD bool mrhiMetalOpenLanes(mrhiMetalLanes* lanes, id<MTLDevice> device,
+                                       id<MTLCommandQueue> queue, NSString* label);
 
 // Releases the queues and events the lanes made.
 void mrhiMetalCloseLanes(mrhiMetalLanes* lanes);

@@ -9,6 +9,8 @@
 #ifndef MAUL_RHI_SRC_POOL_H
 #define MAUL_RHI_SRC_POOL_H
 
+#include "maul-rhi/base.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -28,10 +30,10 @@ void mrhiPoolInit(mrhiPool* pool, uint32_t capacity, uint32_t* generations, uint
 
 // Takes a free slot: true with its index1 and generation, false when
 // every slot is used.
-bool mrhiPoolAcquire(mrhiPool* pool, uint32_t* index1Out, uint32_t* generationOut);
+MRHI_NODISCARD bool mrhiPoolAcquire(mrhiPool* pool, uint32_t* index1Out, uint32_t* generationOut);
 
 // Whether an id names a slot in use.
-bool mrhiPoolIsLive(const mrhiPool* pool, uint32_t index1, uint32_t generation);
+MRHI_NODISCARD bool mrhiPoolIsLive(const mrhiPool* pool, uint32_t index1, uint32_t generation);
 
 // Frees a live slot and ends its ids.
 void mrhiPoolRelease(mrhiPool* pool, uint32_t index1);

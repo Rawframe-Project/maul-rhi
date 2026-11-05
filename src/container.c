@@ -77,9 +77,9 @@ static const uint8_t* FindSection(const uint8_t* bytes, const mrhiContainerSecti
 
 // Takes an array section: false when its size is not a whole number of
 // records, or holds more than MRHI_MAX_CONTAINER_RECORDS.
-static bool TakeArray(const uint8_t* bytes, const mrhiContainerSection* sections, uint32_t count,
-                      uint32_t type, uint32_t recordBytes, const uint8_t** arrayOut,
-                      uint32_t* countOut)
+MRHI_NODISCARD static bool TakeArray(const uint8_t* bytes, const mrhiContainerSection* sections,
+                                     uint32_t count, uint32_t type, uint32_t recordBytes,
+                                     const uint8_t** arrayOut, uint32_t* countOut)
 {
     uint64_t size = 0;
     *arrayOut = FindSection(bytes, sections, count, type, &size);
@@ -90,8 +90,8 @@ static bool TakeArray(const uint8_t* bytes, const mrhiContainerSection* sections
 // Whether a record lies inside the section given. The accessors read
 // only after the parse checked the sizes they rely on; only assertions
 // call it.
-[[maybe_unused]] static bool Inside(const uint8_t* section, size_t sectionBytes, const uint8_t* at,
-                                    size_t bytes)
+MRHI_NODISCARD [[maybe_unused]] static bool Inside(const uint8_t* section, size_t sectionBytes,
+                                                   const uint8_t* at, size_t bytes)
 {
     return section != nullptr && at >= section && bytes <= sectionBytes &&
            (size_t)(at - section) <= sectionBytes - bytes;
@@ -204,8 +204,8 @@ static mrhiD3d12Place ReadPlace(const uint8_t* at)
 }
 
 // Whether a record lies inside the D3D12 map. Only assertions call it.
-[[maybe_unused]] static bool InD3d12Map(const mrhiContainer* container, const uint8_t* at,
-                                        size_t bytes)
+MRHI_NODISCARD [[maybe_unused]] static bool InD3d12Map(const mrhiContainer* container,
+                                                       const uint8_t* at, size_t bytes)
 {
     return Inside(container->d3d12Map, container->d3d12MapBytes, at, bytes);
 }
@@ -275,13 +275,13 @@ bool mrhiContainerD3d12Fixed(const mrhiContainer* container, uint32_t constant)
 }
 
 // Whether a range of records lies in an array of count.
-static bool InArray(uint32_t first, uint32_t length, uint32_t count)
+MRHI_NODISCARD static bool InArray(uint32_t first, uint32_t length, uint32_t count)
 {
     return first + length <= count;
 }
 
 // Whether an entry is well formed, its name unique among those before.
-static bool IsEntryValid(const mrhiContainer* container, uint32_t index)
+MRHI_NODISCARD static bool IsEntryValid(const mrhiContainer* container, uint32_t index)
 {
     mrhiShaderEntry entry = mrhiContainerEntry(container, index);
     bool vertex = entry.stage == mrhi_stageVertex;
@@ -333,7 +333,8 @@ static bool IsEntryValid(const mrhiContainer* container, uint32_t index)
 // Whether the locations of a range of interface records are unique.
 // Whether an entry's inputs, outputs and variables each have unique
 // locations.
-static bool AreEntryLocationsUnique(const mrhiContainer* container, mrhiShaderEntry entry)
+MRHI_NODISCARD static bool AreEntryLocationsUnique(const mrhiContainer* container,
+                                                   mrhiShaderEntry entry)
 {
     return mrhiAreInterfaceLocationsUnique(container->inputs, entry.firstInput, entry.inputCount,
                                            false) &&
@@ -346,14 +347,14 @@ static bool AreEntryLocationsUnique(const mrhiContainer* container, mrhiShaderEn
 // Whether WebGPU reads and writes a storage texture of a format through
 // one binding: only the 32-bit single-channel formats, without its
 // texture-formats-tier2 feature.
-static bool IsReadWriteFormat(mrhiFormat format)
+MRHI_NODISCARD static bool IsReadWriteFormat(mrhiFormat format)
 {
     return format == mrhi_formatR32Float || format == mrhi_formatR32Uint ||
            format == mrhi_formatR32Sint;
 }
 
 // Whether a binding's details suit its kind.
-static bool AreDetailsValid(const mrhiShaderBinding* binding)
+MRHI_NODISCARD static bool AreDetailsValid(const mrhiShaderBinding* binding)
 {
     bool buffer = binding->kind == mrhi_bindingUniformBuffer ||
                   binding->kind == mrhi_bindingStorageBuffer ||
@@ -388,7 +389,7 @@ static bool AreDetailsValid(const mrhiShaderBinding* binding)
 
 // Whether a binding is well formed, its table and slot unique among those
 // before.
-static bool IsBindingValid(const mrhiContainer* container, uint32_t index)
+MRHI_NODISCARD static bool IsBindingValid(const mrhiContainer* container, uint32_t index)
 {
     const uint8_t* raw = container->bindings + (size_t)index * BINDING_BYTES;
     mrhiShaderBinding binding = mrhiContainerBinding(container, index);
@@ -414,7 +415,7 @@ static bool IsBindingValid(const mrhiContainer* container, uint32_t index)
 }
 
 // Whether a constant is well formed, its id unique among those before.
-static bool IsConstantValid(const mrhiContainer* container, uint32_t index)
+MRHI_NODISCARD static bool IsConstantValid(const mrhiContainer* container, uint32_t index)
 {
     const uint8_t* raw = container->constants + (size_t)index * CONSTANT_BYTES;
     mrhiShaderConstant constant = mrhiContainerConstant(container, index);
@@ -454,7 +455,7 @@ static uint32_t MetalClass(mrhiBindingKind kind, uint32_t* limitOut)
 }
 
 // Whether a buffer index is a binding's, or the root block's.
-static bool IsMetalBufferTaken(const mrhiContainer* container, uint8_t index)
+MRHI_NODISCARD static bool IsMetalBufferTaken(const mrhiContainer* container, uint8_t index)
 {
     if (index == mrhiContainerMetalRoot(container))
     {
@@ -474,7 +475,7 @@ static bool IsMetalBufferTaken(const mrhiContainer* container, uint8_t index)
 
 // Whether each binding's Metal index is in its class's range, apart from
 // the bindings of its class before it and from the root block.
-static bool AreMetalBindingsValid(const mrhiContainer* container)
+MRHI_NODISCARD static bool AreMetalBindingsValid(const mrhiContainer* container)
 {
     uint8_t root = mrhiContainerMetalRoot(container);
     for (uint32_t i = 0; i < container->bindingCount; ++i)
@@ -501,7 +502,7 @@ static bool AreMetalBindingsValid(const mrhiContainer* container)
 
 // Whether an entry's Metal record is well formed: its MSL inside the MSL
 // section, or none without one, and its buffer sizes at a free index.
-static bool IsMetalEntryValid(const mrhiContainer* container, uint32_t index)
+MRHI_NODISCARD static bool IsMetalEntryValid(const mrhiContainer* container, uint32_t index)
 {
     const uint8_t* raw = container->metalMap + 8 + (size_t)index * METAL_ENTRY_BYTES;
     mrhiMetalEntry entry = mrhiContainerMetalEntry(container, index);
@@ -520,7 +521,7 @@ static bool IsMetalEntryValid(const mrhiContainer* container, uint32_t index)
 // Whether the Metal code agrees with the rules: the map exactly when
 // there is MSL or a metallib and no entry uses a heap, of its size, with
 // its root block, bindings and entries well formed.
-static bool IsMetalValid(const mrhiContainer* container)
+MRHI_NODISCARD static bool IsMetalValid(const mrhiContainer* container)
 {
     bool code = container->msl != nullptr || container->metallib != nullptr;
     if (container->metalMap == nullptr)
@@ -576,14 +577,15 @@ static int D3d12Class(mrhiBindingKind kind)
     }
 }
 
-static bool IsSamePlace(mrhiD3d12Place a, mrhiD3d12Place b)
+MRHI_NODISCARD static bool IsSamePlace(mrhiD3d12Place a, mrhiD3d12Place b)
 {
     return a.reg == b.reg && a.space == b.space;
 }
 
 // Whether the map's own constant buffers are placed exactly when the
 // container has them, in range and apart; notes which it has.
-static bool AreD3d12BuffersValid(const mrhiContainer* container, bool vertexInfo, bool* present)
+MRHI_NODISCARD static bool AreD3d12BuffersValid(const mrhiContainer* container, bool vertexInfo,
+                                                bool* present)
 {
     present[mrhiD3d12RootBlock] = container->rootBlockBytes > 0;
     present[mrhiD3d12Constants] = container->constantCount > 0;
@@ -617,7 +619,8 @@ static bool AreD3d12BuffersValid(const mrhiContainer* container, bool vertexInfo
 
 // Whether each binding's place is in range and apart from the bindings
 // of its class before it and, for a constant buffer, from the map's own.
-static bool AreD3d12BindingsValid(const mrhiContainer* container, const bool* present)
+MRHI_NODISCARD static bool AreD3d12BindingsValid(const mrhiContainer* container,
+                                                 const bool* present)
 {
     for (uint32_t i = 0; i < container->bindingCount; ++i)
     {
@@ -650,7 +653,7 @@ static bool AreD3d12BindingsValid(const mrhiContainer* container, const bool* pr
 // Whether an entry's D3D12 record is well formed: a DXIL container
 // inside the DXIL section, and the vertex information read only by a
 // vertex entry.
-static bool IsD3d12EntryValid(const mrhiContainer* container, uint32_t index)
+MRHI_NODISCARD static bool IsD3d12EntryValid(const mrhiContainer* container, uint32_t index)
 {
     const uint8_t* raw = container->d3d12Map + D3D12_HEAD_BYTES + (size_t)index * D3D12_ENTRY_BYTES;
     mrhiD3d12Entry entry = mrhiContainerD3d12Entry(container, index);
@@ -670,7 +673,7 @@ static bool IsD3d12EntryValid(const mrhiContainer* container, uint32_t index)
 // within their class, resource ranges exactly when an entry reads
 // resources from the heap and sampler ranges exactly when one reads
 // samplers.
-static bool AreD3d12HeapRangesValid(const mrhiContainer* container)
+MRHI_NODISCARD static bool AreD3d12HeapRangesValid(const mrhiContainer* container)
 {
     uint32_t count = mrhiContainerD3d12HeapRangeCount(container);
     bool resources = false;
@@ -705,7 +708,7 @@ static bool AreD3d12HeapRangesValid(const mrhiContainer* container)
 // Whether the D3D12 code agrees with the rules: the map exactly when
 // there is DXIL, of its size, with its entries, constant buffers,
 // bindings, heap ranges and constants well formed.
-static bool IsD3d12Valid(const mrhiContainer* container)
+MRHI_NODISCARD static bool IsD3d12Valid(const mrhiContainer* container)
 {
     if (container->d3d12Map == nullptr || container->dxil == nullptr)
     {
@@ -752,7 +755,7 @@ static bool IsD3d12Valid(const mrhiContainer* container)
 
 // Whether the records agree with the rules and with each other; notes
 // 16-bit floats and the builtins and heap uses of the entries.
-static bool AreRecordsValid(mrhiContainer* container)
+MRHI_NODISCARD static bool AreRecordsValid(mrhiContainer* container)
 {
     if (container->entryCount == 0 ||
         !mrhiAreInterfaceRecordsValid(container->inputs, container->inputCount, mrhi_interfaceInput,
@@ -806,8 +809,8 @@ static bool AreRecordsValid(mrhiContainer* container)
 // or the view index or the SPIR-V declares 64-bit integers.
 // A metallib has its magic; the Metal map, MSL, D3D12 map and DXIL are
 // checked with the records.
-static bool TakeParts(const uint8_t* bytes, const mrhiContainerSection* sections, uint32_t count,
-                      mrhiContainer* container)
+MRHI_NODISCARD static bool TakeParts(const uint8_t* bytes, const mrhiContainerSection* sections,
+                                     uint32_t count, mrhiContainer* container)
 {
     uint64_t size = 0;
     const uint8_t* meta = FindSection(bytes, sections, count, SECTION_META, &size);
@@ -854,7 +857,7 @@ static bool TakeParts(const uint8_t* bytes, const mrhiContainerSection* sections
 // its section: each entry's name in the strings, its interface ranges in
 // their arrays, its MSL and DXIL in theirs. The record checks above make
 // it so; only an assertion calls it.
-[[maybe_unused]] static bool IsSliced(const mrhiContainer* container)
+MRHI_NODISCARD [[maybe_unused]] static bool IsSliced(const mrhiContainer* container)
 {
     for (uint32_t i = 0; i < container->entryCount; ++i)
     {

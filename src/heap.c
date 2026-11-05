@@ -138,8 +138,8 @@ static uint32_t* RefsOf(mrhiDevice* device, const mrhiHeapEntrySlot* entry, bool
 // Whether an entry names a live object of the generation it was written
 // with: destroying one empties the entries naming it first. Only an
 // assertion calls it.
-[[maybe_unused]] static bool NamesLive(const mrhiDevice* device, const mrhiHeapEntrySlot* entry,
-                                       bool sampler)
+MRHI_NODISCARD [[maybe_unused]] static bool NamesLive(const mrhiDevice* device,
+                                                      const mrhiHeapEntrySlot* entry, bool sampler)
 {
     const mrhiPool* pool = sampler                                 ? &device->samplers
                            : entry->kind == mrhi_heapStorageBuffer ? &device->buffers
@@ -206,7 +206,7 @@ void mrhiDestroyHeaps(mrhiDevice* device)
 
 // Whether no running frame was submitted before an emptied entry's
 // emptying, so that none can read it.
-static bool IsFree(const mrhiDevice* device, const mrhiHeapEntrySlot* entry)
+MRHI_NODISCARD static bool IsFree(const mrhiDevice* device, const mrhiHeapEntrySlot* entry)
 {
     if (entry->object != 0)
     {

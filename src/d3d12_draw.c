@@ -76,7 +76,8 @@ static void SetVertexInfo(const mrhiD3d12Recorder* recorder, int32_t baseVertex,
 
 // Takes bytes of the slot's scratch buffer, making it at its first use:
 // false, failing the frame, when it cannot.
-static bool TakeScratch(mrhiD3d12Recorder* recorder, uint64_t bytes, uint64_t* offsetOut)
+MRHI_NODISCARD static bool TakeScratch(mrhiD3d12Recorder* recorder, uint64_t bytes,
+                                       uint64_t* offsetOut)
 {
     if (*recorder->scratch == nullptr)
     {
@@ -279,8 +280,8 @@ static void Mark(const mrhiD3d12Recorder* recorder, mrhiD3d12QuerySet* set, uint
     set->written[query / 64] |= UINT64_C(1) << (query % 64);
 }
 
-static bool IsWritten(const mrhiD3d12Recorder* recorder, const mrhiD3d12QuerySet* set,
-                      uint32_t query)
+MRHI_NODISCARD static bool IsWritten(const mrhiD3d12Recorder* recorder,
+                                     const mrhiD3d12QuerySet* set, uint32_t query)
 {
     return set->serial == recorder->serial && (set->written[query / 64] >> (query % 64) & 1u) != 0;
 }

@@ -24,7 +24,7 @@ mrhiComputePipelineDef mrhiDefaultComputePipelineDef(void)
 // truncated toward zero into its type's range; a float that rounds to a
 // finite 32-bit one, short of the midpoint between FLT_MAX and 2^128.
 // NaN fails every comparison.
-static bool IsValueValid(mrhiConstantType type, double value)
+MRHI_NODISCARD static bool IsValueValid(mrhiConstantType type, double value)
 {
     switch (type)
     {

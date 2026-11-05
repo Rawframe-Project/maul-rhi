@@ -36,7 +36,7 @@ bool mrhiOutlivesFrame(const mrhiFrameResource* resource)
     return mrhiIsImported(resource) || resource->kind == mrhiSurfaceImage;
 }
 
-static bool IsBuffer(const mrhiFrameResource* resource)
+MRHI_NODISCARD static bool IsBuffer(const mrhiFrameResource* resource)
 {
     return resource->kind == mrhiFrameBuffer || resource->kind == mrhiImportedBuffer;
 }
@@ -120,7 +120,8 @@ uint32_t mrhiUsageOf(const mrhiFrameResource* resource, uint8_t use)
 
 // Whether an imported object or a surface's image was made with the
 // usage a use needs; a declared resource takes any.
-static bool IsUsageMade(const mrhiDevice* device, const mrhiFrameResource* resource, uint8_t use)
+MRHI_NODISCARD static bool IsUsageMade(const mrhiDevice* device, const mrhiFrameResource* resource,
+                                       uint8_t use)
 {
     uint32_t usage = UsageOf(use, IsBuffer(resource));
     if (resource->kind == mrhiImportedTexture || resource->kind == mrhiSurfaceImage)
@@ -135,7 +136,7 @@ static bool IsUsageMade(const mrhiDevice* device, const mrhiFrameResource* resou
 }
 
 // Whether an access kind suits the resource type and the pass's class.
-static bool IsKindAllowed(mrhiAccessKind kind, bool buffer, mrhiPassClass passClass)
+MRHI_NODISCARD static bool IsKindAllowed(mrhiAccessKind kind, bool buffer, mrhiPassClass passClass)
 {
     bool textureOnly = kind == mrhi_accessSampled;
     bool bufferOnly = kind == mrhi_accessUniform || kind == mrhi_accessVertex ||
@@ -164,7 +165,7 @@ static uint32_t LayersAt(const mrhiTextureDef* def, uint32_t mip)
 
 // Whether an access kind is a read the sealed state allows: sampling a
 // texture, or a buffer's reads other than copies.
-static bool IsSealedRead(mrhiAccessKind kind, bool buffer)
+MRHI_NODISCARD static bool IsSealedRead(mrhiAccessKind kind, bool buffer)
 {
     if (!buffer)
     {
@@ -246,7 +247,7 @@ typedef struct TargetShape
 
 // Whether a target's size at its mip and samples match the pass's other
 // targets; the first sets them.
-static bool Agrees(TargetShape* shape, const mrhiTextureDef* def, uint32_t mip)
+MRHI_NODISCARD static bool Agrees(TargetShape* shape, const mrhiTextureDef* def, uint32_t mip)
 {
     uint32_t width = def->width >> mip > 0 ? def->width >> mip : 1;
     uint32_t height = def->height >> mip > 0 ? def->height >> mip : 1;
@@ -297,7 +298,7 @@ static uint32_t FindTarget(const mrhiDevice* device, mrhiResourceId id, uint32_t
 // Whether a clear color converts to a format's texels, as WebGPU's
 // clearValue must: finite components, each of whose integer parts an
 // integer format's 32-bit type holds (the driver converts all four).
-static bool Converts(const mrhiColor* clear, mrhiFormat format)
+MRHI_NODISCARD static bool Converts(const mrhiColor* clear, mrhiFormat format)
 {
     mrhiScalarType scalar = mrhiGetFormatTarget(format).scalar;
     bool sint = scalar == mrhi_scalarSint32;
@@ -361,7 +362,8 @@ static uint32_t UsesOfColor(const mrhiDevice* device, const mrhiColorTarget* tar
     }
     const mrhiTextureDef* into = mrhiFrameTextureOf(&device->frameResources[resolve - 1]);
     TargetShape resolveShape = {0};
-    Agrees(&resolveShape, into, target->resolveMip);
+    // A fresh shape takes the resolve's size and always agrees.
+    (void)Agrees(&resolveShape, into, target->resolveMip);
     // The resolve takes the target's own format, viewed in its view
     // format too.
     // As WebGPU's resolveTarget: a format that resolves, into a texture
@@ -444,13 +446,14 @@ static mrhiResult UseOfDepth(const mrhiDevice* device, const mrhiDepthTarget* ta
 }
 
 // Whether two ranges of one start and count overlap.
-static bool Overlaps(uint32_t baseA, uint32_t countA, uint32_t baseB, uint32_t countB)
+MRHI_NODISCARD static bool Overlaps(uint32_t baseA, uint32_t countA, uint32_t baseB,
+                                    uint32_t countB)
 {
     return baseA < baseB + countB && baseB < baseA + countA;
 }
 
 // Whether two uses of a pass meet on a subresource.
-static bool Meet(const mrhiFrameUse* a, const mrhiFrameUse* b)
+MRHI_NODISCARD static bool Meet(const mrhiFrameUse* a, const mrhiFrameUse* b)
 {
     return a->resource == b->resource && (a->planes & b->planes) != 0 &&
            Overlaps(a->baseMip, a->mipCount, b->baseMip, b->mipCount) &&
@@ -459,7 +462,8 @@ static bool Meet(const mrhiFrameUse* a, const mrhiFrameUse* b)
 
 // Whether two uses of a pass conflict: where they meet, one writes, or a
 // texture would need two states at once.
-static bool Conflicts(const mrhiDevice* device, const mrhiFrameUse* a, const mrhiFrameUse* b)
+MRHI_NODISCARD static bool Conflicts(const mrhiDevice* device, const mrhiFrameUse* a,
+                                     const mrhiFrameUse* b)
 {
     bool texture = !IsBuffer(&device->frameResources[a->resource - 1]);
     return Meet(a, b) && (a->writes || b->writes || (texture && a->state != b->state));
@@ -467,7 +471,8 @@ static bool Conflicts(const mrhiDevice* device, const mrhiFrameUse* a, const mrh
 
 // Whether the pass's uses keep WebGPU's usage scopes, and read declared
 // resources only after a pass wrote them.
-static bool AreUsesValid(const mrhiDevice* device, const mrhiFrameUse* uses, uint32_t count)
+MRHI_NODISCARD static bool AreUsesValid(const mrhiDevice* device, const mrhiFrameUse* uses,
+                                        uint32_t count)
 {
     for (uint32_t i = 0; i < count; ++i)
     {

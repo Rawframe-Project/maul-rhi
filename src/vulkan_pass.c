@@ -228,7 +228,7 @@ static void DepthOf(mrhiVulkanRecording* recording, VkRenderingAttachmentInfo* d
     *hasStencil = mrhiFormatHasStencil(format);
 }
 
-static bool HasTargets(const mrhiDriverPass* pass)
+MRHI_NODISCARD static bool HasTargets(const mrhiDriverPass* pass)
 {
     return pass->colorTargetCount > 0 || pass->depthTarget.resource.index1 != 0;
 }

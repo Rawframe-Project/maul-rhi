@@ -74,7 +74,7 @@ static void Ask(Layer* layer, uint64_t tag)
 }
 
 // Whether a tag was asked and not yet answered, forgetting it.
-static bool Answer(Layer* layer, uint64_t tag)
+MRHI_NODISCARD static bool Answer(Layer* layer, uint64_t tag)
 {
     for (uint32_t i = 0; i < layer->tagCount; ++i)
     {
@@ -432,7 +432,7 @@ static double TimestampPeriod(void* self)
     return period;
 }
 
-static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
+MRHI_NODISCARD static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
 {
     DeviceLayer* device = self;
     return device->inner.vtable->importPipelineCache(device->inner.self, bytes, size);
@@ -464,14 +464,14 @@ static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* b
 
 // Handles a frame names are never zero; the layer does not track which
 // are live.
-static bool IsHandle(const void* handles, uint64_t handle)
+MRHI_NODISCARD static bool IsHandle(const void* handles, uint64_t handle)
 {
     (void)handles;
     return handle != 0;
 }
 
 // Whether a code is one a driver names a submission's budget with.
-static bool IsSubmitBudget(mrhiDiagnosticCode code)
+MRHI_NODISCARD static bool IsSubmitBudget(mrhiDiagnosticCode code)
 {
     return code == mrhi_diagnosticSubmitMemory || code == mrhi_diagnosticSubmitDescriptors ||
            code == mrhi_diagnosticSubmitScratch || code == mrhi_diagnosticSubmitCommandLists;
@@ -506,7 +506,7 @@ static size_t PollDevice(void* self, mrhiDriverEvent* events, size_t capacity)
     return moved;
 }
 
-static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
+MRHI_NODISCARD static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
 {
     DeviceLayer* device = self;
     return device->inner.vtable->waitFrame(device->inner.self, tag, timeoutNs);

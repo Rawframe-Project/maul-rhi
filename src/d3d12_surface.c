@@ -57,7 +57,7 @@ bool mrhiD3d12Tears(IDXGIFactory4* factory)
 }
 
 // Whether an output is the monitor's and in HDR.
-static bool IsHdrOutput(IDXGIOutput* output, HMONITOR monitor)
+MRHI_NODISCARD static bool IsHdrOutput(IDXGIOutput* output, HMONITOR monitor)
 {
     IDXGIOutput6* six = nullptr;
     if (FAILED(IDXGIOutput_QueryInterface(output, &IID_IDXGIOutput6, (void**)&six)))
@@ -72,7 +72,7 @@ static bool IsHdrOutput(IDXGIOutput* output, HMONITOR monitor)
 }
 
 // Whether the monitor showing most of a window is in HDR.
-static bool IsHdr(IDXGIFactory4* factory, HWND window)
+MRHI_NODISCARD static bool IsHdr(IDXGIFactory4* factory, HWND window)
 {
     HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
     bool hdr = false;

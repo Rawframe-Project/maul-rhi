@@ -97,7 +97,8 @@ size_t mrhiVulkanPollPipelines(mrhiVulkanPipelines* pipelines, mrhiDriverEvent* 
                                size_t capacity);
 
 // Takes a cache blob whose header names this device: false otherwise.
-bool mrhiVulkanImportCache(mrhiVulkanPipelines* pipelines, const void* bytes, size_t size);
+MRHI_NODISCARD bool mrhiVulkanImportCache(mrhiVulkanPipelines* pipelines, const void* bytes,
+                                          size_t size);
 
 // Writes the cache's blob when capacity allows; its size either way.
 size_t mrhiVulkanExportCache(mrhiVulkanPipelines* pipelines, void* bytes, size_t capacity);

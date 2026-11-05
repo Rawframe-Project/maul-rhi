@@ -47,7 +47,7 @@ static const mrhiStructType s_instanceStructs[] = {
 
 // Whether the def's Vulkan structs are well formed: name lists, an adopted
 // instance, and no extra extensions for an instance the program made.
-static bool AreVulkanStructsValid(const mrhiInstanceDef* def)
+MRHI_NODISCARD static bool AreVulkanStructsValid(const mrhiInstanceDef* def)
 {
     const mrhiInstanceVulkanAdopt* adopt =
         (const mrhiInstanceVulkanAdopt*)mrhiFindStruct(def->next, mrhi_structInstanceVulkanAdopt);
@@ -62,7 +62,7 @@ static bool AreVulkanStructsValid(const mrhiInstanceDef* def)
 
 // Whether the def asks for more than one driver: the test driver, an
 // external one, or the Vulkan driver through its structs.
-static bool MixesDrivers(const mrhiInstanceDef* def)
+MRHI_NODISCARD static bool MixesDrivers(const mrhiInstanceDef* def)
 {
     bool vulkan = mrhiFindStruct(def->next, mrhi_structInstanceVulkanAdopt) != nullptr ||
                   mrhiFindStruct(def->next, mrhi_structInstanceVulkanExtensions) != nullptr;

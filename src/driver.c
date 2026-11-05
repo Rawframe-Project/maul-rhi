@@ -35,7 +35,7 @@ mrhiResult mrhiCheckInstanceVtable(const mrhiInstanceDriverVtable* vtable)
 }
 
 // Whether a device vtable's resource functions are all there.
-static bool HasResources(const mrhiDeviceDriverVtable* vtable)
+MRHI_NODISCARD static bool HasResources(const mrhiDeviceDriverVtable* vtable)
 {
     return vtable->createSampler != nullptr && vtable->destroySampler != nullptr &&
            vtable->createBuffer != nullptr && vtable->destroyBuffer != nullptr &&

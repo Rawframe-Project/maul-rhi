@@ -101,8 +101,8 @@ static uint32_t KindsOf(const mrhiShaderBinding* binding)
 // color format as its scalar class, float being filterable only where
 // the device filters the format. Every stencil format has depth, and a
 // view of both aspects is refused before.
-static bool IsSampledAs(const mrhiDevice* device, mrhiFormat format, mrhiTextureAspect aspect,
-                        mrhiSampleType type)
+MRHI_NODISCARD static bool IsSampledAs(const mrhiDevice* device, mrhiFormat format,
+                                       mrhiTextureAspect aspect, mrhiSampleType type)
 {
     if (aspect == mrhi_aspectStencilOnly)
     {

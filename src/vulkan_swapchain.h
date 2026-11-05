@@ -102,7 +102,7 @@ uint32_t mrhiVulkanPresentSemaphores(mrhiVulkanSwapchains* swapchains, const mrh
 
 // Presents the images the last mrhiVulkanPresentSemaphores named, once
 // their frame is submitted: false when the device is lost.
-bool mrhiVulkanPresent(mrhiVulkanSwapchains* swapchains);
+MRHI_NODISCARD bool mrhiVulkanPresent(mrhiVulkanSwapchains* swapchains);
 
 // Destroys every swapchain left, on an idle device.
 void mrhiVulkanSwapchainsDestroy(mrhiVulkanSwapchains* swapchains);
@@ -111,7 +111,7 @@ void mrhiVulkanSwapchainsDestroy(mrhiVulkanSwapchains* swapchains);
 // the extent, else one within the surface's bounds. Android reports the
 // window's size yet takes any size within the bounds, which its
 // compositor scales to the window.
-bool mrhiVulkanTakesSize(const VkSurfaceCapabilitiesKHR* caps, VkExtent2D size);
+MRHI_NODISCARD bool mrhiVulkanTakesSize(const VkSurfaceCapabilitiesKHR* caps, VkExtent2D size);
 
 // The swapchain's shape: at least three images within the surface's
 // bounds, its present mode and its alpha.

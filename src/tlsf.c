@@ -167,7 +167,7 @@ static uint32_t FindFitting(const mrhiTlsf* pool, uint64_t size)
 
 // Whether a range meets its neighbours end to end, in its block, linked
 // both ways. Only assertions call it.
-[[maybe_unused]] static bool IsJoined(const mrhiTlsfNodes* store, uint32_t id)
+MRHI_NODISCARD [[maybe_unused]] static bool IsJoined(const mrhiTlsfNodes* store, uint32_t id)
 {
     const mrhiTlsfNode* node = NODE(store, id);
     const mrhiTlsfNode* before = node->previous != 0 ? NODE(store, node->previous) : nullptr;
@@ -181,7 +181,7 @@ static uint32_t FindFitting(const mrhiTlsf* pool, uint64_t size)
 // Whether a range meets its neighbours, none of them free: free ranges
 // never meet, as each free merges with its free neighbours. Only
 // assertions call it.
-[[maybe_unused]] static bool IsMerged(const mrhiTlsfNodes* store, uint32_t id)
+MRHI_NODISCARD [[maybe_unused]] static bool IsMerged(const mrhiTlsfNodes* store, uint32_t id)
 {
     const mrhiTlsfNode* node = NODE(store, id);
     return IsJoined(store, id) && (node->previous == 0 || !NODE(store, node->previous)->free) &&
@@ -234,7 +234,7 @@ static uint64_t SkipOf(const mrhiTlsfNode* node, uint64_t alignment)
     return ((node->offset + alignment - 1) & ~(alignment - 1)) - node->offset;
 }
 
-static bool Fits(const mrhiTlsfNode* node, uint64_t size, uint64_t alignment)
+MRHI_NODISCARD static bool Fits(const mrhiTlsfNode* node, uint64_t size, uint64_t alignment)
 {
     uint64_t skip = SkipOf(node, alignment);
     return skip <= node->size && size <= node->size - skip;

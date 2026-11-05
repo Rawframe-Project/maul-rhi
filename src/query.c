@@ -26,7 +26,7 @@ mrhiQuerySetDef mrhiDefaultQuerySetDef(void)
 
 // The first run of count marks no live set holds, first fit: its start,
 // or false when the device's marks lack one.
-static bool FindRun(const mrhiDevice* device, uint32_t count, uint32_t* firstOut)
+MRHI_NODISCARD static bool FindRun(const mrhiDevice* device, uint32_t count, uint32_t* firstOut)
 {
     uint32_t sets = device->budgets.querySets;
     uint32_t start = 0;
@@ -174,7 +174,8 @@ static mrhiResult CheckOcclusionSet(const mrhiDevice* device, const mrhiPassDef*
 
 // Whether a timestamp query is none, or one of the set not yet written
 // this frame.
-static bool IsTimestampFree(const mrhiDevice* device, const mrhiQuerySetSlot* set, uint32_t query)
+MRHI_NODISCARD static bool IsTimestampFree(const mrhiDevice* device, const mrhiQuerySetSlot* set,
+                                           uint32_t query)
 {
     return query == MRHI_NO_QUERY ||
            (query < set->count &&
@@ -233,7 +234,8 @@ void mrhiMarkPassTimestamps(mrhiDevice* device, const mrhiPassDef* def, mrhiFram
 // Marks a query of a set as written in the open frame: false when the
 // frame already wrote it. Passes record in parallel, so the exchange is
 // atomic.
-static bool MarkWritten(mrhiDevice* device, const mrhiQuerySetSlot* set, uint32_t query)
+MRHI_NODISCARD static bool MarkWritten(mrhiDevice* device, const mrhiQuerySetSlot* set,
+                                       uint32_t query)
 {
     // The caller checked the query against its set.
     MRHI_ASSERT(query < set->count);

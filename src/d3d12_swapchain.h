@@ -82,6 +82,6 @@ ID3D12Resource* mrhiD3d12ImageOf(const mrhiD3d12Swapchains* swapchains, uint64_t
 
 // Presents a swapchain's acquired image after the work queued so far:
 // false when the device is lost.
-bool mrhiD3d12Present(mrhiD3d12Swapchains* swapchains, uint64_t handle);
+MRHI_NODISCARD bool mrhiD3d12Present(mrhiD3d12Swapchains* swapchains, uint64_t handle);
 
 #endif // MAUL_RHI_SRC_D3D12_SWAPCHAIN_H

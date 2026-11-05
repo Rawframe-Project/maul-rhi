@@ -12,6 +12,8 @@
 #ifndef MAUL_RHI_SRC_TLSF_H
 #define MAUL_RHI_SRC_TLSF_H
 
+#include "maul-rhi/base.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -75,7 +77,7 @@ uint32_t mrhiTlsfAllocate(mrhiTlsf* pool, mrhiTlsfNodes* store, uint64_t size, u
 uint32_t mrhiTlsfFree(mrhiTlsf* pool, mrhiTlsfNodes* store, uint32_t allocation);
 
 // Whether a free node spans its whole block.
-bool mrhiTlsfIsBlockEmpty(const mrhiTlsfNodes* store, uint32_t node);
+MRHI_NODISCARD bool mrhiTlsfIsBlockEmpty(const mrhiTlsfNodes* store, uint32_t node);
 
 // Removes an empty block by its free node, returning the node.
 void mrhiTlsfRemoveBlock(mrhiTlsf* pool, mrhiTlsfNodes* store, uint32_t node);

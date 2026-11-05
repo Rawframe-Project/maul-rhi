@@ -59,7 +59,7 @@ void mrhiZeroOnFirstUse(mrhiDevice* device, uint32_t resource)
 // Whether a texture's first use in the frame overwrites all of it with a
 // clear it keeps: one mip and layer, which a pass's color or depth
 // target loads with a clear and stores, its stencil too.
-static bool IsClearedFirst(const mrhiDevice* device, uint32_t resource)
+MRHI_NODISCARD static bool IsClearedFirst(const mrhiDevice* device, uint32_t resource)
 {
     const mrhiTextureDef* def = &device->frameResources[resource - 1].texture;
     if (def->mipLevels != 1 || def->depthOrLayers != 1 || def->kind == mrhi_texture3d)

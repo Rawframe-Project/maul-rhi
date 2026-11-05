@@ -447,8 +447,8 @@ static VkSubmitInfo2 SubmitOf(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, ui
 
 // Whether a submission waits on a semaphore for a value at least the one
 // given.
-[[maybe_unused]] static bool WaitsOn(const VkSubmitInfo2* info, VkSemaphore semaphore,
-                                     uint64_t value)
+MRHI_NODISCARD [[maybe_unused]] static bool WaitsOn(const VkSubmitInfo2* info,
+                                                    VkSemaphore semaphore, uint64_t value)
 {
     for (uint32_t i = 0; i < info->waitSemaphoreInfoCount; ++i)
     {
@@ -467,8 +467,9 @@ static VkSubmitInfo2 SubmitOf(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, ui
 // signals. Worked out again from the passes' waitFor and the submissions
 // themselves, apart from the batches' own waits; only an assertion calls
 // it.
-[[maybe_unused]] static bool HoldsFollows(const mrhiVulkanFrames* frames,
-                                          const mrhiVulkanSlot* slot, const mrhiDriverFrame* frame)
+MRHI_NODISCARD [[maybe_unused]] static bool HoldsFollows(const mrhiVulkanFrames* frames,
+                                                         const mrhiVulkanSlot* slot,
+                                                         const mrhiDriverFrame* frame)
 {
     for (uint32_t p = 0; p < frame->passCount; ++p)
     {

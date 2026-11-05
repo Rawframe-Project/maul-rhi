@@ -16,14 +16,14 @@
 #include <stdckdint.h>
 
 // Whether two resources' kept passes meet.
-static bool Meets(const mrhiFrameResource* a, const mrhiFrameResource* b)
+MRHI_NODISCARD static bool Meets(const mrhiFrameResource* a, const mrhiFrameResource* b)
 {
     return a->firstPass <= b->lastPass && b->firstPass <= a->lastPass;
 }
 
 // Rounds an offset up to an alignment, a power of two: false when it
 // overflows.
-static bool AlignUp(uint64_t offset, uint64_t alignment, uint64_t* out)
+MRHI_NODISCARD static bool AlignUp(uint64_t offset, uint64_t alignment, uint64_t* out)
 {
     uint64_t sum = 0;
     if (ckd_add(&sum, offset, alignment - 1))
@@ -55,9 +55,9 @@ static void Measure(const mrhiDevice* device, const mrhiFrameResource* resource,
 // Whether a range of the frame's memory is clear of every placed resource
 // whose kept passes meet the resource's. Only an assertion calls it, which
 // a release build compiles away.
-[[maybe_unused]] static bool ClearOfOthers(const mrhiDevice* device,
-                                           const mrhiFrameResource* resource, uint64_t offset,
-                                           uint64_t end)
+MRHI_NODISCARD [[maybe_unused]] static bool ClearOfOthers(const mrhiDevice* device,
+                                                          const mrhiFrameResource* resource,
+                                                          uint64_t offset, uint64_t end)
 {
     for (uint32_t i = 0; i < device->frameResourceCount; ++i)
     {
@@ -73,8 +73,8 @@ static void Measure(const mrhiDevice* device, const mrhiFrameResource* resource,
 
 // Places one resource: the lowest aligned offset past the placed ones it
 // meets, taken in offset order. False when the offsets overflow.
-static bool PlaceOne(mrhiDevice* device, mrhiFrameResource* resource, uint64_t bytes,
-                     uint64_t alignment)
+MRHI_NODISCARD static bool PlaceOne(mrhiDevice* device, mrhiFrameResource* resource, uint64_t bytes,
+                                    uint64_t alignment)
 {
     uint32_t* order = device->frameOrder;
     uint32_t count = 0;
@@ -165,8 +165,8 @@ mrhiResult mrhiPlace(mrhiDevice* device)
 }
 
 // Whether a kept pass after the one given reads a part of a resource.
-static bool ReadLater(const mrhiDevice* device, uint32_t after, const mrhiFrameUse* part,
-                      uint8_t planes)
+MRHI_NODISCARD static bool ReadLater(const mrhiDevice* device, uint32_t after,
+                                     const mrhiFrameUse* part, uint8_t planes)
 {
     const mrhiFrameResource* resource = &device->frameResources[part->resource - 1];
     uint32_t partBase = 0;

@@ -228,7 +228,7 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
     }
 }
 
-static bool OpenSlot(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot)
+MRHI_NODISCARD static bool OpenSlot(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot)
 {
     ID3D12Device* device = frames->device;
     for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
@@ -304,7 +304,7 @@ static ID3D12CommandSignature* SignatureOf(ID3D12Device* device, mrhiD3d12Indire
 
 // Makes the kernel expanding counted draws' records, its root signature
 // embedded in its DXIL.
-static bool MakeExpand(mrhiD3d12Frames* frames)
+MRHI_NODISCARD static bool MakeExpand(mrhiD3d12Frames* frames)
 {
     if (FAILED(ID3D12Device_CreateRootSignature(
             frames->device, 0, mrhiD3d12ExpandDxil, sizeof(mrhiD3d12ExpandDxil),
@@ -323,7 +323,7 @@ static bool MakeExpand(mrhiD3d12Frames* frames)
 // Makes the command signatures, the kernel of a device drawing counted
 // multi-draws and the zeros resolves and clears copy, which D3D12 zeroes
 // as it commits them.
-static bool OpenShared(mrhiD3d12Frames* frames)
+MRHI_NODISCARD static bool OpenShared(mrhiD3d12Frames* frames)
 {
     bool made = true;
     for (int i = 0; i < mrhiD3d12IndirectCount; ++i)
@@ -347,7 +347,7 @@ static bool OpenShared(mrhiD3d12Frames* frames)
 // Makes the compute and copy queues and each lane's fence, and compares
 // the compute and direct queues' timestamp frequencies: whether D3D12
 // made them all.
-static bool OpenLanes(mrhiD3d12Lanes* lanes)
+MRHI_NODISCARD static bool OpenLanes(mrhiD3d12Lanes* lanes)
 {
     bool made = true;
     for (int lane = 0; lane < mrhiD3d12LaneCount && made; ++lane)
@@ -620,8 +620,8 @@ static void MakeTransient(const mrhiD3d12Frames* frames, ID3D12Heap* heap,
 
 // Makes a frame's transients in its slot and fills the frame's table:
 // whether D3D12 made them all.
-static bool TakeObjects(const mrhiD3d12Frames* frames, mrhiD3d12Slot* slot,
-                        const mrhiDriverFrame* frame)
+MRHI_NODISCARD static bool TakeObjects(const mrhiD3d12Frames* frames, mrhiD3d12Slot* slot,
+                                       const mrhiDriverFrame* frame)
 {
     MRHI_ASSERT(frame->resourceCount <= frames->resourceLimit);
     ID3D12Heap* heap =
@@ -785,7 +785,7 @@ static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrh
 }
 
 // Notes the device removed when D3D12 says so: whether it has.
-static bool Removed(mrhiD3d12Frames* frames)
+MRHI_NODISCARD static bool Removed(mrhiD3d12Frames* frames)
 {
     HRESULT reason = ID3D12Device_GetDeviceRemovedReason(frames->device);
     if (reason != S_OK)

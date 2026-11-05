@@ -35,7 +35,7 @@ mrhiResult mrhiRefuse(mrhiDevice* device, mrhiResult status, mrhiDiagnosticCode 
 
 // Whether a transfer's extent holds no texels: valid, and copied by no
 // command, since Vulkan refuses empty regions.
-static inline bool mrhiIsEmptyExtent(const mrhiExtent3d* size)
+MRHI_NODISCARD static inline bool mrhiIsEmptyExtent(const mrhiExtent3d* size)
 {
     return size->width == 0 || size->height == 0 || size->depthOrLayers == 0;
 }
@@ -70,8 +70,8 @@ mrhiResult mrhiCheckTextureTransfer(const mrhiDevice* device, const mrhiTextureC
 // data: rows and images given where the transfer has several, each at
 // least what the transfer needs; with aligned, WebGPU's buffer rule of
 // bytes per row in multiples of 256.
-bool mrhiIsLayoutValid(uint64_t offset, uint32_t bytesPerRow, uint32_t rowsPerImage, uint64_t total,
-                       mrhiFormatBlock block, uint32_t bytes, const mrhiExtent3d* size,
-                       bool aligned);
+MRHI_NODISCARD bool mrhiIsLayoutValid(uint64_t offset, uint32_t bytesPerRow, uint32_t rowsPerImage,
+                                      uint64_t total, mrhiFormatBlock block, uint32_t bytes,
+                                      const mrhiExtent3d* size, bool aligned);
 
 #endif // MAUL_RHI_SRC_COPY_CORE_H

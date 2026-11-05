@@ -49,10 +49,11 @@ typedef struct mrhiVulkanRecipe
 // mrhiDeviceVulkanExtensions: false for a malformed list (a name empty
 // or not ended within the bytes); none when the chain has no such
 // struct.
-bool mrhiVulkanDefExtensions(const mrhiDeviceDef* def, const char** namesOut, size_t* bytesOut);
+MRHI_NODISCARD bool mrhiVulkanDefExtensions(const mrhiDeviceDef* def, const char** namesOut,
+                                            size_t* bytesOut);
 
 // Whether the def's features chain holds the core feature structs only.
-bool mrhiVulkanDefFeaturesKnown(const mrhiDeviceDef* def);
+MRHI_NODISCARD bool mrhiVulkanDefFeaturesKnown(const mrhiDeviceDef* def);
 
 // Composes the recipe for a def on a physical device: mrhi_success,
 // mrhi_errorCapacity when memory runs out, mrhi_errorInvalid for a

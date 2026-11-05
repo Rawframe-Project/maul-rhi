@@ -240,20 +240,20 @@ static mrhiResult CheckPrimitive(mrhiDevice* device, const mrhiGraphicsPipelineD
 }
 
 // Whether a comparison is a test: never through always.
-static bool IsCompare(mrhiCompareFunction compare)
+MRHI_NODISCARD static bool IsCompare(mrhiCompareFunction compare)
 {
     return compare >= mrhi_compareNever && compare <= mrhi_compareAlways;
 }
 
 // Whether a stencil face holds known values.
-static bool IsStencilValid(const mrhiStencilFace* face)
+MRHI_NODISCARD static bool IsStencilValid(const mrhiStencilFace* face)
 {
     return IsCompare(face->compare) && (uint32_t)face->failOp <= mrhi_stencilDecrementWrap &&
            (uint32_t)face->depthFailOp <= mrhi_stencilDecrementWrap &&
            (uint32_t)face->passOp <= mrhi_stencilDecrementWrap;
 }
 
-static bool IsStencilDefault(const mrhiStencilFace* face)
+MRHI_NODISCARD static bool IsStencilDefault(const mrhiStencilFace* face)
 {
     return face->compare == DEFAULT_STENCIL.compare && face->failOp == DEFAULT_STENCIL.failOp &&
            face->depthFailOp == DEFAULT_STENCIL.depthFailOp &&
@@ -292,7 +292,7 @@ static mrhiResult CheckDepthStencil(const mrhiDevice* device, const mrhiGraphics
 }
 
 // Whether a blend component is known, and min and max weigh by one.
-static bool IsBlendValid(const mrhiBlendComponent* component)
+MRHI_NODISCARD static bool IsBlendValid(const mrhiBlendComponent* component)
 {
     bool ones = component->srcFactor == mrhi_blendOne && component->dstFactor == mrhi_blendOne;
     return (uint32_t)component->srcFactor <= mrhi_blendOneMinusSrc1Alpha &&
@@ -303,7 +303,7 @@ static bool IsBlendValid(const mrhiBlendComponent* component)
 
 // Whether a blend factor reads a source's alpha; the second source has
 // the first's components.
-static bool ReadsSourceAlpha(mrhiBlendFactor factor)
+MRHI_NODISCARD static bool ReadsSourceAlpha(mrhiBlendFactor factor)
 {
     return factor == mrhi_blendSrcAlpha || factor == mrhi_blendOneMinusSrcAlpha ||
            factor == mrhi_blendSrcAlphaSaturated || factor == mrhi_blendSrc1Alpha ||
@@ -311,7 +311,7 @@ static bool ReadsSourceAlpha(mrhiBlendFactor factor)
 }
 
 // Whether a blend component reads the second source.
-static bool ReadsSecondSource(const mrhiBlendComponent* component)
+MRHI_NODISCARD static bool ReadsSecondSource(const mrhiBlendComponent* component)
 {
     return component->srcFactor >= mrhi_blendSrc1 || component->dstFactor >= mrhi_blendSrc1;
 }
@@ -332,7 +332,7 @@ static const mrhiShaderVariable* OutputAt(Stages stages, uint32_t location)
 }
 
 // Whether the fragment entry has a second blend source.
-static bool HasSecondSource(Stages stages)
+MRHI_NODISCARD static bool HasSecondSource(Stages stages)
 {
     for (uint32_t i = 0; stages.fragment != nullptr && i < stages.fragment->outputCount; ++i)
     {
@@ -345,7 +345,7 @@ static bool HasSecondSource(Stages stages)
 }
 
 // Whether an output's scalar type writes a target's.
-static bool Writes(mrhiScalarType output, mrhiScalarType target)
+MRHI_NODISCARD static bool Writes(mrhiScalarType output, mrhiScalarType target)
 {
     return output == target || (output == mrhi_scalarFloat16 && target == mrhi_scalarFloat32);
 }
@@ -477,7 +477,7 @@ static mrhiResult CheckInterface(mrhiDevice* device, const mrhiGraphicsPipelineD
 }
 
 // Whether a stencil face changes the stencil.
-static bool ChangesStencil(const mrhiStencilFace* face)
+MRHI_NODISCARD static bool ChangesStencil(const mrhiStencilFace* face)
 {
     return face->failOp != mrhi_stencilKeep || face->depthFailOp != mrhi_stencilKeep ||
            face->passOp != mrhi_stencilKeep;

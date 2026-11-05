@@ -20,7 +20,7 @@ mrhiResult mrhiCreateVulkanDriver(const mrhiAllocator* allocator, const mrhiChai
                                   mrhiInstanceDriver* driverOut);
 
 // Whether an instance's driver is this one.
-bool mrhiIsVulkanDriver(const mrhiInstanceDriver* driver);
+MRHI_NODISCARD bool mrhiIsVulkanDriver(const mrhiInstanceDriver* driver);
 
 // An adapter's VkPhysicalDevice.
 void* mrhiVulkanPhysicalDevice(uint64_t adapter);

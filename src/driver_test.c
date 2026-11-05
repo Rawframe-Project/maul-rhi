@@ -277,7 +277,7 @@ static void Name(TestDevice* device, const char* label, size_t length)
 
 // Whether the device is lost: once its adapter's flag is set, for good,
 // the frame it was running then taken as the faulting one.
-static bool IsLost(TestDevice* device)
+MRHI_NODISCARD static bool IsLost(TestDevice* device)
 {
     if (!device->lost && device->loseDevice != nullptr && *device->loseDevice)
     {
@@ -426,7 +426,7 @@ static void DestroyHeap(void* self, uint64_t handle)
 }
 
 // Whether a handle is one the device made.
-static bool IsMade(const TestDevice* device, uint64_t handle)
+MRHI_NODISCARD static bool IsMade(const TestDevice* device, uint64_t handle)
 {
     return handle > HANDLE_BASE && handle <= device->nextHandle;
 }
@@ -508,7 +508,7 @@ static mrhiResult HoldPipeline(TestDevice* device, uint64_t tag, uint64_t* handl
 // before, as a real cache holds what they compiled.
 static const char TEST_CACHE_MAGIC[8] = {'M', 'R', 'H', 'I', 'T', 'E', 'S', 'T'};
 
-static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
+MRHI_NODISCARD static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
 {
     TestDevice* device = self;
     const unsigned char* data = bytes;
@@ -696,7 +696,7 @@ static void BufferMemory(const void* self, const mrhiBufferDef* def, uint64_t* b
 }
 
 // IsMade, as a frame walk checks handles.
-static bool IsHandleOf(const void* self, uint64_t handle)
+MRHI_NODISCARD static bool IsHandleOf(const void* self, uint64_t handle)
 {
     return IsMade(self, handle);
 }
@@ -795,7 +795,7 @@ static size_t PollDevice(void* self, mrhiDriverEvent* events, size_t capacity)
 
 // A frame that is not held has finished; a held one finishes when waited
 // on with a nonzero timeout, and a zero timeout only checks.
-static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
+MRHI_NODISCARD static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
 {
     TestDevice* device = self;
     for (uint32_t i = 0; i < device->frameCount; ++i)

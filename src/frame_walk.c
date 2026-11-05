@@ -26,27 +26,29 @@ typedef struct Walk
 
 // A check: whether it held, counting a fault when it did not. Where a
 // failed check leaves later reads unsafe, the walk stops there.
-static bool Holds(Walk* walk, bool condition)
+MRHI_NODISCARD static bool Holds(Walk* walk, bool condition)
 {
     walk->faults += condition ? 0 : 1;
     return condition;
 }
 
-#define WALK_CHECK(cond) Holds(walk, (cond))
+// A check whose failure leaves later reads safe: the walk counts the
+// fault and goes on.
+#define WALK_CHECK(cond) (void)Holds(walk, (cond))
 
-static bool IsHandle(const Walk* walk, uint64_t handle)
+MRHI_NODISCARD static bool IsHandle(const Walk* walk, uint64_t handle)
 {
     return walk->isHandle(walk->handles, handle);
 }
 
-static bool IsBuffer(mrhiDriverResourceKind kind)
+MRHI_NODISCARD static bool IsBuffer(mrhiDriverResourceKind kind)
 {
     return kind == mrhiDriverTransientBuffer || kind == mrhiDriverDeviceBuffer;
 }
 
 // Whether a frame resource's slot plus one names a buffer, or a texture,
 // of the frame.
-static bool Names(const Walk* walk, uint64_t object, bool buffer)
+MRHI_NODISCARD static bool Names(const Walk* walk, uint64_t object, bool buffer)
 {
     return object != 0 && object <= walk->frame->resourceCount &&
            IsBuffer(walk->frame->resources[object - 1].kind) == buffer;
@@ -81,7 +83,7 @@ static uint64_t SideBytes(const mrhiCommand* command, const mrhiCommandBufferSid
 // frame's staging or readback ring.
 static void CheckCopy(Walk* walk, const mrhiCommand* command, bool fromBuffer, bool toBuffer)
 {
-    if (!WALK_CHECK(command->payload == 2))
+    if (!Holds(walk, command->payload == 2))
     {
         return;
     }
@@ -193,12 +195,12 @@ static void WalkCommands(Walk* walk, const mrhiDriverPass* pass)
     uint32_t visited = 0;
     for (uint32_t chunk = pass->firstChunk; chunk != 0; chunk = frame->chunks[chunk - 1].next)
     {
-        if (!WALK_CHECK(chunk <= frame->chunkCount && ++visited <= frame->chunkCount))
+        if (!Holds(walk, chunk <= frame->chunkCount && ++visited <= frame->chunkCount))
         {
             return;
         }
         const mrhiCommandChunk* at = &frame->chunks[chunk - 1];
-        if (!WALK_CHECK(at->count <= MRHI_CHUNK_COMMANDS))
+        if (!Holds(walk, at->count <= MRHI_CHUNK_COMMANDS))
         {
             return;
         }
@@ -206,7 +208,7 @@ static void WalkCommands(Walk* walk, const mrhiDriverPass* pass)
         while (i < at->count)
         {
             const mrhiCommand* command = &at->commands[i];
-            if (!WALK_CHECK(command->payload < at->count - i))
+            if (!Holds(walk, command->payload < at->count - i))
             {
                 return;
             }

@@ -109,7 +109,7 @@ mrhiResult mrhiInstanceBusy(mrhiInstance* instance);
 // Marks the instance busy while a call of another object that changes
 // it runs host code, as its own allocator would: what the mark was, for
 // mrhiReleaseInstance.
-bool mrhiHoldInstance(mrhiInstance* instance);
+MRHI_NODISCARD bool mrhiHoldInstance(mrhiInstance* instance);
 
 // Gives the instance back the mark mrhiHoldInstance returned.
 void mrhiReleaseInstance(mrhiInstance* instance, bool held);
@@ -118,7 +118,7 @@ void mrhiReleaseInstance(mrhiInstance* instance, bool held);
 void mrhiPushInstanceNotification(mrhiInstance* instance, mrhiInstanceNotification notification);
 
 // Whether the queue has room for one more answer.
-bool mrhiHasRoomForAnswer(const mrhiInstance* instance);
+MRHI_NODISCARD bool mrhiHasRoomForAnswer(const mrhiInstance* instance);
 
 // The index the next request id takes, never zero, without taking it.
 uint32_t mrhiPeekRequest(const mrhiInstance* instance);

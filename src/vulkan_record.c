@@ -160,7 +160,7 @@ static void ReleaseReadbacks(const mrhiVulkanRecording* recording)
     recording->frames->api->vkCmdPipelineBarrier2(recording->slot->commands, &dependency);
 }
 
-static bool IsTexture(const mrhiDriverFrame* frame, uint32_t index1)
+MRHI_NODISCARD static bool IsTexture(const mrhiDriverFrame* frame, uint32_t index1)
 {
     MRHI_ASSERT(index1 != 0 && index1 <= frame->resourceCount);
     mrhiDriverResourceKind kind = frame->resources[index1 - 1].kind;

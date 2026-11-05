@@ -8,6 +8,8 @@
 #ifndef MAUL_RHI_SRC_VULKAN_API_H
 #define MAUL_RHI_SRC_VULKAN_API_H
 
+#include "maul-rhi/base.h"
+
 #define VK_NO_PROTOTYPES
 #include <stdbool.h>
 #include <vulkan/vulkan_core.h>
@@ -171,29 +173,29 @@ typedef struct mrhiVulkanDevice
 
 // Opens the loader and reads the global functions: false, with nothing
 // open, when there is no loader or it lacks one of them.
-bool mrhiOpenVulkan(mrhiVulkan* vulkan);
+MRHI_NODISCARD bool mrhiOpenVulkan(mrhiVulkan* vulkan);
 
 // Reads the global functions through a program's vkGetInstanceProcAddr,
 // opening no loader, for an instance made elsewhere: false, with nothing
 // kept, when one is missing.
-bool mrhiAdoptVulkan(mrhiVulkan* vulkan, PFN_vkGetInstanceProcAddr entry);
+MRHI_NODISCARD bool mrhiAdoptVulkan(mrhiVulkan* vulkan, PFN_vkGetInstanceProcAddr entry);
 
 // Reads the instance's functions: false when one is missing.
-bool mrhiLoadVulkanInstance(mrhiVulkan* vulkan, VkInstance instance);
+MRHI_NODISCARD bool mrhiLoadVulkanInstance(mrhiVulkan* vulkan, VkInstance instance);
 
 // Reads the functions of VK_KHR_surface, which the instance has: false
 // when one is missing.
-bool mrhiLoadVulkanSurface(mrhiVulkan* vulkan, VkInstance instance);
+MRHI_NODISCARD bool mrhiLoadVulkanSurface(mrhiVulkan* vulkan, VkInstance instance);
 
 // Reads the functions of VK_EXT_debug_utils, which the instance has:
 // false, with none kept, when one is missing.
-bool mrhiLoadVulkanDebug(mrhiVulkan* vulkan, VkInstance instance);
+MRHI_NODISCARD bool mrhiLoadVulkanDebug(mrhiVulkan* vulkan, VkInstance instance);
 
 // Reads a device's functions, and those of VK_KHR_swapchain when it has
 // it, and copies the instance's debug functions: false when one is
 // missing.
-bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, bool swapchain,
-                          mrhiVulkanDevice* functions);
+MRHI_NODISCARD bool mrhiLoadVulkanDevice(const mrhiVulkan* vulkan, VkDevice device, bool swapchain,
+                                         mrhiVulkanDevice* functions);
 
 // Closes the loader, if one was opened.
 void mrhiCloseVulkan(mrhiVulkan* vulkan);

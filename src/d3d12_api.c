@@ -12,7 +12,7 @@
 
 // Reads an entry point into the function pointer at pointerOut: false
 // when the library lacks it.
-static bool Read(HMODULE library, const char* name, void* pointerOut)
+MRHI_NODISCARD static bool Read(HMODULE library, const char* name, void* pointerOut)
 {
     FARPROC address = GetProcAddress(library, name);
     // A function pointer read from the platform's untyped symbol.

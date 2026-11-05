@@ -13,7 +13,7 @@
 #include <stdbool.h>
 
 // Whether an allocator is usable: both functions set, or neither.
-bool mrhiIsAllocatorValid(const mrhiAllocator* allocator);
+MRHI_NODISCARD bool mrhiIsAllocatorValid(const mrhiAllocator* allocator);
 
 // A program's allocator behind a flag: while the program's functions
 // run, the object it serves is busy, and its functions that change it

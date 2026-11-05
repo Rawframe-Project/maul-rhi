@@ -230,9 +230,10 @@ static void CopyTexture(const mrhiD3d12Recorder* recorder, const mrhiCommand* co
 
 // Takes a clear's views, its CPU-only one and a shader-visible one:
 // false, with neither taken, when either ring has run out.
-static bool TakeClearViews(mrhiD3d12Recorder* recorder, D3D12_CPU_DESCRIPTOR_HANDLE* cpuOut,
-                           D3D12_CPU_DESCRIPTOR_HANDLE* visibleOut,
-                           D3D12_GPU_DESCRIPTOR_HANDLE* gpuOut)
+MRHI_NODISCARD static bool TakeClearViews(mrhiD3d12Recorder* recorder,
+                                          D3D12_CPU_DESCRIPTOR_HANDLE* cpuOut,
+                                          D3D12_CPU_DESCRIPTOR_HANDLE* visibleOut,
+                                          D3D12_GPU_DESCRIPTOR_HANDLE* gpuOut)
 {
     mrhiD3d12Ring* clears = &recorder->clears;
     mrhiD3d12GpuRing* views = &recorder->views;

@@ -55,8 +55,8 @@ void mrhiPutBinding(mrhiCommand* record, const mrhiCommandBinding* binding);
 // one) of one of the kinds, covering a part of it: the part's planes,
 // mips and layers, or any use for a buffer (part NULL). Target uses are
 // of no access kind.
-bool mrhiPassDeclares(const mrhiDevice* device, const mrhiFramePass* pass, uint32_t object,
-                      uint32_t kinds, const mrhiFrameUse* part);
+MRHI_NODISCARD bool mrhiPassDeclares(const mrhiDevice* device, const mrhiFramePass* pass,
+                                     uint32_t object, uint32_t kinds, const mrhiFrameUse* part);
 
 // The bytes of a buffer of the open frame, declared or imported.
 uint64_t mrhiBufferBytesOf(const mrhiFrameResource* resource);

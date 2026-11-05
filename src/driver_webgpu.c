@@ -193,7 +193,7 @@ EM_JS_DEPS(mrhi_webgpu_driver, "$UTF8ToString,$stringToUTF8");
 
 // Reads the adapter the last search found, when there is one with
 // WebGPU's core features: false otherwise.
-static bool Describe(const WebGpuDriver* driver, mrhiDriverAdapter* adapterOut)
+MRHI_NODISCARD static bool Describe(const WebGpuDriver* driver, mrhiDriverAdapter* adapterOut)
 {
     if (!mrhiJsHasAdapter(driver->state) ||
         !mrhiJsAdapterHas(driver->state, "core-features-and-limits"))

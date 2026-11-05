@@ -85,8 +85,8 @@ static void Store(void* table, size_t offset, PFN_vkVoidFunction function)
 
 // Reads functions through vkGetInstanceProcAddr: false when one is
 // missing.
-static bool ReadInstance(mrhiVulkan* vulkan, VkInstance instance, const Function* functions,
-                         size_t count)
+MRHI_NODISCARD static bool ReadInstance(mrhiVulkan* vulkan, VkInstance instance,
+                                        const Function* functions, size_t count)
 {
     bool found = true;
     for (size_t i = 0; i < count; ++i)
@@ -158,8 +158,9 @@ bool mrhiLoadVulkanDebug(mrhiVulkan* vulkan, VkInstance instance)
 
 // Reads functions through vkGetDeviceProcAddr: false when one is
 // missing.
-static bool ReadDevice(const mrhiVulkan* vulkan, VkDevice device, const Function* functions,
-                       size_t count, mrhiVulkanDevice* table)
+MRHI_NODISCARD static bool ReadDevice(const mrhiVulkan* vulkan, VkDevice device,
+                                      const Function* functions, size_t count,
+                                      mrhiVulkanDevice* table)
 {
     bool found = true;
     for (size_t i = 0; i < count; ++i)

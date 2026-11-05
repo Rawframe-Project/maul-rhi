@@ -32,7 +32,7 @@ static inline void mrhiDropLabel(const char** label, size_t* length)
 // (Unicode's table of well-formed byte sequences: no overlong forms,
 // surrogates or code points past U+10FFFF), no NUL, at most
 // MRHI_MAX_LABEL_BYTES.
-bool mrhiIsLabelValid(const char* label, size_t length);
+MRHI_NODISCARD bool mrhiIsLabelValid(const char* label, size_t length);
 
 // A label's refusal: mrhi_errorInvalid for NULL with a length or bytes
 // that are not valid as mrhiIsLabelValid says, mrhi_errorLimit for one
@@ -40,7 +40,7 @@ bool mrhiIsLabelValid(const char* label, size_t length);
 mrhiResult mrhiCheckLabel(const char* label, size_t length);
 
 // Whether length bytes, at least 1, are well-formed UTF-8 without NUL.
-bool mrhiIsTextValid(const char* text, size_t length);
+MRHI_NODISCARD bool mrhiIsTextValid(const char* text, size_t length);
 
 // How many of length bytes lead the text as well-formed UTF-8 without
 // NUL: all of them, or those before the first byte that is not, a

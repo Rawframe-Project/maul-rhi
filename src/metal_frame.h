@@ -75,6 +75,6 @@ mrhiResult mrhiMetalSubmitFrame(mrhiMetalFrames* frames, const mrhiDriverFrame* 
 size_t mrhiMetalPollFrames(mrhiMetalFrames* frames, mrhiDriverEvent* events, size_t capacity);
 
 // Waits up to timeoutNs for a frame; true when it has finished.
-bool mrhiMetalWaitFrame(mrhiMetalFrames* frames, uint64_t tag, uint64_t timeoutNs);
+MRHI_NODISCARD bool mrhiMetalWaitFrame(mrhiMetalFrames* frames, uint64_t tag, uint64_t timeoutNs);
 
 #endif // MAUL_RHI_SRC_METAL_FRAME_H

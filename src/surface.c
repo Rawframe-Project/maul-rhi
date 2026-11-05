@@ -44,7 +44,7 @@ mrhiSurfaceDef mrhiDefaultSurfaceDef(void)
 
 // Whether a type is a source: one of the library's, or, for an instance
 // of an outside driver, a critical driver-defined one.
-static bool IsSource(mrhiStructType type, bool external)
+MRHI_NODISCARD static bool IsSource(mrhiStructType type, bool external)
 {
     if (external && (type & MRHI_STRUCT_DRIVER_DEFINED) != 0 && (type & MRHI_CHAIN_HINT) == 0)
     {
@@ -270,7 +270,7 @@ mrhiResult mrhiSurface_GetCaps(mrhiInstance* instance, mrhiSurfaceId surface, mr
     return mrhi_success;
 }
 
-static bool IsSameColor(const mrhiSurfaceColor* a, const mrhiSurfaceColor* b)
+MRHI_NODISCARD static bool IsSameColor(const mrhiSurfaceColor* a, const mrhiSurfaceColor* b)
 {
     return a->format == b->format && a->primaries == b->primaries && a->transfer == b->transfer &&
            a->range == b->range;
