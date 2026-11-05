@@ -11,7 +11,8 @@
 
 // Reads a device's id<MTLDevice> and id<MTLCommandQueue>, borrowed:
 // false for a device driver that is not Metal's.
-bool mrhiMetalDeviceNative(const mrhiDeviceDriver* driver, void** deviceOut, void** queueOut);
+MRHI_NODISCARD bool mrhiMetalDeviceNative(const mrhiDeviceDriver* driver, void** deviceOut,
+                                          void** queueOut);
 
 // Reads a device texture's id<MTLTexture>, borrowed.
 void* mrhiMetalTextureNative(uint64_t handle);

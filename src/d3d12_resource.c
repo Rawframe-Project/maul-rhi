@@ -157,7 +157,7 @@ mrhiResult mrhiD3d12CreateBuffer(mrhiD3d12Objects* objects, const mrhiBufferDef*
     return mrhi_success;
 }
 
-static bool IsDepth(mrhiFormat format)
+MRHI_NODISCARD static bool IsDepth(mrhiFormat format)
 {
     return format == mrhi_formatDepth32Float || format == mrhi_formatDepthStencil;
 }

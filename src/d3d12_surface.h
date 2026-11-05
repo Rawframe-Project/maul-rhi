@@ -27,7 +27,7 @@ HWND mrhiD3d12WindowOf(uint64_t surface);
 void mrhiD3d12SurfaceCaps(IDXGIFactory4* factory, uint64_t surface, mrhiSurfaceCaps* capsOut);
 
 // Whether the factory's swapchains may tear.
-bool mrhiD3d12Tears(IDXGIFactory4* factory);
+MRHI_NODISCARD bool mrhiD3d12Tears(IDXGIFactory4* factory);
 
 // The DXGI color space of a surface color the caps report.
 DXGI_COLOR_SPACE_TYPE mrhiD3d12ColorSpace(const mrhiSurfaceColor* color);

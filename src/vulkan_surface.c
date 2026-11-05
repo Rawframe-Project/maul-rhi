@@ -239,7 +239,7 @@ static const Space s_spaces[] = {
 };
 
 // The contract's color for a surface format: false for one it has not.
-static bool ColorOf(VkSurfaceFormatKHR surface, mrhiSurfaceColor* colorOut)
+MRHI_NODISCARD static bool ColorOf(VkSurfaceFormatKHR surface, mrhiSurfaceColor* colorOut)
 {
     const Format* format = nullptr;
     for (size_t i = 0; i < sizeof(s_formats) / sizeof(s_formats[0]); ++i)
@@ -264,7 +264,7 @@ static bool ColorOf(VkSurfaceFormatKHR surface, mrhiSurfaceColor* colorOut)
     return true;
 }
 
-static bool IsSameColor(mrhiSurfaceColor a, mrhiSurfaceColor b)
+MRHI_NODISCARD static bool IsSameColor(mrhiSurfaceColor a, mrhiSurfaceColor b)
 {
     return a.format == b.format && a.primaries == b.primaries && a.transfer == b.transfer &&
            a.range == b.range;
@@ -350,7 +350,7 @@ static mrhiTextureUsage UsagesOf(VkImageUsageFlags flags)
 
 // Whether a surface format is 8-bit sRGB, which a configuration may take
 // as its images' own format.
-static bool IsSrgbImage(VkFormat format)
+MRHI_NODISCARD static bool IsSrgbImage(VkFormat format)
 {
     return format == VK_FORMAT_B8G8R8A8_SRGB || format == VK_FORMAT_R8G8B8A8_SRGB;
 }

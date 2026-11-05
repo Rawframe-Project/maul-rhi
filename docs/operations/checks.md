@@ -55,6 +55,7 @@ A failed cell uploads its ctest logs for a week. The other workflows: `codeql.ym
 | File and function lengths | `tools/check_lengths.py`, `tools/length-exceptions.txt` |
 | Public documentation blocks and thread safety statements | `tools/check_docs.py` |
 | Documentation snippets run by `test/test_guide.c` | `tools/check_guide.py` |
+| Every internal function returning `bool` carries `MRHI_NODISCARD`; a deliberate drop is spelled `(void)` | `tools/check_nodiscard.py`, with its self-test |
 | Headers and generated sources match the contract | `tools/gen_contract.py --check` |
 | Allowed Markdown files, em dash, record numbers, links | the organization's `docs_check.py` |
 

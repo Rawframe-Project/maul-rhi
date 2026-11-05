@@ -22,7 +22,7 @@ mrhiShaderVariable mrhiReadInterfaceRecord(const uint8_t* records, uint32_t inde
 // Whether an inter-stage variable is interpolated as WGSL allows:
 // integers flat, flat from the first or either vertex, and the others
 // sampled at the center, the centroid or per sample.
-static bool IsInterpolationValid(mrhiShaderVariable variable)
+MRHI_NODISCARD static bool IsInterpolationValid(mrhiShaderVariable variable)
 {
     bool integer = variable.type == mrhi_scalarSint32 || variable.type == mrhi_scalarUint32;
     switch (variable.interpolation)

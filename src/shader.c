@@ -140,7 +140,7 @@ static size_t EntryPast(const mrhiLimits* limits, const mrhiContainer* container
 }
 
 // Whether a device has the features a container's code needs.
-static bool HasFeatures(const mrhiDevice* device, const mrhiContainer* container)
+MRHI_NODISCARD static bool HasFeatures(const mrhiDevice* device, const mrhiContainer* container)
 {
     const mrhiFeatures* features = &device->features;
     mrhiShaderHeapUses heterogeneous = mrhi_heapUseStorageTextures | mrhi_heapUseStorageBuffers;
@@ -155,7 +155,7 @@ static bool HasFeatures(const mrhiDevice* device, const mrhiContainer* container
 
 // Whether the device stores the format of each storage texture binding,
 // as WebGPU's layout requires.
-static bool StoresFormats(const mrhiDevice* device, const mrhiContainer* container)
+MRHI_NODISCARD static bool StoresFormats(const mrhiDevice* device, const mrhiContainer* container)
 {
     for (uint32_t i = 0; i < container->bindingCount; ++i)
     {
@@ -188,7 +188,7 @@ static size_t ContainerPast(const mrhiLimits* limits, const mrhiContainer* conta
 // Whether each of a container's four tables holds at most
 // MRHI_MAX_TABLE_BINDINGS bindings, so that a table set while recording fits
 // one chunk.
-static bool AreTablesWithin(const mrhiContainer* container)
+MRHI_NODISCARD static bool AreTablesWithin(const mrhiContainer* container)
 {
     uint32_t tables[4] = {0};
     for (uint32_t i = 0; i < container->bindingCount; ++i)

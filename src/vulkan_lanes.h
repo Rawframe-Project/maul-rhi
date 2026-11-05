@@ -38,6 +38,6 @@ void mrhiVulkanCloseLanes(mrhiVulkanRecording* recording);
 // Places a native pass's command buffer (NULL for none) in its batch
 // after the part recorded so far, and begins the batch's next part:
 // false when the device cannot.
-bool mrhiVulkanNextPart(mrhiVulkanRecording* recording, void* native);
+MRHI_NODISCARD bool mrhiVulkanNextPart(mrhiVulkanRecording* recording, void* native);
 
 #endif // MAUL_RHI_SRC_VULKAN_LANES_H

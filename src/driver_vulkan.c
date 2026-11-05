@@ -165,7 +165,8 @@ static void GetSurfaceCaps(const void* self, uint64_t surface, uint64_t adapter,
 
 // Whether a def that adopts a device asks for the device the last
 // description made: the same adapter, features and own extensions.
-static bool IsDescribed(const VulkanDriver* driver, uint64_t adapter, const mrhiDeviceDef* def)
+MRHI_NODISCARD static bool IsDescribed(const VulkanDriver* driver, uint64_t adapter,
+                                       const mrhiDeviceDef* def)
 {
     bool adopts = false;
     for (const mrhiChain* node = def->next; node != nullptr; node = node->next)
@@ -325,7 +326,7 @@ static VkInstance CreateInstance(mrhiVulkan* vulkan, const mrhiAllocator* alloca
 }
 
 // Whether a NUL-ended list of names has a name.
-static bool Names(const char* names, size_t bytes, const char* name)
+MRHI_NODISCARD static bool Names(const char* names, size_t bytes, const char* name)
 {
     for (size_t at = 0; at < bytes; at += strlen(names + at) + 1)
     {

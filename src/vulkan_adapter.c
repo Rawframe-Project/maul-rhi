@@ -111,8 +111,8 @@ static void FindFamily(const mrhiVulkan* vulkan, VkPhysicalDevice device, mrhiVu
 
 // Reads the device's properties, and its features when it is Vulkan
 // 1.3, whose structs a 1.2 device may not fill: false below 1.3.
-static bool ReadFacts(const mrhiVulkan* vulkan, const mrhiAllocator* allocator,
-                      VkPhysicalDevice device, mrhiVulkanFacts* facts)
+MRHI_NODISCARD static bool ReadFacts(const mrhiVulkan* vulkan, const mrhiAllocator* allocator,
+                                     VkPhysicalDevice device, mrhiVulkanFacts* facts)
 {
     *facts = (mrhiVulkanFacts){
         .properties = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2},
@@ -192,8 +192,9 @@ static mrhiAdapterInfo InfoOf(const VkPhysicalDeviceProperties* properties)
 }
 
 // Whether every format has all the wanted optimal tiling features.
-static bool AllHave(const mrhiVulkan* vulkan, VkPhysicalDevice device, const VkFormat* formats,
-                    size_t count, VkFormatFeatureFlags wanted)
+MRHI_NODISCARD static bool AllHave(const mrhiVulkan* vulkan, VkPhysicalDevice device,
+                                   const VkFormat* formats, size_t count,
+                                   VkFormatFeatureFlags wanted)
 {
     for (size_t i = 0; i < count; ++i)
     {
@@ -207,14 +208,14 @@ static bool AllHave(const mrhiVulkan* vulkan, VkPhysicalDevice device, const VkF
 
 // Whether every float32 format filters, and B10G11R11 renders and
 // blends: the format features the facts do not hold.
-static bool Float32Filterable(const mrhiVulkan* vulkan, VkPhysicalDevice device)
+MRHI_NODISCARD static bool Float32Filterable(const mrhiVulkan* vulkan, VkPhysicalDevice device)
 {
     static const VkFormat float32[] = {VK_FORMAT_R32_SFLOAT, VK_FORMAT_R32G32_SFLOAT,
                                        VK_FORMAT_R32G32B32A32_SFLOAT};
     return AllHave(vulkan, device, float32, 3, VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT);
 }
 
-static bool Rg11b10Renderable(const mrhiVulkan* vulkan, VkPhysicalDevice device)
+MRHI_NODISCARD static bool Rg11b10Renderable(const mrhiVulkan* vulkan, VkPhysicalDevice device)
 {
     static const VkFormat rg11b10[] = {VK_FORMAT_B10G11R11_UFLOAT_PACK32};
     return AllHave(vulkan, device, rg11b10, 1,

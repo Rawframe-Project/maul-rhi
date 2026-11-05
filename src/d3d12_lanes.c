@@ -99,7 +99,7 @@ static mrhiD3d12Lane ClearLane(const mrhiD3d12Recorder* recorder, const mrhiDriv
     return lane;
 }
 
-static bool ComputeTakes(D3D12_RESOURCE_STATES state)
+MRHI_NODISCARD static bool ComputeTakes(D3D12_RESOURCE_STATES state)
 {
     return (state & ~COMPUTE_STATES) == 0;
 }
@@ -290,7 +290,7 @@ static void BeginPart(mrhiD3d12Lanes* lanes, mrhiD3d12Lane lane)
 // Ends a lane's part, if one is recording, and adds it, then a list of
 // the program's (none when NULL), to the lane's batch: whether D3D12
 // closed it.
-static bool EndPart(mrhiD3d12Lanes* lanes, mrhiD3d12Lane lane, void* native)
+MRHI_NODISCARD static bool EndPart(mrhiD3d12Lanes* lanes, mrhiD3d12Lane lane, void* native)
 {
     ID3D12GraphicsCommandList* list = lanes->lists[lane];
     if (list == nullptr)
@@ -337,7 +337,7 @@ static void Open(mrhiD3d12Lanes* lanes, mrhiD3d12Lane lane, const uint64_t* wait
 // and with work beyond the direct lane it signals the lane's next value.
 // After a failure its list is only closed, and nothing runs: false when
 // D3D12 fails to close it.
-static bool Close(mrhiD3d12Lanes* lanes, mrhiD3d12Lane lane)
+MRHI_NODISCARD static bool Close(mrhiD3d12Lanes* lanes, mrhiD3d12Lane lane)
 {
     if (lanes->open[lane] == 0)
     {
@@ -481,8 +481,8 @@ void mrhiD3d12NextPart(mrhiD3d12Lanes* lanes, void* native)
 
 // Whether a batch waits on a lane for a batch that runs before it, for
 // at least the value that one signals.
-static bool WaitsFor(const mrhiD3d12LaneSlot* slot, uint32_t held, uint32_t earlier,
-                     mrhiD3d12Lane lane)
+MRHI_NODISCARD static bool WaitsFor(const mrhiD3d12LaneSlot* slot, uint32_t held, uint32_t earlier,
+                                    mrhiD3d12Lane lane)
 {
     if (earlier == 0 || earlier >= held)
     {
@@ -500,9 +500,9 @@ static bool WaitsFor(const mrhiD3d12LaneSlot* slot, uint32_t held, uint32_t earl
 // The compute and copy lanes' first batches wait for the frame before,
 // and with work beyond the direct lane the frame's last batch is on it
 // and waits for every lane's last. Only an assertion calls it.
-[[maybe_unused]] static bool HoldsFollows(const mrhiD3d12Lanes* lanes,
-                                          const mrhiD3d12LaneSlot* slot,
-                                          const mrhiDriverFrame* frame)
+MRHI_NODISCARD [[maybe_unused]] static bool HoldsFollows(const mrhiD3d12Lanes* lanes,
+                                                         const mrhiD3d12LaneSlot* slot,
+                                                         const mrhiDriverFrame* frame)
 {
     uint32_t lastOf[MRHI_PASS_CLASSES] = {0};
     for (uint32_t p = 0; p < frame->passCount; ++p)

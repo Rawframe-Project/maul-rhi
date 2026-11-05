@@ -403,7 +403,7 @@ static double TimestampPeriod(void* self)
 
 // The browser keeps its own pipeline cache: the driver's is empty, so it
 // takes an empty one, its own, and declines any other.
-static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
+MRHI_NODISCARD static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
 {
     (void)self;
     (void)bytes;
@@ -508,7 +508,7 @@ static size_t Poll(void* self, mrhiDriverEvent* events, size_t capacity)
 }
 
 // A browser never blocks: a frame not yet finished is not waited for.
-static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
+MRHI_NODISCARD static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
 {
     (void)timeoutNs;
     const WebGpuDevice* device = self;

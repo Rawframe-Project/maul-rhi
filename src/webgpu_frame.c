@@ -672,7 +672,7 @@ static void AddTargets(int state, const mrhiDriverFrame* frame, const mrhiDriver
 }
 
 // Whether a command goes on the command encoder, out of a compute pass.
-static bool IsOutside(const mrhiCommand* command)
+MRHI_NODISCARD static bool IsOutside(const mrhiCommand* command)
 {
     return (command->type >= mrhiCommandPushDebugGroup &&
             command->type <= mrhiCommandDebugMarker) ||
@@ -680,7 +680,7 @@ static bool IsOutside(const mrhiCommand* command)
 }
 
 // Whether a pass has a command out of a compute pass.
-static bool Splits(const mrhiDriverFrame* frame, const mrhiDriverPass* pass)
+MRHI_NODISCARD static bool Splits(const mrhiDriverFrame* frame, const mrhiDriverPass* pass)
 {
     for (uint32_t chunk = pass->firstChunk; chunk != 0; chunk = frame->chunks[chunk - 1].next)
     {

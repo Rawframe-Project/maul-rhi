@@ -149,7 +149,7 @@ typedef struct mrhiD3d12FrameRoom
 
 // Whether count heaps of entries and samplers each leave every slot's
 // rings their floor.
-bool mrhiD3d12HeapsFit(uint32_t count, uint32_t entries, uint32_t samplers);
+MRHI_NODISCARD bool mrhiD3d12HeapsFit(uint32_t count, uint32_t entries, uint32_t samplers);
 
 // Adds the tables a device's budgets need to its layout, and sets them
 // up in its block.
@@ -184,7 +184,7 @@ size_t mrhiD3d12PollFrames(mrhiD3d12Frames* frames, mrhiDriverEvent* events, siz
 void mrhiD3d12WaitIdle(mrhiD3d12Frames* frames);
 
 // Waits up to timeoutNs for a running frame: whether it finished.
-bool mrhiD3d12WaitFrame(mrhiD3d12Frames* frames, uint64_t tag, uint64_t timeoutNs);
+MRHI_NODISCARD bool mrhiD3d12WaitFrame(mrhiD3d12Frames* frames, uint64_t tag, uint64_t timeoutNs);
 
 // Releases an object or pipeline once the next frame submitted
 // finishes.

@@ -9,6 +9,8 @@
 #ifndef MAUL_RHI_SRC_D3D12_API_H
 #define MAUL_RHI_SRC_D3D12_API_H
 
+#include "maul-rhi/base.h"
+
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -34,7 +36,7 @@ typedef struct mrhiD3d12Api
 
 // Opens d3d12.dll and dxgi.dll from the system directory and reads their
 // entry points: false, with nothing left open, where one is missing.
-bool mrhiOpenD3d12(mrhiD3d12Api* api);
+MRHI_NODISCARD bool mrhiOpenD3d12(mrhiD3d12Api* api);
 void mrhiCloseD3d12(mrhiD3d12Api* api);
 
 #endif // MAUL_RHI_SRC_D3D12_API_H

@@ -23,7 +23,7 @@ mrhiSurfaceConfig mrhiDefaultSurfaceConfig(void)
 }
 
 // Whether the config's own values are well formed.
-static bool IsWellFormed(const mrhiSurfaceConfig* config)
+MRHI_NODISCARD static bool IsWellFormed(const mrhiSurfaceConfig* config)
 {
     const mrhiSurfaceColor* color = &config->color;
     bool known = mrhiIsFormatKnown(color->format) &&
@@ -47,7 +47,7 @@ static bool IsWellFormed(const mrhiSurfaceConfig* config)
 }
 
 // Whether the surface reports the color.
-static bool IsColorReported(const mrhiSurfaceCaps* caps, mrhiSurfaceColor color)
+MRHI_NODISCARD static bool IsColorReported(const mrhiSurfaceCaps* caps, mrhiSurfaceColor color)
 {
     for (uint32_t i = 0; i < caps->colorCount; ++i)
     {
@@ -65,7 +65,8 @@ static bool IsColorReported(const mrhiSurfaceCaps* caps, mrhiSurfaceColor color)
 // sRGB twin of one's format where its images may be sRGB, and the twin
 // as a view only where views may be. The color format itself is a view
 // every surface gives.
-static bool IsColorTaken(const mrhiSurfaceCaps* caps, const mrhiSurfaceConfig* config)
+MRHI_NODISCARD static bool IsColorTaken(const mrhiSurfaceCaps* caps,
+                                        const mrhiSurfaceConfig* config)
 {
     bool views = false;
     for (uint32_t i = 0; i < MRHI_VIEW_FORMATS; ++i)
@@ -88,8 +89,8 @@ static bool IsColorTaken(const mrhiSurfaceCaps* caps, const mrhiSurfaceConfig* c
 }
 
 // Whether the surface and the device can take the config.
-static bool IsSupported(const mrhiDevice* device, const mrhiSurfaceCaps* caps,
-                        const mrhiSurfaceConfig* config)
+MRHI_NODISCARD static bool IsSupported(const mrhiDevice* device, const mrhiSurfaceCaps* caps,
+                                       const mrhiSurfaceConfig* config)
 {
     return caps->presentable && IsColorTaken(caps, config) &&
            (config->usage & ~caps->usages) == 0 &&
@@ -123,7 +124,7 @@ static mrhiResult CheckNames(mrhiDevice* device, const mrhiSurfaceConfig* config
 }
 
 // Whether the open frame holds an image of a swapchain.
-static bool HoldsImage(const mrhiDevice* device, uint32_t swapchain)
+MRHI_NODISCARD static bool HoldsImage(const mrhiDevice* device, uint32_t swapchain)
 {
     const mrhiImport* acquired = &device->swapchainSlots[swapchain - 1].acquired;
     return device->frameOpen && acquired->frame == device->frameSerial && acquired->resource != 0;

@@ -331,7 +331,7 @@ static void DestroyPipeline(void* self, uint64_t handle)
     mrhiVulkanRetireLater(&device->frames, mrhiVulkanRetiredPipeline, handle);
 }
 
-static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
+MRHI_NODISCARD static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
 {
     VulkanDevice* device = self;
     return mrhiVulkanImportCache(&device->pipelines, bytes, size);
@@ -358,7 +358,7 @@ static mrhiResult SubmitFrame(void* self, const mrhiDriverFrame* frame, uint64_t
     return mrhiVulkanSubmit(&device->frames, frame, tag, budgetOut);
 }
 
-static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
+MRHI_NODISCARD static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
 {
     VulkanDevice* device = self;
     return mrhiVulkanWaitFrame(&device->frames, tag, timeoutNs);
@@ -784,7 +784,7 @@ static void PlaceFrames(VulkanDevice* device, const Layout* at, const mrhiDevice
 // object keeps its slot until the next frame submitted finishes, so a
 // program may replace every object once between submissions. False
 // when the counts overflow.
-static bool WithRetiring(const mrhiDeviceDef* def, mrhiDeviceDef* heldOut)
+MRHI_NODISCARD static bool WithRetiring(const mrhiDeviceDef* def, mrhiDeviceDef* heldOut)
 {
     *heldOut = *def;
     mrhiDeviceBudgets* limits = &heldOut->budgets;

@@ -204,7 +204,7 @@ static double TimestampPeriod(void* self)
 
 // No pipeline is made yet, so the driver's cache is empty: it takes an
 // empty one and declines any other.
-static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
+MRHI_NODISCARD static bool ImportPipelineCache(void* self, const void* bytes, size_t size)
 {
     (void)self;
     (void)bytes;
@@ -247,7 +247,7 @@ static size_t Poll(void* self, mrhiDriverEvent* events, size_t capacity)
     return moved + mrhiD3d12PollFrames(&device->frames, events + moved, capacity - moved);
 }
 
-static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
+MRHI_NODISCARD static bool WaitFrame(void* self, uint64_t tag, uint64_t timeoutNs)
 {
     D3d12Device* device = self;
     return mrhiD3d12WaitFrame(&device->frames, tag, timeoutNs);

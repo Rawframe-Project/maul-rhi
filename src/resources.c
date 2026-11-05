@@ -35,7 +35,7 @@ mrhiSamplerDef mrhiDefaultSamplerDef(void)
 // Whether a sampler def's values are in range: known enums, finite
 // levels of detail in order (NaN refused), and anisotropy only with
 // linear filtering.
-static bool IsSamplerDefValid(const mrhiSamplerDef* def)
+MRHI_NODISCARD static bool IsSamplerDefValid(const mrhiSamplerDef* def)
 {
     bool filters = (uint32_t)def->magFilter <= mrhi_filterLinear &&
                    (uint32_t)def->minFilter <= mrhi_filterLinear &&

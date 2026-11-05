@@ -62,7 +62,7 @@ static const mrhiStructType s_deviceStructs[] = {
 };
 
 // Whether the def's Vulkan structs are well formed.
-static bool AreVulkanStructsValid(const mrhiDeviceDef* def)
+MRHI_NODISCARD static bool AreVulkanStructsValid(const mrhiDeviceDef* def)
 {
     const mrhiDeviceVulkanAdopt* adopt =
         (const mrhiDeviceVulkanAdopt*)mrhiFindStruct(def->next, mrhi_structDeviceVulkanAdopt);
@@ -73,7 +73,7 @@ static bool AreVulkanStructsValid(const mrhiDeviceDef* def)
 }
 
 // Whether the def's budgets for the device's bookkeeping are usable.
-static bool AreBudgetsValid(const mrhiDeviceBudgets* budgets)
+MRHI_NODISCARD static bool AreBudgetsValid(const mrhiDeviceBudgets* budgets)
 {
     return budgets->notifications >= 2 && budgets->samplers != 0 && budgets->buffers != 0 &&
            budgets->textures != 0 && budgets->views != 0 && budgets->surfaces != 0 &&

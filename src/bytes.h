@@ -8,6 +8,8 @@
 #ifndef MAUL_RHI_SRC_BYTES_H
 #define MAUL_RHI_SRC_BYTES_H
 
+#include "maul-rhi/base.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -41,7 +43,7 @@ static inline void mrhiWrite64(uint8_t* at, uint64_t value)
 }
 
 // Whether count bytes from at are all zero.
-static inline bool mrhiIsZero(const uint8_t* at, size_t count)
+MRHI_NODISCARD static inline bool mrhiIsZero(const uint8_t* at, size_t count)
 {
     for (size_t i = 0; i < count; ++i)
     {

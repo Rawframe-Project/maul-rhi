@@ -148,7 +148,7 @@ mrhiResult mrhiPass_SetIndexBuffer(mrhiDevice* device, mrhiPassId id, mrhiResour
 // Whether the pass's index buffer suits the pipeline, as WebGPU's
 // indexed draws: one of any width for a list, and one of its strip index
 // format for a strip, which a strip without one has not.
-static bool IndicesFit(const mrhiFramePass* pass, const mrhiPipelineSlot* slot)
+MRHI_NODISCARD static bool IndicesFit(const mrhiFramePass* pass, const mrhiPipelineSlot* slot)
 {
     return pass->indexFormat != mrhi_indexNone &&
            (!slot->strip || slot->stripIndexFormat == pass->indexFormat);
@@ -187,7 +187,8 @@ static const mrhiPipelineSlot* ReadyToRun(const mrhiDevice* device, const mrhiFr
 // Whether a vertex buffer of bytes holds count elements from first:
 // every element's stride but the last's, which needs only the bytes its
 // attributes reach.
-static bool Holds(const mrhiVertexFacts* facts, uint64_t bytes, uint32_t first, uint32_t count)
+MRHI_NODISCARD static bool Holds(const mrhiVertexFacts* facts, uint64_t bytes, uint32_t first,
+                                 uint32_t count)
 {
     uint64_t elements = (uint64_t)first + count;
     return elements == 0 || (elements - 1) * facts->stride + facts->lastStride <= bytes;

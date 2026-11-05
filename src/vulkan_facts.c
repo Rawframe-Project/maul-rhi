@@ -29,7 +29,7 @@
 
 // Whether a device has the Vulkan 1.0 features the contract's floor
 // uses, which every device enables.
-static bool HasFloorFeatures(const VkPhysicalDeviceFeatures* core)
+MRHI_NODISCARD static bool HasFloorFeatures(const VkPhysicalDeviceFeatures* core)
 {
     return core->fullDrawIndexUint32 && core->imageCubeArray && core->independentBlend &&
            core->sampleRateShading && core->depthBiasClamp && core->fragmentStoresAndAtomics &&
@@ -49,7 +49,7 @@ bool mrhiVulkanMeetsFloor(const mrhiVulkanFacts* facts)
 // needs: runtime arrays, partially bound and update after bind bindings
 // updatable while pending, non-uniform indexing, and a set after the
 // four tables.
-static bool HasBindlessSampling(const mrhiVulkanFacts* facts)
+MRHI_NODISCARD static bool HasBindlessSampling(const mrhiVulkanFacts* facts)
 {
     const VkPhysicalDeviceVulkan12Features* indexing = &facts->features12;
     return indexing->runtimeDescriptorArray && indexing->descriptorBindingPartiallyBound &&
@@ -62,7 +62,7 @@ static bool HasBindlessSampling(const mrhiVulkanFacts* facts)
 // Whether a device can also hold storage images and buffers in the
 // resource heap: their update after bind and non-uniform indexing,
 // storage images without a format, and mutable descriptors.
-static bool HasBindlessHeterogeneous(const mrhiVulkanFacts* facts)
+MRHI_NODISCARD static bool HasBindlessHeterogeneous(const mrhiVulkanFacts* facts)
 {
     const VkPhysicalDeviceVulkan12Features* indexing = &facts->features12;
     const VkPhysicalDeviceFeatures* core = &facts->features.features;

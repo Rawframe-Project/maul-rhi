@@ -69,7 +69,7 @@ static void Mark(mrhiVulkanQuerySet* set, uint32_t query)
     set->written[query / 64] |= UINT64_C(1) << (query % 64);
 }
 
-static bool IsWritten(const mrhiVulkanQuerySet* set, uint32_t query)
+MRHI_NODISCARD static bool IsWritten(const mrhiVulkanQuerySet* set, uint32_t query)
 {
     return (set->written[query / 64] >> (query % 64) & 1u) != 0;
 }

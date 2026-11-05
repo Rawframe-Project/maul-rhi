@@ -25,7 +25,7 @@ static mrhiScalarType ClassOf(mrhiScalarType type)
 // is in its range, so short of one past either end; a float within half
 // a step past FLT_MAX, where rounding still lands on FLT_MAX. NaN is
 // none of them.
-static bool TypeHolds(mrhiConstantType type, double value)
+MRHI_NODISCARD static bool TypeHolds(mrhiConstantType type, double value)
 {
     const double past = (double)FLT_MAX + 0x1p103;
     switch (type)
@@ -141,7 +141,7 @@ static const mrhiShaderVariable* OutputOf(const mrhiReflection* reflection,
 
 // Whether a blend factor reads a source's alpha; the second source has
 // the first's components.
-static bool ReadsAlpha(mrhiBlendFactor factor)
+MRHI_NODISCARD static bool ReadsAlpha(mrhiBlendFactor factor)
 {
     return factor == mrhi_blendSrcAlpha || factor == mrhi_blendOneMinusSrcAlpha ||
            factor == mrhi_blendSrcAlphaSaturated || factor == mrhi_blendSrc1Alpha ||
@@ -149,7 +149,7 @@ static bool ReadsAlpha(mrhiBlendFactor factor)
 }
 
 // Whether a blend factor reads the second source.
-static bool ReadsSecond(mrhiBlendFactor factor)
+MRHI_NODISCARD static bool ReadsSecond(mrhiBlendFactor factor)
 {
     return factor == mrhi_blendSrc1 || factor == mrhi_blendOneMinusSrc1 ||
            factor == mrhi_blendSrc1Alpha || factor == mrhi_blendOneMinusSrc1Alpha;

@@ -60,19 +60,19 @@ void mrhiVulkanSurfaceCaps(const mrhiVulkan* vulkan, VkPhysicalDevice device, bo
 // Whether a surface's formats list the sRGB format of every 8-bit unorm
 // color the caps report, in the same color space, and there is one: then
 // any of them may be configured as sRGB images (twinImages).
-bool mrhiVulkanTwinImages(const VkSurfaceFormatKHR* formats, uint32_t count,
-                          const mrhiSurfaceCaps* caps);
+MRHI_NODISCARD bool mrhiVulkanTwinImages(const VkSurfaceFormatKHR* formats, uint32_t count,
+                                         const mrhiSurfaceCaps* caps);
 
 // The Vulkan format and color space a surface lists for a color: for a
 // unorm color the unorm format, or its sRGB twin when the surface lists
 // only that; for an sRGB color (twin images) the sRGB format itself;
 // false when it lists none.
-bool mrhiVulkanSurfaceFormat(const mrhiVulkan* vulkan, VkPhysicalDevice device,
-                             VkSurfaceKHR surface, mrhiSurfaceColor color,
-                             VkSurfaceFormatKHR* formatOut);
+MRHI_NODISCARD bool mrhiVulkanSurfaceFormat(const mrhiVulkan* vulkan, VkPhysicalDevice device,
+                                            VkSurfaceKHR surface, mrhiSurfaceColor color,
+                                            VkSurfaceFormatKHR* formatOut);
 
 // The same, from the formats a surface lists.
-bool mrhiVulkanPickFormat(const VkSurfaceFormatKHR* formats, uint32_t count, mrhiSurfaceColor color,
-                          VkSurfaceFormatKHR* formatOut);
+MRHI_NODISCARD bool mrhiVulkanPickFormat(const VkSurfaceFormatKHR* formats, uint32_t count,
+                                         mrhiSurfaceColor color, VkSurfaceFormatKHR* formatOut);
 
 #endif // MAUL_RHI_SRC_VULKAN_SURFACE_H

@@ -11,15 +11,15 @@
 #include "maul-rhi/surface.h"
 
 // Whether every feature asked for is granted.
-bool mrhiFeaturesWithin(const mrhiFeatures* asked, const mrhiFeatures* granted);
+MRHI_NODISCARD bool mrhiFeaturesWithin(const mrhiFeatures* asked, const mrhiFeatures* granted);
 
 // Whether every limit asked for is within the grant: at most it, or at
 // least it for a limit that is better lower (the alignments).
-bool mrhiLimitsWithin(const mrhiLimits* asked, const mrhiLimits* granted);
+MRHI_NODISCARD bool mrhiLimitsWithin(const mrhiLimits* asked, const mrhiLimits* granted);
 
 // Whether every limit that is better lower (the alignments) is a power
 // of two, as WebGPU requires of an adapter's limits and a device's.
-bool mrhiAlignmentsValid(const mrhiLimits* limits);
+MRHI_NODISCARD bool mrhiAlignmentsValid(const mrhiLimits* limits);
 
 // The diagnostic code naming the limit at a field's offset in
 // mrhiLimits (offsetof); 0 for a limit no call is refused at.
@@ -34,11 +34,11 @@ void mrhiMaskFeatures(mrhiFeatures* features, mrhiDriverKind driver);
 extern const mrhiFormat mrhiKnownFormats[MRHI_KNOWN_FORMATS];
 
 // Whether a value is a format the contract lists.
-bool mrhiIsFormatKnown(mrhiFormat format);
+MRHI_NODISCARD bool mrhiIsFormatKnown(mrhiFormat format);
 
 // Whether a surface color's format, primaries, transfer and range are
 // each one the contract lists.
-static inline bool mrhiIsSurfaceColorKnown(const mrhiSurfaceColor* color)
+MRHI_NODISCARD static inline bool mrhiIsSurfaceColorKnown(const mrhiSurfaceColor* color)
 {
     return mrhiIsFormatKnown(color->format) &&
            (uint32_t)color->primaries <= mrhi_primariesDisplayP3 &&
@@ -47,7 +47,7 @@ static inline bool mrhiIsSurfaceColorKnown(const mrhiSurfaceColor* color)
 }
 
 // Whether a surface color is 8-bit sRGB in Rec. 709 of standard range.
-static inline bool mrhiIsSurfaceColorSrgb8(const mrhiSurfaceColor* color)
+MRHI_NODISCARD static inline bool mrhiIsSurfaceColorSrgb8(const mrhiSurfaceColor* color)
 {
     return (color->format == mrhi_formatRgba8Unorm || color->format == mrhi_formatBgra8Unorm) &&
            color->primaries == mrhi_primariesBt709 && color->transfer == mrhi_transferSrgb &&
@@ -58,7 +58,7 @@ static inline bool mrhiIsSurfaceColorSrgb8(const mrhiSurfaceColor* color)
 // 8-bit sRGB in Rec. 709 among its colors, of which at most
 // MRHI_SURFACE_COLORS are read; FIFO; opaque alpha; render target usage;
 // and sRGB through twin views or twin images.
-static inline bool mrhiSurfaceCapsMeetFloors(const mrhiSurfaceCaps* caps)
+MRHI_NODISCARD static inline bool mrhiSurfaceCapsMeetFloors(const mrhiSurfaceCaps* caps)
 {
     bool srgb8 = false;
     for (uint32_t i = 0; i < caps->colorCount && i < MRHI_SURFACE_COLORS; ++i)
@@ -76,7 +76,7 @@ mrhiFormatCaps mrhiFloorFormatCaps(mrhiFormat format);
 
 // Whether the feature a format's family needs is granted; true for a
 // format without a family.
-bool mrhiFormatFamilyGranted(mrhiFormat format, const mrhiFeatures* features);
+MRHI_NODISCARD bool mrhiFormatFamilyGranted(mrhiFormat format, const mrhiFeatures* features);
 
 // What a color format is as a render target: its channels, the scalar
 // type of the outputs that write it, its bytes per sample and their
@@ -131,14 +131,15 @@ mrhiFormatCopy mrhiGetFormatCopy(mrhiFormat format, mrhiTextureAspect aspect);
 mrhiFormat mrhiFormatSrgbPair(mrhiFormat format);
 
 // Whether a format has a depth aspect, and a stencil aspect.
-bool mrhiFormatHasDepth(mrhiFormat format);
-bool mrhiFormatHasStencil(mrhiFormat format);
+MRHI_NODISCARD bool mrhiFormatHasDepth(mrhiFormat format);
+MRHI_NODISCARD bool mrhiFormatHasStencil(mrhiFormat format);
 
 // A known format's position in mrhiKnownFormats, or MRHI_KNOWN_FORMATS.
 uint32_t mrhiFormatIndex(mrhiFormat format);
 
 // Whether every capability asked for is granted.
-bool mrhiFormatCapsWithin(const mrhiFormatCaps* asked, const mrhiFormatCaps* granted);
+MRHI_NODISCARD bool mrhiFormatCapsWithin(const mrhiFormatCaps* asked,
+                                         const mrhiFormatCaps* granted);
 
 // The bits of each bitflags type the contract lists.
 extern const mrhiBufferUsage mrhiBufferUsageKnown;

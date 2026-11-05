@@ -36,7 +36,7 @@ typedef struct mrhiVulkanFacts
 } mrhiVulkanFacts;
 
 // Whether a device meets the driver's floor beyond its version.
-bool mrhiVulkanMeetsFloor(const mrhiVulkanFacts* facts);
+MRHI_NODISCARD bool mrhiVulkanMeetsFloor(const mrhiVulkanFacts* facts);
 
 // A device's features, with the two its formats tell: every float32
 // format filtering, and B10G11R11 rendering and blending.

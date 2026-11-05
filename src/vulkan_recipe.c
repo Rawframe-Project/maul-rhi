@@ -90,7 +90,7 @@ static void Merge(void* into, const void* from, size_t offset, size_t size)
 // Merges the def's features chain into the recipe's: the core
 // feature structs' true members; false for a struct of another type,
 // which the library cannot place without knowing its size.
-static bool MergeFeatures(const VkBaseInStructure* chain, mrhiVulkanEnabled* enabled)
+MRHI_NODISCARD static bool MergeFeatures(const VkBaseInStructure* chain, mrhiVulkanEnabled* enabled)
 {
     for (const VkBaseInStructure* node = chain; node != nullptr; node = node->pNext)
     {

@@ -46,7 +46,7 @@ static uint32_t FullChain(const mrhiTextureDef* def)
 
 // Whether the size and layers fit the kind and the format's block, and
 // the mips a full chain.
-static bool IsShapeValid(const mrhiTextureDef* def)
+MRHI_NODISCARD static bool IsShapeValid(const mrhiTextureDef* def)
 {
     mrhiFormatBlock block = mrhiGetFormatBlock(def->format);
     bool compressed = block.width > 1 || block.height > 1;
@@ -101,7 +101,7 @@ static size_t PastLimit(const mrhiTextureDef* def, const mrhiLimits* limits)
 
 // Whether the sample count is 1, 2 or 4, several only on a 2D texture of
 // one mip.
-static bool AreSamplesValid(const mrhiTextureDef* def)
+MRHI_NODISCARD static bool AreSamplesValid(const mrhiTextureDef* def)
 {
     bool samples = def->sampleCount == 1 || def->sampleCount == 2 || def->sampleCount == 4;
     return samples &&
@@ -121,7 +121,7 @@ bool mrhiIsTransientShape(const mrhiTextureDef* def)
 // Whether the usages are well formed: known bits, a transient texture
 // only a render target of a transient shape, several samples only on a
 // render target without storage.
-static bool IsUsageValid(const mrhiTextureDef* def)
+MRHI_NODISCARD static bool IsUsageValid(const mrhiTextureDef* def)
 {
     mrhiTextureUsage usage = def->usage;
     mrhiTextureUsage transient = mrhi_textureTransient | mrhi_textureRenderTarget;
@@ -133,7 +133,7 @@ static bool IsUsageValid(const mrhiTextureDef* def)
 }
 
 // Whether every view format is unused, the format itself or its twin.
-static bool AreViewFormatsValid(const mrhiTextureDef* def)
+MRHI_NODISCARD static bool AreViewFormatsValid(const mrhiTextureDef* def)
 {
     mrhiFormat twin = mrhiFormatSrgbPair(def->format);
     for (uint32_t i = 0; i < MRHI_VIEW_FORMATS; ++i)
@@ -158,7 +158,7 @@ bool mrhiFormatTakes(const mrhiDevice* device, mrhiFormat format, mrhiTextureUsa
 }
 
 // Whether the format can take the usages and sample count on the device.
-static bool IsGranted(const mrhiDevice* device, const mrhiTextureDef* def)
+MRHI_NODISCARD static bool IsGranted(const mrhiDevice* device, const mrhiTextureDef* def)
 {
     const mrhiFormatCaps* caps = &device->formatCaps[mrhiFormatIndex(def->format)];
     return mrhiFormatTakes(device, def->format, def->usage) &&

@@ -33,16 +33,19 @@ typedef struct mrhiVulkanNative
 
 // Reads a device's native objects: false for a device driver that is
 // not Vulkan's.
-bool mrhiVulkanDeviceNative(const mrhiDeviceDriver* driver, mrhiVulkanNative* nativeOut);
+MRHI_NODISCARD bool mrhiVulkanDeviceNative(const mrhiDeviceDriver* driver,
+                                           mrhiVulkanNative* nativeOut);
 
 // Reads a device texture's image, its memory and the VkFormat, usage and
 // create flags its def makes: false for a device driver that is not
 // Vulkan's.
-bool mrhiVulkanDeviceTexture(const mrhiDeviceDriver* driver, uint64_t handle,
-                             const mrhiTextureDef* def, mrhiVulkanTextureInfo* textureOut);
+MRHI_NODISCARD bool mrhiVulkanDeviceTexture(const mrhiDeviceDriver* driver, uint64_t handle,
+                                            const mrhiTextureDef* def,
+                                            mrhiVulkanTextureInfo* textureOut);
 
 // The queue family and index a device submits on: false for a device
 // driver that is not Vulkan's.
-bool mrhiVulkanDeviceQueue(const mrhiDeviceDriver* driver, uint32_t* familyOut, uint32_t* indexOut);
+MRHI_NODISCARD bool mrhiVulkanDeviceQueue(const mrhiDeviceDriver* driver, uint32_t* familyOut,
+                                          uint32_t* indexOut);
 
 #endif // MAUL_RHI_SRC_VULKAN_DEVICE_H

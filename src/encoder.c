@@ -262,7 +262,7 @@ mrhiResult mrhiPass_End(mrhiDevice* device, mrhiPassId id)
 
 // Whether two render layouts are the same targets: formats by location,
 // depth format and sample count.
-static bool AreTargetsEqual(const mrhiRenderLayout* a, const mrhiRenderLayout* b)
+MRHI_NODISCARD static bool AreTargetsEqual(const mrhiRenderLayout* a, const mrhiRenderLayout* b)
 {
     for (uint32_t i = 0; i < MRHI_MAX_COLOR_TARGETS; ++i)
     {
@@ -424,7 +424,7 @@ static mrhiFramePass* RenderPass(mrhiDevice* device, mrhiPassId id, mrhiResult* 
 
 // Whether a viewport is well formed: finite edges, a size not negative,
 // and its depth range ordered within 0 to 1. The comparisons refuse NaN.
-static bool IsViewportValid(const mrhiViewport* viewport)
+MRHI_NODISCARD static bool IsViewportValid(const mrhiViewport* viewport)
 {
     return isfinite(viewport->x) && isfinite(viewport->y) && isfinite(viewport->width) &&
            isfinite(viewport->height) && viewport->width >= 0.0f && viewport->height >= 0.0f &&
@@ -436,7 +436,7 @@ static bool IsViewportValid(const mrhiViewport* viewport)
 // the two lie far apart, so the error two-sum recovers decides a sum
 // that lands on the edge: past it, or below it, the rounding cannot
 // cross the edge.
-static bool IsSumWithin(double a, double b, double edge)
+MRHI_NODISCARD static bool IsSumWithin(double a, double b, double edge)
 {
     double sum = a + b;
     double bPart = sum - a;

@@ -408,7 +408,7 @@ mrhiResult mrhiPass_CopyTextureToBuffer(mrhiDevice* device, mrhiPassId pass,
 
 // Whether a texture side names every aspect of its format: all of them,
 // or the only one.
-static bool IsEveryAspect(const mrhiTextureSide* side)
+MRHI_NODISCARD static bool IsEveryAspect(const mrhiTextureSide* side)
 {
     mrhiFormat format = side->def->format;
     bool single = !(mrhiFormatHasDepth(format) && mrhiFormatHasStencil(format));

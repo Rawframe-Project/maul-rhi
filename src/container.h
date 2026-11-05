@@ -192,6 +192,6 @@ mrhiD3d12Entry mrhiContainerD3d12Entry(const mrhiContainer* container, uint32_t 
 mrhiD3d12Place mrhiContainerD3d12Binding(const mrhiContainer* container, uint32_t binding);
 uint32_t mrhiContainerD3d12HeapRangeCount(const mrhiContainer* container);
 mrhiD3d12HeapRange mrhiContainerD3d12HeapRange(const mrhiContainer* container, uint32_t index);
-bool mrhiContainerD3d12Fixed(const mrhiContainer* container, uint32_t constant);
+MRHI_NODISCARD bool mrhiContainerD3d12Fixed(const mrhiContainer* container, uint32_t constant);
 
 #endif // MAUL_RHI_SRC_CONTAINER_H

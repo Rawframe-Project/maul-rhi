@@ -127,8 +127,8 @@ void mrhiD3d12EnterHeap(mrhiD3d12Recorder* recorder, uint64_t heap)
 
 // Takes count descriptors from a ring: false, failing the frame, when
 // it has too few.
-static bool Take(mrhiD3d12Recorder* recorder, mrhiD3d12GpuRing* ring, uint32_t count,
-                 uint32_t* firstOut)
+MRHI_NODISCARD static bool Take(mrhiD3d12Recorder* recorder, mrhiD3d12GpuRing* ring, uint32_t count,
+                                uint32_t* firstOut)
 {
     if (ring->capacity - ring->taken < count)
     {

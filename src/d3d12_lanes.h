@@ -129,7 +129,7 @@ void mrhiD3d12EndLanes(mrhiD3d12Lanes* lanes);
 // Ends every batch still open, the frame's last among them, after a
 // failure too, since a list is closed even when it is not run so that it
 // resets: false when D3D12 fails to close one.
-bool mrhiD3d12CloseLanes(mrhiD3d12Lanes* lanes);
+MRHI_NODISCARD bool mrhiD3d12CloseLanes(mrhiD3d12Lanes* lanes);
 
 // Places a native pass's list (NULL for none) in the direct lane's batch
 // after the part recorded so far, and begins the batch's next part.

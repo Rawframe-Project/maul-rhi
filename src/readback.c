@@ -60,7 +60,7 @@ void mrhiAnswerReadbacks(mrhiDevice* device, uint32_t first, uint32_t count, mrh
 // than splitting them: their position, or false when the ring lacks
 // room. No bytes take no room, and the bytes an empty ring skips to wrap
 // are free at once, so an empty ring holds a readback of its whole size.
-static bool TakeRing(mrhiDevice* device, uint64_t bytes, uint64_t* positionOut)
+MRHI_NODISCARD static bool TakeRing(mrhiDevice* device, uint64_t bytes, uint64_t* positionOut)
 {
     uint64_t ring = device->budgets.readbackBytes;
     uint64_t at = device->ringHead;

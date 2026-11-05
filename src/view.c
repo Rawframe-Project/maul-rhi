@@ -28,7 +28,7 @@ mrhiViewDef mrhiDefaultViewDef(void)
 
 // Whether the def's kind and aspect are known ones. Its usage needs no
 // check here: it is refused unless it is some of the texture's.
-static bool IsKnown(const mrhiViewDef* def)
+MRHI_NODISCARD static bool IsKnown(const mrhiViewDef* def)
 {
     return (uint32_t)def->kind <= mrhi_texture3d && (uint32_t)def->aspect <= mrhi_aspectStencilOnly;
 }
@@ -50,7 +50,7 @@ bool mrhiIsRangeValid(uint32_t base, uint32_t count, uint32_t total)
 
 // Whether the texture may be seen with the view's kind and layers. A
 // multisampled texture is seen only as 2D, as WebGPU requires.
-static bool IsKindValid(const mrhiTextureDef* texture, const mrhiViewDef* view)
+MRHI_NODISCARD static bool IsKindValid(const mrhiTextureDef* texture, const mrhiViewDef* view)
 {
     bool flat = texture->kind != mrhi_texture3d;
     bool cube = texture->kind == mrhi_textureCube || texture->kind == mrhi_textureCubeArray;
@@ -73,7 +73,7 @@ static bool IsKindValid(const mrhiTextureDef* texture, const mrhiViewDef* view)
 
 // Whether the format, never none once resolved, is the texture's own or
 // one it was given.
-static bool IsFormatGiven(const mrhiTextureDef* texture, mrhiFormat format)
+MRHI_NODISCARD static bool IsFormatGiven(const mrhiTextureDef* texture, mrhiFormat format)
 {
     if (format == texture->format)
     {

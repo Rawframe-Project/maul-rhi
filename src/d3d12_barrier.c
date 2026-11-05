@@ -184,7 +184,7 @@ static void TextureBarrier(mrhiD3d12Recorder* recorder, mrhiD3d12Object* object,
 }
 
 // Whether a state writes, as the core's plan counts writes.
-static bool Writes(mrhiResourceState state)
+MRHI_NODISCARD static bool Writes(mrhiResourceState state)
 {
     return state == mrhi_stateStorageWrite || state == mrhi_stateStorageReadWrite ||
            state == mrhi_stateCopyDestination || state == mrhi_stateColorTarget ||
@@ -192,7 +192,7 @@ static bool Writes(mrhiResourceState state)
            state == mrhi_stateQueryResolve;
 }
 
-static bool SamePass(mrhiPassId a, mrhiPassId b)
+MRHI_NODISCARD static bool SamePass(mrhiPassId a, mrhiPassId b)
 {
     return a.index1 == b.index1 && a.generation == b.generation;
 }
@@ -280,7 +280,7 @@ void mrhiD3d12UseDeclared(mrhiD3d12Recorder* recorder, const mrhiDriverPass* pas
     mrhiD3d12FlushBarriers(recorder);
 }
 
-static bool IsRead(D3D12_RESOURCE_STATES state)
+MRHI_NODISCARD static bool IsRead(D3D12_RESOURCE_STATES state)
 {
     return state != D3D12_RESOURCE_STATE_COMMON && (state & WRITES) == 0;
 }

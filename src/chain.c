@@ -9,7 +9,8 @@
 
 // Whether a def accepts a type: one it lists, or any driver-defined
 // type where it lists MRHI_STRUCT_DRIVER_DEFINED itself.
-static bool IsKnown(mrhiStructType type, const mrhiStructType* known, size_t knownCount)
+MRHI_NODISCARD static bool IsKnown(mrhiStructType type, const mrhiStructType* known,
+                                   size_t knownCount)
 {
     for (size_t i = 0; i < knownCount; ++i)
     {

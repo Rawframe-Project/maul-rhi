@@ -26,6 +26,6 @@ uint64_t mrhiWebGpuStartComputePipeline(int state, const mrhiDriverComputePipeli
 uint64_t mrhiWebGpuStartGraphicsPipeline(int state, const mrhiDriverGraphicsPipeline* pipeline);
 
 // Takes the next settled pipeline: false when none has settled.
-bool mrhiWebGpuTakePipeline(int state, uint64_t* handleOut, mrhiResult* outcomeOut);
+MRHI_NODISCARD bool mrhiWebGpuTakePipeline(int state, uint64_t* handleOut, mrhiResult* outcomeOut);
 
 #endif // MAUL_RHI_SRC_WEBGPU_PIPELINE_H

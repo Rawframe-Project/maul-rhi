@@ -704,16 +704,16 @@ mrhiResult mrhiCheckTextureUsage(mrhiDevice* device, const mrhiTextureDef* def);
 
 // Whether a texture of the def's shape may be transient: one 2D layer of
 // one mip without view formats, as WebGPU's transient attachments are.
-bool mrhiIsTransientShape(const mrhiTextureDef* def);
+MRHI_NODISCARD bool mrhiIsTransientShape(const mrhiTextureDef* def);
 
 // Whether a format has an aspect; every format has mrhi_aspectAll.
-bool mrhiFormatHasAspect(mrhiFormat format, mrhiTextureAspect aspect);
+MRHI_NODISCARD bool mrhiFormatHasAspect(mrhiFormat format, mrhiTextureAspect aspect);
 
 // A count, with MRHI_REMAINING resolved to what follows the base.
 uint32_t mrhiResolveCount(uint32_t count, uint32_t base, uint32_t total);
 
 // Whether a range of at least one fits in the total.
-bool mrhiIsRangeValid(uint32_t base, uint32_t count, uint32_t total);
+MRHI_NODISCARD bool mrhiIsRangeValid(uint32_t base, uint32_t count, uint32_t total);
 
 // The def of a texture resource: its declaration, or the imported
 // texture's.
@@ -731,8 +731,8 @@ uint32_t mrhiFindFrameResource(const mrhiDevice* device, mrhiResourceId id);
 
 // Resolves a view def against its texture into resolvedOut (its format,
 // usage and counts made explicit) and returns whether it is valid there.
-bool mrhiResolveView(const mrhiTextureDef* texture, const mrhiViewDef* def,
-                     mrhiViewDef* resolvedOut);
+MRHI_NODISCARD bool mrhiResolveView(const mrhiTextureDef* texture, const mrhiViewDef* def,
+                                    mrhiViewDef* resolvedOut);
 
 // The format a view of a texture takes: the one given, or the texture's
 // for mrhi_formatNone; mrhi_formatNone when the texture lists no such
@@ -740,11 +740,11 @@ bool mrhiResolveView(const mrhiTextureDef* texture, const mrhiViewDef* def,
 mrhiFormat mrhiViewFormatOf(const mrhiTextureDef* texture, mrhiFormat format);
 
 // Whether a frame resource is an imported device object.
-bool mrhiIsImported(const mrhiFrameResource* resource);
+MRHI_NODISCARD bool mrhiIsImported(const mrhiFrameResource* resource);
 
 // Whether what the frame writes to a resource is seen after it: an
 // imported object's or a surface image's.
-bool mrhiOutlivesFrame(const mrhiFrameResource* resource);
+MRHI_NODISCARD bool mrhiOutlivesFrame(const mrhiFrameResource* resource);
 
 // Gives the driver back the images the open frame acquired, for a frame
 // dropped or whose submission failed.
@@ -754,7 +754,7 @@ void mrhiReleaseImages(mrhiDevice* device);
 uint32_t mrhiUsageOf(const mrhiFrameResource* resource, uint8_t use);
 
 // Whether a state writes what is there.
-bool mrhiStateWrites(mrhiResourceState state);
+MRHI_NODISCARD bool mrhiStateWrites(mrhiResourceState state);
 
 // The planes of a format: 3 with stencil, else 1.
 uint8_t mrhiFormatPlanes(mrhiFormat format);
@@ -800,7 +800,8 @@ void mrhiZeroOnFirstUse(mrhiDevice* device, uint32_t resource);
 void mrhiMarkZeroed(mrhiDevice* device);
 
 // Whether a format can take the usages on the device.
-bool mrhiFormatTakes(const mrhiDevice* device, mrhiFormat format, mrhiTextureUsage usage);
+MRHI_NODISCARD bool mrhiFormatTakes(const mrhiDevice* device, mrhiFormat format,
+                                    mrhiTextureUsage usage);
 
 // Destroys a texture's views and ends their ids.
 void mrhiDestroyViewsOf(mrhiDevice* device, mrhiTextureSlot* texture);
@@ -824,7 +825,7 @@ void mrhiDestroyPipelines(mrhiDevice* device);
 
 // Whether the queue has room for one more answer beside those it holds
 // and those running frames, pending pipelines and readbacks will give.
-bool mrhiHasAnswerRoom(const mrhiDevice* device);
+MRHI_NODISCARD bool mrhiHasAnswerRoom(const mrhiDevice* device);
 
 // The answers the queue still has room for.
 uint32_t mrhiAnswerRoom(const mrhiDevice* device);

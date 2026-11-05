@@ -27,7 +27,8 @@ bool mrhiStateWrites(mrhiResourceState state)
 // write. A buffer read in a second state after a first takes one too:
 // the barrier into the first made the last write visible to that state's
 // reads only, and a later write must wait for the reads of both.
-static bool NeedsBarrier(mrhiResourceState before, mrhiResourceState after, bool texture)
+MRHI_NODISCARD static bool NeedsBarrier(mrhiResourceState before, mrhiResourceState after,
+                                        bool texture)
 {
     if (before == mrhi_stateUndefined)
     {
@@ -36,7 +37,7 @@ static bool NeedsBarrier(mrhiResourceState before, mrhiResourceState after, bool
     return before != after || mrhiStateWrites(after);
 }
 
-static bool IsTexture(const mrhiFrameResource* resource)
+MRHI_NODISCARD static bool IsTexture(const mrhiFrameResource* resource)
 {
     return resource->kind == mrhiFrameTexture || resource->kind == mrhiImportedTexture ||
            resource->kind == mrhiSurfaceImage;
@@ -75,7 +76,7 @@ static mrhiResourceState* CarriedState(mrhiDevice* device, const mrhiFrameResour
 
 // The common part of two boxes: whether they meet, with it in out, in the
 // first's state and tracking.
-static bool Intersect(const mrhiBox* a, const mrhiBox* b, mrhiBox* out)
+MRHI_NODISCARD static bool Intersect(const mrhiBox* a, const mrhiBox* b, mrhiBox* out)
 {
     uint32_t mipStart = a->baseMip > b->baseMip ? a->baseMip : b->baseMip;
     uint32_t mipEnd = a->baseMip + a->mipCount < b->baseMip + b->mipCount
@@ -151,7 +152,7 @@ static uint64_t Volume(const mrhiBox* box)
 // Whether the map's boxes still cover the whole exactly once: each move
 // splits boxes and replaces a part, so their volumes always sum to the
 // whole's, and none is empty. Only assertions call it.
-[[maybe_unused]] static bool CoversWhole(const Map* map)
+MRHI_NODISCARD [[maybe_unused]] static bool CoversWhole(const Map* map)
 {
     uint64_t sum = 0;
     for (uint32_t i = 0; i < map->count; ++i)
@@ -174,7 +175,7 @@ static void Push(Map* map, mrhiBox box)
 }
 
 // Whether the barriers that are the program's have reached its limit.
-static bool IsProgramBudgetFull(const mrhiDevice* device)
+MRHI_NODISCARD static bool IsProgramBudgetFull(const mrhiDevice* device)
 {
     return device->frameBarrierCount - device->frameLibraryBarriers ==
            device->budgets.frameBarriers;
@@ -344,7 +345,7 @@ static void ForgetPasses(mrhiFrameResource* resource)
 // first pass's, which a texture's clear takes from the undefined state,
 // or the first program use of a buffer the clear left in its state,
 // after which it no longer is.
-static bool IsLibraryMove(bool* zeroState, uint32_t p)
+MRHI_NODISCARD static bool IsLibraryMove(bool* zeroState, uint32_t p)
 {
     bool library = *zeroState && p >= MRHI_LIBRARY_PASSES;
     *zeroState = *zeroState && !library;
@@ -433,7 +434,7 @@ static mrhiDiagnosticCode PlanResource(mrhiDevice* device, uint32_t slot)
 
 // Whether the barriers are in the order they run: by pass, the frame's
 // end last. Only an assertion calls it.
-[[maybe_unused]] static bool InRunOrder(const mrhiDevice* device)
+MRHI_NODISCARD [[maybe_unused]] static bool InRunOrder(const mrhiDevice* device)
 {
     uint32_t last = 1;
     for (uint32_t i = 0; i < device->frameBarrierCount; ++i)
@@ -487,8 +488,9 @@ static void Sort(mrhiDevice* device)
 
 // Whether a barrier before a pass after one, up to another, meets a part
 // of a resource. Only assertions call it.
-[[maybe_unused]] static bool BarrierMeets(const mrhiDevice* device, uint32_t after, uint32_t upTo,
-                                          uint32_t slot, const mrhiBox* part)
+MRHI_NODISCARD [[maybe_unused]] static bool BarrierMeets(const mrhiDevice* device, uint32_t after,
+                                                         uint32_t upTo, uint32_t slot,
+                                                         const mrhiBox* part)
 {
     uint8_t planes = WholeOf(&device->frameResources[slot - 1]).planes;
     for (uint32_t i = 0; i < device->frameBarrierCount; ++i)
@@ -519,8 +521,8 @@ static void Sort(mrhiDevice* device)
 
 // Whether two uses of one part race without a barrier between them:
 // either writes, or a texture changes state. Only assertions call it.
-[[maybe_unused]] static bool Races(const mrhiFrameResource* resource, const mrhiFrameUse* first,
-                                   const mrhiFrameUse* second)
+MRHI_NODISCARD [[maybe_unused]] static bool
+Races(const mrhiFrameResource* resource, const mrhiFrameUse* first, const mrhiFrameUse* second)
 {
     return mrhiStateWrites(first->state) || mrhiStateWrites(second->state) ||
            (IsTexture(resource) && first->state != second->state);
@@ -531,7 +533,7 @@ static void Sort(mrhiDevice* device)
 // the first, up to the second, meets the part they share. It checks the
 // barriers against the uses alone, apart from how the maps found them,
 // at the cost of every pair of uses. Only an assertion calls it.
-[[maybe_unused]] static bool IsHazardFree(const mrhiDevice* device)
+MRHI_NODISCARD [[maybe_unused]] static bool IsHazardFree(const mrhiDevice* device)
 {
     for (uint32_t q = 1; q < device->framePassCount; ++q)
     {
@@ -591,7 +593,8 @@ mrhiResult mrhiPlan(mrhiDevice* device)
 
 // Whether another placed resource used memory a placed resource takes, in
 // kept passes before its first.
-static bool UsedBefore(const mrhiFrameResource* other, const mrhiFrameResource* resource)
+MRHI_NODISCARD static bool UsedBefore(const mrhiFrameResource* other,
+                                      const mrhiFrameResource* resource)
 {
     return other->placed && other->lastPass < resource->firstPass &&
            other->memoryOffset < resource->memoryOffset + resource->memoryBytes &&
@@ -600,7 +603,7 @@ static bool UsedBefore(const mrhiFrameResource* other, const mrhiFrameResource* 
 
 // Whether a placed resource takes memory that another placed resource
 // used in kept passes before its first.
-static bool Aliases(const mrhiDevice* device, const mrhiFrameResource* resource)
+MRHI_NODISCARD static bool Aliases(const mrhiDevice* device, const mrhiFrameResource* resource)
 {
     for (uint32_t i = 0; i < device->frameResourceCount; ++i)
     {
@@ -695,14 +698,16 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
 
 // Whether a kept pass follows an earlier kept pass, through waits and
 // class order. Only assertions call it.
-[[maybe_unused]] static bool Follows(const mrhiDevice* device, uint32_t later, uint32_t earlier)
+MRHI_NODISCARD [[maybe_unused]] static bool Follows(const mrhiDevice* device, uint32_t later,
+                                                    uint32_t earlier)
 {
     const mrhiFramePass* first = &device->framePasses[earlier - 1];
     return device->framePasses[later - 1].follows[first->passClass] >= earlier;
 }
 
 // Whether a kept pass uses a resource. Only assertions call it.
-[[maybe_unused]] static bool Uses(const mrhiDevice* device, uint32_t pass, uint32_t slot)
+MRHI_NODISCARD [[maybe_unused]] static bool Uses(const mrhiDevice* device, uint32_t pass,
+                                                 uint32_t slot)
 {
     const mrhiFramePass* framePass = &device->framePasses[pass - 1];
     for (uint32_t i = 0; i < framePass->useCount && framePass->kept; ++i)
@@ -719,7 +724,7 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
 // whatever their classes, when they race or a barrier before the earlier
 // sets the part's state for the later: apart from how the maps found the
 // waits, at the cost of every pair of uses. Only assertions call it.
-[[maybe_unused]] static bool RacesFollow(const mrhiDevice* device)
+MRHI_NODISCARD [[maybe_unused]] static bool RacesFollow(const mrhiDevice* device)
 {
     for (uint32_t q = 1; q < device->framePassCount; ++q)
     {
@@ -754,7 +759,7 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
 
 // Whether every kept use of a placed resource follows every kept use of
 // the resources that used its memory before it. Only assertions call it.
-[[maybe_unused]] static bool MemoryFollows(const mrhiDevice* device)
+MRHI_NODISCARD [[maybe_unused]] static bool MemoryFollows(const mrhiDevice* device)
 {
     for (uint32_t r = 1; r <= device->frameResourceCount; ++r)
     {
@@ -781,7 +786,7 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
 
 // Whether every kept pass follows the native passes before it and is
 // followed by those after it. Only assertions call it.
-[[maybe_unused]] static bool NativesFollow(const mrhiDevice* device)
+MRHI_NODISCARD [[maybe_unused]] static bool NativesFollow(const mrhiDevice* device)
 {
     for (uint32_t n = 1; n <= device->framePassCount; ++n)
     {
@@ -801,7 +806,7 @@ mrhiResult mrhiPlanAliasing(mrhiDevice* device)
 
 // Whether a pass declares a query resolve access, so that it may resolve
 // queries.
-static bool MayResolve(const mrhiDevice* device, const mrhiFramePass* pass)
+MRHI_NODISCARD static bool MayResolve(const mrhiDevice* device, const mrhiFramePass* pass)
 {
     for (uint32_t i = 0; i < pass->useCount; ++i)
     {
@@ -816,7 +821,7 @@ static bool MayResolve(const mrhiDevice* device, const mrhiFramePass* pass)
 // Whether every kept pass that may resolve queries follows every kept
 // timed pass before it, and every kept timed pass follows every kept pass
 // before it that may resolve. Only assertions call it.
-[[maybe_unused]] static bool TimestampsFollow(const mrhiDevice* device)
+MRHI_NODISCARD [[maybe_unused]] static bool TimestampsFollow(const mrhiDevice* device)
 {
     for (uint32_t q = 2; q <= device->framePassCount; ++q)
     {
