@@ -801,6 +801,55 @@ static void TestWalkStops(void)
           "a pass of more color targets than their array");
 }
 
+// Walks one copy between a texture (1) and a buffer side, the staging
+// or the readback ring, each 16 bytes: its faults.
+static uint64_t WalkTextureCopy(uint16_t type, mrhiCommandBufferSide side, uint64_t layers)
+{
+    static const uint8_t staging[16];
+    static const mrhiTextureDef texture = {.width = 4, .height = 4};
+    static const mrhiDriverResource resource = {
+        .kind = mrhiDriverDeviceTexture, .handle = 1, .texture = &texture};
+    static mrhiCommandChunk chunk;
+    chunk = (mrhiCommandChunk){.count = 3};
+    chunk.commands[0] = (mrhiCommand){.type = type, .payload = 2, .d = layers};
+    mrhiCommandTextureSide image = {.object = 1};
+    bool upload = type == mrhiCommandWriteTexture;
+    memcpy(&chunk.commands[upload ? 1 : 2], &side, sizeof(side));
+    memcpy(&chunk.commands[upload ? 2 : 1], &image, sizeof(image));
+    mrhiDriverPass pass = {.id = {1, 1}, .firstChunk = 1};
+    mrhiDriverFrame frame = {
+        .resources = &resource,
+        .resourceCount = 1,
+        .passes = &pass,
+        .passCount = 1,
+        .chunks = &chunk,
+        .chunkCount = 1,
+        .staging = staging,
+        .stagingBytes = sizeof(staging),
+        .readbackBytes = 16,
+    };
+    return mrhiWalkFrame(&frame, AnyHandle, nullptr, nullptr);
+}
+
+// A texture copy's buffer side covers its pitch times its rows times its
+// layers: 16 bytes fit the 16 of the staging and the readback ring, as
+// do 0 at a pitch of 0, and
+// a pitch and rows of 65536 over 2^32 layers, 2^64 bytes, do not, though
+// the product wraps to 0 in 64 bits.
+static void TestWalkSideWraps(void)
+{
+    mrhiCommandBufferSide fits = {.bytesPerRow = 4, .rowsPerImage = 2};
+    mrhiCommandBufferSide wraps = {.bytesPerRow = 65536, .rowsPerImage = 65536};
+    CHECK(WalkTextureCopy(mrhiCommandWriteTexture, fits, 2) == 0, "an upload that fits");
+    CHECK(WalkTextureCopy(mrhiCommandReadTexture, fits, 2) == 0, "a readback that fits");
+    mrhiCommandBufferSide empty = {.rowsPerImage = 2};
+    CHECK(WalkTextureCopy(mrhiCommandWriteTexture, empty, 2) == 0, "an upload of no bytes");
+    CHECK(WalkTextureCopy(mrhiCommandWriteTexture, wraps, 1ull << 32) == 1,
+          "an upload whose size wraps");
+    CHECK(WalkTextureCopy(mrhiCommandReadTexture, wraps, 1ull << 32) == 1,
+          "a readback whose size wraps");
+}
+
 // Kinds are int32_t, so a walk check against a kind's last value alone
 // would pass a negative one: a pass's class, an access's state and a
 // barrier's states of -1 or INT32_MIN are each a fault.
@@ -859,6 +908,7 @@ int main(void)
     TestWalk();
     TestWalkEdges();
     TestWalkStops();
+    TestWalkSideWraps();
     TestWalkNegativeKinds();
     return s_failures == 0 ? 0 : 1;
 }
