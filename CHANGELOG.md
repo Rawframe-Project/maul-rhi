@@ -7,15 +7,29 @@ may change the API, the ABI and every data format.
 
 ## [0.28.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.27.0...v0.28.0) (2026-11-05)
 
+### Changed
 
-### ⚠ BREAKING CHANGES
-
-* **contract:** on a device with `rg11b10Renderable`, `mrhiAdapter_GetFormatCaps` reports rg11b10ufloat as blending and taking 1 and 4 samples, and the library takes what that grants: `mrhiCreateTexture` makes a 4-sample rg11b10ufloat texture, a pass resolves one, and `mrhiCreateGraphicsPipeline` takes a blended rg11b10ufloat target. Before (v0.27.0), the caps reported `blending` false and `sampleCounts` 1 for it, and those calls were refused as `mrhi_errorUnsupported`. A device without the feature is unchanged.
+- **Breaking:** on a device with `rg11b10Renderable`, rg11b10ufloat
+  blends and takes 4 samples, as WebGPU's `rg11b10ufloat-renderable`
+  allows. `mrhiAdapter_GetFormatCaps` reports `blending` and 1 and 4
+  samples for it, `mrhiCreateTexture` makes a 4-sample rg11b10ufloat
+  texture, a pass resolves one, and `mrhiCreateGraphicsPipeline` takes
+  a blended rg11b10ufloat target. Before, the caps reported `blending`
+  false and `sampleCounts` 1, and those calls were refused with
+  `mrhi_errorUnsupported`. The WebGPU, Metal and D3D12 drivers and the
+  test driver change; the Vulkan driver reads the format's own
+  properties as before. A device without the feature is unchanged. The
+  SPI stays 18. `contract_version` rises to 39.
+  ([#491](https://github.com/Rawframe-Project/maul-rhi/pull/491))
 
 ### Fixed
 
-* **contract:** grant rg11b10ufloat blending and 4 samples with it ([#491](https://github.com/Rawframe-Project/maul-rhi/issues/491)) ([d570636](https://github.com/Rawframe-Project/maul-rhi/commit/d5706362fff126275f31d81483b0e951fd266d00)), closes [#490](https://github.com/Rawframe-Project/maul-rhi/issues/490)
-* make MRHI_NODISCARD the attribute under GCC 14's C23 too ([#487](https://github.com/Rawframe-Project/maul-rhi/issues/487)) ([c1ed120](https://github.com/Rawframe-Project/maul-rhi/commit/c1ed120f9f6f44ae252fbe5801866bf8f375606d)), closes [#486](https://github.com/Rawframe-Project/maul-rhi/issues/486)
+- `MRHI_NODISCARD` is `[[nodiscard]]` in C under GCC 14's C23, which
+  reports `__STDC_VERSION__` as `202000L`, so a program built that way
+  now gets a warning when it drops a status. Before, the macro was
+  empty there. It now takes the attribute in any C dialect after C17
+  whose compiler has it; C17 and older dialects and C++ are unchanged.
+  ([#487](https://github.com/Rawframe-Project/maul-rhi/pull/487))
 
 ## [0.27.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.26.0...v0.27.0) (2026-11-04)
 
