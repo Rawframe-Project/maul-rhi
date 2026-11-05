@@ -364,7 +364,8 @@ static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
                                       sizeof(uint64_t), alignof(uint64_t));
     parts.chunks = mrhiLayoutAdd(layout, parts.chunkCount, sizeof(mrhiCommandChunk),
                                  alignof(mrhiCommandChunk));
-    parts.labels = mrhiLayoutAdd(layout, MAUL_RHI_LABELS ? passes * MRHI_MAX_LABEL_BYTES : 0, 1, 1);
+    parts.labels = mrhiLayoutAdd(
+        layout, MAUL_RHI_LABELS ? Times(layout, passes, MRHI_MAX_LABEL_BYTES) : 0, 1, 1);
     parts.driverPasses =
         mrhiLayoutAdd(layout, passes, sizeof(mrhiDriverPass), alignof(mrhiDriverPass));
     parts.driverResources = mrhiLayoutAdd(layout, limits->frameResources,
