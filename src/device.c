@@ -20,7 +20,6 @@
 
 #include <stdalign.h>
 #include <stdatomic.h>
-#include <stdckdint.h>
 #include <stddef.h>
 
 #define DEVICE_DEF_COOKIE 0x6D726476u
@@ -175,16 +174,6 @@ typedef struct TableParts
     size_t payload;
 } TableParts;
 
-// A table's count, the product of two 32-bit counts: or 0, with the
-// layout marked as overflowing, where it passes size_t, 32 bits on
-// wasm32.
-static size_t Times(mrhiLayout* layout, uint64_t a, uint64_t b)
-{
-    size_t count = 0;
-    layout->overflow = layout->overflow || ckd_mul(&count, a, b);
-    return count;
-}
-
 static TableParts AddTable(mrhiLayout* layout, uint32_t count, size_t payloadSize,
                            size_t payloadAlignment)
 {
@@ -242,7 +231,7 @@ static ObjectParts AddObjectParts(mrhiLayout* layout, const mrhiDeviceDef* def)
     parts.pipelines =
         AddTable(layout, limits->pipelines, sizeof(mrhiPipelineSlot), alignof(mrhiPipelineSlot));
     parts.vertex =
-        mrhiLayoutAdd(layout, Times(layout, limits->pipelines, def->limits.vertexBuffers),
+        mrhiLayoutAdd(layout, mrhiLayoutTimes(layout, limits->pipelines, def->limits.vertexBuffers),
                       sizeof(mrhiVertexFacts), alignof(mrhiVertexFacts));
     return parts;
 }
@@ -322,16 +311,6 @@ static uint64_t BoxesOfOne(const mrhiDeviceDef* def)
     return (runs < mips ? runs : mips) * (runs < layers ? runs : layers) * 2;
 }
 
-// The boxes of a resource's map and the next one built beside it, which
-// the device counts in 32 bits: or 0, with the layout marked as
-// overflowing, past them.
-static uint32_t BoxLimit(mrhiLayout* layout, const mrhiDeviceDef* def)
-{
-    uint32_t limit = 0;
-    layout->overflow = layout->overflow || ckd_mul(&limit, 2u, BoxesOfOne(def));
-    return limit;
-}
-
 // Lays out the tables of the open frame, sized by the device's budgets.
 static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
 {
@@ -343,7 +322,9 @@ static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
     // And a barrier each, for the first use after the clear.
     size_t barriers = (size_t)limits->frameBarriers + limits->frameResources;
     FrameParts parts = {
-        .boxLimit = BoxLimit(layout, def),
+        // The map of a resource, and the next one built beside it, which
+        // the device counts in 32 bits.
+        .boxLimit = mrhiLayoutTimes32(layout, 2, BoxesOfOne(def)),
         .programChunks = limits->frameCommandBytes / MRHI_CHUNK_BYTES,
         .barrierLimit = barriers,
     };
@@ -360,12 +341,13 @@ static FrameParts AddFrameParts(mrhiLayout* layout, const mrhiDeviceDef* def)
     parts.boxes = mrhiLayoutAdd(layout, parts.boxLimit, sizeof(mrhiBox), alignof(mrhiBox));
     parts.order =
         mrhiLayoutAdd(layout, limits->frameResources, sizeof(uint32_t), alignof(uint32_t));
-    parts.vertexBytes = mrhiLayoutAdd(layout, Times(layout, passes, def->limits.vertexBuffers),
-                                      sizeof(uint64_t), alignof(uint64_t));
+    parts.vertexBytes =
+        mrhiLayoutAdd(layout, mrhiLayoutTimes(layout, passes, def->limits.vertexBuffers),
+                      sizeof(uint64_t), alignof(uint64_t));
     parts.chunks = mrhiLayoutAdd(layout, parts.chunkCount, sizeof(mrhiCommandChunk),
                                  alignof(mrhiCommandChunk));
     parts.labels = mrhiLayoutAdd(
-        layout, MAUL_RHI_LABELS ? Times(layout, passes, MRHI_MAX_LABEL_BYTES) : 0, 1, 1);
+        layout, MAUL_RHI_LABELS ? mrhiLayoutTimes(layout, passes, MRHI_MAX_LABEL_BYTES) : 0, 1, 1);
     parts.driverPasses =
         mrhiLayoutAdd(layout, passes, sizeof(mrhiDriverPass), alignof(mrhiDriverPass));
     parts.driverResources = mrhiLayoutAdd(layout, limits->frameResources,
@@ -415,9 +397,9 @@ static mrhiDevice* Allocate(const mrhiDeviceDef* def)
         mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
     size_t countsInFlightAt =
         mrhiLayoutAdd(&layout, def->limits.framesInFlight, sizeof(uint32_t), alignof(uint32_t));
-    size_t stagingAt =
-        mrhiLayoutAdd(&layout, Times(&layout, def->limits.framesInFlight, limits->frameUploadBytes),
-                      1, alignof(max_align_t));
+    size_t stagingAt = mrhiLayoutAdd(
+        &layout, mrhiLayoutTimes(&layout, def->limits.framesInFlight, limits->frameUploadBytes), 1,
+        alignof(max_align_t));
     FrameParts frame = AddFrameParts(&layout, def);
     size_t queueAt = mrhiLayoutAdd(&layout, limits->notifications, sizeof(mrhiDeviceNotification),
                                    alignof(mrhiDeviceNotification));

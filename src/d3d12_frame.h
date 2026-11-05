@@ -141,6 +141,12 @@ typedef struct mrhiD3d12FrameRoom
     size_t readbacks;
     size_t retirees;
     uint32_t retireCapacity;
+    // The batches and runs of a slot, and the views of the targets and of
+    // the clears a frame takes at most, which size its descriptor heaps.
+    uint32_t batchLimit;
+    uint32_t runLimit;
+    uint32_t targetLimit;
+    uint32_t clearLimit;
 } mrhiD3d12FrameRoom;
 
 // The descriptors of each kind a slot's rings keep at least beside the

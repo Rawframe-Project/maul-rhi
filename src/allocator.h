@@ -46,4 +46,15 @@ typedef struct mrhiLayout
 // two, and returns the part's offset (0 after an overflow).
 size_t mrhiLayoutAdd(mrhiLayout* layout, size_t count, size_t itemSize, size_t alignment);
 
+// A count a layout is sized by, the product or the sum of two counts: or
+// 0, with the layout marked as overflowing, where it passes size_t (32
+// bits on wasm32, armeabi-v7a or 32-bit Windows).
+size_t mrhiLayoutTimes(mrhiLayout* layout, uint64_t a, uint64_t b);
+size_t mrhiLayoutPlus(mrhiLayout* layout, uint64_t a, uint64_t b);
+
+// The same, for a count kept in 32 bits: or 0, with the layout marked as
+// overflowing, past them.
+uint32_t mrhiLayoutTimes32(mrhiLayout* layout, uint64_t a, uint64_t b);
+uint32_t mrhiLayoutPlus32(mrhiLayout* layout, uint64_t a, uint64_t b);
+
 #endif // MAUL_RHI_SRC_ALLOCATOR_H

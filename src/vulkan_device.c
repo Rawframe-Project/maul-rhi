@@ -564,23 +564,23 @@ static void LayoutBatches(Layout* at, const mrhiDeviceBudgets* limits, uint32_t 
     // With one lane a frame is one batch; with more, a pass opens one at
     // most, beside the frame's first and last. A batch takes a command
     // buffer, and each native pass one more and the program's.
-    at->batchLimit = MRHI_VULKAN_SPLIT ? limits->framePasses + 2 : 1;
-    at->partLimit = at->batchLimit + MRHI_MAX_NATIVE_PASSES;
-    at->parts = mrhiLayoutAdd(layout, (size_t)slots * at->partLimit, sizeof(VkCommandBuffer),
-                              alignof(VkCommandBuffer));
+    // The counts a slot keeps in 32 bits, its submissions' with them.
+    at->batchLimit = MRHI_VULKAN_SPLIT ? mrhiLayoutPlus32(layout, limits->framePasses, 2) : 1;
+    at->partLimit = mrhiLayoutPlus32(layout, at->batchLimit, MRHI_MAX_NATIVE_PASSES);
+    uint32_t submitLimit = mrhiLayoutPlus32(layout, at->partLimit, MRHI_MAX_NATIVE_PASSES);
+    at->parts = mrhiLayoutAdd(layout, mrhiLayoutTimes(layout, slots, at->partLimit),
+                              sizeof(VkCommandBuffer), alignof(VkCommandBuffer));
     at->submits =
-        mrhiLayoutAdd(layout, (size_t)slots * (at->partLimit + MRHI_MAX_NATIVE_PASSES),
+        mrhiLayoutAdd(layout, mrhiLayoutTimes(layout, slots, submitLimit),
                       sizeof(VkCommandBufferSubmitInfo), alignof(VkCommandBufferSubmitInfo));
-    at->batches = mrhiLayoutAdd(layout, (size_t)slots * at->batchLimit, sizeof(mrhiVulkanBatch),
-                                alignof(mrhiVulkanBatch));
-    at->infos = mrhiLayoutAdd(layout, (size_t)slots * at->batchLimit, sizeof(VkSubmitInfo2),
-                              alignof(VkSubmitInfo2));
-    at->semaphores = mrhiLayoutAdd(layout, (size_t)slots * at->batchLimit * (MRHI_VULKAN_LANES + 1),
+    size_t batches = mrhiLayoutTimes(layout, slots, at->batchLimit);
+    at->batches = mrhiLayoutAdd(layout, batches, sizeof(mrhiVulkanBatch), alignof(mrhiVulkanBatch));
+    at->infos = mrhiLayoutAdd(layout, batches, sizeof(VkSubmitInfo2), alignof(VkSubmitInfo2));
+    at->semaphores = mrhiLayoutAdd(layout, mrhiLayoutTimes(layout, batches, MRHI_VULKAN_LANES + 1),
                                    sizeof(VkSemaphoreSubmitInfo), alignof(VkSemaphoreSubmitInfo));
-    at->followed =
-        mrhiLayoutAdd(layout, (size_t)limits->framePasses + 1, sizeof(bool), alignof(bool));
-    at->passBatches =
-        mrhiLayoutAdd(layout, (size_t)limits->framePasses + 1, sizeof(uint32_t), alignof(uint32_t));
+    size_t passes = mrhiLayoutPlus(layout, limits->framePasses, 1);
+    at->followed = mrhiLayoutAdd(layout, passes, sizeof(bool), alignof(bool));
+    at->passBatches = mrhiLayoutAdd(layout, passes, sizeof(uint32_t), alignof(uint32_t));
 }
 
 static Layout LayoutOf(const mrhiDeviceDef* def)
@@ -588,8 +588,9 @@ static Layout LayoutOf(const mrhiDeviceDef* def)
     const mrhiDeviceBudgets* limits = &def->budgets;
     uint32_t slots = def->limits.framesInFlight;
     Layout at = {.layout = {.size = sizeof(VulkanDevice)}};
-    mrhiVulkanMemoryCounts(limits->buffers + limits->textures, &at.blockCount, &at.nodeCount);
     mrhiLayout* layout = &at.layout;
+    mrhiVulkanMemoryCounts(layout, (uint64_t)limits->buffers + limits->textures, &at.blockCount,
+                           &at.nodeCount);
     at.pools = mrhiLayoutAdd(layout, 2 * VK_MAX_MEMORY_TYPES, sizeof(mrhiVulkanPool),
                              alignof(mrhiVulkanPool));
     at.blocks =
@@ -615,33 +616,37 @@ static Layout LayoutOf(const mrhiDeviceDef* def)
         mrhiLayoutAdd(layout, limits->pipelines, sizeof(uint64_t), alignof(uint64_t));
     at.constants =
         mrhiLayoutAdd(layout, 1, sizeof(mrhiVulkanConstants), alignof(mrhiVulkanConstants));
-    size_t links = (size_t)limits->buffers + limits->textures + limits->views + limits->samplers +
-                   limits->querySets + limits->shaders + limits->pipelines + limits->heaps;
-    at.slots = mrhiLayoutAdd(layout, links, sizeof(uint32_t), alignof(uint32_t));
+    uint64_t links = (uint64_t)limits->buffers + limits->textures + limits->views +
+                     limits->samplers + limits->querySets + limits->shaders + limits->pipelines;
+    at.slots = mrhiLayoutAdd(layout, mrhiLayoutPlus(layout, links, limits->heaps), sizeof(uint32_t),
+                             alignof(uint32_t));
     at.frames = mrhiLayoutAdd(layout, slots, sizeof(mrhiVulkanSlot), alignof(mrhiVulkanSlot));
-    size_t transients = (size_t)slots * limits->frameResources;
+    size_t transients = mrhiLayoutTimes(layout, slots, limits->frameResources);
     at.images = mrhiLayoutAdd(layout, transients, sizeof(VkImage), alignof(VkImage));
     at.buffers2 = mrhiLayoutAdd(layout, transients, sizeof(VkBuffer), alignof(VkBuffer));
     at.own = mrhiLayoutAdd(layout, transients, sizeof(VkDeviceMemory), alignof(VkDeviceMemory));
     // A texture binding takes a record at least, and a pass's targets
     // and resolves a view each.
-    at.viewLimit = limits->frameCommandBytes / (uint32_t)sizeof(mrhiCommand) +
-                   limits->framePasses * (2u * MRHI_MAX_COLOR_TARGETS + 1u);
-    at.frameViews = mrhiLayoutAdd(layout, (size_t)slots * at.viewLimit, sizeof(VkImageView),
-                                  alignof(VkImageView));
-    at.readbacks = mrhiLayoutAdd(layout, (size_t)slots * limits->readbacks, sizeof(mrhiVulkanRange),
-                                 alignof(mrhiVulkanRange));
+    at.viewLimit = mrhiLayoutPlus32(
+        layout, limits->frameCommandBytes / (uint32_t)sizeof(mrhiCommand),
+        mrhiLayoutTimes32(layout, limits->framePasses, 2u * MRHI_MAX_COLOR_TARGETS + 1u));
+    at.frameViews = mrhiLayoutAdd(layout, mrhiLayoutTimes(layout, slots, at.viewLimit),
+                                  sizeof(VkImageView), alignof(VkImageView));
+    at.readbacks = mrhiLayoutAdd(layout, mrhiLayoutTimes(layout, slots, limits->readbacks),
+                                 sizeof(mrhiVulkanRange), alignof(mrhiVulkanRange));
     LayoutBatches(&at, limits, slots);
-    at.retireCount = limits->buffers + limits->textures + limits->views + limits->samplers +
-                     limits->querySets + limits->pipelines + limits->heaps;
+    uint64_t retirees = (uint64_t)limits->buffers + limits->textures + limits->views +
+                        limits->samplers + limits->querySets + limits->pipelines;
+    at.retireCount = mrhiLayoutPlus32(layout, retirees, limits->heaps);
     at.retire =
         mrhiLayoutAdd(layout, at.retireCount, sizeof(mrhiVulkanRetire), alignof(mrhiVulkanRetire));
     uint32_t surfaces = limits->surfaces;
     at.swapchains =
         mrhiLayoutAdd(layout, surfaces, sizeof(mrhiVulkanSwapchain), alignof(mrhiVulkanSwapchain));
-    at.waits = mrhiLayoutAdd(layout, (size_t)surfaces + 1, sizeof(VkSemaphoreSubmitInfo),
+    size_t submissions = mrhiLayoutPlus(layout, surfaces, 1);
+    at.waits = mrhiLayoutAdd(layout, submissions, sizeof(VkSemaphoreSubmitInfo),
                              alignof(VkSemaphoreSubmitInfo));
-    at.signals = mrhiLayoutAdd(layout, (size_t)surfaces + 1, sizeof(VkSemaphoreSubmitInfo),
+    at.signals = mrhiLayoutAdd(layout, submissions, sizeof(VkSemaphoreSubmitInfo),
                                alignof(VkSemaphoreSubmitInfo));
     at.presentChains =
         mrhiLayoutAdd(layout, surfaces, sizeof(VkSwapchainKHR), alignof(VkSwapchainKHR));
