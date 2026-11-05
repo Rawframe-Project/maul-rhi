@@ -89,6 +89,23 @@
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
     },
     {
+      "name": "android-x86",
+      "displayName": "The NDK, 32-bit x86, the library alone",
+      "inherits": "android-emulator",
+      "cacheVariables": {
+        "ANDROID_ABI": "x86",
+        "MAUL_RHI_BUILD_TESTS": "OFF",
+        "MAUL_RHI_BUILD_SAMPLES": "OFF",
+        "MAUL_RHI_BUILD_BENCH": "OFF"
+      }
+    },
+    {
+      "name": "android-armv7",
+      "displayName": "The NDK, 32-bit ARM (armeabi-v7a), the library alone",
+      "inherits": "android-x86",
+      "cacheVariables": { "ANDROID_ABI": "armeabi-v7a" }
+    },
+    {
       "name": "web-emscripten",
       "displayName": "Emscripten, Release, the seam check included",
       "inherits": "linux",
@@ -160,6 +177,8 @@
     { "name": "linux-seam-x11", "configurePreset": "linux-seam-x11", "targets": ["test_seam"] },
     { "name": "linux-seam-wayland", "configurePreset": "linux-seam-wayland", "targets": ["test_seam"] },
     { "name": "android-emulator", "configurePreset": "android-emulator" },
+    { "name": "android-x86", "configurePreset": "android-x86", "targets": ["maul-rhi"] },
+    { "name": "android-armv7", "configurePreset": "android-armv7", "targets": ["maul-rhi"] },
     { "name": "web-emscripten", "configurePreset": "web-emscripten" },
     { "name": "web-wasi", "configurePreset": "web-wasi" },
     { "name": "macos-clang", "configurePreset": "macos-clang" },

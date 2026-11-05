@@ -2,7 +2,8 @@
 # main and every night, which fuzzes longer and adds the Android emulator
 # and the iOS simulator. Each build cell is a CMake preset built by the
 # organization's shared workflow; the other jobs run in the same CI image,
-# except the Emscripten build, which needs the emsdk action.
+# except the Emscripten build, which needs the emsdk action, and the
+# Android ones, which need the runner's SDK.
 # docs/operations/checks.md explains each job, and tools/check.sh runs the
 # Linux presets locally.
 name: ci
@@ -211,6 +212,66 @@ jobs:
         run: |
           cmake -S cmake/HeaderCheck -B out/headers
           cmake --build out/headers --config Release
+
+  # The library where size_t is 32 bits, beside the web: the Vulkan
+  # driver's for Android x86 and armeabi-v7a through the NDK, built with
+  # warnings as errors, and the core's and the D3D12 driver's sources for
+  # 32-bit Windows, which no runner here links, checked against
+  # MinGW-w64's headers. A change that breaks a 32-bit build fails on its
+  # own pull request.
+  android-32-bit:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [android-x86, android-armv7]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/28.2.13676358
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: NDK
+        run: |
+          # Runner images move to newer NDKs: the pinned one is installed when
+          # the image lacks it.
+          tools="$ANDROID_HOME/cmdline-tools/latest/bin"
+          if [ ! -f "$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" ]; then
+            yes | "$tools/sdkmanager" --licenses >/dev/null 2>&1 || true
+            "$tools/sdkmanager" --install "ndk;${ANDROID_NDK_HOME##*/}" >/dev/null
+          fi
+      - name: Configure
+        run: cmake --preset "$PRESET"
+        env:
+          PRESET: ${{ matrix.preset }}
+      - name: Build
+        run: cmake --build --preset "$PRESET"
+        env:
+          PRESET: ${{ matrix.preset }}
+
+  windows-x86:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.7@sha256:08c846597243dc000c83d6c008d078a8c3fabf8633d83963d46c0e6d02c2577e
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: MinGW-w64 headers
+        run: |
+          apt-get update >/dev/null
+          apt-get install -y --no-install-recommends mingw-w64-i686-dev >/dev/null
+      - name: Sources for 32-bit Windows
+        run: tools/check_windows32.sh
 
   # The library under Emscripten: the suites in Node, the conformance suite
   # and the seam check in headless Chrome with WebGPU, which they must find,
@@ -705,9 +766,9 @@ jobs:
   # ruleset.
   required:
     if: always()
-    needs: [changes, docs, zizmor, checks, build, msvc-headers, web-emscripten, fuzz, fuzz-targets,
-            fuzz-nightly, windows-d3d12-canary, quarantine-d3d12, android-emulator,
-            ios-simulator, prune-caches]
+    needs: [changes, docs, zizmor, checks, build, msvc-headers, android-32-bit, windows-x86,
+            web-emscripten, fuzz, fuzz-targets, fuzz-nightly, windows-d3d12-canary, quarantine-d3d12,
+            android-emulator, ios-simulator, prune-caches]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     permissions: {}
