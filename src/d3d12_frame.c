@@ -95,52 +95,46 @@ bool mrhiD3d12HeapsFit(uint32_t count, uint32_t entries, uint32_t samplers)
                MRHI_D3D12_RING_FLOOR;
 }
 
-// The batches a frame runs at most: each pass opens one at most, beside
-// the frame's last. Each batch takes a list on its lane, and each native
-// pass one more on the direct lane, besides its own.
-static uint32_t BatchLimit(const mrhiDeviceBudgets* limits)
+// The lists a lane of a slot takes: one a batch, and each native pass
+// one more on the direct lane, besides its own.
+static uint32_t ListLimit(uint32_t batchLimit, mrhiD3d12Lane lane)
 {
-    return limits->framePasses + 2;
-}
-
-static uint32_t ListLimit(const mrhiDeviceBudgets* limits, mrhiD3d12Lane lane)
-{
-    return BatchLimit(limits) + (lane == mrhiD3d12LaneDirect ? MRHI_MAX_NATIVE_PASSES : 0);
-}
-
-static uint32_t SlotLists(const mrhiDeviceBudgets* limits)
-{
-    uint32_t lists = 0;
-    for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
-    {
-        lists += ListLimit(limits, (mrhiD3d12Lane)lane);
-    }
-    return lists;
+    return batchLimit + (lane == mrhiD3d12LaneDirect ? MRHI_MAX_NATIVE_PASSES : 0);
 }
 
 mrhiD3d12FrameRoom mrhiD3d12PlanFrames(mrhiLayout* layout, const mrhiDeviceBudgets* limits,
                                        uint32_t slots)
 {
     mrhiD3d12FrameRoom room = {0};
+    // The counts the frames keep in 32 bits, which a budget that would
+    // pass them refuses here. A frame runs a batch a pass at most, beside
+    // its last; a slot's lists are its lanes' ListLimit, its runs those
+    // and one more each native pass. The targets are a multiple of 8, so
+    // their heap's one more descriptor fits too.
+    room.batchLimit = mrhiLayoutPlus32(layout, limits->framePasses, 2);
+    uint32_t lists =
+        mrhiLayoutPlus32(layout, mrhiLayoutTimes32(layout, mrhiD3d12LaneCount, room.batchLimit),
+                         MRHI_MAX_NATIVE_PASSES);
+    room.runLimit = mrhiLayoutPlus32(layout, lists, MRHI_MAX_NATIVE_PASSES);
+    room.targetLimit = mrhiLayoutTimes32(layout, limits->framePasses, MRHI_MAX_COLOR_TARGETS);
+    room.clearLimit = mrhiLayoutPlus32(layout, limits->frameResources, MRHI_D3D12_CLEAR_VIEWS);
     room.slots = mrhiLayoutAdd(layout, slots, sizeof(mrhiD3d12Slot), alignof(mrhiD3d12Slot));
     room.lists =
-        mrhiLayoutAdd(layout, (size_t)slots * SlotLists(limits), sizeof(ID3D12GraphicsCommandList*),
-                      alignof(ID3D12GraphicsCommandList*));
-    room.runs = mrhiLayoutAdd(layout, (size_t)slots * (SlotLists(limits) + MRHI_MAX_NATIVE_PASSES),
+        mrhiLayoutAdd(layout, mrhiLayoutTimes(layout, slots, lists),
+                      sizeof(ID3D12GraphicsCommandList*), alignof(ID3D12GraphicsCommandList*));
+    room.runs = mrhiLayoutAdd(layout, mrhiLayoutTimes(layout, slots, room.runLimit),
                               sizeof(ID3D12CommandList*), alignof(ID3D12CommandList*));
-    room.batches = mrhiLayoutAdd(layout, (size_t)slots * BatchLimit(limits), sizeof(mrhiD3d12Batch),
-                                 alignof(mrhiD3d12Batch));
-    room.passLanes = mrhiLayoutAdd(layout, (size_t)limits->framePasses + 1, sizeof(mrhiD3d12Lane),
-                                   alignof(mrhiD3d12Lane));
-    room.passBatches =
-        mrhiLayoutAdd(layout, (size_t)limits->framePasses + 1, sizeof(uint32_t), alignof(uint32_t));
-    room.followed =
-        mrhiLayoutAdd(layout, (size_t)limits->framePasses + 1, sizeof(bool), alignof(bool));
+    room.batches = mrhiLayoutAdd(layout, mrhiLayoutTimes(layout, slots, room.batchLimit),
+                                 sizeof(mrhiD3d12Batch), alignof(mrhiD3d12Batch));
+    size_t passes = mrhiLayoutPlus(layout, limits->framePasses, 1);
+    room.passLanes = mrhiLayoutAdd(layout, passes, sizeof(mrhiD3d12Lane), alignof(mrhiD3d12Lane));
+    room.passBatches = mrhiLayoutAdd(layout, passes, sizeof(uint32_t), alignof(uint32_t));
+    room.followed = mrhiLayoutAdd(layout, passes, sizeof(bool), alignof(bool));
     room.table = mrhiLayoutAdd(layout, limits->frameResources, sizeof(mrhiD3d12Object),
                                alignof(mrhiD3d12Object));
-    room.transients = mrhiLayoutAdd(layout, (size_t)slots * limits->frameResources,
+    room.transients = mrhiLayoutAdd(layout, mrhiLayoutTimes(layout, slots, limits->frameResources),
                                     sizeof(ID3D12Resource*), alignof(ID3D12Resource*));
-    room.readbacks = mrhiLayoutAdd(layout, (size_t)slots * limits->readbacks,
+    room.readbacks = mrhiLayoutAdd(layout, mrhiLayoutTimes(layout, slots, limits->readbacks),
                                    sizeof(mrhiD3d12Range), alignof(mrhiD3d12Range));
     uint64_t retirees = (uint64_t)limits->buffers + limits->textures + limits->views +
                         limits->samplers + limits->querySets + limits->pipelines + limits->heaps;
@@ -160,7 +154,7 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
     frames->resourceLimit = limits->frameResources;
     // Each pass takes a view of each color target and one of its depth
     // target at most.
-    frames->targetLimit = limits->framePasses * MRHI_MAX_COLOR_TARGETS;
+    frames->targetLimit = room->targetLimit;
     frames->depthLimit = limits->framePasses;
     // Each binding of a table is a record of the frame's commands, and
     // takes one descriptor at most, as each clear does, the library's of
@@ -168,7 +162,7 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
     // heaps hold past the program's heaps at most.
     uint32_t records = limits->frameCommandBytes / (uint32_t)sizeof(mrhiCommand);
     records = records > 0 ? records : 1;
-    frames->clearLimit = limits->frameResources + MRHI_D3D12_CLEAR_VIEWS;
+    frames->clearLimit = room->clearLimit;
     uint32_t views = RingRoom(D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_1,
                               frames->heapCount, frames->heapEntries);
     uint32_t samplers = RingRoom(D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE, frames->heapCount,
@@ -194,8 +188,8 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
     lanes->device = frames->device;
     lanes->queues[mrhiD3d12LaneDirect] = frames->queue;
     lanes->recorder = &frames->recorder;
-    lanes->batchLimit = BatchLimit(limits);
-    lanes->runLimit = SlotLists(limits) + MRHI_MAX_NATIVE_PASSES;
+    lanes->batchLimit = room->batchLimit;
+    lanes->runLimit = room->runLimit;
     lanes->passLanes = (mrhiD3d12Lane*)(block + room->passLanes);
     lanes->passBatches = (uint32_t*)(block + room->passBatches);
     lanes->followed = (bool*)(block + room->followed);
@@ -217,7 +211,7 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
         // program's allocator as it is.
         for (int lane = 0; lane < mrhiD3d12LaneCount; ++lane)
         {
-            lanes->listLimit[lane] = ListLimit(limits, (mrhiD3d12Lane)lane);
+            lanes->listLimit[lane] = ListLimit(room->batchLimit, (mrhiD3d12Lane)lane);
             slot->lanes.lists[lane] = lists;
             for (uint32_t list = 0; list < lanes->listLimit[lane]; ++list)
             {

@@ -62,6 +62,50 @@ size_t mrhiLayoutAdd(mrhiLayout* layout, size_t count, size_t itemSize, size_t a
     return offset;
 }
 
+size_t mrhiLayoutTimes(mrhiLayout* layout, uint64_t a, uint64_t b)
+{
+    size_t count = 0;
+    if (layout->overflow || ckd_mul(&count, a, b))
+    {
+        layout->overflow = true;
+        return 0;
+    }
+    return count;
+}
+
+size_t mrhiLayoutPlus(mrhiLayout* layout, uint64_t a, uint64_t b)
+{
+    size_t count = 0;
+    if (layout->overflow || ckd_add(&count, a, b))
+    {
+        layout->overflow = true;
+        return 0;
+    }
+    return count;
+}
+
+uint32_t mrhiLayoutTimes32(mrhiLayout* layout, uint64_t a, uint64_t b)
+{
+    uint32_t count = 0;
+    if (layout->overflow || ckd_mul(&count, a, b))
+    {
+        layout->overflow = true;
+        return 0;
+    }
+    return count;
+}
+
+uint32_t mrhiLayoutPlus32(mrhiLayout* layout, uint64_t a, uint64_t b)
+{
+    uint32_t count = 0;
+    if (layout->overflow || ckd_add(&count, a, b))
+    {
+        layout->overflow = true;
+        return 0;
+    }
+    return count;
+}
+
 static void* GuardedAlloc(size_t size, size_t alignment, void* context)
 {
     mrhiAllocatorGuard* guard = context;
