@@ -7,16 +7,43 @@ may change the API, the ABI and every data format.
 
 ## [0.29.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.28.1...v0.29.0) (2026-11-08)
 
+### Changed
 
-### ⚠ BREAKING CHANGES
-
-* **device:** mrhiCreateDevice refuses a frameAccesses budget past UINT32_MAX less frameResources with mrhi_errorInvalid, and, where size_t is 32 bits, budgets whose staging or vertex tables pass it with mrhi_errorCapacity; a def whose box count passes UINT32_MAX is refused with mrhi_errorCapacity on every build.
+- **Breaking:** `mrhiCreateDevice` refuses a `frameAccesses` budget
+  past `UINT32_MAX` less `frameResources` with `mrhi_errorInvalid`.
+  Before, at such a budget the library's own uses of a frame's fresh
+  resources wrapped to index 0 and overwrote the program's first use.
+  The contract now also documents the `framePasses` and `frameBarriers`
+  bounds it already refused. `contract_version` rises to 40.
+  ([#509](https://github.com/Rawframe-Project/maul-rhi/pull/509))
+- **Breaking:** where `size_t` is 32 bits (the web builds),
+  `mrhiCreateDevice` refuses budgets whose staging, pipeline vertex or
+  pass vertex tables pass `size_t` with `mrhi_errorCapacity`, before
+  asking the allocator. Before, such a table was laid out smaller than
+  its count and the device wrote past its own block: on the web, 2
+  frames of 2^31 upload bytes made a staging of 0 bytes. A def whose
+  frame planning parts pass `UINT32_MAX` is refused with
+  `mrhi_errorCapacity` on every build; before, the device kept fewer
+  parts than its budgets need and could refuse a frame within them.
+  ([#509](https://github.com/Rawframe-Project/maul-rhi/pull/509))
 
 ### Fixed
 
-* **device:** check the drivers' budget-sized counts in their layouts ([#512](https://github.com/Rawframe-Project/maul-rhi/issues/512)) ([31cafe2](https://github.com/Rawframe-Project/maul-rhi/commit/31cafe2ac393f7c2ad4b83bbdce5f07b78d888ed)), closes [#511](https://github.com/Rawframe-Project/maul-rhi/issues/511)
-* **device:** refuse budgets whose tables or counts pass their width ([#509](https://github.com/Rawframe-Project/maul-rhi/issues/509)) ([579fd6f](https://github.com/Rawframe-Project/maul-rhi/commit/579fd6f8548f2b9910ef9f1db5001527cda4ee35)), closes [#508](https://github.com/Rawframe-Project/maul-rhi/issues/508)
-* **encoder:** refuse a draw whose vertex reach wraps past 64 bits ([#507](https://github.com/Rawframe-Project/maul-rhi/issues/507)) ([eb863b1](https://github.com/Rawframe-Project/maul-rhi/commit/eb863b165bf139c182571c9e18a34fb23ac0b897)), closes [#506](https://github.com/Rawframe-Project/maul-rhi/issues/506)
+- `mrhiPass_Draw` and `mrhiPass_DrawIndexed` refuse a draw whose
+  vertex reach passes 64 bits with `mrhi_errorInvalid` and
+  `mrhi_diagnosticVertexBufferTooSmall`, as they refuse a buffer too
+  small. Before, the stride times the vertices could wrap and come out
+  within the buffer, and the draw was recorded with the driver told to
+  read past it. Only a device whose driver reports a `vertexStride`
+  limit far above WebGPU's 2048 can make such a pipeline: the test
+  driver can, and so can a driver built outside the tree.
+  ([#507](https://github.com/Rawframe-Project/maul-rhi/pull/507))
+- The Vulkan and D3D12 drivers check the counts they size from the
+  device's budgets, refusing the device with `mrhi_errorCapacity` where
+  one passes its width. Before, such a count could wrap and lay a table
+  or a descriptor heap out smaller than the driver then indexed it.
+  Only budgets the core cannot hold today reach these checks. The SPI
+  stays 18. ([#512](https://github.com/Rawframe-Project/maul-rhi/pull/512))
 
 ## [0.28.1](https://github.com/Rawframe-Project/maul-rhi/compare/v0.28.0...v0.28.1) (2026-11-05)
 
