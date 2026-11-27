@@ -78,7 +78,11 @@ VkBufferCreateInfo mrhiVulkanBufferOf(const mrhiBufferDef* def)
     flags |= (usage & mrhi_bufferIndex) != 0 ? VK_BUFFER_USAGE_INDEX_BUFFER_BIT : 0;
     flags |= (usage & mrhi_bufferUniform) != 0 ? VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT : 0;
     flags |= (usage & mrhi_bufferStorage) != 0 ? VK_BUFFER_USAGE_STORAGE_BUFFER_BIT : 0;
-    flags |= (usage & mrhi_bufferIndirect) != 0 ? VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT : 0;
+    // An indirect buffer is also a copy source: a dispatch's counts are
+    // copied out of it to be guarded (vulkan_record.c).
+    flags |= (usage & mrhi_bufferIndirect) != 0
+                 ? VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+                 : 0;
     flags |= (usage & mrhi_bufferCopySource) != 0 ? VK_BUFFER_USAGE_TRANSFER_SRC_BIT : 0;
     flags |= (usage & (mrhi_bufferCopyDestination | mrhi_bufferQueryResolve)) != 0
                  ? VK_BUFFER_USAGE_TRANSFER_DST_BIT

@@ -486,10 +486,10 @@ static void ClearTexture(const mrhiVulkanRecording* recording, const mrhiCommand
     CopyZeros(recording, image);
 }
 
-static void SetPipeline(mrhiVulkanRecording* recording, const mrhiCommand* command)
+// Binds the pass's pipeline with its push constants and the pass's heap.
+static void BindPipeline(mrhiVulkanRecording* recording)
 {
-    const mrhiVulkanPipeline* pipeline = &recording->frames->pipelines->pipelines[command->b - 1];
-    recording->pipeline = pipeline;
+    const mrhiVulkanPipeline* pipeline = recording->pipeline;
     recording->frames->api->vkCmdBindPipeline(recording->slot->commands, pipeline->bindPoint,
                                               pipeline->pipeline);
     if (pipeline->rootStages != 0)
@@ -508,6 +508,93 @@ static void SetPipeline(mrhiVulkanRecording* recording, const mrhiCommand* comma
                                                         pipeline->bindPoint, pipeline->layout,
                                                         MRHI_VULKAN_TABLES, 1, &set, 0, nullptr);
     }
+}
+
+static void SetPipeline(mrhiVulkanRecording* recording, const mrhiCommand* command)
+{
+    recording->pipeline = &recording->frames->pipelines->pipelines[command->b - 1];
+    BindPipeline(recording);
+}
+
+// Makes the dependency of one range of a buffer.
+static void Depend(mrhiVulkanRecording* recording, VkBuffer buffer, VkDeviceSize offset,
+                   VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+                   VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess)
+{
+    const VkBufferMemoryBarrier2 barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+        .srcStageMask = srcStage,
+        .srcAccessMask = srcAccess,
+        .dstStageMask = dstStage,
+        .dstAccessMask = dstAccess,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .buffer = buffer,
+        .offset = offset,
+        .size = 3 * sizeof(uint32_t),
+    };
+    const VkDependencyInfo dependency = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = 1,
+        .pBufferMemoryBarriers = &barrier,
+    };
+    recording->frames->api->vkCmdPipelineBarrier2(recording->slot->commands, &dependency);
+}
+
+// An indirect dispatch, as WebGPU's: its counts copied into the slot's
+// guard buffer, where the library's kernel zeroes them when one passes
+// workgroupsPerDimension, since Vulkan leaves such a dispatch undefined;
+// the dispatch reads the copy. The kernel's pipeline and push constants
+// replace the pass's, which are set again, with its tables, before the
+// dispatch.
+static void GuardedDispatch(mrhiVulkanRecording* recording, const mrhiCommand* command)
+{
+    mrhiVulkanFrames* frames = recording->frames;
+    mrhiVulkanSlot* slot = recording->slot;
+    const mrhiVulkanDevice* api = frames->api;
+    VkCommandBuffer commands = slot->commands;
+    VkDeviceSize bytes = 3 * sizeof(uint32_t);
+    if (frames->guardBytes - slot->guardUsed < bytes)
+    {
+        recording->status = mrhi_errorCapacity;
+        recording->budget = mrhi_diagnosticSubmitScratch;
+        return;
+    }
+    VkDeviceSize at = slot->guardUsed;
+    slot->guardUsed += bytes;
+    VkBuffer arguments = mrhiVulkanFrameBuffer(recording, (uint32_t)command->a);
+    // The frame's barriers made the counts visible to indirect reads; the
+    // copy reads them after those.
+    Depend(recording, arguments, command->c, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, 0,
+           VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
+    const VkBufferCopy copy = {.srcOffset = command->c, .dstOffset = at, .size = bytes};
+    api->vkCmdCopyBuffer(commands, arguments, slot->guards, 1, &copy);
+    Depend(recording, slot->guards, at, VK_PIPELINE_STAGE_2_COPY_BIT,
+           VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+           VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
+    api->vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, frames->guard);
+    uint8_t shape[sizeof(VkDeviceAddress) + 3 * sizeof(uint32_t)];
+    VkDeviceAddress address = slot->guardAddress + at;
+    const uint32_t words[3] = {frames->workgroupsPerDimension, 0, 0};
+    memcpy(shape, &address, sizeof(address));
+    memcpy(shape + sizeof(address), words, sizeof(words));
+    api->vkCmdPushConstants(commands, frames->guardLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+                            sizeof(shape), shape);
+    api->vkCmdDispatch(commands, 1, 1, 1);
+    Depend(recording, slot->guards, at, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+           VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
+           VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT);
+    BindPipeline(recording);
+    const mrhiVulkanPipeline* pipeline = recording->pipeline;
+    for (uint32_t t = 0; t < MRHI_VULKAN_TABLES; ++t)
+    {
+        if ((recording->tablesBound & (1u << t)) != 0 && t < pipeline->setCount)
+        {
+            api->vkCmdBindDescriptorSets(commands, pipeline->bindPoint, pipeline->layout, t, 1,
+                                         &recording->tables[t], 0, nullptr);
+        }
+    }
+    api->vkCmdDispatchIndirect(commands, slot->guards, at);
 }
 
 // Sets dynamic state from a command and the payload that follows it.
@@ -581,7 +668,7 @@ static void BindBuffer(const mrhiVulkanRecording* recording, const mrhiCommand* 
                                                     &size, nullptr);
 }
 
-static void Draw(const mrhiVulkanRecording* recording, const mrhiCommand* command)
+static void Draw(mrhiVulkanRecording* recording, const mrhiCommand* command)
 {
     const mrhiVulkanDevice* api = recording->frames->api;
     VkCommandBuffer commands = recording->slot->commands;
@@ -620,8 +707,7 @@ static void Draw(const mrhiVulkanRecording* recording, const mrhiCommand* comman
         break;
     default:
         MRHI_ASSERT(command->type == mrhiCommandDispatchIndirect);
-        api->vkCmdDispatchIndirect(commands, mrhiVulkanFrameBuffer(recording, command->a),
-                                   command->c);
+        GuardedDispatch(recording, command);
         break;
     }
 }

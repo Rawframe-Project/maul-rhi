@@ -6,8 +6,10 @@
 // vertex entry reads them gets them as root constants: set before a
 // direct draw, and for an indirect one copied from its arguments into
 // the slot's scratch buffer ahead of them, where the pipeline's command
-// signature sets them. Other indirect draws and dispatches read their
-// arguments in place. A resolve copies the queries the frame wrote,
+// signature sets them. Other indirect draws read their arguments in
+// place; an indirect dispatch reads a copy of its counts in the scratch
+// buffer, which the library's guard kernel zeroed when one passes the
+// workgroup limit. A resolve copies the queries the frame wrote,
 // occlusion as D3D12's binary occlusion (0 or 1) and timestamps in the
 // queue's ticks, and zeros for the others, which D3D12 would leave
 // undefined.

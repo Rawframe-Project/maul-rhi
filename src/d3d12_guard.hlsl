@@ -4,7 +4,7 @@
 // Guards an indirect dispatch's workgroup counts as WebGPU's
 // dispatchWorkgroupsIndirect does: the three counts at t0 are copied to
 // u0, or zeros when one passes `most`, the device's workgroupsPerDimension,
-// or when the entry reads a flattened index (`flat`: 1 for
+// or when the entry reads a flattened index (`indices`: 1 for
 // workgroup_index, 2 for global_invocation_index) that the dispatch's
 // workgroups, or its workgroups times `invocations`, pass 32 bits for.
 // tools/gen_kernels.py compiles it to src/generated/d3d12_guard.h.
@@ -15,7 +15,7 @@
 cbuffer Shape : register(b0)
 {
     uint most;
-    uint flat;
+    uint indices;
     uint invocations;
 };
 
@@ -40,6 +40,6 @@ void main()
     bool grouped = Times(counts.x, counts.y, workgroups) && Times(workgroups, counts.z, total);
     uint threads = 0;
     bool spread = grouped && Times(total, invocations, threads);
-    fits = fits && ((flat & 1u) == 0 || grouped) && ((flat & 2u) == 0 || spread);
+    fits = fits && ((indices & 1u) == 0 || grouped) && ((indices & 2u) == 0 || spread);
     guarded.Store3(0, fits ? counts : uint3(0, 0, 0));
 }

@@ -46,6 +46,7 @@
     X(vkWaitSemaphores)                                                                            \
     X(vkGetDeviceBufferMemoryRequirements)                                                         \
     X(vkGetDeviceImageMemoryRequirements)                                                          \
+    X(vkGetBufferDeviceAddress)                                                                    \
     X(vkAllocateMemory)                                                                            \
     X(vkFreeMemory)                                                                                \
     X(vkGetBufferMemoryRequirements2)                                                              \

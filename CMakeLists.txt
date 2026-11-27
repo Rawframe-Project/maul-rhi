@@ -237,10 +237,11 @@ if(MAUL_RHI_BUILD_TESTS)
         maul_add_test(vulkan_frame WHITEBOX)
         maul_add_test(vulkan_memory_types WHITEBOX)
         maul_add_test(vulkan_zero)
+        maul_add_test(vulkan_dispatch)
         maul_add_test(vulkan_cache WHITEBOX)
         foreach(test vulkan_label vulkan_limits vulkan_facts vulkan_surface vulkan_swapchain
                      vulkan_memory vulkan_external vulkan_frame vulkan_memory_types vulkan_zero
-                     vulkan_cache)
+                     vulkan_cache vulkan_dispatch)
             if(TARGET test_${test})
                 target_include_directories(test_${test} SYSTEM PRIVATE
                                            ${PROJECT_SOURCE_DIR}/khronos)
@@ -537,8 +538,9 @@ if(MAUL_RHI_BUILD_TESTS)
     # The tests that drive a real GPU, window or browser: the changed-files
     # check leaves them out, every other check runs them.
     foreach(test conformance conformance_worker conformance_external conformance_app
-                 vulkan_external vulkan_frame vulkan_zero vulkan_cache metal_native metal_queues
-                 d3d12_native d3d12_queues d3d12_queues_held external_build)
+                 vulkan_external vulkan_frame vulkan_zero vulkan_cache vulkan_dispatch
+                 metal_native metal_queues d3d12_native d3d12_queues d3d12_queues_held
+                 external_build)
         if(TEST ${test})
             set_property(TEST ${test} APPEND PROPERTY LABELS integration)
         endif()
