@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// The constants container's compute entry "cs": writes the bits of a
+// specialization constant of each type, a bool as 0 or 1, an int32, a
+// float32 and a uint32, to a storage buffer, so that a test reads back
+// what a driver handed the shader.
+
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(constant_id = 0) const bool flag = false;
+layout(constant_id = 1) const int offset = 7;
+layout(constant_id = 2) const float scale = 0.5;
+layout(constant_id = 3) const uint count = 9u;
+
+layout(set = 0, binding = 0) buffer Outputs
+{
+    uint values[];
+} outputs;
+
+void main()
+{
+    outputs.values[0] = flag ? 1u : 0u;
+    outputs.values[1] = uint(offset);
+    outputs.values[2] = floatBitsToUint(scale);
+    outputs.values[3] = count;
+}

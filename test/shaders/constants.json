@@ -1,0 +1,11 @@
+{
+  "root_block_bytes": 0,
+  "entries": [{"name": "cs", "stage": "compute", "workgroup": [1, 1, 1]}],
+  "bindings": [
+    {"table": 0, "slot": 0, "kind": "storage_buffer", "stages": ["compute"], "min_size": 16}
+  ],
+  "constants": [{"id": 0, "type": "bool", "default": false},
+                {"id": 1, "type": "int32", "default": 7},
+                {"id": 2, "type": "float32", "default": 0.5},
+                {"id": 3, "type": "uint32", "default": 9}]
+}
