@@ -22,7 +22,7 @@ xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" ctest --preset linux-clang-20-a
 python3 tools/gen_contract.py   # regenerate headers and src/generated/ after editing contract/mrhi.json
 ```
 
-Run the `pr` and `full` tiers through the workspace's heavy-job wrapper on the shared machine. Every CI cell is a preset in `CMakePresets.json`, built in `out/<preset>`. The Linux test presets require lavapipe, the Vulkan validation layer and an X server, so run them under `xvfb-run`. Each suite `test/test_<name>.c` has the label `<name>`. Tests that drive a real GPU, window or browser also carry `integration`, and `-LE integration` leaves them out.
+Run the `pr` and `full` tiers through the workspace's heavy-job wrapper (on Windows, in the workspace's WSL distribution through its `tools/linux.sh`). Every CI cell is a preset in `CMakePresets.json`, built in `out/<preset>`. The Linux test presets require lavapipe, the Vulkan validation layer and an X server, so run them under `xvfb-run`. Each suite `test/test_<name>.c` has the label `<name>`. Tests that drive a real GPU, window or browser also carry `integration`, and `-LE integration` leaves them out.
 
 ## Ways to hurt yourself
 

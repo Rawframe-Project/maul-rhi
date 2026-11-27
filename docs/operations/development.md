@@ -12,7 +12,7 @@ Setting up a machine to build and test Maul RHI, and regenerating what is genera
 | Android | The NDK r28 or newer (`ANDROID_NDK_HOME`), the SDK with an x86_64 Android 15 system image, and KVM for the emulator. |
 | The web | Emscripten, the version `ci.yml` pins for `web-emscripten` (`EMSDK` set, as `emsdk activate` does), or Clang 20 with `lld-20`, wasi-libc and `libclang-rt-20-dev-wasm32`; Node 22.12 or newer, which Puppeteer 25 needs; Puppeteer for headless Chrome, as `test/browser`'s lockfile pins it (copy `test/browser/package*.json` to `<dir>`, run `npm ci --prefix <dir>`, then set `MRHI_NODE_MODULES=<dir>/node_modules`). An npm that holds back install scripts skips Puppeteer's Chrome download; run `node <dir>/node_modules/puppeteer/install.mjs` then. |
 
-The organization's CI image has everything the Linux and WASI cells need. On the shared development machine, run full checks, large builds, fuzzing and emulators through `/home/rawframe-project/tools/heavy.sh`.
+The organization's CI image has everything the Linux and WASI cells need. In the workspace, run full checks, large builds, fuzzing and emulators through `$RAWFRAME_ROOT/tools/heavy.sh`.
 
 ## Building
 
@@ -77,8 +77,8 @@ The library version in `base.h` is not generated: release-please moves it, and `
 The files listed under "Editing shared family files" in [AGENTS.md](../../AGENTS.md#ways-to-hurt-yourself) are synced from the organization's `.github` repository. Take a new family revision with
 
 ```sh
-python3 /home/rawframe-project/.github/maul/family_sync.py --write maul-rhi
-python3 /home/rawframe-project/.github/maul/family_sync.py --check maul-rhi
+python3 ../../.github/maul/family_sync.py --write maul-rhi
+python3 ../../.github/maul/family_sync.py --check maul-rhi
 ```
 
 in a pull request of its own.
