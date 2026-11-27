@@ -5,7 +5,7 @@
 // from samples/shaders/textured.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:9d0e0d4dc5572f70b15383e5b898a34ffb87da0085400a104d2034c29cb5f8a9
+// inputs sha256:1f023bef9960d43e69b4fd68f0b1aca3a4bf30011c969e5d42b0e8c64b5256b5
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0

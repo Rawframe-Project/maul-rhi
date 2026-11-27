@@ -496,6 +496,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
     }
     CheckRoots(device);
     CheckGuardedDispatch(device);
+    CheckGuardedTables(device);
     if (native != nullptr && queue != nullptr)
     {
         CheckDirtyTextures(device, (ID3D12Device*)native, (ID3D12CommandQueue*)queue,

@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// The split_tables container's compute entry "cs": reads a word from a
+// read-only storage buffer bound in table 0 and writes it plus one to a
+// storage buffer bound in table 2, reading no table 1.
+
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) readonly buffer Inputs
+{
+    uint values[];
+} inputs;
+
+layout(set = 2, binding = 0) buffer Outputs
+{
+    uint values[];
+} outputs;
+
+void main()
+{
+    outputs.values[0] = inputs.values[0] + 1u;
+}

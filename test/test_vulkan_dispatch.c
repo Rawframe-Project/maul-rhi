@@ -49,6 +49,7 @@ int main(void)
     if (device != nullptr)
     {
         CheckGuardedDispatch(device);
+        CheckGuardedTables(device);
         mrhiDestroyDevice(device);
     }
     else

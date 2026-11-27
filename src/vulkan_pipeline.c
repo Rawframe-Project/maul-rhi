@@ -163,6 +163,7 @@ mrhiResult mrhiVulkanMakeLayout(mrhiVulkanPipelines* pipelines, const mrhiReflec
     {
         uint32_t table = reflection->bindings[i].table + 1u;
         tables = table > tables ? table : tables;
+        pipelineOut->tablesRead |= 1u << (table - 1u);
     }
     VkResult result = VK_SUCCESS;
     for (uint32_t t = 0; t < tables && result == VK_SUCCESS; ++t)

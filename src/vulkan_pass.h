@@ -27,7 +27,9 @@ typedef struct mrhiVulkanRecording
     uint8_t root[MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES];
     // The descriptor set each table bound in the pass, with a bit for each
     // bound, which the kernel guarding an indirect dispatch disturbs and
-    // the dispatch binds again.
+    // the dispatch binds again, for the tables its pipeline reads. A set
+    // bound for an earlier pipeline stays here, and may not fit the
+    // empty layout the current one has for a table it lacks.
     VkDescriptorSet tables[MRHI_VULKAN_TABLES];
     uint32_t tablesBound;
     // By lane: whether the frame opened a batch on it, the value its last

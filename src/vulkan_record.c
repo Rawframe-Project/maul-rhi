@@ -545,8 +545,9 @@ static void Depend(mrhiVulkanRecording* recording, VkBuffer buffer, VkDeviceSize
 // guard buffer, where the library's kernel zeroes them when one passes
 // workgroupsPerDimension, since Vulkan leaves such a dispatch undefined;
 // the dispatch reads the copy. The kernel's pipeline and push constants
-// replace the pass's, which are set again, with its tables, before the
-// dispatch.
+// replace the pass's, which are set again, with the sets of the tables
+// the pipeline reads, before the dispatch: the core has the pass set
+// each of those for the pipeline's container first.
 static void GuardedDispatch(mrhiVulkanRecording* recording, const mrhiCommand* command)
 {
     mrhiVulkanFrames* frames = recording->frames;
@@ -588,8 +589,9 @@ static void GuardedDispatch(mrhiVulkanRecording* recording, const mrhiCommand* c
     const mrhiVulkanPipeline* pipeline = recording->pipeline;
     for (uint32_t t = 0; t < MRHI_VULKAN_TABLES; ++t)
     {
-        if ((recording->tablesBound & (1u << t)) != 0 && t < pipeline->setCount)
+        if ((pipeline->tablesRead & (1u << t)) != 0)
         {
+            MRHI_ASSERT((recording->tablesBound & (1u << t)) != 0 && t < pipeline->setCount);
             api->vkCmdBindDescriptorSets(commands, pipeline->bindPoint, pipeline->layout, t, 1,
                                          &recording->tables[t], 0, nullptr);
         }

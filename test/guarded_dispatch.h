@@ -15,9 +15,33 @@
 #include "maul-rhi/pipeline.h"
 #include "maul-rhi/resources.h"
 #include "maul-rhi/shader.h"
+#include "shaders/lone_table_container.h"
+#include "shaders/split_tables_container.h"
 #include "shaders/storage_container.h"
 
 #include <string.h>
+
+// A pipeline of a container's compute entry "cs", and its shader.
+static mrhiComputePipelineId GuardedPipeline(mrhiDevice* device, const uint8_t* bytes,
+                                             size_t byteCount, mrhiShaderId* shaderOut)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = bytes;
+    shaderDef.byteCount = byteCount;
+    CHECK(mrhiCreateShader(device, &shaderDef, shaderOut) == mrhi_success, "a shader");
+    mrhiComputePipelineDef pipelineDef = mrhiDefaultComputePipelineDef();
+    pipelineDef.shader = *shaderOut;
+    pipelineDef.entry = "cs";
+    pipelineDef.entryLength = 2;
+    mrhiComputePipelineId pipeline = {0};
+    mrhiRequestId request = {0};
+    mrhiDeviceNotification record;
+    CHECK(mrhiCreateComputePipeline(device, &pipelineDef, &pipeline, &request) == mrhi_success &&
+              mrhiDevice_TakeNotification(device, &record) == mrhi_success &&
+              record.kind == mrhi_devicePipelineReady && record.outcome == mrhi_success,
+          "its pipeline");
+    return pipeline;
+}
 
 static mrhiAccess GuardedWhole(mrhiResourceId resource, mrhiAccessKind kind)
 {
@@ -36,22 +60,10 @@ static mrhiAccess GuardedWhole(mrhiResourceId resource, mrhiAccessKind kind)
 // driver set again the pass's pipeline, constants and tables.
 static void CheckGuardedDispatch(mrhiDevice* device)
 {
-    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
-    shaderDef.bytes = s_storageContainer;
-    shaderDef.byteCount = sizeof(s_storageContainer);
     mrhiShaderId shader = {0};
-    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "the storage shader");
-    mrhiComputePipelineDef pipelineDef = mrhiDefaultComputePipelineDef();
-    pipelineDef.shader = shader;
-    pipelineDef.entry = "cs";
-    pipelineDef.entryLength = 2;
-    mrhiComputePipelineId pipeline = {0};
-    mrhiRequestId request = {0};
+    mrhiComputePipelineId pipeline =
+        GuardedPipeline(device, s_storageContainer, sizeof(s_storageContainer), &shader);
     mrhiDeviceNotification record;
-    CHECK(mrhiCreateComputePipeline(device, &pipelineDef, &pipeline, &request) == mrhi_success &&
-              mrhiDevice_TakeNotification(device, &record) == mrhi_success &&
-              record.kind == mrhi_devicePipelineReady && record.outcome == mrhi_success,
-          "its pipeline");
     mrhiFrameDef frame = mrhiDefaultFrameDef();
     CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
     mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
@@ -160,6 +172,116 @@ static void CheckGuardedDispatch(mrhiDevice* device)
     CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
               mrhiDestroyShader(device, shader) == mrhi_success,
           "the pipeline and shader ended");
+}
+
+// A pass's tables outliving its pipeline: the lone_table container's
+// dispatch binds table 1, then the split_tables container's indirect
+// dispatch binds tables 0 and 2, where its layout has an empty table 1.
+// The guard's kernel disturbs the pass's tables, and the driver binds
+// again only those the split_tables pipeline reads, never the lone
+// table's set where it has none, which the validation layers would
+// refuse. Both write: 1 and the input plus one.
+static void CheckGuardedTables(mrhiDevice* device)
+{
+    mrhiShaderId shaders[2] = {{0}};
+    mrhiComputePipelineId lone =
+        GuardedPipeline(device, s_lone_tableContainer, sizeof(s_lone_tableContainer), &shaders[0]);
+    mrhiComputePipelineId split = GuardedPipeline(device, s_split_tablesContainer,
+                                                  sizeof(s_split_tablesContainer), &shaders[1]);
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
+    bufferDef.size = 16;
+    mrhiResourceId input = {0};
+    mrhiResourceId lonely = {0};
+    mrhiResourceId output = {0};
+    mrhiResourceId arguments = {0};
+    CHECK(mrhiDeclareBuffer(device, &bufferDef, &input) == mrhi_success &&
+              mrhiDeclareBuffer(device, &bufferDef, &lonely) == mrhi_success &&
+              mrhiDeclareBuffer(device, &bufferDef, &output) == mrhi_success &&
+              mrhiDeclareBuffer(device, &bufferDef, &arguments) == mrhi_success,
+          "the buffers");
+    mrhiPassDef uploadDef = mrhiDefaultPassDef();
+    const mrhiAccess uploads[2] = {GuardedWhole(input, mrhi_accessCopyDestination),
+                                   GuardedWhole(arguments, mrhi_accessCopyDestination)};
+    uploadDef.accesses = uploads;
+    uploadDef.accessCount = 2;
+    uploadDef.neverCull = true;
+    mrhiPassDef dispatchDef = mrhiDefaultPassDef();
+    const mrhiAccess uses[4] = {GuardedWhole(input, mrhi_accessStorageRead),
+                                GuardedWhole(lonely, mrhi_accessStorageWrite),
+                                GuardedWhole(output, mrhi_accessStorageWrite),
+                                GuardedWhole(arguments, mrhi_accessIndirect)};
+    dispatchDef.accesses = uses;
+    dispatchDef.accessCount = 4;
+    dispatchDef.neverCull = true;
+    mrhiPassDef readDef = mrhiDefaultPassDef();
+    const mrhiAccess reads[2] = {GuardedWhole(lonely, mrhi_accessCopySource),
+                                 GuardedWhole(output, mrhi_accessCopySource)};
+    readDef.accesses = reads;
+    readDef.accessCount = 2;
+    readDef.neverCull = true;
+    mrhiPassId upload = {0};
+    mrhiPassId dispatch = {0};
+    mrhiPassId read = {0};
+    CHECK(mrhiAddPass(device, &uploadDef, &upload) == mrhi_success &&
+              mrhiAddPass(device, &dispatchDef, &dispatch) == mrhi_success &&
+              mrhiAddPass(device, &readDef, &read) == mrhi_success &&
+              mrhiDevice_CompileFrame(device) == mrhi_success,
+          "the passes compiled");
+    const uint32_t value[4] = {41, 0, 0, 0};
+    const uint32_t counts[4] = {1, 1, 1, 0};
+    const mrhiBinding lonelyBinding = {.slot = 0, .resource = lonely, .size = MRHI_WHOLE_SIZE};
+    const mrhiBinding inputBinding = {.slot = 0, .resource = input, .size = MRHI_WHOLE_SIZE};
+    const mrhiBinding outputBinding = {.slot = 0, .resource = output, .size = MRHI_WHOLE_SIZE};
+    mrhiRequestId results[2] = {{0}};
+    CHECK(mrhiPass_Begin(device, upload) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, input, 0, value, sizeof(value)) ==
+                  mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, arguments, 0, counts, sizeof(counts)) ==
+                  mrhi_success &&
+              mrhiPass_End(device, upload) == mrhi_success,
+          "the input and counts uploaded");
+    CHECK(mrhiPass_Begin(device, dispatch) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, dispatch, lone) == mrhi_success &&
+              mrhiPass_SetBindings(device, dispatch, 1, &lonelyBinding, 1) == mrhi_success &&
+              mrhiPass_Dispatch(device, dispatch, 1, 1, 1) == mrhi_success,
+          "table 1 bound and dispatched");
+    CHECK(mrhiPass_SetComputePipeline(device, dispatch, split) == mrhi_success &&
+              mrhiPass_SetBindings(device, dispatch, 0, &inputBinding, 1) == mrhi_success &&
+              mrhiPass_SetBindings(device, dispatch, 2, &outputBinding, 1) == mrhi_success &&
+              mrhiPass_DispatchIndirect(device, dispatch, arguments, 0) == mrhi_success &&
+              mrhiPass_End(device, dispatch) == mrhi_success,
+          "tables 0 and 2 bound and dispatched indirectly");
+    CHECK(mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, lonely, 0, 4, &results[0]) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, output, 0, 4, &results[1]) == mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
+          "both outputs read");
+    mrhiRequestId token = {0};
+    CHECK(mrhiDevice_SubmitFrame(device, &token) == mrhi_success &&
+              mrhiRequest_WaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
+          "submitted and finished");
+    mrhiDeviceNotification record;
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
+    {
+    }
+    uint32_t got[2] = {0};
+    size_t taken = 0;
+    for (int i = 0; i < 2; ++i)
+    {
+        CHECK(mrhiRequest_TakeReadback(device, results[i], &got[i], sizeof(got[i]), &taken) ==
+                      mrhi_success &&
+                  taken == sizeof(got[i]),
+              "a word read back");
+    }
+    CHECK(got[0] == 1, "the lone table's dispatch written");
+    CHECK(got[1] == 42, "the indirect dispatch through tables 0 and 2 written");
+    CHECK(mrhiDestroyComputePipeline(device, lone) == mrhi_success &&
+              mrhiDestroyComputePipeline(device, split) == mrhi_success &&
+              mrhiDestroyShader(device, shaders[0]) == mrhi_success &&
+              mrhiDestroyShader(device, shaders[1]) == mrhi_success,
+          "the pipelines and shaders ended");
 }
 
 #endif

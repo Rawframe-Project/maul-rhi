@@ -5,7 +5,7 @@
 // from samples/shaders/compute_square.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:521963c7896e3f2c626746dfa3060be26db191ca6957a82411a55552017cb08d
+// inputs sha256:d764fe4841e28073875590e729b55b97749c4201aa91595decc493031fc42f0b
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0

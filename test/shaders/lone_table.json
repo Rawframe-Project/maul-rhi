@@ -1,0 +1,8 @@
+{
+  "root_block_bytes": 0,
+  "entries": [{"name": "cs", "stage": "compute", "workgroup": [1, 1, 1]}],
+  "bindings": [
+    {"table": 1, "slot": 0, "kind": "storage_buffer", "stages": ["compute"], "min_size": 4}
+  ],
+  "constants": []
+}

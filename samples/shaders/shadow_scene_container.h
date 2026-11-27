@@ -5,7 +5,7 @@
 // from samples/shaders/shadow_scene.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:41fc0a33433947b5afff5a82111c195f87481c2c48a86c62f4185048b61d95a8
+// inputs sha256:b7f7d1872b11415515548c1cc2e0ec263398571e819d961f8f75ae938de46017
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0
