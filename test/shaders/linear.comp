@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// The linear container's compute entry "wi", which reads WGSL's
+// workgroup_index: GLSL has no such builtin, and like the CTS's shader
+// the entry does nothing with it, so its native code does nothing.
+
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+void main()
+{
+}

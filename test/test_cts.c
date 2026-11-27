@@ -36,7 +36,6 @@
 //   WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 //   POSSIBILITY OF SUCH DAMAGE.
 
-#include "test_container.h"
 #include "test_device_setup.h"
 
 #include "maul-rhi/device.h"
@@ -47,6 +46,7 @@
 #include "maul-rhi/shader.h"
 #include "shaders/dual_container.h"
 #include "shaders/instanced_container.h"
+#include "shaders/linear_container.h"
 #include "shaders/noop_container.h"
 
 #include <math.h>
@@ -1336,27 +1336,19 @@ static void TestDispatches(void)
     }
 }
 
-// A compute pipeline whose entry reads one flattened index, in a
-// workgroup of 2 invocations for global_invocation_index and 1 for
-// workgroup_index, as the CTS's shader.
-static mrhiComputePipelineId LinearPipeline(mrhiShaderBuiltins builtin)
+// A compute pipeline of the linear container's entry: "wi", one
+// invocation reading workgroup_index, or "gi", two reading
+// global_invocation_index, as the CTS's shader.
+static mrhiComputePipelineId LinearPipeline(const char* entry)
 {
-    Reset();
-    s_sections[BINDINGS].size = 0;
-    uint8_t* compute = Record(ENTRIES, 2, 48);
-    Put32(compute + 12, builtin == mrhi_builtinGlobalInvocationIndex ? 2 : 1);
-    Put32(compute + 16, 1);
-    Put32(compute + 20, 1);
-    Put32(compute + 36, builtin);
-    Assemble();
     mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
-    shaderDef.bytes = s_container;
-    shaderDef.byteCount = s_size;
+    shaderDef.bytes = s_linearContainer;
+    shaderDef.byteCount = sizeof(s_linearContainer);
     mrhiShaderId shader = {0};
-    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "a linear shader");
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the linear shader");
     mrhiComputePipelineDef def = mrhiDefaultComputePipelineDef();
     def.shader = shader;
-    def.entry = "cs";
+    def.entry = entry;
     def.entryLength = 2;
     mrhiComputePipelineId pipeline = {0};
     mrhiRequestId request;
@@ -1374,12 +1366,11 @@ static void TestLinearIndexing(void)
 {
     char name[128];
     uint32_t most = s_limits.workgroupsPerDimension;
-    const mrhiShaderBuiltins builtins[2] = {mrhi_builtinGlobalInvocationIndex,
-                                            mrhi_builtinWorkgroupIndex};
+    const char* const entries[2] = {"gi", "wi"};
     const char* const names[2] = {"global_invocation_index", "workgroup_index"};
     for (size_t b = 0; b < 2; ++b)
     {
-        mrhiComputePipelineId pipeline = LinearPipeline(builtins[b]);
+        mrhiComputePipelineId pipeline = LinearPipeline(entries[b]);
         for (int max = 0; max <= 1; ++max)
         {
             snprintf(name, sizeof(name), "dispatch:dispatch,linear_indexing_range %s %s", names[b],
@@ -1391,8 +1382,7 @@ static void TestLinearIndexing(void)
             {
                 CHECK(mrhiPass_SetComputePipeline(s_device, c.pass, pipeline) == mrhi_success,
                       "the linear pipeline set");
-                status = mrhiPass_Dispatch(s_device, c.pass, most, max ? most : 1,
-                                           builtins[b] == mrhi_builtinWorkgroupIndex ? 2 : 1);
+                status = mrhiPass_Dispatch(s_device, c.pass, most, max ? most : 1, b == 1 ? 2 : 1);
             }
             EndCase(buffer);
             Expect(name, status, max == 0);

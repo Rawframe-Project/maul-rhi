@@ -355,8 +355,8 @@ mrhiResult mrhiPass_DrawIndexed(mrhiDevice* device, mrhiPassId id, uint32_t inde
 // indices its entry point reads within 32 bits, as WebGPU's
 // dispatchWorkgroups: its workgroups for workgroup_index, its
 // invocations for global_invocation_index.
-MRHI_NODISCARD static bool IndicesFit(const mrhiShaderEntry* entry, uint32_t x, uint32_t y,
-                                      uint32_t z)
+MRHI_NODISCARD static bool FlatIndicesFit(const mrhiShaderEntry* entry, uint32_t x, uint32_t y,
+                                          uint32_t z)
 {
     uint64_t workgroups = 0;
     bool past = ckd_mul(&workgroups, (uint64_t)x * y, (uint64_t)z) || workgroups > UINT32_MAX;
@@ -400,7 +400,7 @@ mrhiResult mrhiPass_Dispatch(mrhiDevice* device, mrhiPassId id, uint32_t x, uint
     {
         return status;
     }
-    if (!IndicesFit(&slot->reflection->entries[slot->entries[0]], x, y, z))
+    if (!FlatIndicesFit(&slot->reflection->entries[slot->entries[0]], x, y, z))
     {
         return mrhiDeviceMisuse(device, mrhi_diagnosticDispatchIndexRange);
     }
