@@ -12,7 +12,9 @@
 # MSL_VERSION. An entry reading the view index runs under vertex amplification:
 # SPIRV-Cross writes its view index as the constant line VIEW_INDEX, which becomes
 # a parameter, the amplification id in a vertex entry and the render target array
-# index, its view's layer, in a fragment one. spirv-cross must be on the path.
+# index, its view's layer, in a fragment one. spirv-cross must be on the path,
+# the one this release pins (tools/shader_tools.py), or the script refuses to
+# run.
 #
 # usage: mrhi_msl.py SPIRV REFLECTION DIR
 
@@ -94,6 +96,9 @@ def main():
         print("usage: mrhi_msl.py SPIRV REFLECTION DIR", file=sys.stderr)
         return 2
     spirv_path, reflection_path, folder = sys.argv[1:]
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import shader_tools
+    shader_tools.refuse_unpinned("mrhi_msl", ("spirv-cross",))
     writer = load_writer()
     try:
         with open(spirv_path, "rb") as f:

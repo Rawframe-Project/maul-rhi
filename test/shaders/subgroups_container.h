@@ -5,7 +5,7 @@
 // from test/shaders/subgroups.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:80daa80b4aa1ca575d16b4cc7d1ab78b4281de80a303c6a45bfc69ac4498df11
+// inputs sha256:33773db55bdbc08234e21b097986b0ed7b00954939c9817328b2b2c9f54d3b8b
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0

@@ -53,7 +53,7 @@ The options a developer uses besides the user's: `MAUL_RHI_SANITIZE` (AddressSan
 
 `gen_test_shaders.py` needs `glslangValidator`, `spirv-link`, `spirv-val`, `spirv-cross` and `dxc` on the path, and runs `tools/mrhi_msl.py`, `tools/mrhi_dxil.py` and `tools/mrhi_container.py` for each container. `gen_kernels.py` signs the DXIL when DXC's validator (`libdxil`) sits beside it. Run a generator again whenever its inputs change, and commit what it writes.
 
-Both generators make only with the pinned tools, compared exactly, and refuse others by name:
+Both generators make only with the pinned tools, compared exactly, and refuse others by name. `tools/shader_tools.py` holds the pins, and `tools/mrhi_dxil.py` and `tools/mrhi_msl.py`, which cooks outside the tree run too, refuse a `spirv-cross` or `dxc` other than its pin the same way (`test/test_shader_tools.py` proves both refusals with each tool's answer faked):
 
 | Tool | Pinned version | Where it comes from |
 |---|---|---|

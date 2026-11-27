@@ -5,7 +5,7 @@
 // from test/shaders/bindless.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:feaca7b8f6b3ac9c4c176fd2ea2440a3d8bf99e7f0eb9a112ed802e04c234f49
+// inputs sha256:ba2c437ef8a3ce926bc24ded73e37beebe02f380500997d88b1835cd6e804763
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0

@@ -5,7 +5,7 @@
 // from test/shaders/int64.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:d87d70bca23149264ea8edea9c99b2e8deab868b3e8bc2e2c420a2d9be1aee5e
+// inputs sha256:f4ce1306151df34e6250e504960bedb2751f28e51e94bf99db74f1520e6bfb43
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0

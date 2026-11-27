@@ -26,8 +26,9 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import shader_stamp  # noqa: E402
+import shader_tools  # noqa: E402
 
-SCRIPTS = ["tools/gen_kernels.py", "tools/shader_stamp.py"]
+SCRIPTS = ["tools/gen_kernels.py", "tools/shader_stamp.py", "tools/shader_tools.py"]
 # Each kernel: its source in src/, its header's name, and the array the
 # header declares.
 KERNELS = [("d3d12_expand.hlsl", "d3d12_expand.h", "mrhiD3d12ExpandDxil"),
@@ -86,8 +87,8 @@ def main():
     if flags:
         sys.exit(USAGE)
     dxc = sys.argv[1] if len(sys.argv) > 1 else "dxc"
-    shader_stamp.refuse_unpinned({"dxc": shader_stamp.dxc_identity(dxc)},
-                                 {"dxc": shader_stamp.DXC_IDENTITY})
+    shader_stamp.refuse_unpinned({"dxc": shader_tools.dxc_identity(dxc)},
+                                 {"dxc": shader_tools.PINNED["dxc"]})
     stamped = dict(units(ROOT))
     with tempfile.TemporaryDirectory() as work:
         for source, name, array in KERNELS:

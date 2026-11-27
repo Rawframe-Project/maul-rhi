@@ -388,6 +388,10 @@ if(MAUL_RHI_BUILD_TESTS)
         if(Python3_Interpreter_FOUND AND NOT CMAKE_CROSSCOMPILING)
             add_test(NAME dxil_order COMMAND Python3::Interpreter ${PROJECT_SOURCE_DIR}/test/test_dxil_order.py)
             set_tests_properties(dxil_order PROPERTIES LABELS dxil_order)
+            # The crossing tools' refusal of tools other than their pins.
+            add_test(NAME shader_tools
+                     COMMAND Python3::Interpreter ${PROJECT_SOURCE_DIR}/test/test_shader_tools.py)
+            set_tests_properties(shader_tools PROPERTIES LABELS shader_tools)
         endif()
     endif()
     # Every driver the build has, through the public API. Where the XCB

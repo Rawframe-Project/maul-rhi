@@ -78,7 +78,13 @@
 # must be of its stage and declare no resource outside the map, which
 # the writer reads from its PSV0 part.
 #
-# usage: mrhi_container.py [--msl DIR] [--metallib FILE] [--dxil DIR]
+# With --tools alone, it prints the tools this release pins for
+# tools/mrhi_dxil.py and tools/mrhi_msl.py, which refuse others
+# (tools/shader_tools.py), one "tool" line each as this repository's
+# stamps write them, for a cook to keep in its own stamp.
+#
+# usage: mrhi_container.py --tools
+#        mrhi_container.py [--msl DIR] [--metallib FILE] [--dxil DIR]
 #                          SPIRV WGSL|- REFLECTION OUTPUT
 # Standard library only; exits 1 naming the first problem.
 
@@ -857,6 +863,12 @@ def read_entries(reflection, folder, suffix):
 
 
 def main(argv=None):
+    if (sys.argv[1:] if argv is None else argv) == ["--tools"]:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import shader_tools
+        from mrhi_dxil import DXC_FLAGS
+        print("\n".join(shader_tools.pin_lines(DXC_FLAGS)))
+        return 0
     parser = argparse.ArgumentParser(prog="mrhi_container.py")
     parser.add_argument("--msl", metavar="DIR", help="each entry's MSL, in DIR/NAME.metal")
     parser.add_argument("--metallib", metavar="FILE", help="a Metal library of every entry")

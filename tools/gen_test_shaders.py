@@ -42,20 +42,17 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import shader_stamp  # noqa: E402
+import shader_tools  # noqa: E402
 
 # The tools every committed header was made by, as tool_identities()
 # reads them, DXC the family's (shader_stamp.DXC).
-PINNED = {
-    "glslang": "glslang 15.1.0",
-    "SPIRV-Tools": "SPIRV-Tools v2025.1",
-    "spirv-cross": "spirv-cross 2021.01.15+1.3.239.0",
-    "dxc": shader_stamp.DXC_IDENTITY,
-}
+PINNED = shader_tools.PINNED
 # The stamp's tool lines.
 PINS = (PINNED["glslang"], PINNED["SPIRV-Tools"], PINNED["spirv-cross"], *shader_stamp.DXC)
 # The scripts every container is made by, and the contract's values the
 # writer reads; mrhi_msl.py too for those with MSL.
-SCRIPTS = ("tools/gen_test_shaders.py", "tools/shader_stamp.py", "tools/mrhi_container.py",
+SCRIPTS = ("tools/gen_test_shaders.py", "tools/shader_stamp.py", "tools/shader_tools.py",
+           "tools/mrhi_container.py",
            "tools/mrhi_dxil.py", shader_stamp.CONTRACT_VALUES)
 # Each container: its directory, its name, its stages' sources and
 # entries, and whether it has WGSL (a container reading heaps or the
@@ -87,14 +84,7 @@ CONTAINERS = (
 
 def tool_identities():
     """The installed tools, as PINS names them."""
-    output = shader_stamp.output
-    glslang = output("glslangValidator", "--version").split("\n")[0].rsplit(":", 1)[-1]
-    tools = " ".join(output("spirv-link", "--version").split()[:2])
-    cross = output("spirv-cross", "--revision").strip()
-    if cross in ("", "(Debian package)"):
-        cross = output("dpkg-query", "-W", "-f=${Version}", "spirv-cross").rsplit("-", 1)[0]
-    return {"glslang": f"glslang {glslang.strip()}", "SPIRV-Tools": tools,
-            "spirv-cross": f"spirv-cross {cross}", "dxc": shader_stamp.dxc_identity()}
+    return shader_tools.identities(PINNED)
 
 
 def units(root):

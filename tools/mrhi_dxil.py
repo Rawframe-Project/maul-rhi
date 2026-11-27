@@ -20,7 +20,8 @@
 # reflection or debug data, and with the float math as the source writes it
 # (DXC_FLAGS). HLSL that reads a loop's variable after its continue
 # block has stepped it is refused (stale_reads). spirv-cross and dxc must be on
-# the path.
+# the path, each the one this release pins (tools/shader_tools.py), or the
+# script refuses to run.
 #
 # usage: mrhi_dxil.py SPIRV REFLECTION DIR
 
@@ -190,6 +191,9 @@ def main():
         print("usage: mrhi_dxil.py SPIRV REFLECTION DIR", file=sys.stderr)
         return 2
     spirv_path, reflection_path, folder = sys.argv[1:]
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import shader_tools
+    shader_tools.refuse_unpinned("mrhi_dxil", shader_tools.CROSSING)
     writer = load_writer()
     try:
         with open(spirv_path, "rb") as f:

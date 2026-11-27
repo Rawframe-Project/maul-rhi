@@ -30,39 +30,18 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 import tempfile
 
 STAMP = re.compile(r"^// (inputs|tool|bytes) (.*)$", re.MULTILINE)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mrhi_dxil import DXC_FLAGS  # noqa: E402
-# The family's DXC, which both generators pin: what dxc --version
-# reports of it, and the stamp's lines naming the release asset of
-# microsoft/DirectXShaderCompiler with its SHA-256.
-DXC_IDENTITY = "libdxcompiler 1.9.0.1, 0d3ee6b5"
-DXC = (
-    "dxc linux_dxc_2026_07_29 (v1.9.2607, libdxcompiler 1.9.0.1, 0d3ee6b5)",
-    "dxc sha256:55665c87824051ed4774ff3280a79ccbbb7d39243b9736ca5e98222134112d54",
-    "dxc flags " + " ".join(DXC_FLAGS),
-)
-
-
-def output(*command):
-    """What a command prints, or nothing when it is missing or fails."""
-    try:
-        result = subprocess.run(command, capture_output=True, text=True)
-    except OSError:
-        return ""
-    return result.stdout + result.stderr if result.returncode == 0 else ""
-
-
-def dxc_identity(dxc="dxc"):
-    """The installed DXC as DXC names it, or that it was not found."""
-    found = re.search(r"\((\d+)-(\w+)\)\(([\d.]+)\)", output(dxc, "--version"))
-    if found is None:
-        return "dxc: not found"
-    return f"libdxcompiler {found.group(3)}, {found.group(2)}"
+import shader_tools  # noqa: E402
+# The stamp's lines of the family's DXC, which both generators pin
+# (shader_tools.PINNED): the release asset of
+# microsoft/DirectXShaderCompiler with its SHA-256, and the flags every
+# compile passes.
+DXC = (*shader_tools.DXC_RELEASE, "dxc flags " + " ".join(DXC_FLAGS))
 
 
 def refuse_unpinned(found, pinned):
