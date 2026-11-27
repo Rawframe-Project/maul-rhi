@@ -11,20 +11,13 @@
 // and stage and frees what it took, and parse the same again.
 
 #include "container.h"
+#include "fuzz_expect.h"
 #include "reflection.h"
 #include "sha256.h"
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-static void Expect(bool condition)
-{
-    if (!condition)
-    {
-        abort();
-    }
-}
 
 // The bytes the reflection holds, which must come back to 0.
 static size_t s_held;
