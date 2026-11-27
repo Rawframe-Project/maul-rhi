@@ -16,6 +16,9 @@
 #define MRHI_D3D12_TABLES       4
 #define MRHI_D3D12_HEAP_CLASSES 3
 #define MRHI_D3D12_NO_PARAMETER 0xFF
+// The most root parameters a layout has: the three root constants, two
+// tables for each binding table and the heap tables.
+#define MRHI_D3D12_ROOT_PARAMETERS (3 + 2 * MRHI_D3D12_TABLES + MRHI_D3D12_HEAP_CLASSES)
 
 // Where a root signature's parameters lie: the root block's, the
 // constants' and the vertex information's root constants, each table's

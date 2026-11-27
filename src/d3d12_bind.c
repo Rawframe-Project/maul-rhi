@@ -45,16 +45,51 @@ static void SetConstants(const mrhiD3d12Recorder* recorder, UINT parameter, UINT
     }
 }
 
-static void SetTable(const mrhiD3d12Recorder* recorder, UINT parameter,
-                     D3D12_GPU_DESCRIPTOR_HANDLE table)
+static void SetTable(mrhiD3d12Recorder* recorder, UINT parameter, D3D12_GPU_DESCRIPTOR_HANDLE table)
 {
     if (recorder->pipeline->compute)
     {
+        MRHI_ASSERT(parameter < MRHI_D3D12_ROOT_PARAMETERS);
+        recorder->computeTables[parameter] = table;
+        recorder->computeTablesSet |= 1u << parameter;
         ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(recorder->list, parameter, table);
     }
     else
     {
         ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(recorder->list, parameter, table);
+    }
+}
+
+// Sets the pipeline's constants, the pass's root block and the heap
+// tables, which a new root signature drops.
+static void SetArguments(mrhiD3d12Recorder* recorder)
+{
+    const mrhiD3d12Pipeline* pipeline = recorder->pipeline;
+    ID3D12GraphicsCommandList* list = recorder->list;
+    const mrhiD3d12Layout* layout = &pipeline->layout;
+    if (layout->constantsParameter != MRHI_D3D12_NO_PARAMETER)
+    {
+        SetConstants(recorder, layout->constantsParameter, layout->constantWords,
+                     pipeline->constants, 0);
+    }
+    if (layout->rootParameter != MRHI_D3D12_NO_PARAMETER)
+    {
+        SetConstants(recorder, layout->rootParameter, layout->rootWords, recorder->root, 0);
+    }
+    // The core sets a pipeline reading heaps only in a pass with one.
+    const D3D12_GPU_DESCRIPTOR_HANDLE heaps[MRHI_D3D12_HEAP_CLASSES] = {
+        recorder->heapViews, recorder->heapViews, recorder->heapSamplerViews};
+    for (uint32_t c = 0; c < MRHI_D3D12_HEAP_CLASSES; ++c)
+    {
+        if (layout->heapParameters[c] != MRHI_D3D12_NO_PARAMETER)
+        {
+            SetTable(recorder, layout->heapParameters[c], heaps[c]);
+        }
+    }
+    if (!pipeline->compute)
+    {
+        ID3D12GraphicsCommandList_IASetPrimitiveTopology(list, pipeline->topology);
+        recorder->verticesChanged = true;
     }
 }
 
@@ -80,31 +115,27 @@ void mrhiD3d12SetPipeline(mrhiD3d12Recorder* recorder, uint64_t handle)
         // D3D12 drops the root arguments set before.
         memset(recorder->boundCounts[PointOf(pipeline)], 0,
                sizeof(recorder->boundCounts[PointOf(pipeline)]));
+        recorder->computeTablesSet = pipeline->compute ? 0 : recorder->computeTablesSet;
     }
-    const mrhiD3d12Layout* layout = &pipeline->layout;
-    if (layout->constantsParameter != MRHI_D3D12_NO_PARAMETER)
+    SetArguments(recorder);
+}
+
+void mrhiD3d12RestoreCompute(mrhiD3d12Recorder* recorder)
+{
+    const mrhiD3d12Pipeline* pipeline = recorder->pipeline;
+    MRHI_ASSERT(pipeline != nullptr && pipeline->compute);
+    ID3D12GraphicsCommandList* list = recorder->list;
+    ID3D12GraphicsCommandList_SetPipelineState(list, pipeline->state);
+    ID3D12GraphicsCommandList_SetComputeRootSignature(list, pipeline->root);
+    recorder->computeRoot = pipeline->root;
+    SetArguments(recorder);
+    for (uint32_t i = 0; i < MRHI_D3D12_ROOT_PARAMETERS; ++i)
     {
-        SetConstants(recorder, layout->constantsParameter, layout->constantWords,
-                     pipeline->constants, 0);
-    }
-    if (layout->rootParameter != MRHI_D3D12_NO_PARAMETER)
-    {
-        SetConstants(recorder, layout->rootParameter, layout->rootWords, recorder->root, 0);
-    }
-    // The core sets a pipeline reading heaps only in a pass with one.
-    const D3D12_GPU_DESCRIPTOR_HANDLE heaps[MRHI_D3D12_HEAP_CLASSES] = {
-        recorder->heapViews, recorder->heapViews, recorder->heapSamplerViews};
-    for (uint32_t c = 0; c < MRHI_D3D12_HEAP_CLASSES; ++c)
-    {
-        if (layout->heapParameters[c] != MRHI_D3D12_NO_PARAMETER)
+        if ((recorder->computeTablesSet & (1u << i)) != 0)
         {
-            SetTable(recorder, layout->heapParameters[c], heaps[c]);
+            ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(list, i,
+                                                                    recorder->computeTables[i]);
         }
-    }
-    if (!pipeline->compute)
-    {
-        ID3D12GraphicsCommandList_IASetPrimitiveTopology(list, pipeline->topology);
-        recorder->verticesChanged = true;
     }
 }
 

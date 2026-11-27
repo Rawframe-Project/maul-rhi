@@ -364,6 +364,7 @@ static void Lay(D3d12Device* made, const Room* room, const mrhiDeviceDef* def)
         .heapEntries = heaps ? def->limits.heapSize : 0,
         .heapSamplers = heaps ? def->limits.samplerHeapSize : 0,
         .counted = def->features.multiDrawIndirectCount,
+        .workgroupsPerDimension = def->limits.workgroupsPerDimension,
     };
     mrhiD3d12LayFrames(&made->frames, block, &room->frames, limits, MRHI_D3D12_FRAMES);
 }

@@ -313,6 +313,7 @@ static void Forget(mrhiD3d12Recorder* recorder)
     recorder->pipeline = nullptr;
     memset(recorder->root, 0, sizeof(recorder->root));
     memset(recorder->boundCounts, 0, sizeof(recorder->boundCounts));
+    recorder->computeTablesSet = 0;
     memset(recorder->vertices, 0, sizeof(recorder->vertices));
     recorder->verticesChanged = false;
     recorder->indexObject = 0;

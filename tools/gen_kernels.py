@@ -30,7 +30,8 @@ import shader_stamp  # noqa: E402
 SCRIPTS = ["tools/gen_kernels.py", "tools/shader_stamp.py"]
 # Each kernel: its source in src/, its header's name, and the array the
 # header declares.
-KERNELS = [("d3d12_expand.hlsl", "d3d12_expand.h", "mrhiD3d12ExpandDxil")]
+KERNELS = [("d3d12_expand.hlsl", "d3d12_expand.h", "mrhiD3d12ExpandDxil"),
+           ("d3d12_guard.hlsl", "d3d12_guard.h", "mrhiD3d12GuardDxil")]
 USAGE = "usage: gen_kernels.py [--check | --self-test [--skip-inputs] | path to dxc]"
 
 

@@ -106,6 +106,11 @@ typedef struct mrhiD3d12Frames
     bool counted;
     ID3D12RootSignature* expandRoot;
     ID3D12PipelineState* expand;
+    // The kernel guarding indirect dispatches' counts, and the device's
+    // workgroupsPerDimension it holds them to.
+    ID3D12RootSignature* guardRoot;
+    ID3D12PipelineState* guard;
+    uint32_t workgroupsPerDimension;
     ID3D12Resource* zeros;
     // The frame being recorded's state, kept here for its size.
     mrhiD3d12Recorder recorder;

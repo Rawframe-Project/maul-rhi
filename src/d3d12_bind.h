@@ -22,6 +22,11 @@ void mrhiD3d12EnterHeap(mrhiD3d12Recorder* recorder, uint64_t heap);
 // topology.
 void mrhiD3d12SetPipeline(mrhiD3d12Recorder* recorder, uint64_t handle);
 
+// Sets the compute pipeline set again, with its root signature, its
+// constants, the pass's root block and every table set, after a kernel
+// of the library replaced them.
+void mrhiD3d12RestoreCompute(mrhiD3d12Recorder* recorder);
+
 // Sets a table from a bindings command with its payload.
 void mrhiD3d12BindTable(mrhiD3d12Recorder* recorder, const mrhiCommand* command);
 
