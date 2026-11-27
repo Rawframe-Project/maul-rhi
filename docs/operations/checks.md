@@ -12,10 +12,10 @@ What to run before pushing, what each tier covers, and what the test presets exp
 | `pr` | Every rule; clang-format on every file; clang-tidy in Release and in Debug on the sources it can see on Linux (`src/*.c` but the web and D3D12 ones); the `linux-clang-20-asan` and `linux-gcc-14` presets, integration tests included, on lavapipe under Xvfb; the seam check on X11; 10 seconds of fuzzing per target. | under 10 minutes |
 | `full` | Also ThreadSanitizer, the shared library, labels compiled out, the Vulkan driver's lanes split (`linux-lanes`), the seam check on Wayland under weston's headless compositor, and 60 seconds of fuzzing per target. | under 20 minutes |
 
-Run `changed` before every push. Run `pr` and `full` through the workspace's heavy-job wrapper on the shared machine:
+Run `changed` before every push. Run `pr` and `full` through the workspace's heavy-job wrapper (on Windows, in the workspace's WSL distribution through its `tools/linux.sh`):
 
 ```sh
-/home/rawframe-project/tools/heavy.sh tools/check.sh full
+"$RAWFRAME_ROOT/tools/heavy.sh" tools/check.sh full
 ```
 
 Every preset the script configures is followed by `check_test_hygiene.py --ctest`, which fails a test without a label and a build that registers none; the tree scan rejects a sleep, the wall clock, a retry or a skip in the tests unless it is marked `// hygiene: <reason>`. The macOS, Windows, Android, iOS and web cells run in CI only. The organization's documentation check runs when the `.github` repository is checked out beside the workspace (`ORG_DEFAULTS` overrides where).
