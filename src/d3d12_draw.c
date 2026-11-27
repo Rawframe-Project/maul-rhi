@@ -81,10 +81,11 @@ MRHI_NODISCARD static bool TakeScratch(mrhiD3d12Recorder* recorder, uint64_t byt
 {
     if (*recorder->scratch == nullptr)
     {
-        // The kernel expanding counted draws writes it as a UAV.
+        // The kernels guarding dispatches and expanding counted draws
+        // write it as a UAV.
         const mrhiBufferDef def = {
             .size = recorder->scratchBytes,
-            .usage = recorder->expand != nullptr ? mrhi_bufferStorage : 0,
+            .usage = mrhi_bufferStorage,
         };
         *recorder->scratch = mrhiD3d12CommitBuffer(recorder->objects, &def);
     }
@@ -150,6 +151,40 @@ static void Indirect(mrhiD3d12Recorder* recorder, uint32_t object, uint64_t offs
                                               0);
 }
 
+// An indirect dispatch, as WebGPU's: its counts first copied into the
+// scratch buffer by the library's kernel, or zeros there when one passes
+// workgroupsPerDimension, since D3D12 leaves such a dispatch undefined.
+// The kernel replaces the compute root signature and pipeline, which
+// are set again before the dispatch.
+static void GuardedDispatch(mrhiD3d12Recorder* recorder, uint32_t object, uint64_t offset)
+{
+    ID3D12GraphicsCommandList* list = recorder->list;
+    uint64_t at = 0;
+    if (!TakeScratch(recorder, 3 * sizeof(uint32_t), &at))
+    {
+        return;
+    }
+    mrhiD3d12Use(recorder, object, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    MoveScratch(recorder, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    mrhiD3d12FlushBarriers(recorder);
+    ID3D12GraphicsCommandList_SetComputeRootSignature(list, recorder->guardRoot);
+    recorder->computeRoot = recorder->guardRoot;
+    ID3D12GraphicsCommandList_SetPipelineState(list, recorder->guard);
+    const uint32_t shape[3] = {recorder->workgroupsPerDimension, 0, 0};
+    ID3D12GraphicsCommandList_SetComputeRoot32BitConstants(list, 0, 3, shape, 0);
+    ID3D12GraphicsCommandList_SetComputeRootShaderResourceView(
+        list, 1,
+        ID3D12Resource_GetGPUVirtualAddress(recorder->table[object - 1].resource) + offset);
+    ID3D12GraphicsCommandList_SetComputeRootUnorderedAccessView(
+        list, 2, ID3D12Resource_GetGPUVirtualAddress(*recorder->scratch) + at);
+    ID3D12GraphicsCommandList_Dispatch(list, 1, 1, 1);
+    mrhiD3d12RestoreCompute(recorder);
+    MoveScratch(recorder, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
+    mrhiD3d12Ready(recorder);
+    ID3D12GraphicsCommandList_ExecuteIndirect(list, recorder->signatures[mrhiD3d12IndirectDispatch],
+                                              1, *recorder->scratch, at, nullptr, 0);
+}
+
 // A counted multi-draw, reading its records in place; or, for a
 // pipeline reading the vertex information, its records first expanded
 // into the scratch buffer by the library's kernel, each after a copy
@@ -193,6 +228,7 @@ static void Counted(mrhiD3d12Recorder* recorder, const mrhiCommand* command, boo
     ID3D12GraphicsCommandList_SetComputeRootSignature(list, recorder->expandRoot);
     recorder->computeRoot = recorder->expandRoot;
     memset(recorder->boundCounts[1], 0, sizeof(recorder->boundCounts[1]));
+    recorder->computeTablesSet = 0;
     ID3D12GraphicsCommandList_SetPipelineState(list, recorder->expand);
     const uint32_t shape[3] = {most, words, first};
     ID3D12GraphicsCommandList_SetComputeRoot32BitConstants(list, 0, 3, shape, 0);
@@ -257,7 +293,7 @@ void mrhiD3d12Draw(mrhiD3d12Recorder* recorder, const mrhiCommand* command)
         break;
     default:
         MRHI_ASSERT(command->type == mrhiCommandDispatchIndirect);
-        Indirect(recorder, command->a, command->c, mrhiD3d12IndirectDispatch);
+        GuardedDispatch(recorder, command->a, command->c);
         break;
     }
 }

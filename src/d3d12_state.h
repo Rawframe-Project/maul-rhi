@@ -160,6 +160,11 @@ typedef struct mrhiD3d12Recorder
     uint8_t root[MRHI_MAX_CONTAINER_ROOT_BLOCK_BYTES];
     ID3D12RootSignature* graphicsRoot;
     ID3D12RootSignature* computeRoot;
+    // The descriptor tables set on the compute root signature, by
+    // parameter, with a bit for each set, which a kernel of the library
+    // run between a compute pipeline's dispatches sets again after it.
+    D3D12_GPU_DESCRIPTOR_HANDLE computeTables[MRHI_D3D12_ROOT_PARAMETERS];
+    uint32_t computeTablesSet;
     // The buffers each table bound for graphics (0) and compute (1) uses.
     mrhiD3d12Bound bound[2][MRHI_D3D12_TABLES][MRHI_MAX_TABLE_BINDINGS];
     uint32_t boundCounts[2][MRHI_D3D12_TABLES];
@@ -192,6 +197,11 @@ typedef struct mrhiD3d12Recorder
     // draws them.
     ID3D12RootSignature* expandRoot;
     ID3D12PipelineState* expand;
+    // The kernel guarding an indirect dispatch's counts in the scratch
+    // buffer, and the device's workgroupsPerDimension.
+    ID3D12RootSignature* guardRoot;
+    ID3D12PipelineState* guard;
+    uint32_t workgroupsPerDimension;
     // mrhi_errorCapacity once a descriptor ring, the scratch buffer or a
     // command list runs out, which fails the frame, and the budget that
     // ran out.

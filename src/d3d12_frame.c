@@ -21,6 +21,7 @@
 #include "invariant.h"
 
 #include "generated/d3d12_expand.h"
+#include "generated/d3d12_guard.h"
 
 #include <stdalign.h>
 #include <string.h>
@@ -170,8 +171,8 @@ void mrhiD3d12LayFrames(mrhiD3d12Frames* frames, unsigned char* block,
     uint64_t viewRecords = (uint64_t)records + limits->frameResources;
     frames->viewLimit = viewRecords < views ? (uint32_t)viewRecords : views;
     frames->samplerLimit = records < samplers ? records : samplers;
-    // Each indirect draw is a record, larger than the arguments it
-    // copies; each counted draw expanded takes an indexed draw's
+    // Each indirect draw or dispatch is a record, larger than the
+    // arguments it copies or guards; each counted draw expanded takes an indexed draw's
     // arguments and the vertex information.
     frames->scratchBytes = limits->frameCommandBytes;
     if (frames->counted)
@@ -296,27 +297,27 @@ static ID3D12CommandSignature* SignatureOf(ID3D12Device* device, mrhiD3d12Indire
                : nullptr;
 }
 
-// Makes the kernel expanding counted draws' records, its root signature
-// embedded in its DXIL.
-MRHI_NODISCARD static bool MakeExpand(mrhiD3d12Frames* frames)
+// Makes one of the library's kernels from its DXIL, with the root
+// signature embedded in it.
+MRHI_NODISCARD static bool MakeKernel(ID3D12Device* device, const uint8_t* dxil, size_t bytes,
+                                      ID3D12RootSignature** rootOut, ID3D12PipelineState** stateOut)
 {
-    if (FAILED(ID3D12Device_CreateRootSignature(
-            frames->device, 0, mrhiD3d12ExpandDxil, sizeof(mrhiD3d12ExpandDxil),
-            &IID_ID3D12RootSignature, (void**)&frames->expandRoot)))
+    if (FAILED(ID3D12Device_CreateRootSignature(device, 0, dxil, bytes, &IID_ID3D12RootSignature,
+                                                (void**)rootOut)))
     {
         return false;
     }
     const D3D12_COMPUTE_PIPELINE_STATE_DESC desc = {
-        .pRootSignature = frames->expandRoot,
-        .CS = {mrhiD3d12ExpandDxil, sizeof(mrhiD3d12ExpandDxil)},
+        .pRootSignature = *rootOut,
+        .CS = {dxil, bytes},
     };
     return SUCCEEDED(ID3D12Device_CreateComputePipelineState(
-        frames->device, &desc, &IID_ID3D12PipelineState, (void**)&frames->expand));
+        device, &desc, &IID_ID3D12PipelineState, (void**)stateOut));
 }
 
-// Makes the command signatures, the kernel of a device drawing counted
-// multi-draws and the zeros resolves and clears copy, which D3D12 zeroes
-// as it commits them.
+// Makes the command signatures, the kernel guarding indirect dispatches,
+// the kernel of a device drawing counted multi-draws and the zeros
+// resolves and clears copy, which D3D12 zeroes as it commits them.
 MRHI_NODISCARD static bool OpenShared(mrhiD3d12Frames* frames)
 {
     bool made = true;
@@ -325,9 +326,12 @@ MRHI_NODISCARD static bool OpenShared(mrhiD3d12Frames* frames)
         frames->signatures[i] = SignatureOf(frames->device, (mrhiD3d12Indirect)i);
         made = made && frames->signatures[i] != nullptr;
     }
+    made = made && MakeKernel(frames->device, mrhiD3d12GuardDxil, sizeof(mrhiD3d12GuardDxil),
+                              &frames->guardRoot, &frames->guard);
     if (made && frames->counted)
     {
-        made = MakeExpand(frames);
+        made = MakeKernel(frames->device, mrhiD3d12ExpandDxil, sizeof(mrhiD3d12ExpandDxil),
+                          &frames->expandRoot, &frames->expand);
     }
     if (made)
     {
@@ -544,6 +548,8 @@ void mrhiD3d12CloseFrames(mrhiD3d12Frames* frames)
     }
     Drop(frames->expand);
     Drop(frames->expandRoot);
+    Drop(frames->guard);
+    Drop(frames->guardRoot);
     Drop(frames->zeros);
     Drop(frames->readback);
     if (frames->event != nullptr)
@@ -742,6 +748,9 @@ static mrhiResult Record(mrhiD3d12Frames* frames, mrhiD3d12Slot* slot, const mrh
         .scratchBytes = frames->scratchBytes,
         .expandRoot = frames->expandRoot,
         .expand = frames->expand,
+        .guardRoot = frames->guardRoot,
+        .guard = frames->guard,
+        .workgroupsPerDimension = frames->workgroupsPerDimension,
         .scratchState = D3D12_RESOURCE_STATE_COMMON,
         .status = mrhi_success,
     };
