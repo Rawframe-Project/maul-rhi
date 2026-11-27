@@ -690,6 +690,57 @@ static void TestDispatch(void)
     CloseDevice();
 }
 
+// A compute pipeline of the default container without bindings, whose
+// compute entry (8 by 8 invocations) reads builtins.
+static mrhiComputePipelineId ComputeReading(mrhiShaderBuiltins builtins)
+{
+    Unbound();
+    Put32(Record(ENTRIES, 2, 48) + 36, builtins);
+    return MakeCompute();
+}
+
+// As WebGPU's dispatchWorkgroups: an entry reading workgroup_index
+// takes at most 2^32 - 1 workgroups, and one reading
+// global_invocation_index at most 2^32 - 1 invocations.
+static void TestDispatchIndices(void)
+{
+    Open();
+    mrhiComputePipelineId workgroups = ComputeReading(mrhi_builtinWorkgroupIndex);
+    mrhiComputePipelineId invocations = ComputeReading(mrhi_builtinGlobalInvocationIndex);
+    mrhiComputePipelineId plain = ComputeReading(0);
+    uint32_t most = mrhiDefaultLimits().workgroupsPerDimension;
+    Frame();
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_compute, workgroups) == mrhi_success &&
+              mrhiPass_Dispatch(s_device, s_compute, most, most, 1) == mrhi_success,
+          "65535 by 65535 workgroups within 32 bits");
+    CHECK(mrhiPass_Dispatch(s_device, s_compute, most, most, 2) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticDispatchIndexRange,
+          "twice as many past them");
+    CHECK(mrhiPass_Dispatch(s_device, s_compute, 2, most, most) == mrhi_errorInvalid,
+          "in any order");
+    CHECK(mrhiPass_Dispatch(s_device, s_compute, most, most, most) == mrhi_errorInvalid,
+          "past 64 bits too");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_compute, invocations) == mrhi_success &&
+              mrhiPass_Dispatch(s_device, s_compute, most, 1024, 1) == mrhi_success,
+          "67107840 workgroups of 64 invocations within 32 bits");
+    CHECK(mrhiPass_Dispatch(s_device, s_compute, most, 1025, 1) == mrhi_errorInvalid &&
+              Refusal() == mrhi_diagnosticDispatchIndexRange,
+          "a row more past them");
+    CHECK(mrhiPass_Dispatch(s_device, s_compute, most, most, 1) == mrhi_errorInvalid,
+          "workgroups within 32 bits whose invocations are not");
+    CHECK(mrhiPass_SetComputePipeline(s_device, s_compute, plain) == mrhi_success &&
+              mrhiPass_Dispatch(s_device, s_compute, most, most, most) == mrhi_success,
+          "an entry reading neither");
+    CHECK(mrhiDevice_GetMisuse(s_device) == 5, "each refusal counted");
+    // Each pipeline set, then the dispatch it took.
+    const mrhiCommand* command = Nth(s_compute, 5);
+    CHECK(command != nullptr && command->type == mrhiCommandDispatch && command->a == most &&
+              command->b == most && command->c == most && Nth(s_compute, 6) == nullptr,
+          "only the dispatches taken recorded");
+    Drop();
+    CloseDevice();
+}
+
 static void TestIndirectDraws(void)
 {
     Open();
@@ -1131,6 +1182,8 @@ int main(void)
     TestSlotsUsed(false);
     ResetAdapter();
     TestDispatch();
+    ResetAdapter();
+    TestDispatchIndices();
     ResetAdapter();
     TestIndirectDraws();
     TestCountedDraws();

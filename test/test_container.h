@@ -274,7 +274,7 @@ static inline void Assemble(void)
 {
     memset(s_container, 0, sizeof(s_container));
     memcpy(s_container, "MRSC", 4);
-    Put32(s_container + 4, 2);
+    Put32(s_container + 4, 3);
     uint32_t count = 0;
     for (uint32_t i = 0; i < s_sectionCount; ++i)
     {

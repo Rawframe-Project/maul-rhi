@@ -101,7 +101,7 @@ A full command arena, staging or ring refuses the call with `mrhi_errorCapacity`
 
 ## Draws beyond the basics
 
-- **Indirect draws and dispatches** read their arguments from a buffer the pass declares with the indirect access. As in WebGPU, the arguments are read on the GPU and not checked: a draw with a nonzero first instance on a device without `indirectFirstInstance`, or a dispatch past the limit, does nothing.
+- **Indirect draws and dispatches** read their arguments from a buffer the pass declares with the indirect access. As in WebGPU, the arguments are read on the GPU and not checked: a draw with a nonzero first instance on a device without `indirectFirstInstance`, or a dispatch past the limit or too large for the flattened index its entry point reads, does nothing.
 - **Counted multi-draw** (`multiDrawIndirectCount`): `mrhiPass_DrawIndirectCount` and `mrhiPass_DrawIndexedIndirectCount` make up to `maxCount` draws from packed records, the number drawn read on the GPU from a count a culling pass wrote. A frame's `maxCount`s together stay within the device limit `frameIndirectDraws`.
 - **Multiview** (`multiview`): a pass's `viewCount` renders it into that many consecutive layers of its targets, with pipelines made for as many views. Shader entries read the view index, so their containers carry no WGSL. The adapter limit `multiviewViews` bounds the views: four on Direct3D 12, often two on Metal.
 

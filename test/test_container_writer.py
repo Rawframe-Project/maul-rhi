@@ -361,6 +361,24 @@ def main():
             check([struct.unpack_from("<36xII", entries, at) for at in range(0, len(entries), 48)]
                   == [(0, 0), (4, 0), (0, 1024)],
                   "the entries' builtins and workgroup storage")
+
+        # The subgroup builtins in a fragment entry, the flattened
+        # indices in a compute one.
+        indexed = copy.deepcopy(REFLECTION)
+        indexed["entries"][1]["builtins"] = ["front_facing", "subgroup_invocation_id",
+                                             "subgroup_size"]
+        indexed["entries"][2]["builtins"] = ["workgroup_index", "global_invocation_index"]
+        status, errors, output = write(folder, code, WGSL, indexed)
+        check(status == 0, f"a container of the newer builtins is written: {errors}")
+        if status == 0:
+            with open(output, "rb") as f:
+                data = f.read()
+            library_reads(folder, data, ["3", str(len(REFLECTION["bindings"])), "16", "0"],
+                          "the library reads the newer builtins")
+            entries = section(data, 3) or b""
+            check([struct.unpack_from("<36xI", entries, at)[0]
+                   for at in range(0, len(entries), 48)] == [0, 4 | 128 | 256, 512 | 1024],
+                  "the newer builtins' bits")
             check(section(data, 10) == struct.pack("<IBBBBIBBBBIBBBB", 0, 1, 2, 1, 1,
                                                    1, 4, 1, 3, 4, 0, 1, 2, 2, 2),
                   "the inter-stage variables, with WGSL's default interpolation")
@@ -517,6 +535,14 @@ def main():
         refused("variables on a compute entry",
                 change=lambda r: r["entries"][2].update(variables=[r["entries"][1]["variables"][0]]))
         refused("a vertex builtin", change=lambda r: r["entries"][0].update(builtins=["frag_depth"]))
+        refused("a fragment entry's workgroup index",
+                change=lambda r: r["entries"][1].update(builtins=["workgroup_index"]))
+        refused("a vertex entry's global invocation index",
+                change=lambda r: r["entries"][0].update(builtins=["global_invocation_index"]))
+        refused("a compute entry's subgroup size",
+                change=lambda r: r["entries"][2].update(builtins=["subgroup_size"]))
+        refused("a read_write storage texture of rgba8_unorm",
+                change=lambda r: r["bindings"][4].update(access="read_write"))
         refused("an unknown builtin",
                 change=lambda r: r["entries"][1].update(builtins=["position"]))
         refused("five components",

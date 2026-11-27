@@ -294,6 +294,8 @@ const char* mrhiGetDiagnosticText(mrhiDiagnosticCode code)
         return "A driver reported surface caps with more than MRHI_SURFACE_COLORS colors, or a color whose format, primaries, transfer or range is unknown; the core kept the first MRHI_SURFACE_COLORS, dropped each unknown one, and reported a surface left without a color as not presentable.";
     case mrhi_diagnosticDriverSurfaceFloors:
         return "A driver reported surface caps as presentable without 8-bit sRGB in Rec. 709 among its colors, FIFO, opaque alpha, render target usage, or twin views or images; the core reported the adapter as not presenting to the surface.";
+    case mrhi_diagnosticDispatchIndexRange:
+        return "A dispatch of more than 2^32 - 1 workgroups, or invocations, by an entry point that reads the flattened workgroup_index, or global_invocation_index, builtin.";
     default:
         return "An unknown diagnostic code.";
     }

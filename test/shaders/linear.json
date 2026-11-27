@@ -1,0 +1,11 @@
+{
+  "root_block_bytes": 0,
+  "entries": [
+    {"name": "wi", "stage": "compute", "workgroup": [1, 1, 1],
+     "builtins": ["workgroup_index"]},
+    {"name": "gi", "stage": "compute", "workgroup": [2, 1, 1],
+     "builtins": ["global_invocation_index"]}
+  ],
+  "bindings": [],
+  "constants": []
+}

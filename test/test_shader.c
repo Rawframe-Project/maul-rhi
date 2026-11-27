@@ -121,10 +121,10 @@ static void TestHeader(void)
     s_container[0] = 'm';
     CHECK(Parse() == mrhi_errorFormat, "another magic");
     Assemble();
-    Put32(s_container + 4, 1);
+    Put32(s_container + 4, 2);
     CHECK(Parse() == mrhi_errorVersion, "the earlier version");
     Assemble();
-    Put32(s_container + 4, 3);
+    Put32(s_container + 4, 4);
     CHECK(Parse() == mrhi_errorVersion, "a later version");
     Assemble();
     Put32(s_container + 4, 0);
@@ -537,10 +537,18 @@ static mrhiResult NativeEntryWith(uint32_t index, uint32_t builtins)
 
 static void TestBuiltinsAndStorage(void)
 {
-    uint32_t fragment = mrhiShaderBuiltinsKnown & ~(uint32_t)mrhi_builtinViewIndex;
+    uint32_t indices = mrhi_builtinWorkgroupIndex | mrhi_builtinGlobalInvocationIndex;
+    uint32_t fragment = mrhiShaderBuiltinsKnown & ~(uint32_t)mrhi_builtinViewIndex & ~indices;
     CHECK(EntryWith(1, 36, fragment) == mrhi_success, "every fragment builtin");
-    CHECK(NativeEntryWith(1, mrhiShaderBuiltinsKnown) == mrhi_success,
-          "every builtin, without WGSL");
+    CHECK(NativeEntryWith(1, fragment | mrhi_builtinViewIndex) == mrhi_success,
+          "every fragment builtin and the view index, without WGSL");
+    CHECK(EntryWith(2, 36, indices) == mrhi_success, "a compute entry's flattened indices");
+    CHECK(EntryWith(1, 36, mrhi_builtinWorkgroupIndex) == mrhi_errorFormat,
+          "a fragment entry's workgroup index");
+    CHECK(EntryWith(0, 36, mrhi_builtinGlobalInvocationIndex) == mrhi_errorFormat,
+          "a vertex entry's global invocation index");
+    CHECK(EntryWith(2, 36, mrhi_builtinSubgroupSize) == mrhi_errorFormat,
+          "a compute entry's subgroup size, which constrains nothing there");
     CHECK(EntryWith(1, 36, mrhi_builtinViewIndex) == mrhi_errorFormat, "the view index with WGSL");
     CHECK(NativeEntryWith(0, mrhi_builtinViewIndex) == mrhi_success, "a vertex entry's view index");
     CHECK(NativeEntryWith(0, mrhi_builtinViewIndex | mrhi_builtinFrontFacing) == mrhi_errorFormat,
@@ -1574,6 +1582,10 @@ static void TestEntryLimits(void)
     Put32(fragment + 36, mrhi_builtinSampleMaskIn);
     Put16(fragment + 34, (uint16_t)count);
     CHECK(Made(device) == mrhi_errorUnsupported, "the sample mask counted");
+    Put32(fragment + 36, mrhi_builtinSubgroupInvocationId);
+    CHECK(Made(device) == mrhi_errorUnsupported, "the subgroup invocation id counted");
+    Put32(fragment + 36, mrhi_builtinSubgroupSize);
+    CHECK(Made(device) == mrhi_errorUnsupported, "the subgroup size counted");
     Put32(fragment + 36, 0);
     Put32(Record(VARIABLES, 0, 8), count);
     CHECK(Made(device) == mrhi_errorUnsupported, "a variable location past the limit");

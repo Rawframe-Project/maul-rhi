@@ -181,8 +181,9 @@ extern "C"
         mrhi_samplingEither = 5,
     };
 
-    // The builtins an entry point uses that constrain its pipelines: the
-    // fragment builtins, and the view index.
+    // The builtins an entry point uses that constrain its pipelines or
+    // dispatches: the fragment builtins, the view index and the flattened
+    // compute indices.
     typedef uint32_t mrhiShaderBuiltins;
 
     enum
@@ -205,6 +206,18 @@ extern "C"
         // entry; its container has no WGSL, and its device needs the multiview
         // feature.
         mrhi_builtinViewIndex = 0x40u,
+        // Reads the invocation's index in its subgroup, in a fragment entry;
+        // counts as an inter-stage variable.
+        mrhi_builtinSubgroupInvocationId = 0x80u,
+        // Reads the subgroup size, in a fragment entry; counts as an inter-
+        // stage variable.
+        mrhi_builtinSubgroupSize = 0x100u,
+        // Reads the workgroup's index in its dispatch, flattened, in a compute
+        // entry; a dispatch of it makes at most 2^32 - 1 workgroups.
+        mrhi_builtinWorkgroupIndex = 0x200u,
+        // Reads the invocation's index in its dispatch, flattened, in a compute
+        // entry; a dispatch of it makes at most 2^32 - 1 invocations.
+        mrhi_builtinGlobalInvocationIndex = 0x400u,
     };
 
     // What an entry point reads through the pass's heap; none for an entry

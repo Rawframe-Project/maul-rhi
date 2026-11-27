@@ -714,6 +714,10 @@ extern "C"
         // or twin views or images; the core reported the adapter as not
         // presenting to the surface.
         mrhi_diagnosticDriverSurfaceFloors = 159,
+        // A dispatch of more than 2^32 - 1 workgroups, or invocations, by an
+        // entry point that reads the flattened workgroup_index, or
+        // global_invocation_index, builtin.
+        mrhi_diagnosticDispatchIndexRange = 160,
     };
 
     // A record from an instance's or a device's diagnostic queue.

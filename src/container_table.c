@@ -17,7 +17,7 @@
 
 #define HEADER_BYTES      64
 #define SECTION_BYTES     24
-#define CONTAINER_VERSION 2
+#define CONTAINER_VERSION 3
 
 // Checks the header: success with the section count, version or format.
 static mrhiResult CheckHeader(const uint8_t* bytes, size_t size, uint32_t* countOut)

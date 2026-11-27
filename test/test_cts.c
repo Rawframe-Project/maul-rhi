@@ -46,6 +46,7 @@
 #include "maul-rhi/shader.h"
 #include "shaders/dual_container.h"
 #include "shaders/instanced_container.h"
+#include "shaders/linear_container.h"
 #include "shaders/noop_container.h"
 
 #include <math.h>
@@ -1332,6 +1333,62 @@ static void TestDispatches(void)
                      (unsigned)usage);
             Expect(name, Dispatch(true, usage, 16, 0, 0, 0), (usage & mrhi_bufferIndirect) != 0);
         }
+    }
+}
+
+// A compute pipeline of the linear container's entry: "wi", one
+// invocation reading workgroup_index, or "gi", two reading
+// global_invocation_index, as the CTS's shader.
+static mrhiComputePipelineId LinearPipeline(const char* entry)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_linearContainer;
+    shaderDef.byteCount = sizeof(s_linearContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "the linear shader");
+    mrhiComputePipelineDef def = mrhiDefaultComputePipelineDef();
+    def.shader = shader;
+    def.entry = entry;
+    def.entryLength = 2;
+    mrhiComputePipelineId pipeline = {0};
+    mrhiRequestId request;
+    CHECK(mrhiCreateComputePipeline(s_device, &def, &pipeline, &request) == mrhi_success,
+          "a linear pipeline");
+    Answered(request);
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "its shader destroyed");
+    return pipeline;
+}
+
+// api,validation,dispatch: dispatch,linear_indexing_range. The
+// indirect twin reads its counts on the GPU, where too many dispatch
+// nothing.
+static void TestLinearIndexing(void)
+{
+    char name[128];
+    uint32_t most = s_limits.workgroupsPerDimension;
+    const char* const entries[2] = {"gi", "wi"};
+    const char* const names[2] = {"global_invocation_index", "workgroup_index"};
+    for (size_t b = 0; b < 2; ++b)
+    {
+        mrhiComputePipelineId pipeline = LinearPipeline(entries[b]);
+        for (int max = 0; max <= 1; ++max)
+        {
+            snprintf(name, sizeof(name), "dispatch:dispatch,linear_indexing_range %s %s", names[b],
+                     max ? "max" : "valid");
+            mrhiBufferId buffer = MakeBuffer(12, mrhi_bufferIndirect);
+            CasePass c = {0};
+            mrhiResult status = BeginCase(buffer, mrhi_accessIndirect, false, &c);
+            if (status == mrhi_success)
+            {
+                CHECK(mrhiPass_SetComputePipeline(s_device, c.pass, pipeline) == mrhi_success,
+                      "the linear pipeline set");
+                status = mrhiPass_Dispatch(s_device, c.pass, most, max ? most : 1, b == 1 ? 2 : 1);
+            }
+            EndCase(buffer);
+            Expect(name, status, max == 0);
+        }
+        CHECK(mrhiDestroyComputePipeline(s_device, pipeline) == mrhi_success,
+              "the linear pipeline destroyed");
     }
 }
 
@@ -8611,6 +8668,7 @@ int main(void)
     TestIndirectDraws();
     CHECK(s_differs == 876 && s_inexpressible == 0, "the indirect draw cases set aside");
     TestDispatches();
+    TestLinearIndexing();
     TestVertexIndexBuffers();
     CHECK(s_differs == 878 && s_inexpressible == 0, "the draw cases set aside");
     TestRenderPasses();

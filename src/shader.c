@@ -81,8 +81,9 @@ static size_t BindingsPast(const mrhiLimits* limits, const mrhiContainer* contai
 // variables.
 static uint32_t StageBuiltins(mrhiShaderBuiltins builtins)
 {
-    const mrhiShaderBuiltins counted[] = {mrhi_builtinFrontFacing, mrhi_builtinSampleIndex,
-                                          mrhi_builtinSampleMaskIn, mrhi_builtinPrimitiveIndex};
+    const mrhiShaderBuiltins counted[] = {
+        mrhi_builtinFrontFacing,    mrhi_builtinSampleIndex,          mrhi_builtinSampleMaskIn,
+        mrhi_builtinPrimitiveIndex, mrhi_builtinSubgroupInvocationId, mrhi_builtinSubgroupSize};
     uint32_t count = 0;
     for (size_t i = 0; i < sizeof(counted) / sizeof(counted[0]); ++i)
     {
