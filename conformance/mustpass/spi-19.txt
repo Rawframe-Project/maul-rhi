@@ -25,6 +25,7 @@ binding.culling
 binding.render_state
 binding.root_block
 binding.compute_split
+binding.constants
 binding.heaps
 hazards.aliasing
 hazards.pass_classes
