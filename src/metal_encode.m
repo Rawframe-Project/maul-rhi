@@ -645,13 +645,17 @@ static void ClampPass(const mrhiMetalEncoder* encoder)
 // Guards the counts of the pass's indirect dispatches into the clamped
 // buffer, in a compute encoder before the pass's own, as WebGPU's
 // dispatchWorkgroupsIndirect does: zeros for a dispatch past the
-// workgroup limit, which Metal leaves undefined. A pass never writes a
+// workgroup limit, which Metal leaves undefined, or past 2^32 - 1
+// workgroups, or invocations, for a pipeline reading a flattened index,
+// each dispatch's the last set before it. A pass never writes a
 // buffer it reads counts from, so they are final here; Metal orders the
 // pass's indirect reads after the writes.
 static void GuardPass(const mrhiMetalEncoder* encoder)
 {
     id<MTLComputeCommandEncoder> compute = nil;
     uint64_t guardedAt = encoder->clampedAt;
+    // The pipeline each dispatch runs: the last one set before it.
+    const mrhiMetalPipeline* pipeline = nullptr;
     for (uint32_t chunk = encoder->pass->firstChunk; chunk != 0;
          chunk = encoder->frame->chunks[chunk - 1].next)
     {
@@ -659,16 +663,22 @@ static void GuardPass(const mrhiMetalEncoder* encoder)
         for (uint32_t i = 0; i < at->count; i += 1u + at->commands[i].payload)
         {
             const mrhiCommand* command = &at->commands[i];
+            if (command->type == mrhiCommandComputePipeline)
+            {
+                pipeline = (const mrhiMetalPipeline*)(uintptr_t)command->b;
+            }
             if (command->type != mrhiCommandDispatchIndirect)
             {
                 continue;
             }
+            MRHI_ASSERT(pipeline != nullptr);
             if (compute == nil)
             {
                 compute = [encoder->commands computeCommandEncoder];
                 [compute setComputePipelineState:encoder->guard];
             }
-            const uint32_t shape[3] = {encoder->workgroupsPerDimension, 0, 0};
+            const uint32_t shape[3] = {encoder->workgroupsPerDimension, pipeline->flatIndices,
+                                       pipeline->invocations};
             [compute setBuffer:encoder->objects[command->a - 1]
                         offset:(NSUInteger)command->c
                        atIndex:0];

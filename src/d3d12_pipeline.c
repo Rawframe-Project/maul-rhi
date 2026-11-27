@@ -320,6 +320,11 @@ mrhiResult mrhiD3d12CreateCompute(mrhiD3d12Pipelines* pipelines,
     }
     mrhiD3d12Pipeline* made = &pipelines->pipelines[handle - 1];
     made->rootBytes = pipeline->reflection->rootBlockBytes;
+    const mrhiShaderEntry* entry = &pipeline->reflection->entries[pipeline->entry];
+    made->flatIndices = ((entry->builtins & mrhi_builtinWorkgroupIndex) != 0 ? 1u : 0u) |
+                        ((entry->builtins & mrhi_builtinGlobalInvocationIndex) != 0 ? 2u : 0u);
+    // The core held each size within the device's, so the product is small.
+    made->invocations = entry->workgroup[0] * entry->workgroup[1] * entry->workgroup[2];
     mrhiResult status = mrhi_errorUnsupported;
     if (Specialize(shader, pipeline->reflection, pipeline->constants, pipeline->constantCount,
                    made->constants))

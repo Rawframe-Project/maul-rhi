@@ -543,7 +543,9 @@ static void Depend(mrhiVulkanRecording* recording, VkBuffer buffer, VkDeviceSize
 
 // An indirect dispatch, as WebGPU's: its counts copied into the slot's
 // guard buffer, where the library's kernel zeroes them when one passes
-// workgroupsPerDimension, since Vulkan leaves such a dispatch undefined;
+// workgroupsPerDimension, since Vulkan leaves such a dispatch undefined,
+// or when they pass 2^32 - 1 workgroups, or invocations, for a pipeline
+// reading a flattened index;
 // the dispatch reads the copy. The kernel's pipeline and push constants
 // replace the pass's, which are set again, with the sets of the tables
 // the pipeline reads, before the dispatch: the core has the pass set
@@ -576,7 +578,9 @@ static void GuardedDispatch(mrhiVulkanRecording* recording, const mrhiCommand* c
     api->vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, frames->guard);
     uint8_t shape[sizeof(VkDeviceAddress) + 3 * sizeof(uint32_t)];
     VkDeviceAddress address = slot->guardAddress + at;
-    const uint32_t words[3] = {frames->workgroupsPerDimension, 0, 0};
+    const mrhiVulkanPipeline* running = recording->pipeline;
+    const uint32_t words[3] = {frames->workgroupsPerDimension, running->flatIndices,
+                               running->invocations};
     memcpy(shape, &address, sizeof(address));
     memcpy(shape + sizeof(address), words, sizeof(words));
     api->vkCmdPushConstants(commands, frames->guardLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,

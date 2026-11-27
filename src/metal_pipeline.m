@@ -308,6 +308,12 @@ mrhiResult mrhiMetalCreateCompute(mrhiMetalPipelines* pipelines,
     }
     const uint32_t* size = pipeline->reflection->entries[pipeline->entry].workgroup;
     made->workgroup = MTLSizeMake(size[0], size[1], size[2]);
+    const mrhiShaderEntry* entry = &pipeline->reflection->entries[pipeline->entry];
+    made->flatIndices = ((entry->builtins & mrhi_builtinWorkgroupIndex) != 0 ? 1u : 0u) |
+                        ((entry->builtins & mrhi_builtinGlobalInvocationIndex) != 0 ? 2u : 0u);
+    // The core held each size within the device's, so the product is small.
+    made->invocations = entry->workgroup[0] * entry->workgroup[1] * entry->workgroup[2];
+
     made->sizes[0] = shader->sizes[pipeline->entry];
     mrhiResult status = mrhi_errorPlatform;
     @autoreleasepool

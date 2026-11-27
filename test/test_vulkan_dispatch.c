@@ -50,6 +50,7 @@ int main(void)
     {
         CheckGuardedDispatch(device);
         CheckGuardedTables(device);
+        CheckGuardedIndices(device);
         mrhiDestroyDevice(device);
     }
     else

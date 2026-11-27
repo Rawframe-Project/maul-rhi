@@ -306,6 +306,11 @@ mrhiResult mrhiVulkanCreateCompute(mrhiVulkanPipelines* pipelines,
         mrhiVulkanGivePipeline(pipelines, handle);
         return status;
     }
+    const mrhiShaderEntry* entry = &pipeline->reflection->entries[pipeline->entry];
+    made->flatIndices = ((entry->builtins & mrhi_builtinWorkgroupIndex) != 0 ? 1u : 0u) |
+                        ((entry->builtins & mrhi_builtinGlobalInvocationIndex) != 0 ? 2u : 0u);
+    // The core held each size within the device's, so the product is small.
+    made->invocations = entry->workgroup[0] * entry->workgroup[1] * entry->workgroup[2];
     char name[MRHI_VULKAN_NAME];
     mrhiVulkanEntryName(pipeline->reflection, pipeline->entry, name);
     VkSpecializationInfo constants;

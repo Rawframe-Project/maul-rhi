@@ -155,9 +155,10 @@ static void Indirect(mrhiD3d12Recorder* recorder, uint32_t object, uint64_t offs
 
 // An indirect dispatch, as WebGPU's: its counts first copied into the
 // scratch buffer by the library's kernel, or zeros there when one passes
-// workgroupsPerDimension, since D3D12 leaves such a dispatch undefined.
-// The kernel replaces the compute root signature and pipeline, which
-// are set again before the dispatch.
+// workgroupsPerDimension, since D3D12 leaves such a dispatch undefined,
+// or when they pass 2^32 - 1 workgroups, or invocations, for a pipeline
+// reading a flattened index. The kernel replaces the compute root
+// signature and pipeline, which are set again before the dispatch.
 static void GuardedDispatch(mrhiD3d12Recorder* recorder, uint32_t object, uint64_t offset)
 {
     ID3D12GraphicsCommandList* list = recorder->list;
@@ -172,7 +173,8 @@ static void GuardedDispatch(mrhiD3d12Recorder* recorder, uint32_t object, uint64
     ID3D12GraphicsCommandList_SetComputeRootSignature(list, recorder->guardRoot);
     recorder->computeRoot = recorder->guardRoot;
     ID3D12GraphicsCommandList_SetPipelineState(list, recorder->guard);
-    const uint32_t shape[3] = {recorder->workgroupsPerDimension, 0, 0};
+    const uint32_t shape[3] = {recorder->workgroupsPerDimension, recorder->pipeline->flatIndices,
+                               recorder->pipeline->invocations};
     ID3D12GraphicsCommandList_SetComputeRoot32BitConstants(list, 0, 3, shape, 0);
     ID3D12GraphicsCommandList_SetComputeRootShaderResourceView(
         list, 1,

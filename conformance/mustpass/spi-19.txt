@@ -27,6 +27,7 @@ binding.root_block
 binding.compute_split
 binding.constants
 binding.heaps
+binding.dispatch_past_limit
 hazards.aliasing
 hazards.pass_classes
 hazards.transient_twin

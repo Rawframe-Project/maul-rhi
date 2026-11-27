@@ -15,6 +15,7 @@
 #include "maul-rhi/pipeline.h"
 #include "maul-rhi/resources.h"
 #include "maul-rhi/shader.h"
+#include "shaders/flat_container.h"
 #include "shaders/lone_table_container.h"
 #include "shaders/split_tables_container.h"
 #include "shaders/storage_container.h"
@@ -282,6 +283,128 @@ static void CheckGuardedTables(mrhiDevice* device)
               mrhiDestroyShader(device, shaders[0]) == mrhi_success &&
               mrhiDestroyShader(device, shaders[1]) == mrhi_success,
           "the pipelines and shaders ended");
+}
+
+// Indirect dispatches past the flattened indices, as WebGPU's
+// dispatchWorkgroupsIndirect: the flat container's entry reading
+// workgroup_index dispatched over 65535 x 65535 x 2 workgroups, more
+// than 2^32 - 1, and its entry reading global_invocation_index, of 64
+// invocations, over 65535 x 1025 workgroups, fewer than 2^32 - 1 but
+// more invocations, each within workgroupsPerDimension, do nothing; the
+// latter over one workgroup then writes. Each guard takes its own
+// pipeline's index: the second dispatch past would run with the first's.
+static void CheckGuardedIndices(mrhiDevice* device)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_flatContainer;
+    shaderDef.byteCount = sizeof(s_flatContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "the flat shader");
+    const char* const entries[2] = {"wi", "gi"};
+    mrhiComputePipelineId pipelines[2] = {{0}};
+    for (int i = 0; i < 2; ++i)
+    {
+        mrhiComputePipelineDef pipelineDef = mrhiDefaultComputePipelineDef();
+        pipelineDef.shader = shader;
+        pipelineDef.entry = entries[i];
+        pipelineDef.entryLength = 2;
+        mrhiRequestId request = {0};
+        mrhiDeviceNotification record;
+        CHECK(mrhiCreateComputePipeline(device, &pipelineDef, &pipelines[i], &request) ==
+                      mrhi_success &&
+                  mrhiDevice_TakeNotification(device, &record) == mrhi_success &&
+                  record.kind == mrhi_devicePipelineReady && record.outcome == mrhi_success,
+              "a pipeline of each entry");
+    }
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
+    bufferDef.size = 16;
+    mrhiBufferDef argumentsDef = mrhiDefaultBufferDef();
+    argumentsDef.size = 36;
+    mrhiResourceId skipped = {0};
+    mrhiResourceId written = {0};
+    mrhiResourceId arguments = {0};
+    CHECK(mrhiDeclareBuffer(device, &bufferDef, &skipped) == mrhi_success &&
+              mrhiDeclareBuffer(device, &bufferDef, &written) == mrhi_success &&
+              mrhiDeclareBuffer(device, &argumentsDef, &arguments) == mrhi_success,
+          "the buffers");
+    mrhiPassDef uploadDef = mrhiDefaultPassDef();
+    const mrhiAccess uploads[2] = {GuardedWhole(arguments, mrhi_accessCopyDestination),
+                                   GuardedWhole(skipped, mrhi_accessCopyDestination)};
+    uploadDef.accesses = uploads;
+    uploadDef.accessCount = 2;
+    uploadDef.neverCull = true;
+    mrhiPassDef dispatchDef = mrhiDefaultPassDef();
+    const mrhiAccess uses[3] = {GuardedWhole(skipped, mrhi_accessStorageReadWrite),
+                                GuardedWhole(written, mrhi_accessStorageWrite),
+                                GuardedWhole(arguments, mrhi_accessIndirect)};
+    dispatchDef.accesses = uses;
+    dispatchDef.accessCount = 3;
+    dispatchDef.neverCull = true;
+    mrhiPassDef readDef = mrhiDefaultPassDef();
+    const mrhiAccess reads[2] = {GuardedWhole(skipped, mrhi_accessCopySource),
+                                 GuardedWhole(written, mrhi_accessCopySource)};
+    readDef.accesses = reads;
+    readDef.accessCount = 2;
+    readDef.neverCull = true;
+    mrhiPassId upload = {0};
+    mrhiPassId dispatch = {0};
+    mrhiPassId read = {0};
+    CHECK(mrhiAddPass(device, &uploadDef, &upload) == mrhi_success &&
+              mrhiAddPass(device, &dispatchDef, &dispatch) == mrhi_success &&
+              mrhiAddPass(device, &readDef, &read) == mrhi_success &&
+              mrhiDevice_CompileFrame(device) == mrhi_success,
+          "the passes compiled");
+    const uint32_t counts[9] = {65535, 65535, 2, 65535, 1025, 1, 1, 1, 1};
+    mrhiBinding binding = {.slot = 0, .resource = skipped, .size = MRHI_WHOLE_SIZE};
+    mrhiRequestId results[2] = {{0}};
+    CHECK(mrhiPass_Begin(device, upload) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, arguments, 0, counts, sizeof(counts)) ==
+                  mrhi_success &&
+              mrhiPass_ClearBuffer(device, upload, skipped, 0, 16) == mrhi_success &&
+              mrhiPass_End(device, upload) == mrhi_success,
+          "the counts uploaded, the skipped output cleared");
+    CHECK(mrhiPass_Begin(device, dispatch) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, dispatch, pipelines[0]) == mrhi_success &&
+              mrhiPass_SetBindings(device, dispatch, 0, &binding, 1) == mrhi_success &&
+              mrhiPass_DispatchIndirect(device, dispatch, arguments, 0) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, dispatch, pipelines[1]) == mrhi_success &&
+              mrhiPass_DispatchIndirect(device, dispatch, arguments, 12) == mrhi_success,
+          "dispatched past each flattened index");
+    binding.resource = written;
+    CHECK(mrhiPass_SetBindings(device, dispatch, 0, &binding, 1) == mrhi_success &&
+              mrhiPass_DispatchIndirect(device, dispatch, arguments, 24) == mrhi_success &&
+              mrhiPass_End(device, dispatch) == mrhi_success,
+          "dispatched within them");
+    CHECK(mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, skipped, 0, 4, &results[0]) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, written, 0, 4, &results[1]) == mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
+          "both outputs read");
+    mrhiRequestId token = {0};
+    CHECK(mrhiDevice_SubmitFrame(device, &token) == mrhi_success &&
+              mrhiRequest_WaitFrame(device, token, UINT64_C(10000000000)) == mrhi_success,
+          "submitted and finished");
+    mrhiDeviceNotification record;
+    while (mrhiDevice_TakeNotification(device, &record) == mrhi_success)
+    {
+    }
+    uint32_t got[2] = {0};
+    size_t taken = 0;
+    for (int i = 0; i < 2; ++i)
+    {
+        CHECK(mrhiRequest_TakeReadback(device, results[i], &got[i], sizeof(got[i]), &taken) ==
+                      mrhi_success &&
+                  taken == sizeof(got[i]),
+              "a word read back");
+    }
+    CHECK(got[0] == 0, "nothing written past the flattened indices");
+    CHECK(got[1] == 1, "the dispatch within them written");
+    CHECK(mrhiDestroyComputePipeline(device, pipelines[0]) == mrhi_success &&
+              mrhiDestroyComputePipeline(device, pipelines[1]) == mrhi_success &&
+              mrhiDestroyShader(device, shader) == mrhi_success,
+          "the pipelines and shader ended");
 }
 
 #endif
