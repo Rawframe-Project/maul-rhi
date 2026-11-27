@@ -36,6 +36,7 @@
 //   WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 //   POSSIBILITY OF SUCH DAMAGE.
 
+#include "test_container.h"
 #include "test_device_setup.h"
 
 #include "maul-rhi/device.h"
@@ -1332,6 +1333,72 @@ static void TestDispatches(void)
                      (unsigned)usage);
             Expect(name, Dispatch(true, usage, 16, 0, 0, 0), (usage & mrhi_bufferIndirect) != 0);
         }
+    }
+}
+
+// A compute pipeline whose entry reads one flattened index, in a
+// workgroup of 2 invocations for global_invocation_index and 1 for
+// workgroup_index, as the CTS's shader.
+static mrhiComputePipelineId LinearPipeline(mrhiShaderBuiltins builtin)
+{
+    Reset();
+    s_sections[BINDINGS].size = 0;
+    uint8_t* compute = Record(ENTRIES, 2, 48);
+    Put32(compute + 12, builtin == mrhi_builtinGlobalInvocationIndex ? 2 : 1);
+    Put32(compute + 16, 1);
+    Put32(compute + 20, 1);
+    Put32(compute + 36, builtin);
+    Assemble();
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_container;
+    shaderDef.byteCount = s_size;
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(s_device, &shaderDef, &shader) == mrhi_success, "a linear shader");
+    mrhiComputePipelineDef def = mrhiDefaultComputePipelineDef();
+    def.shader = shader;
+    def.entry = "cs";
+    def.entryLength = 2;
+    mrhiComputePipelineId pipeline = {0};
+    mrhiRequestId request;
+    CHECK(mrhiCreateComputePipeline(s_device, &def, &pipeline, &request) == mrhi_success,
+          "a linear pipeline");
+    Answered(request);
+    CHECK(mrhiDestroyShader(s_device, shader) == mrhi_success, "its shader destroyed");
+    return pipeline;
+}
+
+// api,validation,dispatch: dispatch,linear_indexing_range. The
+// indirect twin reads its counts on the GPU, where too many dispatch
+// nothing.
+static void TestLinearIndexing(void)
+{
+    char name[128];
+    uint32_t most = s_limits.workgroupsPerDimension;
+    const mrhiShaderBuiltins builtins[2] = {mrhi_builtinGlobalInvocationIndex,
+                                            mrhi_builtinWorkgroupIndex};
+    const char* const names[2] = {"global_invocation_index", "workgroup_index"};
+    for (size_t b = 0; b < 2; ++b)
+    {
+        mrhiComputePipelineId pipeline = LinearPipeline(builtins[b]);
+        for (int max = 0; max <= 1; ++max)
+        {
+            snprintf(name, sizeof(name), "dispatch:dispatch,linear_indexing_range %s %s", names[b],
+                     max ? "max" : "valid");
+            mrhiBufferId buffer = MakeBuffer(12, mrhi_bufferIndirect);
+            CasePass c = {0};
+            mrhiResult status = BeginCase(buffer, mrhi_accessIndirect, false, &c);
+            if (status == mrhi_success)
+            {
+                CHECK(mrhiPass_SetComputePipeline(s_device, c.pass, pipeline) == mrhi_success,
+                      "the linear pipeline set");
+                status = mrhiPass_Dispatch(s_device, c.pass, most, max ? most : 1,
+                                           builtins[b] == mrhi_builtinWorkgroupIndex ? 2 : 1);
+            }
+            EndCase(buffer);
+            Expect(name, status, max == 0);
+        }
+        CHECK(mrhiDestroyComputePipeline(s_device, pipeline) == mrhi_success,
+              "the linear pipeline destroyed");
     }
 }
 
@@ -8611,6 +8678,7 @@ int main(void)
     TestIndirectDraws();
     CHECK(s_differs == 876 && s_inexpressible == 0, "the indirect draw cases set aside");
     TestDispatches();
+    TestLinearIndexing();
     TestVertexIndexBuffers();
     CHECK(s_differs == 878 && s_inexpressible == 0, "the draw cases set aside");
     TestRenderPasses();

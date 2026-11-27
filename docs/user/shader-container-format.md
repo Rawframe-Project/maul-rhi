@@ -1,6 +1,6 @@
 # Shader container format
 
-The byte layout of a shader container, version 2, for anyone writing a cook of their own instead of `tools/mrhi_container.py`. [Shaders and pipelines](shaders.md) explains what a container is for and how to make one with the library's tools.
+The byte layout of a shader container, version 3, for anyone writing a cook of their own instead of `tools/mrhi_container.py`. [Shaders and pipelines](shaders.md) explains what a container is for and how to make one with the library's tools.
 
 ## Contents
 
@@ -30,7 +30,7 @@ The first 64 bytes:
 | Offset | Type | Field |
 |---|---|---|
 | 0 | 4 bytes | `MRSC` |
-| 4 | u32 | the format version, 2 |
+| 4 | u32 | the format version, 3 |
 | 8 | u64 | the container's size in bytes, which must be the size handed over |
 | 16 | 32 bytes | the SHA-256 digest of every byte from offset 48 to the end |
 | 48 | u32 | the number of sections, at most `MRHI_MAX_CONTAINER_SECTIONS` (64) |
@@ -84,13 +84,13 @@ The WGSL section is present exactly when no entry reads a heap or the view index
 | 24 | u16, u16 | the first vertex input and the count, 0 unless a vertex entry |
 | 28 | u16, u16 | the first color output and the count, 0 unless a fragment entry |
 | 32 | u16, u16 | the first inter-stage variable and the count: a vertex entry's outputs or a fragment entry's inputs, 0 for compute |
-| 36 | u32 | the builtins used, `mrhiShaderBuiltins` bits: any for a fragment entry, only the view index for a vertex entry, none for compute |
+| 36 | u32 | the builtins used, `mrhiShaderBuiltins` bits: only the workgroup and global invocation indices for a compute entry, only the view index for a vertex entry, any other for a fragment entry |
 | 40 | u32 | the workgroup storage in bytes, 0 unless a compute entry |
 | 44 | u32 | what the entry reads through the pass's heap, `mrhiShaderHeapUses` bits |
 
 Heap uses name sampled textures, storage textures and storage buffers read from the resource heap, and samplers read from the sampler heap. The `writes` bit goes with a storage kind and never in a vertex entry. SPIR-V reads the resource heap at set 4 binding 0, with every type an entry reads aliased there, and the sampler heap at set 4 binding 1, where DXC places Shader Model 6.6 heaps with `-fvk-bind-resource-heap 0 4 -fvk-bind-sampler-heap 1 4`.
 
-An entry that reads a multiview pass's view index has the `mrhi_builtinViewIndex` bit; its SPIR-V reads the `ViewIndex` builtin with the `MultiView` capability.
+An entry that reads a multiview pass's view index has the `mrhi_builtinViewIndex` bit; its SPIR-V reads the `ViewIndex` builtin with the `MultiView` capability. A compute entry whose WGSL reads the flattened `workgroup_index` or `global_invocation_index` has `mrhi_builtinWorkgroupIndex` or `mrhi_builtinGlobalInvocationIndex`, which no SPIR-V builtin marks: `mrhiPass_Dispatch` then refuses a dispatch of more than 2<sup>32</sup> - 1 workgroups, or invocations, as WebGPU does.
 
 ## Bindings
 
@@ -205,7 +205,7 @@ The library checks the structure; each driver's API checks the code itself when 
 
 - the root block, a binding's slot or minimum size, or a stage's count of any binding kind past the device's limits (read-only storage buffers count as storage buffers);
 - a compute entry's workgroup size, invocations or workgroup storage past the limits;
-- a vertex input or inter-stage variable location past the limits, or a fragment entry reading more inter-stage variables than the limit, counting the builtins `front_facing`, `sample_index`, `sample_mask` and `primitive_index`;
+- a vertex input or inter-stage variable location past the limits, or a fragment entry reading more inter-stage variables than the limit, counting the builtins `front_facing`, `sample_index`, `sample_mask`, `primitive_index`, `subgroup_invocation_id` and `subgroup_size`;
 - 16-bit floats without `shaderF16`, or `mrhi_builtinPrimitiveIndex`;
 - code needing a feature the device lacks, read from the capabilities the SPIR-V declares before its other instructions: `Float16` and the 16-bit storage capabilities (4433 to 4436) need `shaderF16`, `Int64` needs `shaderInt64`, and `GroupNonUniform` to `GroupNonUniformQuad` (61 to 68) need `subgroups`;
 - the view index without `multiview`; heap uses without `bindlessSampling`, or storage textures or buffers from the heap without `bindlessHeterogeneous`.

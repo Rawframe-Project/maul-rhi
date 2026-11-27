@@ -351,6 +351,28 @@ mrhiResult mrhiPass_DrawIndexed(mrhiDevice* device, mrhiPassId id, uint32_t inde
     return mrhi_success;
 }
 
+// Whether a dispatch of x by y by z workgroups keeps the flattened
+// indices its entry point reads within 32 bits, as WebGPU's
+// dispatchWorkgroups: its workgroups for workgroup_index, its
+// invocations for global_invocation_index.
+MRHI_NODISCARD static bool IndicesFit(const mrhiShaderEntry* entry, uint32_t x, uint32_t y,
+                                      uint32_t z)
+{
+    uint64_t workgroups = 0;
+    bool past = ckd_mul(&workgroups, (uint64_t)x * y, (uint64_t)z) || workgroups > UINT32_MAX;
+    if ((entry->builtins & mrhi_builtinWorkgroupIndex) != 0 && past)
+    {
+        return false;
+    }
+    uint64_t invocations = workgroups;
+    for (size_t i = 0; i < 3; ++i)
+    {
+        past = past || ckd_mul(&invocations, invocations, (uint64_t)entry->workgroup[i]) ||
+               invocations > UINT32_MAX;
+    }
+    return (entry->builtins & mrhi_builtinGlobalInvocationIndex) == 0 || !past;
+}
+
 mrhiResult mrhiPass_Dispatch(mrhiDevice* device, mrhiPassId id, uint32_t x, uint32_t y, uint32_t z)
 {
     if (device == nullptr)
@@ -373,9 +395,14 @@ mrhiResult mrhiPass_Dispatch(mrhiDevice* device, mrhiPassId id, uint32_t x, uint
     {
         return status;
     }
-    if (ReadyToRun(device, pass, &status) == nullptr)
+    const mrhiPipelineSlot* slot = ReadyToRun(device, pass, &status);
+    if (slot == nullptr)
     {
         return status;
+    }
+    if (!IndicesFit(&slot->reflection->entries[slot->entries[0]], x, y, z))
+    {
+        return mrhiDeviceMisuse(device, mrhi_diagnosticDispatchIndexRange);
     }
     mrhiCommand* record = mrhiTakeCommands(device, pass, 1);
     if (record == nullptr)

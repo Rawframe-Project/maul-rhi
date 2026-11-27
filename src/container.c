@@ -301,11 +301,14 @@ MRHI_NODISCARD static bool IsEntryValid(const mrhiContainer* container, uint32_t
                    (entry.outputCount == 0 || fragment);
     bool variables = InArray(entry.firstVariable, entry.variableCount, container->variableCount) &&
                      (entry.variableCount == 0 || !compute);
-    // The view index is a vertex or fragment builtin; the others are a
-    // fragment entry's.
-    uint32_t others = entry.builtins & ~(uint32_t)mrhi_builtinViewIndex;
-    bool builtins = (entry.builtins & ~mrhiShaderBuiltinsKnown) == 0 && (others == 0 || fragment) &&
-                    ((entry.builtins & mrhi_builtinViewIndex) == 0 || !compute);
+    // The flattened indices are a compute entry's builtins, the view
+    // index a vertex or fragment entry's, and the others a fragment
+    // entry's.
+    uint32_t indices = mrhi_builtinWorkgroupIndex | mrhi_builtinGlobalInvocationIndex;
+    uint32_t allowed = compute    ? indices
+                       : fragment ? mrhiShaderBuiltinsKnown & ~indices
+                                  : (uint32_t)mrhi_builtinViewIndex;
+    bool builtins = (entry.builtins & ~allowed) == 0;
     // Writes go with the storage kinds, never in a vertex entry, as
     // WebGPU's rule for bound storage.
     uint32_t storage = mrhi_heapUseStorageTextures | mrhi_heapUseStorageBuffers;

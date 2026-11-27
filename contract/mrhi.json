@@ -1048,6 +1048,11 @@
               "name": "diagnostic_driver_surface_floors",
               "value": 159,
               "doc": "A driver reported surface caps as presentable without 8-bit sRGB in Rec. 709 among its colors, FIFO, opaque alpha, render target usage, or twin views or images; the core reported the adapter as not presenting to the surface."
+            },
+            {
+              "name": "diagnostic_dispatch_index_range",
+              "value": 160,
+              "doc": "A dispatch of more than 2^32 - 1 workgroups, or invocations, by an entry point that reads the flattened workgroup_index, or global_invocation_index, builtin."
             }
           ],
           "library": "names the library's own checks"
@@ -15155,7 +15160,7 @@
           "kind": "bitflags",
           "name": "shader_builtins",
           "mapped": true,
-          "doc": "The builtins an entry point uses that constrain its pipelines: the fragment builtins, and the view index.",
+          "doc": "The builtins an entry point uses that constrain its pipelines or dispatches: the fragment builtins, the view index and the flattened compute indices.",
           "values": [
             {
               "name": "builtin_frag_depth",
@@ -15315,6 +15320,104 @@
                 "web_gpu": {
                   "class": "absent_rejected",
                   "note": "WGSL has no view index"
+                }
+              }
+            },
+            {
+              "name": "builtin_subgroup_invocation_id",
+              "value": 128,
+              "doc": "Reads the invocation's index in its subgroup, in a fragment entry; counts as an inter-stage variable.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SubgroupLocalInvocationId"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "WaveGetLaneIndex()"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "[[thread_index_in_simdgroup]]"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "subgroup_invocation_id"
+                }
+              }
+            },
+            {
+              "name": "builtin_subgroup_size",
+              "value": 256,
+              "doc": "Reads the subgroup size, in a fragment entry; counts as an inter-stage variable.",
+              "mapping": {
+                "vulkan": {
+                  "class": "direct",
+                  "note": "SubgroupSize"
+                },
+                "d3d12": {
+                  "class": "direct",
+                  "note": "WaveGetLaneCount()"
+                },
+                "metal": {
+                  "class": "direct",
+                  "note": "[[threads_per_simdgroup]]"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "subgroup_size"
+                }
+              }
+            },
+            {
+              "name": "builtin_workgroup_index",
+              "value": 512,
+              "doc": "Reads the workgroup's index in its dispatch, flattened, in a compute entry; a dispatch of it makes at most 2^32 - 1 workgroups.",
+              "mapping": {
+                "vulkan": {
+                  "class": "emulated",
+                  "note": "WorkgroupId and NumWorkgroups, flattened in the shader",
+                  "cost": "a multiply-add in the shader"
+                },
+                "d3d12": {
+                  "class": "emulated",
+                  "note": "SV_GroupID and the dispatch's size, flattened in the shader",
+                  "cost": "a multiply-add in the shader"
+                },
+                "metal": {
+                  "class": "emulated",
+                  "note": "[[threadgroup_position_in_grid]] and [[threadgroups_per_grid]], flattened in the shader",
+                  "cost": "a multiply-add in the shader"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "workgroup_index"
+                }
+              }
+            },
+            {
+              "name": "builtin_global_invocation_index",
+              "value": 1024,
+              "doc": "Reads the invocation's index in its dispatch, flattened, in a compute entry; a dispatch of it makes at most 2^32 - 1 invocations.",
+              "mapping": {
+                "vulkan": {
+                  "class": "emulated",
+                  "note": "GlobalInvocationId, NumWorkgroups and the workgroup size, flattened in the shader",
+                  "cost": "a multiply-add in the shader"
+                },
+                "d3d12": {
+                  "class": "emulated",
+                  "note": "SV_DispatchThreadID, the dispatch's size and the workgroup size, flattened in the shader",
+                  "cost": "a multiply-add in the shader"
+                },
+                "metal": {
+                  "class": "emulated",
+                  "note": "[[thread_position_in_grid]] and [[threads_per_grid]], flattened in the shader",
+                  "cost": "a multiply-add in the shader"
+                },
+                "web_gpu": {
+                  "class": "direct",
+                  "note": "global_invocation_index"
                 }
               }
             }
@@ -22727,5 +22830,5 @@
       ]
     }
   ],
-  "contract_version": 40
+  "contract_version": 41
 }

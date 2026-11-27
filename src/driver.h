@@ -20,10 +20,10 @@
 // The SPI version a driver's vtable must carry. Any change to the SPI
 // headers or to a public type they reach, or to what a driver must do or
 // may assume, raises it; 4 is the first installed.
-#define MRHI_SPI_VERSION 18
+#define MRHI_SPI_VERSION 19
 // What a driver sees at this version, as tools/check_spi_version.py
 // digests it; --write records it.
-// SPI digest: 9bcb06b6fda40c167d86e94943fb462ddaeb8b928e38257faa84ec88879b35f9
+// SPI digest: be754674aef6fa12fa7fa394996b50d1b7f549b7d7aec64689fb8af844493be9
 
 // The pass classes (mrhiPassClass): graphics, async compute and transfer.
 #define MRHI_PASS_CLASSES 3

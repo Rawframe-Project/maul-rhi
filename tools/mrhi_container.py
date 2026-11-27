@@ -18,7 +18,9 @@
 # reads the resource heap at set 4 binding 0 and the sampler heap at set
 # 4 binding 1 (DXC: -fvk-bind-resource-heap 0 4 -fvk-bind-sampler-heap 1
 # 4). An entry reading the view index of a multiview pass lists the
-# builtin "view_index", in a vertex entry too. WGSL reads no heaps yet
+# builtin "view_index", in a vertex entry too, and a compute entry reading
+# WGSL's flattened "workgroup_index" or "global_invocation_index" lists it,
+# so that a dispatch too large for it is refused. WGSL reads no heaps yet
 # and has no view index or 64-bit integers, so a container whose entries
 # use any (its SPIR-V declaring Int64) has no WGSL: pass - for it.
 #
@@ -90,7 +92,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTRACT = os.path.join(ROOT, "contract", "mrhi.json")
-VERSION = 2
+VERSION = 3
 SPIRV_MAGIC = 0x07230203
 COLOR_TARGETS = 8
 MAX_ROOT_BLOCK = 256
@@ -289,12 +291,15 @@ def pack_entries(reflection, enums, strings, inputs, outputs, variables):
         storage = number(entry.get("workgroup_storage_bytes", 0), f"{where}: workgroup storage",
                          0, 0xFFFFFFFF if compute else 0)
         builtins = entry.get("builtins", [])
-        # The view index is a vertex or fragment builtin; the
-        # others are a fragment entry's.
+        # The flattened indices are a compute entry's builtins, the
+        # view index a vertex or fragment entry's, and the others a
+        # fragment entry's.
+        indices = ("workgroup_index", "global_invocation_index")
         need(isinstance(builtins, list) and
-             all(stage == "fragment" or (b == "view_index" and stage == "vertex")
-                 for b in builtins),
-             f"{where}: only fragment entries list builtins, and vertex ones the view index")
+             all((b in indices) == compute and
+                 (stage != "vertex" or b == "view_index") for b in builtins),
+             f"{where}: compute entries list only the flattened indices, vertex ones only the "
+             "view index, and fragment ones any other builtin")
         unique(builtins, f"builtin in {where}")
         mask = 0
         for builtin in builtins:
@@ -353,6 +358,9 @@ def pack_binding(binding, enums):
          f"{where}: a storage texture, and only one, has an access and a format")
     need(kind != "storage_texture" or binding.get("view_dimension") in ("2d", "2d_array", "3d"),
          f"{where}: a storage texture is 2D, a 2D array or 3D")
+    need(binding.get("access") != "read_write" or
+         binding.get("format") in ("r32_float", "r32_uint", "r32_sint"),
+         f"{where}: a read_write storage texture is r32_float, r32_uint or r32_sint")
     need(not multisampled or (kind == "sampled_texture" and binding.get("view_dimension") == "2d"
                               and binding.get("sample_type") != "float"),
          f"{where}: a multisampled texture is 2D and not filterable")
