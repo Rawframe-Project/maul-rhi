@@ -46,6 +46,10 @@ typedef struct mrhiMetalFrames
     // clamps their records, made when it does.
     bool counted;
     id<MTLComputePipelineState> clamp;
+    // The kernel guarding indirect dispatches' counts, and the device's
+    // workgroupsPerDimension it holds them to.
+    id<MTLComputePipelineState> guard;
+    uint32_t workgroupsPerDimension;
     mrhiMetalSlot slots[MRHI_METAL_FRAMES];
     uint64_t submitted;
     uint64_t reported;

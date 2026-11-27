@@ -449,6 +449,7 @@ mrhiResult mrhiCreateMetalDevice(const mrhiAllocator* allocator, id<MTLDevice> d
     }
     Lay(made, &room, &def->budgets);
     made->frames.counted = def->features.multiDrawIndirectCount;
+    made->frames.workgroupsPerDimension = def->limits.workgroupsPerDimension;
     if (!mrhiMetalOpenLanes(&made->frames.lanes, made->device, made->queue, made->queue.label) ||
         mrhiMetalOpenFrames(&made->frames) != mrhi_success)
     {

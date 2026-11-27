@@ -6,11 +6,13 @@
 // texels of its own, and read back by the library, the program's texels
 // coming back; new textures filled with ones through the device's queue
 // before their first frame reading as zeros in it, whichever clear Metal
-// takes; the device's native objects, the refusals, and the usage flags
-// of the textures the library makes. Skipped
+// takes; indirect dispatches past the workgroup limit doing nothing, as
+// in WebGPU; the device's native objects, the refusals, and the usage
+// flags of the textures the library makes. Skipped
 // where there is no Metal adapter, unless MAUL_RHI_REQUIRE_METAL is set.
 
 #include "dirty_textures.h"
+#include "guarded_dispatch.h"
 #include "test_harness.h"
 
 #include "maul-rhi/encoder.h"
@@ -351,6 +353,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
         CheckDirtyTextures(device, (id<MTLDevice>)native, (id<MTLCommandQueue>)queue,
                            &deviceDef.features);
     }
+    CheckGuardedDispatch(device);
     CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "the texture ended");
     mrhiDestroyDevice(device);
 }

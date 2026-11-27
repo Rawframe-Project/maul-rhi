@@ -45,16 +45,49 @@ static const char s_clampSource[] =
     "    if (record >= min(count[0], shape.most)) { clamped[at + 1] = 0; }\n"
     "}\n";
 
-// Makes the kernel clamping counted draws' records: nil when Metal does
-// not.
-static id<MTLComputePipelineState> MakeClamp(id<MTLDevice> device)
+// Guards an indirect dispatch's counts as WebGPU's
+// dispatchWorkgroupsIndirect does: one thread copies the three counts,
+// or zeros when one passes `most`, the device's workgroupsPerDimension,
+// or when the entry reads a flattened index (`indices`: 1 for
+// workgroup_index, 2 for global_invocation_index) that the workgroups,
+// or the workgroups times `invocations`, pass 32 bits for. The twin of
+// src/d3d12_guard.hlsl and src/vulkan_guard.comp.
+static const char s_guardSource[] =
+    "#include <metal_stdlib>\n"
+    "using namespace metal;\n"
+    "struct Guard { uint most; uint indices; uint invocations; };\n"
+    "static bool times(uint a, uint b, thread uint& product)\n"
+    "{\n"
+    "    product = a * b;\n"
+    "    return a == 0 || b <= 0xFFFFFFFFu / a;\n"
+    "}\n"
+    "kernel void guardDispatch(device const uint* counts [[buffer(0)]],\n"
+    "                          device uint* guarded [[buffer(1)]],\n"
+    "                          constant Guard& shape [[buffer(2)]])\n"
+    "{\n"
+    "    uint x = counts[0], y = counts[1], z = counts[2];\n"
+    "    bool fits = x <= shape.most && y <= shape.most && z <= shape.most;\n"
+    "    uint workgroups = 0, total = 0, threads = 0;\n"
+    "    bool grouped = times(x, y, workgroups) && times(workgroups, z, total);\n"
+    "    bool spread = grouped && times(total, shape.invocations, threads);\n"
+    "    fits = fits && ((shape.indices & 1u) == 0 || grouped) &&\n"
+    "           ((shape.indices & 2u) == 0 || spread);\n"
+    "    guarded[0] = fits ? x : 0;\n"
+    "    guarded[1] = fits ? y : 0;\n"
+    "    guarded[2] = fits ? z : 0;\n"
+    "}\n";
+
+// Makes one of the library's kernels from its source and function name:
+// nil when Metal does not.
+static id<MTLComputePipelineState> MakeKernel(id<MTLDevice> device, const char* text,
+                                              NSString* name)
 {
     NSError* error = nil;
-    NSString* source = [NSString stringWithUTF8String:s_clampSource];
+    NSString* source = [NSString stringWithUTF8String:text];
     id<MTLLibrary> library = [device newLibraryWithSource:source
                                                   options:mrhiMetalCompileOptions()
                                                     error:&error];
-    id<MTLFunction> function = [library newFunctionWithName:@"clampRecords"];
+    id<MTLFunction> function = [library newFunctionWithName:name];
     id<MTLComputePipelineState> state =
         function == nil ? nil : [device newComputePipelineStateWithFunction:function error:&error];
     [function release];
@@ -69,7 +102,9 @@ mrhiResult mrhiMetalOpenFrames(mrhiMetalFrames* frames)
         MTLDepthStencilDescriptor* descriptor =
             [[[MTLDepthStencilDescriptor alloc] init] autorelease];
         frames->noDepth = [frames->device newDepthStencilStateWithDescriptor:descriptor];
-        frames->clamp = frames->counted ? MakeClamp(frames->device) : nil;
+        frames->clamp =
+            frames->counted ? MakeKernel(frames->device, s_clampSource, @"clampRecords") : nil;
+        frames->guard = MakeKernel(frames->device, s_guardSource, @"guardDispatch");
         frames->zeros = [frames->device newBufferWithLength:MRHI_METAL_ZERO_BYTES
                                                     options:MTLResourceStorageModeShared];
         if (frames->zeros != nil)
@@ -77,7 +112,7 @@ mrhiResult mrhiMetalOpenFrames(mrhiMetalFrames* frames)
             memset(frames->zeros.contents, 0, MRHI_METAL_ZERO_BYTES);
         }
     }
-    return frames->noDepth != nil && frames->zeros != nil &&
+    return frames->noDepth != nil && frames->zeros != nil && frames->guard != nil &&
                    (frames->clamp != nil || !frames->counted)
                ? mrhi_success
                : mrhi_errorPlatform;
@@ -145,6 +180,7 @@ void mrhiMetalCloseFrames(mrhiMetalFrames* frames)
         [frames->slots[i].clamped release];
     }
     [frames->clamp release];
+    [frames->guard release];
     [frames->noDepth release];
     [frames->zeros release];
 }
@@ -292,6 +328,8 @@ static void Record(mrhiMetalFrames* frames, mrhiMetalSlot* slot, const mrhiDrive
         .zeros = frames->zeros,
         .clamp = frames->clamp,
         .clamped = slot->clamped,
+        .guard = frames->guard,
+        .workgroupsPerDimension = frames->workgroupsPerDimension,
         .commands = commands,
         .noDepth = frames->noDepth,
         .low = UINT64_MAX,

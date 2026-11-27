@@ -58,6 +58,10 @@ typedef struct mrhiMetalEncoder
     id<MTLComputePipelineState> clamp;
     id<MTLBuffer> clamped;
     uint64_t clampedAt;
+    // The kernel guarding indirect dispatches' counts into the clamped
+    // buffer, and the device's workgroupsPerDimension.
+    id<MTLComputePipelineState> guard;
+    uint32_t workgroupsPerDimension;
     id<MTLCommandBuffer> commands;
     id<MTLDepthStencilState> noDepth;
     id<MTLRenderCommandEncoder> render;
