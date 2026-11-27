@@ -21,6 +21,7 @@
 
 #include "bytes.h"
 #include "device_core.h"
+#include "fuzz_expect.h"
 #include "sha256.h"
 
 #include "maul-rhi/device.h"
@@ -46,14 +47,6 @@
 #define VERSION_ONE  1u
 #define VENDOR_AT    8
 #define UUID_AT      16
-
-static void Expect(bool condition)
-{
-    if (!condition)
-    {
-        abort();
-    }
-}
 
 // One device for every input, its envelope's header and Vulkan's header
 // of its own cache: the fuzzer's process is the target's, not the

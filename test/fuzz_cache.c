@@ -11,6 +11,7 @@
 // driver takes only its own 16-byte payload.
 
 #include "device_core.h"
+#include "fuzz_expect.h"
 #include "sha256.h"
 
 #include "maul-rhi/device.h"
@@ -23,14 +24,6 @@
 #include <string.h>
 
 #define HEADER_BYTES 64
-
-static void Expect(bool condition)
-{
-    if (!condition)
-    {
-        abort();
-    }
-}
 
 // One device for every input, and the header of an envelope it wrote:
 // the fuzzer's process is the target's, not the library's.

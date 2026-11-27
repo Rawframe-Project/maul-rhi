@@ -18,6 +18,7 @@
 // refuses them unread.
 
 #include "capabilities_core.h"
+#include "fuzz_expect.h"
 #include "test_container.h"
 
 #include "maul-rhi/device.h"
@@ -31,14 +32,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-static void Expect(bool condition)
-{
-    if (!condition)
-    {
-        abort();
-    }
-}
 
 // The input, read in order; past its end every byte is 0.
 typedef struct Input
