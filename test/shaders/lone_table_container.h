@@ -5,7 +5,7 @@
 // from test/shaders/lone_table.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:78ac93fff8019b96e901a2c5f6de4b442d3c46a0d68102c83ee811205284da16
+// inputs sha256:c6332cf37b6b1d2db49946133d666168f899c6f8f390f918b49c34d531548902
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0

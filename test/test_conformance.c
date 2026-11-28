@@ -28,6 +28,7 @@
 #include "maul-rhi/test.h"
 #include "shaders/bindless_container.h"
 #include "shaders/conformance_container.h"
+#include "shaders/constants_container.h"
 #include "shaders/dual_container.h"
 #include "shaders/f16_container.h"
 #include "shaders/instanced_container.h"
@@ -593,6 +594,7 @@ static Case s_cases[] = {
     {"binding.render_state", 0, 0},
     {"binding.root_block", 0, 0},
     {"binding.compute_split", 0, 0},
+    {"binding.constants", 0, 0},
     {"binding.heaps", 0, 0},
     {"hazards.aliasing", 0, 0},
     {"hazards.pass_classes", 0, 0},
@@ -2330,6 +2332,95 @@ static void CheckShaderInt64(mrhiDevice* device)
     CheckCompute(device, s_int64Container, sizeof(s_int64Container), values, wanted, 8);
 }
 
+// A pipeline of the constants container, whose entry writes the bits of
+// a constant of each type, made with the values given.
+static mrhiComputePipelineId ConstantsPipeline(mrhiDevice* device, mrhiShaderId shader,
+                                               const mrhiConstantValue* values, uint32_t count)
+{
+    mrhiComputePipelineDef def = mrhiDefaultComputePipelineDef();
+    def.shader = shader;
+    def.entry = "cs";
+    def.entryLength = 2;
+    def.constants = values;
+    def.constantCount = count;
+    mrhiComputePipelineId pipeline = {0};
+    mrhiRequestId request = {0};
+    CHECK(mrhiCreateComputePipeline(device, &def, &pipeline, &request) == mrhi_success,
+          "a pipeline of constants");
+    return pipeline;
+}
+
+// Specialization constants of every type reach the shader as WebGPU
+// converts them: a bool given 2.0 is true, an int32 given -1.5 is -1, a
+// float32 given 1.5 is 1.5, and a uint32 left out keeps its default of 9;
+// a pipeline given none keeps every default (false, 7, 0.5, 9).
+static void CheckConstants(mrhiDevice* device)
+{
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_constantsContainer;
+    shaderDef.byteCount = sizeof(s_constantsContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "the constants shader");
+    const mrhiConstantValue values[3] = {
+        {.id = 0, .value = 2.0}, {.id = 1, .value = -1.5}, {.id = 2, .value = 1.5}};
+    mrhiComputePipelineId pipelines[2] = {ConstantsPipeline(device, shader, values, 3),
+                                          ConstantsPipeline(device, shader, nullptr, 0)};
+    AwaitPipelines(device, 2, 0);
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
+    bufferDef.size = 16;
+    mrhiResourceId outputs[2] = {{0}};
+    CHECK(mrhiDeclareBuffer(device, &bufferDef, &outputs[0]) == mrhi_success &&
+              mrhiDeclareBuffer(device, &bufferDef, &outputs[1]) == mrhi_success,
+          "the outputs");
+    mrhiAccess writes[2] = {Whole(outputs[0], mrhi_accessStorageWrite),
+                            Whole(outputs[1], mrhi_accessStorageWrite)};
+    mrhiPassId dispatch = CopyPass(device, writes, 2);
+    mrhiAccess reads[2] = {Whole(outputs[0], mrhi_accessCopySource),
+                           Whole(outputs[1], mrhi_accessCopySource)};
+    mrhiPassId read = CopyPass(device, reads, 2);
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
+    mrhiRequestId results[2] = {{0}};
+    bool recorded = mrhiPass_Begin(device, dispatch) == mrhi_success;
+    for (int i = 0; i < 2; ++i)
+    {
+        const mrhiBinding binding = {.slot = 0, .resource = outputs[i], .size = MRHI_WHOLE_SIZE};
+        recorded = recorded &&
+                   mrhiPass_SetComputePipeline(device, dispatch, pipelines[i]) == mrhi_success &&
+                   mrhiPass_SetBindings(device, dispatch, 0, &binding, 1) == mrhi_success &&
+                   mrhiPass_Dispatch(device, dispatch, 1, 1, 1) == mrhi_success;
+    }
+    recorded = recorded && mrhiPass_End(device, dispatch) == mrhi_success &&
+               mrhiPass_Begin(device, read) == mrhi_success &&
+               mrhiPass_ReadBuffer(device, read, outputs[0], 0, 16, &results[0]) == mrhi_success &&
+               mrhiPass_ReadBuffer(device, read, outputs[1], 0, 16, &results[1]) == mrhi_success &&
+               mrhiPass_End(device, read) == mrhi_success;
+    CHECK(recorded, "dispatched and read");
+    Finish(device, 2);
+    // 1.5 is 0x3FC00000 as a float32, and 0.5 0x3F000000.
+    const uint32_t wanted[2][4] = {{1, 0xFFFFFFFFu, 0x3FC00000u, 9}, {0, 7, 0x3F000000u, 9}};
+    const char* const what[2] = {"the values given, converted", "the defaults"};
+    for (int i = 0; i < 2; ++i)
+    {
+        uint32_t got[4] = {0};
+        size_t taken = 0;
+        bool whole = mrhiRequest_TakeReadback(device, results[i], got, sizeof(got), &taken) ==
+                         mrhi_success &&
+                     taken == sizeof(got);
+        bool same = !s_runs || (whole && memcmp(got, wanted[i], sizeof(got)) == 0);
+        for (uint32_t w = 0; whole && !same && w < 4; ++w)
+        {
+            printf("word %u: %#x, wanted %#x\n", w, got[w], wanted[i][w]);
+        }
+        CHECK(whole && same, what[i]);
+    }
+    CHECK(mrhiDestroyComputePipeline(device, pipelines[0]) == mrhi_success &&
+              mrhiDestroyComputePipeline(device, pipelines[1]) == mrhi_success &&
+              mrhiDestroyShader(device, shader) == mrhi_success,
+          "destroyed");
+}
+
 // A texel of 188 sampled through the texture's sRGB twin decodes to
 // about 0.503, where the texture's own format would give 0.737: the
 // triangle drawn with it is the scene's color at half strength. The twin
@@ -3912,6 +4003,7 @@ static void CheckDrawing(mrhiDevice* device, bool timestamps)
         CheckComputeSplit(&scene, timestamps);
         CheckStorageBindings(device, false);
     });
+    RUN("binding.constants", CheckConstants(device));
     RUN("hazards.pass_classes", CheckPassClasses(&scene));
     if (features.pipelineStatisticsQuery)
     {

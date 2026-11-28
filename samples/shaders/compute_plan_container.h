@@ -5,7 +5,7 @@
 // from samples/shaders/compute_plan.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:5e7ff069c1b5c53c3279a93466d3caac8d8637d28e74653d6ca365cc6494d8ad
+// inputs sha256:a5cf84451adf83316277fb3541670551cba864c6f810ec466d1d6e8655c7d39a
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0

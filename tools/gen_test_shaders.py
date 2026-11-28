@@ -10,7 +10,8 @@
 # shader feature each (int64 without WGSL, which has no 64-bit integers),
 # test/shaders/instanced.*, a color per instance, test/shaders/dual.*, two
 # blend sources, test/shaders/linear.*, two compute entries reading WGSL's
-# flattened indices, and each sample's samples/shaders/NAME.*. glslangValidator
+# flattened indices, test/shaders/constants.*, a constant of each type,
+# and each sample's samples/shaders/NAME.*. glslangValidator
 # compiles each stage under its entry name, spirv-link joins them into
 # one module, spirv-val checks it for Vulkan 1.3, tools/mrhi_msl.py
 # crosses each entry of a container with WGSL to MSL through
@@ -71,6 +72,7 @@ CONTAINERS = (
     ("test/shaders", "storage", (("comp", "cs"),), True),
     ("test/shaders", "lone_table", (("comp", "cs"),), True),
     ("test/shaders", "split_tables", (("comp", "cs"),), True),
+    ("test/shaders", "constants", (("comp", "cs"),), True),
     ("test/shaders", "linear", (("comp", "wi"), ("gi.comp", "gi")), True),
     ("test/shaders", "f16", (("comp", "cs"),), True),
     ("test/shaders", "subgroups", (("comp", "cs"),), True),

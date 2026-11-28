@@ -5,7 +5,7 @@
 // from test/shaders/split_tables.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:b20df8007353c2c469d4296e56599e357ebc0ba3819e228f7caa870028e5a739
+// inputs sha256:c5f2cb15ff4a3015dd5643b3a2ee04aaf033f25c64c6b6d4a2d378269a643bcd
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0

@@ -5,7 +5,7 @@
 // from test/shaders/multiview.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:04da43ffd97aca413d2395e15849f9c44e9ee3ee81e0e6f6f04188d84446d52e
+// inputs sha256:dbf6fb68faf659990a76ca388c40e8c380301527332514bb71b6810d14c83ca8
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0
