@@ -5,7 +5,7 @@
 // from test/shaders/flat.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:332d719c47f750ae1b6365a8a32dbd5183b20cf4725b946253fcf5aa1138384d
+// inputs sha256:3ffbd62bf3d1ff2c60913114e2e5c0344979ad083526f6d20076e6c26616b915
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0
