@@ -25,6 +25,9 @@
 
 #include <string.h>
 
+// The bytes an indirect dispatch's guarded counts take.
+#define GUARDED_BYTES 12
+
 // Where a pass's commands go.
 typedef enum Work
 {
@@ -553,10 +556,12 @@ static void Indirect(mrhiMetalEncoder* encoder, const mrhiCommand* command)
                           indirectBufferOffset:offset];
         break;
     default:
+        // The counts GuardPass copied, or zeros past the limit.
         MRHI_ASSERT(command->type == mrhiCommandDispatchIndirect);
-        [encoder->compute dispatchThreadgroupsWithIndirectBuffer:arguments
-                                            indirectBufferOffset:offset
+        [encoder->compute dispatchThreadgroupsWithIndirectBuffer:encoder->clamped
+                                            indirectBufferOffset:(NSUInteger)encoder->clampedAt
                                            threadsPerThreadgroup:encoder->pipeline->workgroup];
+        encoder->clampedAt += GUARDED_BYTES;
         break;
     }
 }
@@ -588,6 +593,7 @@ uint64_t mrhiMetalClampedBytes(const mrhiDriverFrame* frame)
                 {
                     bytes += (at->commands[i].b >> 32) * RecordBytesOf(&at->commands[i]);
                 }
+                bytes += at->commands[i].type == mrhiCommandDispatchIndirect ? GUARDED_BYTES : 0;
             }
         }
     }
@@ -631,6 +637,46 @@ static void ClampPass(const mrhiMetalEncoder* encoder)
             [compute dispatchThreadgroups:MTLSizeMake((most + 63) / 64, 1, 1)
                     threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
             clampedAt += most * RecordBytesOf(command);
+        }
+    }
+    [compute endEncoding];
+}
+
+// Guards the counts of the pass's indirect dispatches into the clamped
+// buffer, in a compute encoder before the pass's own, as WebGPU's
+// dispatchWorkgroupsIndirect does: zeros for a dispatch past the
+// workgroup limit, which Metal leaves undefined. A pass never writes a
+// buffer it reads counts from, so they are final here; Metal orders the
+// pass's indirect reads after the writes.
+static void GuardPass(const mrhiMetalEncoder* encoder)
+{
+    id<MTLComputeCommandEncoder> compute = nil;
+    uint64_t guardedAt = encoder->clampedAt;
+    for (uint32_t chunk = encoder->pass->firstChunk; chunk != 0;
+         chunk = encoder->frame->chunks[chunk - 1].next)
+    {
+        const mrhiCommandChunk* at = &encoder->frame->chunks[chunk - 1];
+        for (uint32_t i = 0; i < at->count; i += 1u + at->commands[i].payload)
+        {
+            const mrhiCommand* command = &at->commands[i];
+            if (command->type != mrhiCommandDispatchIndirect)
+            {
+                continue;
+            }
+            if (compute == nil)
+            {
+                compute = [encoder->commands computeCommandEncoder];
+                [compute setComputePipelineState:encoder->guard];
+            }
+            const uint32_t shape[3] = {encoder->workgroupsPerDimension, 0, 0};
+            [compute setBuffer:encoder->objects[command->a - 1]
+                        offset:(NSUInteger)command->c
+                       atIndex:0];
+            [compute setBuffer:encoder->clamped offset:(NSUInteger)guardedAt atIndex:1];
+            [compute setBytes:shape length:sizeof(shape) atIndex:2];
+            [compute dispatchThreadgroups:MTLSizeMake(1, 1, 1)
+                    threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+            guardedAt += GUARDED_BYTES;
         }
     }
     [compute endEncoding];
@@ -855,6 +901,7 @@ void mrhiMetalEncodePass(mrhiMetalEncoder* encoder, const mrhiDriverPass* pass)
     }
     else if (work == WORK_COMPUTE)
     {
+        GuardPass(encoder);
         StartCompute(encoder);
     }
     else

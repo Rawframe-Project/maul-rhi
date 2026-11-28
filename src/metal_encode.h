@@ -14,7 +14,7 @@
 void mrhiMetalEncodePass(mrhiMetalEncoder* encoder, const mrhiDriverPass* pass);
 
 // The bytes a frame's counted multi-draws' records take
-// clamped.
+// clamped, and its indirect dispatches' counts guarded.
 uint64_t mrhiMetalClampedBytes(const mrhiDriverFrame* frame);
 
 #endif // MAUL_RHI_SRC_METAL_ENCODE_H
