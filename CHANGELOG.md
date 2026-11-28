@@ -5,6 +5,20 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and every data format.
 
+## [0.30.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.29.0...v0.30.0) (2026-11-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **shader:** shader containers are format version 3, and `mrhiShaderBuiltins` takes the subgroup builtins only on a fragment entry and the flattened indices only on a compute entry. A version 2 container is refused with `mrhi_errorVersion` and must be cooked again with this release's `tools/mrhi_container.py`. Drivers built outside the tree move to SPI version 19.
+
+### Fixed
+
+* **d3d12:** skip an indirect dispatch past the workgroup limit ([#525](https://github.com/Rawframe-Project/maul-rhi/issues/525)) ([d41bf87](https://github.com/Rawframe-Project/maul-rhi/commit/d41bf875785d60f132849b70b2d992b26429a043))
+* **metal:** skip an indirect dispatch past the workgroup limit ([#532](https://github.com/Rawframe-Project/maul-rhi/issues/532)) ([c1952d4](https://github.com/Rawframe-Project/maul-rhi/commit/c1952d4423121b45cb8e2e27ef90f88e13a5fdb3))
+* **shader:** record the subgroup and flattened index builtins ([#521](https://github.com/Rawframe-Project/maul-rhi/issues/521)) ([e4b594b](https://github.com/Rawframe-Project/maul-rhi/commit/e4b594be1d3d12a6a8066be2b42649f4a16768b1)), closes [#364](https://github.com/Rawframe-Project/maul-rhi/issues/364) [#365](https://github.com/Rawframe-Project/maul-rhi/issues/365) [#372](https://github.com/Rawframe-Project/maul-rhi/issues/372)
+* **vulkan:** skip an indirect dispatch past the workgroup limit ([#530](https://github.com/Rawframe-Project/maul-rhi/issues/530)) ([4620881](https://github.com/Rawframe-Project/maul-rhi/commit/46208816c893cdcfdf42d0d58e33a33495055223))
+
 ## [0.29.0](https://github.com/Rawframe-Project/maul-rhi/compare/v0.28.1...v0.29.0) (2026-11-08)
 
 ### Changed
