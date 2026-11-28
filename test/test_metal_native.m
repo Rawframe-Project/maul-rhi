@@ -355,6 +355,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter)
     }
     CheckGuardedDispatch(device);
     CheckGuardedTables(device);
+    CheckGuardedIndices(device);
     CHECK(mrhiDestroyTexture(device, texture) == mrhi_success, "the texture ended");
     mrhiDestroyDevice(device);
 }

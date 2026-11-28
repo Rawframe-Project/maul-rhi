@@ -74,6 +74,7 @@ CONTAINERS = (
     ("test/shaders", "split_tables", (("comp", "cs"),), True),
     ("test/shaders", "constants", (("comp", "cs"),), True),
     ("test/shaders", "linear", (("comp", "wi"), ("gi.comp", "gi")), True),
+    ("test/shaders", "flat", (("comp", "wi"), ("gi.comp", "gi")), True),
     ("test/shaders", "f16", (("comp", "cs"),), True),
     ("test/shaders", "subgroups", (("comp", "cs"),), True),
     ("test/shaders", "int64", (("comp", "cs"),), False),

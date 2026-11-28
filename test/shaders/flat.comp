@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// The flat container's compute entry "wi", which reads WGSL's
+// workgroup_index: GLSL has no such builtin, so workgroup 0, whose
+// index is 0, writes 1 to the storage buffer's first word.
+
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) buffer Words
+{
+    uint values[];
+} words;
+
+void main()
+{
+    if (gl_WorkGroupID == uvec3(0u))
+    {
+        words.values[0] = 1u;
+    }
+}

@@ -59,6 +59,12 @@ typedef struct mrhiD3d12Pipeline
     uint32_t bindingCount;
     const mrhiD3d12Binding* bindings;
     uint32_t* constants;
+    // Which flattened index its compute entry reads (1 for WGSL's
+    // workgroup_index, 2 for global_invocation_index) and its workgroup's
+    // invocations, which the guard of an indirect dispatch takes: such a
+    // dispatch does nothing past 2^32 - 1 workgroups, or invocations.
+    uint32_t flatIndices;
+    uint32_t invocations;
 } mrhiD3d12Pipeline;
 
 // A device's shaders and pipelines, in tables in its block, and the

@@ -46,6 +46,12 @@ typedef struct mrhiMetalPipeline
     uint8_t sizes[2];
     uint32_t bindingCount;
     const mrhiMetalBinding* bindings;
+    // Which flattened index its compute entry reads (1 for WGSL's
+    // workgroup_index, 2 for global_invocation_index) and its workgroup's
+    // invocations, which the guard of an indirect dispatch takes: such a
+    // dispatch does nothing past 2^32 - 1 workgroups, or invocations.
+    uint32_t flatIndices;
+    uint32_t invocations;
 } mrhiMetalPipeline;
 
 // The pipelines made and not yet answered, at most one per pipeline the

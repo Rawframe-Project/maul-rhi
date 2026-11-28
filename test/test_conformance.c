@@ -34,6 +34,7 @@
 #include "shaders/instanced_container.h"
 #include "shaders/int64_container.h"
 #include "shaders/multiview_container.h"
+#include "shaders/split_tables_container.h"
 #include "shaders/storage_container.h"
 #include "shaders/subgroups_container.h"
 
@@ -596,6 +597,7 @@ static Case s_cases[] = {
     {"binding.compute_split", 0, 0},
     {"binding.constants", 0, 0},
     {"binding.heaps", 0, 0},
+    {"binding.dispatch_past_limit", 0, 0},
     {"hazards.aliasing", 0, 0},
     {"hazards.pass_classes", 0, 0},
     {"hazards.transient_twin", 0, 0},
@@ -2229,6 +2231,107 @@ static void CheckStorageBindings(mrhiDevice* device, bool readBack)
     CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
               mrhiDestroyShader(device, shader) == mrhi_success,
           "destroyed");
+}
+
+// Indirect dispatches past workgroupsPerDimension, as WebGPU's
+// dispatchWorkgroupsIndirect: the split_tables container's entry, which
+// writes its input plus one, dispatched over one count past the limit
+// in x, then in z, writes nothing, and over one workgroup then writes.
+// The counts are read on the GPU, so the core cannot refuse them, and
+// the native APIs leave such a dispatch undefined.
+static void CheckDispatchPastLimit(mrhiDevice* device)
+{
+    mrhiLimits limits;
+    CHECK(mrhiDevice_GetLimits(device, &limits) == mrhi_success, "the device's limits");
+    mrhiShaderDef shaderDef = mrhiDefaultShaderDef();
+    shaderDef.bytes = s_split_tablesContainer;
+    shaderDef.byteCount = sizeof(s_split_tablesContainer);
+    mrhiShaderId shader = {0};
+    CHECK(mrhiCreateShader(device, &shaderDef, &shader) == mrhi_success, "the shader");
+    mrhiComputePipelineDef pipelineDef = mrhiDefaultComputePipelineDef();
+    pipelineDef.shader = shader;
+    pipelineDef.entry = "cs";
+    pipelineDef.entryLength = 2;
+    mrhiComputePipelineId pipeline = {0};
+    mrhiRequestId request = {0};
+    CHECK(mrhiCreateComputePipeline(device, &pipelineDef, &pipeline, &request) == mrhi_success,
+          "its pipeline");
+    AwaitPipelines(device, 1, 0);
+    mrhiFrameDef frame = mrhiDefaultFrameDef();
+    CHECK(mrhiDevice_BeginFrame(device, &frame) == mrhi_success, "a frame");
+    mrhiBufferDef bufferDef = mrhiDefaultBufferDef();
+    bufferDef.size = 16;
+    mrhiBufferDef argumentsDef = mrhiDefaultBufferDef();
+    argumentsDef.size = 36;
+    mrhiResourceId input = {0};
+    mrhiResourceId skipped = {0};
+    mrhiResourceId written = {0};
+    mrhiResourceId arguments = {0};
+    CHECK(mrhiDeclareBuffer(device, &bufferDef, &input) == mrhi_success &&
+              mrhiDeclareBuffer(device, &bufferDef, &skipped) == mrhi_success &&
+              mrhiDeclareBuffer(device, &bufferDef, &written) == mrhi_success &&
+              mrhiDeclareBuffer(device, &argumentsDef, &arguments) == mrhi_success,
+          "the buffers");
+    // A declared buffer holds nothing defined until written, so the one
+    // the skipped dispatches would write starts cleared.
+    const mrhiAccess uploads[3] = {Whole(input, mrhi_accessCopyDestination),
+                                   Whole(arguments, mrhi_accessCopyDestination),
+                                   Whole(skipped, mrhi_accessCopyDestination)};
+    mrhiPassId upload = CopyPass(device, uploads, 3);
+    const mrhiAccess uses[4] = {
+        Whole(input, mrhi_accessStorageRead), Whole(skipped, mrhi_accessStorageReadWrite),
+        Whole(written, mrhi_accessStorageWrite), Whole(arguments, mrhi_accessIndirect)};
+    mrhiPassId dispatch = CopyPass(device, uses, 4);
+    const mrhiAccess reads[2] = {Whole(skipped, mrhi_accessCopySource),
+                                 Whole(written, mrhi_accessCopySource)};
+    mrhiPassId read = CopyPass(device, reads, 2);
+    CHECK(mrhiDevice_CompileFrame(device) == mrhi_success, "compiled");
+    const uint32_t value[4] = {41, 0, 0, 0};
+    const uint32_t past = limits.workgroupsPerDimension + 1;
+    const uint32_t counts[9] = {past, 1, 1, 1, 1, past, 1, 1, 1};
+    const mrhiBinding inputBinding = {.slot = 0, .resource = input, .size = MRHI_WHOLE_SIZE};
+    mrhiBinding outputBinding = {.slot = 0, .resource = skipped, .size = MRHI_WHOLE_SIZE};
+    mrhiRequestId results[2] = {{0}};
+    CHECK(mrhiPass_Begin(device, upload) == mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, input, 0, value, sizeof(value)) ==
+                  mrhi_success &&
+              mrhiPass_WriteBuffer(device, upload, arguments, 0, counts, sizeof(counts)) ==
+                  mrhi_success &&
+              mrhiPass_ClearBuffer(device, upload, skipped, 0, 16) == mrhi_success &&
+              mrhiPass_End(device, upload) == mrhi_success,
+          "the input and counts uploaded, the skipped output cleared");
+    CHECK(mrhiPass_Begin(device, dispatch) == mrhi_success &&
+              mrhiPass_SetComputePipeline(device, dispatch, pipeline) == mrhi_success &&
+              mrhiPass_SetBindings(device, dispatch, 0, &inputBinding, 1) == mrhi_success &&
+              mrhiPass_SetBindings(device, dispatch, 2, &outputBinding, 1) == mrhi_success &&
+              mrhiPass_DispatchIndirect(device, dispatch, arguments, 0) == mrhi_success &&
+              mrhiPass_DispatchIndirect(device, dispatch, arguments, 12) == mrhi_success,
+          "dispatched past the limit in x and in z");
+    outputBinding.resource = written;
+    CHECK(mrhiPass_SetBindings(device, dispatch, 2, &outputBinding, 1) == mrhi_success &&
+              mrhiPass_DispatchIndirect(device, dispatch, arguments, 24) == mrhi_success &&
+              mrhiPass_End(device, dispatch) == mrhi_success,
+          "dispatched within it");
+    CHECK(mrhiPass_Begin(device, read) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, skipped, 0, 4, &results[0]) == mrhi_success &&
+              mrhiPass_ReadBuffer(device, read, written, 0, 4, &results[1]) == mrhi_success &&
+              mrhiPass_End(device, read) == mrhi_success,
+          "both outputs read");
+    Finish(device, 2);
+    uint32_t got[2] = {0};
+    size_t taken = 0;
+    for (int i = 0; i < 2; ++i)
+    {
+        CHECK(mrhiRequest_TakeReadback(device, results[i], &got[i], sizeof(got[i]), &taken) ==
+                      mrhi_success &&
+                  taken == sizeof(got[i]),
+              "a word read back");
+    }
+    CHECK(!s_runs || got[0] == 0, "nothing written past the limit");
+    CHECK(!s_runs || got[1] == 42, "the dispatch within it written");
+    CHECK(mrhiDestroyComputePipeline(device, pipeline) == mrhi_success &&
+              mrhiDestroyShader(device, shader) == mrhi_success,
+          "the pipeline and shader ended");
 }
 
 // A compute container's entry "cs" run in one workgroup of four over
@@ -4323,6 +4426,7 @@ static void CheckDevice(mrhiInstance* instance, mrhiAdapterId adapter, const mrh
     });
     RUN("hazards.transient_twin", CheckTransientTwin(device));
     RUN("hazards.read_states", CheckStorageBindings(device, true));
+    RUN("binding.dispatch_past_limit", CheckDispatchPastLimit(device));
     RUN("api.pipelines", CheckPipelines(device));
     RUN("transfers.round_trip", CheckRoundTrip(device));
     RUN("transfers.zeroed_buffers", CheckZeroedBuffers(device));

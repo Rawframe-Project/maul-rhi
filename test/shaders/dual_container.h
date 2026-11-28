@@ -5,7 +5,7 @@
 // from test/shaders/dual.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:093c790a01f54994e8e20e7fc7c81c684eb37758724cc7ab7fd7b3fe02bb2ce5
+// inputs sha256:34fdda0230b1d2e5ce4dec884193317f8c99b3990ca37df6049eb9fdce056c79
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0
