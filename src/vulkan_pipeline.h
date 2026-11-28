@@ -29,6 +29,10 @@ typedef struct mrhiVulkanPipeline
     // layout after them when it reads heaps.
     VkDescriptorSetLayout sets[MRHI_VULKAN_TABLES + 1];
     uint32_t setCount;
+    // A bit for each table its container binds, which the core has the
+    // pass set before each dispatch; the other sets below setCount are
+    // empty layouts standing for tables it lacks.
+    uint32_t tablesRead;
     bool heap;
     // The stages its push constants reach and the root block's bytes; 0
     // without a root block.

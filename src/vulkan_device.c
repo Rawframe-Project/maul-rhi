@@ -848,6 +848,7 @@ mrhiResult mrhiCreateVulkanDevice(const mrhiAllocator* allocator, const mrhiVulk
     {
         status = mrhiVulkanPipelinesInit(&device->pipelines);
     }
+    device->frames.workgroupsPerDimension = def->limits.workgroupsPerDimension;
     if (status == mrhi_success)
     {
         status = mrhiVulkanFramesInit(&device->frames, device->family, &def->budgets,

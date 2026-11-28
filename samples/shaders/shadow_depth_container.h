@@ -5,7 +5,7 @@
 // from samples/shaders/shadow_depth.*: edit the sources and run the script,
 // not this file.
 //
-// inputs sha256:070ec46a93092b662181a75b807e40afdd2610cabbdbdeff860a9abc05cfbc7d
+// inputs sha256:71983cf3d35c927392a607f1de8b857d516fe3e49715bb9301b8f45c0e8398ac
 // tool glslang 15.1.0
 // tool SPIRV-Tools v2025.1
 // tool spirv-cross 2021.01.15+1.3.239.0

@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// Guards an indirect dispatch's workgroup counts as WebGPU's
+// dispatchWorkgroupsIndirect does, in place: the three counts the driver
+// copied to `counts` stay, or become zeros when one passes `most`, the
+// device's workgroupsPerDimension, or when the entry reads a flattened
+// index (`indices`: 1 for workgroup_index, 2 for global_invocation_index)
+// that the dispatch's workgroups, or its workgroups times
+// `invocations`, pass 32 bits for. The twin of src/d3d12_guard.hlsl;
+// tools/gen_kernels.py compiles it to src/generated/vulkan_guard.h.
+
+#version 450
+#extension GL_EXT_buffer_reference : require
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(buffer_reference, std430, buffer_reference_align = 4) buffer Counts
+{
+    uint words[3];
+};
+
+layout(push_constant) uniform Shape
+{
+    Counts counts;
+    uint most;
+    uint indices;
+    uint invocations;
+}
+shape;
+
+// Whether a times b stays within 32 bits, and the product when it does.
+bool Times(uint a, uint b, out uint product)
+{
+    product = a * b;
+    return a == 0u || b <= 0xFFFFFFFFu / a;
+}
+
+void main()
+{
+    uvec3 counts = uvec3(shape.counts.words[0], shape.counts.words[1], shape.counts.words[2]);
+    bool fits = counts.x <= shape.most && counts.y <= shape.most && counts.z <= shape.most;
+    uint workgroups = 0u;
+    uint total = 0u;
+    bool grouped = Times(counts.x, counts.y, workgroups) && Times(workgroups, counts.z, total);
+    uint threads = 0u;
+    bool spread = grouped && Times(total, shape.invocations, threads);
+    fits = fits && ((shape.indices & 1u) == 0u || grouped) && ((shape.indices & 2u) == 0u || spread);
+    if (!fits)
+    {
+        shape.counts.words[0] = 0u;
+        shape.counts.words[1] = 0u;
+        shape.counts.words[2] = 0u;
+    }
+}

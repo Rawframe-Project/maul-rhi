@@ -238,6 +238,7 @@ void mrhiVulkanBeginPass(mrhiVulkanRecording* recording)
     const mrhiDriverPass* pass = recording->pass;
     recording->pipeline = nullptr;
     memset(recording->root, 0, sizeof(recording->root));
+    recording->tablesBound = 0;
     if (!HasTargets(pass))
     {
         return;
@@ -450,4 +451,6 @@ void mrhiVulkanBindTable(mrhiVulkanRecording* recording, const mrhiCommand* comm
     api->vkUpdateDescriptorSets(recording->frames->device, count, writes, 0, nullptr);
     api->vkCmdBindDescriptorSets(recording->slot->commands, pipeline->bindPoint, pipeline->layout,
                                  command->a, 1, &set, 0, nullptr);
+    recording->tables[command->a] = set;
+    recording->tablesBound |= 1u << command->a;
 }

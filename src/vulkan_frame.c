@@ -12,6 +12,8 @@
 #include "invariant.h"
 #include "vulkan_resource.h"
 
+#include "generated/vulkan_guard.h"
+
 #include <string.h>
 
 // Makes a buffer in mapped host-visible memory with the required
@@ -63,6 +65,106 @@ static VkResult MakeMapped(mrhiVulkanFrames* frames, VkDeviceSize size, VkBuffer
     return result;
 }
 
+// Makes a slot's guard buffer in device memory, which the guard kernel
+// reaches by its address.
+static VkResult MakeGuards(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot)
+{
+    const VkBufferCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = frames->guardBytes,
+        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                 VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    };
+    VkResult result = frames->api->vkCreateBuffer(frames->device, &info, nullptr, &slot->guards);
+    if (result != VK_SUCCESS)
+    {
+        return result;
+    }
+    VkMemoryRequirements2 needs = {.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2};
+    const VkBufferMemoryRequirementsInfo2 query = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2, .buffer = slot->guards};
+    frames->api->vkGetBufferMemoryRequirements2(frames->device, &query, &needs);
+    uint32_t type = mrhiVulkanMemoryType(frames->memory, needs.memoryRequirements.memoryTypeBits, 0,
+                                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
+    if (type == UINT32_MAX)
+    {
+        return VK_ERROR_FEATURE_NOT_PRESENT;
+    }
+    const VkMemoryAllocateFlagsInfo flags = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
+        .flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT,
+    };
+    const VkMemoryAllocateInfo allocate = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .pNext = &flags,
+        .allocationSize = needs.memoryRequirements.size,
+        .memoryTypeIndex = type,
+    };
+    result = frames->api->vkAllocateMemory(frames->device, &allocate, nullptr, &slot->guardMemory);
+    if (result == VK_SUCCESS)
+    {
+        result =
+            frames->api->vkBindBufferMemory(frames->device, slot->guards, slot->guardMemory, 0);
+    }
+    if (result == VK_SUCCESS)
+    {
+        const VkBufferDeviceAddressInfo address = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = slot->guards};
+        slot->guardAddress = frames->api->vkGetBufferDeviceAddress(frames->device, &address);
+    }
+    return result;
+}
+
+// Makes the kernel guarding indirect dispatches: its module, a layout of
+// its push constants alone (the counts' address, the limit, the
+// flattened indices the entry reads and its workgroup's invocations),
+// and its pipeline.
+static VkResult MakeGuard(mrhiVulkanFrames* frames)
+{
+    // The SPIR-V's words, which a module takes as such.
+    uint32_t code[sizeof(mrhiVulkanGuardSpirv) / sizeof(uint32_t)];
+    memcpy(code, mrhiVulkanGuardSpirv, sizeof(code));
+    const VkShaderModuleCreateInfo module = {
+        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .codeSize = sizeof(code),
+        .pCode = code,
+    };
+    VkResult result =
+        frames->api->vkCreateShaderModule(frames->device, &module, nullptr, &frames->guardModule);
+    const VkPushConstantRange range = {
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .size = sizeof(VkDeviceAddress) + 3 * sizeof(uint32_t),
+    };
+    const VkPipelineLayoutCreateInfo layout = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &range,
+    };
+    if (result == VK_SUCCESS)
+    {
+        result = frames->api->vkCreatePipelineLayout(frames->device, &layout, nullptr,
+                                                     &frames->guardLayout);
+    }
+    const VkComputePipelineCreateInfo pipeline = {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .stage =
+            {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+                .module = frames->guardModule,
+                .pName = "main",
+            },
+        .layout = frames->guardLayout,
+    };
+    if (result == VK_SUCCESS)
+    {
+        result = frames->api->vkCreateComputePipelines(frames->device, VK_NULL_HANDLE, 1, &pipeline,
+                                                       nullptr, &frames->guard);
+    }
+    return result;
+}
+
 static VkResult MakeSlot(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, uint32_t family,
                          const mrhiDeviceBudgets* limits)
 {
@@ -84,6 +186,10 @@ static VkResult MakeSlot(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot, uint32_
     };
     result = frames->api->vkAllocateCommandBuffers(frames->device, &buffer, slot->parts);
     slot->commands = slot->parts[0];
+    if (result == VK_SUCCESS)
+    {
+        result = MakeGuards(frames, slot);
+    }
     if (result != VK_SUCCESS || limits->frameUploadBytes == 0)
     {
         return result;
@@ -116,7 +222,14 @@ static VkResult MakeLanes(mrhiVulkanFrames* frames)
 mrhiResult mrhiVulkanFramesInit(mrhiVulkanFrames* frames, uint32_t family,
                                 const mrhiDeviceBudgets* limits, uint32_t widest)
 {
+    // Each indirect dispatch is a command record of the frame's.
+    uint64_t dispatches = limits->frameCommandBytes / sizeof(mrhiCommand);
+    frames->guardBytes = (dispatches > 0 ? dispatches : 1) * 3 * sizeof(uint32_t);
     VkResult result = MakeLanes(frames);
+    if (result == VK_SUCCESS)
+    {
+        result = MakeGuard(frames);
+    }
     for (uint32_t i = 0; i < frames->slotCount && result == VK_SUCCESS; ++i)
     {
         result = MakeSlot(frames, &frames->slots[i], family, limits);
@@ -170,6 +283,7 @@ static void DropTransients(mrhiVulkanFrames* frames, mrhiVulkanSlot* slot)
         frames->api->vkDestroyImageView(frames->device, slot->views[i], nullptr);
     }
     slot->viewCount = 0;
+    slot->guardUsed = 0;
     for (uint32_t i = 0; i < slot->poolCount; ++i)
     {
         (void)frames->api->vkResetDescriptorPool(frames->device, slot->pools[i], 0);
@@ -238,6 +352,8 @@ void mrhiVulkanFramesDestroy(mrhiVulkanFrames* frames)
         frames->api->vkFreeMemory(frames->device, slot->memory, nullptr);
         frames->api->vkDestroyBuffer(frames->device, slot->staging, nullptr);
         frames->api->vkFreeMemory(frames->device, slot->stagingMemory, nullptr);
+        frames->api->vkDestroyBuffer(frames->device, slot->guards, nullptr);
+        frames->api->vkFreeMemory(frames->device, slot->guardMemory, nullptr);
         frames->api->vkDestroyCommandPool(frames->device, slot->pool, nullptr);
         for (uint32_t p = 0; p < slot->poolCount; ++p)
         {
@@ -246,6 +362,9 @@ void mrhiVulkanFramesDestroy(mrhiVulkanFrames* frames)
     }
     frames->api->vkDestroyBuffer(frames->device, frames->zeros, nullptr);
     frames->api->vkFreeMemory(frames->device, frames->zerosMemory, nullptr);
+    frames->api->vkDestroyPipeline(frames->device, frames->guard, nullptr);
+    frames->api->vkDestroyPipelineLayout(frames->device, frames->guardLayout, nullptr);
+    frames->api->vkDestroyShaderModule(frames->device, frames->guardModule, nullptr);
     frames->api->vkDestroyBuffer(frames->device, frames->readback, nullptr);
     frames->api->vkFreeMemory(frames->device, frames->readbackMemory, nullptr);
     for (uint32_t l = 0; l < MRHI_VULKAN_LANES; ++l)

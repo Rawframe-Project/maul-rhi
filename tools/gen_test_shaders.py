@@ -70,6 +70,8 @@ CONTAINERS = (
     ("test/shaders", "multiview", (("vert", "vs"), ("frag", "fs")), False),
     ("test/shaders", "noop", (("vert", "vs"), ("frag", "fs"), ("comp", "cs")), True),
     ("test/shaders", "storage", (("comp", "cs"),), True),
+    ("test/shaders", "lone_table", (("comp", "cs"),), True),
+    ("test/shaders", "split_tables", (("comp", "cs"),), True),
     ("test/shaders", "constants", (("comp", "cs"),), True),
     ("test/shaders", "linear", (("comp", "wi"), ("gi.comp", "gi")), True),
     ("test/shaders", "f16", (("comp", "cs"),), True),

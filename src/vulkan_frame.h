@@ -139,6 +139,12 @@ typedef struct mrhiVulkanSlot
     VkDescriptorPool pools[MRHI_VULKAN_POOLS];
     uint32_t poolCount;
     uint32_t poolInUse;
+    // The buffer each indirect dispatch's counts are copied into and
+    // guarded in, its memory and address, and the bytes the frame used.
+    VkBuffer guards;
+    VkDeviceMemory guardMemory;
+    VkDeviceAddress guardAddress;
+    VkDeviceSize guardUsed;
 } mrhiVulkanSlot;
 
 typedef struct mrhiVulkanFrames
@@ -186,6 +192,16 @@ typedef struct mrhiVulkanFrames
     VkDeviceSize readbackSize;
     bool readbackCoherent;
     VkDeviceSize atom;
+    // The kernel guarding indirect dispatches' counts
+    // (src/vulkan_guard.comp), its layout and module; the device's
+    // workgroupsPerDimension it holds them to; and the bytes of each
+    // slot's guard buffer, 12 for each indirect dispatch a frame's
+    // commands can hold.
+    VkShaderModule guardModule;
+    VkPipelineLayout guardLayout;
+    VkPipeline guard;
+    uint32_t workgroupsPerDimension;
+    VkDeviceSize guardBytes;
     mrhiVulkanRetire* retire;
     uint32_t retireFirst;
     uint32_t retireCount;
@@ -193,8 +209,9 @@ typedef struct mrhiVulkanFrames
     bool lost;
 } mrhiVulkanFrames;
 
-// Makes each slot's command pool on the queue family, its buffer and
-// staging, the readback buffer, and the zeros, for a device with these
+// Makes each slot's command pool on the queue family, its buffer, staging
+// and guard buffer, the readback buffer, the zeros, and the kernel
+// guarding indirect dispatches, for a device with these
 // limits whose textures are at most `widest` texels across: mrhi_success,
 // or the error.
 mrhiResult mrhiVulkanFramesInit(mrhiVulkanFrames* frames, uint32_t family,
