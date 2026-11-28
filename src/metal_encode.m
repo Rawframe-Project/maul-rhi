@@ -25,6 +25,9 @@
 
 #include <string.h>
 
+// The bytes an indirect dispatch's guarded counts take.
+#define GUARDED_BYTES 12
+
 // Where a pass's commands go.
 typedef enum Work
 {
@@ -562,9 +565,6 @@ static void Indirect(mrhiMetalEncoder* encoder, const mrhiCommand* command)
         break;
     }
 }
-
-// The bytes an indirect dispatch's guarded counts take.
-#define GUARDED_BYTES 12
 
 // Whether a command is a counted multi-draw, and its records' bytes.
 static bool IsCounted(const mrhiCommand* command)
